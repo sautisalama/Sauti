@@ -1,0 +1,30 @@
+{
+	"name": "Sauti Salama",
+	"short_name": "Sauti salama",
+	"theme_color": "#FC8E00",
+	"background_color": "#ffffff",
+	"display": "fullscreen",
+	"orientation": "any",
+	"scope": "/",
+	"start_url": "/",
+	"icons": [
+		{
+			"src": "/icons-192.png",
+			"type": "image/png",
+			"sizes": "192x192",
+			"purpose": "any maskable"
+		},
+		{
+			"src": "/icons-256.png",
+			"type": "image/png",
+			"sizes": "256x256",
+			"purpose": "any maskable"
+		},
+		{
+			"src": "/icons-512.png",
+			"type": "image/png",
+			"sizes": "512x512",
+			"purpose": "any maskable"
+		}
+	]
+}
