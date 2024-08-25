@@ -44,10 +44,10 @@ export function Nav() {
 					<Link href="https://sauti-salama.vercel.app/Report">
 						<Button variant="default"> Report Abuse </Button>
 					</Link>
-					<Link href="https://sautisalama.org">
+					<Link href="/login ">
 						<Button variant="default">
 							<div className="flex items-center justify-between gap-2">
-								Contact Us <MoveUpRight className="h-4 w-4" />
+								Sign In <MoveUpRight className="h-4 w-4" />
 							</div>
 						</Button>
 					</Link>
@@ -84,10 +84,10 @@ export function Nav() {
 						<Link href="https://sauti-salama.vercel.app/Report">
 							<Button variant="default"> Report Abuse </Button>
 						</Link>
-						<Link href="https://sautisalama.org">
+						<Link href="/login">
 							<Button variant="default">
 								<div className="flex items-center justify-between gap-2">
-									Contact Us <MoveUpRight className="h-4 w-4" />
+									Sign In <MoveUpRight className="h-4 w-4" />
 								</div>
 							</Button>
 						</Link>
