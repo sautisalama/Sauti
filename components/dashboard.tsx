@@ -24,7 +24,7 @@ import { Footer } from "./Footer";
 export function Dashboard() {
 	return (
 		<div className="flex min-h-screen w-full flex-col">
-			<Banner />
+			{/* <Banner /> */}
 			<Nav />
 			<main className="min-h-[200vh]">
 				<div className="bg-landing">
