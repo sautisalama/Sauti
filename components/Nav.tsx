@@ -41,21 +41,8 @@ export function Nav() {
 								: "text-muted-foreground"
 						}`}
 					>
-						Weather forecasts
+						Weather Safety Alerts
 					</Link>
-					{/* <Link
-						href="#"
-						className="text-muted-foreground transition-colors hover:text-foreground"
-					>
-						Information Resources
-					</Link>
-					<Link
-						href="#"
-						className="text-muted-foreground transition-colors hover:text-foreground"
-					>
-						Community
-					</Link> */}
-
 					<Link href="https://sauti-salama.vercel.app/Report">
 						<Button variant="default"> Report Abuse </Button>
 					</Link>
@@ -85,13 +72,13 @@ export function Nav() {
 				</SheetTrigger>
 				<SheetContent side="right">
 					<nav className="grid gap-6 text-lg font-medium z-[999]">
-						<Link href="#" className="flex items-center gap-2 text-lg font-semibold">
+						<Link href="/" className="flex items-center gap-2 text-lg font-semibold">
 							<Image src="/logo.webp" alt="logo" width={80} height={80} />
 							<span className="sr-only">Sauti Salama</span>
 						</Link>
 						<Link
 							href="/"
-							className={`hover:text-foreground ${
+							className={`transition-colors hover:text-foreground ${
 								isActive("/")
 									? "text-foreground font-semibold"
 									: "text-muted-foreground"
@@ -99,19 +86,25 @@ export function Nav() {
 						>
 							Home
 						</Link>
-						<Link href="#" className="text-muted-foreground hover:text-foreground">
-							Proffessional Services
-						</Link>
-						<Link href="#" className="text-muted-foreground hover:text-foreground">
-							Information Resources
-						</Link>
-						<Link href="#" className="text-muted-foreground hover:text-foreground">
-							Community
+						<Link
+							href="/weather"
+							className={`transition-colors hover:text-foreground ${
+								isActive("/weather")
+									? "text-foreground font-semibold"
+									: "text-muted-foreground"
+							}`}
+						>
+							Weather Safety Alerts
 						</Link>
 						<Link href="https://sauti-salama.vercel.app/Report">
 							<Button variant="default"> Report Abuse </Button>
 						</Link>
-						{!isSignedIn && (
+						{isSignedIn ? (
+							<div className="flex items-center gap-2">
+								<UserButton />
+								<span>My Account</span>
+							</div>
+						) : (
 							<SignInButton>
 								<Button variant="default">
 									<div className="flex items-center justify-between gap-2">

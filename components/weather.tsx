@@ -714,6 +714,57 @@ const WeatherDashboard = () => {
 						</CardContent>
 					</Card>
 				</div>
+
+				{/* Safety Information Section - Now at bottom */}
+				<Card className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm border-white/20 shadow-lg mt-8">
+					<CardHeader>
+						<CardTitle className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+							Understanding Weather Safety for Survivors
+						</CardTitle>
+					</CardHeader>
+					<CardContent className="space-y-4">
+						<div className="grid md:grid-cols-2 gap-6">
+							<div className="space-y-3">
+								<h3 className="font-semibold text-lg text-gray-800 dark:text-gray-200">
+									Climate Change & GBV
+								</h3>
+								<p className="text-gray-600 dark:text-gray-300">
+									Extreme weather conditions and climate change can increase
+									vulnerability to gender-based violence. During natural disasters,
+									floods, or extreme temperatures, survivors may face:
+								</p>
+								<ul className="list-disc list-inside text-gray-600 dark:text-gray-300 space-y-2">
+									<li>Limited access to support services</li>
+									<li>Disrupted communication channels</li>
+									<li>Increased economic stress</li>
+									<li>Forced displacement or unsafe shelter conditions</li>
+								</ul>
+							</div>
+							<div className="space-y-3">
+								<h3 className="font-semibold text-lg text-gray-800 dark:text-gray-200">
+									Using Weather Alerts for Safety
+								</h3>
+								<p className="text-gray-600 dark:text-gray-300">
+									Our weather monitoring system helps you:
+								</p>
+								<ul className="list-disc list-inside text-gray-600 dark:text-gray-300 space-y-2">
+									<li>Plan safe travel routes and times</li>
+									<li>Prepare for extreme weather conditions</li>
+									<li>Make informed decisions about shelter and safety</li>
+									<li>Stay connected with support networks during severe weather</li>
+								</ul>
+							</div>
+						</div>
+						<div className="mt-4 p-4 bg-blue-50 dark:bg-blue-900/50 rounded-lg">
+							<p className="text-sm text-blue-600 dark:text-blue-300">
+								<strong>Safety Tip:</strong> Save emergency contact numbers and keep
+								your devices charged when adverse weather is predicted. If you need
+								immediate assistance, contact our 24/7 helpline or local emergency
+								services.
+							</p>
+						</div>
+					</CardContent>
+				</Card>
 			</div>
 		</div>
 	);
