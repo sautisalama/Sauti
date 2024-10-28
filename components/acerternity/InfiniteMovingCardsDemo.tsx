@@ -7,32 +7,33 @@ export function InfiniteMovingCardsDemo() {
 	const testimonials = [
 		{
 			quote:
-				"It was the best of times, it was the worst of times, it was the age of wisdom, it was the age of foolishness, it was the epoch of belief, it was the epoch of incredulity, it was the season of Light, it was the season of Darkness, it was the spring of hope, it was the winter of despair.",
-			name: "Charles Dickens",
-			title: "A Tale of Two Cities",
+				"As a GBV support coordinator, I'm excited about Sauti Salama's anonymous reporting feature. Currently, survivors have to physically visit centers which creates barriers. The app's discreet approach could help us reach the 44% of women facing violence who haven't been able to seek help.",
+			name: "Ayana Bekele",
+			title: "GBV Support Coordinator, Nairobi Women's Center",
 		},
 		{
 			quote:
-				"To be, or not to be, that is the question: Whether 'tis nobler in the mind to suffer The slings and arrows of outrageous fortune, Or to take Arms against a Sea of troubles, And by opposing end them: to die, to sleep.",
-			name: "William Shakespeare",
-			title: "Hamlet",
-		},
-		{
-			quote: "All that we see or seem is but a dream within a dream.",
-			name: "Edgar Allan Poe",
-			title: "A Dream Within a Dream",
+				"The current manual reporting systems make it difficult to track cases and provide timely support. Sauti Salama's digital platform promises real-time alerts and comprehensive case management. This could revolutionize how we respond to GBV cases.",
+			name: "Malik Okonjo",
+			title: "Police Gender Desk Officer",
 		},
 		{
 			quote:
-				"It is a truth universally acknowledged, that a single man in possession of a good fortune, must be in want of a wife.",
-			name: "Jane Austen",
-			title: "Pride and Prejudice",
+				"Our counseling center relies on walk-ins and referrals. Sauti Salama's mental health support feature would allow us to reach survivors remotely, especially corporate professionals who avoid seeking help due to stigma. The privacy-first approach is exactly what we need.",
+			name: "Amara Nyongo",
+			title: "Mental Health Counselor",
 		},
 		{
 			quote:
-				"Call me Ishmael. Some years ago—never mind how long precisely—having little or no money in my purse, and nothing particular to interest me on shore, I thought I would sail about a little and see the watery part of the world.",
-			name: "Herman Melville",
-			title: "Moby-Dick",
+				"As someone working with GBV survivors daily, I'm particularly impressed by how Sauti Salama integrates legal aid, medical care, and counseling in one platform. This could significantly reduce the traumatic experience of retelling their story multiple times.",
+			name: "Jabari Mwangi",
+			title: "Legal Aid Provider",
+		},
+		{
+			quote:
+				"The existing hotlines and walk-in centers have limited reach. Being on Sauti Salama's waitlist gives me hope that soon we'll have a tool that makes support services accessible 24/7, especially for survivors in remote areas who struggle to access physical centers.",
+			name: "Zara Kenyatta",
+			title: "Community Outreach Coordinator",
 		},
 	];
 
