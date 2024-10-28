@@ -3,6 +3,7 @@ import { CircleUser, Menu, MoveUpRight, Package2, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import Image from "next/image"; // Import the Image component from the correct package
+import { UserButton } from "@clerk/nextjs";
 
 export function Nav() {
 	return (
@@ -44,13 +45,14 @@ export function Nav() {
 					<Link href="https://sauti-salama.vercel.app/Report">
 						<Button variant="default"> Report Abuse </Button>
 					</Link>
-					<Link href="/login ">
+					{/* <Link href="/login ">
 						<Button variant="default">
 							<div className="flex items-center justify-between gap-2">
 								Sign In <MoveUpRight className="h-4 w-4" />
 							</div>
 						</Button>
-					</Link>
+					</Link> */}
+					<UserButton />
 				</div>
 			</nav>
 			<Sheet>

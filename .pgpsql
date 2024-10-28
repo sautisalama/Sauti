@@ -1,0 +1,195 @@
+-- Enable necessary extensions
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+-- Create custom types for choices
+CREATE TYPE user_type AS ENUM ('ngo', 'professional', 'survivor');
+CREATE TYPE incident_type AS ENUM ('physical', 'emotional', 'sexual', 'financial', 'other');
+CREATE TYPE urgency_type AS ENUM ('high', 'medium', 'low');
+CREATE TYPE gender_type AS ENUM ('female', 'male', 'non_binary', 'prefer_not_to_say');
+CREATE TYPE support_service_type AS ENUM ('legal', 'medical', 'mental_health', 'shelter', 'financial_assistance', 'other');
+CREATE TYPE language_type AS ENUM ('english', 'swahili', 'other');
+CREATE TYPE contact_preference_type AS ENUM ('phone_call', 'sms', 'email', 'do_not_contact');
+CREATE TYPE consent_type AS ENUM ('yes', 'no');
+CREATE TYPE appointment_status_type AS ENUM ('pending', 'confirmed');
+
+-- Create custom profiles table that extends Supabase auth.users
+CREATE TABLE profiles (
+    id UUID PRIMARY KEY REFERENCES auth.users(id),
+    first_name VARCHAR(150),
+    last_name VARCHAR(150),
+    user_type user_type NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Create Reports table
+CREATE TABLE reports (
+    report_id VARCHAR(255) PRIMARY KEY DEFAULT 'sauti_salama_' || SUBSTRING(uuid_generate_v4()::text, 1, 8),
+    first_name VARCHAR(255),
+    last_name VARCHAR(255),
+    submission_timestamp TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    email VARCHAR(254),
+    phone VARCHAR(20),
+    latitude FLOAT,
+    longitude FLOAT,
+    state VARCHAR(255),
+    country VARCHAR(255),
+    country_code VARCHAR(10),
+    city VARCHAR(255),
+    postcode VARCHAR(20),
+    continent VARCHAR(255),
+    continent_code VARCHAR(10),
+    locality VARCHAR(255),
+    plus_code VARCHAR(20),
+    principal_subdivision VARCHAR(255),
+    principal_subdivision_code VARCHAR(10),
+    administrative JSONB,
+    location VARCHAR(255),
+    type_of_incident incident_type,
+    incident_description TEXT,
+    urgency urgency_type,
+    dob DATE,
+    gender gender_type,
+    support_services support_service_type,
+    preferred_language language_type,
+    additional_info TEXT,
+    contact_preference contact_preference_type,
+    consent consent_type
+);
+
+-- Create Support Services table
+CREATE TABLE support_services (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    name VARCHAR(255) NOT NULL,
+    helpline VARCHAR(50),
+    website VARCHAR(200),
+    phone_number VARCHAR(50),
+    email VARCHAR(254),
+    service_types VARCHAR(255) NOT NULL,
+    latitude FLOAT,
+    longitude FLOAT,
+    coverage_area_radius FLOAT DEFAULT 50,
+    priority INTEGER DEFAULT 0
+);
+
+-- Create Matched Services table
+CREATE TABLE matched_services (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    report_id VARCHAR(255) REFERENCES reports(report_id) ON DELETE CASCADE,
+    service_id UUID REFERENCES support_services(id) ON DELETE CASCADE,
+    match_date TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Create NGO Profiles table
+CREATE TABLE ngo_profiles (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+    organization_name VARCHAR(255) NOT NULL,
+    service_models TEXT NOT NULL
+);
+
+-- Create Professional Profiles table
+CREATE TABLE professional_profiles (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+    profession VARCHAR(100) NOT NULL,
+    bio TEXT NOT NULL,
+    availability VARCHAR(100) NOT NULL,
+    tokens INTEGER DEFAULT 3
+);
+
+-- Create Appointments table
+CREATE TABLE appointments (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    professional_id UUID REFERENCES professional_profiles(id) ON DELETE CASCADE,
+    survivor_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+    date TIMESTAMP WITH TIME ZONE NOT NULL,
+    status appointment_status_type DEFAULT 'pending'
+);
+
+-- Create indexes for better query performance
+CREATE INDEX idx_reports_location ON reports(latitude, longitude);
+CREATE INDEX idx_support_services_location ON support_services(latitude, longitude);
+CREATE INDEX idx_reports_urgency ON reports(urgency);
+CREATE INDEX idx_support_services_priority ON support_services(priority);
+CREATE INDEX idx_matched_services_report ON matched_services(report_id);
+CREATE INDEX idx_matched_services_service ON matched_services(service_id);
+CREATE INDEX idx_appointments_professional ON appointments(professional_id);
+CREATE INDEX idx_appointments_survivor ON appointments(survivor_id);
+CREATE INDEX idx_appointments_date ON appointments(date);
+CREATE INDEX idx_appointments_status ON appointments(status);
+
+-- Add RLS (Row Level Security) policies
+ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE reports ENABLE ROW LEVEL SECURITY;
+ALTER TABLE support_services ENABLE ROW LEVEL SECURITY;
+ALTER TABLE matched_services ENABLE ROW LEVEL SECURITY;
+ALTER TABLE appointments ENABLE ROW LEVEL SECURITY;
+ALTER TABLE ngo_profiles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE professional_profiles ENABLE ROW LEVEL SECURITY;
+
+-- Create basic policies (you may want to customize these based on your needs)
+CREATE POLICY "Users can view their own profile"
+ON profiles FOR SELECT
+TO authenticated
+USING (auth.uid() = id);
+
+CREATE POLICY "Users can update their own profile"
+ON profiles FOR UPDATE
+TO authenticated
+USING (auth.uid() = id);
+
+CREATE POLICY "Reports are viewable by authenticated users"
+ON reports FOR SELECT
+TO authenticated
+USING (true);
+
+CREATE POLICY "Support services are viewable by authenticated users"
+ON support_services FOR SELECT
+TO authenticated
+USING (true);
+
+CREATE POLICY "Matched services are viewable by authenticated users"
+ON matched_services FOR SELECT
+TO authenticated
+USING (true);
+
+CREATE POLICY "Appointments are viewable by involved parties"
+ON appointments FOR SELECT
+TO authenticated
+USING (
+    professional_id IN (
+        SELECT id FROM professional_profiles WHERE user_id = auth.uid()
+    )
+    OR
+    survivor_id = auth.uid()
+);
+
+-- Create triggers for updating timestamps
+CREATE OR REPLACE FUNCTION update_updated_at_column()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = CURRENT_TIMESTAMP;
+    RETURN NEW;
+END;
+$$ language 'plpgsql';
+
+CREATE TRIGGER update_profiles_updated_at
+    BEFORE UPDATE ON profiles
+    FOR EACH ROW
+    EXECUTE PROCEDURE update_updated_at_column();
+
+-- Function to handle new user creation
+CREATE OR REPLACE FUNCTION public.handle_new_user() 
+RETURNS trigger AS $$
+BEGIN
+  INSERT INTO public.profiles (id, first_name, last_name, user_type)
+  VALUES (new.id, '', '', 'survivor');
+  RETURN new;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Trigger to automatically create profile for new users
+CREATE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW EXECUTE PROCEDURE public.handle_new_user();

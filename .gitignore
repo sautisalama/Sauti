@@ -45,3 +45,8 @@ next-env.d.ts
 
 # Github SSH Keys
 .github/ssh-keys/*
+
+
+# DB Schema
+# .pgpsql
+
