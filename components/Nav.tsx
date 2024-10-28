@@ -1,15 +1,24 @@
+"use client";
 import Link from "next/link";
 import { CircleUser, Menu, MoveUpRight, Package2, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import Image from "next/image"; // Import the Image component from the correct package
+import { UserButton, SignInButton, useUser } from "@clerk/nextjs";
+import { usePathname } from "next/navigation"; // Add this import
 
 export function Nav() {
+	const pathname = usePathname(); // Add this hook
+	const { isSignedIn } = useUser(); // Add this hook
+
+	// Helper function to determine if link is active
+	const isActive = (path: string) => pathname === path;
+
 	return (
 		<header className="sticky top-0 flex flex-col md:flex-row h-16 items-center gap-4 border-b bg-background px-4 md:px-6 z-[900]">
 			<nav className="hidden flex-col gap-6 text-lg font-medium md:flex md:flex-row md:items-center md:gap-5 md:text-sm lg:gap-6 container">
 				<Link
-					href="#"
+					href="/"
 					className="flex items-center gap-2 text-lg font-semibold md:text-base"
 				>
 					<Image src="/logo.webp" alt="logo" width={80} height={80} />
@@ -17,18 +26,24 @@ export function Nav() {
 				</Link>
 				<div className="flex items-center gap-4 max-w-[80%] ml-auto">
 					<Link
-						href="#"
-						className="text-foreground transition-colors hover:text-foreground"
+						href="/"
+						className={`transition-colors hover:text-foreground ${
+							isActive("/") ? "text-foreground font-semibold" : "text-muted-foreground"
+						}`}
 					>
 						Home
 					</Link>
 					<Link
-						href="#"
-						className="text-muted-foreground transition-colors hover:text-foreground"
+						href="/weather"
+						className={`transition-colors hover:text-foreground ${
+							isActive("/weather")
+								? "text-foreground font-semibold"
+								: "text-muted-foreground"
+						}`}
 					>
-						Proffesional Services
+						Weather forecasts
 					</Link>
-					<Link
+					{/* <Link
 						href="#"
 						className="text-muted-foreground transition-colors hover:text-foreground"
 					>
@@ -39,18 +54,23 @@ export function Nav() {
 						className="text-muted-foreground transition-colors hover:text-foreground"
 					>
 						Community
-					</Link>
+					</Link> */}
 
 					<Link href="https://sauti-salama.vercel.app/Report">
 						<Button variant="default"> Report Abuse </Button>
 					</Link>
-					<Link href="/login ">
-						<Button variant="default">
-							<div className="flex items-center justify-between gap-2">
-								Sign In <MoveUpRight className="h-4 w-4" />
-							</div>
-						</Button>
-					</Link>
+
+					{isSignedIn ? (
+						<UserButton />
+					) : (
+						<SignInButton>
+							<Button variant="default">
+								<div className="flex items-center justify-between gap-2">
+									Sign In <MoveUpRight className="h-4 w-4" />
+								</div>
+							</Button>
+						</SignInButton>
+					)}
 				</div>
 			</nav>
 			<Sheet>
@@ -69,7 +89,14 @@ export function Nav() {
 							<Image src="/logo.webp" alt="logo" width={80} height={80} />
 							<span className="sr-only">Sauti Salama</span>
 						</Link>
-						<Link href="#" className="hover:text-foreground">
+						<Link
+							href="/"
+							className={`hover:text-foreground ${
+								isActive("/")
+									? "text-foreground font-semibold"
+									: "text-muted-foreground"
+							}`}
+						>
 							Home
 						</Link>
 						<Link href="#" className="text-muted-foreground hover:text-foreground">
@@ -84,13 +111,15 @@ export function Nav() {
 						<Link href="https://sauti-salama.vercel.app/Report">
 							<Button variant="default"> Report Abuse </Button>
 						</Link>
-						<Link href="/login">
-							<Button variant="default">
-								<div className="flex items-center justify-between gap-2">
-									Sign In <MoveUpRight className="h-4 w-4" />
-								</div>
-							</Button>
-						</Link>
+						{!isSignedIn && (
+							<SignInButton>
+								<Button variant="default">
+									<div className="flex items-center justify-between gap-2">
+										Sign In <MoveUpRight className="h-4 w-4" />
+									</div>
+								</Button>
+							</SignInButton>
+						)}
 					</nav>
 				</SheetContent>
 			</Sheet>

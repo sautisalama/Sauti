@@ -20,6 +20,7 @@ import { InfiniteMovingCardsDemo } from "./acerternity/InfiniteMovingCardsDemo";
 import { Input } from "@/components/ui/input";
 import Link from "next/link";
 import { Footer } from "./Footer";
+import Forecast from "./forecast";
 
 export function Dashboard() {
 	return (
@@ -189,6 +190,7 @@ export function Dashboard() {
 				<div className="bg-sauti-footer py-20">
 					<Footer />
 				</div>
+				<Forecast />
 			</main>
 		</div>
 	);
