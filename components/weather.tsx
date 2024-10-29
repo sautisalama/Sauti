@@ -87,10 +87,10 @@ type WeatherData = {
 
 const WeatherDashboard = () => {
 	const [location, setLocation] = useState<Location>({
-		name: "London",
-		country: "GB",
-		lat: 51.5074,
-		lon: -0.1278,
+		name: "Nairobi",
+		country: "KE",
+		lat: -1.2921,
+		lon: 36.8219,
 	});
 	const [weatherData, setWeatherData] = useState<WeatherData | null>(null);
 	const [searchQuery, setSearchQuery] = useState("");
@@ -113,7 +113,6 @@ const WeatherDashboard = () => {
 				},
 				(error) => {
 					console.error("Geolocation error:", error);
-					setError("Failed to get your location");
 				}
 			);
 		}
