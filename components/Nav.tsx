@@ -102,7 +102,14 @@ export function Nav() {
 						{isSignedIn ? (
 							<div className="flex items-center gap-2">
 								<UserButton />
-								<span>My Account</span>
+								<button
+									onClick={() =>
+										document.querySelector<HTMLElement>(".cl-userButtonTrigger")?.click()
+									}
+									className="hover:text-foreground"
+								>
+									My Account
+								</button>
 							</div>
 						) : (
 							<SignInButton>

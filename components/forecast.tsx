@@ -50,6 +50,12 @@ export default function Forecast() {
 			}
 		};
 
+		// Default coordinates for Nairobi
+		const NAIROBI_COORDS = {
+			latitude: -1.2921,
+			longitude: 36.8219,
+		};
+
 		// Get user's location
 		if (navigator.geolocation) {
 			navigator.geolocation.getCurrentPosition(
@@ -57,12 +63,16 @@ export default function Forecast() {
 					fetchWeather(position.coords.latitude, position.coords.longitude);
 				},
 				(err) => {
-					setError("Unable to get location. Please enable location services.");
+					// Use Nairobi coordinates when location access is denied
+					fetchWeather(NAIROBI_COORDS.latitude, NAIROBI_COORDS.longitude);
+					setError(null); // Clear error since we're falling back to default location
 					setLoading(false);
 				}
 			);
 		} else {
-			setError("Geolocation is not supported by your browser");
+			// Use Nairobi coordinates when geolocation is not supported
+			fetchWeather(NAIROBI_COORDS.latitude, NAIROBI_COORDS.longitude);
+			setError(null); // Clear error since we're falling back to default location
 			setLoading(false);
 		}
 	}, []);
