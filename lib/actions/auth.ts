@@ -8,11 +8,15 @@ export async function signUp(formData: FormData) {
     const email = formData.get('email') as string
     const password = formData.get('password') as string
 
+    const redirectUrl = process.env.NODE_ENV === 'production'
+        ? process.env.NEXT_PUBLIC_APP_URL
+        : process.env.NEXT_PUBLIC_APP_URL_DEV
+
     const { error } = await supabase.auth.signUp({
         email,
         password,
         options: {
-        emailRedirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/auth/callback`,
+            emailRedirectTo: `${redirectUrl}/auth/callback`,
         },
     })
 
@@ -43,10 +47,14 @@ export async function signIn(formData: FormData) {
 export async function signInWithGoogle() {
     const supabase = createClient()
     
+    const redirectUrl = process.env.NODE_ENV === 'production'
+        ? process.env.NEXT_PUBLIC_APP_URL
+        : process.env.NEXT_PUBLIC_APP_URL_DEV
+
     const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-        redirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/auth/callback`,
+            redirectTo: `${redirectUrl}/auth/callback`,
         },
     })
 
