@@ -5,11 +5,20 @@ import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import Image from "next/image"; // Import the Image component from the correct package
 import { UserButton, SignInButton, useUser } from "@clerk/nextjs";
-import { usePathname } from "next/navigation"; // Add this import
+import { usePathname } from "next/navigation";
+import {
+	Dialog,
+	DialogContent,
+	DialogDescription,
+	DialogHeader,
+	DialogTitle,
+	DialogTrigger,
+} from "@/components/ui/dialog";
+import ReportAbuseForm from "./ReportAbuseForm";
 
 export function Nav() {
-	const pathname = usePathname(); // Add this hook
-	const { isSignedIn } = useUser(); // Add this hook
+	const pathname = usePathname();
+	const { isSignedIn } = useUser();
 
 	// Helper function to determine if link is active
 	const isActive = (path: string) => pathname === path;
@@ -43,9 +52,33 @@ export function Nav() {
 					>
 						Weather Safety Alerts
 					</Link>
-					<Link href="https://sauti-salama.vercel.app/Report">
+					{/* <Link href="https://sauti-salama.vercel.app/Report">
 						<Button variant="default"> Report Abuse </Button>
-					</Link>
+					</Link> */}
+					{/* Replace the existing Report Abuse button with this: */}
+					<Dialog>
+						<DialogTrigger asChild>
+							<Button variant="default">Report Abuse</Button>
+						</DialogTrigger>
+						<DialogContent className="sm:max-w-[425px] z-[1000]">
+							<DialogHeader>
+								<DialogTitle>Report Abuse</DialogTitle>
+								<DialogDescription>
+									Please fill out this form to report an incident. All information will
+									be kept confidential.
+								</DialogDescription>
+							</DialogHeader>
+							<ReportAbuseForm
+								onClose={() =>
+									document
+										.querySelector<HTMLButtonElement>(
+											'[role="dialog"] button[aria-label="Close"]'
+										)
+										?.click()
+								}
+							/>
+						</DialogContent>
+					</Dialog>
 
 					{isSignedIn ? (
 						<UserButton />
