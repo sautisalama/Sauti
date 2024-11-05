@@ -9,13 +9,39 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "./ui/button";
 
 // Add this form component
 export default function ReportAbuseForm({ onClose }: { onClose: () => void }) {
 	const { toast } = useToast();
 	const [loading, setLoading] = useState(false);
+	const [location, setLocation] = useState<{
+		latitude: number;
+		longitude: number;
+	} | null>(null);
+
+	useEffect(() => {
+		if ("geolocation" in navigator) {
+			navigator.geolocation.getCurrentPosition(
+				(position) => {
+					setLocation({
+						latitude: position.coords.latitude,
+						longitude: position.coords.longitude,
+					});
+				},
+				(error) => {
+					console.error("Error getting location:", error);
+					toast({
+						title: "Location Unavailable",
+						description:
+							"Unable to get your location. Report will be submitted without location data.",
+						variant: "default",
+					});
+				}
+			);
+		}
+	}, []);
 
 	const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
 		e.preventDefault();
@@ -48,6 +74,8 @@ export default function ReportAbuseForm({ onClose }: { onClose: () => void }) {
 			urgency: formData.get("urgency"),
 			consent: formData.get("consent"),
 			contact_preference: contactPreference,
+			latitude: location?.latitude || null,
+			longitude: location?.longitude || null,
 			submission_timestamp: new Date().toISOString(),
 		};
 
