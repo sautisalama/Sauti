@@ -3,8 +3,7 @@ import Link from "next/link";
 import { CircleUser, Menu, MoveUpRight, Package2, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
-import Image from "next/image"; // Import the Image component from the correct package
-import { UserButton, SignInButton, useUser } from "@clerk/nextjs";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import {
 	Dialog,
@@ -18,7 +17,6 @@ import ReportAbuseForm from "./ReportAbuseForm";
 
 export function Nav() {
 	const pathname = usePathname();
-	const { isSignedIn } = useUser();
 
 	// Helper function to determine if link is active
 	const isActive = (path: string) => pathname === path;
@@ -79,18 +77,13 @@ export function Nav() {
 							/>
 						</DialogContent>
 					</Dialog>
-
-					{isSignedIn ? (
-						<UserButton />
-					) : (
-						<SignInButton>
-							<Button variant="default">
-								<div className="flex items-center justify-between gap-2">
-									Sign In <MoveUpRight className="h-4 w-4" />
-								</div>
-							</Button>
-						</SignInButton>
-					)}
+					<Link href="/signin">
+						<Button variant="default">
+							<div className="flex items-center justify-between gap-2">
+								Sign In <MoveUpRight className="h-4 w-4" />
+							</div>
+						</Button>
+					</Link>
 				</div>
 			</nav>
 			<Sheet>
@@ -132,27 +125,14 @@ export function Nav() {
 						<Link href="https://sauti-salama.vercel.app/Report">
 							<Button variant="default"> Report Abuse </Button>
 						</Link>
-						{isSignedIn ? (
-							<div className="flex items-center gap-2">
-								<UserButton />
-								<button
-									onClick={() =>
-										document.querySelector<HTMLElement>(".cl-userButtonTrigger")?.click()
-									}
-									className="hover:text-foreground"
-								>
-									My Account
-								</button>
-							</div>
-						) : (
-							<SignInButton>
-								<Button variant="default">
-									<div className="flex items-center justify-between gap-2">
-										Sign In <MoveUpRight className="h-4 w-4" />
-									</div>
-								</Button>
-							</SignInButton>
-						)}
+
+						<Link href="/signin">
+							<Button variant="default">
+								<div className="flex items-center justify-between gap-2">
+									Sign In <MoveUpRight className="h-4 w-4" />
+								</div>
+							</Button>
+						</Link>
 					</nav>
 				</SheetContent>
 			</Sheet>

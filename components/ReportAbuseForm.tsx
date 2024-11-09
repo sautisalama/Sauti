@@ -9,13 +9,39 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "./ui/button";
 
 // Add this form component
 export default function ReportAbuseForm({ onClose }: { onClose: () => void }) {
 	const { toast } = useToast();
 	const [loading, setLoading] = useState(false);
+	const [location, setLocation] = useState<{
+		latitude: number;
+		longitude: number;
+	} | null>(null);
+
+	useEffect(() => {
+		if ("geolocation" in navigator) {
+			navigator.geolocation.getCurrentPosition(
+				(position) => {
+					setLocation({
+						latitude: position.coords.latitude,
+						longitude: position.coords.longitude,
+					});
+				},
+				(error) => {
+					console.error("Error getting location:", error);
+					toast({
+						title: "Location Unavailable",
+						description:
+							"Unable to get your location. Report will be submitted without location data.",
+						variant: "default",
+					});
+				}
+			);
+		}
+	}, []);
 
 	const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
 		e.preventDefault();
@@ -48,6 +74,8 @@ export default function ReportAbuseForm({ onClose }: { onClose: () => void }) {
 			urgency: formData.get("urgency"),
 			consent: formData.get("consent"),
 			contact_preference: contactPreference,
+			latitude: location?.latitude || null,
+			longitude: location?.longitude || null,
 			submission_timestamp: new Date().toISOString(),
 		};
 
@@ -60,6 +88,9 @@ export default function ReportAbuseForm({ onClose }: { onClose: () => void }) {
 			});
 
 			if (!response.ok) throw new Error("Failed to submit report");
+
+			// Clear the form
+			e.currentTarget.reset();
 
 			toast({
 				title: "Report Submitted",
@@ -87,8 +118,8 @@ export default function ReportAbuseForm({ onClose }: { onClose: () => void }) {
 					<p className="text-lg text-gray-700 whitespace-nowrap">
 						I want to report about
 					</p>
-					<Select name="incident_type" required className="w-48">
-						<SelectTrigger>
+					<Select name="incident_type" required>
+						<SelectTrigger className="w-48">
 							<SelectValue placeholder="type of incident" />
 						</SelectTrigger>
 						<SelectContent className="z-[1001]">
@@ -100,8 +131,8 @@ export default function ReportAbuseForm({ onClose }: { onClose: () => void }) {
 						</SelectContent>
 					</Select>
 					<p className="text-lg text-gray-700 whitespace-nowrap">with</p>
-					<Select name="urgency" required className="w-40">
-						<SelectTrigger>
+					<Select name="urgency" required>
+						<SelectTrigger className="w-40">
 							<SelectValue placeholder="urgency" />
 						</SelectTrigger>
 						<SelectContent className="z-[1001]">
@@ -150,7 +181,7 @@ export default function ReportAbuseForm({ onClose }: { onClose: () => void }) {
 						<Select
 							name="contact_preference"
 							required
-							className="w-[200px]"
+							value=""
 							onValueChange={(value) => {
 								const phoneInput = document.querySelector(
 									'input[name="phone"]'
@@ -181,7 +212,7 @@ export default function ReportAbuseForm({ onClose }: { onClose: () => void }) {
 						needed?
 					</p>
 					<div className="pl-4">
-						<Select name="consent" required className="w-[200px]">
+						<Select name="consent" required>
 							<SelectTrigger>
 								<SelectValue placeholder="Select consent" />
 							</SelectTrigger>
