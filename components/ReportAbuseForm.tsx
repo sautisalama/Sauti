@@ -86,23 +86,31 @@ export default function ReportAbuseForm({ onClose }: { onClose: () => void }) {
 				body: JSON.stringify(data),
 			});
 
-			if (!response.ok) throw new Error("Failed to submit report");
+			const result = await response.json();
 
-			// Clear the form and show toast before closing
+			if (!response.ok) {
+				throw new Error(result.error || "Failed to submit report");
+			}
+
+			// Clear the form and show success toast
 			e.currentTarget.reset();
 			toast({
 				title: "Report Submitted",
 				description: "Thank you for your report. We will review it shortly.",
 			});
 
-			// Add a small delay before closing to ensure toast is visible
+			// Add a small delay before closing
 			setTimeout(() => {
 				onClose();
 			}, 500);
 		} catch (error) {
+			console.error("Submission error:", error);
 			toast({
 				title: "Error",
-				description: "Failed to submit report. Please try again.",
+				description:
+					error instanceof Error
+						? error.message
+						: "Failed to submit report. Please try again.",
 				variant: "destructive",
 			});
 		} finally {
