@@ -14,15 +14,39 @@ import {
 	DialogTrigger,
 } from "@/components/ui/dialog";
 import ReportAbuseForm from "./ReportAbuseForm";
+import { useEffect, useState } from "react";
+import { createClient } from "@/utils/supabase/client";
 
 export function Nav() {
 	const pathname = usePathname();
+	const [isAuthenticated, setIsAuthenticated] = useState(false);
+	const supabase = createClient();
+
+	useEffect(() => {
+		const checkAuth = async () => {
+			const {
+				data: { session },
+			} = await supabase.auth.getSession();
+			setIsAuthenticated(!!session);
+		};
+
+		checkAuth();
+
+		// Set up auth state change listener
+		const {
+			data: { subscription },
+		} = supabase.auth.onAuthStateChange((_event, session) => {
+			setIsAuthenticated(!!session);
+		});
+
+		return () => subscription.unsubscribe();
+	}, []);
 
 	// Helper function to determine if link is active
 	const isActive = (path: string) => pathname === path;
 
 	return (
-		<header className="sticky top-0 flex flex-col md:flex-row h-16 items-center gap-4 border-b bg-background px-4 md:px-6 z-[900]">
+		<header className="sticky top-0 flex flex-col md:flex-row h-16 items-center gap-4 border-b bg-background px-4 md:px-6">
 			<nav className="hidden flex-col gap-6 text-lg font-medium md:flex md:flex-row md:items-center md:gap-5 md:text-sm lg:gap-6 container">
 				<Link
 					href="/"
@@ -58,7 +82,7 @@ export function Nav() {
 						<DialogTrigger asChild>
 							<Button variant="default">Report Abuse</Button>
 						</DialogTrigger>
-						<DialogContent className="sm:max-w-[425px] z-[1000]">
+						<DialogContent className="sm:max-w-4xl">
 							<DialogHeader>
 								<DialogTitle>Report Abuse</DialogTitle>
 								<DialogDescription>
@@ -77,13 +101,23 @@ export function Nav() {
 							/>
 						</DialogContent>
 					</Dialog>
-					<Link href="/signin">
-						<Button variant="default">
-							<div className="flex items-center justify-between gap-2">
-								Sign In <MoveUpRight className="h-4 w-4" />
-							</div>
-						</Button>
-					</Link>
+					{isAuthenticated ? (
+						<Link href="/dashboard">
+							<Button variant="outline">
+								<div className="flex items-center justify-between gap-2">
+									Dashboard <MoveUpRight className="h-4 w-4" />
+								</div>
+							</Button>
+						</Link>
+					) : (
+						<Link href="/signin">
+							<Button variant="default">
+								<div className="flex items-center justify-between gap-2">
+									Sign In <MoveUpRight className="h-4 w-4" />
+								</div>
+							</Button>
+						</Link>
+					)}
 				</div>
 			</nav>
 			<Sheet>
@@ -97,7 +131,7 @@ export function Nav() {
 					</div>
 				</SheetTrigger>
 				<SheetContent side="right">
-					<nav className="grid gap-6 text-lg font-medium z-[999]">
+					<nav className="grid gap-6 text-lg font-medium">
 						<Link href="/" className="flex items-center gap-2 text-lg font-semibold">
 							<Image src="/logo.webp" alt="logo" width={80} height={80} />
 							<span className="sr-only">Sauti Salama</span>
@@ -126,13 +160,23 @@ export function Nav() {
 							<Button variant="default"> Report Abuse </Button>
 						</Link>
 
-						<Link href="/signin">
-							<Button variant="default">
-								<div className="flex items-center justify-between gap-2">
-									Sign In <MoveUpRight className="h-4 w-4" />
-								</div>
-							</Button>
-						</Link>
+						{isAuthenticated ? (
+							<Link href="/dashboard">
+								<Button variant="default">
+									<div className="flex items-center justify-between gap-2">
+										Dashboard <MoveUpRight className="h-4 w-4" />
+									</div>
+								</Button>
+							</Link>
+						) : (
+							<Link href="/signin">
+								<Button variant="default">
+									<div className="flex items-center justify-between gap-2">
+										Sign In <MoveUpRight className="h-4 w-4" />
+									</div>
+								</Button>
+							</Link>
+						)}
 					</nav>
 				</SheetContent>
 			</Sheet>

@@ -41,7 +41,7 @@ export default function ReportAbuseForm({ onClose }: { onClose: () => void }) {
 				}
 			);
 		}
-	}, []);
+	}, [toast]);
 
 	const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
 		e.preventDefault();
@@ -80,27 +80,37 @@ export default function ReportAbuseForm({ onClose }: { onClose: () => void }) {
 		};
 
 		try {
-			// TODO: Add your API endpoint here
 			const response = await fetch("/api/reports", {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
 				body: JSON.stringify(data),
 			});
 
-			if (!response.ok) throw new Error("Failed to submit report");
+			const result = await response.json();
 
-			// Clear the form
+			if (!response.ok) {
+				throw new Error(result.error || "Failed to submit report");
+			}
+
+			// Clear the form and show success toast
 			e.currentTarget.reset();
-
 			toast({
 				title: "Report Submitted",
 				description: "Thank you for your report. We will review it shortly.",
 			});
-			onClose();
+
+			// Add a small delay before closing
+			setTimeout(() => {
+				onClose();
+			}, 500);
 		} catch (error) {
+			console.error("Submission error:", error);
 			toast({
 				title: "Error",
-				description: "Failed to submit report. Please try again.",
+				description:
+					error instanceof Error
+						? error.message
+						: "Failed to submit report. Please try again.",
 				variant: "destructive",
 			});
 		} finally {
@@ -111,15 +121,13 @@ export default function ReportAbuseForm({ onClose }: { onClose: () => void }) {
 	return (
 		<form
 			onSubmit={handleSubmit}
-			className="space-y-6 relative z-[1000] w-full max-w-3xl"
+			className="relative w-full max-w-[1200px] max-h-[80vh] flex flex-col"
 		>
-			<div className="space-y-4">
-				<div className="flex items-center gap-2 flex-wrap">
-					<p className="text-lg text-gray-700 whitespace-nowrap">
-						I want to report about
-					</p>
+			<div className="flex-1 overflow-y-auto space-y-6 pr-4">
+				<div className="flex items-center gap-4 flex-wrap">
+					<p className="text-lg text-gray-700">I want to report about</p>
 					<Select name="incident_type" required>
-						<SelectTrigger className="w-48">
+						<SelectTrigger className="w-56">
 							<SelectValue placeholder="type of incident" />
 						</SelectTrigger>
 						<SelectContent className="z-[1001]">
@@ -130,9 +138,9 @@ export default function ReportAbuseForm({ onClose }: { onClose: () => void }) {
 							<SelectItem value="other">other concerns</SelectItem>
 						</SelectContent>
 					</Select>
-					<p className="text-lg text-gray-700 whitespace-nowrap">with</p>
+					<p className="text-lg text-gray-700">with</p>
 					<Select name="urgency" required>
-						<SelectTrigger className="w-40">
+						<SelectTrigger className="w-48">
 							<SelectValue placeholder="urgency" />
 						</SelectTrigger>
 						<SelectContent className="z-[1001]">
@@ -143,91 +151,91 @@ export default function ReportAbuseForm({ onClose }: { onClose: () => void }) {
 					</Select>
 				</div>
 
-				<div className="pl-4 space-y-4">
+				<div className="w-full">
 					<Textarea
 						placeholder="Please share what happened..."
 						name="incident_description"
 						required
-						className="min-h-[150px] w-full"
+						className="min-h-[120px] w-full"
 					/>
 				</div>
 
-				<p className="text-lg text-gray-700 mt-6">You can contact me at:</p>
-				<div className="pl-4 space-y-4">
-					<div className="flex items-center gap-2">
-						<Input
-							placeholder="Your name"
-							name="first_name"
-							required
-							className="w-full max-w-[200px]"
-						/>
-						<Input
-							placeholder="Your email"
-							name="email"
-							type="email"
-							required
-							className="w-full"
-						/>
+				<div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+					<div className="col-span-full">
+						<p className="text-lg text-gray-700">Contact Information:</p>
 					</div>
-					<div className="flex items-center gap-2">
-						<Input
-							placeholder="Your phone number"
-							name="phone"
-							type="tel"
-							pattern="[0-9]{10,}"
-							title="Please enter a valid phone number (minimum 10 digits)"
-							className="w-full"
-						/>
-						<Select
-							name="contact_preference"
-							required
-							value=""
-							onValueChange={(value) => {
-								const phoneInput = document.querySelector(
-									'input[name="phone"]'
-								) as HTMLInputElement;
-								if (value === "phone_call" || value === "sms") {
-									phoneInput.required = true;
-								} else {
-									phoneInput.required = false;
-								}
-							}}
-						>
-							<SelectTrigger>
-								<SelectValue placeholder="Preferred contact" />
-							</SelectTrigger>
-							<SelectContent className="z-[1001]">
-								<SelectItem value="phone_call">Call me</SelectItem>
-								<SelectItem value="sms">Text me</SelectItem>
-								<SelectItem value="email">Email me</SelectItem>
-								<SelectItem value="do_not_contact">Don't contact me</SelectItem>
-							</SelectContent>
-						</Select>
-					</div>
+					<Input
+						placeholder="Your name"
+						name="first_name"
+						required
+						className="w-full"
+					/>
+					<Input
+						placeholder="Your email"
+						name="email"
+						type="email"
+						required
+						className="w-full"
+					/>
+					<Input
+						placeholder="Your phone number"
+						name="phone"
+						type="tel"
+						pattern="[0-9]{10,}"
+						className="w-full"
+					/>
+					<Select
+						name="contact_preference"
+						required
+						onValueChange={(value) => {
+							const phoneInput = document.querySelector(
+								'input[name="phone"]'
+							) as HTMLInputElement;
+							if (value === "phone_call" || value === "sms") {
+								phoneInput.required = true;
+							} else {
+								phoneInput.required = false;
+							}
+						}}
+					>
+						<SelectTrigger>
+							<SelectValue placeholder="Preferred contact" />
+						</SelectTrigger>
+						<SelectContent className="z-[1001]">
+							<SelectItem value="phone_call">Call me</SelectItem>
+							<SelectItem value="sms">Text me</SelectItem>
+							<SelectItem value="email">Email me</SelectItem>
+							<SelectItem value="do_not_contact">Don't contact me</SelectItem>
+						</SelectContent>
+					</Select>
 				</div>
 
-				<div className="mt-6 space-y-4">
+				<div className="flex items-center gap-4 justify-between">
 					<p className="text-lg text-gray-700">
 						Do you consent to share this information with relevant authorities if
 						needed?
 					</p>
-					<div className="pl-4">
-						<Select name="consent" required>
-							<SelectTrigger>
-								<SelectValue placeholder="Select consent" />
-							</SelectTrigger>
-							<SelectContent className="z-[1001]">
-								<SelectItem value="yes">Yes, I consent</SelectItem>
-								<SelectItem value="no">No, I don't consent</SelectItem>
-							</SelectContent>
-						</Select>
-					</div>
+					<Select name="consent" required>
+						<SelectTrigger className="w-[200px]">
+							<SelectValue placeholder="Select consent" />
+						</SelectTrigger>
+						<SelectContent className="z-[1001]">
+							<SelectItem value="yes">Yes, I consent</SelectItem>
+							<SelectItem value="no">No, I don't consent</SelectItem>
+						</SelectContent>
+					</Select>
 				</div>
 			</div>
 
-			<Button type="submit" className="w-full mt-8" disabled={loading}>
-				{loading ? "Submitting..." : "Submit Report"}
-			</Button>
+			<div className="sticky bottom-0 pt-4 bg-white border-t mt-4">
+				<Button
+					type="submit"
+					className="w-full max-w-md mx-auto"
+					disabled={loading}
+				>
+					{loading ? "Submitting..." : "Submit Report"}
+				</Button>
+			</div>
 		</form>
 	);
 }
