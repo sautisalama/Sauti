@@ -1,26 +1,35 @@
-import { createClient } from "@/lib/supabase/supabase-server";
+import { createClient } from "@/utils/supabase/server";
+import { signOut } from "@/lib/actions/auth";
 import { redirect } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import { LogOut } from "lucide-react";
 
 export default async function Dashboard() {
 	const supabase = createClient();
 
-	// Get user session
 	const {
-		data: { session },
-	} = await supabase.auth.getSession();
+		data: { user },
+	} = await (await supabase).auth.getUser();
 
-	if (!session) {
+	if (!user) {
 		redirect("/signin");
 	}
 
-	// Get user email or name
-	const userDisplay = session.user.user_metadata.full_name || session.user.email;
+	const userDisplay = user?.user_metadata.full_name || user?.email;
 
 	return (
 		<div className="min-h-screen p-8">
 			<div className="max-w-4xl mx-auto">
 				<div className="bg-card rounded-lg shadow-lg p-6">
-					<h1 className="text-3xl font-bold mb-4">Welcome to your Dashboard</h1>
+					<div className="flex justify-between items-center mb-4">
+						<h1 className="text-3xl font-bold">Welcome to your Dashboard</h1>
+						<form action={signOut} method="post">
+							<Button variant="outline" size="sm" type="submit">
+								<LogOut className="h-4 w-4 mr-2" />
+								Sign out
+							</Button>
+						</form>
+					</div>
 					<p className="text-xl text-muted-foreground">Hello, {userDisplay}! 👋</p>
 
 					{/* Add your dashboard content here */}
