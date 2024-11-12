@@ -7,7 +7,7 @@ import { signUp, signInWithGoogle } from "@/lib/actions/auth";
 
 export default function SignUp() {
 	return (
-		<div className="flex flex-col min-h-screen items-center justify-between pt-10">
+		<div className="flex flex-col min-h-screen items-center justify-between">
 			<div className="w-full lg:grid lg:min-h-[600px] lg:grid-cols-2 xl:min-h-[800px]">
 				<div className="hidden bg-muted lg:block">
 					<Image
@@ -23,7 +23,7 @@ export default function SignUp() {
 						<div className="grid gap-2 text-center">
 							<h1 className="text-3xl font-bold">Sign Up</h1>
 							<p className="text-balance text-muted-foreground">
-								Enter your etails to create your account
+								Enter your details to create your account
 							</p>
 						</div>
 						<div className="grid gap-4">
