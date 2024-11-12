@@ -1,6 +1,7 @@
 import { Database, Tables } from "@/types/db-schema";
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { cookies } from "next/headers";
+import { Session, User } from "@supabase/supabase-js";
 
 export function createClient() {
 	const cookieStore = cookies();
@@ -36,30 +37,37 @@ export function createClient() {
 	);
 }
 
-export async function getSession() {
+export async function getSession(): Promise<Session | null> {
 	const supabase = createClient();
-	const {
-		data: { session },
-	} = await supabase.auth.getSession();
-	return session;
+	try {
+		const {
+			data: { session },
+			error,
+		} = await supabase.auth.getSession();
+		if (error) throw error;
+		return session;
+	} catch (error) {
+		console.error("Failed to get session:", error);
+		return null;
+	}
 }
 
-export async function getProfileDetails() {
+export async function getUser(): Promise<Tables<"profiles"> | null> {
 	const supabase = createClient();
 	try {
 		const session = await getSession();
 		if (!session?.user?.id) return null;
-		const { data, error }: { data: Tables<"profiles"> | null; error: any } =
-			await supabase
-				.from("profiles")
-				.select("*")
-				.eq("id", session.user.id ?? "")
-				.single();
+
+		const { data, error } = await supabase
+			.from("profiles")
+			.select("*")
+			.eq("id", session.user.id)
+			.single();
 
 		if (error) throw error;
 		return data;
 	} catch (error) {
-		console.error("get user profile error:", error);
+		console.error("Failed to get user profile:", error);
 		return null;
 	}
 }
