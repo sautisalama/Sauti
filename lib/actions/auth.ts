@@ -2,6 +2,8 @@
 
 import { createClient } from "@/utils/supabase/server";
 import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
+import { Database } from "@/types/db-schema";
 
 const redirectUrl =
 	process.env.NEXT_PUBLIC_NODE_ENV === "production"
@@ -12,20 +14,57 @@ export async function signUp(formData: FormData) {
 	const supabase = await createClient();
 	const email = formData.get("email") as string;
 	const password = formData.get("password") as string;
+	const firstName = formData.get("firstName") as string;
+	const lastName = formData.get("lastName") as string;
+	const userType = formData.get(
+		"userType"
+	) as Database["public"]["Enums"]["user_type"];
 
-	const { error } = await supabase.auth.signUp({
+	// First create the auth user
+	const { data: authData, error: authError } = await supabase.auth.signUp({
 		email,
 		password,
 		options: {
-			emailRedirectTo: `${redirectUrl}/auth/callback`,
+			emailRedirectTo: `${redirectUrl}/auth/confirm`,
+			data: {
+				email,
+				first_name: firstName,
+				last_name: lastName,
+				user_type: userType,
+			},
 		},
 	});
 
-	if (error) {
-		// return { error: error.message };
-		console.log("Sign up error ::", error);
+	if (authError) {
+		console.error("Sign up error:", authError);
+		redirect("/error");
 	}
 
+	// Then handle the profile
+	if (authData.user) {
+		const now = new Date().toISOString();
+		const { error: profileError } = await supabase.from("profiles").upsert(
+			{
+				id: authData.user.id,
+				first_name: firstName,
+				last_name: lastName,
+				user_type: userType,
+				created_at: now,
+				updated_at: now,
+			},
+			{
+				onConflict: "id",
+				ignoreDuplicates: false, // This will update the record if it exists
+			}
+		);
+
+		if (profileError) {
+			console.error("Profile creation error:", profileError);
+			redirect("/error");
+		}
+	}
+
+	revalidatePath("/", "layout");
 	redirect("/signin");
 }
 
@@ -50,23 +89,32 @@ export async function signIn(formData: FormData) {
 export async function signInWithGoogle() {
 	const supabase = await createClient();
 
-	const { error } = await supabase.auth.signInWithOAuth({
+	const { data, error } = await supabase.auth.signInWithOAuth({
 		provider: "google",
 		options: {
-			redirectTo: `${redirectUrl}/auth/callback`,
+			redirectTo: `${redirectUrl}/auth/confirm`,
+			queryParams: {
+				access_type: "offline",
+				prompt: "consent",
+			},
 		},
 	});
 
 	if (error) {
-		return { error: error.message };
+		console.error("Google sign in error:", error);
+		redirect("/error");
+	}
+
+	if (data.url) {
+		redirect(data.url);
 	}
 }
 
 export async function signOut() {
 	const supabase = await createClient();
-	const { error } = await supabase.auth.signOut()
+	const { error } = await supabase.auth.signOut();
 
 	if (error) {
-		return {error: error.message}
+		return { error: error.message };
 	}
 }

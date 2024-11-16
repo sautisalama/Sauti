@@ -4,6 +4,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { signUp, signInWithGoogle } from "@/lib/actions/auth";
+import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from "@/components/ui/select";
 
 export default function SignUp() {
 	return (
@@ -19,7 +26,7 @@ export default function SignUp() {
 					/>
 				</div>
 				<div className="flex items-center justify-center py-12">
-					<form action={signUp} className="mx-auto grid w-[350px] gap-6">
+					<div className="mx-auto grid w-[350px] gap-6">
 						<div className="grid gap-2 text-center">
 							<h1 className="text-3xl font-bold">Sign Up</h1>
 							<p className="text-balance text-muted-foreground">
@@ -27,30 +34,54 @@ export default function SignUp() {
 							</p>
 						</div>
 						<div className="grid gap-4">
-							<div className="grid gap-2">
-								<Label htmlFor="email">Email</Label>
-								<Input
-									name="email"
-									id="email"
-									type="email"
-									placeholder="m@example.com"
-									required
-								/>
-							</div>
-							<div className="grid gap-2">
-								<Label htmlFor="password">Password</Label>
-								<Input name="password" id="password" type="password" required />
-							</div>
-							<Button type="submit" className="w-full">
-								Sign Up
-							</Button>
-							<Button
-								variant="outline"
-								className="w-full"
-								formAction={signInWithGoogle}
-							>
-								Sign Up with Google
-							</Button>
+							<form action={signUp}>
+								<div className="grid gap-4">
+									<div className="grid gap-2">
+										<Label htmlFor="firstName">First Name</Label>
+										<Input name="firstName" id="firstName" type="text" required />
+									</div>
+									<div className="grid gap-2">
+										<Label htmlFor="lastName">Last Name</Label>
+										<Input name="lastName" id="lastName" type="text" required />
+									</div>
+									<div className="grid gap-2">
+										<Label htmlFor="userType">I am a</Label>
+										<Select name="userType" required>
+											<SelectTrigger>
+												<SelectValue placeholder="Select user type" />
+											</SelectTrigger>
+											<SelectContent>
+												<SelectItem value="survivor">Survivor</SelectItem>
+												<SelectItem value="professional">Professional</SelectItem>
+												<SelectItem value="ngo">NGO</SelectItem>
+											</SelectContent>
+										</Select>
+									</div>
+									<div className="grid gap-2">
+										<Label htmlFor="email">Email</Label>
+										<Input
+											name="email"
+											id="email"
+											type="email"
+											placeholder="m@example.com"
+											required
+										/>
+									</div>
+									<div className="grid gap-2">
+										<Label htmlFor="password">Password</Label>
+										<Input name="password" id="password" type="password" required />
+									</div>
+									<Button type="submit" className="w-full">
+										Sign Up
+									</Button>
+								</div>
+							</form>
+
+							<form action={signInWithGoogle}>
+								<Button variant="outline" className="w-full" type="submit">
+									Sign Up with Google
+								</Button>
+							</form>
 						</div>
 						<div className="mt-4 text-center text-sm">
 							Have an account?
@@ -58,7 +89,7 @@ export default function SignUp() {
 								Log In
 							</Link>
 						</div>
-					</form>
+					</div>
 				</div>
 			</div>
 		</div>
