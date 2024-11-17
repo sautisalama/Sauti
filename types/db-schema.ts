@@ -191,6 +191,7 @@ export type Database = {
             | null
           type_of_incident: Database["public"]["Enums"]["incident_type"] | null
           urgency: Database["public"]["Enums"]["urgency_type"] | null
+          user_id: string | null
         }
         Insert: {
           additional_info?: string | null
@@ -230,6 +231,7 @@ export type Database = {
             | null
           type_of_incident?: Database["public"]["Enums"]["incident_type"] | null
           urgency?: Database["public"]["Enums"]["urgency_type"] | null
+          user_id?: string | null
         }
         Update: {
           additional_info?: string | null
@@ -269,8 +271,17 @@ export type Database = {
             | null
           type_of_incident?: Database["public"]["Enums"]["incident_type"] | null
           urgency?: Database["public"]["Enums"]["urgency_type"] | null
+          user_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "reports_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       support_services: {
         Row: {
