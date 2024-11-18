@@ -207,7 +207,7 @@ export default function ProfessionalView({ userId }: { userId: string }) {
 								<div className="flex justify-between items-start">
 									<div>
 										<h3 className="font-semibold">
-											Case #{report.report_id.slice(0, 8)}
+											Case #{report.report_id.slice(6, 20)}
 										</h3>
 										<p className="text-sm text-muted-foreground">
 											{report.submission_timestamp &&
