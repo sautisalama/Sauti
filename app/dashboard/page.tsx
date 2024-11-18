@@ -1,4 +1,4 @@
-import { createClient } from "@/utils/supabase/server";
+import { createClient, getSession } from "@/utils/supabase/server";
 import { getUser } from "@/utils/supabase/server";
 import { redirect } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -9,6 +9,7 @@ import ProfessionalView from "./_views/ProfesionalView";
 
 export default async function Dashboard() {
 	const user = await getUser();
+	console.log("session", await getSession());
 
 	if (!user) {
 		redirect("/signin");
