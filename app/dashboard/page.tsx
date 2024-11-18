@@ -24,6 +24,9 @@ export default async function Dashboard() {
 						<div>
 							<h1 className="text-3xl font-bold">Dashboard</h1>
 							<p className="text-muted-foreground">Welcome back, {userDisplay}</p>
+							<p className="text-muted-foreground text-sm">
+								You are signed in as a {user.user_type}
+							</p>
 						</div>
 						<form action={signOut} method="post">
 							<Button variant="outline" size="sm" type="submit">

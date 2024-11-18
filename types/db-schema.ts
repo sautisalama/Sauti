@@ -285,6 +285,7 @@ export type Database = {
       }
       support_services: {
         Row: {
+          availability: string | null
           coverage_area_radius: number | null
           email: string | null
           helpline: string | null
@@ -295,9 +296,11 @@ export type Database = {
           phone_number: string | null
           priority: number | null
           service_types: string
+          user_id: string | null
           website: string | null
         }
         Insert: {
+          availability?: string | null
           coverage_area_radius?: number | null
           email?: string | null
           helpline?: string | null
@@ -308,9 +311,11 @@ export type Database = {
           phone_number?: string | null
           priority?: number | null
           service_types: string
+          user_id?: string | null
           website?: string | null
         }
         Update: {
+          availability?: string | null
           coverage_area_radius?: number | null
           email?: string | null
           helpline?: string | null
@@ -321,9 +326,18 @@ export type Database = {
           phone_number?: string | null
           priority?: number | null
           service_types?: string
+          user_id?: string | null
           website?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "support_services_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
