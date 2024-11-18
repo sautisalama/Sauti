@@ -14,6 +14,7 @@ import {
 import ReportAbuseForm from "@/components/ReportAbuseForm";
 import { Plus } from "lucide-react";
 import { useState, useEffect } from "react";
+import AuthenticatedReportAbuseForm from "@/components/AuthenticatedReportAbuseForm";
 
 export default function SurvivorView({ userId }: { userId: string }) {
 	const [reports, setReports] = useState<Tables<"reports">[]>([]);
@@ -54,7 +55,10 @@ export default function SurvivorView({ userId }: { userId: string }) {
 								kept confidential.
 							</DialogDescription>
 						</DialogHeader>
-						<ReportAbuseForm onClose={() => setOpen(false)} />
+						<AuthenticatedReportAbuseForm
+							onClose={() => setOpen(false)}
+							userId={userId}
+						/>
 					</DialogContent>
 				</Dialog>
 			</div>
