@@ -5,17 +5,13 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { Database } from "@/types/db-schema";
 
-const redirectUrl =
-	process.env.NEXT_PUBLIC_NODE_ENV === "production"
-		? process.env.NEXT_PUBLIC_APP_URL
-		: process.env.NEXT_PUBLIC_APP_URL_DEV;
-
 export async function signUp(formData: FormData) {
 	const supabase = await createClient();
 	const email = formData.get("email") as string;
 	const password = formData.get("password") as string;
 	const firstName = formData.get("firstName") as string;
 	const lastName = formData.get("lastName") as string;
+	const redirectUrl = process.env.NEXT_PUBLIC_APP_URL;
 	const userType = formData.get(
 		"userType"
 	) as Database["public"]["Enums"]["user_type"];
@@ -88,7 +84,7 @@ export async function signIn(formData: FormData) {
 
 export async function signInWithGoogle() {
 	const supabase = await createClient();
-
+	const redirectUrl = process.env.NEXT_PUBLIC_APP_URL;
 	const { data, error } = await supabase.auth.signInWithOAuth({
 		provider: "google",
 		options: {
