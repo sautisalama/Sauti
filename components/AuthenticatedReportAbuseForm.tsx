@@ -59,7 +59,8 @@ export default function AuthenticatedReportAbuseForm({
 		e.preventDefault();
 		setLoading(true);
 
-		const formData = new FormData(e.currentTarget);
+		const form = e.currentTarget;
+		const formData = new FormData(form);
 		const contactPreference = formData.get("contact_preference");
 		const phone = formData.get("phone");
 
@@ -97,14 +98,13 @@ export default function AuthenticatedReportAbuseForm({
 
 			if (error) throw error;
 
-			// Clear the form and show success toast
-			e.currentTarget.reset();
 			toast({
 				title: "Report Submitted",
 				description: "Thank you for your report. We will review it shortly.",
 			});
 
-			// Add a small delay before closing
+			form.reset();
+
 			setTimeout(() => {
 				onClose();
 			}, 500);
