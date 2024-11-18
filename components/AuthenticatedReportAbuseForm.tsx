@@ -1,6 +1,5 @@
 "use client";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
 	Select,
 	SelectContent,
@@ -12,15 +11,27 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { useState, useEffect } from "react";
 import { Button } from "./ui/button";
+import { createClient } from "@/utils/supabase/client";
+import { Tables } from "@/types/db-schema";
 
-// Add this form component
-export default function ReportAbuseForm({ onClose }: { onClose: () => void }) {
+interface AuthenticatedReportAbuseFormProps {
+	onClose: () => void;
+	userId: string;
+	userProfile?: Tables<"profiles">;
+}
+
+export default function AuthenticatedReportAbuseForm({
+	onClose,
+	userId,
+	userProfile,
+}: AuthenticatedReportAbuseFormProps) {
 	const { toast } = useToast();
 	const [loading, setLoading] = useState(false);
 	const [location, setLocation] = useState<{
 		latitude: number;
 		longitude: number;
 	} | null>(null);
+	const supabase = createClient();
 
 	useEffect(() => {
 		if ("geolocation" in navigator) {
@@ -48,7 +59,8 @@ export default function ReportAbuseForm({ onClose }: { onClose: () => void }) {
 		e.preventDefault();
 		setLoading(true);
 
-		const formData = new FormData(e.currentTarget);
+		const form = e.currentTarget;
+		const formData = new FormData(form);
 		const contactPreference = formData.get("contact_preference");
 		const phone = formData.get("phone");
 
@@ -67,8 +79,9 @@ export default function ReportAbuseForm({ onClose }: { onClose: () => void }) {
 		}
 
 		const data = {
-			first_name: formData.get("first_name"),
-			email: formData.get("email"),
+			first_name: userProfile?.first_name || null,
+			last_name: userProfile?.last_name || null,
+			user_id: userId,
 			phone: phone,
 			type_of_incident: formData.get("incident_type"),
 			incident_description: formData.get("incident_description"),
@@ -81,26 +94,17 @@ export default function ReportAbuseForm({ onClose }: { onClose: () => void }) {
 		};
 
 		try {
-			const response = await fetch("/api/reports", {
-				method: "POST",
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify(data),
-			});
+			const { error } = await supabase.from("reports").insert([data]);
 
-			const result = await response.json();
+			if (error) throw error;
 
-			if (!response.ok) {
-				throw new Error(result.error || "Failed to submit report");
-			}
-
-			// Clear the form and show success toast
-			e.currentTarget.reset();
 			toast({
 				title: "Report Submitted",
 				description: "Thank you for your report. We will review it shortly.",
 			});
 
-			// Add a small delay before closing
+			form.reset();
+
 			setTimeout(() => {
 				onClose();
 			}, 500);
@@ -161,25 +165,12 @@ export default function ReportAbuseForm({ onClose }: { onClose: () => void }) {
 					/>
 				</div>
 
-				<div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+				<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 					<div className="col-span-full">
-						<p className="text-lg text-gray-700">Contact Information:</p>
+						<p className="text-lg text-gray-700">Contact Preference:</p>
 					</div>
 					<Input
-						placeholder="Your name"
-						name="first_name"
-						required
-						className="w-full"
-					/>
-					<Input
-						placeholder="Your email"
-						name="email"
-						type="email"
-						required
-						className="w-full"
-					/>
-					<Input
-						placeholder="Your phone number"
+						placeholder="Your phone number (optional)"
 						name="phone"
 						type="tel"
 						pattern="[0-9]{10,}"

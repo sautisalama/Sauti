@@ -22,7 +22,7 @@ import Link from "next/link";
 import { Footer } from "./Footer";
 import Forecast from "./forecast";
 
-export function Dashboard() {
+export function LandingPage() {
 	return (
 		<div className="flex min-h-screen w-full flex-col">
 			{/* <Banner /> */}
