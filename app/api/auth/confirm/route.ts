@@ -1,28 +1,19 @@
-import { createClient } from "@/utils/supabase/server";
-import { NextResponse } from "next/server";
+import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs";
+import { cookies } from "next/headers";
 
-export async function GET(request: Request) {
-	const requestUrl = new URL(request.url);
-	const code = requestUrl.searchParams.get("code");
-	const next = requestUrl.searchParams.get("next") ?? "/dashboard";
+import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
+
+export async function GET(request: NextRequest) {
+	let requestUrl = new URL(request.url);
+	let code = requestUrl.searchParams.get("code");
 
 	if (code) {
-		const supabase = await createClient();
-		const { error } = await supabase.auth.exchangeCodeForSession(code);
-
-		if (error) {
-			console.error("Auth callback error:", error);
-			const errorUrl = new URL(
-				"/error",
-				process.env.NEXT_PUBLIC_APP_URL || request.url
-			);
-			return NextResponse.redirect(errorUrl);
-		}
+		let supabase = createRouteHandlerClient({ cookies });
+		await supabase.auth.exchangeCodeForSession(code);
 	}
 
-	const redirectUrl = new URL(
-		next,
-		process.env.NEXT_PUBLIC_APP_URL || request.url
-	);
-	return NextResponse.redirect(redirectUrl);
+	// URL to redirect to after sign in process completes
+	return NextResponse.redirect(requestUrl.origin);
+	//return NextResponse.redirect('https://testing.d1n70pub9ihfwm.amplifyapp.com');
 }
