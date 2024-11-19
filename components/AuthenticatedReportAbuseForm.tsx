@@ -13,6 +13,11 @@ import { useState, useEffect } from "react";
 import { Button } from "./ui/button";
 import { createClient } from "@/utils/supabase/client";
 import { Tables } from "@/types/db-schema";
+import { MultiSelect } from "@/components/ui/multi-select";
+import {
+	SUPPORT_SERVICE_OPTIONS,
+	type SupportServiceType,
+} from "@/lib/constants";
 
 interface AuthenticatedReportAbuseFormProps {
 	onClose: () => void;
@@ -27,6 +32,7 @@ export default function AuthenticatedReportAbuseForm({
 }: AuthenticatedReportAbuseFormProps) {
 	const { toast } = useToast();
 	const [loading, setLoading] = useState(false);
+	const [selectedServices, setSelectedServices] = useState<string[]>([]);
 	const [location, setLocation] = useState<{
 		latitude: number;
 		longitude: number;
@@ -88,6 +94,7 @@ export default function AuthenticatedReportAbuseForm({
 			urgency: formData.get("urgency"),
 			consent: formData.get("consent"),
 			contact_preference: contactPreference,
+			required_services: selectedServices,
 			latitude: location?.latitude || null,
 			longitude: location?.longitude || null,
 			submission_timestamp: new Date().toISOString(),
@@ -128,7 +135,7 @@ export default function AuthenticatedReportAbuseForm({
 			onSubmit={handleSubmit}
 			className="relative w-full max-w-[1200px] max-h-[80vh] flex flex-col"
 		>
-			<div className="flex-1 overflow-y-auto space-y-6 pr-4">
+			<div className="flex-1 overflow-y-auto space-y-6 pr-4 pb-20">
 				<div className="flex items-center gap-4 flex-wrap">
 					<p className="text-lg text-gray-700">I want to report about</p>
 					<Select name="incident_type" required>
@@ -162,6 +169,19 @@ export default function AuthenticatedReportAbuseForm({
 						name="incident_description"
 						required
 						className="min-h-[120px] w-full"
+					/>
+				</div>
+
+				<div className="w-full space-y-2">
+					<p className="text-lg text-gray-700">What support services do you need?</p>
+					<p className="text-sm text-gray-500">
+						Select all that apply in order of priority
+					</p>
+					<MultiSelect
+						selected={selectedServices}
+						onChange={setSelectedServices}
+						options={SUPPORT_SERVICE_OPTIONS}
+						placeholder="Select required services..."
 					/>
 				</div>
 
@@ -219,14 +239,16 @@ export default function AuthenticatedReportAbuseForm({
 				</div>
 			</div>
 
-			<div className="sticky bottom-0 pt-4 bg-white border-t mt-4">
-				<Button
-					type="submit"
-					className="w-full max-w-md mx-auto"
-					disabled={loading}
-				>
-					{loading ? "Submitting..." : "Submit Report"}
-				</Button>
+			<div className="fixed bottom-0 left-0 right-0 pt-4 pb-4 bg-white border-t mt-4 z-50">
+				<div className="max-w-[1200px] mx-auto px-4">
+					<Button
+						type="submit"
+						className="w-full max-w-md mx-auto block"
+						disabled={loading}
+					>
+						{loading ? "Submitting..." : "Submit Report"}
+					</Button>
+				</div>
 			</div>
 		</form>
 	);

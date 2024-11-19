@@ -184,6 +184,7 @@ export type Database = {
           principal_subdivision: string | null
           principal_subdivision_code: string | null
           report_id: string
+          required_services: Json | null
           state: string | null
           submission_timestamp: string | null
           support_services:
@@ -224,6 +225,7 @@ export type Database = {
           principal_subdivision?: string | null
           principal_subdivision_code?: string | null
           report_id?: string
+          required_services?: Json | null
           state?: string | null
           submission_timestamp?: string | null
           support_services?:
@@ -264,6 +266,7 @@ export type Database = {
           principal_subdivision?: string | null
           principal_subdivision_code?: string | null
           report_id?: string
+          required_services?: Json | null
           state?: string | null
           submission_timestamp?: string | null
           support_services?:
