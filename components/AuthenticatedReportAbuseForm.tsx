@@ -101,9 +101,15 @@ export default function AuthenticatedReportAbuseForm({
 		};
 
 		try {
-			const { error } = await supabase.from("reports").insert([data]);
+			const response = await fetch("/api/reports/submit", {
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json",
+				},
+				body: JSON.stringify(data),
+			});
 
-			if (error) throw error;
+			if (!response.ok) throw new Error("Failed to submit report");
 
 			toast({
 				title: "Report Submitted",
@@ -111,7 +117,6 @@ export default function AuthenticatedReportAbuseForm({
 			});
 
 			form.reset();
-
 			setTimeout(() => {
 				onClose();
 			}, 500);

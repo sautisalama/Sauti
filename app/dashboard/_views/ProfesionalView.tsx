@@ -28,6 +28,13 @@ import { useToast } from "@/hooks/use-toast";
 
 type SupportService = Database["public"]["Tables"]["support_services"]["Row"];
 
+const formatServiceName = (service: string) => {
+	return service
+		.split("_")
+		.map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+		.join(" ");
+};
+
 export default function ProfessionalView({ userId }: { userId: string }) {
 	const [open, setOpen] = useState(false);
 	const [appointments, setAppointments] = useState<any[]>([]);
@@ -97,74 +104,94 @@ export default function ProfessionalView({ userId }: { userId: string }) {
 		setDeleteService(null);
 	};
 
-	// Move fetchData outside useEffect so it can be called from handlers
 	const fetchData = async () => {
-		const [appointmentsRes, reportsRes, matchedServicesRes, supportServicesRes] =
-			await Promise.all([
-				supabase
-					.from("appointments")
-					.select(`*, reports:reports(*)`)
-					.eq("professional_id", userId),
-				supabase.from("reports").select("*").eq("user_id", userId),
-				supabase
+		console.log("Fetching data for professional view...", { userId });
+
+		try {
+			// Fetch support services first
+			const { data: supportServicesData, error: supportServicesError } =
+				await supabase.from("support_services").select("*").eq("user_id", userId);
+
+			if (supportServicesError) {
+				console.error("Error fetching support services:", supportServicesError);
+				return;
+			}
+
+			console.log("Fetched support services:", supportServicesData);
+			setSupportServices(supportServicesData || []);
+
+			// Get all service IDs associated with this user
+			const serviceIds = supportServicesData?.map((service) => service.id) || [];
+			console.log("Service IDs for matching:", serviceIds);
+
+			// Fetch matched cases for all services
+			const { data: matchedServicesData, error: matchedServicesError } =
+				await supabase
 					.from("matched_services")
 					.select(
 						`
-						*,
-						reports(*),
-						support_services(*)
-					`
+					*,
+					reports(
+						report_id,
+						type_of_incident,
+						incident_description,
+						urgency,
+						required_services,
+						submission_timestamp
 					)
-					.eq("service_id", userId),
-				supabase.from("support_services").select("*").eq("user_id", userId),
-			]);
+				`
+					)
+					.in("service_id", serviceIds)
+					.order("match_date", { ascending: false });
 
-		setAppointments(appointmentsRes.data || []);
-		setReports(reportsRes.data || []);
-		setMatchedServices(matchedServicesRes.data || []);
-		setSupportServices(supportServicesRes.data || []);
+			if (matchedServicesError) {
+				console.error("Error fetching matched services:", matchedServicesError);
+				return;
+			}
+
+			console.log("Fetched matched services:", matchedServicesData);
+			setMatchedServices(matchedServicesData || []);
+
+			// Fetch other data...
+			const { data: reportsData } = await supabase
+				.from("reports")
+				.select("*")
+				.eq("user_id", userId);
+
+			setReports(reportsData || []);
+		} catch (error) {
+			console.error("Error in fetchData:", error);
+			toast({
+				title: "Error",
+				description: "Failed to fetch data. Please try again.",
+				variant: "destructive",
+			});
+		}
 	};
 
 	useEffect(() => {
 		fetchData();
 
-		// Subscribe to real-time changes
-		const reportsChannel = supabase
-			.channel("reports_changes")
+		// Set up realtime subscription for matched_services
+		const matchedServicesSubscription = supabase
+			.channel("matched-services-changes")
 			.on(
 				"postgres_changes",
 				{
-					event: "*",
+					event: "*", // Listen to all events (INSERT, UPDATE, DELETE)
 					schema: "public",
-					table: "reports",
-					filter: `user_id=eq.${userId}`,
+					table: "matched_services",
 				},
 				() => {
+					console.log("Matched services changed, refreshing data...");
 					fetchData();
 				}
 			)
 			.subscribe();
 
-		const servicesChannel = supabase
-			.channel("services_changes")
-			.on(
-				"postgres_changes",
-				{
-					event: "*",
-					schema: "public",
-					table: "support_services",
-					filter: `user_id=eq.${userId}`,
-				},
-				() => {
-					fetchData();
-				}
-			)
-			.subscribe();
-
-		// Cleanup subscriptions
+		// Cleanup subscription when component unmounts
 		return () => {
-			supabase.removeChannel(reportsChannel);
-			supabase.removeChannel(servicesChannel);
+			matchedServicesSubscription.unsubscribe();
 		};
 	}, [userId]);
 
@@ -231,6 +258,19 @@ export default function ProfessionalView({ userId }: { userId: string }) {
 								<p className="mt-2 text-sm line-clamp-2">
 									{report.incident_description}
 								</p>
+								{report.required_services && (
+									<div className="mt-2 flex flex-wrap gap-1">
+										{Array.isArray(report.required_services) &&
+											report.required_services.map((service: string, index: number) => (
+												<span
+													key={index}
+													className="px-2 py-1 text-xs rounded-full bg-secondary text-secondary-foreground"
+												>
+													{formatServiceName(service)}
+												</span>
+											))}
+									</div>
+								)}
 							</div>
 						))}
 					</div>
@@ -301,15 +341,61 @@ export default function ProfessionalView({ userId }: { userId: string }) {
 							<div key={match.id} className="bg-card p-4 rounded-lg border shadow-sm">
 								<div className="flex justify-between items-start">
 									<div>
-										<h3 className="font-semibold">
-											Match from {new Date(match.match_date || "").toLocaleDateString()}
-										</h3>
-										{match.reports && (
-											<p className="text-sm text-muted-foreground">
+										<div className="flex items-center gap-2">
+											<h3 className="font-semibold">
 												Case #{match.reports.report_id.slice(0, 8)}
-											</p>
-										)}
+											</h3>
+											<span
+												className={`px-2 py-1 text-xs rounded-full ${
+													match.match_status_type === "pending"
+														? "bg-yellow-100 text-yellow-800"
+														: match.match_status_type === "accepted"
+														? "bg-green-100 text-green-800"
+														: match.match_status_type === "declined"
+														? "bg-red-100 text-red-800"
+														: "bg-gray-100 text-gray-800"
+												}`}
+											>
+												{match.match_status_type?.toUpperCase()}
+											</span>
+										</div>
+										<p className="text-sm text-muted-foreground">
+											Matched on {new Date(match.match_date || "").toLocaleDateString()}
+										</p>
 									</div>
+									<div className="flex items-center gap-2">
+										<span className="px-2 py-1 text-xs rounded-full bg-primary/10 text-primary">
+											{match.reports.type_of_incident}
+										</span>
+										<span className="px-2 py-1 text-xs rounded-full bg-secondary text-secondary-foreground">
+											{match.reports.urgency}
+										</span>
+									</div>
+								</div>
+								<div className="mt-4 space-y-2">
+									<p className="text-sm line-clamp-2">
+										{match.reports.incident_description}
+									</p>
+									{match.reports.required_services && (
+										<div className="flex flex-wrap gap-1">
+											{Array.isArray(match.reports.required_services) &&
+												match.reports.required_services.map(
+													(service: string, index: number) => (
+														<span
+															key={index}
+															className="px-2 py-1 text-xs rounded-full bg-secondary/50 text-secondary-foreground"
+														>
+															{formatServiceName(service)}
+														</span>
+													)
+												)}
+										</div>
+									)}
+									{match.match_score && (
+										<p className="text-sm text-muted-foreground">
+											Match Score: {Math.round(match.match_score * 100)}%
+										</p>
+									)}
 								</div>
 							</div>
 						))}

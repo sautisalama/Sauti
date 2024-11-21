@@ -49,7 +49,7 @@ export async function getUser(): Promise<Tables<"profiles"> | null> {
 	const supabase = createClient();
 	try {
 		const session = await getSession();
-		console.log("session", session);
+		// console.log("session", session);
 		if (!session?.user?.id) return null;
 
 		const { data, error } = await supabase
