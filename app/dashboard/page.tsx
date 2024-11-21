@@ -9,7 +9,7 @@ import ProfessionalView from "./_views/ProfesionalView";
 
 export default async function Dashboard() {
 	const user = await getUser();
-	console.log("session", await getSession());
+	// console.log("session", await getSession());
 
 	if (!user) {
 		redirect("/signin");

@@ -76,7 +76,7 @@ export async function signIn(formData: FormData) {
 
 	if (error) {
 		// return { error: error.message };
-		console.log("Sign in error:", error);
+		// console.log("Sign in error:", error);
 	}
 
 	redirect("/dashboard");
