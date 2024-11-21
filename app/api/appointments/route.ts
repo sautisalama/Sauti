@@ -21,7 +21,10 @@ export async function POST(request: Request) {
 			.select(
 				`
 				*,
-				reports!inner(*)
+				reports!inner(
+					report_id,
+					user_id
+				)
 			`
 			)
 			.eq("id", matchId)
@@ -30,30 +33,44 @@ export async function POST(request: Request) {
 		if (matchQueryError) throw matchQueryError;
 		if (!matchData?.reports) throw new Error("Report not found");
 
-		// Create appointment with the correct report_id
+		// Create appointment with the correct survivor_id (user_id from report)
 		const { data: appointment, error: appointmentError } = await supabase
 			.from("appointments")
 			.insert({
 				date,
 				professional_id: professionalId,
 				status: "confirmed",
-				survivor_id: matchData.report_id,
+				survivor_id: matchData.reports.user_id,
 			})
 			.select()
 			.single();
 
 		if (appointmentError) throw appointmentError;
 
-		// Update matched_services status
-		const { error: matchError } = await supabase
-			.from("matched_services")
-			.update({
-				match_status_type: "accepted",
-				updated_at: new Date().toISOString(),
-			})
-			.eq("id", matchId);
+		// Update both matched_services and reports status
+		const updates = await Promise.all([
+			// Update matched_services status
+			supabase
+				.from("matched_services")
+				.update({
+					match_status_type: "accepted",
+					updated_at: new Date().toISOString(),
+				})
+				.eq("id", matchId),
 
+			// Update report match_status
+			supabase
+				.from("reports")
+				.update({
+					match_status: "accepted",
+				})
+				.eq("report_id", matchData.reports.report_id),
+		]);
+
+		// Check for errors in either update
+		const [matchError, reportError] = updates.map((update) => update.error);
 		if (matchError) throw matchError;
+		if (reportError) throw reportError;
 
 		return NextResponse.json({
 			message: "Appointment created and case accepted successfully",
