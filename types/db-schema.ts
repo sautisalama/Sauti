@@ -43,22 +43,43 @@ export type Database = {
       }
       matched_services: {
         Row: {
+          feedback: string | null
           id: string
           match_date: string | null
+          match_score: number | null
+          match_status_type:
+            | Database["public"]["Enums"]["match_status_type"]
+            | null
+          notes: string | null
           report_id: string | null
           service_id: string | null
+          updated_at: string | null
         }
         Insert: {
+          feedback?: string | null
           id?: string
           match_date?: string | null
+          match_score?: number | null
+          match_status_type?:
+            | Database["public"]["Enums"]["match_status_type"]
+            | null
+          notes?: string | null
           report_id?: string | null
           service_id?: string | null
+          updated_at?: string | null
         }
         Update: {
+          feedback?: string | null
           id?: string
           match_date?: string | null
+          match_score?: number | null
+          match_status_type?:
+            | Database["public"]["Enums"]["match_status_type"]
+            | null
+          notes?: string | null
           report_id?: string | null
           service_id?: string | null
+          updated_at?: string | null
         }
         Relationships: [
           {
@@ -298,7 +319,7 @@ export type Database = {
           name: string
           phone_number: string | null
           priority: number | null
-          service_types: string
+          service_types: Database["public"]["Enums"]["support_service_type"]
           user_id: string | null
           website: string | null
         }
@@ -313,7 +334,7 @@ export type Database = {
           name: string
           phone_number?: string | null
           priority?: number | null
-          service_types: string
+          service_types: Database["public"]["Enums"]["support_service_type"]
           user_id?: string | null
           website?: string | null
         }
@@ -328,7 +349,7 @@ export type Database = {
           name?: string
           phone_number?: string | null
           priority?: number | null
-          service_types?: string
+          service_types?: Database["public"]["Enums"]["support_service_type"]
           user_id?: string | null
           website?: string | null
         }
@@ -347,7 +368,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      modify_matched_services_table: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
     }
     Enums: {
       appointment_status_type: "pending" | "confirmed"
@@ -356,6 +380,12 @@ export type Database = {
       gender_type: "female" | "male" | "non_binary" | "prefer_not_to_say"
       incident_type: "physical" | "emotional" | "sexual" | "financial" | "other"
       language_type: "english" | "swahili" | "other"
+      match_status_type:
+        | "pending"
+        | "accepted"
+        | "declined"
+        | "completed"
+        | "cancelled"
       support_service_type:
         | "legal"
         | "medical"

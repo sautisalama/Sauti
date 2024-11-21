@@ -12,6 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useState, useEffect } from "react";
 import { Button } from "./ui/button";
 import { createClient } from "@/utils/supabase/client";
+import { SUPPORT_SERVICE_OPTIONS } from "@/lib/constants";
 
 interface AddSupportServiceFormProps {
 	onClose: () => void;
@@ -148,12 +149,11 @@ export default function AddSupportServiceForm({
 						<SelectValue placeholder="Service Type" />
 					</SelectTrigger>
 					<SelectContent>
-						<SelectItem value="counseling">Counseling</SelectItem>
-						<SelectItem value="legal">Legal Support</SelectItem>
-						<SelectItem value="medical">Medical Care</SelectItem>
-						<SelectItem value="shelter">Shelter</SelectItem>
-						<SelectItem value="financial">Financial Aid</SelectItem>
-						<SelectItem value="other">Other</SelectItem>
+						{SUPPORT_SERVICE_OPTIONS.map((option) => (
+							<SelectItem key={option.value} value={option.value}>
+								{option.label}
+							</SelectItem>
+						))}
 					</SelectContent>
 				</Select>
 
