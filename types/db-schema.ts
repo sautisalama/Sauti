@@ -123,6 +123,7 @@ export type Database = {
         Row: {
           availability: string
           bio: string
+          created_at: string | null
           id: string
           profession: string
           tokens: number | null
@@ -131,6 +132,7 @@ export type Database = {
         Insert: {
           availability: string
           bio: string
+          created_at?: string | null
           id?: string
           profession: string
           tokens?: number | null
@@ -139,6 +141,7 @@ export type Database = {
         Update: {
           availability?: string
           bio?: string
+          created_at?: string | null
           id?: string
           profession?: string
           tokens?: number | null
@@ -196,6 +199,7 @@ export type Database = {
           locality: string | null
           location: string | null
           longitude: number | null
+          match_status: Database["public"]["Enums"]["match_status_type"] | null
           phone: string | null
           plus_code: string | null
           postcode: string | null
@@ -237,6 +241,7 @@ export type Database = {
           locality?: string | null
           location?: string | null
           longitude?: number | null
+          match_status?: Database["public"]["Enums"]["match_status_type"] | null
           phone?: string | null
           plus_code?: string | null
           postcode?: string | null
@@ -278,6 +283,7 @@ export type Database = {
           locality?: string | null
           location?: string | null
           longitude?: number | null
+          match_status?: Database["public"]["Enums"]["match_status_type"] | null
           phone?: string | null
           plus_code?: string | null
           postcode?: string | null

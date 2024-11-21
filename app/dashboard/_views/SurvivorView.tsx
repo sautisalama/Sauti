@@ -1,7 +1,7 @@
 "use client";
 
 import { createClient } from "@/utils/supabase/client";
-import { Tables } from "@/types/db-schema";
+import { Database, Tables } from "@/types/db-schema";
 import { Button } from "@/components/ui/button";
 import {
 	Dialog,
@@ -26,9 +26,26 @@ import {
 	AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
+import CaseCard from "@/app/components/CaseCard";
+
+// Add this interface to type the joined data
+interface ReportWithRelations extends Tables<"reports"> {
+	matched_services?: Array<{
+		id: string;
+		match_status_type: Database["public"]["Enums"]["match_status_type"];
+		support_services: {
+			name: string;
+			service_types: Database["public"]["Enums"]["support_service_type"];
+		};
+		appointments?: Array<{
+			date: string;
+			status: Database["public"]["Enums"]["appointment_status_type"] | null;
+		}>;
+	}>;
+}
 
 export default function SurvivorView({ userId }: { userId: string }) {
-	const [reports, setReports] = useState<Tables<"reports">[]>([]);
+	const [reports, setReports] = useState<ReportWithRelations[]>([]);
 	const [open, setOpen] = useState(false);
 	const supabase = createClient();
 	const { toast } = useToast();
@@ -38,7 +55,23 @@ export default function SurvivorView({ userId }: { userId: string }) {
 	const fetchReports = async () => {
 		const { data } = await supabase
 			.from("reports")
-			.select("*")
+			.select(
+				`
+				*,
+				matched_services(
+					id,
+					match_status_type,
+					support_services(
+						name,
+						service_types
+					),
+					appointments(
+						date,
+						status
+					)
+				)
+			`
+			)
 			.eq("user_id", userId)
 			.order("submission_timestamp", { ascending: false });
 
@@ -102,6 +135,14 @@ export default function SurvivorView({ userId }: { userId: string }) {
 		};
 	}, [userId]);
 
+	// Add formatServiceName inside component
+	const formatServiceName = (service: string) => {
+		return service
+			.split("_")
+			.map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+			.join(" ");
+	};
+
 	return (
 		<div className="space-y-6">
 			<div className="flex justify-between items-center">
@@ -132,36 +173,20 @@ export default function SurvivorView({ userId }: { userId: string }) {
 			{reports && reports.length > 0 ? (
 				<div className="grid gap-4">
 					{reports.map((report) => (
-						<div
+						<CaseCard
 							key={report.report_id}
-							className="bg-card p-4 rounded-lg border shadow-sm"
-						>
-							<div className="flex justify-between items-start">
-								<div>
-									<h3 className="font-semibold">Case #{report.report_id.slice(0, 8)}</h3>
-									<p className="text-sm text-muted-foreground">
-										{report.submission_timestamp &&
-											new Date(report.submission_timestamp).toLocaleDateString()}
-									</p>
-								</div>
-								<div className="flex items-center gap-2">
-									<span className="px-2 py-1 text-xs rounded-full bg-primary/10 text-primary">
-										{report.type_of_incident}
-									</span>
-									<Button
-										variant="ghost"
-										size="icon"
-										className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
-										onClick={() => setDeleteReport(report.report_id)}
-									>
-										<Trash2 className="h-4 w-4" />
-									</Button>
-								</div>
-							</div>
-							<p className="mt-2 text-sm line-clamp-2">
-								{report.incident_description}
-							</p>
-						</div>
+							reportId={report.report_id}
+							timestamp={report.submission_timestamp}
+							typeOfIncident={report.type_of_incident ?? "other"}
+							description={report.incident_description ?? ""}
+							requiredServices={
+								(Array.isArray(report.required_services)
+									? (report.required_services as Database["public"]["Enums"]["support_service_type"][])
+									: []) ?? []
+							}
+							onDelete={(reportId) => setDeleteReport(reportId)}
+							matchedService={report.matched_services?.[0]}
+						/>
 					))}
 				</div>
 			) : (

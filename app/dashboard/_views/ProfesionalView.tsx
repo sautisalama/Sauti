@@ -25,6 +25,8 @@ import {
 	AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
+import AppointmentDialog from "@/app/components/AppointmentDialog";
+import CaseCard from "@/app/components/CaseCard";
 
 type SupportService = Database["public"]["Tables"]["support_services"]["Row"];
 
@@ -45,6 +47,10 @@ export default function ProfessionalView({ userId }: { userId: string }) {
 	const { toast } = useToast();
 	const [deleteReport, setDeleteReport] = useState<string | null>(null);
 	const [deleteService, setDeleteService] = useState<string | null>(null);
+	const [appointmentMatch, setAppointmentMatch] = useState<string | null>(null);
+	const [professionalProfileId, setProfessionalProfileId] = useState<
+		string | null
+	>(null);
 
 	const handleDeleteReport = async (reportId: string) => {
 		try {
@@ -108,6 +114,45 @@ export default function ProfessionalView({ userId }: { userId: string }) {
 		console.log("Fetching data for professional view...", { userId });
 
 		try {
+			// First check if professional profile exists
+			const { data: existingProfiles, error: checkError } = await supabase
+				.from("professional_profiles")
+				.select("*")
+				.eq("user_id", userId)
+				.order("created_at", { ascending: false });
+
+			if (checkError) {
+				throw checkError;
+			}
+
+			let profileData;
+
+			if (!existingProfiles || existingProfiles.length === 0) {
+				// Only create new profile if none exists
+				const { data: newProfile, error: createError } = await supabase
+					.from("professional_profiles")
+					.insert({
+						user_id: userId,
+						profession: "Other",
+						availability: "Available",
+						bio: "Professional healthcare provider",
+					})
+					.select();
+
+				if (createError) {
+					throw createError;
+				}
+
+				profileData = newProfile[0]; // Use first item from array instead of .single()
+			} else {
+				// Use the most recent profile
+				profileData = existingProfiles[0];
+			}
+
+			// Store professional profile ID for appointments
+			const professionalProfileId = profileData.id;
+			setProfessionalProfileId(professionalProfileId);
+
 			// Fetch support services first
 			const { data: supportServicesData, error: supportServicesError } =
 				await supabase.from("support_services").select("*").eq("user_id", userId);
@@ -124,7 +169,7 @@ export default function ProfessionalView({ userId }: { userId: string }) {
 			const serviceIds = supportServicesData?.map((service) => service.id) || [];
 			console.log("Service IDs for matching:", serviceIds);
 
-			// Fetch matched cases for all services
+			// Modified matched services query
 			const { data: matchedServicesData, error: matchedServicesError } =
 				await supabase
 					.from("matched_services")
@@ -138,19 +183,42 @@ export default function ProfessionalView({ userId }: { userId: string }) {
 						urgency,
 						required_services,
 						submission_timestamp
+					),
+					 support_services(
+						name,
+						service_types
 					)
 				`
 					)
-					.in("service_id", serviceIds)
-					.order("match_date", { ascending: false });
+					.in("service_id", serviceIds);
 
 			if (matchedServicesError) {
 				console.error("Error fetching matched services:", matchedServicesError);
 				return;
 			}
 
-			console.log("Fetched matched services:", matchedServicesData);
-			setMatchedServices(matchedServicesData || []);
+			// If you need appointments data, fetch it separately
+			if (matchedServicesData) {
+				// Fetch appointments for each matched service
+				const matchedServicesWithAppointments = await Promise.all(
+					matchedServicesData.map(async (match) => {
+						const { data: appointmentsData } = await supabase
+							.from("appointments")
+							.select("*")
+							.eq("match_id", match.id)
+							.single();
+
+						return {
+							...match,
+							appointments: appointmentsData ? [appointmentsData] : [],
+						};
+					})
+				);
+
+				setMatchedServices(matchedServicesWithAppointments);
+			} else {
+				setMatchedServices([]);
+			}
 
 			// Fetch other data...
 			const { data: reportsData } = await supabase
@@ -195,6 +263,10 @@ export default function ProfessionalView({ userId }: { userId: string }) {
 		};
 	}, [userId]);
 
+	const handleAcceptMatch = (matchId: string) => {
+		setAppointmentMatch(matchId);
+	};
+
 	return (
 		<div className="space-y-12">
 			{/* Your Cases Section */}
@@ -227,51 +299,15 @@ export default function ProfessionalView({ userId }: { userId: string }) {
 				{reports && reports.length > 0 ? (
 					<div className="grid gap-4">
 						{reports.map((report) => (
-							<div
+							<CaseCard
 								key={report.report_id}
-								className="bg-card p-4 rounded-lg border shadow-sm"
-							>
-								<div className="flex justify-between items-start">
-									<div>
-										<h3 className="font-semibold">
-											Case #{report.report_id.slice(6, 20)}
-										</h3>
-										<p className="text-sm text-muted-foreground">
-											{report.submission_timestamp &&
-												new Date(report.submission_timestamp).toLocaleDateString()}
-										</p>
-									</div>
-									<div className="flex items-center gap-2">
-										<span className="px-2 py-1 text-xs rounded-full bg-primary/10 text-primary">
-											{report.type_of_incident}
-										</span>
-										<Button
-											variant="ghost"
-											size="icon"
-											className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
-											onClick={() => setDeleteReport(report.report_id)}
-										>
-											<Trash2 className="h-4 w-4" />
-										</Button>
-									</div>
-								</div>
-								<p className="mt-2 text-sm line-clamp-2">
-									{report.incident_description}
-								</p>
-								{report.required_services && (
-									<div className="mt-2 flex flex-wrap gap-1">
-										{Array.isArray(report.required_services) &&
-											report.required_services.map((service: string, index: number) => (
-												<span
-													key={index}
-													className="px-2 py-1 text-xs rounded-full bg-secondary text-secondary-foreground"
-												>
-													{formatServiceName(service)}
-												</span>
-											))}
-									</div>
-								)}
-							</div>
+								reportId={report.report_id}
+								timestamp={report.submission_timestamp}
+								typeOfIncident={report.type_of_incident}
+								description={report.incident_description}
+								requiredServices={report.required_services || []}
+								onDelete={(reportId) => setDeleteReport(reportId)}
+							/>
 						))}
 					</div>
 				) : (
@@ -338,72 +374,40 @@ export default function ProfessionalView({ userId }: { userId: string }) {
 				{matchedServices && matchedServices.length > 0 ? (
 					<div className="grid gap-4">
 						{matchedServices.map((match) => (
-							<div key={match.id} className="bg-card p-4 rounded-lg border shadow-sm">
-								<div className="flex justify-between items-start">
-									<div>
-										<div className="flex items-center gap-2">
-											<h3 className="font-semibold">
-												Case #{match.reports.report_id.slice(0, 8)}
-											</h3>
-											<span
-												className={`px-2 py-1 text-xs rounded-full ${
-													match.match_status_type === "pending"
-														? "bg-yellow-100 text-yellow-800"
-														: match.match_status_type === "accepted"
-														? "bg-green-100 text-green-800"
-														: match.match_status_type === "declined"
-														? "bg-red-100 text-red-800"
-														: "bg-gray-100 text-gray-800"
-												}`}
-											>
-												{match.match_status_type?.toUpperCase()}
-											</span>
-										</div>
-										<p className="text-sm text-muted-foreground">
-											Matched on {new Date(match.match_date || "").toLocaleDateString()}
-										</p>
-									</div>
-									<div className="flex items-center gap-2">
-										<span className="px-2 py-1 text-xs rounded-full bg-primary/10 text-primary">
-											{match.reports.type_of_incident}
-										</span>
-										<span className="px-2 py-1 text-xs rounded-full bg-secondary text-secondary-foreground">
-											{match.reports.urgency}
-										</span>
-									</div>
-								</div>
-								<div className="mt-4 space-y-2">
-									<p className="text-sm line-clamp-2">
-										{match.reports.incident_description}
-									</p>
-									{match.reports.required_services && (
-										<div className="flex flex-wrap gap-1">
-											{Array.isArray(match.reports.required_services) &&
-												match.reports.required_services.map(
-													(service: string, index: number) => (
-														<span
-															key={index}
-															className="px-2 py-1 text-xs rounded-full bg-secondary/50 text-secondary-foreground"
-														>
-															{formatServiceName(service)}
-														</span>
-													)
-												)}
-										</div>
-									)}
-									{match.match_score && (
-										<p className="text-sm text-muted-foreground">
-											Match Score: {Math.round(match.match_score * 100)}%
-										</p>
-									)}
-								</div>
-							</div>
+							<CaseCard
+								key={match.id}
+								reportId={match.reports.report_id}
+								timestamp={match.reports.submission_timestamp}
+								typeOfIncident={match.reports.type_of_incident}
+								description={match.reports.incident_description}
+								requiredServices={match.reports.required_services || []}
+								onDelete={(reportId) => setDeleteReport(reportId)}
+								onAcceptMatch={handleAcceptMatch}
+								matchedService={{
+									id: match.id,
+									match_status_type: match.match_status_type,
+									support_service: match.support_services,
+									appointment: match.appointments?.[0],
+								}}
+							/>
 						))}
 					</div>
 				) : (
 					<p className="text-muted-foreground">No matched cases found.</p>
 				)}
 			</div>
+
+			<AppointmentDialog
+				isOpen={!!appointmentMatch}
+				onClose={() => setAppointmentMatch(null)}
+				matchId={appointmentMatch || ""}
+				reportId={
+					matchedServices.find((m) => m.id === appointmentMatch)?.reports
+						?.report_id || ""
+				}
+				professionalId={professionalProfileId || ""}
+				onSuccess={fetchData}
+			/>
 
 			<AlertDialog
 				open={!!deleteReport}
