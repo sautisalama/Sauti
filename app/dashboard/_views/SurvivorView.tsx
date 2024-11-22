@@ -11,7 +11,6 @@ import {
 	DialogTitle,
 	DialogTrigger,
 } from "@/components/ui/dialog";
-import ReportAbuseForm from "@/components/ReportAbuseForm";
 import { Plus, Trash2 } from "lucide-react";
 import { useState, useEffect } from "react";
 import AuthenticatedReportAbuseForm from "@/components/AuthenticatedReportAbuseForm";
@@ -174,19 +173,27 @@ export default function SurvivorView({ userId }: { userId: string }) {
 				<div className="grid gap-4">
 					{reports.map((report) => (
 						<CaseCard
+							variant="survivor"
 							key={report.report_id}
 							reportId={report.report_id}
 							timestamp={report.submission_timestamp}
-							typeOfIncident={report.type_of_incident ?? "other"}
-							description={report.incident_description ?? ""}
+							typeOfIncident={report.type_of_incident}
+							description={report.incident_description}
 							requiredServices={
-								(Array.isArray(report.required_services)
-									? (report.required_services as Database["public"]["Enums"]["support_service_type"][])
-									: []) ?? []
+								report.required_services as
+									| (
+											| "other"
+											| "legal"
+											| "medical"
+											| "mental_health"
+											| "shelter"
+											| "financial_assistance"
+									  )[]
+									| null
 							}
 							onDelete={(reportId) => setDeleteReport(reportId)}
-							matchedService={report.matched_services?.[0]}
-							matchStatus={report.match_status?.toString() || ""}
+							matchStatus={report.match_status}
+							formatServiceName={formatServiceName}
 						/>
 					))}
 				</div>

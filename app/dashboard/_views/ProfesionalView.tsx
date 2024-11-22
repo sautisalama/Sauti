@@ -29,6 +29,24 @@ import AppointmentDialog from "@/app/components/AppointmentDialog";
 import CaseCard from "@/app/components/CaseCard";
 
 type SupportService = Database["public"]["Tables"]["support_services"]["Row"];
+type Report = Database["public"]["Tables"]["reports"]["Row"];
+type MatchedService =
+	Database["public"]["Tables"]["matched_services"]["Row"] & {
+		reports: Pick<
+			Report,
+			| "report_id"
+			| "type_of_incident"
+			| "incident_description"
+			| "urgency"
+			| "required_services"
+			| "submission_timestamp"
+		>;
+		support_services: Pick<SupportService, "name" | "service_types">;
+		appointments?: Array<{
+			date: string;
+			status: Database["public"]["Enums"]["appointment_status_type"];
+		}>;
+	};
 
 const formatServiceName = (service: string) => {
 	return service
@@ -39,9 +57,11 @@ const formatServiceName = (service: string) => {
 
 export default function ProfessionalView({ userId }: { userId: string }) {
 	const [open, setOpen] = useState(false);
-	const [appointments, setAppointments] = useState<any[]>([]);
-	const [reports, setReports] = useState<any[]>([]);
-	const [matchedServices, setMatchedServices] = useState<any[]>([]);
+	const [appointments, setAppointments] = useState<
+		Database["public"]["Tables"]["appointments"]["Row"][]
+	>([]);
+	const [reports, setReports] = useState<Report[]>([]);
+	const [matchedServices, setMatchedServices] = useState<MatchedService[]>([]);
 	const [supportServices, setSupportServices] = useState<SupportService[]>([]);
 	const supabase = createClient();
 	const { toast } = useToast();
@@ -169,14 +189,14 @@ export default function ProfessionalView({ userId }: { userId: string }) {
 			const serviceIds = supportServicesData?.map((service) => service.id) || [];
 			console.log("Service IDs for matching:", serviceIds);
 
-			// Modified matched services query
+			// Modified matched services query with proper typing
 			const { data: matchedServicesData, error: matchedServicesError } =
 				await supabase
 					.from("matched_services")
 					.select(
 						`
 					*,
-					reports(
+					reports (
 						report_id,
 						type_of_incident,
 						incident_description,
@@ -184,7 +204,7 @@ export default function ProfessionalView({ userId }: { userId: string }) {
 						required_services,
 						submission_timestamp
 					),
-					 support_services(
+					support_services (
 						name,
 						service_types
 					)
@@ -197,9 +217,8 @@ export default function ProfessionalView({ userId }: { userId: string }) {
 				return;
 			}
 
-			// If you need appointments data, fetch it separately
+			// Type assertion for matchedServicesData
 			if (matchedServicesData) {
-				// Fetch appointments for each matched service
 				const matchedServicesWithAppointments = await Promise.all(
 					matchedServicesData.map(async (match) => {
 						const { data: appointmentsData } = await supabase
@@ -211,7 +230,7 @@ export default function ProfessionalView({ userId }: { userId: string }) {
 						return {
 							...match,
 							appointments: appointmentsData ? [appointmentsData] : [],
-						};
+						} as MatchedService;
 					})
 				);
 
@@ -300,14 +319,27 @@ export default function ProfessionalView({ userId }: { userId: string }) {
 					<div className="grid gap-4">
 						{reports.map((report) => (
 							<CaseCard
+								variant="survivor"
 								key={report.report_id}
 								reportId={report.report_id}
 								timestamp={report.submission_timestamp}
 								typeOfIncident={report.type_of_incident}
 								description={report.incident_description}
-								requiredServices={report.required_services || []}
+								requiredServices={
+									report.required_services as
+										| (
+												| "other"
+												| "legal"
+												| "medical"
+												| "mental_health"
+												| "shelter"
+												| "financial_assistance"
+										  )[]
+										| null
+								}
 								onDelete={(reportId) => setDeleteReport(reportId)}
 								matchStatus={report.match_status}
+								formatServiceName={formatServiceName}
 							/>
 						))}
 					</div>
@@ -376,20 +408,39 @@ export default function ProfessionalView({ userId }: { userId: string }) {
 					<div className="grid gap-4">
 						{matchedServices.map((match) => (
 							<CaseCard
-								key={match.id}
+								variant="professional"
+								key={match.reports.report_id}
 								reportId={match.reports.report_id}
 								timestamp={match.reports.submission_timestamp}
 								typeOfIncident={match.reports.type_of_incident}
 								description={match.reports.incident_description}
-								requiredServices={match.reports.required_services || []}
+								requiredServices={
+									match.reports.required_services as (
+										| "other"
+										| "legal"
+										| "medical"
+										| "mental_health"
+										| "shelter"
+										| "financial_assistance"
+									)[]
+								}
 								onDelete={(reportId) => setDeleteReport(reportId)}
 								onAcceptMatch={handleAcceptMatch}
 								matchedService={{
 									id: match.id,
 									match_status_type: match.match_status_type,
-									support_service: match.support_services,
-									appointment: match.appointments?.[0],
+									support_service: {
+										name: match.support_services.name,
+										service_types: match.support_services.service_types,
+									},
+									appointment: match.appointments?.[0]
+										? {
+												date: match.appointments[0].date,
+												status: match.appointments[0].status,
+										  }
+										: undefined,
 								}}
+								formatServiceName={formatServiceName}
 							/>
 						))}
 					</div>
