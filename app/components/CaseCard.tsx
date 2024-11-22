@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Trash2 } from "lucide-react";
 import { MATCH_STATUS_OPTIONS } from "@/lib/constants";
+import { Badge } from "@/components/ui/badge";
 
 interface CaseCardProps {
 	reportId: string;
@@ -23,31 +24,8 @@ interface CaseCardProps {
 			status: string;
 		};
 	};
+	matchStatus?: string;
 }
-
-const getStatusStyles = (status: string) => {
-	switch (status) {
-		case "pending":
-			return "bg-yellow-100 text-yellow-800";
-		case "accepted":
-			return "bg-green-100 text-green-800";
-		case "declined":
-			return "bg-red-100 text-red-800";
-		case "completed":
-			return "bg-blue-100 text-blue-800";
-		case "cancelled":
-			return "bg-gray-100 text-gray-800";
-		default:
-			return "bg-gray-100 text-gray-800";
-	}
-};
-
-const getStatusLabel = (status: string) => {
-	return (
-		MATCH_STATUS_OPTIONS.find((option) => option.value === status)?.label ||
-		status.toUpperCase()
-	);
-};
 
 export default function CaseCard({
 	reportId,
@@ -64,21 +42,29 @@ export default function CaseCard({
 			.map((word) => word.charAt(0).toUpperCase() + word.slice(1))
 			.join(" "),
 }: CaseCardProps) {
+	const getStatusColor = (status: string) => {
+		switch (status) {
+			case "pending":
+				return "bg-yellow-100 text-yellow-800 hover:bg-yellow-100";
+			case "accepted":
+				return "bg-green-100 text-green-800 hover:bg-green-100";
+			case "declined":
+				return "bg-red-100 text-red-800 hover:bg-red-100";
+			case "completed":
+				return "bg-blue-100 text-blue-800 hover:bg-blue-100";
+			case "cancelled":
+				return "bg-gray-100 text-gray-800 hover:bg-gray-100";
+			default:
+				return "bg-gray-100 text-gray-800 hover:bg-gray-100";
+		}
+	};
+
 	return (
 		<div className="bg-card p-4 rounded-lg border shadow-sm">
 			<div className="flex justify-between items-start">
 				<div>
 					<div className="flex items-center gap-2">
 						<h3 className="font-semibold">Case #{reportId.slice(0, 8)}</h3>
-						{matchedService?.match_status_type && (
-							<span
-								className={`px-2 py-1 text-xs rounded-full font-medium ${getStatusStyles(
-									matchedService.match_status_type
-								)}`}
-							>
-								{getStatusLabel(matchedService.match_status_type)}
-							</span>
-						)}
 					</div>
 					<p className="text-sm text-muted-foreground">
 						{timestamp && new Date(timestamp).toLocaleDateString()}
@@ -88,6 +74,14 @@ export default function CaseCard({
 					<span className="px-2 py-1 text-xs rounded-full bg-primary/10 text-primary">
 						{typeOfIncident}
 					</span>
+					{matchedService?.match_status_type && (
+						<Badge
+							className={`text-xs ${getStatusColor(matchedService.match_status_type)}`}
+						>
+							{matchedService.match_status_type.charAt(0).toUpperCase() +
+								matchedService.match_status_type.slice(1)}
+						</Badge>
+					)}
 					<Button
 						variant="ghost"
 						size="icon"

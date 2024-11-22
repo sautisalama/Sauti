@@ -307,6 +307,7 @@ export default function ProfessionalView({ userId }: { userId: string }) {
 								description={report.incident_description}
 								requiredServices={report.required_services || []}
 								onDelete={(reportId) => setDeleteReport(reportId)}
+								matchStatus={report.match_status}
 							/>
 						))}
 					</div>

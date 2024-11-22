@@ -186,6 +186,7 @@ export default function SurvivorView({ userId }: { userId: string }) {
 							}
 							onDelete={(reportId) => setDeleteReport(reportId)}
 							matchedService={report.matched_services?.[0]}
+							matchStatus={report.match_status?.toString() || ""}
 						/>
 					))}
 				</div>
