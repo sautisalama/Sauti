@@ -194,6 +194,7 @@ export type Database = {
           first_name: string | null
           gender: Database["public"]["Enums"]["gender_type"] | null
           incident_description: string | null
+          isMatched: boolean | null
           last_name: string | null
           latitude: number | null
           locality: string | null
@@ -236,6 +237,7 @@ export type Database = {
           first_name?: string | null
           gender?: Database["public"]["Enums"]["gender_type"] | null
           incident_description?: string | null
+          isMatched?: boolean | null
           last_name?: string | null
           latitude?: number | null
           locality?: string | null
@@ -278,6 +280,7 @@ export type Database = {
           first_name?: string | null
           gender?: Database["public"]["Enums"]["gender_type"] | null
           incident_description?: string | null
+          isMatched?: boolean | null
           last_name?: string | null
           latitude?: number | null
           locality?: string | null

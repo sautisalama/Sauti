@@ -118,6 +118,15 @@ export default function AddSupportServiceForm({
 				throw new Error(errorData.error || "Failed to add service");
 			}
 
+			const matchResponse = await fetch("/api/support-services/match", {
+				method: "POST",
+				credentials: "include",
+			});
+
+			if (!matchResponse.ok) {
+				console.error("Warning: Failed to process report matching");
+			}
+
 			toast({
 				title: "Service Added",
 				description: "Support service has been successfully added.",
