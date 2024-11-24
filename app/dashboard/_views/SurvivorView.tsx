@@ -181,18 +181,28 @@ export default function SurvivorView({ userId }: { userId: string }) {
 							description={report.incident_description}
 							requiredServices={
 								report.required_services as
-									| (
-											| "other"
-											| "legal"
-											| "medical"
-											| "mental_health"
-											| "shelter"
-											| "financial_assistance"
-									  )[]
+									| Database["public"]["Enums"]["support_service_type"][]
 									| null
 							}
 							onDelete={(reportId) => setDeleteReport(reportId)}
 							matchStatus={report.match_status}
+							matchedService={
+								report.matched_services?.[0]
+									? {
+											support_service: {
+												name: report.matched_services[0].support_services.name,
+												service_types:
+													report.matched_services[0].support_services.service_types,
+											},
+											appointment: report.matched_services[0].appointments?.[0]
+												? {
+														date: report.matched_services[0].appointments[0].date,
+														status: report.matched_services[0].appointments[0].status,
+												  }
+												: undefined,
+									  }
+									: undefined
+							}
 							formatServiceName={formatServiceName}
 						/>
 					))}

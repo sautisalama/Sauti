@@ -27,26 +27,9 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import AppointmentDialog from "@/app/components/AppointmentDialog";
 import CaseCard from "@/app/components/CaseCard";
+import { Report, MatchedService } from "@/types/reports";
 
 type SupportService = Database["public"]["Tables"]["support_services"]["Row"];
-type Report = Database["public"]["Tables"]["reports"]["Row"];
-type MatchedService =
-	Database["public"]["Tables"]["matched_services"]["Row"] & {
-		reports: Pick<
-			Report,
-			| "report_id"
-			| "type_of_incident"
-			| "incident_description"
-			| "urgency"
-			| "required_services"
-			| "submission_timestamp"
-		>;
-		support_services: Pick<SupportService, "name" | "service_types">;
-		appointments?: Array<{
-			date: string;
-			status: Database["public"]["Enums"]["appointment_status_type"];
-		}>;
-	};
 
 const formatServiceName = (service: string) => {
 	return service
@@ -195,8 +178,11 @@ export default function ProfessionalView({ userId }: { userId: string }) {
 					.from("matched_services")
 					.select(
 						`
-					*,
-					reports (
+					id,
+					match_status_type,
+					match_date,
+					match_score,
+					reports!inner(
 						report_id,
 						type_of_incident,
 						incident_description,
@@ -204,7 +190,7 @@ export default function ProfessionalView({ userId }: { userId: string }) {
 						required_services,
 						submission_timestamp
 					),
-					support_services (
+					support_services!inner(
 						name,
 						service_types
 					)
@@ -217,35 +203,73 @@ export default function ProfessionalView({ userId }: { userId: string }) {
 				return;
 			}
 
-			// Type assertion for matchedServicesData
+			// Separately fetch appointments for these matched services
 			if (matchedServicesData) {
-				const matchedServicesWithAppointments = await Promise.all(
-					matchedServicesData.map(async (match) => {
-						const { data: appointmentsData } = await supabase
-							.from("appointments")
-							.select("*")
-							.eq("match_id", match.id)
-							.single();
+				const matchIds = matchedServicesData.map((match) => match.id);
+				const { data: appointmentsData } = await supabase
+					.from("appointments")
+					.select("*")
+					.in("professional_id", [professionalProfileId]);
 
-						return {
-							...match,
-							appointments: appointmentsData ? [appointmentsData] : [],
-						} as MatchedService;
+				// Combine the data
+				const matchedServicesWithAppointments = matchedServicesData.map(
+					(match) => ({
+						...match,
+						appointments:
+							appointmentsData?.filter(
+								(apt) => apt.professional_id === professionalProfileId
+							) || [],
 					})
 				);
 
-				setMatchedServices(matchedServicesWithAppointments);
-			} else {
-				setMatchedServices([]);
+				setMatchedServices(
+					matchedServicesWithAppointments as unknown as MatchedService[]
+				);
 			}
 
-			// Fetch other data...
-			const { data: reportsData } = await supabase
+			// Fetch reports where the professional's services are matched
+			const { data: reportsData, error: reportsError } = await supabase
 				.from("reports")
-				.select("*")
+				.select(
+					`
+					*,
+					matched_services(
+						id,
+						match_status_type,
+						support_services(
+							id,
+							name,
+							service_types,
+							user_id
+						)
+					)
+				`
+				)
 				.eq("user_id", userId);
 
-			setReports(reportsData || []);
+			// If we have reports, fetch their appointments separately
+			if (reportsData) {
+				const { data: appointmentsData } = await supabase
+					.from("appointments")
+					.select("*")
+					.in("professional_id", [professionalProfileId]);
+
+				// Combine the appointments with the reports data
+				const reportsWithAppointments = reportsData.map((report) => ({
+					...report,
+					matched_services: report.matched_services?.map((match: any) => ({
+						...match,
+						appointments:
+							appointmentsData?.filter(
+								(apt) => apt.professional_id === professionalProfileId
+							) || [],
+					})),
+				}));
+
+				setReports(reportsWithAppointments);
+			} else {
+				setReports([]);
+			}
 		} catch (error) {
 			console.error("Error in fetchData:", error);
 			toast({
@@ -327,18 +351,28 @@ export default function ProfessionalView({ userId }: { userId: string }) {
 								description={report.incident_description}
 								requiredServices={
 									report.required_services as
-										| (
-												| "other"
-												| "legal"
-												| "medical"
-												| "mental_health"
-												| "shelter"
-												| "financial_assistance"
-										  )[]
+										| Database["public"]["Enums"]["support_service_type"][]
 										| null
 								}
 								onDelete={(reportId) => setDeleteReport(reportId)}
 								matchStatus={report.match_status}
+								matchedService={
+									report.matched_services?.[0]
+										? {
+												support_service: {
+													name: report.matched_services[0].support_services.name,
+													service_types:
+														report.matched_services[0].support_services.service_types,
+												},
+												appointment: report.matched_services[0].appointments?.[0]
+													? {
+															date: report.matched_services[0].appointments[0].date,
+															status: report.matched_services[0].appointments[0].status,
+													  }
+													: undefined,
+										  }
+										: undefined
+								}
 								formatServiceName={formatServiceName}
 							/>
 						))}

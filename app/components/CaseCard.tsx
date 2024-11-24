@@ -2,6 +2,7 @@ import { Button } from "@/components/ui/button";
 import { Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Database } from "@/types/db-schema";
+import { Report, MatchedService } from "@/types/reports";
 
 type BaseProps = {
 	reportId: string;
@@ -13,10 +14,10 @@ type BaseProps = {
 	formatServiceName?: (service: string) => string;
 };
 
-type MatchedService = {
+type MatchedServiceDetails = {
 	id: string;
 	match_status_type: Database["public"]["Enums"]["match_status_type"] | null;
-	support_service?: {
+	support_service: {
 		name: string;
 		service_types: Database["public"]["Enums"]["support_service_type"];
 	};
@@ -29,15 +30,16 @@ type MatchedService = {
 type ProfessionalProps = BaseProps & {
 	variant: "professional";
 	onAcceptMatch: (matchId: string) => void;
-	matchedService?: MatchedService;
+	matchedService?: MatchedServiceDetails;
 };
 
 type SurvivorProps = BaseProps & {
 	variant: "survivor";
 	matchStatus?: Database["public"]["Enums"]["match_status_type"] | null;
+	matchedService?: Omit<MatchedServiceDetails, "id" | "match_status_type">;
 };
 
-type CaseCardProps = ProfessionalProps | SurvivorProps;
+export type CaseCardProps = ProfessionalProps | SurvivorProps;
 
 export default function CaseCard(props: CaseCardProps) {
 	const formatServiceName =
@@ -141,6 +143,40 @@ export default function CaseCard(props: CaseCardProps) {
 		return null;
 	};
 
+	const renderSurvivorMatchDetails = () => {
+		if (props.variant !== "survivor" || !props.matchedService) return null;
+
+		if (props.matchStatus === "accepted") {
+			return (
+				<div className="mt-4 p-3 bg-secondary/20 rounded-md space-y-2">
+					<div className="flex items-center justify-between">
+						<p className="text-sm font-medium">
+							Matched with: {props.matchedService.support_service?.name}
+						</p>
+						<span className="text-xs text-muted-foreground">
+							{props.matchedService.support_service?.service_types}
+						</span>
+					</div>
+					{props.matchedService.appointment && (
+						<div className="text-sm">
+							<p>
+								Appointment:{" "}
+								{new Date(props.matchedService.appointment.date).toLocaleDateString()}{" "}
+								at{" "}
+								{new Date(props.matchedService.appointment.date).toLocaleTimeString()}
+							</p>
+							<p className="text-xs text-muted-foreground">
+								Status: {props.matchedService.appointment?.status?.toUpperCase()}
+							</p>
+						</div>
+					)}
+				</div>
+			);
+		}
+
+		return null;
+	};
+
 	return (
 		<div className="bg-card p-4 rounded-lg border shadow-sm">
 			<div className="flex justify-between items-start">
@@ -182,7 +218,9 @@ export default function CaseCard(props: CaseCardProps) {
 				</div>
 			)}
 
-			{renderMatchedServiceDetails()}
+			{props.variant === "survivor"
+				? renderSurvivorMatchDetails()
+				: renderMatchedServiceDetails()}
 		</div>
 	);
 }
