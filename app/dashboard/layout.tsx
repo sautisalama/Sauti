@@ -1,5 +1,6 @@
 import { getUser } from "@/utils/supabase/server";
 import { redirect } from "next/navigation";
+import { MainSidebar } from "./_views/MainSidebar";
 
 export default async function DashboardLayout({
 	children,
@@ -12,5 +13,10 @@ export default async function DashboardLayout({
 		redirect("/signin");
 	}
 
-	return <div className="min-h-screen">{children}</div>;
+	return (
+		<div className="flex">
+			<MainSidebar />
+			<main className="flex-1">{children}</main>
+		</div>
+	);
 }
