@@ -1,4 +1,4 @@
-import ChatWrapper from "./_components/ChatWrapper";
+import ChatWrapper from "@/app/chat/_components/ChatWrapper";
 
 export default function ChatLayout({
 	children,
