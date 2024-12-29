@@ -111,7 +111,7 @@ export function MainSidebar() {
 						<span className="text-xs">Resources</span>
 					</Link>
 					<Link
-						href="/messages"
+						href="/chat"
 						className={`flex flex-col items-center gap-1 transition-colors hover:text-[#f8941c] mx-8 ${
 							pathname === "/messages" ? "text-[#f8941c]" : "text-white"
 						}`}
