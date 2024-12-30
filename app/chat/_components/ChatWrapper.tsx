@@ -1,74 +1,64 @@
 "use client";
 
-import { StreamChat } from "stream-chat";
-import { Chat } from "stream-chat-react";
 import { useEffect, useState } from "react";
+import { Chat } from "stream-chat-react";
+import { StreamChat } from "stream-chat";
+import { connectToStream } from "@/utils/stream-chat";
+import ChatChannels from "./ChatChannels";
 import { createClient } from "@/utils/supabase/client";
 
-const apiKey = process.env.NEXT_PUBLIC_STREAM_KEY!;
+import "stream-chat-react/dist/css/v2/index.css";
 
 export default function ChatWrapper({
-  children,
+	children,
 }: {
-  children: React.ReactNode;
+	children: React.ReactNode;
 }) {
-  const [chatClient, setChatClient] = useState<StreamChat | null>(null);
-  const supabase = createClient();
+	const [client, setClient] = useState<StreamChat | null>(null);
+	const supabase = createClient();
+	const [user, setUser] = useState<any>(null);
 
-  useEffect(() => {
-    const initChat = async () => {
-      const client = StreamChat.getInstance(apiKey);
-      
-      // Get current user from Supabase
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) return;
+	useEffect(() => {
+		// Get user on mount
+		supabase.auth.getUser().then(({ data: { user } }) => {
+			setUser(user);
+		});
+	}, []);
 
-      // Get user profile
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("id", user.id)
-        .single();
+	useEffect(() => {
+		if (!user) return;
 
-      if (!profile) return;
+		const initChat = async () => {
+			try {
+				const connectedClient = await connectToStream(
+					user.id,
+					user.name || "Anonymous"
+				);
+				setClient(connectedClient);
+			} catch (error) {
+				console.error("Error initializing chat:", error);
+			}
+		};
 
-      // Get Stream Chat token from our API
-      const response = await fetch('/api/stream/token', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ userId: user.id }),
-      });
+		initChat();
 
-      const { token } = await response.json();
-      if (!token) return;
+		return () => {
+			if (client) {
+				client.disconnectUser();
+			}
+		};
+	}, [user]);
 
-      // Connect user to Stream Chat
-      await client.connectUser(
-        {
-          id: user.id,
-          name: `${profile.first_name} ${profile.last_name}`,
-          role: profile.user_type,
-        },
-        token // Using the server-generated token
-      );
+	if (!client || !user) {
+		return <div>Loading chat...</div>;
+	}
 
-      setChatClient(client);
-    };
-
-    initChat();
-
-    return () => {
-      if (chatClient) chatClient.disconnectUser();
-    };
-  }, []);
-
-  if (!chatClient) {
-    return <div>Loading chat...</div>;
-  }
-
-  return <Chat client={chatClient}>{children}</Chat>;
+	return (
+		<Chat client={client} theme="messaging light">
+			<div className="flex h-screen">
+				<ChatChannels userId={user.id} />
+				<div className="flex-1">{children}</div>
+			</div>
+		</Chat>
+	);
 }

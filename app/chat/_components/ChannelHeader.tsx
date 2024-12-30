@@ -2,7 +2,7 @@
 
 import { useChannelStateContext } from "stream-chat-react";
 import { Button } from "@/components/ui/button";
-import { Users, Image as ImageIcon } from "lucide-react";
+import { Users } from "lucide-react";
 import {
 	Dialog,
 	DialogContent,
@@ -70,16 +70,6 @@ export function ChannelHeader() {
 						</div>
 					</DialogContent>
 				</Dialog>
-
-				{/* <Button
-					variant="ghost"
-					size="icon"
-					onClick={() => {
-						channel?.updateImage({ image: "new_image_url" });
-					}}
-				>
-					<ImageIcon className="h-5 w-5" />
-				</Button> */}
 			</div>
 		</div>
 	);

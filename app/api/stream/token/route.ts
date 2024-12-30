@@ -6,9 +6,9 @@ const serverClient = StreamChat.getInstance(
   process.env.STREAM_CHAT_SECRET!
 );
 
-export async function POST(request: Request) {
+export async function POST(req: Request) {
   try {
-    const { userId } = await request.json();
+    const { userId, userName } = await req.json();
     
     if (!userId) {
       return NextResponse.json(
@@ -18,7 +18,7 @@ export async function POST(request: Request) {
     }
 
     const token = serverClient.createToken(userId);
-    
+
     return NextResponse.json({ token });
   } catch (error) {
     console.error('Error generating token:', error);
