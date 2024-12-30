@@ -1,30 +1,32 @@
-import { StreamChat } from 'stream-chat';
-import { NextResponse } from 'next/server';
+import { StreamChat } from "stream-chat";
+import { NextResponse } from "next/server";
+import { createClient } from "@/utils/supabase/server";
 
-const serverClient = StreamChat.getInstance(
-  process.env.NEXT_PUBLIC_STREAM_KEY!,
-  process.env.STREAM_CHAT_SECRET!
-);
+export async function GET() {
+	const supabase = createClient();
 
-export async function POST(req: Request) {
-  try {
-    const { userId, userName } = await req.json();
-    
-    if (!userId) {
-      return NextResponse.json(
-        { error: 'User ID is required' },
-        { status: 400 }
-      );
-    }
+	try {
+		const {
+			data: { session },
+		} = await supabase.auth.getSession();
 
-    const token = serverClient.createToken(userId);
+		if (!session) {
+			return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+		}
 
-    return NextResponse.json({ token });
-  } catch (error) {
-    console.error('Error generating token:', error);
-    return NextResponse.json(
-      { error: 'Could not generate token' },
-      { status: 500 }
-    );
-  }
+		const streamClient = StreamChat.getInstance(
+			process.env.NEXT_PUBLIC_STREAM_KEY!,
+			process.env.STREAM_CHAT_SECRET
+		);
+
+		const token = streamClient.createToken(session.user.id);
+
+		return NextResponse.json({ token });
+	} catch (error) {
+		console.error("Error generating stream token:", error);
+		return NextResponse.json(
+			{ error: "Failed to generate token" },
+			{ status: 500 }
+		);
+	}
 }

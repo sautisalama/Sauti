@@ -1,17 +1,17 @@
-"use client";
+import { getUser } from "@/utils/supabase/server";
+import { redirect } from "next/navigation";
+import { ChatComponent } from "@/app/components/Chat";
 
-import { Channel, MessageInput, MessageList, Window } from "stream-chat-react";
+export default async function ChatPage() {
+	const user = await getUser();
 
-import { ChannelHeader } from "@/app/chat/_components/ChannelHeader";
+	if (!user) {
+		redirect("/signin");
+	}
 
-export default function ChatPage() {
-  return (
-    <Channel>
-      <Window>
-        <ChannelHeader />
-        <MessageList />
-        <MessageInput focus />
-      </Window>
-    </Channel>
-  );
+	return (
+		<div className="h-screen">
+			<ChatComponent userId={user.id} username={user.first_name || user.id} />
+		</div>
+	);
 }
