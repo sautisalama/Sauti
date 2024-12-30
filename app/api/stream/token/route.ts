@@ -4,7 +4,7 @@ import { NextResponse } from 'next/server';
 const serverClient = StreamChat.getInstance(
   process.env.NEXT_PUBLIC_STREAM_KEY!,
   process.env.STREAM_CHAT_SECRET!
-); 
+);
 
 export async function POST(request: Request) {
   try {
@@ -27,4 +27,4 @@ export async function POST(request: Request) {
       { status: 500 }
     );
   }
-} 
+}
