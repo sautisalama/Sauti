@@ -16,8 +16,6 @@ export default async function Dashboard() {
 		redirect("/signin");
 	}
 
-	const userDisplay = user.first_name || user.id;
-
 	return (
 		<div className="flex h-screen overflow-hidden">
 			{/* Sticky sidebar */}
@@ -28,7 +26,7 @@ export default async function Dashboard() {
 			{/* Main content area with independent scrolling */}
 			<div className="flex-1 overflow-auto ml-[72px]">
 				{user.user_type === "survivor" ? (
-					<SurvivorView userId={user.id} />
+					<SurvivorView userId={user.id} profileDetails={user} />
 				) : user.user_type === "professional" ? (
 					<ProfessionalView userId={user.id} />
 				) : (

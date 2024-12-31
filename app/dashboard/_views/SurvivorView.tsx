@@ -11,7 +11,7 @@ import {
 	DialogTitle,
 	DialogTrigger,
 } from "@/components/ui/dialog";
-import { Plus, Trash2 } from "lucide-react";
+import { Info, Plus, Trash2 } from "lucide-react";
 import { useState, useEffect } from "react";
 import AuthenticatedReportAbuseForm from "@/components/AuthenticatedReportAbuseForm";
 import {
@@ -39,6 +39,8 @@ import { MainSidebar } from "./MainSidebar";
 import { UpcomingAppointments } from "@/app/components/UpcomingAppointments";
 import { CommunityCard } from "@/app/components/CommunityCard";
 import { DailyProgress } from "@/app/components/DailyProgress";
+import WelcomeHeader from "@/app/components/WelcomeHeader";
+import { JoinCommunity } from "@/app/components/JoinCommunity";
 
 // Add this interface to type the joined data
 interface ReportWithRelations extends Tables<"reports"> {
@@ -62,12 +64,21 @@ interface ReportWithRelations extends Tables<"reports"> {
 	}>;
 }
 
-export default function SurvivorView({ userId }: { userId: string }) {
+interface SurvivorViewProps {
+	userId: string;
+	profileDetails: Tables<"profiles">;
+}
+
+export default function SurvivorView({
+	userId,
+	profileDetails,
+}: SurvivorViewProps) {
 	const [reports, setReports] = useState<ReportWithRelations[]>([]);
 	const [open, setOpen] = useState(false);
 	const supabase = createClient();
 	const { toast } = useToast();
 	const [deleteReport, setDeleteReport] = useState<string | null>(null);
+	const [showAlert, setShowAlert] = useState(true);
 
 	// Move fetchReports outside useEffect so it can be called from handlers
 	const fetchReports = async () => {
@@ -213,57 +224,46 @@ export default function SurvivorView({ userId }: { userId: string }) {
 			<main className="flex-1 w-[calc(100%-80px)]">
 				<div className="p-6">
 					{/* Alert Banner */}
-					<Alert className="mb-6 bg-[#FFF8F0] border-none">
-						<AlertTitle className="flex items-center gap-2">
-							<Image src="/icons/info.svg" alt="Info" width={20} height={20} />
-							Information
-						</AlertTitle>
-						<AlertDescription className="flex items-center justify-between">
-							<span>
-								This is a temporary account. It will be cleared after: 4days 24hrs 10
-								Sec
-							</span>
-							<div className="flex gap-4">
-								<Button variant="outline" className="border-teal-600 text-teal-600">
-									Create An Account
-								</Button>
-								<Button variant="ghost">Dismiss</Button>
-							</div>
-						</AlertDescription>
-					</Alert>
+					{showAlert && (
+						<Alert className="mb-6 bg-[#FFF8F0] border-none">
+							<AlertTitle className="flex items-center gap-2">
+								<Info className="h-5 w-5" />
+								Information
+							</AlertTitle>
+							<AlertDescription className="flex items-center justify-between">
+								<span>
+									This is a temporary account. It will be cleared after: 4days 24hrs 10
+									Sec
+								</span>
+								<div className="flex gap-4">
+									<Button
+										variant="outline"
+										className="border-teal-600 text-teal-600"
+										asChild
+									>
+										<Link href="/signup">Create An Account</Link>
+									</Button>
+									<Button variant="ghost" onClick={() => setShowAlert(false)}>
+										Dismiss
+									</Button>
+								</div>
+							</AlertDescription>
+						</Alert>
+					)}
 
 					{/* Header */}
-					<header className="mb-8 flex items-center justify-between">
-						<div>
-							<h1 className="text-2xl font-bold">
-								Hello <span className="text-teal-600">Cute Mapkin</span>
-							</h1>
-							<p className="text-gray-500">
-								Lorem ipsum dolor sit amet, consectetur adipiscing elit
-							</p>
-						</div>
-						<div className="flex items-center gap-6">
-							<Button variant="ghost" className="text-teal-600">
-								Learn Something
-							</Button>
-							<Button variant="ghost" size="icon">
-								<Search className="h-5 w-5" />
-							</Button>
-							<Button variant="ghost" size="icon">
-								<Bell className="h-5 w-5" />
-							</Button>
-							<Button variant="ghost" size="icon">
-								<Users className="h-5 w-5" />
-							</Button>
-						</div>
-					</header>
+					<WelcomeHeader profileDetails={profileDetails} />
 
 					{/* Tabs */}
 					<Tabs defaultValue="overview" className="mb-8">
 						<TabsList>
 							<TabsTrigger value="overview">Overview</TabsTrigger>
-							<TabsTrigger value="reports">My Reports</TabsTrigger>
-							<TabsTrigger value="toolkit">My Toolkit</TabsTrigger>
+							<TabsTrigger value="reports" disabled>
+								My Reports
+							</TabsTrigger>
+							<TabsTrigger value="toolkit" disabled>
+								My Toolkit
+							</TabsTrigger>
 						</TabsList>
 
 						<TabsContent value="overview">
@@ -441,17 +441,18 @@ export default function SurvivorView({ userId }: { userId: string }) {
 										<CardContent className="p-6">
 											<h3 className="mb-2 text-lg font-bold">Check your condition</h3>
 											<p className="mb-4">
-												Lorem ipsum dolor sit amet, consectetur adipiscing elit
+												Take a simple test to evaluate how you are feeling
 											</p>
-											<Button className="bg-teal-600">Check it now</Button>
+
 											<div className="mt-4 flex justify-end">
 												<Image
-													src="/icons/watering-can.svg"
+													src="/dashboard/watering-can.png"
 													alt="Illustration"
 													width={100}
 													height={100}
 												/>
 											</div>
+											<Button className="bg-teal-600">Check it now</Button>
 										</CardContent>
 									</Card>
 
@@ -494,48 +495,7 @@ export default function SurvivorView({ userId }: { userId: string }) {
 									</div>
 
 									{/* Community Card */}
-									<Card className="mt-6 bg-[#FFF8F0]">
-										<CardContent className="p-6">
-											<div className="mb-4 flex justify-between">
-												<span className="rounded bg-teal-600 px-2 py-1 text-xs text-white">
-													About Community
-												</span>
-												<Button variant="ghost" className="text-xs">
-													About
-												</Button>
-											</div>
-											<h3 className="mb-2 text-lg font-bold">Join Our Community</h3>
-											<p className="mb-4 text-sm text-gray-500">
-												Lorem ipsum dolor sit amet, consectetur adipiscing elit
-											</p>
-											<div className="flex -space-x-2">
-												<Avatar className="border-2 border-white">
-													<AvatarImage src="/avatars/user1.png" />
-													<AvatarFallback>U1</AvatarFallback>
-												</Avatar>
-												<Avatar className="border-2 border-white">
-													<AvatarImage src="/avatars/user2.png" />
-													<AvatarFallback>U2</AvatarFallback>
-												</Avatar>
-												<Avatar className="border-2 border-white">
-													<AvatarImage src="/avatars/user3.png" />
-													<AvatarFallback>U3</AvatarFallback>
-												</Avatar>
-												<Avatar className="border-2 border-white bg-teal-600 text-white">
-													<AvatarFallback>+2</AvatarFallback>
-												</Avatar>
-											</div>
-											<div className="mt-4">
-												<Image
-													src="/illustrations/community.svg"
-													alt="Community"
-													width={200}
-													height={100}
-													className="ml-auto"
-												/>
-											</div>
-										</CardContent>
-									</Card>
+									<JoinCommunity />
 								</div>
 							</div>
 						</TabsContent>
@@ -677,12 +637,12 @@ export default function SurvivorView({ userId }: { userId: string }) {
 							</div>
 						</TabsContent> */}
 
-						<TabsContent value="toolkit">
+						{/* <TabsContent value="toolkit">
 							<div className="grid gap-6">
 								<h2 className="text-2xl font-bold">My Toolkit</h2>
-								{/* Add toolkit content here */}
+								
 							</div>
-						</TabsContent>
+						</TabsContent> */}
 					</Tabs>
 				</div>
 			</main>
