@@ -90,15 +90,7 @@ export function Nav() {
 									be kept confidential.
 								</DialogDescription>
 							</DialogHeader>
-							<ReportAbuseForm
-								onClose={() =>
-									document
-										.querySelector<HTMLButtonElement>(
-											'[role="dialog"] button[aria-label="Close"]'
-										)
-										?.click()
-								}
-							/>
+							<ReportAbuseForm />
 						</DialogContent>
 					</Dialog>
 					{isAuthenticated ? (

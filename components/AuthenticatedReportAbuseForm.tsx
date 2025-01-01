@@ -143,29 +143,29 @@ export default function AuthenticatedReportAbuseForm({
 			<div className="flex-1 overflow-y-auto space-y-6 pr-4 pb-20">
 				<div className="flex items-center gap-4 flex-wrap">
 					<p className="text-lg text-gray-700">I want to report about</p>
-					<Select name="incident_type" required>
-						<SelectTrigger className="w-56">
-							<SelectValue placeholder="type of incident" />
-						</SelectTrigger>
-						<SelectContent className="z-[1001]">
-							<SelectItem value="physical">physical abuse</SelectItem>
-							<SelectItem value="emotional">emotional abuse</SelectItem>
-							<SelectItem value="sexual">sexual abuse</SelectItem>
-							<SelectItem value="financial">financial abuse</SelectItem>
-							<SelectItem value="other">other concerns</SelectItem>
-						</SelectContent>
-					</Select>
+					<select
+						name="incident_type"
+						required
+						className="border-b-2 border-teal-500 focus:outline-none px-2 bg-transparent"
+					>
+						<option value="">select incident type</option>
+						<option value="physical">physical abuse</option>
+						<option value="emotional">emotional abuse</option>
+						<option value="sexual">sexual abuse</option>
+						<option value="financial">financial abuse</option>
+						<option value="other">other concerns</option>
+					</select>
 					<p className="text-lg text-gray-700">with</p>
-					<Select name="urgency" required>
-						<SelectTrigger className="w-48">
-							<SelectValue placeholder="urgency" />
-						</SelectTrigger>
-						<SelectContent className="z-[1001]">
-							<SelectItem value="high">high urgency</SelectItem>
-							<SelectItem value="medium">medium urgency</SelectItem>
-							<SelectItem value="low">low urgency</SelectItem>
-						</SelectContent>
-					</Select>
+					<select
+						name="urgency"
+						required
+						className="border-b-2 border-teal-500 focus:outline-none px-2 bg-transparent"
+					>
+						<option value="">select urgency</option>
+						<option value="high">high urgency</option>
+						<option value="medium">medium urgency</option>
+						<option value="low">low urgency</option>
+					</select>
 				</div>
 
 				<div className="w-full">
@@ -201,30 +201,27 @@ export default function AuthenticatedReportAbuseForm({
 						pattern="[0-9]{10,}"
 						className="w-full"
 					/>
-					<Select
+					<select
 						name="contact_preference"
 						required
-						onValueChange={(value) => {
+						className="border-b-2 border-teal-500 focus:outline-none px-2 bg-transparent"
+						onChange={(e) => {
 							const phoneInput = document.querySelector(
 								'input[name="phone"]'
 							) as HTMLInputElement;
-							if (value === "phone_call" || value === "sms") {
+							if (e.target.value === "phone_call" || e.target.value === "sms") {
 								phoneInput.required = true;
 							} else {
 								phoneInput.required = false;
 							}
 						}}
 					>
-						<SelectTrigger>
-							<SelectValue placeholder="Preferred contact" />
-						</SelectTrigger>
-						<SelectContent className="z-[1001]">
-							<SelectItem value="phone_call">Call me</SelectItem>
-							<SelectItem value="sms">Text me</SelectItem>
-							<SelectItem value="email">Email me</SelectItem>
-							<SelectItem value="do_not_contact">Don't contact me</SelectItem>
-						</SelectContent>
-					</Select>
+						<option value="">select contact preference</option>
+						<option value="phone_call">Call me</option>
+						<option value="sms">Text me</option>
+						<option value="email">Email me</option>
+						<option value="do_not_contact">Don't contact me</option>
+					</select>
 				</div>
 
 				<div className="flex items-center gap-4 justify-between">
@@ -232,15 +229,15 @@ export default function AuthenticatedReportAbuseForm({
 						Do you consent to share this information with relevant authorities if
 						needed?
 					</p>
-					<Select name="consent" required>
-						<SelectTrigger className="w-[200px]">
-							<SelectValue placeholder="Select consent" />
-						</SelectTrigger>
-						<SelectContent className="z-[1001]">
-							<SelectItem value="yes">Yes, I consent</SelectItem>
-							<SelectItem value="no">No, I don't consent</SelectItem>
-						</SelectContent>
-					</Select>
+					<select
+						name="consent"
+						required
+						className="border-b-2 border-teal-500 focus:outline-none px-2 bg-transparent w-[200px]"
+					>
+						<option value="">select consent</option>
+						<option value="yes">Yes, I consent</option>
+						<option value="no">No, I don't consent</option>
+					</select>
 				</div>
 			</div>
 

@@ -9,74 +9,6 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      appointments: {
-        Row: {
-          date: string
-          id: string
-          professional_id: string | null
-          status: Database["public"]["Enums"]["appointment_status_type"] | null
-          survivor_id: string | null
-        }
-        Insert: {
-          date: string
-          id?: string
-          professional_id?: string | null
-          status?: Database["public"]["Enums"]["appointment_status_type"] | null
-          survivor_id?: string | null
-        }
-        Update: {
-          date?: string
-          id?: string
-          professional_id?: string | null
-          status?: Database["public"]["Enums"]["appointment_status_type"] | null
-          survivor_id?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "appointments_professional_id_fkey"
-            columns: ["professional_id"]
-            isOneToOne: false
-            referencedRelation: "professional_profiles"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      email_logs: {
-        Row: {
-          created_at: string | null
-          email_type: string
-          error_message: string | null
-          id: string
-          metadata: Json | null
-          sent_at: string | null
-          status: string | null
-          updated_at: string | null
-          user_id: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          email_type: string
-          error_message?: string | null
-          id?: string
-          metadata?: Json | null
-          sent_at?: string | null
-          status?: string | null
-          updated_at?: string | null
-          user_id?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          email_type?: string
-          error_message?: string | null
-          id?: string
-          metadata?: Json | null
-          sent_at?: string | null
-          status?: string | null
-          updated_at?: string | null
-          user_id?: string | null
-        }
-        Relationships: []
-      }
       matched_services: {
         Row: {
           feedback: string | null
@@ -133,57 +65,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
-      }
-      ngo_profiles: {
-        Row: {
-          id: string
-          organization_name: string
-          service_models: string
-          user_id: string | null
-        }
-        Insert: {
-          id?: string
-          organization_name: string
-          service_models: string
-          user_id?: string | null
-        }
-        Update: {
-          id?: string
-          organization_name?: string
-          service_models?: string
-          user_id?: string | null
-        }
-        Relationships: []
-      }
-      professional_profiles: {
-        Row: {
-          availability: string
-          bio: string
-          created_at: string | null
-          id: string
-          profession: string
-          tokens: number | null
-          user_id: string | null
-        }
-        Insert: {
-          availability: string
-          bio: string
-          created_at?: string | null
-          id?: string
-          profession: string
-          tokens?: number | null
-          user_id?: string | null
-        }
-        Update: {
-          availability?: string
-          bio?: string
-          created_at?: string | null
-          id?: string
-          profession?: string
-          tokens?: number | null
-          user_id?: string | null
-        }
-        Relationships: []
       }
       profiles: {
         Row: {
@@ -356,6 +237,7 @@ export type Database = {
         Row: {
           availability: string | null
           coverage_area_radius: number | null
+          created_at: string | null
           email: string | null
           helpline: string | null
           id: string
@@ -371,6 +253,7 @@ export type Database = {
         Insert: {
           availability?: string | null
           coverage_area_radius?: number | null
+          created_at?: string | null
           email?: string | null
           helpline?: string | null
           id?: string
@@ -386,6 +269,7 @@ export type Database = {
         Update: {
           availability?: string | null
           coverage_area_radius?: number | null
+          created_at?: string | null
           email?: string | null
           helpline?: string | null
           id?: string

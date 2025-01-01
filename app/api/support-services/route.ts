@@ -1,5 +1,6 @@
 import { createClient } from "@/utils/supabase/server";
 import { NextResponse } from "next/server";
+import { Database } from "@/types/db-schema";
 
 export async function POST(request: Request) {
 	const supabase = createClient();
@@ -10,13 +11,7 @@ export async function POST(request: Request) {
 			error: sessionError,
 		} = await supabase.auth.getSession();
 
-		if (sessionError) {
-			console.error("Session error:", sessionError);
-			return NextResponse.json({ error: "Authentication error" }, { status: 401 });
-		}
-
-		if (!session) {
-			console.error("No session found");
+		if (sessionError || !session) {
 			return NextResponse.json(
 				{ error: "Unauthorized - No valid session" },
 				{ status: 401 }
@@ -25,25 +20,24 @@ export async function POST(request: Request) {
 
 		const data = await request.json();
 
-		// Verify that the professional_id matches the authenticated user
-		if (data.professional_id !== session.user.id) {
-			return NextResponse.json(
-				{ error: "Unauthorized - User ID mismatch" },
-				{ status: 403 }
-			);
-		}
-
 		// Transform the data to match the database schema
-		const serviceData = {
-			name: data.name,
-			service_types: data.service_types,
-			phone_number: data.phone_number,
-			availability: data.availability,
-			latitude: data.latitude,
-			longitude: data.longitude,
-			email: session.user.email,
-			user_id: session.user.id,
-		};
+		const serviceData: Database["public"]["Tables"]["support_services"]["Insert"] =
+			{
+				name: data.name,
+				service_types: data.service_types,
+				phone_number: data.phone_number,
+				availability: data.availability,
+				latitude: data.latitude,
+				longitude: data.longitude,
+				email: session.user.email,
+				user_id: session.user.id,
+				// Optional fields from schema
+				helpline: null,
+				website: null,
+				coverage_area_radius: null,
+				priority: null,
+				created_at: new Date().toISOString(),
+			};
 
 		const { error: insertError } = await supabase
 			.from("support_services")
@@ -62,6 +56,37 @@ export async function POST(request: Request) {
 		console.error("Error adding support service:", error);
 		return NextResponse.json(
 			{ error: "Failed to add support service" },
+			{ status: 500 }
+		);
+	}
+}
+
+// Optional: Add GET method to fetch services
+export async function GET(request: Request) {
+	const supabase = createClient();
+
+	try {
+		const {
+			data: { session },
+			error: sessionError,
+		} = await supabase.auth.getSession();
+
+		if (sessionError || !session) {
+			return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+		}
+
+		const { data: services, error } = await supabase
+			.from("support_services")
+			.select("*")
+			.eq("user_id", session.user.id);
+
+		if (error) throw error;
+
+		return NextResponse.json(services);
+	} catch (error) {
+		console.error("Error fetching support services:", error);
+		return NextResponse.json(
+			{ error: "Failed to fetch support services" },
 			{ status: 500 }
 		);
 	}
