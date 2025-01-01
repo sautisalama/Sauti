@@ -12,7 +12,7 @@ import {
 	DialogTrigger,
 } from "@/components/ui/dialog";
 import { Info, Plus, Trash2 } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import AuthenticatedReportAbuseForm from "@/components/AuthenticatedReportAbuseForm";
 import {
 	AlertDialog,
@@ -41,175 +41,129 @@ import { CommunityCard } from "@/app/components/CommunityCard";
 import { DailyProgress } from "@/app/components/DailyProgress";
 import WelcomeHeader from "@/app/components/WelcomeHeader";
 import { JoinCommunity } from "@/app/components/JoinCommunity";
-
-// Add this interface to type the joined data
-interface ReportWithRelations extends Tables<"reports"> {
-	matched_services?: Array<{
-		id: string;
-		match_status_type: Database["public"]["Enums"]["match_status_type"];
-		match_date: string | null;
-		match_score: number | null;
-		support_services: {
-			id: string;
-			name: string;
-			service_types: Database["public"]["Enums"]["support_service_type"];
-		};
-		appointments?: Array<{
-			id: string;
-			date: string;
-			status: Database["public"]["Enums"]["appointment_status_type"] | null;
-			professional_id: string | null;
-			survivor_id: string | null;
-		}>;
-	}>;
-}
+import { ConditionCheckCard } from "@/app/components/ConditionCheckCard";
 
 interface SurvivorViewProps {
 	userId: string;
 	profileDetails: Tables<"profiles">;
 }
 
-// Add this interface near the top with other interfaces
-interface SupportService {
-	id: string;
-	name: string;
-	service_types: string;
-	phone_number: string | null;
-	availability: string | null;
-	latitude: number | null;
-	longitude: number | null;
-	created_at: string;
-}
+// Dummy data for reports
+const dummyReports = [
+	{
+		report_id: "1",
+		type_of_incident: "domestic_violence",
+		urgency: "high",
+		submission_timestamp: "2024-03-15T10:00:00Z",
+		matched_services: [
+			{
+				support_services: { name: "Emergency Support Center" },
+				match_status_type: "accepted",
+				appointments: [{ status: "confirmed", datetime: "2024-03-20T14:00:00Z" }],
+			},
+		],
+	},
+	{
+		report_id: "2",
+		type_of_incident: "sexual_harassment",
+		urgency: "medium",
+		submission_timestamp: "2024-03-14T15:30:00Z",
+		matched_services: [
+			{
+				support_services: { name: "Women's Legal Aid" },
+				match_status_type: "pending",
+				appointments: [],
+			},
+		],
+	},
+	{
+		report_id: "3",
+		type_of_incident: "stalking",
+		urgency: "low",
+		submission_timestamp: "2024-03-13T09:15:00Z",
+		matched_services: [],
+	},
+];
 
-// Add this interface near the top with other interfaces
-interface MatchedCase {
-	id: string;
-	match_status_type: Database["public"]["Enums"]["match_status_type"];
-	match_date: string | null;
-	match_score: number | null;
-	report: {
-		report_id: string;
-		type_of_incident: string;
-		urgency: string;
-		submission_timestamp: string;
-	};
-	support_service: {
-		id: string;
-		name: string;
-		service_types: string;
-	};
-	appointments?: {
-		id: string;
-		date: string;
-		status: Database["public"]["Enums"]["appointment_status_type"];
-	}[];
-}
+// Dummy data for matched cases
+const matchedCases = [
+	{
+		id: "1",
+		report: {
+			type_of_incident: "domestic_violence",
+			urgency: "high",
+		},
+		match_date: "2024-03-15T10:00:00Z",
+		support_service: { name: "Emergency Support Center" },
+		match_status_type: "accepted",
+		match_score: 0.95,
+		appointments: [{ status: "confirmed" }],
+	},
+	{
+		id: "2",
+		report: {
+			type_of_incident: "sexual_harassment",
+			urgency: "medium",
+		},
+		match_date: "2024-03-14T15:30:00Z",
+		support_service: { name: "Women's Legal Aid" },
+		match_status_type: "pending",
+		match_score: 0.85,
+		appointments: [],
+	},
+];
+
+// Dummy data for support services
+const supportServices = [
+	{
+		id: "1",
+		name: "Emergency Support Center",
+		service_types: "domestic_violence, crisis_intervention",
+		phone_number: "+1 (555) 123-4567",
+		availability: "24/7",
+		latitude: 40.7128,
+		longitude: -74.006,
+	},
+	{
+		id: "2",
+		name: "Women's Legal Aid",
+		service_types: "legal_support, counseling",
+		phone_number: "+1 (555) 987-6543",
+		availability: "Mon-Fri 9AM-5PM",
+		latitude: 40.7589,
+		longitude: -73.9851,
+	},
+	{
+		id: "3",
+		name: "Trauma Recovery Center",
+		service_types: "counseling, therapy, support_group",
+		phone_number: "+1 (555) 456-7890",
+		availability: "Mon-Sat 8AM-8PM",
+		latitude: 40.7829,
+		longitude: -73.9654,
+	},
+];
 
 export default function ProfessionalView({
 	userId,
 	profileDetails,
 }: SurvivorViewProps) {
-	const [reports, setReports] = useState<ReportWithRelations[]>([]);
 	const [open, setOpen] = useState(false);
-	const supabase = createClient();
+	const [deleteReportId, setDeleteReportId] = useState<string | null>(null);
 	const { toast } = useToast();
-	const [deleteReport, setDeleteReport] = useState<string | null>(null);
-	const [showAlert, setShowAlert] = useState(true);
-	const [supportServices, setSupportServices] = useState<SupportService[]>([]);
-	const [matchedCases, setMatchedCases] = useState<MatchedCase[]>([]);
-
-	// Move fetchReports outside useEffect so it can be called from handlers
-	const fetchReports = async () => {
-		console.log("Fetching reports for user:", userId);
-
-		const { data, error } = await supabase
-			.from("reports")
-			.select(
-				`
-				*,
-				matched_services (
-					id,
-					match_status_type,
-					match_date,
-					match_score,
-					support_services (
-						id,
-						name,
-						service_types
-					)
-				)
-			`
-			)
-			.eq("user_id", userId)
-			.order("submission_timestamp", { ascending: false });
-
-		if (error) {
-			console.error("Error fetching reports:", error);
-			toast({
-				title: "Error",
-				description: "Failed to fetch reports. Please try again.",
-				variant: "destructive",
-			});
-			return;
-		}
-
-		// If we need appointments data, we'll need to fetch it separately
-		if (data && data.length > 0) {
-			// Get all matched service IDs
-			const matchedServiceIds = data
-				.flatMap((report) => report.matched_services || [])
-				.map((service) => service.id);
-
-			if (matchedServiceIds.length > 0) {
-				const { data: appointmentsData, error: appointmentsError } = await supabase
-					.from("appointments")
-					.select("*")
-					.in("professional_id", matchedServiceIds);
-
-				if (!appointmentsError && appointmentsData) {
-					// Merge appointments data with the reports
-					const reportsWithAppointments = data.map((report) => ({
-						...report,
-						matched_services: report.matched_services?.map(
-							(service: { id: string }) => ({
-								...service,
-								appointments: appointmentsData.filter(
-									(apt) => apt.professional_id === service.id
-								),
-							})
-						),
-					}));
-
-					console.log("Reports with appointments:", reportsWithAppointments);
-					setReports(reportsWithAppointments);
-					return;
-				}
-			}
-		}
-
-		// If no appointments needed to be fetched or if there was an error, just set the reports
-		console.log("Fetched reports:", data);
-		setReports(data || []);
-	};
+	// Add state for reports using dummy data
+	const [reports, setReports] = useState(dummyReports);
 
 	const handleDelete = async (reportId: string) => {
 		try {
-			const response = await fetch(`/api/reports/${reportId}`, {
-				method: "DELETE",
-			});
-
-			if (!response.ok) {
-				throw new Error("Failed to delete report");
-			}
+			// Update to use dummy data instead of API call
+			setReports(reports.filter((report) => report.report_id !== reportId));
 
 			toast({
 				title: "Report deleted",
 				description: "The report has been successfully deleted.",
 				variant: "default",
 			});
-
-			// Refresh data after successful deletion
-			fetchReports();
 		} catch (error) {
 			toast({
 				title: "Error",
@@ -218,98 +172,40 @@ export default function ProfessionalView({
 			});
 			console.error("Error deleting report:", error);
 		}
-		setDeleteReport(null);
+		setDeleteReportId(null);
 	};
 
-	// Add this function to fetch support services
-	const fetchSupportServices = async () => {
-		const { data, error } = await supabase
-			.from("support_services")
-			.select("*")
-			.eq("user_id", userId)
-			.order("created_at", { ascending: false });
+	// Remove or comment out the useEffect that fetches data
+	/* useEffect(() => {
+		const loadReports = async () => {
+			const reports = await fetchProfessionalReports(userId);
+			setReports(reports);
+		};
 
-		if (error) {
-			console.error("Error fetching support services:", error);
-			toast({
-				title: "Error",
-				description: "Failed to fetch support services. Please try again.",
-				variant: "destructive",
-			});
-			return;
-		}
-
-		setSupportServices(data || []);
-	};
-
-	// Add this function to fetch matched cases
-	const fetchMatchedCases = async () => {
-		const { data, error } = await supabase
-			.from("matched_services")
-			.select(
-				`
-				id,
-				match_status_type,
-				match_date,
-				match_score,
-				report:reports!inner(
-					report_id,
-					type_of_incident,
-					urgency,
-					submission_timestamp
-				)::report!inner(*)::single,
-				support_service:support_services!inner(
-					id,
-					name,
-					service_types
-				)::support_services!inner(*)::single,
-				appointments(
-					id,
-					date,
-					status
-				)
-			`
-			)
-			.eq("professional_id", userId);
-
-		if (error) throw error;
-		setMatchedCases(data || []);
-	};
-
-	useEffect(() => {
-		fetchReports();
+		loadReports();
 
 		// Set up real-time subscription
+		const supabase = createClient();
 		const channel = supabase
-			.channel("reports_changes")
+			.channel("professional-reports")
 			.on(
 				"postgres_changes",
 				{
 					event: "*",
 					schema: "public",
 					table: "reports",
-					filter: `user_id=eq.${userId}`,
 				},
-				(payload) => {
-					console.log("Real-time update received:", payload); // Debug log
-					fetchReports();
+				async () => {
+					const updatedReports = await fetchProfessionalReports(userId);
+					setReports(updatedReports);
 				}
 			)
 			.subscribe();
 
-		// Cleanup subscription
 		return () => {
 			supabase.removeChannel(channel);
 		};
-	}, [userId]);
-
-	useEffect(() => {
-		fetchSupportServices();
-	}, [userId]);
-
-	useEffect(() => {
-		fetchMatchedCases();
-	}, [userId]);
+	}, [userId]); */
 
 	// Add formatServiceName inside component
 	const formatServiceName = (service: string) => {
@@ -661,7 +557,7 @@ export default function ProfessionalView({
 																		variant="ghost"
 																		size="icon"
 																		className="text-destructive hover:text-destructive hover:bg-destructive/10"
-																		onClick={() => setDeleteReport(report.report_id)}
+																		onClick={() => setDeleteReportId(report.report_id)}
 																	>
 																		<Trash2 className="h-4 w-4" />
 																	</Button>
@@ -891,33 +787,8 @@ export default function ProfessionalView({
 						</div>
 
 						{/* Right side cards - fixed width */}
-						<div className="w-[350px] space-y-6">
-							{/* Condition Check Card */}
-							<Card className="bg-[#466D6D] text-white">
-								<CardContent className="p-6">
-									<h3 className="mb-2 text-lg font-bold">Explore Support Resources</h3>
-									<p className="mb-4">
-										Did you know? Having access to the right resources can increase your
-										chances of recovery by 70%. Discover personalized support options
-										tailored for you.
-									</p>
-
-									<div className="mt-4 flex justify-between items-center">
-										<Button asChild className="bg-teal-600 hover:bg-teal-700">
-											<Link href="/dashboard/resources">Browse Resources</Link>
-										</Button>
-										<Image
-											src="/dashboard/watering-can.png"
-											alt="Growth and Support Illustration"
-											width={100}
-											height={100}
-											className="opacity-90"
-										/>
-									</div>
-								</CardContent>
-							</Card>
-
-							{/* Community Card */}
+						<div className="w-[350px] space-y-6 sticky top-6 self-start">
+							<ConditionCheckCard />
 							<JoinCommunity />
 						</div>
 					</div>
@@ -926,8 +797,8 @@ export default function ProfessionalView({
 
 			{/* Existing Alert Dialog */}
 			<AlertDialog
-				open={!!deleteReport}
-				onOpenChange={(open) => !open && setDeleteReport(null)}
+				open={!!deleteReportId}
+				onOpenChange={(open) => !open && setDeleteReportId(null)}
 			>
 				<AlertDialogContent>
 					<AlertDialogHeader>
@@ -940,7 +811,7 @@ export default function ProfessionalView({
 						<AlertDialogCancel>Cancel</AlertDialogCancel>
 						<AlertDialogAction
 							className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-							onClick={() => deleteReport && handleDelete(deleteReport)}
+							onClick={() => deleteReportId && handleDelete(deleteReportId)}
 						>
 							Delete
 						</AlertDialogAction>
