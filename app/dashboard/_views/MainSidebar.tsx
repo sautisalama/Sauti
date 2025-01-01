@@ -93,27 +93,27 @@ export function MainSidebar() {
 						<span className="text-xs">Incidences</span>
 					</Link> */}
 					<Link
-						href="/sessions"
+						href="/dashboard/sessions"
 						className={`flex flex-col items-center gap-1 transition-colors hover:text-[#f8941c] mx-8 ${
-							pathname === "/sessions" ? "text-[#f8941c]" : "text-white"
+							pathname === "/dashboard/sessions" ? "text-[#f8941c]" : "text-white"
 						}`}
 					>
 						<Calendar className="h-6 w-6" />
 						<span className="text-xs">Sessions</span>
 					</Link>
 					<Link
-						href="/resources"
+						href="/dashboard/resources"
 						className={`flex flex-col items-center gap-1 transition-colors hover:text-[#f8941c] mx-8 ${
-							pathname === "/resources" ? "text-[#f8941c]" : "text-white"
+							pathname === "/dashboard/resources" ? "text-[#f8941c]" : "text-white"
 						}`}
 					>
 						<FileText className="h-6 w-6" />
 						<span className="text-xs">Resources</span>
 					</Link>
 					<Link
-						href="/chat"
+						href="/dashboard/chat"
 						className={`flex flex-col items-center gap-1 transition-colors hover:text-[#f8941c] mx-8 ${
-							pathname === "/messages" ? "text-[#f8941c]" : "text-white"
+							pathname === "/dashboard/messages" ? "text-[#f8941c]" : "text-white"
 						}`}
 					>
 						<MessageCircle className="h-6 w-6" />

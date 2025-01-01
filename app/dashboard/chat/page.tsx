@@ -1,6 +1,6 @@
 import { getUser } from "@/utils/supabase/server";
 import { redirect } from "next/navigation";
-import { ChatComponent } from "@/app/chat/_components/Chat";
+import { ChatComponent } from "@/app/dashboard/chat/_components/Chat";
 
 export default async function ChatPage() {
 	const user = await getUser();

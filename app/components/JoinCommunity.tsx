@@ -15,8 +15,13 @@ export function JoinCommunity() {
 						<span className="rounded bg-teal-600 px-2 py-1 text-xs text-white">
 							About Community
 						</span>
-						<Button variant="ghost" size="sm" className="text-xs text-teal-700" asChild>
-							<Link href="/about">About</Link>
+						<Button
+							variant="ghost"
+							size="sm"
+							className="text-xs text-teal-700"
+							asChild
+						>
+							<Link href="/dashboard/about">About</Link>
 						</Button>
 					</div>
 

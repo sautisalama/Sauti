@@ -448,7 +448,7 @@ export default function SurvivorView({
 
 											<div className="mt-4 flex justify-between items-center">
 												<Button asChild className="bg-teal-600 hover:bg-teal-700">
-													<Link href="/resources">Browse Resources</Link>
+													<Link href="/dashboard/resources">Browse Resources</Link>
 												</Button>
 												<Image
 													src="/dashboard/watering-can.png"
