@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/popover";
 import { format } from "date-fns";
 import { TimePickerDemo } from "@/components/ui/time-picker";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 
 interface Appointment {
 	id: string;
@@ -69,15 +70,10 @@ export function UpcomingAppointments() {
 				{/* Doctor Info Card */}
 				<div className="space-y-4">
 					<div className="flex items-center gap-3">
-						<div className="h-12 w-12 overflow-hidden rounded-full">
-							<Image
-								src="/dashboard/featured.png"
-								alt="Dr Emilia Winson"
-								width={48}
-								height={48}
-								className="h-full w-full object-cover"
-							/>
-						</div>
+						<Avatar className="h-12 w-12">
+							<AvatarImage src="/dashboard/featured.png" alt="Dr Emilia Winson" />
+							<AvatarFallback>EW</AvatarFallback>
+						</Avatar>
 						<div className="flex items-center justify-between flex-1">
 							<div>
 								<h4 className="font-medium text-[#1A3434]">Dr Emilia Winson</h4>
@@ -101,6 +97,17 @@ export function UpcomingAppointments() {
 					{/* Schedule Card */}
 					<div className="rounded-2xl bg-[#1A3434] p-4">
 						<div className="flex justify-between text-white">
+							<div className="flex items-center gap-2">
+								<CalendarIcon className="h-5 w-5" />
+								<span>Thursday, March 28, 2025</span>
+							</div>
+
+							<div className="flex items-center gap-2">
+								<Clock className="h-5 w-5" />
+								<span>10:00 AM</span>
+							</div>
+						</div>
+						{/* <div className="flex justify-between text-white">
 							<Popover>
 								<PopoverTrigger asChild>
 									<div className="flex items-center gap-2 cursor-pointer hover:opacity-80">
@@ -129,7 +136,7 @@ export function UpcomingAppointments() {
 									<TimePickerDemo selected={time} onTimeChange={setTime} />
 								</PopoverContent>
 							</Popover>
-						</div>
+						</div> */}
 					</div>
 				</div>
 
@@ -158,13 +165,18 @@ export function UpcomingAppointments() {
 						}`}
 					>
 						<div className="flex items-center gap-3">
-							<Image
-								src={appointment.doctorImage}
-								alt={appointment.doctorName}
-								width={40}
-								height={40}
-								className="rounded-full"
-							/>
+							<Avatar className="h-10 w-10">
+								<AvatarImage
+									src={appointment.doctorImage}
+									alt={appointment.doctorName}
+								/>
+								<AvatarFallback>
+									{appointment.doctorName
+										.split(" ")
+										.map((n) => n[0])
+										.join("")}
+								</AvatarFallback>
+							</Avatar>
 							<div>
 								<h4 className="font-medium">{appointment.doctorName}</h4>
 								<p className="text-sm text-gray-500">{appointment.time}</p>

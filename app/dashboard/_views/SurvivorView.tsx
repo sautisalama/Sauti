@@ -457,7 +457,7 @@ export default function SurvivorView({
 									</Card>
 
 									{/* Appointments Calendar */}
-									<div>
+									{/* <div>
 										<div className="mb-4 flex items-center justify-between">
 											<h3 className="text-lg font-bold">List of Appointments</h3>
 											<div className="flex gap-2">
@@ -492,7 +492,7 @@ export default function SurvivorView({
 												See More Schedule →
 											</Button>
 										</div>
-									</div>
+									</div> */}
 
 									{/* Community Card */}
 									<JoinCommunity />
