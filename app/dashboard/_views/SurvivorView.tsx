@@ -220,19 +220,17 @@ export default function SurvivorView({
 
 	return (
 		<div className="flex min-h-screen bg-white">
-			<main className="flex-1 w-[calc(100%-80px)]">
-				<div className="p-6">
+			<main className="flex-1 w-full">
+				<div className="p-4 md:p-6 mt-14 md:mt-0 mb-20 md:mb-0">
 					<WelcomeHeader profileDetails={profileDetails} />
 
-					<div className="flex gap-6">
+					<div className="flex flex-col md:flex-row gap-6">
 						<div className="flex-1">
 							<Tabs defaultValue="overview" className="mb-8">
-								<TabsList>
+								<TabsList className="overflow-x-auto">
 									<TabsTrigger value="overview">Overview</TabsTrigger>
-									<TabsTrigger value="reports">My Reports</TabsTrigger>
-									<TabsTrigger value="toolkit" disabled>
-										My Toolkit
-									</TabsTrigger>
+									<TabsTrigger value="reports">Reports</TabsTrigger>
+									<TabsTrigger value="toolkit">Toolkit</TabsTrigger>
 								</TabsList>
 
 								<TabsContent value="overview">
@@ -525,15 +523,16 @@ export default function SurvivorView({
 
 							<div className="space-y-8">
 								<UpcomingAppointments />
-								<div className="grid grid-cols-2 gap-6">
+								<div className="grid grid-cols-1 md:grid-cols-2 gap-6">
 									<CommunityCard />
-									<DailyProgress />
+									<div className="hidden md:block">
+										<DailyProgress />
+									</div>
 								</div>
 							</div>
 						</div>
 
-						<div className="w-[350px] space-y-6 sticky top-6 self-start">
-							{/* Condition Check Card */}
+						<div className="hidden md:block w-[350px] space-y-6 sticky top-6 self-start">
 							<Card className="mb-6 bg-[#466D6D] text-white">
 								<CardContent className="p-6">
 									<h3 className="mb-2 text-lg font-bold">Explore Support Resources</h3>
