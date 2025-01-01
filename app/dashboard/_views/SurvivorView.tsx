@@ -224,7 +224,7 @@ export default function SurvivorView({
 			<main className="flex-1 w-[calc(100%-80px)]">
 				<div className="p-6">
 					{/* Alert Banner */}
-					{showAlert && (
+					{/* {showAlert && (
 						<Alert className="mb-6 bg-[#FFF8F0] border-none">
 							<AlertTitle className="flex items-center gap-2">
 								<Info className="h-5 w-5" />
@@ -249,7 +249,7 @@ export default function SurvivorView({
 								</div>
 							</AlertDescription>
 						</Alert>
-					)}
+					)} */}
 
 					{/* Header */}
 					<WelcomeHeader profileDetails={profileDetails} />
@@ -439,6 +439,30 @@ export default function SurvivorView({
 									{/* Condition Check Card */}
 									<Card className="mb-6 bg-[#466D6D] text-white">
 										<CardContent className="p-6">
+											<h3 className="mb-2 text-lg font-bold">Explore Support Resources</h3>
+											<p className="mb-4">
+												Did you know? Having access to the right resources can increase your
+												chances of recovery by 70%. Discover personalized support options
+												tailored for you.
+											</p>
+
+											<div className="mt-4 flex justify-between items-center">
+												<Button asChild className="bg-teal-600 hover:bg-teal-700">
+													<Link href="/resources">Browse Resources</Link>
+												</Button>
+												<Image
+													src="/dashboard/watering-can.png"
+													alt="Growth and Support Illustration"
+													width={100}
+													height={100}
+													className="opacity-90"
+												/>
+											</div>
+										</CardContent>
+									</Card>
+									{/* 
+									<Card className="mb-6 bg-[#466D6D] text-white">
+										<CardContent className="p-6">
 											<h3 className="mb-2 text-lg font-bold">Check your condition</h3>
 											<p className="mb-4">
 												Take a simple test to evaluate how you are feeling
@@ -454,7 +478,7 @@ export default function SurvivorView({
 											</div>
 											<Button className="bg-teal-600">Check it now</Button>
 										</CardContent>
-									</Card>
+									</Card> */}
 
 									{/* Appointments Calendar */}
 									{/* <div>
