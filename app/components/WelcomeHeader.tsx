@@ -4,11 +4,11 @@ import { Tables } from "@/types/db-schema";
 import React from "react";
 
 type WelcomeHeaderProps = {
-	profileDetails: Tables<"profiles">;
+	profileDetails?: Tables<"profiles">;
 };
 
 export default function WelcomeHeader({ profileDetails }: WelcomeHeaderProps) {
-	const displayName = profileDetails.first_name || "Guest";
+	const displayName = profileDetails?.first_name || "Guest";
 
 	return (
 		<div className="mb-8">

@@ -129,7 +129,7 @@ export function MainSidebar() {
 						<User className="h-4 w-4" />
 					</AvatarFallback>
 				</Avatar>
-				<Button
+				{/* <Button
 					variant="ghost"
 					size="icon"
 					className="text-white hover:text-[#f8941c] transition-colors mx-6"
@@ -142,7 +142,7 @@ export function MainSidebar() {
 					className="text-white hover:text-[#f8941c] transition-colors mx-6"
 				>
 					<Info className="h-5 w-5" />
-				</Button>
+				</Button> */}
 				<form action={signOut}>
 					<Button
 						variant="ghost"

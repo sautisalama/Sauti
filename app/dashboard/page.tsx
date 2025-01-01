@@ -28,7 +28,7 @@ export default async function Dashboard() {
 				{user.user_type === "survivor" ? (
 					<SurvivorView userId={user.id} profileDetails={user} />
 				) : user.user_type === "professional" ? (
-					<ProfessionalView userId={user.id} />
+					<ProfessionalView userId={user.id} profileDetails={user} />
 				) : (
 					<p>Invalid user type</p>
 				)}

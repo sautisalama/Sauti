@@ -1,6 +1,7 @@
 "use client";
+
 import { createClient } from "@/utils/supabase/client";
-import AddSupportServiceButton from "@/components/AddSupportServiceButton";
+import { Database, Tables } from "@/types/db-schema";
 import { Button } from "@/components/ui/button";
 import {
 	Dialog,
@@ -10,10 +11,9 @@ import {
 	DialogTitle,
 	DialogTrigger,
 } from "@/components/ui/dialog";
-import { Plus, Trash2 } from "lucide-react";
-import AuthenticatedReportAbuseForm from "@/components/AuthenticatedReportAbuseForm";
+import { Info, Plus, Trash2 } from "lucide-react";
 import { useState, useEffect } from "react";
-import { Database } from "@/types/db-schema";
+import AuthenticatedReportAbuseForm from "@/components/AuthenticatedReportAbuseForm";
 import {
 	AlertDialog,
 	AlertDialogAction,
@@ -25,37 +25,174 @@ import {
 	AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
-import AppointmentDialog from "@/app/components/AppointmentDialog";
 import CaseCard from "@/app/components/CaseCard";
-import { Report, MatchedService } from "@/types/reports";
+import { Bell, Search, Users } from "lucide-react";
+import Image from "next/image";
+import Link from "next/link";
+import { Calendar } from "@/components/ui/calendar";
+// import { Progress } from "@/components/ui/progress";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { MainSidebar } from "./MainSidebar";
+import { UpcomingAppointments } from "@/app/components/UpcomingAppointments";
+import { CommunityCard } from "@/app/components/CommunityCard";
+import { DailyProgress } from "@/app/components/DailyProgress";
+import WelcomeHeader from "@/app/components/WelcomeHeader";
+import { JoinCommunity } from "@/app/components/JoinCommunity";
 
-type SupportService = Database["public"]["Tables"]["support_services"]["Row"];
+// Add this interface to type the joined data
+interface ReportWithRelations extends Tables<"reports"> {
+	matched_services?: Array<{
+		id: string;
+		match_status_type: Database["public"]["Enums"]["match_status_type"];
+		match_date: string | null;
+		match_score: number | null;
+		support_services: {
+			id: string;
+			name: string;
+			service_types: Database["public"]["Enums"]["support_service_type"];
+		};
+		appointments?: Array<{
+			id: string;
+			date: string;
+			status: Database["public"]["Enums"]["appointment_status_type"] | null;
+			professional_id: string | null;
+			survivor_id: string | null;
+		}>;
+	}>;
+}
 
-const formatServiceName = (service: string) => {
-	return service
-		.split("_")
-		.map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-		.join(" ");
-};
+interface SurvivorViewProps {
+	userId: string;
+	profileDetails: Tables<"profiles">;
+}
 
-export default function ProfessionalView({ userId }: { userId: string }) {
+// Add this interface near the top with other interfaces
+interface SupportService {
+	id: string;
+	name: string;
+	service_types: string;
+	phone_number: string | null;
+	availability: string | null;
+	latitude: number | null;
+	longitude: number | null;
+	created_at: string;
+}
+
+// Add this interface near the top with other interfaces
+interface MatchedCase {
+	id: string;
+	match_status_type: Database["public"]["Enums"]["match_status_type"];
+	match_date: string | null;
+	match_score: number | null;
+	report: {
+		report_id: string;
+		type_of_incident: string;
+		urgency: string;
+		submission_timestamp: string;
+	};
+	support_service: {
+		id: string;
+		name: string;
+		service_types: string;
+	};
+	appointments?: {
+		id: string;
+		date: string;
+		status: Database["public"]["Enums"]["appointment_status_type"];
+	}[];
+}
+
+export default function ProfessionalView({
+	userId,
+	profileDetails,
+}: SurvivorViewProps) {
+	const [reports, setReports] = useState<ReportWithRelations[]>([]);
 	const [open, setOpen] = useState(false);
-	const [appointments, setAppointments] = useState<
-		Database["public"]["Tables"]["appointments"]["Row"][]
-	>([]);
-	const [reports, setReports] = useState<Report[]>([]);
-	const [matchedServices, setMatchedServices] = useState<MatchedService[]>([]);
-	const [supportServices, setSupportServices] = useState<SupportService[]>([]);
 	const supabase = createClient();
 	const { toast } = useToast();
 	const [deleteReport, setDeleteReport] = useState<string | null>(null);
-	const [deleteService, setDeleteService] = useState<string | null>(null);
-	const [appointmentMatch, setAppointmentMatch] = useState<string | null>(null);
-	const [professionalProfileId, setProfessionalProfileId] = useState<
-		string | null
-	>(null);
+	const [showAlert, setShowAlert] = useState(true);
+	const [supportServices, setSupportServices] = useState<SupportService[]>([]);
+	const [matchedCases, setMatchedCases] = useState<MatchedCase[]>([]);
 
-	const handleDeleteReport = async (reportId: string) => {
+	// Move fetchReports outside useEffect so it can be called from handlers
+	const fetchReports = async () => {
+		console.log("Fetching reports for user:", userId);
+
+		const { data, error } = await supabase
+			.from("reports")
+			.select(
+				`
+				*,
+				matched_services (
+					id,
+					match_status_type,
+					match_date,
+					match_score,
+					support_services (
+						id,
+						name,
+						service_types
+					)
+				)
+			`
+			)
+			.eq("user_id", userId)
+			.order("submission_timestamp", { ascending: false });
+
+		if (error) {
+			console.error("Error fetching reports:", error);
+			toast({
+				title: "Error",
+				description: "Failed to fetch reports. Please try again.",
+				variant: "destructive",
+			});
+			return;
+		}
+
+		// If we need appointments data, we'll need to fetch it separately
+		if (data && data.length > 0) {
+			// Get all matched service IDs
+			const matchedServiceIds = data
+				.flatMap((report) => report.matched_services || [])
+				.map((service) => service.id);
+
+			if (matchedServiceIds.length > 0) {
+				const { data: appointmentsData, error: appointmentsError } = await supabase
+					.from("appointments")
+					.select("*")
+					.in("professional_id", matchedServiceIds);
+
+				if (!appointmentsError && appointmentsData) {
+					// Merge appointments data with the reports
+					const reportsWithAppointments = data.map((report) => ({
+						...report,
+						matched_services: report.matched_services?.map(
+							(service: { id: string }) => ({
+								...service,
+								appointments: appointmentsData.filter(
+									(apt) => apt.professional_id === service.id
+								),
+							})
+						),
+					}));
+
+					console.log("Reports with appointments:", reportsWithAppointments);
+					setReports(reportsWithAppointments);
+					return;
+				}
+			}
+		}
+
+		// If no appointments needed to be fetched or if there was an error, just set the reports
+		console.log("Fetched reports:", data);
+		setReports(data || []);
+	};
+
+	const handleDelete = async (reportId: string) => {
 		try {
 			const response = await fetch(`/api/reports/${reportId}`, {
 				method: "DELETE",
@@ -72,7 +209,7 @@ export default function ProfessionalView({ userId }: { userId: string }) {
 			});
 
 			// Refresh data after successful deletion
-			fetchData();
+			fetchReports();
 		} catch (error) {
 			toast({
 				title: "Error",
@@ -84,417 +221,710 @@ export default function ProfessionalView({ userId }: { userId: string }) {
 		setDeleteReport(null);
 	};
 
-	const handleDeleteService = async (serviceId: string) => {
-		try {
-			const response = await fetch(`/api/support-services/${serviceId}`, {
-				method: "DELETE",
-			});
+	// Add this function to fetch support services
+	const fetchSupportServices = async () => {
+		const { data, error } = await supabase
+			.from("support_services")
+			.select("*")
+			.eq("user_id", userId)
+			.order("created_at", { ascending: false });
 
-			if (!response.ok) {
-				throw new Error("Failed to delete service");
-			}
-
-			toast({
-				title: "Service deleted",
-				description: "The support service has been successfully deleted.",
-				variant: "default",
-			});
-
-			// Refresh data after successful deletion
-			fetchData();
-		} catch (error) {
+		if (error) {
+			console.error("Error fetching support services:", error);
 			toast({
 				title: "Error",
-				description: "Failed to delete the service. Please try again.",
+				description: "Failed to fetch support services. Please try again.",
 				variant: "destructive",
 			});
-			console.error("Error deleting service:", error);
+			return;
 		}
-		setDeleteService(null);
+
+		setSupportServices(data || []);
 	};
 
-	const fetchData = async () => {
-		console.log("Fetching data for professional view...", { userId });
-
-		try {
-			// First check if professional profile exists
-			const { data: existingProfiles, error: checkError } = await supabase
-				.from("professional_profiles")
-				.select("*")
-				.eq("user_id", userId)
-				.order("created_at", { ascending: false });
-
-			if (checkError) {
-				throw checkError;
-			}
-
-			let profileData;
-
-			if (!existingProfiles || existingProfiles.length === 0) {
-				// Only create new profile if none exists
-				const { data: newProfile, error: createError } = await supabase
-					.from("professional_profiles")
-					.insert({
-						user_id: userId,
-						profession: "Other",
-						availability: "Available",
-						bio: "Professional healthcare provider",
-					})
-					.select();
-
-				if (createError) {
-					throw createError;
-				}
-
-				profileData = newProfile[0]; // Use first item from array instead of .single()
-			} else {
-				// Use the most recent profile
-				profileData = existingProfiles[0];
-			}
-
-			// Store professional profile ID for appointments
-			const professionalProfileId = profileData.id;
-			setProfessionalProfileId(professionalProfileId);
-
-			// Fetch support services first
-			const { data: supportServicesData, error: supportServicesError } =
-				await supabase.from("support_services").select("*").eq("user_id", userId);
-
-			if (supportServicesError) {
-				console.error("Error fetching support services:", supportServicesError);
-				return;
-			}
-
-			console.log("Fetched support services:", supportServicesData);
-			setSupportServices(supportServicesData || []);
-
-			// Get all service IDs associated with this user
-			const serviceIds = supportServicesData?.map((service) => service.id) || [];
-			console.log("Service IDs for matching:", serviceIds);
-
-			// Modified matched services query with proper typing
-			const { data: matchedServicesData, error: matchedServicesError } =
-				await supabase
-					.from("matched_services")
-					.select(
-						`
+	// Add this function to fetch matched cases
+	const fetchMatchedCases = async () => {
+		const { data, error } = await supabase
+			.from("matched_services")
+			.select(
+				`
+				id,
+				match_status_type,
+				match_date,
+				match_score,
+				report:reports!inner(
+					report_id,
+					type_of_incident,
+					urgency,
+					submission_timestamp
+				)::report!inner(*)::single,
+				support_service:support_services!inner(
 					id,
-					match_status_type,
-					match_date,
-					match_score,
-					reports!inner(
-						report_id,
-						type_of_incident,
-						incident_description,
-						urgency,
-						required_services,
-						submission_timestamp
-					),
-					support_services!inner(
-						name,
-						service_types
-					)
-				`
-					)
-					.in("service_id", serviceIds);
-
-			if (matchedServicesError) {
-				console.error("Error fetching matched services:", matchedServicesError);
-				return;
-			}
-
-			// Separately fetch appointments for these matched services
-			if (matchedServicesData) {
-				const matchIds = matchedServicesData.map((match) => match.id);
-				const { data: appointmentsData } = await supabase
-					.from("appointments")
-					.select("*")
-					.in("professional_id", [professionalProfileId]);
-
-				// Combine the data
-				const matchedServicesWithAppointments = matchedServicesData.map(
-					(match) => ({
-						...match,
-						appointments:
-							appointmentsData?.filter(
-								(apt) => apt.professional_id === professionalProfileId
-							) || [],
-					})
-				);
-
-				setMatchedServices(
-					matchedServicesWithAppointments as unknown as MatchedService[]
-				);
-			}
-
-			// Fetch reports where the professional's services are matched
-			const { data: reportsData, error: reportsError } = await supabase
-				.from("reports")
-				.select(
-					`
-					*,
-					matched_services(
-						id,
-						match_status_type,
-						support_services(
-							id,
-							name,
-							service_types,
-							user_id
-						)
-					)
-				`
+					name,
+					service_types
+				)::support_services!inner(*)::single,
+				appointments(
+					id,
+					date,
+					status
 				)
-				.eq("user_id", userId);
+			`
+			)
+			.eq("professional_id", userId);
 
-			// If we have reports, fetch their appointments separately
-			if (reportsData) {
-				const { data: appointmentsData } = await supabase
-					.from("appointments")
-					.select("*")
-					.in("professional_id", [professionalProfileId]);
-
-				// Combine the appointments with the reports data
-				const reportsWithAppointments = reportsData.map((report) => ({
-					...report,
-					matched_services: report.matched_services?.map((match: any) => ({
-						...match,
-						appointments:
-							appointmentsData?.filter(
-								(apt) => apt.professional_id === professionalProfileId
-							) || [],
-					})),
-				}));
-
-				setReports(reportsWithAppointments);
-			} else {
-				setReports([]);
-			}
-		} catch (error) {
-			console.error("Error in fetchData:", error);
-			toast({
-				title: "Error",
-				description: "Failed to fetch data. Please try again.",
-				variant: "destructive",
-			});
-		}
+		if (error) throw error;
+		setMatchedCases(data || []);
 	};
 
 	useEffect(() => {
-		fetchData();
+		fetchReports();
 
-		// Set up realtime subscription for matched_services
-		const matchedServicesSubscription = supabase
-			.channel("matched-services-changes")
+		// Set up real-time subscription
+		const channel = supabase
+			.channel("reports_changes")
 			.on(
 				"postgres_changes",
 				{
-					event: "*", // Listen to all events (INSERT, UPDATE, DELETE)
+					event: "*",
 					schema: "public",
-					table: "matched_services",
+					table: "reports",
+					filter: `user_id=eq.${userId}`,
 				},
-				() => {
-					console.log("Matched services changed, refreshing data...");
-					fetchData();
+				(payload) => {
+					console.log("Real-time update received:", payload); // Debug log
+					fetchReports();
 				}
 			)
 			.subscribe();
 
-		// Cleanup subscription when component unmounts
+		// Cleanup subscription
 		return () => {
-			matchedServicesSubscription.unsubscribe();
+			supabase.removeChannel(channel);
 		};
 	}, [userId]);
 
-	const handleAcceptMatch = (matchId: string) => {
-		setAppointmentMatch(matchId);
+	useEffect(() => {
+		fetchSupportServices();
+	}, [userId]);
+
+	useEffect(() => {
+		fetchMatchedCases();
+	}, [userId]);
+
+	// Add formatServiceName inside component
+	const formatServiceName = (service: string) => {
+		return service
+			.split("_")
+			.map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+			.join(" ");
 	};
 
 	return (
-		<div className="space-y-12">
-			{/* Your Cases Section */}
-			<div className="space-y-6">
-				<div className="flex justify-between items-center">
-					<h2 className="text-2xl font-bold">Your Cases</h2>
-					<Dialog open={open} onOpenChange={setOpen}>
-						<DialogTrigger asChild>
-							<Button>
-								<Plus className="h-4 w-4 mr-2" />
-								Report Abuse
-							</Button>
-						</DialogTrigger>
-						<DialogContent className="sm:max-w-4xl">
-							<DialogHeader>
-								<DialogTitle>Report Abuse</DialogTitle>
-								<DialogDescription>
-									Please fill out this form to report an incident. All information will
-									be kept confidential.
-								</DialogDescription>
-							</DialogHeader>
-							<AuthenticatedReportAbuseForm
-								userId={userId}
-								onClose={() => setOpen(false)}
-							/>
-						</DialogContent>
-					</Dialog>
-				</div>
+		<div className="flex min-h-screen bg-white">
+			<main className="flex-1 w-[calc(100%-80px)]">
+				<div className="p-6">
+					<WelcomeHeader profileDetails={profileDetails} />
 
-				{reports && reports.length > 0 ? (
-					<div className="grid gap-4">
-						{reports.map((report) => (
-							<CaseCard
-								variant="survivor"
-								key={report.report_id}
-								reportId={report.report_id}
-								timestamp={report.submission_timestamp}
-								typeOfIncident={report.type_of_incident}
-								description={report.incident_description}
-								requiredServices={
-									report.required_services as
-										| Database["public"]["Enums"]["support_service_type"][]
-										| null
-								}
-								onDelete={(reportId) => setDeleteReport(reportId)}
-								matchStatus={report.match_status}
-								matchedService={
-									report.matched_services?.[0]
-										? {
-												support_service: {
-													name: report.matched_services[0].support_services.name,
-													service_types:
-														report.matched_services[0].support_services.service_types,
-												},
-												appointment: report.matched_services[0].appointments?.[0]
-													? {
-															date: report.matched_services[0].appointments[0].date,
-															status: report.matched_services[0].appointments[0].status,
-													  }
-													: undefined,
-										  }
-										: undefined
-								}
-								formatServiceName={formatServiceName}
-							/>
-						))}
-					</div>
-				) : (
-					<p className="text-muted-foreground">No reports found.</p>
-				)}
-			</div>
+					{/* New layout structure */}
+					<div className="flex gap-6">
+						{/* Left side with tabs - taking up more space */}
+						<div className="flex-1">
+							<Tabs defaultValue="overview" className="mb-8">
+								<TabsList>
+									<TabsTrigger value="overview">Overview</TabsTrigger>
+									<TabsTrigger value="reports">My Reports</TabsTrigger>
+									<TabsTrigger value="matched-cases">Matched Cases</TabsTrigger>
+									<TabsTrigger value="support-services">Support Services</TabsTrigger>
+								</TabsList>
 
-			{/* Your Support Services Section */}
-			<div className="space-y-6">
-				<div className="flex justify-between items-center">
-					<h2 className="text-2xl font-bold">Your Support Services</h2>
-					<AddSupportServiceButton userId={userId} />
-				</div>
-				{supportServices && supportServices.length > 0 ? (
-					<div className="grid gap-4">
-						{supportServices.map((service) => (
-							<div
-								key={service.id}
-								className="bg-card p-4 rounded-lg border shadow-sm"
-							>
-								<div className="flex justify-between items-start">
-									<div>
-										<h3 className="font-semibold">{service.name}</h3>
-										<p className="text-sm text-muted-foreground">
-											{service.service_types}
-										</p>
+								{/* Tab contents now take full width of their container */}
+								<TabsContent value="overview">
+									<div className="space-y-8">
+										{/* Reports Section */}
+										<div className="space-y-6">
+											<div className="flex justify-between items-center">
+												<div>
+													<h2 className="text-xl font-semibold text-[#1A3434]">
+														Recent Reports
+													</h2>
+													<p className="text-sm text-gray-500">
+														{reports.length} {reports.length === 1 ? "report" : "reports"}{" "}
+														found
+													</p>
+												</div>
+											</div>
+
+											{reports.length > 0 ? (
+												<div className="space-y-3">
+													{reports.map((report) => {
+														const matchedService = report.matched_services?.[0];
+														const appointment = matchedService?.appointments?.[0];
+
+														return (
+															<div
+																key={report.report_id}
+																className={`flex items-center justify-between rounded-lg p-4 ${
+																	report.urgency === "high"
+																		? "bg-[#FFF5F5]"
+																		: report.urgency === "medium"
+																		? "bg-[#FFF8F0]"
+																		: "bg-[#F0F9FF]"
+																}`}
+															>
+																{/* Existing report card content */}
+																<div className="flex items-center gap-3">
+																	<div className="h-10 w-10 rounded-full bg-[#1A3434] text-white flex items-center justify-center">
+																		{report.type_of_incident?.[0]?.toUpperCase() || "?"}
+																	</div>
+																	<div>
+																		<h4 className="font-medium">
+																			{formatServiceName(
+																				report.type_of_incident || "Unknown Incident"
+																			)}
+																		</h4>
+																		<div className="flex items-center gap-2 text-sm text-gray-500">
+																			<span>
+																				{new Date(
+																					report.submission_timestamp || ""
+																				).toLocaleDateString()}
+																			</span>
+																			<span className="w-1.5 h-1.5 rounded-full bg-gray-300" />
+																			<span
+																				className={`px-2 py-0.5 rounded-full text-xs ${
+																					report.urgency === "high"
+																						? "bg-red-100 text-red-700"
+																						: report.urgency === "medium"
+																						? "bg-yellow-100 text-yellow-700"
+																						: "bg-blue-100 text-blue-700"
+																				}`}
+																			>
+																				{formatServiceName(report.urgency || "low")} Priority
+																			</span>
+																		</div>
+																	</div>
+																</div>
+
+																<div className="flex items-center gap-6">
+																	<div>
+																		<p className="font-medium">
+																			{matchedService?.support_services.name || "Pending Match"}
+																		</p>
+																		<p className="text-sm text-gray-500">
+																			{matchedService?.match_status_type
+																				? formatServiceName(matchedService.match_status_type)
+																				: "Awaiting Response"}
+																		</p>
+																	</div>
+																	{appointment && (
+																		<Button className="bg-[#00A5A5] hover:bg-[#008585]">
+																			{appointment.status === "confirmed"
+																				? "Join Meeting"
+																				: "View Appointment"}
+																		</Button>
+																	)}
+																</div>
+															</div>
+														);
+													})}
+												</div>
+											) : (
+												<div className="text-center py-6 bg-gray-50 rounded-lg">
+													<p className="text-gray-500">No reports found</p>
+												</div>
+											)}
+										</div>
+
+										{/* Matched Cases Section */}
+										<div className="space-y-6">
+											<div>
+												<h2 className="text-xl font-semibold text-[#1A3434]">
+													Recent Matched Cases
+												</h2>
+												<p className="text-sm text-gray-500">
+													{matchedCases.length}{" "}
+													{matchedCases.length === 1 ? "case" : "cases"} matched
+												</p>
+											</div>
+
+											{matchedCases.length > 0 ? (
+												<div className="space-y-4">
+													{matchedCases.slice(0, 3).map((matchedCase) => (
+														<div
+															key={matchedCase.id}
+															className={`rounded-lg p-4 ${
+																matchedCase.report.urgency === "high"
+																	? "bg-[#FFF5F5]"
+																	: matchedCase.report.urgency === "medium"
+																	? "bg-[#FFF8F0]"
+																	: "bg-[#F0F9FF]"
+															}`}
+														>
+															{/* Existing matched case card content */}
+															<div className="flex items-center justify-between">
+																<div className="flex items-center gap-3">
+																	<div className="h-10 w-10 rounded-full bg-[#1A3434] text-white flex items-center justify-center">
+																		{matchedCase.report.type_of_incident?.[0]?.toUpperCase() ||
+																			"?"}
+																	</div>
+																	<div>
+																		<h4 className="font-medium">
+																			{formatServiceName(matchedCase.report.type_of_incident)}
+																		</h4>
+																		<div className="flex items-center gap-2 text-sm text-gray-500">
+																			<span>
+																				Matched on{" "}
+																				{new Date(
+																					matchedCase.match_date || ""
+																				).toLocaleDateString()}
+																			</span>
+																		</div>
+																	</div>
+																</div>
+
+																<div className="flex items-center gap-4">
+																	<div className="text-right">
+																		<p className="font-medium">
+																			{matchedCase.support_service.name}
+																		</p>
+																		<p className="text-sm text-gray-500">
+																			{formatServiceName(matchedCase.match_status_type)}
+																		</p>
+																	</div>
+																</div>
+															</div>
+														</div>
+													))}
+												</div>
+											) : (
+												<div className="text-center py-6 bg-gray-50 rounded-lg">
+													<p className="text-gray-500">No matched cases found</p>
+												</div>
+											)}
+										</div>
+
+										{/* Support Services Section */}
+										<div className="space-y-6">
+											<div>
+												<h2 className="text-xl font-semibold text-[#1A3434]">
+													Your Support Services
+												</h2>
+												<p className="text-sm text-gray-500">
+													{supportServices.length}{" "}
+													{supportServices.length === 1 ? "service" : "services"} registered
+												</p>
+											</div>
+
+											{supportServices.length > 0 ? (
+												<div className="grid gap-4">
+													{supportServices.slice(0, 3).map((service) => (
+														<div
+															key={service.id}
+															className="p-4 rounded-lg border bg-card flex justify-between items-start"
+														>
+															<div className="space-y-2">
+																<h3 className="font-medium">{service.name}</h3>
+																<div className="flex flex-wrap gap-2">
+																	{service.service_types.split(",").map((type, index) => (
+																		<span
+																			key={index}
+																			className="px-2 py-1 text-xs rounded-full bg-secondary text-secondary-foreground"
+																		>
+																			{formatServiceName(type.trim())}
+																		</span>
+																	))}
+																</div>
+															</div>
+														</div>
+													))}
+												</div>
+											) : (
+												<div className="text-center py-6 bg-gray-50 rounded-lg">
+													<p className="text-gray-500">No support services found</p>
+												</div>
+											)}
+										</div>
 									</div>
-									<div className="flex items-center gap-2">
-										{service.availability && (
-											<span className="px-2 py-1 text-xs rounded-full bg-primary/10 text-primary">
-												{service.availability}
-											</span>
+								</TabsContent>
+
+								<TabsContent value="reports">
+									<div className="space-y-6">
+										<div className="flex justify-between items-center mb-6">
+											<div>
+												<h2 className="text-xl font-semibold text-[#1A3434]">My Reports</h2>
+												<p className="text-sm text-gray-500">
+													{reports.length} {reports.length === 1 ? "report" : "reports"}{" "}
+													found
+												</p>
+											</div>
+											<Dialog open={open} onOpenChange={setOpen}>
+												<DialogTrigger asChild>
+													<Button>
+														<Plus className="h-4 w-4 mr-2" />
+														New Report
+													</Button>
+												</DialogTrigger>
+												<DialogContent className="sm:max-w-4xl">
+													<DialogHeader>
+														<DialogTitle>Report Abuse</DialogTitle>
+														<DialogDescription>
+															Please fill out this form to report an incident. All information
+															will be kept confidential.
+														</DialogDescription>
+													</DialogHeader>
+													<AuthenticatedReportAbuseForm
+														onClose={() => setOpen(false)}
+														userId={userId}
+													/>
+												</DialogContent>
+											</Dialog>
+										</div>
+
+										{reports.length > 0 ? (
+											<div className="space-y-3">
+												{reports.map((report) => {
+													// Get the most recent matched service if any
+													const matchedService = report.matched_services?.[0];
+													const appointment = matchedService?.appointments?.[0];
+
+													return (
+														<div
+															key={report.report_id}
+															className={`flex items-center justify-between rounded-lg p-4 ${
+																report.urgency === "high"
+																	? "bg-[#FFF5F5]"
+																	: report.urgency === "medium"
+																	? "bg-[#FFF8F0]"
+																	: "bg-[#F0F9FF]"
+															}`}
+														>
+															<div className="flex items-center gap-3">
+																<div className="h-10 w-10 rounded-full bg-[#1A3434] text-white flex items-center justify-center">
+																	{report.type_of_incident?.[0]?.toUpperCase() || "?"}
+																</div>
+																<div>
+																	<h4 className="font-medium">
+																		{formatServiceName(
+																			report.type_of_incident || "Unknown Incident"
+																		)}
+																	</h4>
+																	<div className="flex items-center gap-2 text-sm text-gray-500">
+																		<span>
+																			{new Date(
+																				report.submission_timestamp || ""
+																			).toLocaleDateString()}
+																		</span>
+																		<span className="w-1.5 h-1.5 rounded-full bg-gray-300" />
+																		<span
+																			className={`
+																			px-2 py-0.5 rounded-full text-xs
+																			${
+																				report.urgency === "high"
+																					? "bg-red-100 text-red-700"
+																					: report.urgency === "medium"
+																					? "bg-yellow-100 text-yellow-700"
+																					: "bg-blue-100 text-blue-700"
+																			}
+																		`}
+																		>
+																			{formatServiceName(report.urgency || "low")} Priority
+																		</span>
+																	</div>
+																</div>
+															</div>
+
+															<div className="flex items-center gap-6">
+																<div>
+																	<p className="font-medium">
+																		{matchedService?.support_services.name || "Pending Match"}
+																	</p>
+																	<p className="text-sm text-gray-500">
+																		{matchedService?.match_status_type
+																			? formatServiceName(matchedService.match_status_type)
+																			: "Awaiting Response"}
+																	</p>
+																</div>
+																<div className="flex gap-2">
+																	{appointment && (
+																		<Button
+																			className="bg-[#00A5A5] hover:bg-[#008585]"
+																			onClick={() => {
+																				// Handle appointment view
+																				console.log("View appointment:", appointment);
+																			}}
+																		>
+																			{appointment.status === "confirmed"
+																				? "Join Meeting"
+																				: "View Appointment"}
+																		</Button>
+																	)}
+																	<Button
+																		variant="ghost"
+																		size="icon"
+																		className="text-destructive hover:text-destructive hover:bg-destructive/10"
+																		onClick={() => setDeleteReport(report.report_id)}
+																	>
+																		<Trash2 className="h-4 w-4" />
+																	</Button>
+																</div>
+															</div>
+														</div>
+													);
+												})}
+											</div>
+										) : (
+											<div className="text-center py-12 bg-gray-50 rounded-lg">
+												<div className="space-y-3">
+													<p className="text-gray-500">No reports found</p>
+													<p className="text-sm text-gray-400">
+														Click "New Report" to create your first report
+													</p>
+												</div>
+											</div>
 										)}
-										<Button
-											variant="ghost"
-											size="icon"
-											className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
-											onClick={() => setDeleteService(service.id)}
-										>
-											<Trash2 className="h-4 w-4" />
-										</Button>
 									</div>
-								</div>
-								<div className="mt-2 space-y-1 text-sm">
-									{service.helpline && <p>Helpline: {service.helpline}</p>}
-									{service.email && <p>Email: {service.email}</p>}
-									{service.phone_number && <p>Phone: {service.phone_number}</p>}
-									{service.website && <p>Website: {service.website}</p>}
-									{service.coverage_area_radius && (
-										<p>Coverage Area: {service.coverage_area_radius}km radius</p>
-									)}
+								</TabsContent>
+
+								<TabsContent value="matched-cases">
+									<div className="space-y-6">
+										<div className="flex justify-between items-center">
+											<div>
+												<h2 className="text-xl font-semibold text-[#1A3434]">
+													Matched Cases
+												</h2>
+												<p className="text-sm text-gray-500">
+													{matchedCases.length}{" "}
+													{matchedCases.length === 1 ? "case" : "cases"} matched
+												</p>
+											</div>
+										</div>
+
+										{matchedCases.length > 0 ? (
+											<div className="space-y-4">
+												{matchedCases.map((matchedCase) => (
+													<div
+														key={matchedCase.id}
+														className={`rounded-lg p-4 ${
+															matchedCase.report.urgency === "high"
+																? "bg-[#FFF5F5]"
+																: matchedCase.report.urgency === "medium"
+																? "bg-[#FFF8F0]"
+																: "bg-[#F0F9FF]"
+														}`}
+													>
+														<div className="flex items-center justify-between">
+															<div className="flex items-center gap-3">
+																<div className="h-10 w-10 rounded-full bg-[#1A3434] text-white flex items-center justify-center">
+																	{matchedCase.report.type_of_incident?.[0]?.toUpperCase() ||
+																		"?"}
+																</div>
+																<div>
+																	<h4 className="font-medium">
+																		{formatServiceName(matchedCase.report.type_of_incident)}
+																	</h4>
+																	<div className="flex items-center gap-2 text-sm text-gray-500">
+																		<span>
+																			Matched on{" "}
+																			{new Date(matchedCase.match_date || "").toLocaleDateString()}
+																		</span>
+																		<span className="w-1.5 h-1.5 rounded-full bg-gray-300" />
+																		<span
+																			className={`
+																			px-2 py-0.5 rounded-full text-xs
+																			${
+																				matchedCase.report.urgency === "high"
+																					? "bg-red-100 text-red-700"
+																					: matchedCase.report.urgency === "medium"
+																					? "bg-yellow-100 text-yellow-700"
+																					: "bg-blue-100 text-blue-700"
+																			}
+																		`}
+																		>
+																			{formatServiceName(matchedCase.report.urgency)} Priority
+																		</span>
+																	</div>
+																</div>
+															</div>
+
+															<div className="flex items-center gap-4">
+																<div className="text-right">
+																	<p className="font-medium">
+																		{matchedCase.support_service.name}
+																	</p>
+																	<p className="text-sm text-gray-500">
+																		{formatServiceName(matchedCase.match_status_type)}
+																	</p>
+																</div>
+																{matchedCase.appointments?.[0] && (
+																	<Button
+																		className="bg-[#00A5A5] hover:bg-[#008585]"
+																		onClick={() => {
+																			// Handle appointment action
+																			console.log(
+																				"Appointment action:",
+																				matchedCase.appointments?.[0]
+																			);
+																		}}
+																	>
+																		{matchedCase.appointments[0].status === "confirmed"
+																			? "Join Meeting"
+																			: "View Appointment"}
+																	</Button>
+																)}
+															</div>
+														</div>
+
+														{matchedCase.match_score && (
+															<div className="mt-4 flex items-center gap-2">
+																<span className="text-sm text-gray-500">Match Score:</span>
+																<span className="text-sm font-medium">
+																	{Math.round(matchedCase.match_score * 100)}%
+																</span>
+															</div>
+														)}
+													</div>
+												))}
+											</div>
+										) : (
+											<div className="text-center py-12 bg-gray-50 rounded-lg">
+												<div className="space-y-3">
+													<p className="text-gray-500">No matched cases found</p>
+													<p className="text-sm text-gray-400">
+														Cases will appear here when they are matched with support services
+													</p>
+												</div>
+											</div>
+										)}
+									</div>
+								</TabsContent>
+
+								<TabsContent value="support-services">
+									<div className="space-y-6">
+										<div className="flex justify-between items-center">
+											<div>
+												<h2 className="text-xl font-semibold text-[#1A3434]">
+													Support Services
+												</h2>
+												<p className="text-sm text-gray-500">
+													{supportServices.length}{" "}
+													{supportServices.length === 1 ? "service" : "services"} registered
+												</p>
+											</div>
+											<Button
+												onClick={() => {
+													/* Add your new service dialog logic here */
+												}}
+											>
+												<Plus className="h-4 w-4 mr-2" />
+												Add Service
+											</Button>
+										</div>
+
+										{supportServices.length > 0 ? (
+											<div className="grid gap-4">
+												{supportServices.map((service) => (
+													<div
+														key={service.id}
+														className="p-4 rounded-lg border bg-card flex justify-between items-start"
+													>
+														<div className="space-y-2">
+															<h3 className="font-medium">{service.name}</h3>
+															<div className="flex flex-wrap gap-2">
+																{service.service_types.split(",").map((type, index) => (
+																	<span
+																		key={index}
+																		className="px-2 py-1 text-xs rounded-full bg-secondary text-secondary-foreground"
+																	>
+																		{formatServiceName(type.trim())}
+																	</span>
+																))}
+															</div>
+															{service.phone_number && (
+																<p className="text-sm text-muted-foreground">
+																	📞 {service.phone_number}
+																</p>
+															)}
+															{service.availability && (
+																<p className="text-sm text-muted-foreground">
+																	🕒 {service.availability}
+																</p>
+															)}
+															{service.latitude && service.longitude && (
+																<p className="text-sm text-muted-foreground">
+																	📍 Location available
+																</p>
+															)}
+														</div>
+														<Button
+															variant="ghost"
+															size="icon"
+															className="text-destructive hover:text-destructive hover:bg-destructive/10"
+															onClick={() => {
+																// Add your delete service logic here
+															}}
+														>
+															<Trash2 className="h-4 w-4" />
+														</Button>
+													</div>
+												))}
+											</div>
+										) : (
+											<div className="text-center py-12 bg-gray-50 rounded-lg">
+												<div className="space-y-3">
+													<p className="text-gray-500">No support services found</p>
+													<p className="text-sm text-gray-400">
+														Click "Add Service" to register your first support service
+													</p>
+												</div>
+											</div>
+										)}
+									</div>
+								</TabsContent>
+							</Tabs>
+							{/* Additional content visible across all tabs */}
+							<div className="space-y-8">
+								<UpcomingAppointments />
+								<div className="grid grid-cols-2 gap-6">
+									<CommunityCard />
+									{/* <DailyProgress /> */}
 								</div>
 							</div>
-						))}
+						</div>
+
+						{/* Right side cards - fixed width */}
+						<div className="w-[350px] space-y-6">
+							{/* Condition Check Card */}
+							<Card className="bg-[#466D6D] text-white">
+								<CardContent className="p-6">
+									<h3 className="mb-2 text-lg font-bold">Explore Support Resources</h3>
+									<p className="mb-4">
+										Did you know? Having access to the right resources can increase your
+										chances of recovery by 70%. Discover personalized support options
+										tailored for you.
+									</p>
+
+									<div className="mt-4 flex justify-between items-center">
+										<Button asChild className="bg-teal-600 hover:bg-teal-700">
+											<Link href="/dashboard/resources">Browse Resources</Link>
+										</Button>
+										<Image
+											src="/dashboard/watering-can.png"
+											alt="Growth and Support Illustration"
+											width={100}
+											height={100}
+											className="opacity-90"
+										/>
+									</div>
+								</CardContent>
+							</Card>
+
+							{/* Community Card */}
+							<JoinCommunity />
+						</div>
 					</div>
-				) : (
-					<p className="text-muted-foreground">No support services found.</p>
-				)}
-			</div>
+				</div>
+			</main>
 
-			{/* Matched Cases Section */}
-			<div className="space-y-6">
-				<h2 className="text-2xl font-bold">Matched Cases</h2>
-				{matchedServices && matchedServices.length > 0 ? (
-					<div className="grid gap-4">
-						{matchedServices.map((match) => (
-							<CaseCard
-								variant="professional"
-								key={match.reports.report_id}
-								reportId={match.reports.report_id}
-								timestamp={match.reports.submission_timestamp}
-								typeOfIncident={match.reports.type_of_incident}
-								description={match.reports.incident_description}
-								requiredServices={
-									match.reports.required_services as (
-										| "other"
-										| "legal"
-										| "medical"
-										| "mental_health"
-										| "shelter"
-										| "financial_assistance"
-									)[]
-								}
-								onDelete={(reportId) => setDeleteReport(reportId)}
-								onAcceptMatch={handleAcceptMatch}
-								matchedService={{
-									id: match.id,
-									match_status_type: match.match_status_type,
-									support_service: {
-										name: match.support_services.name,
-										service_types: match.support_services.service_types,
-									},
-									appointment: match.appointments?.[0]
-										? {
-												date: match.appointments[0].date,
-												status: match.appointments[0].status,
-										  }
-										: undefined,
-								}}
-								formatServiceName={formatServiceName}
-							/>
-						))}
-					</div>
-				) : (
-					<p className="text-muted-foreground">No matched cases found.</p>
-				)}
-			</div>
-
-			<AppointmentDialog
-				isOpen={!!appointmentMatch}
-				onClose={() => setAppointmentMatch(null)}
-				matchId={appointmentMatch || ""}
-				reportId={
-					matchedServices.find((m) => m.id === appointmentMatch)?.reports
-						?.report_id || ""
-				}
-				professionalId={professionalProfileId || ""}
-				onSuccess={fetchData}
-			/>
-
+			{/* Existing Alert Dialog */}
 			<AlertDialog
 				open={!!deleteReport}
 				onOpenChange={(open) => !open && setDeleteReport(null)}
@@ -510,31 +940,7 @@ export default function ProfessionalView({ userId }: { userId: string }) {
 						<AlertDialogCancel>Cancel</AlertDialogCancel>
 						<AlertDialogAction
 							className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-							onClick={() => deleteReport && handleDeleteReport(deleteReport)}
-						>
-							Delete
-						</AlertDialogAction>
-					</AlertDialogFooter>
-				</AlertDialogContent>
-			</AlertDialog>
-
-			<AlertDialog
-				open={!!deleteService}
-				onOpenChange={(open) => !open && setDeleteService(null)}
-			>
-				<AlertDialogContent>
-					<AlertDialogHeader>
-						<AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-						<AlertDialogDescription>
-							This action cannot be undone. This will permanently delete the support
-							service.
-						</AlertDialogDescription>
-					</AlertDialogHeader>
-					<AlertDialogFooter>
-						<AlertDialogCancel>Cancel</AlertDialogCancel>
-						<AlertDialogAction
-							className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-							onClick={() => deleteService && handleDeleteService(deleteService)}
+							onClick={() => deleteReport && handleDelete(deleteReport)}
 						>
 							Delete
 						</AlertDialogAction>
