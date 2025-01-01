@@ -41,6 +41,42 @@ export type Database = {
           },
         ]
       }
+      email_logs: {
+        Row: {
+          created_at: string | null
+          email_type: string
+          error_message: string | null
+          id: string
+          metadata: Json | null
+          sent_at: string | null
+          status: string | null
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          email_type: string
+          error_message?: string | null
+          id?: string
+          metadata?: Json | null
+          sent_at?: string | null
+          status?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          email_type?: string
+          error_message?: string | null
+          id?: string
+          metadata?: Json | null
+          sent_at?: string | null
+          status?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       matched_services: {
         Row: {
           feedback: string | null
@@ -156,7 +192,7 @@ export type Database = {
           id: string
           last_name: string | null
           updated_at: string | null
-          user_type: Database["public"]["Enums"]["user_type"]
+          user_type: Database["public"]["Enums"]["user_type"] | null
         }
         Insert: {
           created_at?: string | null
@@ -164,7 +200,7 @@ export type Database = {
           id: string
           last_name?: string | null
           updated_at?: string | null
-          user_type: Database["public"]["Enums"]["user_type"]
+          user_type?: Database["public"]["Enums"]["user_type"] | null
         }
         Update: {
           created_at?: string | null
@@ -172,7 +208,7 @@ export type Database = {
           id?: string
           last_name?: string | null
           updated_at?: string | null
-          user_type?: Database["public"]["Enums"]["user_type"]
+          user_type?: Database["public"]["Enums"]["user_type"] | null
         }
         Relationships: []
       }
@@ -194,6 +230,7 @@ export type Database = {
           first_name: string | null
           gender: Database["public"]["Enums"]["gender_type"] | null
           incident_description: string | null
+          isMatched: boolean | null
           last_name: string | null
           latitude: number | null
           locality: string | null
@@ -236,6 +273,7 @@ export type Database = {
           first_name?: string | null
           gender?: Database["public"]["Enums"]["gender_type"] | null
           incident_description?: string | null
+          isMatched?: boolean | null
           last_name?: string | null
           latitude?: number | null
           locality?: string | null
@@ -278,6 +316,7 @@ export type Database = {
           first_name?: string | null
           gender?: Database["public"]["Enums"]["gender_type"] | null
           incident_description?: string | null
+          isMatched?: boolean | null
           last_name?: string | null
           latitude?: number | null
           locality?: string | null
@@ -374,10 +413,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      modify_matched_services_table: {
-        Args: Record<PropertyKey, never>
-        Returns: undefined
-      }
+      [_ in never]: never
     }
     Enums: {
       appointment_status_type: "pending" | "confirmed"

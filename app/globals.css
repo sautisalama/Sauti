@@ -43,6 +43,17 @@
 		--weather-text-primary: #2d3748;
 		--weather-text-secondary: #4a5568;
 		--weather-accent: #3182ce;
+		--sidebar-background: 0 0% 98%;
+		--sidebar-foreground: 240 5.3% 26.1%;
+		--sidebar-primary: 240 5.9% 10%;
+		--sidebar-primary-foreground: 0 0% 98%;
+		--sidebar-accent: 240 4.8% 95.9%;
+		--sidebar-accent-foreground: 240 5.9% 10%;
+		--sidebar-border: 220 13% 91%;
+		--sidebar-ring: 217.2 91.2% 59.8%;
+		--sidebar: 200 33% 18%;
+		--sidebar-border: 200 33% 25%;
+		--highlight: 32 89% 54%;
 	}
 
 	.dark {
@@ -83,6 +94,14 @@
 		--weather-text-primary: #f7fafc;
 		--weather-text-secondary: #a0aec0;
 		--weather-accent: #63b3ed;
+		--sidebar-background: 240 5.9% 10%;
+		--sidebar-foreground: 240 4.8% 95.9%;
+		--sidebar-primary: 224.3 76.3% 48%;
+		--sidebar-primary-foreground: 0 0% 100%;
+		--sidebar-accent: 240 3.7% 15.9%;
+		--sidebar-accent-foreground: 240 4.8% 95.9%;
+		--sidebar-border: 240 3.7% 15.9%;
+		--sidebar-ring: 217.2 91.2% 59.8%;
 	}
 }
 
@@ -92,5 +111,15 @@
 	}
 	body {
 		@apply bg-background text-foreground;
+	}
+}
+
+@layer utilities {
+	.appointment-card {
+		@apply relative overflow-hidden rounded-2xl;
+	}
+
+	.appointment-overlay {
+		@apply absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/60 to-transparent text-white;
 	}
 }
