@@ -95,7 +95,7 @@ export function MainSidebar() {
 					<Link
 						href="/dashboard/sessions"
 						className={`flex flex-col items-center gap-1 transition-colors hover:text-[#f8941c] mx-8 ${
-							pathname === "/dashboard/sessions" ? "text-[#f8941c]" : "text-white"
+							pathname.includes("/sessions") ? "text-[#f8941c]" : "text-white"
 						}`}
 					>
 						<Calendar className="h-6 w-6" />
@@ -104,7 +104,7 @@ export function MainSidebar() {
 					<Link
 						href="/dashboard/resources"
 						className={`flex flex-col items-center gap-1 transition-colors hover:text-[#f8941c] mx-8 ${
-							pathname === "/dashboard/resources" ? "text-[#f8941c]" : "text-white"
+							pathname.includes("/resources") ? "text-[#f8941c]" : "text-white"
 						}`}
 					>
 						<FileText className="h-6 w-6" />
@@ -113,7 +113,7 @@ export function MainSidebar() {
 					<Link
 						href="/dashboard/chat"
 						className={`flex flex-col items-center gap-1 transition-colors hover:text-[#f8941c] mx-8 ${
-							pathname === "/dashboard/messages" ? "text-[#f8941c]" : "text-white"
+							pathname.includes("/chat") ? "text-[#f8941c]" : "text-white"
 						}`}
 					>
 						<MessageCircle className="h-6 w-6" />
