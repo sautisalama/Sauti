@@ -173,20 +173,26 @@ export default function ProfessionalView({
 	};
 
 	useEffect(() => {
-		const loadReports = async () => {
+		const loadData = async () => {
 			try {
-				const userReports = await fetchUserReports(userId);
+				// Load both reports and support services
+				const [userReports, userServices] = await Promise.all([
+					fetchUserReports(userId),
+					fetchUserSupportServices(userId)
+				]);
+				
 				setReports(userReports);
+				setSupportServices(userServices);
 			} catch (error) {
 				toast({
 					title: "Error",
-					description: "Failed to load reports. Please try again.",
+					description: "Failed to load data. Please try again.",
 					variant: "destructive",
 				});
 			}
 		};
 
-		loadReports();
+		loadData();
 
 		// Set up real-time subscription for reports
 		const supabase = createClient();
