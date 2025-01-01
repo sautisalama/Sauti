@@ -1,58 +1,61 @@
 "use client";
-import { Input } from "@/components/ui/input";
-import {
-	Select,
-	SelectContent,
-	SelectItem,
-	SelectTrigger,
-	SelectValue,
-} from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
-import { useToast } from "@/hooks/use-toast";
 import { useState, useEffect } from "react";
+import { useToast } from "@/hooks/use-toast";
 import { Button } from "./ui/button";
-import { createClient } from "@/utils/supabase/client";
-import { SUPPORT_SERVICE_OPTIONS } from "@/lib/constants";
+import { Database } from "@/types/db-schema";
 
-interface AddSupportServiceFormProps {
-	onClose: () => void;
-	userId: string;
-}
+type ServiceType = Database["public"]["Enums"]["support_service_type"];
 
-export default function AddSupportServiceForm({
-	onClose,
-	userId,
-}: AddSupportServiceFormProps) {
+const SERVICE_OPTIONS = [
+	{ value: "legal", label: "legal support" },
+	{ value: "medical", label: "medical care" },
+	{ value: "mental_health", label: "mental health support" },
+	{ value: "shelter", label: "shelter services" },
+	{ value: "financial_assistance", label: "financial assistance" },
+	{ value: "other", label: "other support services" },
+] as const;
+
+const AVAILABILITY_OPTIONS = [
+	{ value: "24/7", label: "24/7" },
+	{ value: "weekdays_9_5", label: "weekdays (9 AM - 5 PM)" },
+	{ value: "weekdays_extended", label: "weekdays (8 AM - 8 PM)" },
+	{ value: "weekends", label: "weekends only" },
+	{ value: "by_appointment", label: "by appointment" },
+] as const;
+
+const COVERAGE_OPTIONS = [
+	{ value: "5", label: "5 kilometers" },
+	{ value: "10", label: "10 kilometers" },
+	{ value: "25", label: "25 kilometers" },
+	{ value: "50", label: "50 kilometers" },
+	{ value: "100", label: "100 kilometers" },
+] as const;
+
+export function AddSupportServiceForm({
+	onSuccess,
+}: {
+	onSuccess?: () => void;
+}) {
 	const { toast } = useToast();
 	const [loading, setLoading] = useState(false);
-	const [isAuthenticated, setIsAuthenticated] = useState(false);
-	const supabase = createClient();
-	const [userLocation, setUserLocation] = useState<{
-		latitude: number | null;
-		longitude: number | null;
-	}>({
-		latitude: null,
-		longitude: null,
+	const [location, setLocation] = useState<{ lat: number; lng: number } | null>(
+		null
+	);
+	const [formData, setFormData] = useState({
+		name: "",
+		service_types: "" as ServiceType,
+		phone_number: "",
+		availability: "",
+		coverage_area_radius: "",
 	});
-
-	useEffect(() => {
-		const checkAuth = async () => {
-			const {
-				data: { session },
-			} = await supabase.auth.getSession();
-			setIsAuthenticated(!!session);
-		};
-
-		checkAuth();
-	}, []);
 
 	useEffect(() => {
 		if ("geolocation" in navigator) {
 			navigator.geolocation.getCurrentPosition(
 				(position) => {
-					setUserLocation({
-						latitude: position.coords.latitude,
-						longitude: position.coords.longitude,
+					setLocation({
+						lat: position.coords.latitude,
+						lng: position.coords.longitude,
 					});
 				},
 				(error) => {
@@ -69,78 +72,36 @@ export default function AddSupportServiceForm({
 
 	const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
 		e.preventDefault();
-		const form = e.target as HTMLFormElement;
-		const formData = new FormData(form);
-
-		if (!isAuthenticated) {
-			toast({
-				title: "Error",
-				description: "You must be logged in to add a service",
-				variant: "destructive",
-			});
-			return;
-		}
-
 		setLoading(true);
 
 		try {
-			const {
-				data: { session },
-			} = await supabase.auth.getSession();
-
-			if (!session) {
-				throw new Error("No valid session");
-			}
-
 			const data = {
-				professional_id: userId,
-				name: formData.get("service_name")?.toString(),
-				service_types: formData.get("service_type")?.toString(),
-				phone_number: formData.get("contact_information")?.toString(),
-				availability: formData.get("availability")?.toString(),
-				latitude: userLocation.latitude,
-				longitude: userLocation.longitude,
-				email: session.user.email,
-				created_at: new Date().toISOString(),
+				...formData,
+				latitude: location?.lat,
+				longitude: location?.lng,
+				coverage_area_radius: formData.coverage_area_radius
+					? Number(formData.coverage_area_radius)
+					: null,
 			};
 
 			const response = await fetch("/api/support-services", {
 				method: "POST",
-				headers: {
-					"Content-Type": "application/json",
-				},
-				credentials: "include",
+				headers: { "Content-Type": "application/json" },
 				body: JSON.stringify(data),
 			});
 
-			if (!response.ok) {
-				const errorData = await response.json();
-				throw new Error(errorData.error || "Failed to add service");
-			}
-
-			const matchResponse = await fetch("/api/support-services/match", {
-				method: "POST",
-				credentials: "include",
-			});
-
-			if (!matchResponse.ok) {
-				console.error("Warning: Failed to process report matching");
-			}
+			if (!response.ok) throw new Error("Failed to add service");
 
 			toast({
-				title: "Service Added",
+				title: "Success",
 				description: "Support service has been successfully added.",
 			});
 
-			setTimeout(() => {
-				onClose();
-			}, 500);
+			onSuccess?.();
 		} catch (error) {
-			console.error("Submission error:", error);
 			toast({
 				title: "Error",
-				description:
-					error instanceof Error ? error.message : "Failed to add service.",
+				description: "Failed to add support service. Please try again.",
 				variant: "destructive",
 			});
 		} finally {
@@ -149,67 +110,97 @@ export default function AddSupportServiceForm({
 	};
 
 	return (
-		<form onSubmit={handleSubmit} className="space-y-6">
-			<div className="space-y-4">
-				<Input placeholder="Service Name" name="service_name" required />
-
-				<Select name="service_type" required>
-					<SelectTrigger>
-						<SelectValue placeholder="Service Type" />
-					</SelectTrigger>
-					<SelectContent>
-						{SUPPORT_SERVICE_OPTIONS.map((option) => (
-							<SelectItem key={option.value} value={option.value}>
-								{option.label}
-							</SelectItem>
+		<form onSubmit={handleSubmit} className="space-y-8">
+			<div className="prose prose-sm">
+				<p className="leading-relaxed text-gray-600">
+					We are{" "}
+					<input
+						type="text"
+						className="border-b-2 border-teal-500 focus:outline-none px-2 w-64 bg-transparent"
+						placeholder="organization name"
+						value={formData.name}
+						onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+						required
+					/>
+					, providing{" "}
+					<select
+						value={formData.service_types}
+						onChange={(e) =>
+							setFormData({
+								...formData,
+								service_types: e.target.value as ServiceType,
+							})
+						}
+						required
+						className="border-b-2 border-teal-500 focus:outline-none px-2 bg-transparent"
+					>
+						<option value="">select service type</option>
+						{SERVICE_OPTIONS.map(({ value, label }) => (
+							<option key={value} value={value}>
+								{label}
+							</option>
 						))}
-					</SelectContent>
-				</Select>
-
-				<Textarea
-					placeholder="Service Description"
-					name="description"
-					required
-					className="min-h-[100px]"
-				/>
-
-				<Select name="availability" required>
-					<SelectTrigger>
-						<SelectValue placeholder="Availability" />
-					</SelectTrigger>
-					<SelectContent>
-						<SelectItem value="24/7">24/7</SelectItem>
-						<SelectItem value="weekdays">Weekdays Only</SelectItem>
-						<SelectItem value="weekends">Weekends Only</SelectItem>
-						<SelectItem value="by_appointment">By Appointment</SelectItem>
-					</SelectContent>
-				</Select>
-
-				<Input
-					placeholder="Contact Information"
-					name="contact_information"
-					required
-				/>
-
-				<Textarea
-					placeholder="Eligibility Criteria"
-					name="eligibility_criteria"
-					className="min-h-[80px]"
-				/>
-
-				<Input
-					placeholder="Cost (e.g., Free, Sliding Scale, Fixed Rate)"
-					name="cost"
-					required
-				/>
-
-				<Input placeholder="Location" name="location" required />
+					</select>
+					. You can reach us at{" "}
+					<input
+						type="tel"
+						className="border-b-2 border-teal-500 focus:outline-none px-2 w-48 bg-transparent"
+						placeholder="phone number"
+						value={formData.phone_number}
+						onChange={(e) =>
+							setFormData({ ...formData, phone_number: e.target.value })
+						}
+						required
+					/>
+					. We are available{" "}
+					<select
+						value={formData.availability}
+						onChange={(e) =>
+							setFormData({ ...formData, availability: e.target.value })
+						}
+						required
+						className="border-b-2 border-teal-500 focus:outline-none px-2 bg-transparent"
+					>
+						<option value="">select availability</option>
+						{AVAILABILITY_OPTIONS.map(({ value, label }) => (
+							<option key={value} value={value}>
+								{label}
+							</option>
+						))}
+					</select>{" "}
+					and can serve clients within{" "}
+					<select
+						value={formData.coverage_area_radius}
+						onChange={(e) =>
+							setFormData({ ...formData, coverage_area_radius: e.target.value })
+						}
+						required
+						className="border-b-2 border-teal-500 focus:outline-none px-2 bg-transparent"
+					>
+						<option value="">select coverage</option>
+						{COVERAGE_OPTIONS.map(({ value, label }) => (
+							<option key={value} value={value}>
+								{label}
+							</option>
+						))}
+					</select>{" "}
+					of our location.
+				</p>
 			</div>
 
-			<div className="pt-4 border-t">
-				<Button type="submit" className="w-full" disabled={loading}>
-					{loading ? "Adding Service..." : "Add Support Service"}
+			<div className="flex items-center gap-4">
+				<Button
+					type="submit"
+					className="bg-teal-600 hover:bg-teal-700"
+					disabled={loading || !location}
+				>
+					{loading ? "Adding..." : "Register Service"}
 				</Button>
+				{location ? (
+					<span className="text-sm text-green-600">📍 Location detected</span>
+				) : (
+					<span className="text-sm text-yellow-600">📍 Detecting location...</span>
+				)}
 			</div>
 		</form>
 	);

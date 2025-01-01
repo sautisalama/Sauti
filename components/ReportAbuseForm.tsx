@@ -19,7 +19,7 @@ import {
 } from "@/lib/constants";
 
 // Add this form component
-export default function ReportAbuseForm({ onClose }: { onClose: () => void }) {
+export default function ReportAbuseForm() {
 	const { toast } = useToast();
 	const [loading, setLoading] = useState(false);
 	const [location, setLocation] = useState<{
@@ -107,10 +107,12 @@ export default function ReportAbuseForm({ onClose }: { onClose: () => void }) {
 				description: "Thank you for your report. We will review it shortly.",
 			});
 
-			// Add a small delay before closing
-			setTimeout(() => {
-				onClose();
-			}, 500);
+			// After successful submission, close the dialog
+			document
+				.querySelector<HTMLButtonElement>(
+					'[role="dialog"] button[aria-label="Close"]'
+				)
+				?.click();
 		} catch (error) {
 			console.error("Submission error:", error);
 			toast({

@@ -92,7 +92,7 @@ export function MainSidebar() {
 						<AlertTriangle className="h-6 w-6" />
 						<span className="text-xs">Incidences</span>
 					</Link> */}
-					<Link
+					{/* <Link
 						href="/dashboard/sessions"
 						className={`flex flex-col items-center gap-1 transition-colors hover:text-[#f8941c] mx-8 ${
 							pathname.includes("/sessions") ? "text-[#f8941c]" : "text-white"
@@ -100,7 +100,7 @@ export function MainSidebar() {
 					>
 						<Calendar className="h-6 w-6" />
 						<span className="text-xs">Sessions</span>
-					</Link>
+					</Link> */}
 					<Link
 						href="/dashboard/resources"
 						className={`flex flex-col items-center gap-1 transition-colors hover:text-[#f8941c] mx-8 ${
