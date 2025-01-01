@@ -1,209 +1,161 @@
 "use client";
 
-import Image from "next/image";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
-import Link from "next/link";
-import { useState } from "react";
-import { Calendar as CalendarIcon, Clock } from "lucide-react";
-import { Calendar as CalendarComponent } from "@/components/ui/calendar";
-import {
-	Popover,
-	PopoverContent,
-	PopoverTrigger,
-} from "@/components/ui/popover";
+import { createClient } from "@/utils/supabase/client";
+import { Database } from "@/types/db-schema";
 import { format } from "date-fns";
-import { TimePickerDemo } from "@/components/ui/time-picker";
-import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 
-interface Appointment {
-	id: string;
-	doctorName: string;
-	doctorImage: string;
-	time: string;
-	type: string;
-	duration: string;
-	status: "upcoming" | "joined" | "available";
-}
-
-const appointments: Appointment[] = [
-	{
-		id: "1",
-		doctorName: "Dr Emilia Winson",
-		doctorImage: "/doctors/dr-emilia.jpg",
-		time: "8:00 AM - 9:00 AM",
-		type: "Group Check",
-		duration: "30 Mins",
-		status: "upcoming",
-	},
-	{
-		id: "2",
-		doctorName: "Sauti Salama",
-		doctorImage: "/doctors/sauti.jpeg",
-		time: "8:00 AM - 9:00 AM",
-		type: "Event Name",
-		duration: "30 Mins",
-		status: "available",
-	},
-	{
-		id: "3",
-		doctorName: "Adv Maina Njugu",
-		doctorImage: "/doctors/maina.jpeg",
-		time: "8:00 AM - 9:00 AM",
-		type: "Case Proceedings",
-		duration: "30 Mins",
-		status: "joined",
-	},
-];
+type AppointmentWithDetails =
+	Database["public"]["Tables"]["appointments"]["Row"] & {
+		professional_profiles: {
+			profession: string;
+			profiles: {
+				first_name: string | null;
+				last_name: string | null;
+			} | null;
+		} | null;
+		matched_services: {
+			reports: {
+				incident_description: string | null;
+			} | null;
+			support_services: {
+				name: string;
+			} | null;
+		} | null;
+	};
 
 export function UpcomingAppointments() {
-	const [date, setDate] = useState<Date>();
-	const [time, setTime] = useState<string>();
+	const [appointments, setAppointments] = useState<AppointmentWithDetails[]>([]);
+	const [isLoading, setIsLoading] = useState(true);
+
+	useEffect(() => {
+		async function fetchAppointments() {
+			const supabase = createClient();
+
+			// Get the current user's session
+			const {
+				data: { session },
+			} = await supabase.auth.getSession();
+
+			if (!session?.user?.id) {
+				console.error("No user session found");
+				setIsLoading(false);
+				return;
+			}
+
+			// Get the user's profile to determine their type (professional or survivor)
+			const { data: userProfile } = await supabase
+				.from("profiles")
+				.select("user_type")
+				.eq("id", session.user.id)
+				.single();
+
+			// Build the query based on user type
+			const query = supabase
+				.from("appointments")
+				.select(
+					`
+					*,
+					professional_profiles (
+						profession,
+						profiles (
+							first_name,
+							last_name
+						)
+					),
+					matched_services (
+						reports (
+							incident_description
+						),
+						support_services (
+							name
+						)
+					)
+				`
+				)
+				.order("date", { ascending: false });
+
+			// Filter based on user type
+			if (userProfile?.user_type === "professional") {
+				query.eq("professional_id", session.user.id);
+			} else if (userProfile?.user_type === "survivor") {
+				query.eq("survivor_id", session.user.id);
+			}
+
+			const { data: appointmentsData, error } = await query;
+
+			if (error) {
+				console.error("Error fetching appointments:", error);
+				return;
+			}
+
+			setAppointments(appointmentsData || []);
+			setIsLoading(false);
+		}
+
+		fetchAppointments();
+	}, []);
+
+	if (isLoading) {
+		return <div>Loading appointments...</div>;
+	}
 
 	return (
-		<div className="space-y-6">
-			<h2 className="text-xl font-semibold text-[#1A3434]">
-				Upcoming Appointments
-			</h2>
-
-			{/* Featured Appointment Section */}
-			<div className="grid grid-cols-[1fr_auto] gap-4">
-				{/* Doctor Info Card */}
-				<div className="space-y-4">
-					<div className="flex items-center gap-3">
-						<Avatar className="h-12 w-12">
-							<AvatarImage src="/dashboard/featured.png" alt="Dr Emilia Winson" />
-							<AvatarFallback>EW</AvatarFallback>
-						</Avatar>
-						<div className="flex items-center justify-between flex-1">
-							<div>
-								<h4 className="font-medium text-[#1A3434]">Dr Emilia Winson</h4>
-								<p className="text-sm text-gray-600">Your mental health coach</p>
-							</div>
-							<Button
-								className="rounded-full bg-[#00A5A5] px-6 hover:bg-[#008585]"
-								asChild
-							>
-								<Link href="/chat">Chat</Link>
-							</Button>
-						</div>
-					</div>
-
-					{/* Hospital Info */}
-					<div className="space-y-1">
-						<h3 className="text-lg font-semibold">Good Life Center</h3>
-						<p className="text-gray-600">Nairobi,Kenya</p>
-					</div>
-
-					{/* Schedule Card */}
-					<div className="rounded-2xl bg-[#1A3434] p-4">
-						<div className="flex justify-between text-white">
-							<div className="flex items-center gap-2">
-								<CalendarIcon className="h-5 w-5" />
-								<span>Thursday, March 28, 2025</span>
-							</div>
-
-							<div className="flex items-center gap-2">
-								<Clock className="h-5 w-5" />
-								<span>10:00 AM</span>
-							</div>
-						</div>
-						{/* <div className="flex justify-between text-white">
-							<Popover>
-								<PopoverTrigger asChild>
-									<div className="flex items-center gap-2 cursor-pointer hover:opacity-80">
-										<CalendarIcon className="h-5 w-5" />
-										<span>{date ? format(date, "PPP") : "Pick a date"}</span>
-									</div>
-								</PopoverTrigger>
-								<PopoverContent className="w-auto p-0 bg-white">
-									<CalendarComponent
-										mode="single"
-										selected={date}
-										onSelect={setDate}
-										initialFocus
-									/>
-								</PopoverContent>
-							</Popover>
-
-							<Popover>
-								<PopoverTrigger asChild>
-									<div className="flex items-center gap-2 cursor-pointer hover:opacity-80">
-										<Clock className="h-5 w-5" />
-										<span>{time || "Pick a time"}</span>
-									</div>
-								</PopoverTrigger>
-								<PopoverContent className="w-auto p-0 bg-white">
-									<TimePickerDemo selected={time} onTimeChange={setTime} />
-								</PopoverContent>
-							</Popover>
-						</div> */}
-					</div>
-				</div>
-
-				{/* Featured Image */}
-				<div className="relative h-48 w-80 overflow-hidden rounded-2xl">
-					<Image
-						src="/dashboard/featured.png"
-						alt="Hospital"
-						fill
-						className="object-cover"
-					/>
-				</div>
+		<div className="space-y-4">
+			<div className="flex items-center justify-between">
+				<h2 className="text-xl font-semibold">Your Appointments</h2>
+				<Button variant="outline" size="sm">
+					View All
+				</Button>
 			</div>
 
-			{/* Appointment List */}
 			<div className="space-y-3">
-				{appointments.map((appointment) => (
-					<div
-						key={appointment.id}
-						className={`flex items-center justify-between rounded-lg p-4 ${
-							appointment.id === "1"
-								? "bg-[#FFF8F0]"
-								: appointment.id === "2"
-								? "bg-[#F0F9FF]"
-								: "bg-[#FFF5F5]"
-						}`}
-					>
-						<div className="flex items-center gap-3">
-							<Avatar className="h-10 w-10">
-								<AvatarImage
-									src={appointment.doctorImage}
-									alt={appointment.doctorName}
-								/>
-								<AvatarFallback>
-									{appointment.doctorName
-										.split(" ")
-										.map((n) => n[0])
-										.join("")}
-								</AvatarFallback>
-							</Avatar>
-							<div>
-								<h4 className="font-medium">{appointment.doctorName}</h4>
-								<p className="text-sm text-gray-500">{appointment.time}</p>
+				{appointments.length === 0 ? (
+					<p className="text-muted-foreground text-sm">No appointments found</p>
+				) : (
+					appointments.map((appointment) => (
+						<div
+							key={appointment.id}
+							className="flex items-start justify-between p-4 rounded-lg border bg-card"
+						>
+							<div className="space-y-1">
+								<p className="font-medium">
+									{appointment.professional_profiles?.profiles?.first_name}{" "}
+									{appointment.professional_profiles?.profiles?.last_name}
+								</p>
+								<p className="text-sm text-muted-foreground">
+									{appointment.professional_profiles?.profession}
+								</p>
+								<p className="text-sm text-muted-foreground">
+									{appointment.matched_services?.support_services?.name}
+								</p>
+								{appointment.matched_services?.reports?.incident_description && (
+									<p className="text-sm text-muted-foreground line-clamp-2">
+										{appointment.matched_services.reports.incident_description}
+									</p>
+								)}
+							</div>
+							<div className="text-right">
+								<p className="font-medium">
+									{format(new Date(appointment.date), "MMM d, yyyy")}
+								</p>
+								<p className="text-sm text-muted-foreground">
+									{format(new Date(appointment.date), "h:mm a")}
+								</p>
+								<span
+									className={`inline-block mt-2 px-2 py-1 text-xs rounded-full ${
+										appointment.status === "confirmed"
+											? "bg-green-100 text-green-800"
+											: "bg-yellow-100 text-yellow-800"
+									}`}
+								>
+									{appointment.status}
+								</span>
 							</div>
 						</div>
-
-						<div className="flex items-center gap-6">
-							<div>
-								<p className="font-medium">{appointment.type}</p>
-								<p className="text-sm text-gray-500">{appointment.duration}</p>
-							</div>
-							<Button
-								className={
-									appointment.status === "joined"
-										? "bg-[#00A5A5] hover:bg-[#008585]"
-										: "bg-[#00A5A5] hover:bg-[#008585]"
-								}
-							>
-								{appointment.status === "upcoming"
-									? "Join Now"
-									: appointment.status === "available"
-									? "Join"
-									: "Joined"}
-							</Button>
-						</div>
-					</div>
-				))}
+					))
+				)}
 			</div>
 		</div>
 	);
