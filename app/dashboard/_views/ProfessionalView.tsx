@@ -1,7 +1,5 @@
 "use client";
 
-import { createClient } from "@/utils/supabase/client";
-import { Database, Tables } from "@/types/db-schema";
 import { Button } from "@/components/ui/button";
 import {
 	Dialog,
@@ -11,7 +9,7 @@ import {
 	DialogTitle,
 	DialogTrigger,
 } from "@/components/ui/dialog";
-import { Info, Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
 import AuthenticatedReportAbuseForm from "@/components/AuthenticatedReportAbuseForm";
 import {
@@ -25,25 +23,15 @@ import {
 	AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
-import CaseCard from "@/app/components/CaseCard";
-import { Bell, Search, Users } from "lucide-react";
-import Image from "next/image";
-import Link from "next/link";
-import { Calendar } from "@/components/ui/calendar";
-// import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { MainSidebar } from "./MainSidebar";
 import { UpcomingAppointments } from "@/app/components/UpcomingAppointments";
 import { CommunityCard } from "@/app/components/CommunityCard";
-import { DailyProgress } from "@/app/components/DailyProgress";
 import WelcomeHeader from "@/app/components/WelcomeHeader";
 import { JoinCommunity } from "@/app/components/JoinCommunity";
 import { ConditionCheckCard } from "@/app/components/ConditionCheckCard";
+import { Tables } from "@/types/db-schema";
 
-interface SurvivorViewProps {
+interface ProfessionalViewProps {
 	userId: string;
 	profileDetails: Tables<"profiles">;
 }
@@ -147,7 +135,7 @@ const supportServices = [
 export default function ProfessionalView({
 	userId,
 	profileDetails,
-}: SurvivorViewProps) {
+}: ProfessionalViewProps) {
 	const [open, setOpen] = useState(false);
 	const [deleteReportId, setDeleteReportId] = useState<string | null>(null);
 	const { toast } = useToast();
