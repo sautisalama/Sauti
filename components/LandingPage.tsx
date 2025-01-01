@@ -1,7 +1,9 @@
+"use client";
+
 import { Nav } from "./Nav";
 import Image from "next/image";
 import { AnimatedButton } from "./acerternity/AnimatedButton";
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { Banner } from "./Banner";
 import AboutCard from "./AboutCard";
 import {
@@ -21,8 +23,41 @@ import { Input } from "@/components/ui/input";
 import Link from "next/link";
 import { Footer } from "./Footer";
 import Forecast from "./forecast";
+import {
+	Dialog,
+	DialogContent,
+	DialogDescription,
+	DialogHeader,
+	DialogTitle,
+	DialogTrigger,
+} from "@/components/ui/dialog";
+import ReportAbuseForm from "./ReportAbuseForm";
+import { createClient } from "@/utils/supabase/client";
 
 export function LandingPage() {
+	const [isAuthenticated, setIsAuthenticated] = useState(false);
+	const supabase = createClient();
+
+	useEffect(() => {
+		const checkAuth = async () => {
+			const {
+				data: { session },
+			} = await supabase.auth.getSession();
+			setIsAuthenticated(!!session);
+		};
+
+		checkAuth();
+
+		// Set up auth state change listener
+		const {
+			data: { subscription },
+		} = supabase.auth.onAuthStateChange((_event, session) => {
+			setIsAuthenticated(!!session);
+		});
+
+		return () => subscription.unsubscribe();
+	}, []);
+
 	return (
 		<div className="flex min-h-screen w-full flex-col">
 			{/* <Banner /> */}
@@ -43,13 +78,30 @@ export function LandingPage() {
 									and healing.
 								</p>
 								<div className="flex flex-col sm:flex-row gap-4">
-									<Link href="https://sauti-salama.vercel.app/Report">
-										<AnimatedButton text="Report Abuse" icon="📢" variant="default" />
-									</Link>
-									<Link href="https://google.com" className="min-w-full sm:min-w-[60%]">
+									<Dialog>
+										<DialogTrigger asChild>
+											<div>
+												<AnimatedButton text="Report Abuse" icon="📢" variant="default" />
+											</div>
+										</DialogTrigger>
+										<DialogContent className="sm:max-w-4xl">
+											<DialogHeader>
+												<DialogTitle>Report Abuse</DialogTitle>
+												<DialogDescription>
+													Please fill out this form to report an incident. All information
+													will be kept confidential.
+												</DialogDescription>
+											</DialogHeader>
+											<ReportAbuseForm />
+										</DialogContent>
+									</Dialog>
+									<Link
+										href={isAuthenticated ? "/dashboard" : "/signin"}
+										className="min-w-full sm:min-w-[60%]"
+									>
 										<AnimatedButton
-											text="Fast Exit"
-											icon="🏃⚡"
+											text={isAuthenticated ? "Dashboard" : "Sign In"}
+											icon={<MoveUpRight className="h-4 w-4" />}
 											variant="outline"
 											className="min-w-full sm:min-w-[80%]"
 										/>
