@@ -1,5 +1,5 @@
 import { Database, Tables } from "@/types/db-schema";
-import { createServerClient, type CookieOptions } from "@supabase/ssr";
+import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { Session, User } from "@supabase/supabase-js";
 
@@ -11,18 +11,21 @@ export function createClient() {
 		process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
 		{
 			cookies: {
-				getAll() {
-					return cookieStore.getAll();
+				get(name: string) {
+					return cookieStore.get(name)?.value;
 				},
-				setAll(cookiesToSet) {
+				set(name: string, value: string, options: any) {
 					try {
-						cookiesToSet.forEach(({ name, value, options }) =>
-							cookieStore.set(name, value, options)
-						);
-					} catch {
-						// The `setAll` method was called from a Server Component.
-						// This can be ignored if you have middleware refreshing
-						// user sessions.
+						cookieStore.set(name, value, options);
+					} catch (error) {
+						// Handle cookie setting error in server component
+					}
+				},
+				remove(name: string) {
+					try {
+						cookieStore.delete(name);
+					} catch (error) {
+						// Handle cookie removal error in server component
 					}
 				},
 			},
@@ -48,14 +51,16 @@ export async function getSession(): Promise<Session | null> {
 export async function getUser(): Promise<Tables<"profiles"> | null> {
 	const supabase = createClient();
 	try {
-		const session = await getSession();
-		// console.log("session", session);
-		if (!session?.user?.id) return null;
+		const {
+			data: { user },
+			error: userError,
+		} = await supabase.auth.getUser();
+		if (userError || !user?.id) return null;
 
 		const { data, error } = await supabase
 			.from("profiles")
 			.select("*")
-			.eq("id", session.user.id)
+			.eq("id", user.id)
 			.single();
 
 		if (error) throw error;
