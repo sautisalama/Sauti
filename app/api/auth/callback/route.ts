@@ -33,7 +33,9 @@ export async function GET(request: Request) {
 			return NextResponse.redirect(redirectUrl);
 		} else {
 			console.error("Auth exchange error:", error);
-			return NextResponse.redirect(`${origin}/error?message=auth_exchange_failed`);
+			return NextResponse.redirect(
+				`${origin}/error?message=${encodeURIComponent(error.message || 'auth_exchange_failed')}`
+			);
 		}
 	}
 
