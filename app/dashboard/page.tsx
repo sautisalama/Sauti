@@ -9,30 +9,31 @@ import ProfessionalView from "./_views/ProfessionalView";
 import { MainSidebar } from "./_views/MainSidebar";
 
 export default async function Dashboard() {
-	const user = await getUser();
-	// console.log("session", await getSession());
+	// const user = await getUser();
+	// // console.log("session", await getSession());
 
-	if (!user) {
-		redirect("/signin");
-	}
+	// if (!user) {
+	// 	redirect("/signin");
+	// }
 
-	return (
-		<div className="flex h-screen overflow-hidden">
-			{/* Sidebar - hidden on mobile */}
-			<div className="hidden md:block fixed left-0 h-full">
-				<MainSidebar />
-			</div>
+	// return (
+	// 	<div className="flex h-screen overflow-hidden">
+	// 		{/* Sidebar - hidden on mobile */}
+	// 		<div className="hidden md:block fixed left-0 h-full">
+	// 			<MainSidebar />
+	// 		</div>
 
-			{/* Main content area */}
-			<div className="flex-1 overflow-auto md:ml-[72px]">
-				{user.user_type === "survivor" ? (
-					<SurvivorView userId={user.id} profileDetails={user} />
-				) : user.user_type === "professional" ? (
-					<ProfessionalView userId={user.id} profileDetails={user} />
-				) : (
-					<p>Invalid user type</p>
-				)}
-			</div>
-		</div>
-	);
+	// 		{/* Main content area */}
+	// 		<div className="flex-1 overflow-auto md:ml-[72px]">
+	// 			{user.user_type === "survivor" ? (
+	// 				<SurvivorView userId={user.id} profileDetails={user} />
+	// 			) : user.user_type === "professional" ? (
+	// 				<ProfessionalView userId={user.id} profileDetails={user} />
+	// 			) : (
+	// 				<p>Invalid user type</p>
+	// 			)}
+	// 		</div>
+	// 	</div>
+	// );
+	return <div>Dashboard</div>;
 }

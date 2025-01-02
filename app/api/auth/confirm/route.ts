@@ -10,7 +10,10 @@ export async function GET(request: Request) {
 		const supabase = await createClient();
 		const { error } = await supabase.auth.exchangeCodeForSession(code);
 
+		console.log("we jhave lift off", error);
+
 		if (error) {
+			console.log(error);
 			console.error("Auth callback error:", error);
 			const errorUrl = new URL(
 				"/error",
