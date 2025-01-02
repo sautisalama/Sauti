@@ -21,7 +21,7 @@ export async function signUp(formData: FormData) {
 		email,
 		password,
 		options: {
-			emailRedirectTo: `${redirectUrl}/api/auth/confirm`,
+			emailRedirectTo: `${redirectUrl}/api/auth/callback`,
 			data: {
 				email,
 				first_name: firstName,
@@ -90,7 +90,7 @@ export async function signInWithGoogle() {
 	const { data, error } = await supabase.auth.signInWithOAuth({
 		provider: "google",
 		options: {
-			redirectTo: `${redirectUrl}/api/auth/confirm`,
+			redirectTo: `${redirectUrl}/api/auth/callback`,
 			queryParams: {
 				access_type: "offline",
 				prompt: "consent",
