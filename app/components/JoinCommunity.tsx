@@ -53,7 +53,7 @@ export function JoinCommunity() {
 
 					<div className="mt-6 flex gap-4">
 						<Link
-							href="https://www.instagram.com/p/DDYrY0YsN0W/?igsh=cjBwbjBpZmx3dzNn"
+							href="https://chat.whatsapp.com/K4EoeSsNEQ49y0b2P2O7RR"
 							target="_blank"
 							rel="noopener noreferrer"
 							className="text-slate-700 hover:text-slate-900 transition-colors"
