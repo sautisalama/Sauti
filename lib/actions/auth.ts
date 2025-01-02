@@ -21,7 +21,7 @@ export async function signUp(formData: FormData) {
 		email,
 		password,
 		options: {
-			emailRedirectTo: `${redirectUrl}/auth/confirm`,
+			emailRedirectTo: `${redirectUrl}/api/auth/confirm`,
 			data: {
 				email,
 				first_name: firstName,
@@ -32,6 +32,7 @@ export async function signUp(formData: FormData) {
 	});
 
 	if (authError) {
+		console.log(authError);
 		console.error("Sign up error:", authError);
 		redirect("/error");
 	}
@@ -75,8 +76,9 @@ export async function signIn(formData: FormData) {
 	});
 
 	if (error) {
-		return { error: error.message };
-		console.log("Sign in error:", error);
+		console.error("Sign in error:", error);
+		console.log(error);
+		redirect("/error");
 	}
 
 	redirect("/dashboard");
@@ -97,6 +99,7 @@ export async function signInWithGoogle() {
 	});
 
 	if (error) {
+		console.log(error);
 		console.error("Google sign in error:", error);
 		redirect("/error");
 	}
