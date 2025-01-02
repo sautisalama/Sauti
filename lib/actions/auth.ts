@@ -21,7 +21,7 @@ export async function signUp(formData: FormData) {
 		email,
 		password,
 		options: {
-			emailRedirectTo: `${redirectUrl}/api/auth/callback`,
+			emailRedirectTo: `${redirectUrl}/api/auth/confirm`,
 			data: {
 				email,
 				first_name: firstName,
@@ -62,7 +62,7 @@ export async function signUp(formData: FormData) {
 	}
 
 	revalidatePath("/", "layout");
-	redirect("/signin");
+	redirect("/dashboard");
 }
 
 export async function signIn(formData: FormData) {
@@ -104,8 +104,6 @@ export async function signInWithGoogle() {
 		redirect("/error");
 	}
 
-	console.log("There is a success", data);
-
 	if (data.url) {
 		console.log(data.url);
 		redirect(data.url);
@@ -119,4 +117,6 @@ export async function signOut() {
 	if (error) {
 		return { error: error.message };
 	}
+	// Add redirect after successful signout
+	redirect("/");
 }
