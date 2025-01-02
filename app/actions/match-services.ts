@@ -130,6 +130,12 @@ export async function matchReportWithServices(reportId: string) {
 				match_score:
 					match.distance === Infinity ? 0 : 100 - Math.min(match.distance, 100),
 				match_status_type: "pending",
+				description: report.incident_description,
+				feedback: null,
+				notes: null,
+				support_service: match.service.name,
+				survivor_id: report.user_id,
+				updated_at: new Date().toISOString(),
 			}));
 
 			const { error: matchError } = await supabase
