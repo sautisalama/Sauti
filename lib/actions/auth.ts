@@ -104,8 +104,11 @@ export async function signInWithGoogle() {
 		redirect("/error");
 	}
 
+	console.log("There is a success", data);
+
 	if (data.url) {
 		redirect(data.url);
+		console.log(data.url);
 	}
 }
 
