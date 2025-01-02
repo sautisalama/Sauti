@@ -301,7 +301,7 @@ export default function ProfessionalView({
 														return (
 															<div
 																key={report.report_id}
-																className={`flex items-center justify-between rounded-lg p-4 ${
+																className={`flex flex-col rounded-lg p-4 ${
 																	report.urgency === "high"
 																		? "bg-[#FFF5F5]"
 																		: report.urgency === "medium"
@@ -309,46 +309,54 @@ export default function ProfessionalView({
 																		: "bg-[#F0F9FF]"
 																}`}
 															>
-																<div className="flex items-center gap-3">
-																	<div className="h-10 w-10 rounded-full bg-[#1A3434] text-white flex items-center justify-center">
-																		{report.type_of_incident?.[0]?.toUpperCase() || "?"}
-																	</div>
-																	<div>
-																		<h4 className="font-medium">
-																			{formatServiceName(
-																				report.type_of_incident || "Unknown Incident"
-																			)}
-																		</h4>
-																		<div className="flex items-center gap-2 text-sm text-gray-500">
-																			<span>
-																				{new Date(
-																					report.submission_timestamp || ""
-																				).toLocaleDateString()}
-																			</span>
-																			<span className="w-1.5 h-1.5 rounded-full bg-gray-300" />
-																			<span
-																				className={`px-2 py-0.5 rounded-full text-xs ${
-																					report.urgency === "high"
-																						? "bg-red-100 text-red-700"
-																						: report.urgency === "medium"
-																						? "bg-yellow-100 text-yellow-700"
-																						: "bg-blue-100 text-blue-700"
-																				}`}
-																			>
-																				{formatServiceName(report.urgency || "low")} Priority
-																			</span>
+																<div className="flex items-center justify-between">
+																	<div className="flex items-center gap-3">
+																		<div className="h-10 w-10 rounded-full bg-[#1A3434] text-white flex items-center justify-center">
+																			{report.type_of_incident?.[0]?.toUpperCase() || "?"}
+																		</div>
+																		<div>
+																			<h4 className="font-medium">
+																				{formatServiceName(
+																					report.type_of_incident || "Unknown Incident"
+																				)}
+																			</h4>
+																			<div className="flex items-center gap-2 text-sm text-gray-500">
+																				<span>
+																					{new Date(
+																						report.submission_timestamp || ""
+																					).toLocaleDateString()}
+																				</span>
+																				<span className="w-1.5 h-1.5 rounded-full bg-gray-300" />
+																				<span
+																					className={`px-2 py-0.5 rounded-full text-xs ${
+																						report.urgency === "high"
+																							? "bg-red-100 text-red-700"
+																							: report.urgency === "medium"
+																							? "bg-yellow-100 text-yellow-700"
+																							: "bg-blue-100 text-blue-700"
+																					}`}
+																				>
+																					{formatServiceName(report.urgency || "low")} Priority
+																				</span>
+																			</div>
 																		</div>
 																	</div>
+
+																	<Button
+																		variant="ghost"
+																		size="icon"
+																		className="text-destructive hover:text-destructive hover:bg-destructive/10"
+																		onClick={() => setDeleteReportId(report.report_id)}
+																	>
+																		<Trash2 className="h-4 w-4" />
+																	</Button>
 																</div>
 
-																<Button
-																	variant="ghost"
-																	size="icon"
-																	className="text-destructive hover:text-destructive hover:bg-destructive/10"
-																	onClick={() => setDeleteReportId(report.report_id)}
-																>
-																	<Trash2 className="h-4 w-4" />
-																</Button>
+																{report.incident_description && (
+																	<div className="mt-3 text-sm text-gray-600 line-clamp-3">
+																		{report.incident_description}
+																	</div>
+																)}
 															</div>
 														);
 													})}
@@ -507,7 +515,7 @@ export default function ProfessionalView({
 												{reports.map((report) => (
 													<div
 														key={report.report_id}
-														className={`flex items-center justify-between rounded-lg p-4 ${
+														className={`flex flex-col rounded-lg p-4 ${
 															report.urgency === "high"
 																? "bg-[#FFF5F5]"
 																: report.urgency === "medium"
@@ -515,46 +523,54 @@ export default function ProfessionalView({
 																: "bg-[#F0F9FF]"
 														}`}
 													>
-														<div className="flex items-center gap-3">
-															<div className="h-10 w-10 rounded-full bg-[#1A3434] text-white flex items-center justify-center">
-																{report.type_of_incident?.[0]?.toUpperCase() || "?"}
-															</div>
-															<div>
-																<h4 className="font-medium">
-																	{formatServiceName(
-																		report.type_of_incident || "Unknown Incident"
-																	)}
-																</h4>
-																<div className="flex items-center gap-2 text-sm text-gray-500">
-																	<span>
-																		{new Date(
-																			report.submission_timestamp || ""
-																		).toLocaleDateString()}
-																	</span>
-																	<span className="w-1.5 h-1.5 rounded-full bg-gray-300" />
-																	<span
-																		className={`px-2 py-0.5 rounded-full text-xs ${
-																			report.urgency === "high"
-																				? "bg-red-100 text-red-700"
-																				: report.urgency === "medium"
-																				? "bg-yellow-100 text-yellow-700"
-																				: "bg-blue-100 text-blue-700"
-																		}`}
-																	>
-																		{formatServiceName(report.urgency || "low")} Priority
-																	</span>
+														<div className="flex items-center justify-between">
+															<div className="flex items-center gap-3">
+																<div className="h-10 w-10 rounded-full bg-[#1A3434] text-white flex items-center justify-center">
+																	{report.type_of_incident?.[0]?.toUpperCase() || "?"}
+																</div>
+																<div>
+																	<h4 className="font-medium">
+																		{formatServiceName(
+																			report.type_of_incident || "Unknown Incident"
+																		)}
+																	</h4>
+																	<div className="flex items-center gap-2 text-sm text-gray-500">
+																		<span>
+																			{new Date(
+																				report.submission_timestamp || ""
+																			).toLocaleDateString()}
+																		</span>
+																		<span className="w-1.5 h-1.5 rounded-full bg-gray-300" />
+																		<span
+																			className={`px-2 py-0.5 rounded-full text-xs ${
+																				report.urgency === "high"
+																					? "bg-red-100 text-red-700"
+																					: report.urgency === "medium"
+																					? "bg-yellow-100 text-yellow-700"
+																					: "bg-blue-100 text-blue-700"
+																			}`}
+																		>
+																			{formatServiceName(report.urgency || "low")} Priority
+																		</span>
+																	</div>
 																</div>
 															</div>
+
+															<Button
+																variant="ghost"
+																size="icon"
+																className="text-destructive hover:text-destructive hover:bg-destructive/10"
+																onClick={() => setDeleteReportId(report.report_id)}
+															>
+																<Trash2 className="h-4 w-4" />
+															</Button>
 														</div>
 
-														<Button
-															variant="ghost"
-															size="icon"
-															className="text-destructive hover:text-destructive hover:bg-destructive/10"
-															onClick={() => setDeleteReportId(report.report_id)}
-														>
-															<Trash2 className="h-4 w-4" />
-														</Button>
+														{report.incident_description && (
+															<div className="mt-3 text-sm text-gray-600 line-clamp-3">
+																{report.incident_description}
+															</div>
+														)}
 													</div>
 												))}
 											</div>
