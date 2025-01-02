@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { matchReportWithServices } from "@/app/actions/match-services";
 
 export async function POST(request: Request) {
-	const supabase = createClient();
+	const supabase = await createClient();
 
 	try {
 		const data = await request.json();
