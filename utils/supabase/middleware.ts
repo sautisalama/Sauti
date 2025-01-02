@@ -39,10 +39,14 @@ export async function updateSession(request: NextRequest) {
 		data: { user },
 	} = await supabase.auth.getUser();
 
+	console.log(user);
 	if (
 		!user &&
 		!request.nextUrl.pathname.startsWith("/signin") &&
 		!request.nextUrl.pathname.startsWith("/signup") &&
+		!request.nextUrl.pathname.startsWith("/error") &&
+		!request.nextUrl.pathname.startsWith("/api/auth/callback") &&
+		!request.nextUrl.pathname.startsWith("/api/auth/confirm") &&
 		request.nextUrl.pathname !== "/"
 	) {
 		const url = request.nextUrl.clone();
