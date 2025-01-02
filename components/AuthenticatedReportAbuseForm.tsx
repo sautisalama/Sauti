@@ -84,8 +84,10 @@ export default function AuthenticatedReportAbuseForm({
 			return;
 		}
 
+		console.log(userProfile?.first_name);
+
 		const data = {
-			first_name: userProfile?.first_name || null,
+			first_name: userProfile?.first_name,
 			last_name: userProfile?.last_name || null,
 			user_id: userId,
 			phone: phone,
@@ -101,7 +103,7 @@ export default function AuthenticatedReportAbuseForm({
 		};
 
 		try {
-			const response = await fetch("/api/reports/submit", {
+			const response = await fetch("/api/reports", {
 				method: "POST",
 				headers: {
 					"Content-Type": "application/json",
