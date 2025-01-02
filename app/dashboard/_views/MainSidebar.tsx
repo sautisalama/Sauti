@@ -30,6 +30,13 @@ import {
 import { signOut } from "@/lib/actions/auth";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
+import {
+	Tooltip,
+	TooltipContent,
+	TooltipProvider,
+	TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { useUser } from "@/hooks/useUser";
 
 const navigation = [
 	{
@@ -62,12 +69,13 @@ const navigation = [
 
 export function MainSidebar() {
 	const pathname = usePathname();
+	const user = useUser();
 	const [isVisible, setIsVisible] = useState(true);
 	const [lastScrollY, setLastScrollY] = useState(0);
 
 	useEffect(() => {
 		const controlNavbar = () => {
-			if (typeof window !== 'undefined') {
+			if (typeof window !== "undefined") {
 				// Show navbar at the top of the page
 				if (window.scrollY === 0) {
 					setIsVisible(true);
@@ -155,26 +163,21 @@ export function MainSidebar() {
 				</div>
 
 				<div className="flex flex-col items-center gap-4">
-					<Avatar className="h-8 w-8 mx-6">
-						<AvatarImage src="https://github.com/shadcn.png" alt="User" />
-						<AvatarFallback>
-							<User className="h-4 w-4" />
-						</AvatarFallback>
-					</Avatar>
-					{/* <Button
-						variant="ghost"
-						size="icon"
-						className="text-white hover:text-[#f8941c] transition-colors mx-6"
-					>
-						<Settings className="h-5 w-5" />
-					</Button>
-					<Button
-						variant="ghost"
-						size="icon"
-						className="text-white hover:text-[#f8941c] transition-colors mx-6"
-					>
-						<Info className="h-5 w-5" />
-					</Button> */}
+					<TooltipProvider>
+						<Tooltip>
+							<TooltipTrigger>
+								<Avatar className="h-8 w-8 mx-6 bg-gradient-to-br from-emerald-400 via-teal-400 to-cyan-400">
+									<AvatarFallback className="text-white font-medium bg-gradient-to-br from-purple-400 via-fuchsia-400 to-pink-400">
+										{user?.email?.[0].toUpperCase() || "?"}
+									</AvatarFallback>
+								</Avatar>
+							</TooltipTrigger>
+							<TooltipContent>
+								<p>{user?.email || "No email available"}</p>
+							</TooltipContent>
+						</Tooltip>
+					</TooltipProvider>
+
 					<form action={signOut}>
 						<Button
 							variant="ghost"
@@ -202,12 +205,20 @@ export function MainSidebar() {
 						className="w-6 h-8"
 					/>
 					<div className="flex items-center gap-3">
-						<Avatar className="h-8 w-8">
-							<AvatarImage src="https://github.com/shadcn.png" alt="User" />
-							<AvatarFallback>
-								<User className="h-4 w-4" />
-							</AvatarFallback>
-						</Avatar>
+						<TooltipProvider>
+							<Tooltip>
+								<TooltipTrigger>
+									<Avatar className="h-8 w-8 mx-6 bg-gradient-to-br from-emerald-400 via-teal-400 to-cyan-400">
+										<AvatarFallback className="text-white font-medium bg-gradient-to-br from-emerald-500 via-teal-500 to-cyan-500">
+											{user?.email?.[0].toUpperCase() || "?"}
+										</AvatarFallback>
+									</Avatar>
+								</TooltipTrigger>
+								<TooltipContent>
+									<p>{user?.email || "No email available"}</p>
+								</TooltipContent>
+							</Tooltip>
+						</TooltipProvider>
 						<form action={signOut}>
 							<Button
 								variant="ghost"
