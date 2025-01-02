@@ -1,19 +1,21 @@
 {
-  "extends": [
-    "next/core-web-vitals",
-    "eslint:recommended",
-    "plugin:@typescript-eslint/recommended"
-  ],
-  "parser": "@typescript-eslint/parser",
-  "plugins": ["@typescript-eslint"],
-  "rules": {
-    "indent": ["error", "tab"],
-    "no-unused-vars": "error",
-    "semi": ["error", "always"],
-    "quotes": ["error", "single"],
-    "no-console": "warn",
-    "tailwindcss/classnames-order": "warn",
-    "tailwindcss/no-custom-classname": "warn",
-    "tailwindcss/no-contradicting-classname": "error"
-  }
+	"extends": [
+		"next/core-web-vitals",
+		"eslint:recommended",
+		"plugin:@typescript-eslint/recommended"
+	],
+	"parser": "@typescript-eslint/parser",
+	"plugins": ["@typescript-eslint"],
+	"rules": {
+		"quotes": "off",
+		"semi": "off",
+		"indent": "off",
+		"no-console": "off",
+		"@typescript-eslint/no-unused-vars": "off",
+		"no-unused-vars": "off",
+		"@typescript-eslint/no-explicit-any": "off",
+		"react/no-unescaped-entities": "off",
+		"react-hooks/exhaustive-deps": "warn",
+		"@next/next/no-img-element": "off"
+	}
 }

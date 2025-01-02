@@ -2,7 +2,7 @@
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { useState } from "react";
-import AddSupportServiceForm from "./AddSupportServiceForm";
+import { AddSupportServiceForm } from "./AddSupportServiceForm";
 
 export default function AddSupportServiceButton({
 	userId,
@@ -17,7 +17,7 @@ export default function AddSupportServiceButton({
 				<Button>Add Support Service</Button>
 			</DialogTrigger>
 			<DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
-				<AddSupportServiceForm onClose={() => setOpen(false)} userId={userId} />
+				<AddSupportServiceForm onSuccess={() => setOpen(false)} />
 			</DialogContent>
 		</Dialog>
 	);
