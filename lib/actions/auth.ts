@@ -87,6 +87,9 @@ export async function signIn(formData: FormData) {
 export async function signInWithGoogle() {
 	const supabase = await createClient();
 	const redirectUrl = process.env.NEXT_PUBLIC_APP_URL;
+
+	console.log("Starting Google sign in with redirect URL:", redirectUrl);
+
 	const { data, error } = await supabase.auth.signInWithOAuth({
 		provider: "google",
 		options: {
@@ -99,13 +102,12 @@ export async function signInWithGoogle() {
 	});
 
 	if (error) {
-		console.log(error);
 		console.error("Google sign in error:", error);
-		redirect("/error");
+		redirect("/error?message=google_signin_failed");
 	}
 
 	if (data.url) {
-		console.log(data.url);
+		console.log("Redirecting to OAuth URL:", data.url);
 		redirect(data.url);
 	}
 }

@@ -1,7 +1,17 @@
-import { type NextRequest } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
 import { updateSession } from "@/utils/supabase/middleware";
 
 export async function middleware(request: NextRequest) {
+	const { pathname, searchParams } = new URL(request.url);
+
+	// Handle OAuth callback at root path
+	if (pathname === "/" && searchParams.has("code")) {
+		const code = searchParams.get("code");
+		return NextResponse.redirect(
+			new URL(`/api/auth/callback?code=${code}`, request.url)
+		);
+	}
+
 	return await updateSession(request);
 }
 
