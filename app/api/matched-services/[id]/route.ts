@@ -5,7 +5,7 @@ export async function PATCH(
 	request: Request,
 	{ params }: { params: { id: string } }
 ) {
-	const supabase = createClient();
+	const supabase = await createClient();
 
 	try {
 		const {

@@ -37,7 +37,7 @@ function calculateDistance(
  * @returns Array of matched services with their distances
  */
 export async function matchReportWithServices(reportId: string) {
-	const supabase = createClient();
+	const supabase = await createClient();
 
 	try {
 		// Fetch the report with required services

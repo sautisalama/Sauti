@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { Database } from "@/types/db-schema";
 
 export async function POST(request: Request) {
-	const supabase = createClient();
+	const supabase = await createClient();
 
 	try {
 		const {
@@ -63,7 +63,7 @@ export async function POST(request: Request) {
 
 // Optional: Add GET method to fetch services
 export async function GET(request: Request) {
-	const supabase = createClient();
+	const supabase = await createClient();
 
 	try {
 		const {

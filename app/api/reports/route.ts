@@ -10,7 +10,7 @@ const client = new MailtrapClient({ token: TOKEN });
 
 export async function POST(request: Request) {
 	try {
-		const supabase = createClient();
+		const supabase = await createClient();
 		const data = await request.json();
 
 		const { error: supabaseError, data: insertedReport } = await supabase

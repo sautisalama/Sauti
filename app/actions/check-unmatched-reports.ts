@@ -2,7 +2,7 @@ import { createClient } from "@/utils/supabase/server";
 import { matchReportWithServices } from "./match-services";
 
 export async function checkUnmatchedReports() {
-	const supabase = createClient();
+	const supabase = await createClient();
 
 	try {
 		// Fetch all unmatched reports
