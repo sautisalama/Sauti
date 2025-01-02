@@ -67,7 +67,7 @@ export function MainSidebar() {
 
 	useEffect(() => {
 		const controlNavbar = () => {
-			if (typeof window !== undefined) {
+			if (typeof window !== 'undefined') {
 				// Show navbar at the top of the page
 				if (window.scrollY === 0) {
 					setIsVisible(true);
@@ -76,10 +76,8 @@ export function MainSidebar() {
 
 				// Hide/show based on scroll direction
 				if (window.scrollY > lastScrollY) {
-					// scrolling down
 					setIsVisible(false);
 				} else {
-					// scrolling up
 					setIsVisible(true);
 				}
 
