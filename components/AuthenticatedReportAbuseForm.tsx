@@ -84,7 +84,6 @@ export default function AuthenticatedReportAbuseForm({
 			return;
 		}
 
-		console.log(userProfile?.first_name);
 
 		const data = {
 			first_name: userProfile?.first_name,

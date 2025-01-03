@@ -66,26 +66,19 @@ export async function matchReportWithServices(reportId: string) {
 			? report.required_services
 			: [];
 
-		console.log("Required services:", requiredServices);
+		
 
 		// First, filter services by type match
 		const matchingServices = services.filter((service) => {
 			const serviceTypes = service.service_types
 				.split(",")
 				.map((s: string) => s.trim().toLowerCase());
-			console.log(`Checking service ${service.id}:`, {
-				serviceTypes,
-				requiredServices,
-				isMatch: requiredServices.some((required: string) =>
-					serviceTypes.includes(required.toLowerCase())
-				),
-			});
 			return requiredServices.some((required: string) =>
 				serviceTypes.includes(required.toLowerCase())
 			);
 		});
 
-		console.log("Services after type matching:", matchingServices.length);
+		
 
 		// Then, calculate distances for matching services
 		const servicesWithDistances = matchingServices.map((service) => {
@@ -103,10 +96,8 @@ export async function matchReportWithServices(reportId: string) {
 					service.latitude,
 					service.longitude
 				);
-				console.log(`Distance for service ${service.id}:`, distance, "km");
-			} else {
-				console.log(`Missing coordinates for service ${service.id}`);
-			}
+				
+			} 
 
 			return {
 				service,
@@ -119,7 +110,6 @@ export async function matchReportWithServices(reportId: string) {
 			.sort((a, b) => a.distance - b.distance)
 			.slice(0, 5);
 
-		console.log("Final closest matches:", closestMatches);
 
 		// Insert matches into matched_services table
 		if (closestMatches.length > 0) {
@@ -146,9 +136,7 @@ export async function matchReportWithServices(reportId: string) {
 				console.error("Match insert error:", matchError);
 				throw new Error("Failed to insert matches");
 			}
-		} else {
-			console.log("No matching services found for report:", reportId);
-		}
+		} 
 
 		return closestMatches;
 	} catch (error) {

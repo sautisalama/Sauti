@@ -24,7 +24,6 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { UpcomingAppointments } from "@/app/components/UpcomingAppointments";
 import { CommunityCard } from "@/app/components/CommunityCard";
 import WelcomeHeader from "@/app/components/WelcomeHeader";
 import { JoinCommunity } from "@/app/components/JoinCommunity";
@@ -49,103 +48,7 @@ interface ProfessionalViewProps {
 type MatchedServiceWithRelations = Tables<"matched_services"> & {
 	report: Tables<"reports">;
 	support_service: Tables<"support_services">;
-}
-
-// Dummy data for reports
-// const dummyReports = [
-// 	{
-// 		report_id: "1",
-// 		type_of_incident: "domestic_violence",
-// 		urgency: "high",
-// 		submission_timestamp: "2024-03-15T10:00:00Z",
-// 		matched_services: [
-// 			{
-// 				support_services: { name: "Emergency Support Center" },
-// 				match_status_type: "accepted",
-// 				appointments: [{ status: "confirmed", datetime: "2024-03-20T14:00:00Z" }],
-// 			},
-// 		],
-// 	},
-// 	{
-// 		report_id: "2",
-// 		type_of_incident: "sexual_harassment",
-// 		urgency: "medium",
-// 		submission_timestamp: "2024-03-14T15:30:00Z",
-// 		matched_services: [
-// 			{
-// 				support_services: { name: "Women's Legal Aid" },
-// 				match_status_type: "pending",
-// 				appointments: [],
-// 			},
-// 		],
-// 	},
-// 	{
-// 		report_id: "3",
-// 		type_of_incident: "stalking",
-// 		urgency: "low",
-// 		submission_timestamp: "2024-03-13T09:15:00Z",
-// 		matched_services: [],
-// 	},
-// ];
-
-// Dummy data for matched cases
-// const matchedCases = [
-// 	{
-// 		id: "1",
-// 		report: {
-// 			type_of_incident: "domestic_violence",
-// 			urgency: "high",
-// 		},
-// 		match_date: "2024-03-15T10:00:00Z",
-// 		support_service: { name: "Emergency Support Center" },
-// 		match_status_type: "accepted",
-// 		match_score: 0.95,
-// 		appointments: [{ status: "confirmed" }],
-// 	},
-// 	{
-// 		id: "2",
-// 		report: {
-// 			type_of_incident: "sexual_harassment",
-// 			urgency: "medium",
-// 		},
-// 		match_date: "2024-03-14T15:30:00Z",
-// 		support_service: { name: "Women's Legal Aid" },
-// 		match_status_type: "pending",
-// 		match_score: 0.85,
-// 		appointments: [],
-// 	},
-// ];
-
-// Dummy data for support services
-// const supportServices = [
-// 	{
-// 		id: "1",
-// 		name: "Emergency Support Center",
-// 		service_types: "domestic_violence, crisis_intervention",
-// 		phone_number: "+1 (555) 123-4567",
-// 		availability: "24/7",
-// 		latitude: 40.7128,
-// 		longitude: -74.006,
-// 	},
-// 	{
-// 		id: "2",
-// 		name: "Women's Legal Aid",
-// 		service_types: "legal_support, counseling",
-// 		phone_number: "+1 (555) 987-6543",
-// 		availability: "Mon-Fri 9AM-5PM",
-// 		latitude: 40.7589,
-// 		longitude: -73.9851,
-// 	},
-// 	{
-// 		id: "3",
-// 		name: "Trauma Recovery Center",
-// 		service_types: "counseling, therapy, support_group",
-// 		phone_number: "+1 (555) 456-7890",
-// 		availability: "Mon-Sat 8AM-8PM",
-// 		latitude: 40.7829,
-// 		longitude: -73.9654,
-// 	},
-// ];
+};
 
 export default function ProfessionalView({
 	userId,
@@ -154,22 +57,26 @@ export default function ProfessionalView({
 	const [open, setOpen] = useState(false);
 	const [deleteReportId, setDeleteReportId] = useState<string | null>(null);
 	const { toast } = useToast();
-	const [reports, setReports] = useState<(Tables<"reports"> & {
-		matched_services?: {
-			match_status_type: string;
-			support_service: Tables<"support_services">;
-			appointments?: {
-				appointment_date: string;
-				status: string;
+	const [reports, setReports] = useState<
+		(Tables<"reports"> & {
+			matched_services?: {
+				match_status_type: string;
+				support_service: Tables<"support_services">;
+				appointments?: {
+					appointment_date: string;
+					status: string;
+				}[];
 			}[];
-		}[];
-	})[]>([]);
+		})[]
+	>([]);
 	const [supportServices, setSupportServices] = useState<
 		Tables<"support_services">[]
 	>([]);
 	const [deleteServiceId, setDeleteServiceId] = useState<string | null>(null);
 	const [reportDialogOpen, setReportDialogOpen] = useState(false);
-	const [matchedServices, setMatchedServices] = useState<MatchedServiceWithRelations[]>([]);
+	const [matchedServices, setMatchedServices] = useState<
+		MatchedServiceWithRelations[]
+	>([]);
 
 	const handleDelete = async (reportId: string) => {
 		try {
@@ -261,7 +168,7 @@ export default function ProfessionalView({
 					event: "*",
 					schema: "public",
 					table: "matched_services",
-					filter: `service_id=in.(${supportServices.map(s => s.id).join(',')})`,
+					filter: `service_id=in.(${supportServices.map((s) => s.id).join(",")})`,
 				},
 				async () => {
 					const updatedMatches = await fetchMatchedServices(userId);
@@ -364,7 +271,7 @@ export default function ProfessionalView({
 												<div className="space-y-3">
 													{reports.map((report) => {
 														const acceptedMatch = report.matched_services?.find(
-															match => match.match_status_type === "accepted"
+															(match) => match.match_status_type === "accepted"
 														);
 														const appointment = acceptedMatch?.appointments?.[0];
 
@@ -438,7 +345,9 @@ export default function ProfessionalView({
 																			{appointment?.appointment_date && (
 																				<div className="text-gray-600">
 																					<span className="font-medium">Appointment:</span>{" "}
-																					{new Date(appointment.appointment_date).toLocaleDateString()}
+																					{new Date(
+																						appointment.appointment_date
+																					).toLocaleDateString()}
 																				</div>
 																			)}
 																		</div>
@@ -487,10 +396,9 @@ export default function ProfessionalView({
 																	</div>
 																	<div>
 																		<h4 className="font-medium">
-																			{matchedCase.report.type_of_incident ? 
-																				formatServiceName(matchedCase.report.type_of_incident) 
-																				: 'Unknown Incident'
-																			}
+																			{matchedCase.report.type_of_incident
+																				? formatServiceName(matchedCase.report.type_of_incident)
+																				: "Unknown Incident"}
 																		</h4>
 																		<div className="flex items-center gap-2 text-sm text-gray-500">
 																			<span>
@@ -509,10 +417,9 @@ export default function ProfessionalView({
 																			{matchedCase.support_service.name}
 																		</p>
 																		<p className="text-sm text-gray-500">
-																			{matchedCase.match_status_type ? 
-																				formatServiceName(matchedCase.match_status_type) 
-																				: 'Unknown Status'
-																			}
+																			{matchedCase.match_status_type
+																				? formatServiceName(matchedCase.match_status_type)
+																				: "Unknown Status"}
 																		</p>
 																	</div>
 																</div>
@@ -607,10 +514,10 @@ export default function ProfessionalView({
 											<div className="space-y-3">
 												{reports.map((report) => {
 													const acceptedMatch = report.matched_services?.find(
-														match => match.match_status_type === "accepted"
+														(match) => match.match_status_type === "accepted"
 													);
 													const pendingMatches = report.matched_services?.filter(
-														match => match.match_status_type === "pending"
+														(match) => match.match_status_type === "pending"
 													);
 													const appointment = acceptedMatch?.appointments?.[0];
 
@@ -684,7 +591,10 @@ export default function ProfessionalView({
 																				</span>
 																				{appointment && (
 																					<div className="text-sm text-gray-600 mt-1">
-																						📅 Appointment: {new Date(appointment.appointment_date).toLocaleDateString()}
+																						📅 Appointment:{" "}
+																						{new Date(
+																							appointment.appointment_date
+																						).toLocaleDateString()}
 																						<span className="ml-2 px-2 py-0.5 rounded-full text-xs bg-green-100 text-green-700">
 																							{appointment.status}
 																						</span>
@@ -702,7 +612,10 @@ export default function ProfessionalView({
 																		</span>
 																		<div className="mt-2 space-y-2">
 																			{pendingMatches.map((match, index) => (
-																				<div key={index} className="text-sm text-gray-600 flex items-center justify-between">
+																				<div
+																					key={index}
+																					className="text-sm text-gray-600 flex items-center justify-between"
+																				>
 																					<span>{match.support_service.name}</span>
 																					<span className="px-2 py-0.5 rounded-full text-xs bg-yellow-100 text-yellow-700">
 																						pending
@@ -734,9 +647,12 @@ export default function ProfessionalView({
 									<div className="space-y-6">
 										<div className="flex justify-between items-center">
 											<div>
-												<h2 className="text-xl font-semibold text-[#1A3434]">Matched Cases</h2>
+												<h2 className="text-xl font-semibold text-[#1A3434]">
+													Matched Cases
+												</h2>
 												<p className="text-sm text-gray-500">
-													{matchedServices.length} {matchedServices.length === 1 ? "case" : "cases"} matched
+													{matchedServices.length}{" "}
+													{matchedServices.length === 1 ? "case" : "cases"} matched
 												</p>
 											</div>
 										</div>
@@ -759,7 +675,8 @@ export default function ProfessionalView({
 												<div className="space-y-3">
 													<p className="text-gray-500">No matched cases found</p>
 													<p className="text-sm text-gray-400">
-														Matches will appear here when your services are matched with reports
+														Matches will appear here when your services are matched with
+														reports
 													</p>
 												</div>
 											</div>
@@ -832,7 +749,6 @@ export default function ProfessionalView({
 								</TabsContent>
 							</Tabs>
 							<div className="space-y-8">
-								<UpcomingAppointments />
 								<div className="grid grid-cols-1 md:grid-cols-2 gap-6">
 									<CommunityCard />
 									<div className="hidden md:block">

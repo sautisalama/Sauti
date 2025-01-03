@@ -36,7 +36,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { MainSidebar } from "./MainSidebar";
-import { UpcomingAppointments } from "@/app/components/UpcomingAppointments";
 import { CommunityCard } from "@/app/components/CommunityCard";
 import { DailyProgress } from "@/app/components/DailyProgress";
 import WelcomeHeader from "@/app/components/WelcomeHeader";
@@ -522,7 +521,6 @@ export default function SurvivorView({
 							</Tabs>
 
 							<div className="space-y-8">
-								<UpcomingAppointments />
 								<div className="grid grid-cols-1 md:grid-cols-2 gap-6">
 									<CommunityCard />
 									<div className="hidden md:block">

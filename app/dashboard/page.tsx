@@ -10,7 +10,6 @@ import { MainSidebar } from "./_views/MainSidebar";
 
 export default async function Dashboard() {
 	const user = await getUser();
-	// console.log("session", await getSession());
 
 	if (!user) {
 		redirect("/signin");
