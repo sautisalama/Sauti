@@ -1,5 +1,8 @@
 import { Button } from "@/components/ui/button";
-import { acceptMatch } from "@/app/dashboard/_views/actions/matched-services";
+import { 
+	acceptMatch, 
+	updateMatchStatus 
+} from "@/app/dashboard/_views/actions/matched-services";
 import { useToast } from "@/hooks/use-toast";
 import { Tables } from "@/types/db-schema";
 
@@ -32,6 +35,24 @@ export function MatchCard({ match, onAccept }: MatchCardProps) {
 		}
 	};
 
+	const handleStatusUpdate = async (status: "declined" | "completed" | "cancelled") => {
+		try {
+			await updateMatchStatus(match.id, match.report.report_id, status);
+			toast({
+				title: "Status updated",
+				description: `Match has been ${status}.`,
+			});
+			onAccept?.(); // Refresh the list
+		} catch (error) {
+			console.error("Error updating match status:", error);
+			toast({
+				title: "Error",
+				description: "Failed to update status. Please try again.",
+				variant: "destructive",
+			});
+		}
+	};
+
 	return (
 		<div className="p-4 border rounded-lg">
 			<div className="flex justify-between items-start mb-4">
@@ -43,11 +64,33 @@ export function MatchCard({ match, onAccept }: MatchCardProps) {
 						</p>
 					)}
 				</div>
-				{match.match_status_type === "pending" && (
-					<Button onClick={handleAccept} className="bg-teal-600 hover:bg-teal-700">
-						Accept Match
-					</Button>
-				)}
+				<div className="flex gap-2">
+					{match.match_status_type === "pending" && (
+						<>
+							<Button 
+								onClick={handleAccept} 
+								className="bg-teal-600 hover:bg-teal-700"
+							>
+								Accept
+							</Button>
+							<Button 
+								onClick={() => handleStatusUpdate("declined")}
+								variant="outline"
+								className="text-red-600 border-red-600 hover:bg-red-50"
+							>
+								Decline
+							</Button>
+						</>
+					)}
+					{match.match_status_type === "accepted" && (
+						<Button 
+							onClick={() => handleStatusUpdate("completed")}
+							className="bg-green-600 hover:bg-green-700"
+						>
+							Complete
+						</Button>
+					)}
+				</div>
 			</div>
 			<p className="text-sm text-gray-600">
 				{match.description || "No description provided"}

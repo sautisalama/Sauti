@@ -19,6 +19,17 @@ export async function fetchMatchedServices(userId: string) {
 	return data || [];
 }
 
+async function updateReportMatchStatus(reportId: string, status: string) {
+	const supabase = createClient();
+	
+	const { error } = await supabase
+		.from("reports")
+		.update({ match_status: status })
+		.eq("report_id", reportId);
+
+	if (error) throw error;
+}
+
 export async function acceptMatch(matchId: string) {
 	const supabase = createClient();
 
@@ -39,33 +50,67 @@ export async function acceptMatch(matchId: string) {
 		if (matchError) throw matchError;
 		if (!matchData) throw new Error("Match not found");
 
-		// Update match status to accepted
-		const { error: updateError } = await supabase
-			.from("matched_services")
-			.update({ 
-				match_status_type: "accepted",
-				updated_at: new Date().toISOString()
-			})
-			.eq("id", matchId);
+		// Start a transaction by updating both tables
+		const [matchUpdate, reportUpdate, appointmentCreate] = await Promise.all([
+			// Update match status in matched_services
+			supabase
+				.from("matched_services")
+				.update({ 
+					match_status_type: "accepted",
+					updated_at: new Date().toISOString()
+				})
+				.eq("id", matchId),
 
-		if (updateError) throw updateError;
+			// Update match status in reports
+			updateReportMatchStatus(matchData.report_id!, "accepted"),
 
-		// Create appointment record
-		const { error: appointmentError } = await supabase
-			.from("appointments")
-			.insert({
-				matched_services: matchId,
-				created_at: new Date().toISOString(),
-				appointment_date: null, // Will be set when scheduling
-				professional_id: matchData.support_service.user_id,
-				survivor_id: matchData.survivor_id,
-				status: "pending"
-			});
+			// Create appointment record
+			supabase
+				.from("appointments")
+				.insert({
+					matched_services: matchId,
+					created_at: new Date().toISOString(),
+					appointment_date: null, // Will be set when scheduling
+					professional_id: matchData.support_service.user_id,
+					survivor_id: matchData.survivor_id,
+					status: "pending"
+				})
+		]);
 
-		if (appointmentError) throw appointmentError;
+		// Check for any errors in the updates
+		if (matchUpdate.error) throw matchUpdate.error;
+		if (appointmentCreate.error) throw appointmentCreate.error;
 
 	} catch (error) {
 		console.error("Error accepting match:", error);
+		throw error;
+	}
+}
+
+// Add new function to handle other status updates
+export async function updateMatchStatus(
+	matchId: string, 
+	reportId: string, 
+	status: "pending" | "declined" | "completed" | "cancelled"
+) {
+	const supabase = createClient();
+
+	try {
+		const [matchUpdate, reportUpdate] = await Promise.all([
+			supabase
+				.from("matched_services")
+				.update({ 
+					match_status_type: status,
+					updated_at: new Date().toISOString()
+				})
+				.eq("id", matchId),
+			updateReportMatchStatus(reportId, status)
+		]);
+
+		if (matchUpdate.error) throw matchUpdate.error;
+
+	} catch (error) {
+		console.error("Error updating match status:", error);
 		throw error;
 	}
 }
