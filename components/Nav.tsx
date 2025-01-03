@@ -21,6 +21,7 @@ export function Nav() {
 	const pathname = usePathname();
 	const [isAuthenticated, setIsAuthenticated] = useState(false);
 	const supabase = createClient();
+	const [dialogOpen, setDialogOpen] = useState(false);
 
 	useEffect(() => {
 		const checkAuth = async () => {
@@ -78,7 +79,7 @@ export function Nav() {
 						<Button variant="default"> Report Abuse </Button>
 					</Link> */}
 					{/* Replace the existing Report Abuse button with this: */}
-					<Dialog>
+					<Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
 						<DialogTrigger asChild>
 							<Button variant="default">Report Abuse</Button>
 						</DialogTrigger>
@@ -90,7 +91,7 @@ export function Nav() {
 									be kept confidential.
 								</DialogDescription>
 							</DialogHeader>
-							<ReportAbuseForm />
+							<ReportAbuseForm onClose={() => setDialogOpen(false)} />
 						</DialogContent>
 					</Dialog>
 					{isAuthenticated ? (
