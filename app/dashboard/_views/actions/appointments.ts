@@ -10,5 +10,8 @@ export async function createAppointment(
     .from("appointments")
     .insert([appointment]);
 
-  if (error) throw error;
+  if (error) {
+    console.error("Error creating appointment:", error);
+    throw error;
+  }
 } 

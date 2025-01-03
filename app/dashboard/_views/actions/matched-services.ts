@@ -34,7 +34,7 @@ export async function acceptMatch(matchId: string) {
 	const supabase = createClient();
 
 	try {
-		// First get the match details to create the appointment
+		// First get the match details
 		const { data: matchData, error: matchError } = await supabase
 			.from("matched_services")
 			.select(`
@@ -50,39 +50,51 @@ export async function acceptMatch(matchId: string) {
 		if (matchError) throw matchError;
 		if (!matchData) throw new Error("Match not found");
 
-		// Start a transaction by updating both tables
-		const [matchUpdate, reportUpdate, appointmentCreate] = await Promise.all([
-			// Update match status in matched_services
-			supabase
-				.from("matched_services")
-				.update({ 
-					match_status_type: "accepted",
-					updated_at: new Date().toISOString()
-				})
-				.eq("id", matchId),
+		// Update match status in matched_services
+		const { error: matchUpdateError } = await supabase
+			.from("matched_services")
+			.update({ 
+				match_status_type: "accepted",
+				updated_at: new Date().toISOString()
+			})
+			.eq("id", matchId);
 
-			// Update match status in reports
-			updateReportMatchStatus(matchData.report_id!, "accepted"),
+		if (matchUpdateError) throw matchUpdateError;
 
-			// Create appointment record
-			supabase
-				.from("appointments")
-				.insert({
-					matched_services: matchId,
-					created_at: new Date().toISOString(),
-					appointment_date: null, // Will be set when scheduling
-					professional_id: matchData.support_service.user_id,
-					survivor_id: matchData.survivor_id,
-					status: "pending"
-				})
-		]);
-
-		// Check for any errors in the updates
-		if (matchUpdate.error) throw matchUpdate.error;
-		if (appointmentCreate.error) throw appointmentCreate.error;
+		// Update match status in reports
+		await updateReportMatchStatus(matchData.report_id!, "accepted");
 
 	} catch (error) {
 		console.error("Error accepting match:", error);
+		throw error;
+	}
+}
+
+// Move appointment creation to a separate transaction
+export async function createMatchAppointment(
+	matchId: string,
+	appointmentDate: Date,
+	professionalId: string,
+	survivorId: string
+) {
+	const supabase = createClient();
+
+	try {
+		const { error: appointmentError } = await supabase
+			.from("appointments")
+			.insert({
+				matched_services: matchId,
+				created_at: new Date().toISOString(),
+				appointment_date: appointmentDate.toISOString(),
+				professional_id: professionalId,
+				survivor_id: survivorId,
+				status: "confirmed"
+			});
+
+		if (appointmentError) throw appointmentError;
+
+	} catch (error) {
+		console.error("Error creating appointment:", error);
 		throw error;
 	}
 }
