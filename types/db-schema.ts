@@ -9,8 +9,61 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      appointments: {
+        Row: {
+          appointment_date: string | null
+          appointment_id: string
+          created_at: string | null
+          matched_services: string | null
+          professional_id: string | null
+          status: Database["public"]["Enums"]["appointment_status_type"] | null
+          survivor_id: string | null
+        }
+        Insert: {
+          appointment_date?: string | null
+          appointment_id?: string
+          created_at?: string | null
+          matched_services?: string | null
+          professional_id?: string | null
+          status?: Database["public"]["Enums"]["appointment_status_type"] | null
+          survivor_id?: string | null
+        }
+        Update: {
+          appointment_date?: string | null
+          appointment_id?: string
+          created_at?: string | null
+          matched_services?: string | null
+          professional_id?: string | null
+          status?: Database["public"]["Enums"]["appointment_status_type"] | null
+          survivor_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "appointments_matched_services_fkey"
+            columns: ["matched_services"]
+            isOneToOne: false
+            referencedRelation: "matched_services"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "appointments_professional_id_fkey"
+            columns: ["professional_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "appointments_survivor_id_fkey"
+            columns: ["survivor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       matched_services: {
         Row: {
+          description: string | null
           feedback: string | null
           id: string
           match_date: string | null
@@ -21,9 +74,12 @@ export type Database = {
           notes: string | null
           report_id: string | null
           service_id: string | null
+          support_service: string | null
+          survivor_id: string | null
           updated_at: string | null
         }
         Insert: {
+          description?: string | null
           feedback?: string | null
           id?: string
           match_date?: string | null
@@ -34,9 +90,12 @@ export type Database = {
           notes?: string | null
           report_id?: string | null
           service_id?: string | null
+          support_service?: string | null
+          survivor_id?: string | null
           updated_at?: string | null
         }
         Update: {
+          description?: string | null
           feedback?: string | null
           id?: string
           match_date?: string | null
@@ -47,6 +106,8 @@ export type Database = {
           notes?: string | null
           report_id?: string | null
           service_id?: string | null
+          support_service?: string | null
+          survivor_id?: string | null
           updated_at?: string | null
         }
         Relationships: [
@@ -62,6 +123,13 @@ export type Database = {
             columns: ["service_id"]
             isOneToOne: false
             referencedRelation: "support_services"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "matched_services_survivor_id_fkey"
+            columns: ["survivor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -108,7 +176,7 @@ export type Database = {
           country_code: string | null
           dob: string | null
           email: string | null
-          first_name: string | null
+          first_name: string
           gender: Database["public"]["Enums"]["gender_type"] | null
           incident_description: string | null
           isMatched: boolean | null
@@ -151,7 +219,7 @@ export type Database = {
           country_code?: string | null
           dob?: string | null
           email?: string | null
-          first_name?: string | null
+          first_name: string
           gender?: Database["public"]["Enums"]["gender_type"] | null
           incident_description?: string | null
           isMatched?: boolean | null
@@ -194,7 +262,7 @@ export type Database = {
           country_code?: string | null
           dob?: string | null
           email?: string | null
-          first_name?: string | null
+          first_name?: string
           gender?: Database["public"]["Enums"]["gender_type"] | null
           incident_description?: string | null
           isMatched?: boolean | null

@@ -22,12 +22,52 @@ export async function fetchMatchedServices(userId: string) {
 export async function acceptMatch(matchId: string) {
 	const supabase = createClient();
 
-	const { error } = await supabase
-		.from("matched_services")
-		.update({ match_status_type: "accepted" })
-		.eq("id", matchId);
+	try {
+		// First get the match details to create the appointment
+		const { data: matchData, error: matchError } = await supabase
+			.from("matched_services")
+			.select(`
+				*,
+				support_service:support_services(
+					user_id,
+					name
+				)
+			`)
+			.eq("id", matchId)
+			.single();
 
-	if (error) throw error;
+		if (matchError) throw matchError;
+		if (!matchData) throw new Error("Match not found");
+
+		// Update match status to accepted
+		const { error: updateError } = await supabase
+			.from("matched_services")
+			.update({ 
+				match_status_type: "accepted",
+				updated_at: new Date().toISOString()
+			})
+			.eq("id", matchId);
+
+		if (updateError) throw updateError;
+
+		// Create appointment record
+		const { error: appointmentError } = await supabase
+			.from("appointments")
+			.insert({
+				matched_services: matchId,
+				created_at: new Date().toISOString(),
+				appointment_date: null, // Will be set when scheduling
+				professional_id: matchData.support_service.user_id,
+				survivor_id: matchData.survivor_id,
+				status: "pending"
+			});
+
+		if (appointmentError) throw appointmentError;
+
+	} catch (error) {
+		console.error("Error accepting match:", error);
+		throw error;
+	}
 }
 
 export async function getServiceIdsByUserId(userId: string) {

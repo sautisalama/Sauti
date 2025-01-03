@@ -39,6 +39,7 @@ import {
 import { AddSupportServiceForm } from "@/components/AddSupportServiceForm";
 import { DailyProgress } from "@/app/components/DailyProgress";
 import { fetchMatchedServices } from "./actions/matched-services";
+import { MatchCard } from "@/app/dashboard/_components/MatchCard";
 
 interface ProfessionalViewProps {
 	userId: string;
@@ -602,67 +603,14 @@ export default function ProfessionalView({
 										{matchedServices.length > 0 ? (
 											<div className="space-y-4">
 												{matchedServices.map((matchedCase) => (
-													<div
+													<MatchCard
 														key={matchedCase.id}
-														className={`rounded-lg p-4 ${
-															matchedCase.report?.urgency === "high"
-																? "bg-[#FFF5F5]"
-																: matchedCase.report?.urgency === "medium"
-																? "bg-[#FFF8F0]"
-																: "bg-[#F0F9FF]"
-														}`}
-													>
-														<div className="flex items-center justify-between">
-															<div className="flex items-center gap-3">
-																<div className="h-10 w-10 rounded-full bg-[#1A3434] text-white flex items-center justify-center">
-																	{matchedCase.report?.type_of_incident?.[0]?.toUpperCase() || "?"}
-																</div>
-																<div>
-																	<h4 className="font-medium">
-																		{matchedCase.report?.type_of_incident ? 
-																			formatServiceName(matchedCase.report.type_of_incident) 
-																			: 'Unknown Incident'
-																		}
-																	</h4>
-																	<div className="flex items-center gap-2 text-sm text-gray-500">
-																		<span>
-																			Matched on{" "}
-																			{new Date(matchedCase.match_date || "").toLocaleDateString()}
-																		</span>
-																		<span className="w-1.5 h-1.5 rounded-full bg-gray-300" />
-																		<span
-																			className={`px-2 py-0.5 rounded-full text-xs ${
-																				matchedCase.match_status_type === "accepted"
-																					? "bg-green-100 text-green-700"
-																					: matchedCase.match_status_type === "pending"
-																					? "bg-yellow-100 text-yellow-700"
-																					: "bg-gray-100 text-gray-700"
-																			}`}
-																		>
-																			{formatServiceName(matchedCase.match_status_type || "unknown")}
-																		</span>
-																	</div>
-																</div>
-															</div>
-
-															<div className="flex items-center gap-4">
-																<div className="text-right">
-																	<p className="font-medium">
-																		{matchedCase.support_service?.name || "Unknown Service"}
-																	</p>
-																	<p className="text-sm text-gray-500">
-																		Match Score: {(matchedCase.match_score || 0) * 100}%
-																	</p>
-																</div>
-															</div>
-														</div>
-
-														{matchedCase.description && (
-															<div className="mt-3 text-sm text-gray-600">
-																{matchedCase.description}
-															</div>
-														)}
-													</div>
+														match={matchedCase}
+														onAccept={() => {
+															// Refresh matches or update UI as needed
+															fetchMatchedServices(userId).then(setMatchedServices);
+														}}
+													/>
 												))}
 											</div>
 										) : (
