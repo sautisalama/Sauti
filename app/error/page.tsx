@@ -1,5 +1,7 @@
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
+import Animation from "@/components/LottieWrapper";
+import animationData from "@/public/lottie-animations/wellness.json";
 
 export default function ErrorPage({
 	searchParams,
@@ -11,6 +13,7 @@ export default function ErrorPage({
 	return (
 		<div className="flex flex-col items-center justify-center min-h-screen p-4">
 			<div className="text-center space-y-4">
+				<Animation animationData={animationData} />
 				<h1 className="text-2xl font-bold">
 					{message === "account_not_found"
 						? "Account Not Found"

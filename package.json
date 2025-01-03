@@ -34,6 +34,7 @@
 		"cmdk": "^1.0.0",
 		"date-fns": "^3.6.0",
 		"framer-motion": "^11.3.27",
+		"lottie-react": "^2.4.0",
 		"lucide-react": "^0.427.0",
 		"mailtrap": "^3.4.0",
 		"next": "14.2.5",
