@@ -99,12 +99,13 @@ export function LandingPage() {
 										href={isAuthenticated ? "/dashboard" : "/signin"}
 										className="min-w-full sm:min-w-[60%]"
 									>
-										<AnimatedButton
-											text={isAuthenticated ? "Dashboard" : "Sign In"}
-											icon={<MoveUpRight className="h-4 w-4" />}
+										<Button
 											variant="outline"
-											className="min-w-full sm:min-w-[80%]"
-										/>
+											className="w-full flex items-center justify-center gap-2"
+										>
+											{isAuthenticated ? "Dashboard" : "Sign In"}
+											<MoveUpRight className="h-4 w-4" />
+										</Button>
 									</Link>
 								</div>
 							</div>
@@ -216,7 +217,7 @@ export function LandingPage() {
 								Information resources, professional resouces and a community. Ready to
 								find your voice? Join the Sauti Salama Community.
 							</h1>
-							<Link href="https://sautisalama.org">
+							<Link href="https://app.sautisalama.org/signin">
 								<Button
 									variant="default"
 									className="bg-landing max-w-full md:max-w-[20%] text-sauti-black hover:text-landing"

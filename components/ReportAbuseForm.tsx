@@ -88,7 +88,7 @@ export default function ReportAbuseForm() {
 		};
 
 		try {
-			const response = await fetch("/api/reports", {
+			const response = await fetch("/api/reports/anonymous", {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
 				body: JSON.stringify(data),
