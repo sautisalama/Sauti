@@ -12,6 +12,8 @@ import {
 } from "stream-chat-react";
 import { StreamChat, Channel as StreamChannel } from "stream-chat";
 import "stream-chat-react/dist/css/v2/index.css";
+import Animation from "@/components/LottieWrapper";
+import ChatAnimation from "@/public/lottie-animations/messages.json";
 
 interface ChatComponentProps {
 	userId: string;
@@ -81,7 +83,14 @@ export function ChatComponent({ userId, username }: ChatComponentProps) {
 	}, [userId, username, client]);
 
 	if (!client || !channel) {
-		return <div>Loading...</div>;
+		return (
+			<div className="flex flex-col items-center justify-center min-h-screen p-4">
+				<div className="text-center space-y-4">
+					<Animation animationData={ChatAnimation} />
+					<p className="text-muted-foreground">Getting community chats...</p>
+				</div>
+			</div>
+		);
 	}
 
 	return (
