@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { MailtrapClient } from "mailtrap";
 import { REPORT_EMAIL_RECIPIENTS, REPORT_EMAIL_SENDER } from "@/lib/constants";
 import { createClient } from "@/utils/supabase/server";
-import { Database } from "@/types/db-schema";
+import { Database, TablesInsert } from "@/types/db-schema";
 import { matchReportWithServices } from "@/app/actions/match-services";
 
 const TOKEN = process.env.MAILTRAP_TOKEN!;
@@ -11,11 +11,31 @@ const client = new MailtrapClient({ token: TOKEN });
 export async function POST(request: Request) {
 	try {
 		const supabase = await createClient();
-		const data = await request.json();
+		const formData = await request.json();
+
+		// Transform the data to match the database schema
+		const reportData: TablesInsert<"reports"> = {
+			first_name: formData.first_name || "Anonymous",
+			last_name: formData.last_name || null,
+			user_id: formData.user_id,
+			phone: formData.phone,
+			type_of_incident: formData.type_of_incident,
+			incident_description: formData.incident_description,
+			urgency: formData.urgency,
+			consent: formData.consent,
+			contact_preference: formData.contact_preference,
+			required_services: formData.required_services,
+			latitude: formData.latitude,
+			longitude: formData.longitude,
+			submission_timestamp: formData.submission_timestamp,
+			// Initialize match-related fields
+			isMatched: false,
+			match_status: "pending",
+		};
 
 		const { error: supabaseError, data: insertedReport } = await supabase
 			.from("reports")
-			.insert([data])
+			.insert([reportData])
 			.select()
 			.single();
 		if (supabaseError) throw supabaseError;
@@ -32,21 +52,21 @@ export async function POST(request: Request) {
 			await client.send({
 				from: REPORT_EMAIL_SENDER,
 				to: REPORT_EMAIL_RECIPIENTS,
-				subject: `New Abuse Report: ${data.type_of_incident} (${data.urgency} urgency)`,
+				subject: `New Abuse Report: ${formData.type_of_incident} (${formData.urgency} urgency)`,
 				text: `
 					New abuse report submitted:
-					Type of Incident: ${data.type_of_incident}
-					Urgency: ${data.urgency}
-					Description: ${data.incident_description}
-					Required Services: ${data.required_services.join(", ")}
+					Type of Incident: ${formData.type_of_incident}
+					Urgency: ${formData.urgency}
+					Description: ${formData.incident_description}
+					Required Services: ${formData.required_services.join(", ")}
 					Reporter Information:
-					Name: ${data.first_name}
-					Email: ${data.email}
-					Phone: ${data.phone || "Not provided"}
-					Preferred Contact Method: ${data.contact_preference}
-					Consent to Share: ${data.consent}
+					Name: ${formData.first_name}
+					Email: ${formData.email}
+					Phone: ${formData.phone || "Not provided"}
+					Preferred Contact Method: ${formData.contact_preference}
+					Consent to Share: ${formData.consent}
 
-					Submitted at: ${data.submission_timestamp}
+					Submitted at: ${formData.submission_timestamp}
 				`.trim(),
 				category: "Abuse Reports",
 			});
@@ -64,7 +84,10 @@ export async function POST(request: Request) {
 	} catch (error) {
 		console.error("Error submitting report:", error);
 		return new NextResponse(
-			JSON.stringify({ error: "Failed to submit report" }),
+			JSON.stringify({ 
+				error: "Failed to submit report",
+				details: error instanceof Error ? error.message : String(error)
+			}),
 			{
 				status: 500,
 				headers: { "Content-Type": "application/json" },
@@ -73,19 +96,17 @@ export async function POST(request: Request) {
 	}
 }
 
-export type ReportFormData = {
-	first_name: string | null;
-	email: string | null;
-	phone: string | null;
-	type_of_incident: Database["public"]["Enums"]["incident_type"] | null;
-	incident_description: string | null;
-	urgency: Database["public"]["Enums"]["urgency_type"] | null;
-	consent: Database["public"]["Enums"]["consent_type"] | null;
-	contact_preference:
-		| Database["public"]["Enums"]["contact_preference_type"]
-		| null;
+export type ReportFormData = Omit<
+	TablesInsert<"reports">,
+	| "report_id"
+	| "isMatched"
+	| "match_status"
+	| "administrative"
+	| "location"
+	| "plus_code"
+	| "support_services"
+> & {
 	required_services: string[];
-	latitude: number | null;
-	longitude: number | null;
-	submission_timestamp: string;
+	first_name: string;
+	user_id: string;
 };

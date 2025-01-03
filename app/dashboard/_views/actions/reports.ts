@@ -1,16 +1,30 @@
-import { createClient } from "@/utils/supabase/client";
+"use server";
+
+import { createClient } from "@/utils/supabase/server";
 import { Tables } from "@/types/db-schema";
 
 // Step 1: Fetch basic reports for the user
 export async function fetchUserReports(
 	userId: string
 ): Promise<Tables<"reports">[]> {
-	const supabase = createClient();
+	const supabase = await createClient();
 
 	try {
 		const { data: reports, error } = await supabase
 			.from("reports")
-			.select("*")
+			.select(`
+				*,
+				matched_services (
+					match_status_type,
+					support_service:support_services (
+						name
+					),
+					appointments (
+						appointment_date,
+						status
+					)
+				)
+			`)
 			.eq("user_id", userId)
 			.order("submission_timestamp", { ascending: false });
 
@@ -28,7 +42,7 @@ export async function fetchUserReports(
 
 // Delete report function
 export async function deleteReport(reportId: string) {
-	const supabase = createClient();
+	const supabase = await createClient();
 
 	try {
 		const { error } = await supabase
@@ -46,3 +60,41 @@ export async function deleteReport(reportId: string) {
 		throw error;
 	}
 }
+
+// export async function submitReport(reportData: {
+// 	first_name: string | null;
+// 	last_name: string | null;
+// 	user_id: string;
+// 	phone: string | null;
+// 	type_of_incident: string;
+// 	incident_description: string;
+// 	urgency: string;
+// 	consent: string;
+// 	contact_preference: string;
+// 	required_services: string[];
+// 	latitude: number | null;
+// 	longitude: number | null;
+// }) {
+// 	const supabase = await createClient();
+
+// 	try {
+// 		const { data, error } = await supabase
+// 			.from("reports")
+// 			.insert([
+// 				{
+// 					...reportData,
+// 					isMatched: false,
+// 					submission_timestamp: new Date().toISOString(),
+// 				},
+// 			])
+// 			.select()
+// 			.single();
+
+// 		if (error) throw error;
+
+// 		return { success: true, data };
+// 	} catch (error) {
+// 		console.error("Error submitting report:", error);
+// 		throw error;
+// 	}
+// }

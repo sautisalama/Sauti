@@ -30,6 +30,13 @@ import {
 import { signOut } from "@/lib/actions/auth";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
+import {
+	Tooltip,
+	TooltipContent,
+	TooltipProvider,
+	TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { useUser } from "@/hooks/useUser";
 
 const navigation = [
 	{
@@ -62,12 +69,13 @@ const navigation = [
 
 export function MainSidebar() {
 	const pathname = usePathname();
+	const user = useUser();
 	const [isVisible, setIsVisible] = useState(true);
 	const [lastScrollY, setLastScrollY] = useState(0);
 
 	useEffect(() => {
 		const controlNavbar = () => {
-			if (typeof window !== 'undefined') {
+			if (typeof window !== "undefined") {
 				// Show navbar at the top of the page
 				if (window.scrollY === 0) {
 					setIsVisible(true);
@@ -95,20 +103,20 @@ export function MainSidebar() {
 	return (
 		<>
 			{/* Desktop Sidebar */}
-			<div className="hidden md:flex h-screen w-[72px] flex-col items-center justify-between bg-[#1A3434] py-8">
-				<div className="flex flex-col items-center gap-8">
+			<div className="hidden md:flex h-screen w-[72px] flex-col items-center justify-between bg-[#1A3434] py-8 px-8">
+				<div className="flex flex-col items-center gap-12 mx-6">
 					<Image
 						src="/small-logo.png"
 						alt="Logo"
 						width={30}
 						height={30}
-						className="w-7 h-10 mx-6"
+						className="w-7 h-10"
 					/>
 
-					<nav className="flex flex-col items-center gap-6">
+					<nav className="flex flex-col items-center gap-8">
 						<Link
 							href="/dashboard"
-							className={`flex flex-col items-center gap-1 transition-colors hover:text-[#f8941c] mx-8 ${
+							className={`flex flex-col items-center gap-2 transition-colors hover:text-[#f8941c] px-2 w-full ${
 								pathname === "/dashboard" ? "text-[#f8941c]" : "text-white"
 							}`}
 						>
@@ -135,7 +143,7 @@ export function MainSidebar() {
 						</Link> */}
 						<Link
 							href="/dashboard/resources"
-							className={`flex flex-col items-center gap-1 transition-colors hover:text-[#f8941c] mx-8 ${
+							className={`flex flex-col items-center gap-2 transition-colors hover:text-[#f8941c] px-2 w-full ${
 								pathname.includes("/resources") ? "text-[#f8941c]" : "text-white"
 							}`}
 						>
@@ -144,7 +152,7 @@ export function MainSidebar() {
 						</Link>
 						<Link
 							href="/dashboard/chat"
-							className={`flex flex-col items-center gap-1 transition-colors hover:text-[#f8941c] mx-8 ${
+							className={`flex flex-col items-center gap-2 transition-colors hover:text-[#f8941c] px-2 w-full ${
 								pathname.includes("/chat") ? "text-[#f8941c]" : "text-white"
 							}`}
 						>
@@ -154,32 +162,27 @@ export function MainSidebar() {
 					</nav>
 				</div>
 
-				<div className="flex flex-col items-center gap-4">
-					<Avatar className="h-8 w-8 mx-6">
-						<AvatarImage src="https://github.com/shadcn.png" alt="User" />
-						<AvatarFallback>
-							<User className="h-4 w-4" />
-						</AvatarFallback>
-					</Avatar>
-					{/* <Button
-						variant="ghost"
-						size="icon"
-						className="text-white hover:text-[#f8941c] transition-colors mx-6"
-					>
-						<Settings className="h-5 w-5" />
-					</Button>
-					<Button
-						variant="ghost"
-						size="icon"
-						className="text-white hover:text-[#f8941c] transition-colors mx-6"
-					>
-						<Info className="h-5 w-5" />
-					</Button> */}
+				<div className="flex flex-col items-center gap-6 mx-6">
+					<TooltipProvider>
+						<Tooltip>
+							<TooltipTrigger>
+								<Avatar className="h-8 w-8 bg-gradient-to-br from-emerald-400 via-teal-400 to-cyan-400">
+									<AvatarFallback className="text-white font-medium bg-gradient-to-br from-purple-400 via-fuchsia-400 to-pink-400">
+										{user?.email?.[0].toUpperCase() || "?"}
+									</AvatarFallback>
+								</Avatar>
+							</TooltipTrigger>
+							<TooltipContent>
+								<p>{user?.email || "No email available"}</p>
+							</TooltipContent>
+						</Tooltip>
+					</TooltipProvider>
+
 					<form action={signOut}>
 						<Button
 							variant="ghost"
 							size="icon"
-							className="text-white hover:text-[#f8941c] transition-colors mx-6"
+							className="text-white hover:text-[#f8941c] transition-colors"
 						>
 							<LogOut className="h-5 w-5" />
 						</Button>
@@ -202,12 +205,20 @@ export function MainSidebar() {
 						className="w-6 h-8"
 					/>
 					<div className="flex items-center gap-3">
-						<Avatar className="h-8 w-8">
-							<AvatarImage src="https://github.com/shadcn.png" alt="User" />
-							<AvatarFallback>
-								<User className="h-4 w-4" />
-							</AvatarFallback>
-						</Avatar>
+						<TooltipProvider>
+							<Tooltip>
+								<TooltipTrigger>
+									<Avatar className="h-8 w-8 bg-gradient-to-br from-emerald-400 via-teal-400 to-cyan-400">
+										<AvatarFallback className="text-white font-medium bg-gradient-to-br from-emerald-500 via-teal-500 to-cyan-500">
+											{user?.email?.[0].toUpperCase() || "?"}
+										</AvatarFallback>
+									</Avatar>
+								</TooltipTrigger>
+								<TooltipContent>
+									<p>{user?.email || "No email available"}</p>
+								</TooltipContent>
+							</Tooltip>
+						</TooltipProvider>
 						<form action={signOut}>
 							<Button
 								variant="ghost"

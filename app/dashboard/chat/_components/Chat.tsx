@@ -10,7 +10,7 @@ import {
 	Thread,
 	Window,
 } from "stream-chat-react";
-import { StreamChat } from "stream-chat";
+import { StreamChat, Channel as StreamChannel } from "stream-chat";
 import "stream-chat-react/dist/css/v2/index.css";
 
 interface ChatComponentProps {
@@ -20,35 +20,55 @@ interface ChatComponentProps {
 
 export function ChatComponent({ userId, username }: ChatComponentProps) {
 	const [client, setClient] = useState<StreamChat | null>(null);
-	const [channel, setChannel] = useState<any>(null);
+	const [channel, setChannel] = useState<StreamChannel | null>(null);
 
 	useEffect(() => {
 		const initChat = async () => {
-			const streamClient = StreamChat.getInstance(
-				process.env.NEXT_PUBLIC_STREAM_KEY!
-			);
+			try {
+				const response = await fetch("/api/stream/token", {
+					signal: AbortSignal.timeout(10000),
+				});
 
-			// Get token from our API endpoint
-			const response = await fetch("/api/stream/token");
-			const { token } = await response.json();
+				if (!response.ok) throw new Error("Failed to fetch token");
 
-			await streamClient.connectUser(
-				{
-					id: userId,
-					name: username,
-				},
-				token // Use the token from our API instead of devToken
-			);
+				const { token } = await response.json();
 
-			// Initialize or join the general channel
-			const channel = streamClient.channel("messaging", "general", {
-				name: "General",
-				members: [userId],
-			});
+				const streamClient = StreamChat.getInstance(
+					process.env.NEXT_PUBLIC_STREAM_KEY!
+				);
 
-			await channel.watch();
-			setChannel(channel);
-			setClient(streamClient);
+				await streamClient.connectUser(
+					{
+						id: userId,
+						name: username,
+					},
+					token
+				);
+
+				const channel = streamClient.channel("messaging", "general", {
+					name: "General",
+					created_by_id: userId,
+					members: [],
+					configs: {
+						replies: true,
+						typing_events: true,
+						read_events: true,
+						connect_events: true,
+					},
+					permissions: {
+						"read-channel": ["*"],
+						"write-channel": ["*"],
+						"send-message": ["*"],
+						"read-messages": ["*"],
+					},
+				});
+
+				await channel.watch();
+				setChannel(channel);
+				setClient(streamClient);
+			} catch (error) {
+				console.error("Error initializing chat:", error);
+			}
 		};
 
 		initChat();
@@ -58,7 +78,7 @@ export function ChatComponent({ userId, username }: ChatComponentProps) {
 				client.disconnectUser();
 			}
 		};
-	}, [userId, username]);
+	}, [userId, username, client]);
 
 	if (!client || !channel) {
 		return <div>Loading...</div>;

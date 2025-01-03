@@ -32,7 +32,6 @@ export async function signUp(formData: FormData) {
 	});
 
 	if (authError) {
-		console.log(authError);
 		console.error("Sign up error:", authError);
 		redirect("/error");
 	}
@@ -69,7 +68,6 @@ export async function signIn(formData: FormData) {
 	const supabase = await createClient();
 	const email = formData.get("email") as string;
 	const password = formData.get("password") as string;
-	console.log("Sign in details::", email, password);
 	const { error } = await supabase.auth.signInWithPassword({
 		email,
 		password,
@@ -77,7 +75,6 @@ export async function signIn(formData: FormData) {
 
 	if (error) {
 		console.error("Sign in error:", error);
-		console.log(error);
 		redirect("/error");
 	}
 
@@ -88,7 +85,6 @@ export async function signInWithGoogle() {
 	const supabase = await createClient();
 	const redirectUrl = process.env.NEXT_PUBLIC_APP_URL;
 
-	console.log("Starting Google sign in with redirect URL:", redirectUrl);
 
 	const { data, error } = await supabase.auth.signInWithOAuth({
 		provider: "google",
@@ -107,7 +103,6 @@ export async function signInWithGoogle() {
 	}
 
 	if (data.url) {
-		console.log("Redirecting to OAuth URL:", data.url);
 		redirect(data.url);
 	}
 }

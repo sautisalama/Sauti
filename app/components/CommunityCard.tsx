@@ -16,7 +16,7 @@ export function CommunityCard() {
 					<span className="text-sm text-gray-400">PLACE</span>
 					<div className="flex items-center gap-2">
 						<MapPin className="h-5 w-5 text-[#00A5A5]" />
-						<span className="font-medium">KHA Hospital</span>
+						<span className="font-medium">Ngong Forest Sanctuary</span>
 					</div>
 				</div>
 
@@ -45,7 +45,14 @@ export function CommunityCard() {
 				</div>
 			</div>
 
-			<Button className="mt-6 bg-[#00A5A5] hover:bg-[#008585] px-8">Join</Button>
+			<Button
+				className="mt-6 bg-[#00A5A5] hover:bg-[#008585] px-8"
+				onClick={() =>
+					window.open("https://chat.whatsapp.com/K4EoeSsNEQ49y0b2P2O7RR", "_blank")
+				}
+			>
+				Join
+			</Button>
 		</div>
 	);
 }
