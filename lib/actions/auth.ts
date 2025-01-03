@@ -74,6 +74,10 @@ export async function signIn(formData: FormData) {
 	});
 
 	if (error) {
+		// Check specifically for invalid login credentials
+		if (error.message === 'Invalid login credentials') {
+			redirect('/error?message=account_not_found');
+		}
 		console.error("Sign in error:", error);
 		redirect("/error");
 	}

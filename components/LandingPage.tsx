@@ -36,6 +36,7 @@ import { createClient } from "@/utils/supabase/client";
 
 export function LandingPage() {
 	const [isAuthenticated, setIsAuthenticated] = useState(false);
+	const [dialogOpen, setDialogOpen] = useState(false);
 	const supabase = createClient();
 
 	useEffect(() => {
@@ -78,7 +79,7 @@ export function LandingPage() {
 									and healing.
 								</p>
 								<div className="flex flex-col sm:flex-row gap-4">
-									<Dialog>
+									<Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
 										<DialogTrigger asChild>
 											<div>
 												<AnimatedButton text="Report Abuse" icon="📢" variant="default" />
@@ -92,7 +93,7 @@ export function LandingPage() {
 													will be kept confidential.
 												</DialogDescription>
 											</DialogHeader>
-											<ReportAbuseForm />
+											<ReportAbuseForm onClose={() => setDialogOpen(false)} />
 										</DialogContent>
 									</Dialog>
 									<Link

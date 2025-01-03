@@ -1,6 +1,9 @@
 "use client";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { useToast } from "@/hooks/use-toast";
+import { useState, useEffect } from "react";
+import { Button } from "./ui/button";
 import {
 	Select,
 	SelectContent,
@@ -8,26 +11,26 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
-import { useToast } from "@/hooks/use-toast";
-import { useState, useEffect } from "react";
-import { Button } from "./ui/button";
-import { MultiSelect } from "@/components/ui/multi-select";
-import {
-	SUPPORT_SERVICE_OPTIONS,
-	type SupportServiceType,
-} from "@/lib/constants";
+import { submitReport } from "@/app/_actions/unauth_reports";
 
-// Add this form component
-export default function ReportAbuseForm() {
+const SUPPORT_SERVICE_OPTIONS = [
+	{ value: "legal", label: "legal support" },
+	{ value: "medical", label: "medical care" },
+	{ value: "mental_health", label: "mental health support" },
+	{ value: "shelter", label: "shelter services" },
+	{ value: "financial_assistance", label: "financial assistance" },
+	{ value: "other", label: "other support services" },
+] as const;
+
+export default function ReportAbuseForm({ onClose }: { onClose?: () => void }) {
 	const { toast } = useToast();
 	const [loading, setLoading] = useState(false);
 	const [location, setLocation] = useState<{
 		latitude: number;
 		longitude: number;
 	} | null>(null);
-	const [selectedServices, setSelectedServices] = useState<string[]>([]);
 
+	// Get location on component mount
 	useEffect(() => {
 		if ("geolocation" in navigator) {
 			navigator.geolocation.getCurrentPosition(
@@ -39,88 +42,95 @@ export default function ReportAbuseForm() {
 				},
 				(error) => {
 					console.error("Error getting location:", error);
-					toast({
-						title: "Location Unavailable",
-						description:
-							"Unable to get your location. Report will be submitted without location data.",
-						variant: "default",
+					// Set default coordinates for Kenya
+					setLocation({
+						latitude: -1.2921,
+						longitude: 36.8219,
 					});
 				}
 			);
 		}
-	}, [toast]);
+	}, []);
 
 	const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
 		e.preventDefault();
+		const form = e.currentTarget;
 		setLoading(true);
 
-		const formData = new FormData(e.currentTarget);
-		const contactPreference = formData.get("contact_preference");
-		const phone = formData.get("phone");
-
-		if (
-			(contactPreference === "phone_call" || contactPreference === "sms") &&
-			!phone
-		) {
-			toast({
-				title: "Error",
-				description:
-					"Phone number is required for phone call or SMS contact preference.",
-				variant: "destructive",
-			});
-			setLoading(false);
-			return;
-		}
-
-		const data = {
-			first_name: formData.get("first_name"),
-			email: formData.get("email"),
-			phone: phone,
-			type_of_incident: formData.get("incident_type"),
-			incident_description: formData.get("incident_description"),
-			urgency: formData.get("urgency"),
-			consent: formData.get("consent"),
-			contact_preference: contactPreference,
-			latitude: location?.latitude || null,
-			longitude: location?.longitude || null,
-			submission_timestamp: new Date().toISOString(),
-			required_services: selectedServices,
-		};
+		const formData = new FormData(form);
 
 		try {
-			const response = await fetch("/api/reports/anonymous", {
-				method: "POST",
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify(data),
+			await submitReport({
+				// Required fields from form
+				first_name: formData.get("first_name") as string,
+				email: formData.get("email") as string,
+				incident_description: formData.get("incident_description") as string,
+				type_of_incident: formData.get("incident_type") as
+					| "physical"
+					| "emotional"
+					| "sexual"
+					| "financial"
+					| "other",
+				urgency: formData.get("urgency") as "high" | "medium" | "low",
+				consent: formData.get("consent") as "yes" | "no",
+				contact_preference: formData.get("contact_preference") as
+					| "phone_call"
+					| "sms"
+					| "email"
+					| "do_not_contact",
+
+				// Optional fields with defaults
+				phone: (formData.get("phone") as string) || null,
+				last_name: null,
+				user_id: null,
+				latitude: location?.latitude || null,
+				longitude: location?.longitude || null,
+				required_services: [],
+				submission_timestamp: new Date().toISOString(),
+
+				// Required fields with default values
+				isMatched: false,
+				match_status: "pending",
+
+				// Optional fields set to null
+				administrative: null,
+				additional_info: null,
+				city: null,
+				country: null,
+				country_code: null,
+				continent: null,
+				continent_code: null,
+				state: null,
+				locality: null,
+				location: null,
+				plus_code: null,
+				postcode: null,
+				principal_subdivision: null,
+				principal_subdivision_code: null,
+				preferred_language: null,
+				support_services: formData.get("support_services") as "legal" | "medical" | "mental_health" | "shelter" | "financial_assistance" | "other" | null,
+				dob: null,
+				gender: null,
 			});
 
-			const result = await response.json();
-
-			if (!response.ok) {
-				throw new Error(result.error || "Failed to submit report");
-			}
-
-			// Clear the form and show success toast
-			e.currentTarget.reset();
+			// Only reset and show success if the submission was successful
+			form.reset();
 			toast({
 				title: "Report Submitted",
 				description: "Thank you for your report. We will review it shortly.",
 			});
 
-			// After successful submission, close the dialog
-			document
-				.querySelector<HTMLButtonElement>(
-					'[role="dialog"] button[aria-label="Close"]'
-				)
-				?.click();
+			// Add timeout to close the dialog after successful submission
+			if (onClose) {
+				setTimeout(() => {
+					onClose();
+				}, 500);
+			}
 		} catch (error) {
 			console.error("Submission error:", error);
 			toast({
 				title: "Error",
-				description:
-					error instanceof Error
-						? error.message
-						: "Failed to submit report. Please try again.",
+				description: "Failed to submit report. Please try again.",
 				variant: "destructive",
 			});
 		} finally {
@@ -129,138 +139,110 @@ export default function ReportAbuseForm() {
 	};
 
 	return (
-		<form
-			onSubmit={handleSubmit}
-			className="relative w-full max-w-[1200px] max-h-[80vh] flex flex-col"
-		>
-			<div className="flex-1 overflow-y-auto space-y-6 pr-4 pb-20">
-				<div className="flex items-center gap-4 flex-wrap">
-					<p className="text-lg text-gray-700">I want to report about</p>
-					<Select name="incident_type" required>
-						<SelectTrigger className="w-56">
-							<SelectValue placeholder="type of incident" />
-						</SelectTrigger>
-						<SelectContent className="z-[1001]">
-							<SelectItem value="physical">physical abuse</SelectItem>
-							<SelectItem value="emotional">emotional abuse</SelectItem>
-							<SelectItem value="sexual">sexual abuse</SelectItem>
-							<SelectItem value="financial">financial abuse</SelectItem>
-							<SelectItem value="other">other concerns</SelectItem>
-						</SelectContent>
-					</Select>
-					<p className="text-lg text-gray-700">with</p>
-					<Select name="urgency" required>
-						<SelectTrigger className="w-48">
-							<SelectValue placeholder="urgency" />
-						</SelectTrigger>
-						<SelectContent className="z-[1001]">
-							<SelectItem value="high">high urgency</SelectItem>
-							<SelectItem value="medium">medium urgency</SelectItem>
-							<SelectItem value="low">low urgency</SelectItem>
-						</SelectContent>
-					</Select>
-				</div>
-
-				<div className="w-full">
-					<Textarea
-						placeholder="Please share what happened..."
-						name="incident_description"
-						required
-						className="min-h-[120px] w-full"
-					/>
-				</div>
-
-				<div className="w-full space-y-2">
-					<p className="text-lg text-gray-700">What support services do you need?</p>
-					<p className="text-sm text-gray-500">
-						Select all that apply in order of priority
-					</p>
-					<MultiSelect
-						selected={selectedServices}
-						onChange={setSelectedServices}
-						options={SUPPORT_SERVICE_OPTIONS}
-						placeholder="Select required services..."
-					/>
-				</div>
-
-				<div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-					<div className="col-span-full">
-						<p className="text-lg text-gray-700">Contact Information:</p>
-					</div>
-					<Input
-						placeholder="Your name"
+		<form onSubmit={handleSubmit} className="space-y-8">
+			<div className="prose prose-sm">
+				<p className="leading-relaxed text-gray-600">
+					Hello, my name is{" "}
+					<input
+						type="text"
+						className="border-b-2 border-teal-500 focus:outline-none px-2 w-48 bg-transparent"
+						placeholder="your name"
 						name="first_name"
 						required
-						className="w-full"
 					/>
-					<Input
-						placeholder="Your email"
-						name="email"
+					. You can reach me at{" "}
+					<input
 						type="email"
+						className="border-b-2 border-teal-500 focus:outline-none px-2 w-64 bg-transparent"
+						placeholder="your email"
+						name="email"
 						required
-						className="w-full"
-					/>
-					<Input
-						placeholder="Your phone number"
-						name="phone"
+					/>{" "}
+					or by phone at{" "}
+					<input
 						type="tel"
-						pattern="[0-9]{10,}"
-						className="w-full"
+						className="border-b-2 border-teal-500 focus:outline-none px-2 w-48 bg-transparent"
+						placeholder="phone (optional)"
+						name="phone"
 					/>
-					<Select
+					. I would like to report a case of{" "}
+					<select
+						name="incident_type"
+						required
+						className="border-b-2 border-teal-500 focus:outline-none px-2 bg-transparent"
+					>
+						<option value="">select incident type</option>
+						<option value="physical">physical abuse</option>
+						<option value="emotional">emotional abuse</option>
+						<option value="sexual">sexual abuse</option>
+						<option value="financial">financial abuse</option>
+						<option value="other">other concerns</option>
+					</select>{" "}
+					which requires{" "}
+					<select
+						name="urgency"
+						required
+						className="border-b-2 border-teal-500 focus:outline-none px-2 bg-transparent"
+					>
+						<option value="">select urgency</option>
+						<option value="high">high urgency</option>
+						<option value="medium">medium urgency</option>
+						<option value="low">low urgency</option>
+					</select>{" "}
+					attention. I most urgently need{" "}
+					<select
+						name="support_services"
+						required
+						className="border-b-2 border-teal-500 focus:outline-none px-2 bg-transparent"
+					>
+						<option value="">select type of help</option>
+						{SUPPORT_SERVICE_OPTIONS.map(({ value, label }) => (
+							<option key={value} value={value}>
+								{label}
+							</option>
+						))}
+					</select>
+					.
+				</p>
+
+				<p className="mt-4">Here's what happened:</p>
+				<Textarea
+					placeholder="Please share what happened..."
+					name="incident_description"
+					required
+					className="min-h-[120px] w-full mt-2"
+				/>
+
+				<p className="mt-4">
+					Please{" "}
+					<select
 						name="contact_preference"
 						required
-						onValueChange={(value) => {
-							const phoneInput = document.querySelector(
-								'input[name="phone"]'
-							) as HTMLInputElement;
-							if (value === "phone_call" || value === "sms") {
-								phoneInput.required = true;
-							} else {
-								phoneInput.required = false;
-							}
-						}}
+						className="border-b-2 border-teal-500 focus:outline-none px-2 bg-transparent"
 					>
-						<SelectTrigger>
-							<SelectValue placeholder="Preferred contact" />
-						</SelectTrigger>
-						<SelectContent className="z-[1001]">
-							<SelectItem value="phone_call">Call me</SelectItem>
-							<SelectItem value="sms">Text me</SelectItem>
-							<SelectItem value="email">Email me</SelectItem>
-							<SelectItem value="do_not_contact">Don't contact me</SelectItem>
-						</SelectContent>
-					</Select>
-				</div>
-
-				<div className="flex items-center gap-4 justify-between">
-					<p className="text-lg text-gray-700">
-						Do you consent to share this information with relevant authorities if
-						needed?
-					</p>
-					<Select name="consent" required>
-						<SelectTrigger className="w-[200px]">
-							<SelectValue placeholder="Select consent" />
-						</SelectTrigger>
-						<SelectContent className="z-[1001]">
-							<SelectItem value="yes">Yes, I consent</SelectItem>
-							<SelectItem value="no">No, I don't consent</SelectItem>
-						</SelectContent>
-					</Select>
-				</div>
+						<option value="">select contact method</option>
+						<option value="phone_call">call me</option>
+						<option value="sms">text me</option>
+						<option value="email">email me</option>
+						<option value="do_not_contact">don't contact me</option>
+					</select>{" "}
+					to follow up.{" "}
+					<select
+						name="consent"
+						required
+						className="border-b-2 border-teal-500 focus:outline-none px-2 bg-transparent"
+					>
+						<option value="">select consent</option>
+						<option value="yes">I consent</option>
+						<option value="no">I don't consent</option>
+					</select>{" "}
+					to share this information with relevant authorities if needed.
+				</p>
 			</div>
 
-			<div className="fixed bottom-0 left-0 right-0 pt-4 pb-4 bg-white border-t mt-4 z-50">
-				<div className="max-w-[1200px] mx-auto px-4">
-					<Button
-						type="submit"
-						className="w-full max-w-md mx-auto block"
-						disabled={loading}
-					>
-						{loading ? "Submitting..." : "Submit Report"}
-					</Button>
-				</div>
-			</div>
+			<Button type="submit" className="w-full" disabled={loading}>
+				{loading ? "Submitting..." : "Submit Report"}
+			</Button>
 		</form>
 	);
 }
