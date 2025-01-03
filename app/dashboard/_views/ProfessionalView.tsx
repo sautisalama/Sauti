@@ -216,9 +216,43 @@ export default function ProfessionalView({
 		// Set up real-time subscriptions
 		const supabase = createClient();
 
-		// Existing subscriptions for reports and support services...
+		// Subscribe to reports changes
+		const reportsChannel = supabase
+			.channel("reports-changes")
+			.on(
+				"postgres_changes",
+				{
+					event: "*",
+					schema: "public",
+					table: "reports",
+					filter: `user_id=eq.${userId}`,
+				},
+				async () => {
+					const updatedReports = await fetchUserReports(userId);
+					setReports(updatedReports);
+				}
+			)
+			.subscribe();
 
-		// Add subscription for matched services
+		// Subscribe to support services changes
+		const servicesChannel = supabase
+			.channel("services-changes")
+			.on(
+				"postgres_changes",
+				{
+					event: "*",
+					schema: "public",
+					table: "support_services",
+					filter: `user_id=eq.${userId}`,
+				},
+				async () => {
+					const updatedServices = await fetchUserSupportServices(userId);
+					setSupportServices(updatedServices);
+				}
+			)
+			.subscribe();
+
+		// Subscribe to matched services changes
 		const matchesChannel = supabase
 			.channel("matched-services-changes")
 			.on(
@@ -227,7 +261,7 @@ export default function ProfessionalView({
 					event: "*",
 					schema: "public",
 					table: "matched_services",
-					filter: `service_id=eq.${userId}`,
+					filter: `service_id=in.(${supportServices.map(s => s.id).join(',')})`,
 				},
 				async () => {
 					const updatedMatches = await fetchMatchedServices(userId);
@@ -236,11 +270,37 @@ export default function ProfessionalView({
 			)
 			.subscribe();
 
+		// Subscribe to appointments changes
+		const appointmentsChannel = supabase
+			.channel("appointments-changes")
+			.on(
+				"postgres_changes",
+				{
+					event: "*",
+					schema: "public",
+					table: "appointments",
+					filter: `professional_id=eq.${userId}`,
+				},
+				async () => {
+					// Refresh both matches and reports since they contain appointment data
+					const [updatedMatches, updatedReports] = await Promise.all([
+						fetchMatchedServices(userId),
+						fetchUserReports(userId),
+					]);
+					setMatchedServices(updatedMatches);
+					setReports(updatedReports);
+				}
+			)
+			.subscribe();
+
+		// Cleanup subscriptions
 		return () => {
-			// Existing cleanup...
+			supabase.removeChannel(reportsChannel);
+			supabase.removeChannel(servicesChannel);
 			supabase.removeChannel(matchesChannel);
+			supabase.removeChannel(appointmentsChannel);
 		};
-	}, [userId]);
+	}, [userId, supportServices, toast]);
 
 	const handleDeleteService = async (serviceId: string) => {
 		try {
