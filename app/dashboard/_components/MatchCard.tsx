@@ -128,11 +128,11 @@ export function MatchCard({ match, onAccept }: MatchCardProps) {
 					>
 						{match.match_status_type}
 					</span>
-					{match.report.match_score !== null && (
+					{/* {match.report.match_score !== null && (
 						<span className="text-sm text-gray-500">
 							Match Score: {Math.round(match.match_score)}%
 						</span>
-					)}
+					)} */}
 				</div>
 			</div>
 
