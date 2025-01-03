@@ -103,20 +103,20 @@ export function MainSidebar() {
 	return (
 		<>
 			{/* Desktop Sidebar */}
-			<div className="hidden md:flex h-screen w-[72px] flex-col items-center justify-between bg-[#1A3434] py-8">
-				<div className="flex flex-col items-center gap-8">
+			<div className="hidden md:flex h-screen w-[72px] flex-col items-center justify-between bg-[#1A3434] py-8 px-8">
+				<div className="flex flex-col items-center gap-12 mx-6">
 					<Image
 						src="/small-logo.png"
 						alt="Logo"
 						width={30}
 						height={30}
-						className="w-7 h-10 mx-6"
+						className="w-7 h-10"
 					/>
 
-					<nav className="flex flex-col items-center gap-6">
+					<nav className="flex flex-col items-center gap-8">
 						<Link
 							href="/dashboard"
-							className={`flex flex-col items-center gap-1 transition-colors hover:text-[#f8941c] mx-8 ${
+							className={`flex flex-col items-center gap-2 transition-colors hover:text-[#f8941c] px-2 w-full ${
 								pathname === "/dashboard" ? "text-[#f8941c]" : "text-white"
 							}`}
 						>
@@ -143,7 +143,7 @@ export function MainSidebar() {
 						</Link> */}
 						<Link
 							href="/dashboard/resources"
-							className={`flex flex-col items-center gap-1 transition-colors hover:text-[#f8941c] mx-8 ${
+							className={`flex flex-col items-center gap-2 transition-colors hover:text-[#f8941c] px-2 w-full ${
 								pathname.includes("/resources") ? "text-[#f8941c]" : "text-white"
 							}`}
 						>
@@ -152,7 +152,7 @@ export function MainSidebar() {
 						</Link>
 						<Link
 							href="/dashboard/chat"
-							className={`flex flex-col items-center gap-1 transition-colors hover:text-[#f8941c] mx-8 ${
+							className={`flex flex-col items-center gap-2 transition-colors hover:text-[#f8941c] px-2 w-full ${
 								pathname.includes("/chat") ? "text-[#f8941c]" : "text-white"
 							}`}
 						>
@@ -162,11 +162,11 @@ export function MainSidebar() {
 					</nav>
 				</div>
 
-				<div className="flex flex-col items-center gap-4">
+				<div className="flex flex-col items-center gap-6 mx-6">
 					<TooltipProvider>
 						<Tooltip>
 							<TooltipTrigger>
-								<Avatar className="h-8 w-8 mx-6 bg-gradient-to-br from-emerald-400 via-teal-400 to-cyan-400">
+								<Avatar className="h-8 w-8 bg-gradient-to-br from-emerald-400 via-teal-400 to-cyan-400">
 									<AvatarFallback className="text-white font-medium bg-gradient-to-br from-purple-400 via-fuchsia-400 to-pink-400">
 										{user?.email?.[0].toUpperCase() || "?"}
 									</AvatarFallback>
@@ -182,7 +182,7 @@ export function MainSidebar() {
 						<Button
 							variant="ghost"
 							size="icon"
-							className="text-white hover:text-[#f8941c] transition-colors mx-6"
+							className="text-white hover:text-[#f8941c] transition-colors"
 						>
 							<LogOut className="h-5 w-5" />
 						</Button>
@@ -208,7 +208,7 @@ export function MainSidebar() {
 						<TooltipProvider>
 							<Tooltip>
 								<TooltipTrigger>
-									<Avatar className="h-8 w-8 mx-6 bg-gradient-to-br from-emerald-400 via-teal-400 to-cyan-400">
+									<Avatar className="h-8 w-8 bg-gradient-to-br from-emerald-400 via-teal-400 to-cyan-400">
 										<AvatarFallback className="text-white font-medium bg-gradient-to-br from-emerald-500 via-teal-500 to-cyan-500">
 											{user?.email?.[0].toUpperCase() || "?"}
 										</AvatarFallback>

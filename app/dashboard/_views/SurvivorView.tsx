@@ -40,6 +40,7 @@ import { CommunityCard } from "@/app/components/CommunityCard";
 import { DailyProgress } from "@/app/components/DailyProgress";
 import WelcomeHeader from "@/app/components/WelcomeHeader";
 import { JoinCommunity } from "@/app/components/JoinCommunity";
+import { AppointmentsTab } from "../_components/tabs/AppointmentsTab";
 
 // Add this interface to type the joined data
 interface ReportWithRelations extends Tables<"reports"> {
@@ -229,7 +230,9 @@ export default function SurvivorView({
 								<TabsList className="overflow-x-auto">
 									<TabsTrigger value="overview">Overview</TabsTrigger>
 									<TabsTrigger value="reports">Reports</TabsTrigger>
-									<TabsTrigger value="toolkit">Toolkit</TabsTrigger>
+									<TabsTrigger value="appointments" disabled>
+										Appointments
+									</TabsTrigger>
 								</TabsList>
 
 								<TabsContent value="overview">
@@ -522,12 +525,9 @@ export default function SurvivorView({
 									</div>
 								</TabsContent>
 
-								{/* <TabsContent value="toolkit">
-									<div className="grid gap-6">
-										<h2 className="text-2xl font-bold">My Toolkit</h2>
-										
-									</div>
-								</TabsContent> */}
+								<TabsContent value="appointments">
+									<AppointmentsTab userId={userId} userType="survivor" />
+								</TabsContent>
 							</Tabs>
 
 							<div className="space-y-8">

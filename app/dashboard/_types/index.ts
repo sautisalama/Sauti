@@ -18,3 +18,12 @@ export interface ReportWithRelations extends Tables<"reports"> {
 		}[];
 	}[];
 }
+
+export interface AppointmentWithDetails {
+	id: string;
+	appointment_date: string;
+	status: string;
+	matched_service: {
+		support_service: Tables<"support_services">;
+	};
+}
