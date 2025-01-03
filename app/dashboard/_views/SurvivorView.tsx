@@ -281,7 +281,7 @@ export default function SurvivorView({
 														return (
 															<div
 																key={report.report_id}
-																className={`flex items-center justify-between rounded-lg p-4 ${
+																className={`flex flex-col md:flex-row md:items-center justify-between rounded-lg p-3 md:p-4 space-y-3 md:space-y-0 ${
 																	report.urgency === "high"
 																		? "bg-[#FFF5F5]"
 																		: report.urgency === "medium"
@@ -289,11 +289,86 @@ export default function SurvivorView({
 																		: "bg-[#F0F9FF]"
 																}`}
 															>
-																<div className="flex items-center gap-3">
-																	<div className="h-10 w-10 rounded-full bg-[#1A3434] text-white flex items-center justify-center">
+																<div className="flex md:hidden flex-col space-y-3">
+																	<div className="flex items-start justify-between">
+																		<div className="flex items-start gap-2 flex-1">
+																			<div className="h-8 w-8 shrink-0 rounded-full bg-[#1A3434] text-white flex items-center justify-center text-sm">
+																				{report.type_of_incident?.[0]?.toUpperCase() || "?"}
+																			</div>
+																			<div className="min-w-0">
+																				<h4 className="font-medium text-sm">
+																					{formatServiceName(
+																						report.type_of_incident || "Unknown Incident"
+																					)}
+																				</h4>
+																				{report.incident_description && (
+																					<p className="text-sm text-gray-600 mt-1 line-clamp-2">
+																						{report.incident_description}
+																					</p>
+																				)}
+																				<div className="flex flex-wrap gap-2 text-xs text-gray-500 mt-1">
+																					<span>
+																						{new Date(
+																							report.submission_timestamp || ""
+																						).toLocaleDateString()}
+																					</span>
+																					<span
+																						className={`
+																						px-2 py-0.5 rounded-full text-xs
+																						${
+																							report.urgency === "high"
+																								? "bg-red-100 text-red-700"
+																								: report.urgency === "medium"
+																								? "bg-yellow-100 text-yellow-700"
+																								: "bg-blue-100 text-blue-700"
+																						}
+																					`}
+																					>
+																						{formatServiceName(report.urgency || "low")}
+																					</span>
+																				</div>
+																			</div>
+																		</div>
+																		<Button
+																			variant="ghost"
+																			size="icon"
+																			className="text-destructive hover:text-destructive hover:bg-destructive/10 -mt-1"
+																			onClick={() => setDeleteReport(report.report_id)}
+																		>
+																			<Trash2 className="h-4 w-4" />
+																		</Button>
+																	</div>
+
+																	<div className="bg-white/50 p-2 rounded-md">
+																		<p className="font-medium text-sm">
+																			{matchedService?.support_services.name || "Pending Match"}
+																		</p>
+																		<p className="text-xs text-gray-500">
+																			{matchedService?.match_status_type
+																				? formatServiceName(matchedService.match_status_type)
+																				: "Awaiting Response"}
+																		</p>
+																	</div>
+
+																	{appointment && (
+																		<Button
+																			className="w-full bg-[#00A5A5] hover:bg-[#008585] text-sm"
+																			onClick={() => {
+																				console.log("View appointment:", appointment);
+																			}}
+																		>
+																			{appointment.status === "confirmed"
+																				? "Join Meeting"
+																				: "View Appointment"}
+																		</Button>
+																	)}
+																</div>
+
+																<div className="hidden md:flex items-start gap-3">
+																	<div className="h-10 w-10 shrink-0 rounded-full bg-[#1A3434] text-white flex items-center justify-center">
 																		{report.type_of_incident?.[0]?.toUpperCase() || "?"}
 																	</div>
-																	<div>
+																	<div className="min-w-0">
 																		<h4 className="font-medium">
 																			{formatServiceName(
 																				report.type_of_incident || "Unknown Incident"
@@ -304,7 +379,7 @@ export default function SurvivorView({
 																				{report.incident_description}
 																			</p>
 																		)}
-																		<div className="flex items-center gap-2 text-sm text-gray-500 mt-1">
+																		<div className="flex flex-wrap items-center gap-2 text-sm text-gray-500 mt-1">
 																			<span>
 																				{new Date(
 																					report.submission_timestamp || ""
@@ -329,8 +404,8 @@ export default function SurvivorView({
 																	</div>
 																</div>
 
-																<div className="flex items-center gap-6">
-																	<div>
+																<div className="hidden md:flex flex-col md:flex-row items-start md:items-center gap-4 md:gap-6">
+																	<div className="w-full md:w-auto">
 																		<p className="font-medium">
 																			{matchedService?.support_services.name || "Pending Match"}
 																		</p>
@@ -340,12 +415,11 @@ export default function SurvivorView({
 																				: "Awaiting Response"}
 																		</p>
 																	</div>
-																	<div className="flex gap-2">
+																	<div className="flex w-full md:w-auto gap-2">
 																		{appointment && (
 																			<Button
-																				className="bg-[#00A5A5] hover:bg-[#008585]"
+																				className="flex-1 md:flex-none bg-[#00A5A5] hover:bg-[#008585]"
 																				onClick={() => {
-																					// Handle appointment view
 																					console.log("View appointment:", appointment);
 																				}}
 																			>
@@ -425,7 +499,7 @@ export default function SurvivorView({
 													return (
 														<div
 															key={report.report_id}
-															className={`flex items-center justify-between rounded-lg p-4 ${
+															className={`flex flex-col md:flex-row md:items-center justify-between rounded-lg p-3 md:p-4 space-y-3 md:space-y-0 ${
 																report.urgency === "high"
 																	? "bg-[#FFF5F5]"
 																	: report.urgency === "medium"
@@ -433,11 +507,86 @@ export default function SurvivorView({
 																	: "bg-[#F0F9FF]"
 															}`}
 														>
-															<div className="flex items-center gap-3">
-																<div className="h-10 w-10 rounded-full bg-[#1A3434] text-white flex items-center justify-center">
+															<div className="flex md:hidden flex-col space-y-3">
+																<div className="flex items-start justify-between">
+																	<div className="flex items-start gap-2 flex-1">
+																		<div className="h-8 w-8 shrink-0 rounded-full bg-[#1A3434] text-white flex items-center justify-center text-sm">
+																			{report.type_of_incident?.[0]?.toUpperCase() || "?"}
+																		</div>
+																		<div className="min-w-0">
+																			<h4 className="font-medium text-sm">
+																				{formatServiceName(
+																					report.type_of_incident || "Unknown Incident"
+																				)}
+																			</h4>
+																			{report.incident_description && (
+																				<p className="text-sm text-gray-600 mt-1 line-clamp-2">
+																					{report.incident_description}
+																				</p>
+																			)}
+																			<div className="flex flex-wrap gap-2 text-xs text-gray-500 mt-1">
+																				<span>
+																					{new Date(
+																						report.submission_timestamp || ""
+																					).toLocaleDateString()}
+																				</span>
+																				<span
+																					className={`
+																								px-2 py-0.5 rounded-full text-xs
+																								${
+																									report.urgency === "high"
+																										? "bg-red-100 text-red-700"
+																										: report.urgency === "medium"
+																										? "bg-yellow-100 text-yellow-700"
+																										: "bg-blue-100 text-blue-700"
+																								}
+																						`}
+																				>
+																					{formatServiceName(report.urgency || "low")}
+																				</span>
+																			</div>
+																		</div>
+																	</div>
+																	<Button
+																		variant="ghost"
+																		size="icon"
+																		className="text-destructive hover:text-destructive hover:bg-destructive/10 -mt-1"
+																		onClick={() => setDeleteReport(report.report_id)}
+																	>
+																		<Trash2 className="h-4 w-4" />
+																	</Button>
+																</div>
+
+																<div className="bg-white/50 p-2 rounded-md">
+																	<p className="font-medium text-sm">
+																		{matchedService?.support_services.name || "Pending Match"}
+																	</p>
+																	<p className="text-xs text-gray-500">
+																		{matchedService?.match_status_type
+																			? formatServiceName(matchedService.match_status_type)
+																			: "Awaiting Response"}
+																	</p>
+																</div>
+
+																{appointment && (
+																	<Button
+																		className="w-full bg-[#00A5A5] hover:bg-[#008585] text-sm"
+																		onClick={() => {
+																			console.log("View appointment:", appointment);
+																		}}
+																	>
+																		{appointment.status === "confirmed"
+																			? "Join Meeting"
+																			: "View Appointment"}
+																	</Button>
+																)}
+															</div>
+
+															<div className="hidden md:flex items-start gap-3">
+																<div className="h-10 w-10 shrink-0 rounded-full bg-[#1A3434] text-white flex items-center justify-center">
 																	{report.type_of_incident?.[0]?.toUpperCase() || "?"}
 																</div>
-																<div>
+																<div className="min-w-0">
 																	<h4 className="font-medium">
 																		{formatServiceName(
 																			report.type_of_incident || "Unknown Incident"
@@ -448,7 +597,7 @@ export default function SurvivorView({
 																			{report.incident_description}
 																		</p>
 																	)}
-																	<div className="flex items-center gap-2 text-sm text-gray-500 mt-1">
+																	<div className="flex flex-wrap items-center gap-2 text-sm text-gray-500 mt-1">
 																		<span>
 																			{new Date(
 																				report.submission_timestamp || ""
@@ -457,15 +606,15 @@ export default function SurvivorView({
 																		<span className="w-1.5 h-1.5 rounded-full bg-gray-300" />
 																		<span
 																			className={`
-																			px-2 py-0.5 rounded-full text-xs
-																			${
-																				report.urgency === "high"
-																					? "bg-red-100 text-red-700"
-																					: report.urgency === "medium"
-																					? "bg-yellow-100 text-yellow-700"
-																					: "bg-blue-100 text-blue-700"
-																			}
-																		`}
+																								px-2 py-0.5 rounded-full text-xs
+																								${
+																									report.urgency === "high"
+																										? "bg-red-100 text-red-700"
+																										: report.urgency === "medium"
+																										? "bg-yellow-100 text-yellow-700"
+																										: "bg-blue-100 text-blue-700"
+																								}
+																						`}
 																		>
 																			{formatServiceName(report.urgency || "low")} Priority
 																		</span>
@@ -473,8 +622,8 @@ export default function SurvivorView({
 																</div>
 															</div>
 
-															<div className="flex items-center gap-6">
-																<div>
+															<div className="hidden md:flex flex-col md:flex-row items-start md:items-center gap-4 md:gap-6">
+																<div className="w-full md:w-auto">
 																	<p className="font-medium">
 																		{matchedService?.support_services.name || "Pending Match"}
 																	</p>
@@ -484,12 +633,11 @@ export default function SurvivorView({
 																			: "Awaiting Response"}
 																	</p>
 																</div>
-																<div className="flex gap-2">
+																<div className="flex w-full md:w-auto gap-2">
 																	{appointment && (
 																		<Button
-																			className="bg-[#00A5A5] hover:bg-[#008585]"
+																			className="flex-1 md:flex-none bg-[#00A5A5] hover:bg-[#008585]"
 																			onClick={() => {
-																				// Handle appointment view
 																				console.log("View appointment:", appointment);
 																			}}
 																		>
