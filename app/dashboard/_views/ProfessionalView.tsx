@@ -32,6 +32,7 @@ import { ReportsTab } from "../_components/tabs/ReportsTab";
 import { SupportServicesTab } from "../_components/tabs/SupportServicesTab";
 import { ReportWithRelations, MatchedServiceWithRelations } from "../_types";
 import { MatchCard } from "../_components/MatchCard";
+import { MatchedCasesTab } from "../_components/tabs/MatchedCasesTab";
 
 interface ProfessionalViewProps {
 	userId: string;
@@ -251,54 +252,21 @@ export default function ProfessionalView({
 								</TabsContent>
 
 								<TabsContent value="matched-cases">
-									<div className="space-y-6">
-										<div className="flex justify-between items-center">
-											<div>
-												<h2 className="text-xl font-semibold text-[#1A3434]">
-													Matched Cases
-												</h2>
-												<p className="text-sm text-gray-500">
-													{matchedServices.length}{" "}
-													{matchedServices.length === 1 ? "case" : "cases"} matched
-												</p>
-											</div>
-										</div>
-
-										{matchedServices.length > 0 ? (
-											<div className="space-y-4">
-												{matchedServices.map((matchedCase) => (
-													<MatchCard
-														key={matchedCase.id}
-														match={matchedCase}
-														onAccept={() => {
-															fetchMatchedServices(userId).then(setMatchedServices);
-														}}
-													/>
-												))}
-											</div>
-										) : (
-											<div className="text-center py-12 bg-gray-50 rounded-lg">
-												<div className="space-y-3">
-													<p className="text-gray-500">No matched cases found</p>
-													<p className="text-sm text-gray-400">
-														Matches will appear here when your services are matched with
-														reports
-													</p>
-												</div>
-											</div>
-										)}
-									</div>
+									<MatchedCasesTab
+										matchedServices={matchedServices}
+										onRefresh={() => fetchMatchedServices(userId).then(setMatchedServices)}
+									/>
 								</TabsContent>
 
 								<TabsContent value="support-services">
 									<SupportServicesTab
 										supportServices={supportServices}
-										formatServiceName={formatServiceName}
-										onDeleteService={setDeleteServiceId}
-										open={open}
-										setOpen={setOpen}
-										userId={userId}
-										setSupportServices={setSupportServices}
+											formatServiceName={formatServiceName}
+											onDeleteService={setDeleteServiceId}
+											open={open}
+											setOpen={setOpen}
+											userId={userId}
+											setSupportServices={setSupportServices}
 									/>
 								</TabsContent>
 							</Tabs>
