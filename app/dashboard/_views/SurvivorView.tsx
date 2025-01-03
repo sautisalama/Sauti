@@ -296,7 +296,12 @@ export default function SurvivorView({
 																				report.type_of_incident || "Unknown Incident"
 																			)}
 																		</h4>
-																		<div className="flex items-center gap-2 text-sm text-gray-500">
+																		{report.incident_description && (
+																			<p className="text-sm text-gray-600 mt-1 line-clamp-2">
+																				{report.incident_description}
+																			</p>
+																		)}
+																		<div className="flex items-center gap-2 text-sm text-gray-500 mt-1">
 																			<span>
 																				{new Date(
 																					report.submission_timestamp || ""
@@ -435,7 +440,12 @@ export default function SurvivorView({
 																			report.type_of_incident || "Unknown Incident"
 																		)}
 																	</h4>
-																	<div className="flex items-center gap-2 text-sm text-gray-500">
+																	{report.incident_description && (
+																		<p className="text-sm text-gray-600 mt-1 line-clamp-2">
+																			{report.incident_description}
+																		</p>
+																	)}
+																	<div className="flex items-center gap-2 text-sm text-gray-500 mt-1">
 																		<span>
 																			{new Date(
 																				report.submission_timestamp || ""
