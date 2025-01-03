@@ -5,16 +5,12 @@ import {
 	updateMatchStatus,
 } from "@/app/dashboard/_views/actions/matched-services";
 import { useToast } from "@/hooks/use-toast";
-import { Tables } from "@/types/db-schema";
 import { AppointmentScheduler } from "./AppointmentScheduler";
-import { createAppointment } from "@/app/dashboard/_views/actions/appointments";
 import { useState } from "react";
+import { MatchedServiceWithRelations } from "../_types";
 
 interface MatchCardProps {
-	match: Tables<"matched_services"> & {
-		support_service: Tables<"support_services">;
-		report: Tables<"reports">;
-	};
+	match: MatchedServiceWithRelations;
 	onAccept?: () => void;
 }
 
@@ -36,7 +32,7 @@ export function MatchCard({ match, onAccept }: MatchCardProps) {
 				match.id,
 				appointmentDate,
 				match.support_service.user_id!,
-				match.survivor_id!
+				match.report.user_id!
 			);
 
 			toast({
@@ -51,6 +47,8 @@ export function MatchCard({ match, onAccept }: MatchCardProps) {
 				description: "Failed to schedule appointment. Please try again.",
 				variant: "destructive",
 			});
+		} finally {
+			setIsScheduling(false);
 		}
 	};
 
@@ -115,7 +113,7 @@ export function MatchCard({ match, onAccept }: MatchCardProps) {
 					</div>
 				</div>
 				<p className="text-sm text-gray-600">
-					{match.description || "No description provided"}
+					{match.report.incident_description || "No description provided"}
 				</p>
 				<div className="mt-2 flex items-center justify-between">
 					<span
@@ -128,9 +126,9 @@ export function MatchCard({ match, onAccept }: MatchCardProps) {
 								: "bg-gray-100 text-gray-800"
 						}`}
 					>
-						{match.match_status_type || "unknown"}
+						{match.match_status_type}
 					</span>
-					{match.match_score !== null && (
+					{match.report.match_score !== null && (
 						<span className="text-sm text-gray-500">
 							Match Score: {Math.round(match.match_score)}%
 						</span>
