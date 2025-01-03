@@ -1,5 +1,6 @@
 "use client";
 
+import { useUser } from "@/hooks/useUser";
 import { Tables } from "@/types/db-schema";
 import React from "react";
 
@@ -8,7 +9,9 @@ type WelcomeHeaderProps = {
 };
 
 export default function WelcomeHeader({ profileDetails }: WelcomeHeaderProps) {
-	const displayName = profileDetails?.first_name || "Guest";
+	const user = useUser();
+	const displayName =
+		profileDetails?.first_name || user?.email?.split("@")[0] || "Guest";
 
 	return (
 		<div className="mb-8">
