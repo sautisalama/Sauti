@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
-import { signIn, signInWithGoogle } from "@/lib/actions/auth";
+import { signIn, signInWithGoogle } from "@/app/(auth)/actions/auth";
 
 export default function SignIn() {
 	return (
@@ -40,7 +40,7 @@ export default function SignIn() {
 									</div>
 									<Input id="password" name="password" type="password" required />
 								</div>
-								<Button type="submit" className="w-full">
+								<Button type="submit" className="mt-4  w-full">
 									Login
 								</Button>
 							</form>
