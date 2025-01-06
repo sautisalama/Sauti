@@ -53,6 +53,18 @@ export async function updateSession(request: NextRequest) {
 		return NextResponse.redirect(url);
 	}
 
+	// Add a new check for authenticated users trying to access auth pages
+	if (
+		user &&
+		(request.nextUrl.pathname.startsWith("/signin") ||
+			request.nextUrl.pathname.startsWith("/signup") ||
+			request.nextUrl.pathname === "/")
+	) {
+		const url = request.nextUrl.clone();
+		url.pathname = "/dashboard";
+		return NextResponse.redirect(url);
+	}
+
 	// IMPORTANT: You *must* return the supabaseResponse object as it is.
 	// If you're creating a new response object with NextResponse.next() make sure to:
 	// 1. Pass the request in it, like so:

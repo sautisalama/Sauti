@@ -3,7 +3,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { signUp, signInWithGoogle } from "@/lib/actions/auth";
+import { signUp, signInWithGoogle } from "@/app/(auth)/actions/auth";
 import {
 	Select,
 	SelectContent,

@@ -27,7 +27,7 @@ import {
 	SidebarMenuItem,
 	SidebarProvider,
 } from "@/components/ui/sidebar";
-import { signOut } from "@/lib/actions/auth";
+import { signOut } from "@/app/(auth)/actions/auth";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import {
@@ -105,13 +105,15 @@ export function MainSidebar() {
 			{/* Desktop Sidebar */}
 			<div className="hidden md:flex h-screen w-[72px] flex-col items-center justify-between bg-[#1A3434] py-8 px-8">
 				<div className="flex flex-col items-center gap-12 mx-6">
-					<Image
-						src="/small-logo.png"
-						alt="Logo"
-						width={30}
-						height={30}
-						className="w-7 h-10"
-					/>
+					<Link href="/dashboard">
+						<Image
+							src="/small-logo.png"
+							alt="Logo"
+							width={30}
+							height={30}
+							className="w-7 h-10"
+						/>
+					</Link>
 
 					<nav className="flex flex-col items-center gap-8">
 						<Link
@@ -197,13 +199,15 @@ export function MainSidebar() {
 				}`}
 			>
 				<div className="flex items-center justify-between px-4 py-3">
-					<Image
-						src="/small-logo.png"
-						alt="Logo"
-						width={24}
-						height={24}
-						className="w-6 h-8"
-					/>
+					<Link href="/dashboard">
+						<Image
+							src="/small-logo.png"
+							alt="Logo"
+							width={24}
+							height={24}
+							className="w-6 h-8"
+						/>
+					</Link>
 					<div className="flex items-center gap-3">
 						<TooltipProvider>
 							<Tooltip>

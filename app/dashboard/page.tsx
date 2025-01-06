@@ -3,7 +3,7 @@ import { getUser } from "@/utils/supabase/server";
 import { redirect } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { LogOut } from "lucide-react";
-import { signOut } from "@/lib/actions/auth";
+import { signOut } from "@/app/(auth)/actions/auth";
 import SurvivorView from "./_views/SurvivorView";
 import ProfessionalView from "./_views/ProfessionalView";
 import { MainSidebar } from "./_views/MainSidebar";
