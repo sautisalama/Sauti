@@ -33,7 +33,7 @@ export async function signUp(formData: FormData) {
 
 	if (authError) {
 		console.error("Sign up error:", authError);
-		redirect("/error");
+		redirect("/?message=signup_failed");
 	}
 
 	// Then handle the profile
@@ -56,12 +56,12 @@ export async function signUp(formData: FormData) {
 
 		if (profileError) {
 			console.error("Profile creation error:", profileError);
-			redirect("/error");
+			redirect("/?message=profile_creation_failed");
 		}
 	}
 
 	revalidatePath("/", "layout");
-	redirect("/dashboard");
+	redirect("/dashboard?message=signup_success");
 }
 
 export async function signIn(formData: FormData) {
@@ -76,10 +76,10 @@ export async function signIn(formData: FormData) {
 	if (error) {
 		// Check specifically for invalid login credentials
 		if (error.message === "Invalid login credentials") {
-			redirect("/error?message=account_not_found");
+			redirect("/?message=account_not_found");
 		}
 		console.error("Sign in error:", error);
-		redirect("/error");
+		redirect("/?message=account_not_found");
 	}
 
 	// Add revalidation before redirect
@@ -104,7 +104,7 @@ export async function signInWithGoogle() {
 
 	if (error) {
 		console.error("Google sign in error:", error);
-		redirect("/error?message=google_signin_failed");
+		redirect("/?message=google_signin_failed");
 	}
 
 	if (data.url) {
