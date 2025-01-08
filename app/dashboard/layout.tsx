@@ -10,7 +10,7 @@ export default async function DashboardLayout({
 	const user = await getUser();
 
 	if (!user) {
-		redirect("/signin");
+		redirect("https://app.sautisalama.org/signin");
 	}
 
 	return (

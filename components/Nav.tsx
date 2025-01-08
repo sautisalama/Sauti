@@ -103,7 +103,7 @@ export function Nav() {
 							</Button>
 						</Link>
 					) : (
-						<Link href="/signin">
+						<Link href="https://app.sautisalama.org/signin">
 							<Button variant="default">
 								<div className="flex items-center justify-between gap-2">
 									Sign In <MoveUpRight className="h-4 w-4" />
@@ -162,7 +162,7 @@ export function Nav() {
 								</Button>
 							</Link>
 						) : (
-							<Link href="/signin">
+							<Link href="https://app.sautisalama.org/signin">
 								<Button variant="default">
 									<div className="flex items-center justify-between gap-2">
 										Sign In <MoveUpRight className="h-4 w-4" />
