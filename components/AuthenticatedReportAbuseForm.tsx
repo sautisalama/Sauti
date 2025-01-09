@@ -1,12 +1,5 @@
 "use client";
 import { Input } from "@/components/ui/input";
-import {
-	Select,
-	SelectContent,
-	SelectItem,
-	SelectTrigger,
-	SelectValue,
-} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { useState, useEffect } from "react";
@@ -83,7 +76,6 @@ export default function AuthenticatedReportAbuseForm({
 			setLoading(false);
 			return;
 		}
-
 
 		const data = {
 			first_name: userProfile?.first_name,
@@ -196,9 +188,9 @@ export default function AuthenticatedReportAbuseForm({
 						<p className="text-lg text-gray-700">Contact Preference:</p>
 					</div>
 					<Input
-						placeholder="Your phone number (optional)"
+						placeholder="Your phone number"
 						name="phone"
-						type="tel"
+						type="text"
 						pattern="[0-9]{10,}"
 						className="w-full"
 					/>

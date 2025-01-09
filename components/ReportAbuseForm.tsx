@@ -1,16 +1,8 @@
 "use client";
-import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { useState, useEffect } from "react";
 import { Button } from "./ui/button";
-import {
-	Select,
-	SelectContent,
-	SelectItem,
-	SelectTrigger,
-	SelectValue,
-} from "@/components/ui/select";
 import { submitReport } from "@/app/_actions/unauth_reports";
 
 const SUPPORT_SERVICE_OPTIONS = [
@@ -108,7 +100,14 @@ export default function ReportAbuseForm({ onClose }: { onClose?: () => void }) {
 				principal_subdivision: null,
 				principal_subdivision_code: null,
 				preferred_language: null,
-				support_services: formData.get("support_services") as "legal" | "medical" | "mental_health" | "shelter" | "financial_assistance" | "other" | null,
+				support_services: formData.get("support_services") as
+					| "legal"
+					| "medical"
+					| "mental_health"
+					| "shelter"
+					| "financial_assistance"
+					| "other"
+					| null,
 				dob: null,
 				gender: null,
 			});
@@ -160,7 +159,7 @@ export default function ReportAbuseForm({ onClose }: { onClose?: () => void }) {
 					/>{" "}
 					or by phone at{" "}
 					<input
-						type="tel"
+						type="text"
 						className="border-b-2 border-teal-500 focus:outline-none px-2 w-48 bg-transparent"
 						placeholder="phone (optional)"
 						name="phone"
