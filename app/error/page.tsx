@@ -10,22 +10,39 @@ export default function ErrorPage({
 }) {
 	const message = searchParams.message;
 
+	const getErrorContent = () => {
+		switch (message) {
+			case "account_not_found":
+				return {
+					title: "Account Not Found",
+					description: "Please create an account first to sign in.",
+					showCreateAccount: true,
+				};
+			case "invalid_user_type":
+				return {
+					title: "Invalid User Type",
+					description: "Your account type is invalid. Please sign up again with a valid user type.",
+					showCreateAccount: true,
+				};
+			default:
+				return {
+					title: "An Error Occurred",
+					description: "Something went wrong. Please try again.",
+					showCreateAccount: false,
+				};
+		}
+	};
+
+	const errorContent = getErrorContent();
+
 	return (
 		<div className="flex flex-col items-center justify-center min-h-screen p-4">
 			<div className="text-center space-y-4">
 				<Animation animationData={animationData} />
-				<h1 className="text-2xl font-bold">
-					{message === "account_not_found"
-						? "Account Not Found"
-						: "An Error Occurred"}
-				</h1>
-				<p className="text-muted-foreground">
-					{message === "account_not_found"
-						? "Please create an account first to sign in."
-						: "Something went wrong. Please try again."}
-				</p>
+				<h1 className="text-2xl font-bold">{errorContent.title}</h1>
+				<p className="text-muted-foreground">{errorContent.description}</p>
 				<div className="space-x-4">
-					{message === "account_not_found" && (
+					{errorContent.showCreateAccount && (
 						<Button asChild>
 							<Link href="/signup">Create Account</Link>
 						</Button>
