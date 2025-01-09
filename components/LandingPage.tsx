@@ -97,7 +97,9 @@ export function LandingPage() {
 										</DialogContent>
 									</Dialog>
 									<Link
-										href={isAuthenticated ? "/dashboard" : "/signin"}
+										href={
+											isAuthenticated ? "/dashboard" : "https://app.sautisalama.org/signin"
+										}
 										className="min-w-full sm:min-w-[60%]"
 									>
 										<Button

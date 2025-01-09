@@ -7,12 +7,18 @@ import { signOut } from "@/app/(auth)/actions/auth";
 import SurvivorView from "./_views/SurvivorView";
 import ProfessionalView from "./_views/ProfessionalView";
 import { MainSidebar } from "./_views/MainSidebar";
+import ChooseUser from "./_views/ChooseUser";
 
 export default async function Dashboard() {
 	const user = await getUser();
 
 	if (!user) {
 		redirect("/signin");
+	}
+
+	// If user exists but has no user_type, show the ChooseUser component
+	if (!user.user_type) {
+		return <ChooseUser />;
 	}
 
 	return (
@@ -26,10 +32,12 @@ export default async function Dashboard() {
 			<div className="flex-1 overflow-auto md:ml-[72px]">
 				{user.user_type === "survivor" ? (
 					<SurvivorView userId={user.id} profileDetails={user} />
-				) : user.user_type === "professional" ? (
+				) : user.user_type === "professional" || user.user_type === "ngo" ? (
 					<ProfessionalView userId={user.id} profileDetails={user} />
+				) : user.user_type === null ? (
+					<ChooseUser />
 				) : (
-					<p>Invalid user type</p>
+					redirect("/error?message=Invalid user type")
 				)}
 			</div>
 		</div>

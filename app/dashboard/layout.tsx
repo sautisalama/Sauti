@@ -13,6 +13,7 @@ export default async function DashboardLayout({
 		redirect("/signin");
 	}
 
+
 	return (
 		<div className="flex">
 			<MainSidebar />
