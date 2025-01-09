@@ -10,8 +10,9 @@ export default async function DashboardLayout({
 	const user = await getUser();
 
 	if (!user) {
-		redirect("https://app.sautisalama.org/signin");
+		redirect("/signin");
 	}
+
 
 	return (
 		<div className="flex">
