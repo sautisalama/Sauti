@@ -2,7 +2,6 @@ import { Button } from "@/components/ui/button";
 import { Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Database } from "@/types/db-schema";
-import { Report, MatchedService } from "@/types/reports";
 
 type BaseProps = {
 	reportId: string;
