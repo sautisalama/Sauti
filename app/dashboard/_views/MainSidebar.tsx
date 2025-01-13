@@ -169,6 +169,10 @@ export function MainSidebar() {
 						<Tooltip>
 							<TooltipTrigger>
 								<Avatar className="h-8 w-8 bg-gradient-to-br from-emerald-400 via-teal-400 to-cyan-400">
+									<AvatarImage
+										src={user?.profile?.avatar_url || ""}
+										alt={user?.email || "User avatar"}
+									/>
 									<AvatarFallback className="text-white font-medium bg-gradient-to-br from-purple-400 via-fuchsia-400 to-pink-400">
 										{user?.email?.[0].toUpperCase() || "?"}
 									</AvatarFallback>
@@ -213,6 +217,10 @@ export function MainSidebar() {
 							<Tooltip>
 								<TooltipTrigger>
 									<Avatar className="h-8 w-8 bg-gradient-to-br from-emerald-400 via-teal-400 to-cyan-400">
+										<AvatarImage
+											src={user?.profile?.avatar_url || ""}
+											alt={user?.email || "User avatar"}
+										/>
 										<AvatarFallback className="text-white font-medium bg-gradient-to-br from-emerald-500 via-teal-500 to-cyan-500">
 											{user?.email?.[0].toUpperCase() || "?"}
 										</AvatarFallback>
