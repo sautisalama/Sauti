@@ -30,7 +30,7 @@ export async function POST(request: Request) {
 			submission_timestamp: formData.submission_timestamp,
 			// Initialize match-related fields
 			ismatched: false,
-			match_status: "pending",
+			match_status: "pending" as Database["public"]["Enums"]["match_status_type"],
 			email: formData.email,
 		};
 
