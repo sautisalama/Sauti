@@ -4,7 +4,12 @@ import { useEffect, useState } from "react";
 import { Button } from "./ui/button";
 import { Toast } from "./ui/toast";
 
-export function PWAInstallPrompt() {
+export type PWAInstallHandlers = {
+  showInstallPrompt: boolean;
+  handleInstallClick: () => Promise<void>;
+};
+
+export function PWAInstallPrompt({ onHandlersReady }: { onHandlersReady?: (handlers: PWAInstallHandlers) => void } = {}) {
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [showInstallPrompt, setShowInstallPrompt] = useState(false);
 
@@ -22,6 +27,16 @@ export function PWAInstallPrompt() {
 
     return () => window.removeEventListener('beforeinstallprompt', handler);
   }, []);
+
+  useEffect(() => {
+    // Expose handlers to parent components
+    if (onHandlersReady) {
+      onHandlersReady({
+        showInstallPrompt,
+        handleInstallClick
+      });
+    }
+  }, [showInstallPrompt]);
 
   const handleInstallClick = async () => {
     if (!deferredPrompt) return;

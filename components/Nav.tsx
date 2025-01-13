@@ -16,12 +16,16 @@ import {
 import ReportAbuseForm from "./ReportAbuseForm";
 import { useEffect, useState } from "react";
 import { createClient } from "@/utils/supabase/client";
+import { PWAInstallPrompt, type PWAInstallHandlers } from "./PWAInstallPrompt";
 
 export function Nav() {
 	const pathname = usePathname();
 	const [isAuthenticated, setIsAuthenticated] = useState(false);
 	const supabase = createClient();
 	const [dialogOpen, setDialogOpen] = useState(false);
+	const [pwaHandlers, setPwaHandlers] = useState<PWAInstallHandlers | null>(
+		null
+	);
 
 	useEffect(() => {
 		const checkAuth = async () => {
@@ -41,7 +45,7 @@ export function Nav() {
 		});
 
 		return () => subscription.unsubscribe();
-	}, []);
+	}, [supabase]);
 
 	// Helper function to determine if link is active
 	const isActive = (path: string) => pathname === path;
@@ -182,9 +186,23 @@ export function Nav() {
 								</Button>
 							</Link>
 						)}
+
+						{pwaHandlers?.showInstallPrompt && (
+							<Button
+								variant="default"
+								onClick={pwaHandlers.handleInstallClick}
+								className="mt-auto"
+							>
+								<div className="flex items-center justify-between gap-2">
+									Install App <Package2 className="h-4 w-4" />
+								</div>
+							</Button>
+						)}
 					</nav>
 				</SheetContent>
 			</Sheet>
+
+			<PWAInstallPrompt onHandlersReady={setPwaHandlers} />
 
 			{/* <div className="flex w-full items-center gap-4 md:ml-auto md:gap-2 lg:gap-4">
 				<form className="ml-auto flex-1 sm:flex-initial">
