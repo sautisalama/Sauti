@@ -58,12 +58,12 @@ export async function POST(request: Request) {
 				})
 				.eq("id", matchId),
 
-			// Update report match_status and isMatched
+			// Update report match_status and ismatched
 			supabase
 				.from("reports")
 				.update({
 					match_status: "accepted",
-					isMatched: true,
+					ismatched: true
 				})
 				.eq("report_id", matchData.reports.report_id),
 		]);

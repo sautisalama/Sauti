@@ -74,7 +74,9 @@ export type Database = {
           notes: string | null
           report_id: string | null
           service_id: string | null
-          support_service: string | null
+          support_service:
+            | Database["public"]["Enums"]["support_service_type"]
+            | null
           survivor_id: string | null
           updated_at: string | null
         }
@@ -90,7 +92,9 @@ export type Database = {
           notes?: string | null
           report_id?: string | null
           service_id?: string | null
-          support_service?: string | null
+          support_service?:
+            | Database["public"]["Enums"]["support_service_type"]
+            | null
           survivor_id?: string | null
           updated_at?: string | null
         }
@@ -106,7 +110,9 @@ export type Database = {
           notes?: string | null
           report_id?: string | null
           service_id?: string | null
-          support_service?: string | null
+          support_service?:
+            | Database["public"]["Enums"]["support_service_type"]
+            | null
           survivor_id?: string | null
           updated_at?: string | null
         }
@@ -136,7 +142,9 @@ export type Database = {
       }
       profiles: {
         Row: {
+          avatar_url: string | null
           created_at: string | null
+          email: string | null
           first_name: string | null
           id: string
           last_name: string | null
@@ -144,15 +152,19 @@ export type Database = {
           user_type: Database["public"]["Enums"]["user_type"] | null
         }
         Insert: {
+          avatar_url?: string | null
           created_at?: string | null
+          email?: string | null
           first_name?: string | null
-          id: string
+          id?: string
           last_name?: string | null
           updated_at?: string | null
           user_type?: Database["public"]["Enums"]["user_type"] | null
         }
         Update: {
+          avatar_url?: string | null
           created_at?: string | null
+          email?: string | null
           first_name?: string | null
           id?: string
           last_name?: string | null
@@ -179,7 +191,7 @@ export type Database = {
           first_name: string
           gender: Database["public"]["Enums"]["gender_type"] | null
           incident_description: string | null
-          isMatched: boolean | null
+          ismatched: boolean | null
           last_name: string | null
           latitude: number | null
           locality: string | null
@@ -222,7 +234,7 @@ export type Database = {
           first_name: string
           gender?: Database["public"]["Enums"]["gender_type"] | null
           incident_description?: string | null
-          isMatched?: boolean | null
+          ismatched?: boolean | null
           last_name?: string | null
           latitude?: number | null
           locality?: string | null
@@ -265,7 +277,7 @@ export type Database = {
           first_name?: string
           gender?: Database["public"]["Enums"]["gender_type"] | null
           incident_description?: string | null
-          isMatched?: boolean | null
+          ismatched?: boolean | null
           last_name?: string | null
           latitude?: number | null
           locality?: string | null

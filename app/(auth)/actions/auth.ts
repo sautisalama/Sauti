@@ -119,6 +119,8 @@ export async function signOut() {
 	if (error) {
 		return { error: error.message };
 	}
-	// Add redirect after successful signout
+	
+	// Revalidate all pages before redirect
+	revalidatePath("/", "layout");
 	redirect("/");
 }

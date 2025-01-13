@@ -15,7 +15,13 @@ export async function POST(request: Request) {
 
 		// Transform the data to match the database schema
 		const reportData: TablesInsert<"reports"> = {
-			first_name: formData.first_name || "Anonymous",
+			first_name: formData.user_id ? 
+				(await supabase
+					.from('profiles')
+					.select('first_name')
+					.eq('id', formData.user_id)
+					.single()
+				).data?.first_name || "Anonymous" : "Anonymous",
 			last_name: formData.last_name || null,
 			user_id: formData.user_id,
 			phone: formData.phone,
@@ -29,7 +35,7 @@ export async function POST(request: Request) {
 			longitude: formData.longitude,
 			submission_timestamp: formData.submission_timestamp,
 			// Initialize match-related fields
-			isMatched: false,
+			ismatched: false,
 			match_status: "pending",
 		};
 
@@ -99,7 +105,7 @@ export async function POST(request: Request) {
 export type ReportFormData = Omit<
 	TablesInsert<"reports">,
 	| "report_id"
-	| "isMatched"
+	| "ismatched"
 	| "match_status"
 	| "administrative"
 	| "location"
