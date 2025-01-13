@@ -97,7 +97,7 @@ export async function signInWithGoogle() {
 			redirectTo: `${redirectUrl}/api/auth/callback`,
 			queryParams: {
 				access_type: "offline",
-				prompt: "consent",
+				// prompt: "consent",
 			},
 		},
 	});
@@ -119,7 +119,7 @@ export async function signOut() {
 	if (error) {
 		return { error: error.message };
 	}
-	
+
 	// Revalidate all pages before redirect
 	revalidatePath("/", "layout");
 	redirect("/");
