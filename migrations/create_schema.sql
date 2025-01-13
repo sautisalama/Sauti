@@ -38,6 +38,7 @@ CREATE TABLE profiles (
     first_name TEXT,
     last_name TEXT,
     email TEXT,
+    avatar_url TEXT,
     user_type user_type,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
@@ -157,55 +158,52 @@ CREATE TRIGGER update_matched_services_updated_at
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
 
--- Create the trigger functions for user management
-CREATE OR REPLACE FUNCTION handle_new_email_user()
-RETURNS TRIGGER AS $$
-BEGIN
-    INSERT INTO public.profiles (id, first_name, last_name, user_type, email)
-    VALUES (
-        NEW.id,
-        NEW.raw_user_meta_data->>'firstName',
-        NEW.raw_user_meta_data->>'lastName',
-        (NEW.raw_user_meta_data->>'userType')::public.user_type,
-        NEW.email
+
+-- Function to handle both OAuth and email/password signup
+create or replace function public.handle_new_user() 
+returns trigger as $$
+declare
+    name_parts text[];
+    first_name_val text;
+    last_name_val text;
+begin
+    -- Check if user signed up with OAuth (Google)
+    if new.raw_user_meta_data->>'name' is not null then
+        -- OAuth signup - split name into parts
+        name_parts := string_to_array(new.raw_user_meta_data->>'name', ' ');
+        first_name_val := name_parts[1];
+        last_name_val := array_to_string(name_parts[2:array_length(name_parts, 1)], ' ');
+    else
+        -- Email signup - use provided first_name and last_name
+        first_name_val := new.raw_user_meta_data->>'first_name';
+        last_name_val := new.raw_user_meta_data->>'last_name';
+    end if;
+
+    insert into public.profiles (
+        id,
+        first_name,
+        last_name,
+        email,
+        avatar_url,
+        created_at
+    )
+    values (
+        new.id,
+        first_name_val,
+        last_name_val,
+        new.email,
+        coalesce(new.raw_user_meta_data->>'avatar_url', null), -- Will be null for email signup
+        new.created_at
     );
-    RETURN NEW;
-END;
+    return new;
+end;
 $$ language plpgsql security definer;
 
-CREATE OR REPLACE FUNCTION handle_new_google_user()
-RETURNS TRIGGER AS $$
-BEGIN
-    -- Only proceed with Google OAuth users
-    IF EXISTS (
-        SELECT 1 
-        FROM jsonb_array_elements(NEW.identities) 
-        WHERE value->>'provider' = 'google'
-        ) THEN
-        INSERT INTO public.profiles (id, first_name, last_name, user_type, email)
-        VALUES (
-            NEW.id,
-            (NEW.identities->0->>'identity_data')::jsonb->>'given_name',
-            (NEW.identities->0->>'identity_data')::jsonb->>'family_name',
-            (NEW.raw_user_meta_data->>'userType')::public.user_type,
-            (NEW.identities->0->>'identity_data')::jsonb->>'email'
-        );
-        END IF;
-        RETURN NEW;
-END;
-$$ language plpgsql security definer;
+-- Create a trigger that runs after a user signs up
+create or replace trigger on_auth_user_created
+    after insert on auth.users
+    for each row execute procedure public.handle_new_user();
 
--- Create the triggers in the auth schema
-CREATE TRIGGER on_auth_user_created_email
-    AFTER INSERT ON auth.users
-    FOR EACH ROW
-    WHEN (NEW.email IS NOT NULL AND NEW.raw_user_meta_data->>'provider' = 'email')
-    EXECUTE FUNCTION handle_new_email_user();
-
-CREATE TRIGGER on_auth_user_created_google
-    AFTER INSERT ON auth.users
-    FOR EACH ROW
-    EXECUTE FUNCTION handle_new_google_user();
 
 -- Enable realtime for all tables
 ALTER TABLE profiles REPLICA IDENTITY FULL;
