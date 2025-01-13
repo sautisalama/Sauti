@@ -8,6 +8,8 @@ import SurvivorView from "./_views/SurvivorView";
 import ProfessionalView from "./_views/ProfessionalView";
 import { MainSidebar } from "./_views/MainSidebar";
 import ChooseUser from "./_views/ChooseUser";
+import { useUser } from "@/hooks/useUser";
+import { ChatComponent } from "./chat/_components/Chat";
 
 export default async function Dashboard() {
 	const user = await getUser();
@@ -39,6 +41,10 @@ export default async function Dashboard() {
 				) : (
 					redirect("/error?message=Invalid user type")
 				)}
+				<ChatComponent
+					userId={user.id}
+					username={user.first_name || user.id.slice(0, 8)}
+				/>
 			</div>
 		</div>
 	);
