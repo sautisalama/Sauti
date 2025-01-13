@@ -62,23 +62,15 @@ export async function matchReportWithServices(reportId: string) {
 			throw new Error("Failed to fetch support services");
 		}
 
-		const requiredServices = Array.isArray(report.required_services)
-			? report.required_services
-			: [];
+		// Ensure required_services is properly typed and handled
+		const requiredServices = (report.required_services as string[]) || [];
 
-		
-
-		// First, filter services by type match
+		// First, filter services by type match - updated to handle enum type
 		const matchingServices = services.filter((service) => {
-			const serviceTypes = service.service_types
-				.split(",")
-				.map((s: string) => s.trim().toLowerCase());
-			return requiredServices.some((required: string) =>
-				serviceTypes.includes(required.toLowerCase())
-			);
+			// Handle the enum type properly - it's not a comma-separated string
+			const serviceType = service.service_types;
+			return requiredServices.some((required: string) => serviceType === required);
 		});
-
-		
 
 		// Then, calculate distances for matching services
 		const servicesWithDistances = matchingServices.map((service) => {
@@ -96,8 +88,7 @@ export async function matchReportWithServices(reportId: string) {
 					service.latitude,
 					service.longitude
 				);
-				
-			} 
+			}
 
 			return {
 				service,
@@ -110,20 +101,33 @@ export async function matchReportWithServices(reportId: string) {
 			.sort((a, b) => a.distance - b.distance)
 			.slice(0, 5);
 
-
-		// Insert matches into matched_services table
+		// Update the report's match status
 		if (closestMatches.length > 0) {
+			const { error: updateError } = await supabase
+				.from("reports")
+				.update({
+					ismatched: true,
+					match_status:
+						"pending" as Database["public"]["Enums"]["match_status_type"],
+				})
+				.eq("report_id", reportId);
+
+			if (updateError) {
+				console.error("Report update error:", updateError);
+			}
+
 			const matches = closestMatches.map((match) => ({
 				report_id: reportId,
 				service_id: match.service.id,
 				match_date: new Date().toISOString(),
 				match_score:
 					match.distance === Infinity ? 0 : 100 - Math.min(match.distance, 100),
-				match_status_type: "pending",
+				match_status_type:
+					"pending" as Database["public"]["Enums"]["match_status_type"],
 				description: report.incident_description,
 				feedback: null,
 				notes: null,
-				support_service: match.service.name,
+				support_service: match.service.service_types, // Use the enum type directly
 				survivor_id: report.user_id,
 				updated_at: new Date().toISOString(),
 			}));
@@ -136,7 +140,7 @@ export async function matchReportWithServices(reportId: string) {
 				console.error("Match insert error:", matchError);
 				throw new Error("Failed to insert matches");
 			}
-		} 
+		}
 
 		return closestMatches;
 	} catch (error) {

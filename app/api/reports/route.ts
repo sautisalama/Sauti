@@ -15,13 +15,7 @@ export async function POST(request: Request) {
 
 		// Transform the data to match the database schema
 		const reportData: TablesInsert<"reports"> = {
-			first_name: formData.user_id ? 
-				(await supabase
-					.from('profiles')
-					.select('first_name')
-					.eq('id', formData.user_id)
-					.single()
-				).data?.first_name || "Anonymous" : "Anonymous",
+			first_name: formData.first_name || "Anonymous",
 			last_name: formData.last_name || null,
 			user_id: formData.user_id,
 			phone: formData.phone,
@@ -36,7 +30,8 @@ export async function POST(request: Request) {
 			submission_timestamp: formData.submission_timestamp,
 			// Initialize match-related fields
 			ismatched: false,
-			match_status: "pending",
+			match_status: "pending" as Database["public"]["Enums"]["match_status_type"],
+			email: formData.email,
 		};
 
 		const { error: supabaseError, data: insertedReport } = await supabase
@@ -90,9 +85,9 @@ export async function POST(request: Request) {
 	} catch (error) {
 		console.error("Error submitting report:", error);
 		return new NextResponse(
-			JSON.stringify({ 
+			JSON.stringify({
 				error: "Failed to submit report",
-				details: error instanceof Error ? error.message : String(error)
+				details: error instanceof Error ? error.message : String(error),
 			}),
 			{
 				status: 500,

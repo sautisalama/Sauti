@@ -11,17 +11,16 @@ import {
 	SUPPORT_SERVICE_OPTIONS,
 	type SupportServiceType,
 } from "@/lib/constants";
+import { useUser } from "@/hooks/useUser";
 
 interface AuthenticatedReportAbuseFormProps {
 	onClose: () => void;
 	userId: string;
-	userProfile?: Tables<"profiles">;
 }
 
 export default function AuthenticatedReportAbuseForm({
 	onClose,
 	userId,
-	userProfile,
 }: AuthenticatedReportAbuseFormProps) {
 	const { toast } = useToast();
 	const [loading, setLoading] = useState(false);
@@ -31,6 +30,7 @@ export default function AuthenticatedReportAbuseForm({
 		longitude: number;
 	} | null>(null);
 	const supabase = createClient();
+	const user = useUser();
 
 	useEffect(() => {
 		if ("geolocation" in navigator) {
@@ -78,8 +78,8 @@ export default function AuthenticatedReportAbuseForm({
 		}
 
 		const data = {
-			first_name: userProfile?.first_name,
-			last_name: userProfile?.last_name || null,
+			first_name: user?.profile?.first_name,
+			last_name: user?.profile?.last_name || null,
 			user_id: userId,
 			phone: phone,
 			type_of_incident: formData.get("incident_type"),
@@ -91,6 +91,7 @@ export default function AuthenticatedReportAbuseForm({
 			latitude: location?.latitude || null,
 			longitude: location?.longitude || null,
 			submission_timestamp: new Date().toISOString(),
+			email: user?.profile?.email || null,
 		};
 
 		try {
