@@ -9,7 +9,7 @@ export async function checkUnmatchedReports() {
 		const { data: unmatchedReports, error } = await supabase
 			.from("reports")
 			.select("report_id")
-			.eq("isMatched", false);
+			.eq("ismatched", false);
 
 		if (error) throw error;
 

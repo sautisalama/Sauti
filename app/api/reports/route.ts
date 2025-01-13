@@ -29,7 +29,7 @@ export async function POST(request: Request) {
 			longitude: formData.longitude,
 			submission_timestamp: formData.submission_timestamp,
 			// Initialize match-related fields
-			isMatched: false,
+			ismatched: false,
 			match_status: "pending",
 		};
 
@@ -99,7 +99,7 @@ export async function POST(request: Request) {
 export type ReportFormData = Omit<
 	TablesInsert<"reports">,
 	| "report_id"
-	| "isMatched"
+	| "ismatched"
 	| "match_status"
 	| "administrative"
 	| "location"

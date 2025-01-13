@@ -83,7 +83,7 @@ export async function deleteReport(reportId: string) {
 // 			.insert([
 // 				{
 // 					...reportData,
-// 					isMatched: false,
+// 					ismatched: false,
 // 					submission_timestamp: new Date().toISOString(),
 // 				},
 // 			])

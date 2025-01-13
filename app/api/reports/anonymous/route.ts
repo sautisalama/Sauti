@@ -30,7 +30,7 @@ export async function POST(request: Request) {
             latitude: formData.latitude || null,
             longitude: formData.longitude || null,
             submission_timestamp: formData.submission_timestamp,
-            isMatched: false,
+            ismatched: false,
             match_status: "pending",
             user_id: null
         };

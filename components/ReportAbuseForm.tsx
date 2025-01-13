@@ -81,7 +81,7 @@ export default function ReportAbuseForm({ onClose }: { onClose?: () => void }) {
 				submission_timestamp: new Date().toISOString(),
 
 				// Required fields with default values
-				isMatched: false,
+				ismatched: false,
 				match_status: "pending",
 
 				// Optional fields set to null

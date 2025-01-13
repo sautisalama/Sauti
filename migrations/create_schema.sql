@@ -77,7 +77,7 @@ CREATE TABLE reports (
     required_services JSONB,
     additional_info TEXT,
     support_services support_service_type,
-    isMatched BOOLEAN DEFAULT FALSE,
+    ismatched BOOLEAN DEFAULT FALSE,
     match_status match_status_type,
     submission_timestamp TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
