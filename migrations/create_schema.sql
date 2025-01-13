@@ -34,7 +34,7 @@ END $$;
 
 -- Create Tables
 CREATE TABLE profiles (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
     first_name TEXT,
     last_name TEXT,
     email TEXT,
@@ -46,7 +46,7 @@ CREATE TABLE profiles (
 
 CREATE TABLE reports (
     report_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID REFERENCES profiles(id),
+    user_id UUID REFERENCES profiles(id) ON DELETE CASCADE,
     first_name TEXT NOT NULL,
     last_name TEXT,
     email TEXT,
@@ -84,7 +84,7 @@ CREATE TABLE reports (
 
 CREATE TABLE support_services (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID REFERENCES profiles(id),
+    user_id UUID REFERENCES profiles(id) ON DELETE CASCADE,
     name TEXT NOT NULL,
     service_types support_service_type NOT NULL,
     email TEXT,
@@ -101,9 +101,9 @@ CREATE TABLE support_services (
 
 CREATE TABLE matched_services (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    survivor_id UUID REFERENCES profiles(id),
-    report_id UUID REFERENCES reports(report_id),
-    service_id UUID REFERENCES support_services(id),
+    survivor_id UUID REFERENCES profiles(id) ON DELETE CASCADE,
+    report_id UUID REFERENCES reports(report_id) ON DELETE CASCADE,
+    service_id UUID REFERENCES support_services(id) ON DELETE CASCADE,
     support_service support_service_type,
     match_score DECIMAL,
     match_status_type match_status_type,
@@ -116,9 +116,9 @@ CREATE TABLE matched_services (
 
 CREATE TABLE appointments (
     appointment_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    survivor_id UUID REFERENCES profiles(id),
-    professional_id UUID REFERENCES profiles(id),
-    matched_services UUID REFERENCES matched_services(id),
+    survivor_id UUID REFERENCES profiles(id) ON DELETE CASCADE,
+    professional_id UUID REFERENCES profiles(id) ON DELETE CASCADE,
+    matched_services UUID REFERENCES matched_services(id) ON DELETE CASCADE,
     appointment_date TIMESTAMP WITH TIME ZONE,
     status appointment_status_type,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
