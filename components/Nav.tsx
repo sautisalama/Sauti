@@ -26,6 +26,7 @@ export function Nav() {
 	const [pwaHandlers, setPwaHandlers] = useState<PWAInstallHandlers | null>(
 		null
 	);
+	const url = process.env.NEXT_PUBLIC_APP_URL!;
 
 	useEffect(() => {
 		const checkAuth = async () => {
@@ -107,7 +108,7 @@ export function Nav() {
 							</Button>
 						</Link>
 					) : (
-						<Link href="https://app.sautisalama.org/signin">
+						<Link href={`${url}/signin`}>
 							<Button variant="default">
 								<div className="flex items-center justify-between gap-2">
 									Sign In <MoveUpRight className="h-4 w-4" />
@@ -178,7 +179,7 @@ export function Nav() {
 								</Button>
 							</Link>
 						) : (
-							<Link href="https://app.sautisalama.org/signin">
+							<Link href={`${url}/signin`}>
 								<Button variant="default">
 									<div className="flex items-center justify-between gap-2">
 										Sign In <MoveUpRight className="h-4 w-4" />
