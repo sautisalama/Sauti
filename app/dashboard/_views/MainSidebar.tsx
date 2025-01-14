@@ -169,11 +169,7 @@ export function MainSidebar() {
 					<TooltipProvider>
 						<Tooltip>
 							<TooltipTrigger>
-								<UserAvatar
-									userId={user?.id || ""}
-									avatarUrl={user?.profile?.avatar_url || ""}
-									className="h-10 w-10"
-								/>
+								<UserAvatar userId={user?.id || ""} email={user?.email || ""} />
 							</TooltipTrigger>
 							<TooltipContent>
 								<p>{user?.email || "No email available"}</p>
