@@ -38,6 +38,7 @@ export function LandingPage() {
 	const [isAuthenticated, setIsAuthenticated] = useState(false);
 	const [dialogOpen, setDialogOpen] = useState(false);
 	const supabase = createClient();
+	const url = process.env.NEXT_PUBLIC_APP_URL!;
 
 	useEffect(() => {
 		const checkAuth = async () => {
@@ -98,7 +99,7 @@ export function LandingPage() {
 									</Dialog>
 									<Link
 										href={
-											isAuthenticated ? "/dashboard" : "https://app.sautisalama.org/signin"
+											isAuthenticated ? "/dashboard" : `${url}/signin`
 										}
 										className="min-w-full sm:min-w-[60%]"
 									>
@@ -220,7 +221,7 @@ export function LandingPage() {
 								Information resources, professional resouces and a community. Ready to
 								find your voice? Join the Sauti Salama Community.
 							</h1>
-							<Link href="https://app.sautisalama.org/signin">
+							<Link href={`${url}/signin`}>
 								<Button
 									variant="default"
 									className="bg-landing max-w-full md:max-w-[20%] text-sauti-black hover:text-landing"
