@@ -37,6 +37,7 @@ import {
 	TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { useUser } from "@/hooks/useUser";
+import { UserAvatar } from "@/app/components/UserAvatar";
 
 const navigation = [
 	{
@@ -168,15 +169,11 @@ export function MainSidebar() {
 					<TooltipProvider>
 						<Tooltip>
 							<TooltipTrigger>
-								<Avatar className="h-8 w-8 bg-gradient-to-br from-emerald-400 via-teal-400 to-cyan-400">
-									<AvatarImage
-										src={user?.profile?.avatar_url || ""}
-										alt={user?.email || "User avatar"}
-									/>
-									<AvatarFallback className="text-white font-medium bg-gradient-to-br from-purple-400 via-fuchsia-400 to-pink-400">
-										{user?.email?.[0].toUpperCase() || "?"}
-									</AvatarFallback>
-								</Avatar>
+								<UserAvatar
+									userId={user?.id || ""}
+									avatarUrl={user?.profile?.avatar_url || ""}
+									className="h-10 w-10"
+								/>
 							</TooltipTrigger>
 							<TooltipContent>
 								<p>{user?.email || "No email available"}</p>
