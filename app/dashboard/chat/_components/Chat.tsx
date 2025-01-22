@@ -23,6 +23,7 @@ interface ChatComponentProps {
 export function ChatComponent({ userId, username }: ChatComponentProps) {
 	const [client, setClient] = useState<StreamChat | null>(null);
 	const [channel, setChannel] = useState<StreamChannel | null>(null);
+	const [isLoading, setIsLoading] = useState(true);
 
 	useEffect(() => {
 		const initChat = async () => {
@@ -43,33 +44,29 @@ export function ChatComponent({ userId, username }: ChatComponentProps) {
 					{
 						id: userId,
 						name: username,
+						role: "user",
 					},
 					token
 				);
 
 				const channel = streamClient.channel("messaging", "general", {
 					name: "General",
-					created_by_id: userId,
-					members: [],
+					members: [userId],
 					configs: {
 						replies: true,
 						typing_events: true,
 						read_events: true,
 						connect_events: true,
 					},
-					permissions: {
-						"read-channel": ["*"],
-						"write-channel": ["*"],
-						"send-message": ["*"],
-						"read-messages": ["*"],
-					},
 				});
 
 				await channel.watch();
 				setChannel(channel);
 				setClient(streamClient);
+				setIsLoading(false);
 			} catch (error) {
 				console.error("Error initializing chat:", error);
+				setIsLoading(false);
 			}
 		};
 
@@ -80,9 +77,9 @@ export function ChatComponent({ userId, username }: ChatComponentProps) {
 				client.disconnectUser();
 			}
 		};
-	}, [userId, username, client]);
+	}, [userId, username, isLoading, client, channel]);
 
-	if (!client || !channel) {
+	if (isLoading || !client || !channel) {
 		return (
 			<div className="flex flex-col items-center justify-center min-h-screen p-4">
 				<div className="text-center space-y-4">

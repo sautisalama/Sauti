@@ -16,8 +16,13 @@ export async function GET() {
 
 		const streamClient = StreamChat.getInstance(
 			process.env.NEXT_PUBLIC_STREAM_KEY!,
-			process.env.STREAM_CHAT_SECRET
+			process.env.STREAM_CHAT_SECRET!
 		);
+
+		await streamClient.upsertUser({
+			id: session.user.id,
+			role: "user",
+		});
 
 		const token = streamClient.createToken(session.user.id);
 
