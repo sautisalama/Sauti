@@ -27,15 +27,28 @@ export async function GET() {
 			.single();
 
 		// Create or update the Stream user
-		await streamClient.upsertUser({
-			id: session.user.id,
-			name: profile?.first_name || session.user.id,
-			role: "user",
-		});
+		try {
+			await streamClient.upsertUser({
+				id: session.user.id,
+				name: profile?.first_name || session.user.id,
+				role: "user",
+			});
 
-		const token = streamClient.createToken(session.user.id);
-
-		return NextResponse.json({ token });
+			const token = streamClient.createToken(session.user.id);
+			return NextResponse.json({ token });
+		} catch (error: any) {
+			// Check if it's a rate limit error
+			if (error.response?.status === 429) {
+				return NextResponse.json(
+					{
+						error: "Too many connection attempts. Please wait a moment before trying again.",
+						retryAfter: error.response.headers.get("retry-after") || 60,
+					},
+					{ status: 429 }
+				);
+			}
+			throw error;
+		}
 	} catch (error) {
 		console.error("Error generating stream token:", error);
 		return NextResponse.json(
