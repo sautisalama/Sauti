@@ -45,7 +45,7 @@ export default function ChooseUser() {
 	return (
 		<div className="container mx-auto px-4 py-8">
 			<div className="max-w-2xl mx-auto">
-				<h1 className="text-2xl font-bold text-center my-8 text-[#143A43]">
+				<h1 className="text-2xl font-bold text-center mt-14 sm:mt-8 mb-8 text-[#143A43]">
 					Choose Your Role
 				</h1>
 
@@ -59,17 +59,23 @@ export default function ChooseUser() {
 						}`}
 						onClick={() => setSelectedType("survivor")}
 					>
-						<div className="aspect-square relative mb-1 sm:mb-2 flex justify-center items-center">
-							<Image
-								src="/icons/survivor-light.png"
-								alt="Survivor"
-								className="object-contain"
-								height={120}
-								width={120}
-							/>
+						<div className="flex flex-row sm:flex-col items-center gap-4 sm:gap-0">
+							<div className="w-20 sm:w-full aspect-square relative flex justify-center items-center">
+								<Image
+									src="/icons/survivor-light.png"
+									alt="Survivor"
+									className="object-contain"
+									height={120}
+									width={120}
+								/>
+							</div>
+							<div className="flex-1 sm:w-full">
+								<h3 className="font-semibold text-left sm:text-center">Survivor</h3>
+								<p className="text-sm text-gray-600 text-left sm:text-center">
+									Seeking support and resources
+								</p>
+							</div>
 						</div>
-						<h3 className="font-semibold">Survivor</h3>
-						<p className="text-sm text-gray-600">Seeking support and resources</p>
 					</div>
 
 					{/* Professional Tile */}
@@ -81,17 +87,23 @@ export default function ChooseUser() {
 						}`}
 						onClick={() => setSelectedType("professional")}
 					>
-						<div className="aspect-square relative mb-2 sm:mb-4 flex justify-center items-center">
-							<Image
-								src="/icons/professional-light.png"
-								alt="Professional"
-								height={150}
-								width={150}
-								className="object-contain"
-							/>
+						<div className="flex flex-row sm:flex-col items-center gap-4 sm:gap-0">
+							<div className="w-20 sm:w-full aspect-square relative flex justify-center items-center">
+								<Image
+									src="/icons/professional-light.png"
+									alt="Professional"
+									height={150}
+									width={150}
+									className="object-contain"
+								/>
+							</div>
+							<div className="flex-1 sm:w-full">
+								<h3 className="font-semibold text-left sm:text-center">Professional</h3>
+								<p className="text-sm text-gray-600 text-left sm:text-center">
+									Providing expert support
+								</p>
+							</div>
 						</div>
-						<h3 className="font-semibold">Professional</h3>
-						<p className="text-sm text-gray-600">Providing expert support</p>
 					</div>
 
 					{/* NGO Tile */}
@@ -103,17 +115,23 @@ export default function ChooseUser() {
 						}`}
 						onClick={() => setSelectedType("ngo")}
 					>
-						<div className="aspect-square relative mb-2 sm:mb-4 flex justify-center items-center">
-							<Image
-								src="/icons/ngo-light.png"
-								alt="NGO"
-								height={170}
-								width={170}
-								className="object-contain"
-							/>
+						<div className="flex flex-row sm:flex-col items-center gap-4 sm:gap-0">
+							<div className="w-20 sm:w-full aspect-square relative flex justify-center items-center">
+								<Image
+									src="/icons/ngo-light.png"
+									alt="NGO"
+									height={170}
+									width={170}
+									className="object-contain"
+								/>
+							</div>
+							<div className="flex-1 sm:w-full">
+								<h3 className="font-semibold text-left sm:text-center">NGO</h3>
+								<p className="text-sm text-gray-600 text-left sm:text-center">
+									Organization providing services
+								</p>
+							</div>
 						</div>
-						<h3 className="font-semibold">NGO</h3>
-						<p className="text-sm text-gray-600">Organization providing services</p>
 					</div>
 				</div>
 
