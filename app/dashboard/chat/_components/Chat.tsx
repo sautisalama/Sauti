@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import {
-	Chat,
+	Chat as StreamChat,
 	Channel,
 	ChannelHeader,
 	MessageInput,
@@ -10,64 +10,58 @@ import {
 	Thread,
 	Window,
 } from "stream-chat-react";
-import { StreamChat, Channel as StreamChannel } from "stream-chat";
+import { StreamChat as StreamChatClient } from "stream-chat";
+import { UserList } from "./UserList";
 import "stream-chat-react/dist/css/v2/index.css";
-import Animation from "@/components/LottieWrapper";
-import ChatAnimation from "@/public/lottie-animations/messages.json";
 
-interface ChatComponentProps {
-	userId: string;
+interface User {
+	id: string;
 	username: string;
 }
 
-export function ChatComponent({ userId, username }: ChatComponentProps) {
-	const [client, setClient] = useState<StreamChat | null>(null);
-	const [channel, setChannel] = useState<StreamChannel | null>(null);
-	const [isLoading, setIsLoading] = useState(true);
+export function ChatComponent({
+	userId,
+	username,
+}: {
+	userId: string;
+	username: string;
+}) {
+	const [client, setClient] = useState<StreamChatClient | null>(null);
+	const [channel, setChannel] = useState<any>(null);
+	const [users, setUsers] = useState<User[]>([]);
 
 	useEffect(() => {
 		const initChat = async () => {
-			try {
-				const response = await fetch("/api/stream/token", {
-					signal: AbortSignal.timeout(10000),
-				});
+			const response = await fetch("/api/stream/token");
+			const { token } = await response.json();
 
-				if (!response.ok) throw new Error("Failed to fetch token");
+			const streamClient = new StreamChatClient(
+				process.env.NEXT_PUBLIC_STREAM_KEY!,
+				{ timeout: 6000 }
+			);
 
-				const { token } = await response.json();
+			await streamClient.connectUser(
+				{
+					id: userId,
+					name: username,
+				},
+				token
+			);
 
-				const streamClient = StreamChat.getInstance(
-					process.env.NEXT_PUBLIC_STREAM_KEY!
-				);
+			// Fetch all users
+			const { users: userList } = await streamClient.queryUsers(
+				{ id: { $ne: userId } }, // Exclude current user
+				{ id: 1 }
+			);
 
-				await streamClient.connectUser(
-					{
-						id: userId,
-						name: username,
-						role: "user",
-					},
-					token
-				);
+			setUsers(
+				userList.map((user) => ({
+					id: user.id,
+					username: user.name || user.id,
+				}))
+			);
 
-				const channel = streamClient.channel("messaging", "general", {
-					name: "General",
-					members: [userId],
-					configs: {
-						replies: true,
-						typing_events: true,
-						read_events: true,
-						connect_events: true,
-					},
-				});
-
-				await channel.watch();
-				setChannel(channel);
-				setClient(streamClient);
-				setIsLoading(false);
-			} catch (error) {
-				console.error("Error initializing chat:", error);
-				setIsLoading(false);
-			}
+			setClient(streamClient);
 		};
 
 		initChat();
@@ -77,29 +71,47 @@ export function ChatComponent({ userId, username }: ChatComponentProps) {
 				client.disconnectUser();
 			}
 		};
-	}, [userId, username, isLoading, client, channel]);
+	}, [userId, username, client]);
 
-	if (isLoading || !client || !channel) {
-		return (
-			<div className="flex flex-col items-center justify-center min-h-screen p-4">
-				<div className="text-center space-y-4">
-					<Animation animationData={ChatAnimation} />
-					<p className="text-muted-foreground">Getting community chats...</p>
-				</div>
-			</div>
-		);
+	const startDirectMessage = async (otherUserId: string) => {
+		if (!client) return;
+
+		// Create a unique channel ID for the 1-on-1 chat
+		const channelId = [userId, otherUserId].sort().join("-");
+
+		const newChannel = client.channel("messaging", channelId, {
+			members: [userId, otherUserId],
+		});
+
+		await newChannel.create();
+		setChannel(newChannel);
+	};
+
+	if (!client) {
+		return <div>Loading...</div>;
 	}
 
 	return (
-		<Chat client={client} theme="messaging light">
-			<Channel channel={channel}>
-				<Window>
-					<ChannelHeader />
-					<MessageList />
-					<MessageInput />
-				</Window>
-				<Thread />
-			</Channel>
-		</Chat>
+		<div className="flex h-full">
+			<StreamChat client={client} theme="messaging light">
+				<div className="w-80 border-r border-gray-200">
+					<UserList users={users} onUserSelect={startDirectMessage} />
+				</div>
+				{channel ? (
+					<Channel channel={channel}>
+						<Window>
+							<ChannelHeader />
+							<MessageList />
+							<MessageInput />
+						</Window>
+						<Thread />
+					</Channel>
+				) : (
+					<div className="flex-1 flex items-center justify-center">
+						<p className="text-gray-500">Select a user to start chatting</p>
+					</div>
+				)}
+			</StreamChat>
+		</div>
 	);
 }

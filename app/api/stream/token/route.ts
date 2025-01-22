@@ -19,8 +19,17 @@ export async function GET() {
 			process.env.STREAM_CHAT_SECRET!
 		);
 
+		// Get user details from Supabase
+		const { data: profile } = await supabase
+			.from("profiles")
+			.select("first_name")
+			.eq("id", session.user.id)
+			.single();
+
+		// Create or update the Stream user
 		await streamClient.upsertUser({
 			id: session.user.id,
+			name: profile?.first_name || session.user.id,
 			role: "user",
 		});
 
