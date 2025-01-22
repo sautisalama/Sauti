@@ -44,11 +44,6 @@ export function ChatComponent({
 					process.env.NEXT_PUBLIC_STREAM_KEY!,
 					{
 						timeout: 6000,
-						wsConnection: {
-							timeout: 30000,
-							reconnectionDelay: 2000,
-							maxReconnectionAttempts: 5,
-						},
 					}
 				);
 

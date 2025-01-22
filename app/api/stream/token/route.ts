@@ -26,13 +26,20 @@ export async function GET() {
 			.eq("id", session.user.id)
 			.single();
 
-		// Create or update the Stream user
 		try {
-			await streamClient.upsertUser({
-				id: session.user.id,
-				name: profile?.first_name || session.user.id,
-				role: "user",
-			});
+			// First try to get the user
+			const existingUser = await streamClient.queryUsers({ id: session.user.id });
+
+			// If user doesn't exist or was deleted, create a new one
+			if (!existingUser.users.length) {
+				await streamClient.upsertUsers([
+					{
+						id: session.user.id,
+						name: profile?.first_name || session.user.id,
+						role: "user",
+					},
+				]);
+			}
 
 			const token = streamClient.createToken(session.user.id);
 			return NextResponse.json({ token });
@@ -41,7 +48,8 @@ export async function GET() {
 			if (error.response?.status === 429) {
 				return NextResponse.json(
 					{
-						error: "Too many connection attempts. Please wait a moment before trying again.",
+						error:
+							"Too many connection attempts. Please wait a moment before trying again.",
 						retryAfter: error.response.headers.get("retry-after") || 60,
 					},
 					{ status: 429 }
