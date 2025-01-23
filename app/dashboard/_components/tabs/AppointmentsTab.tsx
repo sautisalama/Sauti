@@ -3,16 +3,7 @@ import { useEffect, useState, useCallback } from "react";
 import { AppointmentCard } from "../AppointmentCard";
 import { fetchUserAppointments } from "../../_views/actions/appointments";
 import { useToast } from "@/hooks/use-toast";
-import { Tables } from "@/types/db-schema";
-
-interface AppointmentWithDetails {
-	id: string;
-	appointment_date: string;
-	status: string;
-	matched_service: {
-		support_service: Tables<"support_services">;
-	};
-}
+import { AppointmentWithDetails } from "@/app/dashboard/_types";
 
 export function AppointmentsTab({
 	userId,

@@ -49,16 +49,19 @@ export async function fetchUserAppointments(
 		// 2. Get appointments for these matched services
 		const { data: appointments, error: appointmentsError } = await supabase
 			.from("appointments")
-			.select(
-				`
+			.select(`
 				appointment_id,
 				appointment_date,
 				status,
 				matched_services,
 				professional_id,
-				survivor_id
-			`
-			)
+				survivor_id,
+				matched_services!inner (
+					id,
+					report:reports(*),
+					support_service:support_services(*)
+				)
+			`)
 			.in(
 				"matched_services",
 				matchedServices.map((match) => match.id)
@@ -68,19 +71,17 @@ export async function fetchUserAppointments(
 		if (appointmentsError) throw appointmentsError;
 
 		// 3. Combine the data
-		const appointmentsWithDetails = appointments?.map((appointment) => {
-			const matchedService = matchedServices.find(
-				(match) => match.id === appointment.matched_services
-			);
-			return {
-				id: appointment.appointment_id,
-				appointment_date: appointment.appointment_date,
-				status: appointment.status,
-				matched_service: {
-					support_service: matchedService?.support_service || {},
-				},
-			};
-		}) as AppointmentWithDetails[];
+		const appointmentsWithDetails = appointments?.map((appointment) => ({
+			id: appointment.appointment_id,
+			appointment_date: appointment.appointment_date,
+			status: appointment.status,
+			professional_id: appointment.professional_id,
+			survivor_id: appointment.survivor_id,
+			matched_service: {
+				support_service: appointment.matched_services.support_service,
+				report: appointment.matched_services.report
+			},
+		})) as AppointmentWithDetails[];
 
 		return appointmentsWithDetails || [];
 	} catch (error) {
