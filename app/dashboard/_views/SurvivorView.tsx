@@ -230,9 +230,7 @@ export default function SurvivorView({
 								<TabsList className="overflow-x-auto">
 									<TabsTrigger value="overview">Overview</TabsTrigger>
 									<TabsTrigger value="reports">Reports</TabsTrigger>
-									<TabsTrigger value="appointments" disabled>
-										Appointments
-									</TabsTrigger>
+									<TabsTrigger value="appointments">Appointments</TabsTrigger>
 								</TabsList>
 
 								<TabsContent value="overview">
