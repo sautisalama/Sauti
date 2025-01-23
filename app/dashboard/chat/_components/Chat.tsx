@@ -34,6 +34,7 @@ export function ChatComponent({
 	const [channel, setChannel] = useState<any>(null);
 	const [users, setUsers] = useState<User[]>([]);
 	const [connectionError, setConnectionError] = useState<string | null>(null);
+	const [showUserList, setShowUserList] = useState(true);
 
 	useEffect(() => {
 		const initChat = async () => {
@@ -127,7 +128,6 @@ export function ChatComponent({
 	const startDirectMessage = async (otherUserId: string) => {
 		if (!client) return;
 
-		// Create a shorter unique channel ID by taking parts of the UUIDs
 		const channelId = [userId.slice(0, 12), otherUserId.slice(0, 12)]
 			.sort()
 			.join("-");
@@ -138,6 +138,12 @@ export function ChatComponent({
 
 		await newChannel.create();
 		setChannel(newChannel);
+		setShowUserList(false);
+	};
+
+	const handleBackToUsers = () => {
+		setShowUserList(true);
+		setChannel(null);
 	};
 
 	if (!client) {
@@ -145,7 +151,7 @@ export function ChatComponent({
 	}
 
 	return (
-		<div className="flex h-full">
+		<div className="flex h-full pb-[72px] md:pb-0">
 			{connectionError ? (
 				<div className="w-full flex items-center justify-center">
 					<div className="text-center">
@@ -164,25 +170,40 @@ export function ChatComponent({
 			) : (
 				<StreamChat client={client}>
 					<div className="flex h-full w-full">
-						<div className="w-80 border-r border-gray-200">
-							<UserList users={users} onUserSelect={startDirectMessage} />
-						</div>
-						{channel ? (
-							<div className="flex-1">
+						{showUserList ? (
+							<div className="w-full md:hidden">
+								<UserList 
+									users={users} 
+									onUserSelect={startDirectMessage}
+								/>
+							</div>
+						) : (
+							<div className="w-full md:w-[calc(100%-20rem)]">
 								<Channel channel={channel}>
 									<Window>
-										<ChannelHeader />
+										<div className="flex items-center p-2 bg-gray-50 border-b border-gray-200">
+											<button
+												onClick={handleBackToUsers}
+												className="md:hidden p-2 hover:bg-gray-100 rounded-full mr-2"
+											>
+												←
+											</button>
+											<ChannelHeader />
+										</div>
 										<MessageList />
 										<MessageInput />
 									</Window>
 									<Thread />
 								</Channel>
 							</div>
-						) : (
-							<div className="flex-1 flex items-center justify-center">
-								<p className="text-gray-500">Select a user to start chatting</p>
-							</div>
 						)}
+						
+						<div className="hidden md:block w-80 border-r border-gray-200">
+							<UserList 
+								users={users} 
+								onUserSelect={startDirectMessage}
+							/>
+						</div>
 					</div>
 				</StreamChat>
 			)}

@@ -224,7 +224,7 @@ export default function ProfessionalView({
 					<div className="flex flex-col md:flex-row gap-6">
 						<div className="flex-1">
 							<Tabs defaultValue="overview" className="mb-8">
-								<TabsList className="overflow-x-auto">
+								<TabsList className="w-full overflow-x-auto flex whitespace-nowrap">
 									<TabsTrigger value="overview">Overview</TabsTrigger>
 									<TabsTrigger value="reports">Reports</TabsTrigger>
 									<TabsTrigger value="matched-cases">Cases</TabsTrigger>
@@ -282,9 +282,9 @@ export default function ProfessionalView({
 							</Tabs>
 
 							<div className="space-y-8">
-								<div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+								<div className="grid grid-cols-1 gap-6">
 									<CommunityCard />
-									<div className="hidden md:block">
+									<div className="md:hidden">
 										<DailyProgress />
 									</div>
 								</div>
