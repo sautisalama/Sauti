@@ -41,10 +41,6 @@ export default async function Dashboard() {
 				) : (
 					redirect("/error?message=Invalid user type")
 				)}
-				<ChatComponent
-					userId={user.id}
-					username={user.first_name || user.id.slice(0, 8)}
-				/>
 			</div>
 		</div>
 	);

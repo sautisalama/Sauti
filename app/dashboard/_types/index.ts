@@ -20,10 +20,17 @@ export interface ReportWithRelations extends Tables<"reports"> {
 }
 
 export interface AppointmentWithDetails {
+	appointment_id: string;
 	id: string;
 	appointment_date: string;
 	status: string;
+	professional_id?: string;
+	survivor_id?: string;
+	professional?: Tables<"profiles">;
+	survivor?: Tables<"profiles">;
+	notes?: string;
 	matched_service: {
 		support_service: Tables<"support_services">;
+		report: Tables<"reports">;
 	};
 }

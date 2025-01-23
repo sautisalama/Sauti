@@ -22,13 +22,20 @@ export function UserAvatar({ userId, email }: UserAvatarProps) {
 				.select("avatar_url")
 				.eq("id", userId)
 				.single();
-			
-			if (!error && data) {
+
+			if (error) {
+				console.error("Error fetching avatar:", error);
+				return;
+			}
+
+			if (data) {
 				setAvatarUrl(data.avatar_url);
 			}
 		}
 
-		fetchAvatarUrl();
+		if (userId) {
+			fetchAvatarUrl();
+		}
 	}, [userId, supabase]);
 
 	return (

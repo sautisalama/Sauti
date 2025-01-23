@@ -238,7 +238,7 @@ export function MainSidebar() {
 			</div>
 
 			{/* Mobile Bottom Navigation - Always visible */}
-			<div className="md:hidden fixed bottom-0 left-0 right-0 bg-[#1A3434] border-t border-[#2A4444] z-50">
+			<div className="md:hidden fixed bottom-0 left-0 right-0 bg-[#1A3434] border-t border-[#2A4444] z-40">
 				<nav className="flex items-center justify-around px-4 py-2">
 					<Link
 						href="/dashboard"

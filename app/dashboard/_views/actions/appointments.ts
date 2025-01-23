@@ -18,75 +18,44 @@ export async function createAppointment(
 // Fetch appointments for a user (either as professional or survivor)
 export async function fetchUserAppointments(
 	userId: string,
-	userType: "professional" | "survivor"
+	userType: "professional" | "survivor",
+	includeBothRoles = false
 ) {
 	const supabase = createClient();
 
-	try {
-		// 1. First get all accepted matches for the user
-		const { data: matchedServices, error: matchError } = await supabase
-			.from("matched_services")
-			.select(
-				`
-				id,
-				match_status_type,
-				service_id,
-				support_service:support_services (
-					id,
-					name,
-					email
+	let query = supabase.from("appointments").select(`
+			*,
+			matched_service:matched_services (
+				*,
+				support_service:support_services (*),
+				report:reports (
+					*,
+					user:profiles (*)
 				)
-			`
-			)
-			.eq("survivor_id", userId)
-			.eq("match_status_type", "accepted");
+			),
+			professional:profiles!appointments_professional_id_fkey (*),
+			survivor:profiles!appointments_survivor_id_fkey (*)
+		`);
 
-		if (matchError) throw matchError;
+	if (includeBothRoles && userType === "professional") {
+		// For professionals, show appointments where they are either the professional or survivor
+		query = query.or(`professional_id.eq.${userId},survivor_id.eq.${userId}`);
+	} else {
+		// For other cases, use the original logic
+		query = query.eq(
+			userType === "professional" ? "professional_id" : "survivor_id",
+			userId
+		);
+	}
 
-		if (!matchedServices?.length) return [];
-		console.log("Matched Services...", matchedServices);
+	const { data, error } = await query;
 
-		// 2. Get appointments for these matched services
-		const { data: appointments, error: appointmentsError } = await supabase
-			.from("appointments")
-			.select(
-				`
-				appointment_id,
-				appointment_date,
-				status,
-				matched_services,
-				professional_id,
-				survivor_id
-			`
-			)
-			.in(
-				"matched_services",
-				matchedServices.map((match) => match.id)
-			)
-			.order("appointment_date", { ascending: true });
-
-		if (appointmentsError) throw appointmentsError;
-
-		// 3. Combine the data
-		const appointmentsWithDetails = appointments?.map((appointment) => {
-			const matchedService = matchedServices.find(
-				(match) => match.id === appointment.matched_services
-			);
-			return {
-				id: appointment.appointment_id,
-				appointment_date: appointment.appointment_date,
-				status: appointment.status,
-				matched_service: {
-					support_service: matchedService?.support_service || {},
-				},
-			};
-		}) as AppointmentWithDetails[];
-
-		return appointmentsWithDetails || [];
-	} catch (error) {
+	if (error) {
 		console.error("Error fetching appointments:", error);
 		throw error;
 	}
+
+	return data;
 }
 
 // Update appointment status
@@ -103,6 +72,56 @@ export async function updateAppointmentStatus(
 
 	if (error) {
 		console.error("Error updating appointment status:", error);
+		throw error;
+	}
+}
+
+// Add this new function
+export async function fetchAppointmentById(appointmentId: string) {
+	const supabase = createClient();
+
+	const { data, error } = await supabase
+		.from("appointments")
+		.select(
+			`
+			*,
+			matched_service:matched_services (
+				*,
+				support_service:support_services (*),
+				report:reports (
+					*,
+					user:profiles (*)
+				)
+			),
+			professional:profiles!appointments_professional_id_fkey (*),
+			survivor:profiles!appointments_survivor_id_fkey (*)
+		`
+		)
+		.eq("appointment_id", appointmentId)
+		.single();
+
+	if (error) {
+		console.error("Error fetching appointment:", error);
+		throw error;
+	}
+
+	return data;
+}
+
+// Add this new function
+export async function updateAppointmentNotes(
+	appointmentId: string,
+	notes: string
+) {
+	const supabase = createClient();
+
+	const { error } = await supabase
+		.from("appointments")
+		.update({ notes })
+		.eq("appointment_id", appointmentId);
+
+	if (error) {
+		console.error("Error updating appointment notes:", error);
 		throw error;
 	}
 }

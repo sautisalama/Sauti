@@ -1,33 +1,26 @@
 // app/dashboard/_components/tabs/AppointmentsTab.tsx
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { AppointmentCard } from "../AppointmentCard";
 import { fetchUserAppointments } from "../../_views/actions/appointments";
 import { useToast } from "@/hooks/use-toast";
-import { Tables } from "@/types/db-schema";
-
-interface AppointmentWithDetails {
-	id: string;
-	appointment_date: string;
-	status: string;
-	matched_service: {
-		support_service: Tables<"support_services">;
-	};
-}
+import { AppointmentWithDetails } from "@/app/dashboard/_types";
 
 export function AppointmentsTab({
 	userId,
 	userType,
+	username,
 }: {
 	userId: string;
 	userType: "professional" | "survivor";
+	username: string;
 }) {
 	const [appointments, setAppointments] = useState<AppointmentWithDetails[]>([]);
 	const [isLoading, setIsLoading] = useState(true);
 	const { toast } = useToast();
 
-	const loadAppointments = async () => {
+	const loadAppointments = useCallback(async () => {
 		try {
-			const data = await fetchUserAppointments(userId, userType);
+			const data = await fetchUserAppointments(userId, userType, true);
 			setAppointments(data);
 		} catch (error) {
 			toast({
@@ -38,11 +31,11 @@ export function AppointmentsTab({
 		} finally {
 			setIsLoading(false);
 		}
-	};
+	}, [userId, userType, toast]);
 
 	useEffect(() => {
 		loadAppointments();
-	}, [userId, userType]);
+	}, [userId, userType, loadAppointments]);
 
 	if (isLoading) {
 		return <div>Loading appointments...</div>;
@@ -53,12 +46,14 @@ export function AppointmentsTab({
 			<h2 className="text-xl font-semibold">Your Appointments</h2>
 
 			{appointments.length > 0 ? (
-				<div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+				<div className="">
 					{appointments.map((appointment) => (
 						<AppointmentCard
 							key={appointment.id}
 							appointment={appointment}
 							onStatusUpdate={loadAppointments}
+							userId={userId}
+							username={username}
 						/>
 					))}
 				</div>

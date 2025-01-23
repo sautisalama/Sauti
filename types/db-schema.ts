@@ -15,6 +15,7 @@ export type Database = {
           appointment_id: string
           created_at: string | null
           matched_services: string | null
+          notes: string | null
           professional_id: string | null
           status: Database["public"]["Enums"]["appointment_status_type"] | null
           survivor_id: string | null
@@ -24,6 +25,7 @@ export type Database = {
           appointment_id?: string
           created_at?: string | null
           matched_services?: string | null
+          notes?: string | null
           professional_id?: string | null
           status?: Database["public"]["Enums"]["appointment_status_type"] | null
           survivor_id?: string | null
@@ -33,6 +35,7 @@ export type Database = {
           appointment_id?: string
           created_at?: string | null
           matched_services?: string | null
+          notes?: string | null
           professional_id?: string | null
           status?: Database["public"]["Enums"]["appointment_status_type"] | null
           survivor_id?: string | null
@@ -156,7 +159,7 @@ export type Database = {
           created_at?: string | null
           email?: string | null
           first_name?: string | null
-          id?: string
+          id: string
           last_name?: string | null
           updated_at?: string | null
           user_type?: Database["public"]["Enums"]["user_type"] | null
