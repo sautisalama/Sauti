@@ -63,10 +63,13 @@ export function AppointmentChat({
 						? appointmentData.survivor_id
 						: appointmentData.professional_id;
 
-				const channelId = `appointment-${appointmentId}`;
+				// Create a consistent channel ID using sorted user IDs
+				const channelId = [userId.slice(0, 12), otherUserId.slice(0, 12)]
+					.sort()
+					.join("-");
+
 				const newChannel = streamClient.channel("messaging", channelId, {
 					members: [userId, otherUserId],
-					appointment_id: appointmentId,
 				});
 
 				await newChannel.create();
