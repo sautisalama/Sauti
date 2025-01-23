@@ -107,3 +107,21 @@ export async function fetchAppointmentById(appointmentId: string) {
 
 	return data;
 }
+
+// Add this new function
+export async function updateAppointmentNotes(
+	appointmentId: string,
+	notes: string
+) {
+	const supabase = createClient();
+
+	const { error } = await supabase
+		.from("appointments")
+		.update({ notes })
+		.eq("appointment_id", appointmentId);
+
+	if (error) {
+		console.error("Error updating appointment notes:", error);
+		throw error;
+	}
+}

@@ -28,6 +28,7 @@ export interface AppointmentWithDetails {
 	survivor_id?: string;
 	professional?: Tables<"profiles">;
 	survivor?: Tables<"profiles">;
+	notes?: string;
 	matched_service: {
 		support_service: Tables<"support_services">;
 		report: Tables<"reports">;
