@@ -98,7 +98,7 @@ export function AppointmentChat({
 			};
 			cleanup();
 		};
-	}, [userId, username, appointmentId]);
+	}, [userId, username, appointmentId, client, channel]);
 
 	if (!client || !channel) {
 		return (
