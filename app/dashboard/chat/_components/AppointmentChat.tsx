@@ -12,6 +12,9 @@ import {
 import { StreamChat as StreamChatClient } from "stream-chat";
 import "stream-chat-react/dist/css/v2/index.css";
 import { fetchAppointmentById } from "@/app/dashboard/_views/actions/appointments";
+import Animation from "@/components/LottieWrapper";
+import animationData from "@/public/lottie-animations/wellness.json";
+import styles from "./chat.module.css";
 
 interface AppointmentChatProps {
 	userId: string;
@@ -102,8 +105,9 @@ export function AppointmentChat({
 
 	if (!client || !channel) {
 		return (
-			<div className="flex items-center justify-center h-full">
-				<div className="text-center">
+			<div className="flex flex-col items-center justify-center min-h-screen p-4">
+				<div className="text-center space-y-4">
+					<Animation animationData={animationData} />
 					{connectionError ? (
 						<>
 							<p className="text-red-500 mb-4">{connectionError}</p>
@@ -118,7 +122,7 @@ export function AppointmentChat({
 							</button>
 						</>
 					) : (
-						<div className="animate-pulse">Loading chat...</div>
+						<p className="text-muted-foreground">Loading chat...</p>
 					)}
 				</div>
 			</div>
@@ -128,13 +132,17 @@ export function AppointmentChat({
 	return (
 		<div className="h-full">
 			<StreamChat client={client}>
-				<Channel channel={channel}>
-					<Window>
-						<ChannelHeader />
-						<MessageList />
-						<MessageInput />
-					</Window>
-				</Channel>
+				<div className={styles.chatBackground}>
+					<Channel channel={channel}>
+						<Window>
+							<div className="bg-white">
+								<ChannelHeader />
+							</div>
+							<MessageList />
+							<MessageInput />
+						</Window>
+					</Channel>
+				</div>
 			</StreamChat>
 		</div>
 	);

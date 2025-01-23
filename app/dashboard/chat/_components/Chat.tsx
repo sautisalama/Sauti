@@ -13,6 +13,9 @@ import {
 import { StreamChat as StreamChatClient } from "stream-chat";
 import { UserList } from "./UserList";
 import "stream-chat-react/dist/css/v2/index.css";
+import Animation from "@/components/LottieWrapper";
+import animationData from "@/public/lottie-animations/messages.json";
+import styles from "./chat.module.css";
 
 interface User {
 	id: string;
@@ -44,12 +47,12 @@ export function ChatComponent({
 				const response = await fetch("/api/stream/token");
 				if (!response.ok) {
 					const errorData = await response.json();
-					throw new Error(errorData.error || 'Failed to fetch token');
+					throw new Error(errorData.error || "Failed to fetch token");
 				}
-				
+
 				const data = await response.json();
 				if (!data.token) {
-					throw new Error('No token received');
+					throw new Error("No token received");
 				}
 
 				const streamClient = new StreamChatClient(
@@ -71,12 +74,15 @@ export function ChatComponent({
 				setClient(streamClient);
 
 				if (appointmentId) {
-					const appointmentResponse = await fetch(`/api/appointments/${appointmentId}`);
+					const appointmentResponse = await fetch(
+						`/api/appointments/${appointmentId}`
+					);
 					const appointmentData = await appointmentResponse.json();
-					
-					const otherUserId = appointmentData.professional_id === userId 
-						? appointmentData.survivor_id 
-						: appointmentData.professional_id;
+
+					const otherUserId =
+						appointmentData.professional_id === userId
+							? appointmentData.survivor_id
+							: appointmentData.professional_id;
 
 					if (otherUserId) {
 						const channelId = `appointment-${appointmentId}`;
@@ -103,8 +109,8 @@ export function ChatComponent({
 			} catch (error) {
 				console.error("Error connecting to Stream:", error);
 				setConnectionError(
-					error instanceof Error 
-						? error.message 
+					error instanceof Error
+						? error.message
 						: "Unable to connect to chat. Please try again later."
 				);
 			}
@@ -147,7 +153,14 @@ export function ChatComponent({
 	};
 
 	if (!client) {
-		return <div>Loading...</div>;
+		return (
+			<div className="flex flex-col items-center justify-center min-h-screen p-4">
+				<div className="text-center space-y-4">
+					<Animation animationData={animationData} />
+					<p className="text-muted-foreground">Loading chat...</p>
+				</div>
+			</div>
+		);
 	}
 
 	return (
@@ -169,19 +182,16 @@ export function ChatComponent({
 				</div>
 			) : (
 				<StreamChat client={client}>
-					<div className="flex h-full w-full">
+					<div className={`flex h-full w-full ${styles.chatBackground}`}>
 						{showUserList ? (
-							<div className="w-full md:hidden">
-								<UserList 
-									users={users} 
-									onUserSelect={startDirectMessage}
-								/>
+							<div className="w-full md:hidden bg-white">
+								<UserList users={users} onUserSelect={startDirectMessage} />
 							</div>
 						) : (
 							<div className="w-full md:w-[calc(100%-20rem)]">
 								<Channel channel={channel}>
 									<Window>
-										<div className="flex items-center p-2 bg-gray-50 border-b border-gray-200">
+										<div className="flex items-center p-2 bg-white border-b border-gray-200">
 											<button
 												onClick={handleBackToUsers}
 												className="md:hidden p-2 hover:bg-gray-100 rounded-full mr-2"
@@ -197,12 +207,9 @@ export function ChatComponent({
 								</Channel>
 							</div>
 						)}
-						
-						<div className="hidden md:block w-80 border-r border-gray-200">
-							<UserList 
-								users={users} 
-								onUserSelect={startDirectMessage}
-							/>
+
+						<div className="hidden md:block w-80 border-r border-gray-200 bg-white">
+							<UserList users={users} onUserSelect={startDirectMessage} />
 						</div>
 					</div>
 				</StreamChat>

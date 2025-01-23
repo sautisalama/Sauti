@@ -1,0 +1,14 @@
+.chatBackground {
+	background-image: url("/Bg.png");
+	background-repeat: repeat;
+	background-size: 500px;
+	background-position: center;
+	width: 100%;
+	height: 100%;
+}
+
+@media (max-width: 768px) {
+	.chatBackground {
+		background-size: 300px;
+	}
+}
