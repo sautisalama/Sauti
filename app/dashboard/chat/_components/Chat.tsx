@@ -19,13 +19,17 @@ interface User {
 	username: string;
 }
 
+interface ChatComponentProps {
+	userId: string;
+	username: string;
+	appointmentId?: string;
+}
+
 export function ChatComponent({
 	userId,
 	username,
-}: {
-	userId: string;
-	username: string;
-}) {
+	appointmentId,
+}: ChatComponentProps) {
 	const [client, setClient] = useState<StreamChatClient | null>(null);
 	const [channel, setChannel] = useState<any>(null);
 	const [users, setUsers] = useState<User[]>([]);
@@ -34,11 +38,18 @@ export function ChatComponent({
 	useEffect(() => {
 		const initChat = async () => {
 			try {
-				// Check if we already have a client instance
 				if (client) return;
 
 				const response = await fetch("/api/stream/token");
-				const { token } = await response.json();
+				if (!response.ok) {
+					const errorData = await response.json();
+					throw new Error(errorData.error || 'Failed to fetch token');
+				}
+				
+				const data = await response.json();
+				if (!data.token) {
+					throw new Error('No token received');
+				}
 
 				const streamClient = new StreamChatClient(
 					process.env.NEXT_PUBLIC_STREAM_KEY!,
@@ -52,27 +63,49 @@ export function ChatComponent({
 						id: userId,
 						name: username,
 					},
-					token
+					data.token
 				);
 
-				// Reset error state on successful connection
 				setConnectionError(null);
 				setClient(streamClient);
 
-				// Fetch users after successful connection
-				const { users: streamUsers } = await streamClient.queryUsers(
-					{ id: { $ne: userId } },
-					{ last_active: -1 }
-				);
-				setUsers(
-					streamUsers.map((user) => ({
-						id: user.id,
-						username: user.name || user.id,
-					}))
-				);
+				if (appointmentId) {
+					const appointmentResponse = await fetch(`/api/appointments/${appointmentId}`);
+					const appointmentData = await appointmentResponse.json();
+					
+					const otherUserId = appointmentData.professional_id === userId 
+						? appointmentData.survivor_id 
+						: appointmentData.professional_id;
+
+					if (otherUserId) {
+						const channelId = `appointment-${appointmentId}`;
+						const newChannel = streamClient.channel("messaging", channelId, {
+							members: [userId, otherUserId],
+							appointment_id: appointmentId,
+						});
+
+						await newChannel.create();
+						setChannel(newChannel);
+					}
+				} else {
+					const { users: streamUsers } = await streamClient.queryUsers(
+						{ id: { $ne: userId } },
+						{ last_active: -1 }
+					);
+					setUsers(
+						streamUsers.map((user) => ({
+							id: user.id,
+							username: user.name || user.id,
+						}))
+					);
+				}
 			} catch (error) {
 				console.error("Error connecting to Stream:", error);
-				setConnectionError("Unable to connect to chat. Please try again later.");
+				setConnectionError(
+					error instanceof Error 
+						? error.message 
+						: "Unable to connect to chat. Please try again later."
+				);
 			}
 		};
 
@@ -89,7 +122,7 @@ export function ChatComponent({
 			};
 			cleanup();
 		};
-	}, [userId, username, client]);
+	}, [userId, username, client, appointmentId]);
 
 	const startDirectMessage = async (otherUserId: string) => {
 		if (!client) return;

@@ -20,6 +20,7 @@ export interface ReportWithRelations extends Tables<"reports"> {
 }
 
 export interface AppointmentWithDetails {
+	appointment_id: string;
 	id: string;
 	appointment_date: string;
 	status: string;

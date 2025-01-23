@@ -11,7 +11,10 @@ export default async function ChatPage() {
 
 	return (
 		<div className="h-screen">
-			<ChatComponent userId={user.id} username={user.first_name || user.id} />
+			<ChatComponent 
+				userId={user.id} 
+				username={user.first_name || user.id}
+			/>
 		</div>
 	);
 }

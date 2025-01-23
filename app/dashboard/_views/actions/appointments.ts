@@ -23,9 +23,7 @@ export async function fetchUserAppointments(
 ) {
 	const supabase = createClient();
 
-	let query = supabase
-		.from("appointments")
-		.select(`
+	let query = supabase.from("appointments").select(`
 			*,
 			matched_service:matched_services (
 				*,
@@ -76,4 +74,36 @@ export async function updateAppointmentStatus(
 		console.error("Error updating appointment status:", error);
 		throw error;
 	}
+}
+
+// Add this new function
+export async function fetchAppointmentById(appointmentId: string) {
+	const supabase = createClient();
+
+	const { data, error } = await supabase
+		.from("appointments")
+		.select(
+			`
+			*,
+			matched_service:matched_services (
+				*,
+				support_service:support_services (*),
+				report:reports (
+					*,
+					user:profiles (*)
+				)
+			),
+			professional:profiles!appointments_professional_id_fkey (*),
+			survivor:profiles!appointments_survivor_id_fkey (*)
+		`
+		)
+		.eq("appointment_id", appointmentId)
+		.single();
+
+	if (error) {
+		console.error("Error fetching appointment:", error);
+		throw error;
+	}
+
+	return data;
 }

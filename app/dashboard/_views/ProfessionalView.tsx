@@ -273,7 +273,11 @@ export default function ProfessionalView({
 								</TabsContent>
 
 								<TabsContent value="appointments">
-									<AppointmentsTab userId={userId} userType="professional" />
+									<AppointmentsTab 
+										userId={userId} 
+										userType="professional" 
+										username={profileDetails.first_name || userId}
+									/>
 								</TabsContent>
 							</Tabs>
 

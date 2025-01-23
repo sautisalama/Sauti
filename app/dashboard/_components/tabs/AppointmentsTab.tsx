@@ -8,9 +8,11 @@ import { AppointmentWithDetails } from "@/app/dashboard/_types";
 export function AppointmentsTab({
 	userId,
 	userType,
+	username,
 }: {
 	userId: string;
 	userType: "professional" | "survivor";
+	username: string;
 }) {
 	const [appointments, setAppointments] = useState<AppointmentWithDetails[]>([]);
 	const [isLoading, setIsLoading] = useState(true);
@@ -50,6 +52,8 @@ export function AppointmentsTab({
 							key={appointment.id}
 							appointment={appointment}
 							onStatusUpdate={loadAppointments}
+							userId={userId}
+							username={username}
 						/>
 					))}
 				</div>
