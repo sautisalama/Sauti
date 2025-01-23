@@ -23,7 +23,10 @@ export interface AppointmentWithDetails {
 	id: string;
 	appointment_date: string;
 	status: string;
+	professional_id?: string;
+	survivor_id?: string;
 	matched_service: {
 		support_service: Tables<"support_services">;
+		report: Tables<"reports">;
 	};
 }
