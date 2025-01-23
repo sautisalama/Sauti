@@ -33,6 +33,7 @@ import { SupportServicesTab } from "../_components/tabs/SupportServicesTab";
 import { ReportWithRelations, MatchedServiceWithRelations } from "../_types";
 import { MatchCard } from "../_components/MatchCard";
 import { MatchedCasesTab } from "../_components/tabs/MatchedCasesTab";
+import { AppointmentsTab } from "../_components/tabs/AppointmentsTab";
 
 interface ProfessionalViewProps {
 	userId: string;
@@ -228,6 +229,7 @@ export default function ProfessionalView({
 									<TabsTrigger value="reports">Reports</TabsTrigger>
 									<TabsTrigger value="matched-cases">Cases</TabsTrigger>
 									<TabsTrigger value="support-services">Services</TabsTrigger>
+									<TabsTrigger value="appointments">Appointments</TabsTrigger>
 								</TabsList>
 
 								<TabsContent value="overview">
@@ -261,13 +263,17 @@ export default function ProfessionalView({
 								<TabsContent value="support-services">
 									<SupportServicesTab
 										supportServices={supportServices}
-											formatServiceName={formatServiceName}
-											onDeleteService={setDeleteServiceId}
-											open={open}
-											setOpen={setOpen}
-											userId={userId}
-											setSupportServices={setSupportServices}
+										formatServiceName={formatServiceName}
+										onDeleteService={setDeleteServiceId}
+										open={open}
+										setOpen={setOpen}
+										userId={userId}
+										setSupportServices={setSupportServices}
 									/>
+								</TabsContent>
+
+								<TabsContent value="appointments">
+									<AppointmentsTab userId={userId} userType="professional" />
 								</TabsContent>
 							</Tabs>
 

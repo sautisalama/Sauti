@@ -1,5 +1,5 @@
 // app/dashboard/_components/tabs/AppointmentsTab.tsx
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { AppointmentCard } from "../AppointmentCard";
 import { fetchUserAppointments } from "../../_views/actions/appointments";
 import { useToast } from "@/hooks/use-toast";
@@ -25,7 +25,7 @@ export function AppointmentsTab({
 	const [isLoading, setIsLoading] = useState(true);
 	const { toast } = useToast();
 
-	const loadAppointments = async () => {
+	const loadAppointments = useCallback(async () => {
 		try {
 			const data = await fetchUserAppointments(userId, userType);
 			setAppointments(data);
@@ -38,11 +38,11 @@ export function AppointmentsTab({
 		} finally {
 			setIsLoading(false);
 		}
-	};
+	}, [userId, userType, toast]);
 
 	useEffect(() => {
 		loadAppointments();
-	}, [userId, userType]);
+	}, [userId, userType, loadAppointments]);
 
 	if (isLoading) {
 		return <div>Loading appointments...</div>;
