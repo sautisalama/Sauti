@@ -18,7 +18,7 @@ export function AppointmentsTab({
 
 	const loadAppointments = useCallback(async () => {
 		try {
-			const data = await fetchUserAppointments(userId, userType);
+			const data = await fetchUserAppointments(userId, userType, true);
 			setAppointments(data);
 		} catch (error) {
 			toast({

@@ -193,7 +193,7 @@ export default function ProfessionalView({
 					event: "*",
 					schema: "public",
 					table: "appointments",
-					filter: `professional_id=eq.${userId}`,
+					filter: `or(professional_id.eq.${userId},survivor_id.eq.${userId})`,
 				},
 				async () => {
 					const [updatedMatches, updatedReports] = await Promise.all([
