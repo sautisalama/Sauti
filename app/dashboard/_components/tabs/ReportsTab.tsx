@@ -29,6 +29,7 @@ interface ReportsTabProps {
 	userId: string;
 	reportDialogOpen: boolean;
 	setReportDialogOpen: (open: boolean) => void;
+	onRefresh: () => Promise<void>;
 }
 
 export function ReportsTab({
@@ -38,6 +39,7 @@ export function ReportsTab({
 	userId,
 	reportDialogOpen,
 	setReportDialogOpen,
+	onRefresh,
 }: ReportsTabProps) {
 	return (
 		<div className="space-y-6">
@@ -64,7 +66,10 @@ export function ReportsTab({
 							</DialogDescription>
 						</DialogHeader>
 						<AuthenticatedReportAbuseForm
-							onClose={() => setReportDialogOpen(false)}
+							onClose={() => {
+								setReportDialogOpen(false);
+								onRefresh();
+							}}
 							userId={userId}
 						/>
 					</DialogContent>

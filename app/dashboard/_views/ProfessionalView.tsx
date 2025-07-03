@@ -62,7 +62,8 @@ export default function ProfessionalView({
 	const handleDelete = async (reportId: string) => {
 		try {
 			await deleteReport(reportId);
-			setReports(reports.filter((report) => report.report_id !== reportId));
+			const updatedReports = await fetchUserReports(userId);
+			setReports(updatedReports as ReportWithRelations[]);
 			toast({
 				title: "Report deleted",
 				description: "The report has been successfully deleted.",
@@ -80,9 +81,11 @@ export default function ProfessionalView({
 	const handleDeleteService = async (serviceId: string) => {
 		try {
 			await deleteSupportService(serviceId);
-			setSupportServices((services) =>
-				services.filter((service) => service.id !== serviceId)
-			);
+			const updatedServices = await fetchUserSupportServices(userId);
+			setSupportServices(updatedServices);
+			// Also refresh matched services as they might be affected
+			const updatedMatches = await fetchMatchedServices(userId);
+			setMatchedServices(updatedMatches);
 			toast({
 				title: "Service deleted",
 				description: "The support service has been successfully deleted.",
@@ -126,94 +129,7 @@ export default function ProfessionalView({
 		};
 
 		loadData();
-
-		// Set up real-time subscriptions
-		const supabase = createClient();
-
-		// Subscribe to reports changes
-		const reportsChannel = supabase
-			.channel("reports-changes")
-			.on(
-				"postgres_changes",
-				{
-					event: "*",
-					schema: "public",
-					table: "reports",
-					filter: `user_id=eq.${userId}`,
-				},
-				async () => {
-					const updatedReports = await fetchUserReports(userId);
-					setReports(updatedReports as ReportWithRelations[]);
-				}
-			)
-			.subscribe();
-
-		// Subscribe to support services changes
-		const servicesChannel = supabase
-			.channel("services-changes")
-			.on(
-				"postgres_changes",
-				{
-					event: "*",
-					schema: "public",
-					table: "support_services",
-					filter: `user_id=eq.${userId}`,
-				},
-				async () => {
-					const updatedServices = await fetchUserSupportServices(userId);
-					setSupportServices(updatedServices);
-				}
-			)
-			.subscribe();
-
-		// Subscribe to matched services changes
-		const matchesChannel = supabase
-			.channel("matched-services-changes")
-			.on(
-				"postgres_changes",
-				{
-					event: "*",
-					schema: "public",
-					table: "matched_services",
-					filter: `service_id=in.(${supportServices.map((s) => s.id).join(",")})`,
-				},
-				async () => {
-					const updatedMatches = await fetchMatchedServices(userId);
-					setMatchedServices(updatedMatches);
-				}
-			)
-			.subscribe();
-
-		// Subscribe to appointments changes
-		const appointmentsChannel = supabase
-			.channel("appointments-changes")
-			.on(
-				"postgres_changes",
-				{
-					event: "*",
-					schema: "public",
-					table: "appointments",
-					filter: `or(professional_id.eq.${userId},survivor_id.eq.${userId})`,
-				},
-				async () => {
-					const [updatedMatches, updatedReports] = await Promise.all([
-						fetchMatchedServices(userId),
-						fetchUserReports(userId),
-					]);
-					setMatchedServices(updatedMatches);
-					setReports(updatedReports as ReportWithRelations[]);
-				}
-			)
-			.subscribe();
-
-		// Cleanup subscriptions
-		return () => {
-			supabase.removeChannel(reportsChannel);
-			supabase.removeChannel(servicesChannel);
-			supabase.removeChannel(matchesChannel);
-			supabase.removeChannel(appointmentsChannel);
-		};
-	}, [userId, supportServices, toast]);
+	}, [userId, toast]);
 
 	return (
 		<div className="flex min-h-screen bg-white">
@@ -250,13 +166,25 @@ export default function ProfessionalView({
 										userId={userId}
 										reportDialogOpen={reportDialogOpen}
 										setReportDialogOpen={setReportDialogOpen}
+										onRefresh={async () => {
+											const updatedReports = await fetchUserReports(userId);
+											setReports(updatedReports as ReportWithRelations[]);
+										}}
 									/>
 								</TabsContent>
 
 								<TabsContent value="matched-cases">
 									<MatchedCasesTab
+										userId={userId}
 										matchedServices={matchedServices}
-										onRefresh={() => fetchMatchedServices(userId).then(setMatchedServices)}
+										onRefresh={async () => {
+											const [updatedMatches, updatedServices] = await Promise.all([
+												fetchMatchedServices(userId),
+												fetchUserSupportServices(userId),
+											]);
+											setMatchedServices(updatedMatches);
+											setSupportServices(updatedServices);
+										}}
 									/>
 								</TabsContent>
 
@@ -268,15 +196,22 @@ export default function ProfessionalView({
 										open={open}
 										setOpen={setOpen}
 										userId={userId}
-										setSupportServices={setSupportServices}
+										onRefresh={async () => {
+											const updatedServices = await fetchUserSupportServices(userId);
+											setSupportServices(updatedServices);
+										}}
 									/>
 								</TabsContent>
 
 								<TabsContent value="appointments">
-									<AppointmentsTab 
-										userId={userId} 
-										userType="professional" 
+									<AppointmentsTab
+										userId={userId}
+										userType="professional"
 										username={profileDetails.first_name || userId}
+										onAppointmentsChange={async () => {
+											const updatedMatches = await fetchMatchedServices(userId);
+											setMatchedServices(updatedMatches);
+										}}
 									/>
 								</TabsContent>
 							</Tabs>
