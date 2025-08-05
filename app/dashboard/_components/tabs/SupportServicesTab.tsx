@@ -18,7 +18,7 @@ interface SupportServicesTabProps {
 	open: boolean;
 	setOpen: (open: boolean) => void;
 	userId: string;
-	setSupportServices: (services: Tables<"support_services">[]) => void;
+	onRefresh: () => Promise<void>;
 }
 
 export function SupportServicesTab({
@@ -28,7 +28,7 @@ export function SupportServicesTab({
 	open,
 	setOpen,
 	userId,
-	setSupportServices,
+	onRefresh,
 }: SupportServicesTabProps) {
 	return (
 		<div className="space-y-6">
@@ -100,8 +100,7 @@ export function SupportServicesTab({
 					<AddSupportServiceForm
 						onSuccess={() => {
 							setOpen(false);
-							// Refresh the services list
-							fetchUserSupportServices(userId).then(setSupportServices);
+							onRefresh();
 						}}
 					/>
 				</DialogContent>
