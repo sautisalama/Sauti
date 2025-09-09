@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
 	Chat as StreamChat,
 	Channel,
@@ -16,6 +16,7 @@ import "stream-chat-react/dist/css/v2/index.css";
 import Animation from "@/components/LottieWrapper";
 import animationData from "@/public/lottie-animations/messages.json";
 import styles from "./chat.module.css";
+import { Button } from "@/components/ui/button";
 
 interface User {
 	id: string;
@@ -38,6 +39,8 @@ export function ChatComponent({
 	const [users, setUsers] = useState<User[]>([]);
 	const [connectionError, setConnectionError] = useState<string | null>(null);
 	const [showUserList, setShowUserList] = useState(true);
+	const [activeTab, setActiveTab] = useState<"community" | "dm">("community");
+	const communityChannelRef = useRef<any>(null);
 
 	useEffect(() => {
 		const initChat = async () => {
@@ -72,6 +75,22 @@ export function ChatComponent({
 
 				setConnectionError(null);
 				setClient(streamClient);
+
+				// Prepare or join community channel
+				try {
+					const community = streamClient.channel("messaging", "community-global", {
+						name: "Sauti Community",
+						members: [userId],
+					});
+					await community.create();
+					communityChannelRef.current = community;
+				} catch (err) {
+					// ignore if already exists
+					communityChannelRef.current = streamClient.channel("messaging", "community-global", {
+						name: "Sauti Community",
+						members: [userId],
+					});
+				}
 
 				if (appointmentId) {
 					const appointmentResponse = await fetch(
@@ -183,33 +202,66 @@ export function ChatComponent({
 			) : (
 				<StreamChat client={client}>
 					<div className={`flex h-full w-full ${styles.chatBackground}`}>
-						{showUserList ? (
-							<div className="w-full md:hidden bg-white">
+						{/* Left rail (desktop) */}
+						<div className="hidden md:flex flex-col w-80 border-r border-gray-200 bg-white">
+							<div className="p-3 border-b">
+								<div className="flex gap-2">
+									<Button size="sm" variant={activeTab === "community" ? "default" : "outline"} onClick={() => setActiveTab("community")}>Community</Button>
+									<Button size="sm" variant={activeTab === "dm" ? "default" : "outline"} onClick={() => setActiveTab("dm")}>Messages</Button>
+								</div>
+							</div>
+							{activeTab === "dm" ? (
 								<UserList users={users} onUserSelect={startDirectMessage} />
-							</div>
-						) : (
-							<div className="w-full md:w-[calc(100%-20rem)]">
-								<Channel channel={channel}>
-									<Window>
-										<div className="flex items-center p-2 bg-white border-b border-gray-200">
-											<button
-												onClick={handleBackToUsers}
-												className="md:hidden p-2 hover:bg-gray-100 rounded-full mr-2"
-											>
-												←
-											</button>
-											<ChannelHeader />
-										</div>
-										<MessageList />
-										<MessageInput />
-									</Window>
-									<Thread />
-								</Channel>
-							</div>
-						)}
+							) : (
+								<div className="p-4 text-sm text-gray-600">Welcome to the Sauti Community. Be respectful and kind.</div>
+							)}
+						</div>
 
-						<div className="hidden md:block w-80 border-r border-gray-200 bg-white">
-							<UserList users={users} onUserSelect={startDirectMessage} />
+						{/* Main area */}
+						<div className="flex-1 flex flex-col">
+							{/* Mobile tabs */}
+							<div className="md:hidden p-2 bg-white border-b flex gap-2 sticky top-0 z-10">
+								<Button size="sm" variant={activeTab === "community" ? "default" : "outline"} onClick={() => setActiveTab("community")}>Community</Button>
+								<Button size="sm" variant={activeTab === "dm" ? "default" : "outline"} onClick={() => setActiveTab("dm")}>Messages</Button>
+							</div>
+
+							{activeTab === "community" ? (
+								<div className="w-full">
+									<Channel channel={communityChannelRef.current}>
+										<Window>
+											<div className="flex items-center p-2 bg-white border-b border-gray-200">
+												<ChannelHeader />
+											</div>
+											<MessageList />
+											<MessageInput />
+										</Window>
+										<Thread />
+									</Channel>
+								</div>
+							) : showUserList ? (
+								<div className="w-full md:hidden bg-white">
+									<UserList users={users} onUserSelect={startDirectMessage} />
+								</div>
+							) : (
+								<div className="w-full">
+									<Channel channel={channel}>
+										<Window>
+											<div className="flex items-center p-2 bg-white border-b border-gray-200">
+												<button
+													onClick={handleBackToUsers}
+													className="md:hidden p-2 hover:bg-gray-100 rounded-full mr-2"
+												>
+													←
+												</button>
+												<ChannelHeader />
+											</div>
+											<MessageList />
+											<MessageInput />
+										</Window>
+										<Thread />
+									</Channel>
+								</div>
+							)}
 						</div>
 					</div>
 				</StreamChat>

@@ -4,6 +4,8 @@ import { useToast } from "@/hooks/use-toast";
 import { useState, useEffect } from "react";
 import { Button } from "./ui/button";
 import { submitReport } from "@/app/_actions/unauth_reports";
+import { Mic, Square } from "lucide-react";
+import { useSpeechToText } from "@/hooks/useSpeechToText";
 
 const SUPPORT_SERVICE_OPTIONS = [
 	{ value: "legal", label: "legal support" },
@@ -17,6 +19,8 @@ const SUPPORT_SERVICE_OPTIONS = [
 export default function ReportAbuseForm({ onClose }: { onClose?: () => void }) {
 	const { toast } = useToast();
 	const [loading, setLoading] = useState(false);
+	const [description, setDescription] = useState("");
+	const { isSupported, isListening, transcript, start, stop, reset } = useSpeechToText({ lang: "en-US", interimResults: true });
 	const [location, setLocation] = useState<{
 		latitude: number;
 		longitude: number;
@@ -44,6 +48,14 @@ export default function ReportAbuseForm({ onClose }: { onClose?: () => void }) {
 		}
 	}, []);
 
+	useEffect(() => {
+		// When recording stops and we have a transcript, append it once to the description
+		if (!isListening && transcript) {
+			setDescription((prev) => (prev ? `${prev} ${transcript.trim()}` : transcript.trim()));
+			reset();
+		}
+	}, [isListening, transcript, reset]);
+
 	const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
 		e.preventDefault();
 		const form = e.currentTarget;
@@ -56,7 +68,7 @@ export default function ReportAbuseForm({ onClose }: { onClose?: () => void }) {
 				// Required fields from form
 				first_name: formData.get("first_name") as string,
 				email: formData.get("email") as string,
-				incident_description: formData.get("incident_description") as string,
+				incident_description: description,
 				type_of_incident: formData.get("incident_type") as
 					| "physical"
 					| "emotional"
@@ -114,6 +126,7 @@ export default function ReportAbuseForm({ onClose }: { onClose?: () => void }) {
 
 			// Only reset and show success if the submission was successful
 			form.reset();
+			setDescription("");
 			toast({
 				title: "Report Submitted",
 				description: "Thank you for your report. We will review it shortly.",
@@ -205,12 +218,42 @@ export default function ReportAbuseForm({ onClose }: { onClose?: () => void }) {
 				</p>
 
 				<p className="mt-4">Here's what happened:</p>
-				<Textarea
-					placeholder="Please share what happened..."
-					name="incident_description"
-					required
-					className="min-h-[120px] w-full mt-2"
-				/>
+				<div className="space-y-2">
+					<div className="flex items-center justify-between">
+						<span className="text-xs text-gray-500">You can speak instead of typing</span>
+						<div className="flex items-center gap-2">
+							<Button
+								type="button"
+								variant={isListening ? "destructive" : "outline"}
+								size="sm"
+								onClick={() => (isListening ? stop() : start())}
+							>
+								{isListening ? (
+									<>
+										<Square className="h-4 w-4 mr-2" /> Stop
+									</>
+								) : (
+									<>
+										<Mic className="h-4 w-4 mr-2" /> Speak
+									</>
+								)}
+							</Button>
+						</div>
+					</div>
+					<Textarea
+						placeholder="Please share what happened..."
+						name="incident_description"
+						required
+						className="min-h-[140px] w-full mt-1"
+						value={description}
+						onChange={(e) => setDescription(e.target.value)}
+					/>
+					{!isSupported && (
+						<p className="text-xs text-gray-400">
+							Voice input is not supported on this device/browser.
+						</p>
+					)}
+				</div>
 
 				<p className="mt-4">
 					Please{" "}

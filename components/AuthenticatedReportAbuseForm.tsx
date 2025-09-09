@@ -12,6 +12,8 @@ import {
 	type SupportServiceType,
 } from "@/lib/constants";
 import { useUser } from "@/hooks/useUser";
+import { Mic, Square } from "lucide-react";
+import { useSpeechToText } from "@/hooks/useSpeechToText";
 
 interface AuthenticatedReportAbuseFormProps {
 	onClose: () => void;
@@ -25,6 +27,8 @@ export default function AuthenticatedReportAbuseForm({
 	const { toast } = useToast();
 	const [loading, setLoading] = useState(false);
 	const [selectedServices, setSelectedServices] = useState<string[]>([]);
+	const [description, setDescription] = useState("");
+	const { isSupported, isListening, transcript, start, stop, reset } = useSpeechToText({ lang: "en-US", interimResults: true });
 	const [location, setLocation] = useState<{
 		latitude: number;
 		longitude: number;
@@ -53,6 +57,13 @@ export default function AuthenticatedReportAbuseForm({
 			);
 		}
 	}, [toast]);
+
+	useEffect(() => {
+		if (!isListening && transcript) {
+			setDescription((prev) => (prev ? `${prev} ${transcript.trim()}` : transcript.trim()));
+			reset();
+		}
+	}, [isListening, transcript, reset]);
 
 	const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
 		e.preventDefault();
@@ -83,7 +94,7 @@ export default function AuthenticatedReportAbuseForm({
 			user_id: userId,
 			phone: phone,
 			type_of_incident: formData.get("incident_type"),
-			incident_description: formData.get("incident_description"),
+			incident_description: description,
 			urgency: formData.get("urgency"),
 			consent: formData.get("consent"),
 			contact_preference: contactPreference,
@@ -162,13 +173,39 @@ export default function AuthenticatedReportAbuseForm({
 					</select>
 				</div>
 
-				<div className="w-full">
+				<div className="w-full space-y-2">
+					<div className="flex items-center justify-between">
+						<span className="text-xs text-gray-500">You can speak instead of typing</span>
+						<Button
+							type="button"
+							variant={isListening ? "destructive" : "outline"}
+							size="sm"
+							onClick={() => (isListening ? stop() : start())}
+						>
+							{isListening ? (
+								<>
+									<Square className="h-4 w-4 mr-2" /> Stop
+								</>
+							) : (
+								<>
+									<Mic className="h-4 w-4 mr-2" /> Speak
+								</>
+							)}
+						</Button>
+					</div>
 					<Textarea
 						placeholder="Please share what happened..."
 						name="incident_description"
 						required
-						className="min-h-[120px] w-full"
+						className="min-h-[140px] w-full"
+						value={description}
+						onChange={(e) => setDescription(e.target.value)}
 					/>
+					{!isSupported && (
+						<p className="text-xs text-gray-400">
+							Voice input is not supported on this device/browser.
+						</p>
+					)}
 				</div>
 
 				<div className="w-full space-y-2">
