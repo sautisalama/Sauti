@@ -59,6 +59,7 @@ export default function RootLayout({
 				<PWAInstallPrompt />
 				<Toaster />
 				<BottomNav />
+				cls{" "}
 			</body>
 		</html>
 	);
