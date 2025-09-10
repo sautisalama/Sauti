@@ -16,7 +16,6 @@ import animationData from "@/public/lottie-animations/messages.json";
 import styles from "./chat.module.css";
 import { Button } from "@/components/ui/button";
 import { Images, LinkIcon } from "lucide-react";
-import { BottomNav } from "@/components/BottomNav";
 import { useRouter } from "next/navigation";
 
 interface User {
@@ -294,9 +293,6 @@ export function ChatOverview({
                 )}
               </div>
             )}
-
-            {/* Local Bottom Nav only on overview page */}
-            <BottomNav forceShow />
           </div>
         </div>
       </StreamChat>

@@ -20,7 +20,6 @@ import { Button } from "@/components/ui/button";
 import { AppointmentScheduler } from "@/app/dashboard/_components/AppointmentScheduler";
 import { createClient as createSbClient } from "@/utils/supabase/client";
 import { CalendarDays, LinkIcon, Images, Search, Plus } from "lucide-react";
-import { BottomNav } from "@/components/BottomNav";
 import { getPreloadedChat, preloadChat } from "@/utils/chat/preload";
 
 interface User {
@@ -309,7 +308,6 @@ const [showUserList, setShowUserList] = useState(true);
 											</div>
 										</div>
 										<UserList users={users.filter(u => u.username.toLowerCase().includes(search.toLowerCase()))} onUserSelect={async (id) => { await startDirectMessage(id); setShowUserList(false); setShowNewChat(false); }} />
-										<BottomNav forceShow />
 									</div>
 								) : (
 									<div className="flex-1 overflow-y-auto bg-white pb-20">
@@ -358,7 +356,6 @@ const [showUserList, setShowUserList] = useState(true);
 													</button>
 												);
 											})}
-										<BottomNav forceShow />
 									</div>
 								)}
 						</div>

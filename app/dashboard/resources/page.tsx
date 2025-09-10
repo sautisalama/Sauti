@@ -78,7 +78,7 @@ export default function BlogPage() {
 			</div>
 
 			{/* Categories */}
-			<div className="mb-8">
+			<div className="mb-8 sticky top-0 z-10 bg-white/80 backdrop-blur supports-[backdrop-filter]:bg-white/60 py-3 border-b">
 				<div className="flex flex-wrap gap-2 justify-center">
 					{categories.map((category) => (
 						<Button
@@ -104,9 +104,9 @@ export default function BlogPage() {
 				{filteredPosts.map((post, index) => (
 					<Card
 						key={index}
-						className="overflow-hidden hover:shadow-lg transition-shadow"
+						className="overflow-hidden hover:shadow-lg transition-shadow rounded-2xl border border-neutral-200"
 					>
-						<div className="relative h-48 w-full">
+						<div className="relative h-48 w-full overflow-hidden">
 							<Image
 								src={post.imageUrl}
 								alt={post.title}
@@ -121,7 +121,7 @@ export default function BlogPage() {
 								</Badge>
 								<span className="text-sm text-gray-500">{post.date}</span>
 							</div>
-							<CardTitle className="text-xl font-bold text-[#1A3434] line-clamp-2">
+						<CardTitle className="text-xl font-bold text-[#1A3434] line-clamp-2 leading-snug">
 								{post.title}
 							</CardTitle>
 						</CardHeader>

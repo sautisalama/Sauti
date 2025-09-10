@@ -39,6 +39,7 @@ import { StatCard } from "@/components/dashboard/StatCard";
 import { QuickActions } from "@/components/dashboard/QuickActions";
 import { SectionHeader } from "@/components/dashboard/SectionHeader";
 import { ClipboardList, Users, CalendarDays, MessageCircle, PlusCircle } from "lucide-react";
+import Link from "next/link";
 
 interface ProfessionalViewProps {
 	userId: string;
@@ -160,6 +161,45 @@ export default function ProfessionalView({
 								{ label: "Reports", description: "View cases", href: "#reports", icon: ClipboardList },
 							]}
 						/>
+					</div>
+
+					{/* Quick Agenda + Queues */}
+					<div className="grid grid-cols-1 md:grid-cols-3 gap-4 my-4">
+						<div className="rounded-xl border p-4 bg-white shadow-sm">
+							<p className="text-sm text-neutral-600 mb-2">Today’s Agenda</p>
+							<div className="space-y-2 text-sm">
+								<div className="flex items-center justify-between">
+									<span>10:00 • Intake call</span>
+									<Link href="/dashboard?tab=appointments" className="text-sauti-orange">Open</Link>
+								</div>
+								<div className="flex items-center justify-between">
+									<span>14:00 • Follow-up</span>
+									<Link href="/dashboard?tab=appointments" className="text-sauti-orange">Open</Link>
+								</div>
+							</div>
+						</div>
+						<div className="rounded-xl border p-4 bg-white shadow-sm">
+							<p className="text-sm text-neutral-600 mb-2">Queues</p>
+							<div className="grid grid-cols-3 gap-2 text-sm">
+								<div className="rounded-lg bg-[#FFF5F5] p-3 text-center">
+									<p className="text-xs text-neutral-500">High</p>
+									<p className="text-lg font-semibold">2</p>
+								</div>
+								<div className="rounded-lg bg-[#FFF8F0] p-3 text-center">
+									<p className="text-xs text-neutral-500">Medium</p>
+									<p className="text-lg font-semibold">5</p>
+								</div>
+								<div className="rounded-lg bg-[#F0F9FF] p-3 text-center">
+									<p className="text-xs text-neutral-500">Low</p>
+									<p className="text-lg font-semibold">9</p>
+								</div>
+							</div>
+						</div>
+						<div className="rounded-xl border p-4 bg-white shadow-sm">
+							<p className="text-sm text-neutral-600 mb-2">Quick Chat</p>
+							<p className="text-sm mb-2">Open your messages to coordinate care.</p>
+							<Link href="/dashboard/chat" className="text-sauti-orange">Open chat →</Link>
+						</div>
 					</div>
 
 					<div className="flex flex-col md:flex-row gap-6">

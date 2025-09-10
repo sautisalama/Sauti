@@ -26,11 +26,6 @@ export default async function Dashboard() {
 
 	return (
 		<div className="flex h-screen overflow-hidden">
-			{/* Sidebar - hidden on mobile */}
-			<div className="hidden md:block fixed left-0 h-full">
-				<MainSidebar />
-			</div>
-
 			{/* Main content area */}
 			<div className="flex-1 overflow-auto md:ml-[72px]">
 				<Suspense fallback={<div className="p-6">Loading dashboard...</div>}>
