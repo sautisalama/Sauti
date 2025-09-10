@@ -16,20 +16,49 @@ export default function ProfilePage() {
   const { toast } = useToast();
   const isProfessional = user?.profile?.user_type === "professional" || user?.profile?.user_type === "ngo";
 
+  // Anonymous mode state (persisted client-side)
+  const anonEnabled = typeof window !== "undefined" ? window.localStorage.getItem("ss_anon_mode") === "1" : false;
+
   const onSave = (section: string) => {
     toast({ title: "Saved", description: `${section} updated (UI only)`, });
+  };
+
+  const toggleAnon = () => {
+    try {
+      if (typeof window === "undefined") return;
+      const current = window.localStorage.getItem("ss_anon_mode") === "1";
+      if (current) {
+        window.localStorage.setItem("ss_anon_mode", "0");
+        window.localStorage.removeItem("ss_anon_id");
+        toast({ title: "Anonymous mode off", description: "You are now using your profile identity." });
+      } else {
+        window.localStorage.setItem("ss_anon_mode", "1");
+        // Generate stable anonymous ID for this user session until turned off
+        const base = (user?.id || "user").slice(0, 12);
+        const rand = Math.random().toString(36).slice(2, 8);
+        const anonId = `anon-${base}-${rand}`;
+        window.localStorage.setItem("ss_anon_id", anonId);
+        toast({ title: "Anonymous mode on", description: "You will appear as Anonymous in chat." });
+      }
+    } catch {}
   };
 
   return (
     <div className="max-w-5xl mx-auto p-4 md:p-6 space-y-6">
       {/* Header */}
       <div className="flex items-center gap-4">
-        <Avatar className="h-16 w-16">
-          <AvatarImage src={user?.profile?.avatar_url || ""} />
-          <AvatarFallback className="bg-sauti-orange text-white">
-            {user?.profile?.first_name?.[0]?.toUpperCase() || user?.email?.[0]?.toUpperCase() || "U"}
-          </AvatarFallback>
-        </Avatar>
+        <div className="relative">
+          <Avatar className="h-16 w-16">
+            <AvatarImage src={user?.profile?.avatar_url || ""} />
+            <AvatarFallback className="bg-sauti-orange text-white">
+              {user?.profile?.first_name?.[0]?.toUpperCase() || user?.email?.[0]?.toUpperCase() || "U"}
+            </AvatarFallback>
+          </Avatar>
+          {/* Anonymous indicator dot */}
+          {typeof window !== "undefined" && window.localStorage.getItem("ss_anon_mode") === "1" && (
+            <span className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-emerald-500 ring-2 ring-white" title="Anonymous mode" />
+          )}
+        </div>
         <div className="min-w-0">
           <h1 className="text-xl md:text-2xl font-bold truncate">{user?.profile?.first_name || user?.email || "User"}</h1>
           <div className="flex items-center gap-2 mt-1 text-sm text-neutral-600">
@@ -177,6 +206,33 @@ export default function ProfilePage() {
         )}
 
         {/* Survivor: About & Privacy */}
+        {/* Privacy & Identity */}
+        <TabsContent value={isProfessional ? "overview" : "about"} className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Privacy & Identity</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-medium">Anonymous mode</p>
+                  <p className="text-sm text-neutral-500">When enabled, you appear as Anonymous in chats.</p>
+                </div>
+                <button
+                  onClick={toggleAnon}
+                  className="relative inline-flex h-6 w-11 items-center rounded-full transition-colors"
+                  style={{ backgroundColor: (typeof window !== "undefined" && window.localStorage.getItem("ss_anon_mode") === "1") ? '#10b981' : '#e5e7eb' }}
+                >
+                  <span
+                    className="inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform"
+                    style={{ transform: (typeof window !== "undefined" && window.localStorage.getItem("ss_anon_mode") === "1") ? 'translateX(20px)' : 'translateX(2px)' }}
+                  />
+                </button>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
         {!isProfessional && (
           <TabsContent value="about" className="space-y-6">
             <Card>

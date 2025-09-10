@@ -16,7 +16,23 @@ let cached: PreloadedChat | null = null;
 let inflight: Promise<PreloadedChat> | null = null;
 
 async function connectClient(userId: string, username: string): Promise<StreamChatClient> {
-  const response = await fetch("/api/stream/token");
+  // Determine anonymous mode from localStorage
+  let effectiveId = userId;
+  let effectiveName = username;
+  let qs = "";
+  if (typeof window !== "undefined") {
+    try {
+      const anon = window.localStorage.getItem("ss_anon_mode");
+      const anonId = window.localStorage.getItem("ss_anon_id");
+      if (anon === "1" && anonId) {
+        effectiveId = anonId;
+        effectiveName = "Anonymous";
+        qs = `?anon=1&anonId=${encodeURIComponent(anonId)}`;
+      }
+    } catch {}
+  }
+
+  const response = await fetch(`/api/stream/token${qs}`);
   if (!response.ok) {
     const errorData = await response.json();
     throw new Error(errorData.error || "Failed to fetch token");
@@ -24,12 +40,22 @@ async function connectClient(userId: string, username: string): Promise<StreamCh
   const data = await response.json();
   if (!data.token) throw new Error("No token received");
   const streamClient = new StreamChatClient(process.env.NEXT_PUBLIC_STREAM_KEY!, { timeout: 6000 });
-  await streamClient.connectUser({ id: userId, name: username }, data.token);
+  await streamClient.connectUser({ id: effectiveId, name: effectiveName }, data.token);
   return streamClient;
 }
 
 export async function preloadChat(userId: string, username: string): Promise<PreloadedChat> {
-  if (cached && cached.userId === userId) return cached;
+  // Account for anonymous cache key
+  let cacheKey = userId;
+  if (typeof window !== "undefined") {
+    try {
+      const anon = window.localStorage.getItem("ss_anon_mode");
+      const anonId = window.localStorage.getItem("ss_anon_id");
+      if (anon === "1" && anonId) cacheKey = anonId;
+    } catch {}
+  }
+
+  if (cached && cached.userId === cacheKey) return cached;
   if (inflight) return inflight;
 
   inflight = (async () => {
@@ -73,7 +99,21 @@ export async function preloadChat(userId: string, username: string): Promise<Pre
     }
     const mappedUsers: PreloadedUser[] = allUsers.map((u) => ({ id: u.id, username: (u as any).name || u.id }));
 
-    cached = { client, userId, username, dmChannels, users: mappedUsers, communityChannel };
+    // Use effective id/name for cached values
+    let effectiveId = userId;
+    let effectiveName = username;
+    if (typeof window !== "undefined") {
+      try {
+        const anon = window.localStorage.getItem("ss_anon_mode");
+        const anonId = window.localStorage.getItem("ss_anon_id");
+        if (anon === "1" && anonId) {
+          effectiveId = anonId;
+          effectiveName = "Anonymous";
+        }
+      } catch {}
+    }
+
+    cached = { client, userId: effectiveId, username: effectiveName, dmChannels, users: mappedUsers, communityChannel };
     inflight = null;
     return cached;
   })();

@@ -2,6 +2,7 @@ import { getUser } from "@/utils/supabase/server";
 import { redirect } from "next/navigation";
 import { EnhancedSidebar } from "@/components/navigation/EnhancedSidebar";
 import { EnhancedBottomNav } from "@/components/navigation/EnhancedBottomNav";
+import { MobileProfileButton } from "@/components/navigation/MobileProfileButton";
 import { ChatPreloader } from "./_components/ChatPreloader";
 
 export default async function DashboardLayout({
@@ -29,6 +30,8 @@ export default async function DashboardLayout({
 				<div className="pb-20 lg:pb-0">
 					{children}
 				</div>
+				{/* Mobile Profile Button */}
+				<MobileProfileButton />
 			</main>
 			
 			{/* Mobile Bottom Navigation */}

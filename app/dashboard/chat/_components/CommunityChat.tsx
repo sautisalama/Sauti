@@ -23,14 +23,27 @@ export function CommunityChat({ userId, username }: { userId: string; username: 
     const init = async () => {
       try {
         if (client) return;
-        const response = await fetch("/api/stream/token");
+        // Support anonymous mode via query params
+        let qs = "";
+        if (typeof window !== "undefined") {
+          try {
+            const anon = window.localStorage.getItem("ss_anon_mode");
+            const anonId = window.localStorage.getItem("ss_anon_id");
+            if (anon === "1" && anonId) qs = `?anon=1&anonId=${encodeURIComponent(anonId)}`;
+          } catch {}
+        }
+        const response = await fetch(`/api/stream/token${qs}`);
         if (!response.ok) {
           const errorData = await response.json();
           throw new Error(errorData.error || "Failed to fetch token");
         }
         const data = await response.json();
         const streamClient = new StreamChatClient(process.env.NEXT_PUBLIC_STREAM_KEY!, { timeout: 6000 });
-        await streamClient.connectUser({ id: userId, name: username }, data.token);
+        let effectiveId = userId, effectiveName = username;
+        if (typeof window !== "undefined") {
+          try { if (window.localStorage.getItem("ss_anon_mode") === "1") { effectiveName = "Anonymous"; effectiveId = window.localStorage.getItem("ss_anon_id") || effectiveId; } } catch {}
+        }
+        await streamClient.connectUser({ id: effectiveId, name: effectiveName }, data.token);
         const ch = streamClient.channel("livestream", "community-global", { name: "Sauti Community" });
         await ch.create();
         await ch.watch();
