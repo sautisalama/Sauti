@@ -10,13 +10,18 @@ import {
 	Thread,
 	Window,
 } from "stream-chat-react";
-import { StreamChat as StreamChatClient } from "stream-chat";
+import { StreamChat as StreamChatClient, ChannelFilters, ChannelSort } from "stream-chat";
 import { UserList } from "./UserList";
 import "stream-chat-react/dist/css/v2/index.css";
 import Animation from "@/components/LottieWrapper";
 import animationData from "@/public/lottie-animations/messages.json";
 import styles from "./chat.module.css";
 import { Button } from "@/components/ui/button";
+import { AppointmentScheduler } from "@/app/dashboard/_components/AppointmentScheduler";
+import { createClient as createSbClient } from "@/utils/supabase/client";
+import { CalendarDays, Paperclip, LinkIcon, Images, Video, PhoneCall } from "lucide-react";
+import { BottomNav } from "@/components/BottomNav";
+import { getPreloadedChat, preloadChat } from "@/utils/chat/preload";
 
 interface User {
 	id: string;
@@ -38,58 +43,65 @@ export function ChatComponent({
 	const [channel, setChannel] = useState<any>(null);
 	const [users, setUsers] = useState<User[]>([]);
 	const [connectionError, setConnectionError] = useState<string | null>(null);
-	const [showUserList, setShowUserList] = useState(true);
-	const [activeTab, setActiveTab] = useState<"community" | "dm">("community");
+const [showUserList, setShowUserList] = useState(true);
+	const [activeTab, setActiveTab] = useState<"community" | "dm" | "contacts">("community");
 	const communityChannelRef = useRef<any>(null);
+	const [dmChannels, setDmChannels] = useState<any[]>([]);
+	const [showSchedule, setShowSchedule] = useState(false);
+	const [appointments, setAppointments] = useState<any[]>([]);
+	const [mediaCounts, setMediaCounts] = useState<{attachments:number; links:number}>({attachments:0, links:0});
+
+	// Helpers: count media and links in current channel messages
+	const collectMedia = (ch: any) => {
+		try {
+			const msgs: any[] = ch?.state?.messages || [];
+			let attachments = 0;
+			let links = 0;
+			msgs.forEach((m) => {
+				if (Array.isArray(m.attachments) && m.attachments.length) attachments += m.attachments.length;
+				if (typeof m.text === "string") {
+					const found = (m.text.match(/https?:\/\//g) || []).length;
+					links += found;
+				}
+			});
+			setMediaCounts({ attachments, links });
+		} catch {}
+	};
+	const collectLinks = (ch: any) => {
+		try {
+			const msgs: any[] = ch?.state?.messages || [];
+			let links = 0;
+			msgs.forEach((m) => {
+				if (typeof m.text === "string") {
+					const found = (m.text.match(/https?:\/\//g) || []).length;
+					links += found;
+				}
+			});
+			setMediaCounts((prev) => ({ attachments: prev.attachments, links }));
+		} catch {}
+	};
 
 	useEffect(() => {
 		const initChat = async () => {
 			try {
 				if (client) return;
 
-				const response = await fetch("/api/stream/token");
-				if (!response.ok) {
-					const errorData = await response.json();
-					throw new Error(errorData.error || "Failed to fetch token");
-				}
-
-				const data = await response.json();
-				if (!data.token) {
-					throw new Error("No token received");
-				}
-
-				const streamClient = new StreamChatClient(
-					process.env.NEXT_PUBLIC_STREAM_KEY!,
-					{
-						timeout: 6000,
-					}
-				);
-
-				await streamClient.connectUser(
-					{
-						id: userId,
-						name: username,
-					},
-					data.token
-				);
-
-				setConnectionError(null);
-				setClient(streamClient);
-
-				// Prepare or join community channel
-				try {
-					const community = streamClient.channel("messaging", "community-global", {
-						name: "Sauti Community",
-						members: [userId],
-					});
-					await community.create();
-					communityChannelRef.current = community;
-				} catch (err) {
-					// ignore if already exists
-					communityChannelRef.current = streamClient.channel("messaging", "community-global", {
-						name: "Sauti Community",
-						members: [userId],
-					});
+				// Prefer preloaded chat if available for this user
+				const pre = getPreloadedChat(userId);
+				if (pre) {
+					setClient(pre.client);
+					setConnectionError(null);
+					setDmChannels(pre.dmChannels || []);
+					communityChannelRef.current = pre.communityChannel;
+					setUsers(pre.users || []);
+				} else {
+					// Kick off preload (will cache), then apply
+					const loaded = await preloadChat(userId, username);
+					setClient(loaded.client);
+					setConnectionError(null);
+					setDmChannels(loaded.dmChannels || []);
+					communityChannelRef.current = loaded.communityChannel;
+					setUsers(loaded.users || []);
 				}
 
 				if (appointmentId) {
@@ -105,7 +117,7 @@ export function ChatComponent({
 
 					if (otherUserId) {
 						const channelId = `appointment-${appointmentId}`;
-						const newChannel = streamClient.channel("messaging", channelId, {
+						const newChannel = (pre || (await preloadChat(userId, username))).client.channel("messaging", channelId, {
 							members: [userId, otherUserId],
 							appointment_id: appointmentId,
 						});
@@ -113,17 +125,6 @@ export function ChatComponent({
 						await newChannel.create();
 						setChannel(newChannel);
 					}
-				} else {
-					const { users: streamUsers } = await streamClient.queryUsers(
-						{ id: { $ne: userId } },
-						{ last_active: -1 }
-					);
-					setUsers(
-						streamUsers.map((user) => ({
-							id: user.id,
-							username: user.name || user.id,
-						}))
-					);
 				}
 			} catch (error) {
 				console.error("Error connecting to Stream:", error);
@@ -137,16 +138,9 @@ export function ChatComponent({
 
 		initChat();
 
-		// Cleanup function
+		// Cleanup function: do not disconnect the shared preloaded client here
 		return () => {
-			const cleanup = async () => {
-				if (client) {
-					await client.disconnectUser();
-					setClient(null);
-					setChannel(null);
-				}
-			};
-			cleanup();
+			setChannel(null);
 		};
 	}, [userId, username, client, appointmentId]);
 
@@ -164,6 +158,7 @@ export function ChatComponent({
 		await newChannel.create();
 		setChannel(newChannel);
 		setShowUserList(false);
+		setActiveTab("dm");
 	};
 
 	const handleBackToUsers = () => {
@@ -183,7 +178,7 @@ export function ChatComponent({
 	}
 
 	return (
-		<div className="flex h-full pb-[72px] md:pb-0">
+		<div className="flex h-[calc(100vh-0px)] w-full">
 			{connectionError ? (
 				<div className="w-full flex items-center justify-center">
 					<div className="text-center">
@@ -202,34 +197,77 @@ export function ChatComponent({
 			) : (
 				<StreamChat client={client}>
 					<div className={`flex h-full w-full ${styles.chatBackground}`}>
-						{/* Left rail (desktop) */}
-						<div className="hidden md:flex flex-col w-80 border-r border-gray-200 bg-white">
-							<div className="p-3 border-b">
-								<div className="flex gap-2">
-									<Button size="sm" variant={activeTab === "community" ? "default" : "outline"} onClick={() => setActiveTab("community")}>Community</Button>
-									<Button size="sm" variant={activeTab === "dm" ? "default" : "outline"} onClick={() => setActiveTab("dm")}>Messages</Button>
-								</div>
+					{/* Left rail (desktop) */}
+					<div className="hidden md:flex flex-col w-96 border-r border-gray-200 bg-white overflow-hidden">
+						<div className="p-3 border-b">
+							<div className="flex gap-2">
+								<Button size="sm" variant={activeTab === "community" ? "default" : "outline"} onClick={() => setActiveTab("community")}>Community</Button>
+								<Button size="sm" variant={activeTab === "dm" ? "default" : "outline"} onClick={() => setActiveTab("dm")}>Messages</Button>
+								<Button size="sm" variant={activeTab === "contacts" ? "default" : "outline"} onClick={() => setActiveTab("contacts")}>Contacts</Button>
 							</div>
-							{activeTab === "dm" ? (
-								<UserList users={users} onUserSelect={startDirectMessage} />
-							) : (
-								<div className="p-4 text-sm text-gray-600">Welcome to the Sauti Community. Be respectful and kind.</div>
-							)}
 						</div>
+						{activeTab === "dm" ? (
+							<div className="flex-1 overflow-y-auto">
+								{/* DM channel list with preview and presence */}
+									{dmChannels.map((ch: any) => {
+										const members: any[] = Object.values(ch.state.members || {});
+										const other = (members.find((m: any) => (m?.user?.id && m.user.id !== userId)) as any)?.user;
+									const last = ch.state?.messages?.slice().reverse().find((m: any) => !m.deleted_at);
+									return (
+										<button key={ch.id} className="w-full text-left px-3 py-2 hover:bg-gray-50 border-b" onClick={() => { setChannel(ch); setShowUserList(false); setActiveTab("dm"); }}>
+											<div className="flex items-start gap-2">
+												<div className="relative mt-1">
+													<div className="w-9 h-9 rounded-full bg-gray-200 flex items-center justify-center text-gray-600 text-sm">
+														{(other?.name || other?.id || "?").toString().charAt(0).toUpperCase()}
+													</div>
+													<span className={`absolute -right-0 -bottom-0 w-2.5 h-2.5 rounded-full ${other?.online ? 'bg-green-500' : 'bg-gray-300'}`}></span>
+												</div>
+												<div className="flex-1 min-w-0">
+													<div className="flex items-center justify-between">
+														<div className="font-medium truncate">{other?.name || other?.id}</div>
+														<div className="text-[11px] text-muted-foreground">{last?.created_at ? new Date(last.created_at).toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'}) : ''}</div>
+													</div>
+													<div className="text-xs text-muted-foreground truncate">{last?.text || (last?.attachments?.length ? `${last.attachments.length} attachment(s)` : 'No messages yet')}</div>
+												</div>
+											</div>
+										</button>
+									);
+								})}
+							</div>
+						) : activeTab === "contacts" ? (
+							<div className="flex-1 overflow-y-auto">
+								{users.map((u) => (
+									<button key={u.id} className="w-full text-left px-3 py-2 hover:bg-gray-50 border-b" onClick={() => startDirectMessage(u.id)}>
+										<div className="flex items-start gap-2">
+											<div className="w-9 h-9 rounded-full bg-gray-200 flex items-center justify-center text-gray-600 text-sm mt-1">
+												{u.username.charAt(0).toUpperCase()}
+											</div>
+											<div className="flex-1 min-w-0">
+												<div className="font-medium truncate">{u.username}</div>
+												<div className="text-xs text-muted-foreground truncate">Tap to start a conversation</div>
+											</div>
+										</div>
+									</button>
+								))}
+							</div>
+						) : (
+							<div className="p-4 text-sm text-gray-600">Welcome to the Sauti Community. Be respectful and kind.</div>
+						)}
+					</div>
 
-						{/* Main area */}
-						<div className="flex-1 flex flex-col">
+					{/* Main area */}
+					<div className="flex-1 flex flex-col min-w-0">
 							{/* Mobile tabs */}
 							<div className="md:hidden p-2 bg-white border-b flex gap-2 sticky top-0 z-10">
 								<Button size="sm" variant={activeTab === "community" ? "default" : "outline"} onClick={() => setActiveTab("community")}>Community</Button>
 								<Button size="sm" variant={activeTab === "dm" ? "default" : "outline"} onClick={() => setActiveTab("dm")}>Messages</Button>
 							</div>
 
-							{activeTab === "community" ? (
-								<div className="w-full">
+						{activeTab === "community" ? (
+								<div className="w-full h-full flex flex-col min-h-0">
 									<Channel channel={communityChannelRef.current}>
 										<Window>
-											<div className="flex items-center p-2 bg-white border-b border-gray-200">
+											<div className="flex items-center justify-between p-2 bg-white/90 backdrop-blur border-b border-gray-200">
 												<ChannelHeader />
 											</div>
 											<MessageList />
@@ -238,15 +276,18 @@ export function ChatComponent({
 										<Thread />
 									</Channel>
 								</div>
-							) : showUserList ? (
-								<div className="w-full md:hidden bg-white">
+) : showUserList ? (
+<>
+<div className="w-full md:hidden bg-white pb-20">
 									<UserList users={users} onUserSelect={startDirectMessage} />
 								</div>
-							) : (
-								<div className="w-full">
+<BottomNav forceShow />
+</>
+) : (
+								<div className="w-full h-full flex flex-col min-h-0">
 									<Channel channel={channel}>
 										<Window>
-											<div className="flex items-center p-2 bg-white border-b border-gray-200">
+											<div className="flex items-center justify-between p-2 bg-white/90 backdrop-blur border-b border-gray-200">
 												<button
 													onClick={handleBackToUsers}
 													className="md:hidden p-2 hover:bg-gray-100 rounded-full mr-2"
@@ -254,12 +295,72 @@ export function ChatComponent({
 													←
 												</button>
 												<ChannelHeader />
+												<div className="flex items-center gap-2">
+													{/* Media/Links/Docs quick buttons */}
+													<Button size="sm" variant="outline" className="hidden sm:inline-flex" onClick={() => collectMedia(channel)}>
+														<Images className="h-4 w-4 mr-1" /> Media {mediaCounts.attachments ? `(${mediaCounts.attachments})` : ''}
+													</Button>
+													<Button size="sm" variant="outline" className="hidden sm:inline-flex" onClick={() => collectLinks(channel)}>
+														<LinkIcon className="h-4 w-4 mr-1" /> Links {mediaCounts.links ? `(${mediaCounts.links})` : ''}
+													</Button>
+													<Button size="sm" variant="outline" onClick={() => setShowSchedule(true)}>
+														<CalendarDays className="h-4 w-4 mr-1" /> Schedule
+													</Button>
+												</div>
 											</div>
+											{/* Safety actions for DM */}
+											{channel?.id !== "community-global" && (
+												<div className="flex items-center justify-end gap-2 px-2 py-1 bg-white border-b">
+													{(() => {
+														const members = channel?.state?.members ? Object.keys(channel.state.members) : [];
+														const other = members.find((m) => m !== userId);
+														return (
+															<>
+																<Button size="sm" variant="outline" onClick={async () => {
+																	try { await client?.flagUser(other!); } catch {}
+																}}>
+																	Report User
+																</Button>
+																<Button size="sm" variant="destructive" onClick={async () => {
+																	try { await client?.banUser(other!, { timeout: 60 * 24 }); } catch {}
+																}}>
+																	Block 24h
+																</Button>
+															</>
+														);
+													})()}
+												</div>
+											)}
 											<MessageList />
 											<MessageInput />
 										</Window>
 										<Thread />
 									</Channel>
+
+									{/* Appointment Scheduler (DM) */}
+									<AppointmentScheduler
+										isOpen={showSchedule}
+										onClose={() => setShowSchedule(false)}
+										onSchedule={async (date) => {
+											// Create direct appointment (no matched_service)
+											const members = Object.keys(channel?.state?.members || {});
+											const otherId = members.find((m) => m !== userId);
+											const sb = createSbClient();
+											// Determine roles: fetch current and other user profiles
+											const { data: me } = await sb.from("profiles").select("id,user_type").eq("id", userId).single();
+											const { data: other } = await sb.from("profiles").select("id,user_type").eq("id", otherId as string).single();
+											if (!me || !other) return;
+											const isPro = me.user_type === "professional" || me.user_type === "ngo";
+											const appointment = {
+												appointment_date: date.toISOString(),
+												professional_id: isPro ? me.id : other.id,
+												survivor_id: isPro ? (other.id as string) : me.id,
+												status: "confirmed" as any,
+											};
+											await sb.from("appointments").insert([appointment]);
+											setShowSchedule(false);
+										}}
+									/>
 								</div>
 							)}
 						</div>
