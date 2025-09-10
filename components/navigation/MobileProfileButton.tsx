@@ -23,12 +23,11 @@ export function MobileProfileButton() {
     >
       <div className="relative">
         <Avatar className="h-8 w-8">
-          <AvatarImage src={user?.profile?.avatar_url || ""} />
+          <AvatarImage src={isAnon ? "/anon.svg" : (user?.profile?.avatar_url || "")} />
           <AvatarFallback className="text-[11px]">
             {user?.profile?.first_name?.[0]?.toUpperCase() || user?.email?.[0]?.toUpperCase() || "U"}
           </AvatarFallback>
         </Avatar>
-        {isAnon && <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-emerald-500 ring-2 ring-white" title="Anonymous mode" />}
       </div>
     </Link>
   );

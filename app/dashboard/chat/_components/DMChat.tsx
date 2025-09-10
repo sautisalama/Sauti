@@ -77,7 +77,7 @@ export function DMChat({ userId, username, channelId }: { userId: string; userna
         if (typeof window !== "undefined") {
           try { if (window.localStorage.getItem("ss_anon_mode") === "1") { effectiveName = "Anonymous"; effectiveId = window.localStorage.getItem("ss_anon_id") || effectiveId; } } catch {}
         }
-        await streamClient.connectUser({ id: effectiveId, name: effectiveName }, data.token);
+        await streamClient.connectUser({ id: effectiveId, name: effectiveName, image: effectiveName === "Anonymous" ? "/anon.svg" : undefined }, data.token);
         const ch = streamClient.channel("messaging", channelId, {});
         await ch.create();
         await ch.watch();

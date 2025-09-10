@@ -49,15 +49,11 @@ export default function ProfilePage() {
       <div className="flex items-center gap-4">
         <div className="relative">
           <Avatar className="h-16 w-16">
-            <AvatarImage src={user?.profile?.avatar_url || ""} />
+            <AvatarImage src={(typeof window !== "undefined" && window.localStorage.getItem("ss_anon_mode") === "1") ? "/anon.svg" : (user?.profile?.avatar_url || "")} />
             <AvatarFallback className="bg-sauti-orange text-white">
               {user?.profile?.first_name?.[0]?.toUpperCase() || user?.email?.[0]?.toUpperCase() || "U"}
             </AvatarFallback>
           </Avatar>
-          {/* Anonymous indicator dot */}
-          {typeof window !== "undefined" && window.localStorage.getItem("ss_anon_mode") === "1" && (
-            <span className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-emerald-500 ring-2 ring-white" title="Anonymous mode" />
-          )}
         </div>
         <div className="min-w-0">
           <h1 className="text-xl md:text-2xl font-bold truncate">{user?.profile?.first_name || user?.email || "User"}</h1>

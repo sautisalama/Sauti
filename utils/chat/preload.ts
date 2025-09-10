@@ -40,7 +40,7 @@ async function connectClient(userId: string, username: string): Promise<StreamCh
   const data = await response.json();
   if (!data.token) throw new Error("No token received");
   const streamClient = new StreamChatClient(process.env.NEXT_PUBLIC_STREAM_KEY!, { timeout: 6000 });
-  await streamClient.connectUser({ id: effectiveId, name: effectiveName }, data.token);
+  await streamClient.connectUser({ id: effectiveId, name: effectiveName, image: effectiveName === "Anonymous" ? "/anon.svg" : undefined }, data.token);
   return streamClient;
 }
 

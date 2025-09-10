@@ -259,7 +259,7 @@ export function EnhancedSidebar({ defaultCollapsed = false, className }: Enhance
             isCollapsed && "justify-center"
           )}>
             <Avatar className="h-10 w-10">
-              <AvatarImage src={user?.profile?.avatar_url || ""} />
+              <AvatarImage src={(typeof window !== "undefined" && window.localStorage.getItem("ss_anon_mode") === "1") ? "/anon.svg" : (user?.profile?.avatar_url || "")} />
               <AvatarFallback className="bg-sauti-orange text-white">
                 {user?.profile?.first_name?.[0]?.toUpperCase() || user?.email?.[0]?.toUpperCase() || "U"}
               </AvatarFallback>

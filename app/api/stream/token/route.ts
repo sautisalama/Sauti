@@ -45,6 +45,7 @@ export async function GET(request: Request) {
 						id: targetId,
 						name: targetName,
 						role: "user",
+						image: useAnon ? "/anon.svg" : undefined,
 					},
 				]);
 			}
