@@ -28,6 +28,7 @@ export default function AuthenticatedReportAbuseForm({
 	const [loading, setLoading] = useState(false);
 	const [selectedServices, setSelectedServices] = useState<string[]>([]);
 	const [description, setDescription] = useState("");
+	const [draft, setDraft] = useState<any | null>(null);
 	const { isSupported, isListening, transcript, start, stop, reset } = useSpeechToText({ lang: "en-US", interimResults: true });
 	const [location, setLocation] = useState<{
 		latitude: number;
@@ -57,6 +58,18 @@ export default function AuthenticatedReportAbuseForm({
 			);
 		}
 	}, [toast]);
+
+	useEffect(() => {
+		try {
+			const saved = localStorage.getItem("authReportDraft");
+			if (saved) {
+				const parsed = JSON.parse(saved);
+				setDraft(parsed);
+				if (parsed.description) setDescription(parsed.description);
+				if (parsed.selectedServices) setSelectedServices(parsed.selectedServices);
+			}
+		} catch {}
+	}, []);
 
 	useEffect(() => {
 		if (!isListening && transcript) {
@@ -122,6 +135,7 @@ export default function AuthenticatedReportAbuseForm({
 			});
 
 			form.reset();
+			try { localStorage.removeItem("authReportDraft"); } catch {}
 			setTimeout(() => {
 				onClose();
 			}, 500);
@@ -213,12 +227,15 @@ export default function AuthenticatedReportAbuseForm({
 					<p className="text-sm text-gray-500">
 						Select all that apply in order of priority
 					</p>
-					<MultiSelect
-						selected={selectedServices}
-						onChange={setSelectedServices}
-						options={SUPPORT_SERVICE_OPTIONS}
-						placeholder="Select required services..."
-					/>
+									<MultiSelect
+										selected={selectedServices}
+										onChange={setSelectedServices}
+										options={SUPPORT_SERVICE_OPTIONS}
+										placeholder="Select required services..."
+									/>
+									{draft?.selectedServices && draft.selectedServices.length > 0 && (
+										<p className="text-xs text-gray-400">Draft selected: {draft.selectedServices.join(", ")}</p>
+									)}
 				</div>
 
 				<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -273,13 +290,32 @@ export default function AuthenticatedReportAbuseForm({
 			</div>
 
 			<div className="fixed bottom-0 left-0 right-0 pt-4 pb-4 bg-white border-t mt-4 z-50">
-				<div className="max-w-[1200px] mx-auto px-4">
+				<div className="max-w-[1200px] mx-auto px-4 flex flex-col sm:flex-row gap-2">
 					<Button
 						type="submit"
-						className="w-full max-w-md mx-auto block"
+						className="w-full sm:flex-1"
 						disabled={loading}
 					>
 						{loading ? "Submitting..." : "Submit Report"}
+					</Button>
+					<Button
+						variant="outline"
+						onClick={(e) => {
+							const form = (e.currentTarget.closest("form") as HTMLFormElement)!;
+							const fd = new FormData(form);
+							const toSave = Object.fromEntries(fd.entries());
+							(toSave as any).description = description;
+							(toSave as any).selectedServices = selectedServices;
+							try { localStorage.setItem("authReportDraft", JSON.stringify(toSave)); setDraft(toSave); } catch {}
+						}}
+					>
+						Save Draft
+					</Button>
+					<Button
+						variant="ghost"
+						onClick={() => { try { localStorage.removeItem("authReportDraft"); setDraft(null); setDescription(""); setSelectedServices([]); } catch {} }}
+					>
+						Clear Draft
 					</Button>
 				</div>
 			</div>

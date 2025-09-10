@@ -72,7 +72,7 @@ export async function matchReportWithServices(reportId: string) {
 			return requiredServices.some((required: string) => serviceType === required);
 		});
 
-		// Then, calculate distances for matching services
+		// Then, calculate distances and scores for matching services
 		const servicesWithDistances = matchingServices.map((service) => {
 			let distance = Infinity;
 
@@ -90,15 +90,28 @@ export async function matchReportWithServices(reportId: string) {
 				);
 			}
 
+			// Scoring: base for type match + proximity + availability, scaled by urgency
+			const radius = Number(service.coverage_area_radius) || 50;
+			const distanceScore = isFinite(distance)
+				? Math.max(0, 20 * (1 - Math.min(distance / radius, 1)))
+				: 0;
+			const availabilityBonus = /24\/7|open|available|always/i.test(service.availability || "")
+				? 10
+				: 0;
+			const base = 60; // service type match
+			const urgencyMult = report.urgency === "high" ? 1.15 : report.urgency === "medium" ? 1.05 : 1.0;
+			const score = Math.round((base + distanceScore + availabilityBonus) * urgencyMult);
+
 			return {
 				service,
 				distance,
+				score,
 			};
 		});
 
-		// Sort by distance and take the top 5 closest matches
+		// Sort by score desc (then by distance asc) and take top 5
 		const closestMatches = servicesWithDistances
-			.sort((a, b) => a.distance - b.distance)
+			.sort((a, b) => (b.score - a.score) || (a.distance - b.distance))
 			.slice(0, 5);
 
 		// Update the report's match status
@@ -120,8 +133,7 @@ export async function matchReportWithServices(reportId: string) {
 				report_id: reportId,
 				service_id: match.service.id,
 				match_date: new Date().toISOString(),
-				match_score:
-					match.distance === Infinity ? 0 : 100 - Math.min(match.distance, 100),
+				match_score: match.score,
 				match_status_type:
 					"pending" as Database["public"]["Enums"]["match_status_type"],
 				description: report.incident_description,

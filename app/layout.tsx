@@ -4,6 +4,8 @@ import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
 import "stream-chat-react/dist/css/v2/index.css";
 import { PWAInstallPrompt } from "@/components/PWAInstallPrompt";
+// import { SafetyBar } from "@/components/SafetyBar";
+import { BottomNav } from "@/components/BottomNav";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -52,9 +54,11 @@ export default function RootLayout({
 	return (
 		<html lang="en">
 			<body className={inter.className}>
+				{/* <SafetyBar /> */}
 				{children}
 				<PWAInstallPrompt />
 				<Toaster />
+				<BottomNav />
 			</body>
 		</html>
 	);

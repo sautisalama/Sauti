@@ -1,6 +1,6 @@
 import { Tables } from "@/types/db-schema";
 import { Button } from "@/components/ui/button";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, Download } from "lucide-react";
 import {
 	Dialog,
 	DialogContent,
@@ -127,14 +127,32 @@ export function ReportsTab({
 										</div>
 									</div>
 
-									<Button
-										variant="ghost"
-										size="icon"
-										className="text-destructive hover:text-destructive hover:bg-destructive/10"
-										onClick={() => onDeleteReport(report.report_id)}
-									>
-										<Trash2 className="h-4 w-4" />
-									</Button>
+									<div className="flex items-center gap-1">
+										<Button
+											variant="outline"
+											size="icon"
+											onClick={() => {
+												const json = JSON.stringify(report, null, 2);
+												const blob = new Blob([json], { type: "application/json" });
+												const url = URL.createObjectURL(blob);
+												const a = document.createElement("a");
+												a.href = url;
+												a.download = `report-${report.report_id}.json`;
+												a.click();
+												URL.revokeObjectURL(url);
+											}}
+										>
+											<Download className="h-4 w-4" />
+										</Button>
+										<Button
+											variant="ghost"
+											size="icon"
+											className="text-destructive hover:text-destructive hover:bg-destructive/10"
+											onClick={() => onDeleteReport(report.report_id)}
+										>
+											<Trash2 className="h-4 w-4" />
+										</Button>
+									</div>
 								</div>
 
 								{report.incident_description && (

@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/dialog";
 import { Info, Plus, Trash2 } from "lucide-react";
 import { useState, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import AuthenticatedReportAbuseForm from "@/components/AuthenticatedReportAbuseForm";
 import {
 	AlertDialog,
@@ -41,6 +42,11 @@ import { DailyProgress } from "@/app/components/DailyProgress";
 import WelcomeHeader from "@/app/components/WelcomeHeader";
 import { JoinCommunity } from "@/app/components/JoinCommunity";
 import { AppointmentsTab } from "../_components/tabs/AppointmentsTab";
+import { SafetyPlanCard } from "@/components/SafetyPlanCard";
+import { SectionHeader } from "@/components/dashboard/SectionHeader";
+import { QuickActions } from "@/components/dashboard/QuickActions";
+import { StatCard } from "@/components/dashboard/StatCard";
+import { Megaphone, CalendarDays, MessageCircle, BookOpen } from "lucide-react";
 
 // Add this interface to type the joined data
 interface ReportWithRelations extends Tables<"reports"> {
@@ -75,6 +81,9 @@ export default function SurvivorView({
 }: SurvivorViewProps) {
 	const [reports, setReports] = useState<ReportWithRelations[]>([]);
 	const [open, setOpen] = useState(false);
+	const searchParams = useSearchParams();
+	const initialTab = (searchParams?.get("tab") as "overview" | "reports" | "appointments" | null) || "overview";
+	const [activeTab, setActiveTab] = useState<"overview" | "reports" | "appointments">(initialTab);
 	const supabase = createClient();
 	const { toast } = useToast();
 	const [deleteReport, setDeleteReport] = useState<string | null>(null);
@@ -224,13 +233,31 @@ export default function SurvivorView({
 				<div className="p-4 md:p-6 mt-14 md:mt-0 mb-20 md:mb-0">
 					<WelcomeHeader profileDetails={profileDetails} />
 
+					{/* Quick Actions */}
+					<div className="my-4">
+						<QuickActions
+							actions={[
+								{ label: "Report Now", description: "Start a new report", onClick: () => setOpen(true), icon: Megaphone },
+								{ label: "Appointments", description: "View your schedule", href: "/dashboard?tab=appointments", icon: CalendarDays },
+								{ label: "Messages", description: "Open chat", href: "/dashboard/chat", icon: MessageCircle },
+								{ label: "Resources", description: "Learn and grow", href: "/dashboard/resources", icon: BookOpen },
+							]}
+						/>
+					</div>
+
+					{/* Safety Plan (local) */}
+					<div className="my-4">
+						<SafetyPlanCard userId={userId} />
+					</div>
+
+					{/* Content Tabs */}
 					<div className="flex flex-col md:flex-row gap-6">
 						<div className="flex-1">
-							<Tabs defaultValue="overview" className="mb-8">
+							<Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="mb-8">
 								<TabsList className="w-full overflow-x-auto flex whitespace-nowrap">
-									<TabsTrigger value="overview">Overview</TabsTrigger>
-									<TabsTrigger value="reports">Reports</TabsTrigger>
-									<TabsTrigger value="appointments">Appointments</TabsTrigger>
+								<TabsTrigger value="overview">Overview</TabsTrigger>
+								<TabsTrigger value="reports">Reports</TabsTrigger>
+								<TabsTrigger value="appointments">Appointments</TabsTrigger>
 								</TabsList>
 
 								<TabsContent value="overview">

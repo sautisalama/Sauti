@@ -34,6 +34,11 @@ import { ReportWithRelations, MatchedServiceWithRelations } from "../_types";
 import { MatchCard } from "../_components/MatchCard";
 import { MatchedCasesTab } from "../_components/tabs/MatchedCasesTab";
 import { AppointmentsTab } from "../_components/tabs/AppointmentsTab";
+import { SafetyPlanCard } from "@/components/SafetyPlanCard";
+import { StatCard } from "@/components/dashboard/StatCard";
+import { QuickActions } from "@/components/dashboard/QuickActions";
+import { SectionHeader } from "@/components/dashboard/SectionHeader";
+import { ClipboardList, Users, CalendarDays, MessageCircle, PlusCircle } from "lucide-react";
 
 interface ProfessionalViewProps {
 	userId: string;
@@ -137,6 +142,26 @@ export default function ProfessionalView({
 				<div className="p-4 md:p-6 mt-14 md:mt-0 mb-20 md:mb-0">
 					<WelcomeHeader profileDetails={profileDetails} />
 
+					{/* KPI Row */}
+					<div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mt-4">
+						<StatCard title="Reports" value={reports.length} icon={<ClipboardList className="h-6 w-6" />} className="bg-[#0f766e]" invertColors />
+						<StatCard title="Services" value={supportServices.length} icon={<Users className="h-6 w-6" />} className="bg-[#2563eb]" invertColors />
+						<StatCard title="Matches" value={matchedServices.length} icon={<MessageCircle className="h-6 w-6" />} className="bg-[#9333ea]" invertColors />
+						<StatCard title="Appointments" value={"–"} icon={<CalendarDays className="h-6 w-6" />} className="bg-[#f59e0b]" invertColors />
+					</div>
+
+					{/* Quick Actions */}
+					<div className="my-4">
+						<QuickActions
+							actions={[
+								{ label: "Add Service", description: "Register a service", href: "#support-services", icon: PlusCircle },
+								{ label: "Messages", description: "Open chat", href: "/dashboard/chat", icon: MessageCircle },
+								{ label: "Schedule", description: "Manage appointments", href: "#appointments", icon: CalendarDays },
+								{ label: "Reports", description: "View cases", href: "#reports", icon: ClipboardList },
+							]}
+						/>
+					</div>
+
 					<div className="flex flex-col md:flex-row gap-6">
 						<div className="flex-1">
 							<Tabs defaultValue="overview" className="mb-8">
@@ -229,6 +254,7 @@ export default function ProfessionalView({
 						<div className="hidden md:block w-[350px] space-y-6 sticky top-6 self-start">
 							<ConditionCheckCard />
 							<JoinCommunity />
+							<SafetyPlanCard userId={userId} />
 						</div>
 					</div>
 				</div>
