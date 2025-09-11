@@ -297,12 +297,7 @@ export default function SettingsPage() {
 									<select
 										aria-label="Text size"
 										className="w-full rounded-md border px-2 py-1 text-sm"
-										defaultValue={
-											typeof document !== "undefined"
-												? document.documentElement.getAttribute("data-a11y-text-scale") ||
-												  "100"
-												: "100"
-										}
+										defaultValue={typeof document !== "undefined" ? (document.documentElement.getAttribute("data-a11y-text-scale") || "100") : "100"}
 										onChange={(e) => {
 											const n = Number(e.target.value) || 100;
 											document.documentElement.setAttribute(

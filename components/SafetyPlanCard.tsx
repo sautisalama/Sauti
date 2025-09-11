@@ -33,14 +33,18 @@ export function SafetyPlanCard({ userId }: { userId?: string }) {
         setItems(parsed.items || []);
         setContacts(parsed.contacts || []);
       }
-    } catch {}
+    } catch (e) {
+      // ignore local storage read error
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key]);
 
   useEffect(() => {
     try {
       localStorage.setItem(key, JSON.stringify({ items, contacts }));
-    } catch {}
+    } catch (e) {
+      // ignore local storage write error
+    }
   }, [key, items, contacts]);
 
   const addItem = () => {

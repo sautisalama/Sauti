@@ -23,7 +23,9 @@ export function SafetyBar() {
       // Clear transient client state only; do not clear cookies (handled by panicLogout)
       localStorage.clear();
       sessionStorage.clear();
-    } catch {}
+    } catch (e) {
+      // ignore storage errors
+    }
     // Redirect to a neutral, safe page
     window.location.replace("https://www.google.com");
   };
@@ -31,11 +33,15 @@ export function SafetyBar() {
   const panicLogout = async () => {
     try {
       await supabase.auth.signOut();
-    } catch {}
+    } catch (e) {
+      // ignore signout errors
+    }
     try {
       localStorage.clear();
       sessionStorage.clear();
-    } catch {}
+    } catch (e) {
+      // ignore storage errors
+    }
     window.location.replace("https://www.google.com");
   };
 

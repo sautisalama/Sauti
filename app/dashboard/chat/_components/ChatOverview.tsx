@@ -99,15 +99,16 @@ export function ChatOverview({
         const pageSize = 100;
         let offset = 0;
         let allUsers: any[] = [];
-        while (true) {
+        let hasMore = true;
+        while (hasMore) {
           const { users: page } = await streamClient.queryUsers(
             { id: { $ne: userId } },
             { last_active: -1 },
             { limit: pageSize, offset, presence: true } as any
           );
-          if (!page || page.length === 0) break;
+          if (!page || page.length === 0) { hasMore = false; break; }
           allUsers = allUsers.concat(page);
-          if (page.length < pageSize) break;
+          if (page.length < pageSize) { hasMore = false; break; }
           offset += pageSize;
         }
         setUsers(

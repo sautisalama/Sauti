@@ -65,7 +65,9 @@ const [showUserList, setShowUserList] = useState(true);
 				}
 			});
 			setMediaCounts({ attachments, links });
-		} catch {}
+			} catch (e) {
+				console.debug('collectMedia: unable to compute media counts', e);
+			}
 	};
 	const collectLinks = (ch: any) => {
 		try {
@@ -78,7 +80,9 @@ const [showUserList, setShowUserList] = useState(true);
 				}
 			});
 			setMediaCounts((prev) => ({ attachments: prev.attachments, links }));
-		} catch {}
+			} catch (e) {
+				console.debug('collectLinks: unable to compute link counts', e);
+			}
 	};
 
 	useEffect(() => {
@@ -424,12 +428,12 @@ const [showUserList, setShowUserList] = useState(true);
 												return (
 													<>
 														<Button size="sm" variant="outline" onClick={async () => {
-															try { await client?.flagUser(other!); } catch {}
+															try { await client?.flagUser(other!); } catch (e) { console.warn('flagUser failed', e); }
 														}}>
 															Report User
 														</Button>
 														<Button size="sm" variant="destructive" onClick={async () => {
-															try { await client?.banUser(other!, { timeout: 60 * 24 }); } catch {}
+															try { await client?.banUser(other!, { timeout: 60 * 24 }); } catch (e) { console.warn('banUser failed', e); }
 														}}>
 															Block 24h
 														</Button>

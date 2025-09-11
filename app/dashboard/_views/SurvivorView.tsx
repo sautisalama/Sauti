@@ -176,7 +176,7 @@ export default function SurvivorView({
 					setReports(reportsWithAppointments);
 					try {
 						localStorage.setItem(`reports-cache-${userId}`, JSON.stringify(reportsWithAppointments));
-					} catch {}
+					} catch (e) { /* ignore cache write */ }
 					return;
 				}
 			}
@@ -187,7 +187,7 @@ export default function SurvivorView({
 		setReports(data || []);
 		try {
 			localStorage.setItem(`reports-cache-${userId}`, JSON.stringify(data || []));
-		} catch {}
+		} catch (e) { /* ignore cache write */ }
 	};
 
 	const handleDelete = async (reportId: string) => {
