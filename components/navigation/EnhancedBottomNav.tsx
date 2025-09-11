@@ -86,9 +86,10 @@ export function EnhancedBottomNav({ forceShow = false, className }: EnhancedBott
       ];
     }
 
-    // Survivors
+    // Survivors: include Reports for quick access
     return [
       { id: "overview", label: "Overview", icon: LayoutDashboard, href: "/dashboard" },
+      { id: "reports", label: "Reports", icon: ClipboardList, href: "/dashboard/reports" },
       { id: "chat", label: "Chat", icon: MessageCircle, href: "/dashboard/chat", badge: unreadMessages },
       { id: "resources", label: "Resources", icon: FileText, href: "/dashboard/resources" },
     ];

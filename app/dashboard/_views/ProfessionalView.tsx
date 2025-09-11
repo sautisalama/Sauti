@@ -62,6 +62,7 @@ import {
 	DialogDescription,
 } from "@/components/ui/dialog";
 import AuthenticatedReportAbuseForm from "@/components/AuthenticatedReportAbuseForm";
+import { getPreloadedChat, preloadChat } from "@/utils/chat/preload";
 
 interface ProfessionalViewProps {
 	userId: string;
@@ -87,6 +88,7 @@ export default function ProfessionalView({
 		MatchedServiceWithRelations[]
 	>([]);
 	const [appointments, setAppointments] = useState<any[]>([]);
+	const [unreadCount, setUnreadCount] = useState<number>(0);
 
 	const handleDelete = async (reportId: string) => {
 		try {
@@ -163,6 +165,58 @@ export default function ProfessionalView({
 		loadData();
 	}, [userId, toast]);
 
+	// Live unread messages count (Stream Chat)
+	useEffect(() => {
+		let cleanup: (() => void) | undefined;
+		const init = async () => {
+			try {
+				const username = profileDetails.first_name || userId;
+				let pre = getPreloadedChat(userId);
+				if (!pre) {
+					pre = await preloadChat(userId, username);
+				}
+				const computeUnread = () => {
+					try {
+						const total = (pre?.dmChannels || []).reduce((sum: number, ch: any) => {
+							const n = typeof ch.countUnread === "function" ? ch.countUnread() : 0;
+							return sum + (Number.isFinite(n) ? n : 0);
+						}, 0);
+						setUnreadCount(total);
+					} catch {
+						setUnreadCount(0);
+					}
+				};
+				computeUnread();
+				const client = pre?.client as any;
+				if (client && typeof client.on === "function") {
+					const handler = () => computeUnread();
+					client.on("notification.message_new", handler);
+					client.on("message.new", handler);
+					client.on("notification.mark_read", handler);
+					client.on("notification.channel_marked_read", handler);
+					client.on("notification.added_to_channel", handler);
+					cleanup = () => {
+						try {
+							client.off("notification.message_new", handler);
+							client.off("message.new", handler);
+							client.off("notification.mark_read", handler);
+							client.off("notification.channel_marked_read", handler);
+							client.off("notification.added_to_channel", handler);
+						} catch {
+							console.log("");
+						}
+					};
+				}
+			} catch {
+				setUnreadCount(0);
+			}
+		};
+		init();
+		return () => {
+			if (cleanup) cleanup();
+		};
+	}, [userId, profileDetails.first_name]);
+
 	// Determine verification and gating conditions
 	const hasServices = supportServices.length > 0;
 	const hasMatches = matchedServices.length > 0;
@@ -209,7 +263,7 @@ export default function ProfessionalView({
 				<AlertDescription>
 					{description}
 					<div className="mt-3 flex flex-wrap gap-2">
-						<Link href="/dashboard/profile">
+						<Link href="/dashboard/onboarding">
 							<Button size="sm" variant="default">
 								Update profile
 							</Button>
@@ -231,27 +285,29 @@ export default function ProfessionalView({
 
 					{/* KPI Row */}
 					<div className="grid grid-cols-2 lg:grid-cols-5 gap-3 mt-4">
-						{/* Reordered to prioritize Matches (cases) */}
+						{/* 1) Cases matched */}
 						<Link href="/dashboard/cases" className="text-left">
 							<StatCard
 								title="Cases matched"
 								value={matchedServices.length}
-								icon={<MessageCircle className="h-6 w-6" />}
+								icon={<Users className="h-6 w-6" />}
 								className="bg-[#9333ea] hover:brightness-110"
 								invertColors
 								footer={<span>Cases matched to your services</span>}
 							/>
 						</Link>
-						<Link href="/dashboard/reports" className="text-left">
+						{/* 2) Appointments */}
+						<Link href="/dashboard/appointments" className="text-left">
 							<StatCard
-								title="Reports"
-								value={reports.length}
-								icon={<ClipboardList className="h-6 w-6" />}
-								className="bg-[#0f766e] hover:brightness-110"
+								title="Appointments"
+								value={appointments.length}
+								icon={<CalendarDays className="h-6 w-6" />}
+								className="bg-[#f59e0b] hover:brightness-110"
 								invertColors
-								footer={<span>Total reports you have filed</span>}
+								footer={<span>Upcoming sessions</span>}
 							/>
 						</Link>
+						{/* 3) Services */}
 						<Link href="/dashboard/services" className="text-left">
 							<StatCard
 								title="Services"
@@ -262,14 +318,15 @@ export default function ProfessionalView({
 								footer={<span>Your registered support services</span>}
 							/>
 						</Link>
-						<Link href="/dashboard/cases" className="text-left">
+						{/* 4) Reports */}
+						<Link href="/dashboard/reports" className="text-left">
 							<StatCard
-								title="Appointments"
-								value={appointments.length}
-								icon={<CalendarDays className="h-6 w-6" />}
-								className="bg-[#f59e0b] hover:brightness-110"
+								title="Reports"
+								value={reports.length}
+								icon={<ClipboardList className="h-6 w-6" />}
+								className="bg-[#0f766e] hover:brightness-110"
 								invertColors
-								footer={<span>Upcoming sessions</span>}
+								footer={<span>Total reports you have filed</span>}
 							/>
 						</Link>
 					</div>

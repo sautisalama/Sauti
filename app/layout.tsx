@@ -49,6 +49,27 @@ export const metadata: Metadata = {
 			},
 		],
 	},
+	openGraph: {
+		title: "Sauti Salama",
+		description: "Breaking the Silence, Building a Brighter Future",
+		url: process.env.NEXT_PUBLIC_APP_URL || "https://sautisalama.org",
+		siteName: "Sauti Salama",
+		images: [
+			{
+				url: "/dashboard/featured.png",
+				width: 1200,
+				height: 630,
+				alt: "Sauti Salama",
+			},
+		],
+		type: "website",
+	},
+	twitter: {
+		card: "summary_large_image",
+		title: "Sauti Salama",
+		description: "Breaking the Silence, Building a Brighter Future",
+		images: ["/dashboard/featured.png"],
+	},
 };
 
 export const viewport: Viewport = {

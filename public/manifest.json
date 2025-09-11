@@ -1,12 +1,14 @@
 {
 	"name": "Sauti Salama",
-	"short_name": "Sauti salama",
+	"short_name": "Sauti",
+	"description": "Breaking the Silence, Building a Brighter Future",
 	"theme_color": "#FC8E00",
 	"background_color": "#ffffff",
-	"display": "fullscreen",
+	"display": "standalone",
 	"orientation": "portrait",
 	"scope": "/",
 	"start_url": "/",
+	"categories": ["health", "nonprofit", "productivity"],
 	"icons": [
 		{
 			"src": "/icons/icons-192.png",
@@ -26,5 +28,18 @@
 			"sizes": "512x512",
 			"purpose": "any maskable"
 		}
+],
+	"screenshots": [
+		{
+			"src": "/dashboard/featured.png",
+			"sizes": "1200x630",
+			"type": "image/png",
+			"form_factor": "wide"
+		}
+	],
+	"shortcuts": [
+		{ "name": "Open Cases", "url": "/dashboard/cases", "icons": [{"src":"/icons/icons-192.png","sizes":"192x192"}]},
+		{ "name": "New Report", "url": "/dashboard/reports", "icons": [{"src":"/icons/icons-192.png","sizes":"192x192"}]},
+		{ "name": "Messages", "url": "/dashboard/chat", "icons": [{"src":"/icons/icons-192.png","sizes":"192x192"}]}
 	]
 }
