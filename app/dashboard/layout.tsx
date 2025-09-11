@@ -27,7 +27,7 @@ export default async function DashboardLayout({
 				<ChatPreloader userId={user.id} username={user.first_name || user.id} />
 				
 				{/* Content with proper spacing for mobile nav */}
-				<div className="pb-20 lg:pb-0">
+				<div id="main-content" className="pb-20 lg:pb-0">
 					{children}
 				</div>
 				{/* Mobile Profile Button */}

@@ -299,15 +299,15 @@ export default function SurvivorView({
 
 					{/* Stats Overview */}
 					<div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4 mb-6">
-					<Link href="/dashboard/reports">
-						<StatsCard
-							title="My Reports"
-							value={reports.length}
-							icon={<Shield className="h-4 w-4" />}
-							description="Total incidents reported"
-							className="cursor-pointer hover:shadow-md"
-						/>
-					</Link>
+						<Link href="/dashboard/reports">
+							<StatsCard
+								title="My Reports"
+								value={reports.length}
+								icon={<Shield className="h-4 w-4" />}
+								description="Total incidents reported"
+								className="cursor-pointer hover:shadow-md"
+							/>
+						</Link>
 						<StatsCard
 							title="Support Matches"
 							value={reports.filter((r) => r.matched_services?.length).length}
@@ -480,9 +480,11 @@ export default function SurvivorView({
 													description={`${reports.length} ${
 														reports.length === 1 ? "report" : "reports"
 													} on file`}
-												action={{
+													action={{
 														label: "View All",
-														onClick: () => { window.location.href = "/dashboard/reports"; }
+														onClick: () => {
+															window.location.href = "/dashboard/reports";
+														},
 													}}
 												/>
 											</CardHeader>
