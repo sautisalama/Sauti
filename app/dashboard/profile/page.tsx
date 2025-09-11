@@ -11,6 +11,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { AnonymousModeToggle } from "@/components/chat/AnonymousModeToggle";
+import { ProfessionalDocumentsForm } from "./professional-documents";
 
 export default function ProfilePage() {
   const user = useUser();
@@ -25,6 +26,12 @@ export default function ProfilePage() {
     <div className="max-w-5xl mx-auto p-4 md:p-6 space-y-6">
       {/* Header */}
       <div className="flex items-center gap-4">
+        {/* CTA to unify onboarding/profile */}
+        <div className="ml-auto">
+          <Button asChild variant="secondary" size="sm">
+            <a href="/dashboard/onboarding">Open Profile Setup</a>
+          </Button>
+        </div>
         <div className="relative">
           <Avatar className="h-16 w-16">
             <AvatarImage src={(typeof window !== "undefined" && window.localStorage.getItem("ss_anon_mode") === "1") ? "/anon.svg" : (user?.profile?.avatar_url || "")} />
@@ -36,7 +43,9 @@ export default function ProfilePage() {
         <div className="min-w-0">
           <h1 className="text-xl md:text-2xl font-bold truncate">{user?.profile?.first_name || user?.email || "User"}</h1>
           <div className="flex items-center gap-2 mt-1 text-sm text-neutral-600">
-            <Badge variant="secondary" className="capitalize">{user?.profile?.user_type || "member"}</Badge>
+            {user?.profile?.user_type !== "survivor" && (
+              <Badge variant="secondary" className="capitalize">{user?.profile?.user_type || "member"}</Badge>
+            )}
             <span className="text-neutral-400">•</span>
             <span>ID: {user?.id?.slice(0, 8)}</span>
           </div>
@@ -169,11 +178,7 @@ export default function ProfilePage() {
                 <CardTitle>Verification Documents</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="text-sm text-muted-foreground">Upload certificates, IDs (UI only)</div>
-                <Input type="file" multiple />
-                <div className="flex justify-end">
-                  <Button onClick={() => onSave("Documents")}>Upload</Button>
-                </div>
+                <ProfessionalDocumentsForm onSave={() => onSave("Documents")} />
               </CardContent>
             </Card>
           </TabsContent>

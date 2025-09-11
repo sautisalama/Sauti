@@ -189,7 +189,7 @@ export function ReportsTab({
 															variant="outline"
 															size="sm"
 															onClick={() =>
-																(window.location.href = "/dashboard?tab=appointments")
+(window.location.href = "/dashboard/appointments")
 															}
 															className="text-xs"
 														>

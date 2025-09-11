@@ -12,6 +12,7 @@ export type QuickAction = {
   onClick?: () => void;
   icon: LucideIcon;
   variant?: "default" | "outline" | "secondary" | "ghost";
+  disabled?: boolean;
 };
 
 export function QuickActions({ actions, className }: { actions: QuickAction[]; className?: string }) {
@@ -24,7 +25,11 @@ export function QuickActions({ actions, className }: { actions: QuickAction[]; c
             key={i}
             onClick={a.onClick}
             variant={a.variant || "secondary"}
-            className="w-full h-24 sm:h-28 flex flex-col items-start justify-between rounded-xl border bg-card hover:shadow-md"
+            disabled={a.disabled}
+            className={cn(
+              "w-full h-24 sm:h-28 flex flex-col items-start justify-between rounded-xl border bg-card hover:shadow-md",
+              a.disabled && "opacity-50 pointer-events-none"
+            )}
           >
             <Icon className="h-5 w-5 text-teal-700" />
             <div className="text-left">
@@ -35,7 +40,7 @@ export function QuickActions({ actions, className }: { actions: QuickAction[]; c
             </div>
           </Button>
         );
-        if (a.href) {
+        if (a.href && !a.disabled) {
           return (
             <Link key={i} href={a.href} className="block">
               {content}

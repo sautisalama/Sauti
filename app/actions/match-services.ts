@@ -62,14 +62,33 @@ export async function matchReportWithServices(reportId: string) {
 			throw new Error("Failed to fetch support services");
 		}
 
+		// Fetch profiles for service owners to check verification completeness
+		const userIds = Array.from(new Set(services.map(s => s.user_id).filter(Boolean))) as string[];
+		let profilesById = new Map<string, { first_name: string | null; phone: string | null; professional_title: string | null }>();
+		if (userIds.length > 0) {
+			const { data: profiles, error: profileErr } = await supabase
+				.from("profiles")
+				.select("id, first_name, phone, professional_title")
+				.in("id", userIds);
+			if (!profileErr && profiles) {
+				profiles.forEach((p: any) => profilesById.set(p.id, p));
+			}
+		}
+		const isVerified = (userId: string | null) => {
+			if (!userId) return false;
+			const p = profilesById.get(userId);
+			if (!p) return false;
+			return Boolean(p.first_name && p.phone && p.professional_title);
+		};
+
 		// Ensure required_services is properly typed and handled
 		const requiredServices = (report.required_services as string[]) || [];
 
-		// First, filter services by type match - updated to handle enum type
+		// First, filter services by type match AND only include verified providers
 		const matchingServices = services.filter((service) => {
-			// Handle the enum type properly - it's not a comma-separated string
 			const serviceType = service.service_types;
-			return requiredServices.some((required: string) => serviceType === required);
+			const typeMatch = requiredServices.some((required: string) => serviceType === required);
+			return typeMatch && isVerified(service.user_id);
 		});
 
 		// Then, calculate distances and scores for matching services

@@ -12,6 +12,7 @@ import {
 	AlertDialogHeader,
 	AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { CommunityCard } from "@/app/components/CommunityCard";
 import WelcomeHeader from "@/app/components/WelcomeHeader";
@@ -27,6 +28,7 @@ import {
 import { DailyProgress } from "@/app/components/DailyProgress";
 import { fetchMatchedServices } from "./actions/matched-services";
 import { useState, useEffect, useMemo } from "react";
+import SurvivorView from "./SurvivorView";
 import { OverviewTab } from "../_components/tabs/OverviewTab";
 import { ReportsTab } from "../_components/tabs/ReportsTab";
 import { SupportServicesTab } from "../_components/tabs/SupportServicesTab";
@@ -40,7 +42,14 @@ import { SafetyPlanCard } from "@/components/SafetyPlanCard";
 import { StatCard } from "@/components/dashboard/StatCard";
 import { QuickActions } from "@/components/dashboard/QuickActions";
 import { SectionHeader } from "@/components/dashboard/SectionHeader";
-import { ClipboardList, Users, CalendarDays, MessageCircle, PlusCircle } from "lucide-react";
+import {
+	ClipboardList,
+	Users,
+	CalendarDays,
+	MessageCircle,
+	PlusCircle,
+	Lock,
+} from "lucide-react";
 import Link from "next/link";
 import { fetchUserAppointments } from "./actions/appointments";
 import { SamplePlaceholder } from "@/components/dashboard/SamplePlaceholder";
@@ -121,12 +130,13 @@ export default function ProfessionalView({
 	useEffect(() => {
 		const loadData = async () => {
 			try {
-				const [userReports, userServices, userMatches, userAppointments] = await Promise.all([
-					fetchUserReports(userId),
-					fetchUserSupportServices(userId),
-					fetchMatchedServices(userId),
-					fetchUserAppointments(userId, "professional", true),
-				]);
+				const [userReports, userServices, userMatches, userAppointments] =
+					await Promise.all([
+						fetchUserReports(userId),
+						fetchUserSupportServices(userId),
+						fetchMatchedServices(userId),
+						fetchUserAppointments(userId, "professional", true),
+					]);
 
 				setReports(userReports as ReportWithRelations[]);
 				setSupportServices(userServices);
@@ -144,28 +154,133 @@ export default function ProfessionalView({
 		loadData();
 	}, [userId, toast]);
 
+	// Determine verification and gating conditions
+	const hasServices = supportServices.length > 0;
+	const hasMatches = matchedServices.length > 0;
+	const hasPendingMatches = useMemo(
+		() =>
+			matchedServices.some(
+				(ms) => (ms.match_status_type || "").toLowerCase() === "pending"
+			),
+		[matchedServices]
+	);
+	const profileIncomplete = useMemo(() => {
+		const required = [
+			profileDetails?.first_name,
+			profileDetails?.phone,
+			profileDetails?.professional_title,
+		];
+		return required.some((v) => !v || (typeof v === "string" && v.trim() === ""));
+	}, [profileDetails]);
+	const isVerified = !profileIncomplete; // simple heuristic until backend verification exists
+
+	// Persist verification state for mobile nav to adapt
+	useEffect(() => {
+		try {
+			window.localStorage.setItem("ss_pro_verified", isVerified ? "1" : "0");
+			// Keep legacy key for compatibility
+			window.localStorage.setItem("ss_pro_restricted", !isVerified ? "1" : "0");
+		} catch {
+			// Ignore localStorage errors
+		}
+	}, [isVerified]);
+
+	// Tailored banner content
+	const renderGateBanner = () => {
+		const title = "Complete your professional profile";
+		const description =
+			hasServices && !hasMatches
+				? "You have services listed but no matches yet. Verify and complete your profile to be discoverable."
+				: "Update your profile details for verification so you can be matched with cases.";
+		return (
+			<Alert className="mb-4 border-amber-300 bg-amber-50 text-amber-900">
+				<AlertTitle className="font-semibold flex items-center gap-2">
+					<Lock className="h-4 w-4" /> Verification required
+				</AlertTitle>
+				<AlertDescription>
+					{description}
+					<div className="mt-3 flex flex-wrap gap-2">
+						<Link href="/dashboard/profile">
+							<Button size="sm" variant="default">
+								Update profile
+							</Button>
+						</Link>
+					</div>
+				</AlertDescription>
+			</Alert>
+		);
+	};
+
 	return (
 		<div className="flex min-h-screen bg-white">
 			<main className="flex-1 w-full">
 				<div className="p-4 md:p-6 mt-14 md:mt-0 mb-20 md:mb-0">
 					<WelcomeHeader profileDetails={profileDetails} />
 
+					{/* Persistent verification banner for unverified */}
+					{!isVerified && renderGateBanner()}
+
 					{/* KPI Row */}
 					<div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mt-4">
-						<StatCard title="Reports" value={reports.length} icon={<ClipboardList className="h-6 w-6" />} className="bg-[#0f766e]" invertColors />
-						<StatCard title="Services" value={supportServices.length} icon={<Users className="h-6 w-6" />} className="bg-[#2563eb]" invertColors />
-						<StatCard title="Matches" value={matchedServices.length} icon={<MessageCircle className="h-6 w-6" />} className="bg-[#9333ea]" invertColors />
-					<StatCard title="Appointments" value={appointments.length} icon={<CalendarDays className="h-6 w-6" />} className="bg-[#f59e0b]" invertColors />
+						<StatCard
+							title="Reports"
+							value={reports.length}
+							icon={<ClipboardList className="h-6 w-6" />}
+							className="bg-[#0f766e]"
+							invertColors
+						/>
+						<StatCard
+							title="Services"
+							value={supportServices.length}
+							icon={<Users className="h-6 w-6" />}
+							className="bg-[#2563eb]"
+							invertColors
+						/>
+						<StatCard
+							title="Matches"
+							value={matchedServices.length}
+							icon={<MessageCircle className="h-6 w-6" />}
+							className="bg-[#9333ea]"
+							invertColors
+						/>
+						<StatCard
+							title="Appointments"
+							value={appointments.length}
+							icon={<CalendarDays className="h-6 w-6" />}
+							className="bg-[#f59e0b]"
+							invertColors
+						/>
 					</div>
 
 					{/* Quick Actions */}
 					<div className="my-4">
 						<QuickActions
 							actions={[
-								{ label: "Add Service", description: "Register a service", href: "#support-services", icon: PlusCircle },
-								{ label: "Messages", description: "Open chat", href: "/dashboard/chat", icon: MessageCircle },
-								{ label: "Schedule", description: "Manage appointments", href: "#appointments", icon: CalendarDays },
-								{ label: "Reports", description: "View cases", href: "#reports", icon: ClipboardList },
+								{
+									label: "Report Now",
+									description: "Quick incident reporting",
+									onClick: () => setReportDialogOpen(true),
+									icon: ClipboardList,
+								},
+								{
+									label: "Messages",
+									description: "Open chat",
+									href: "/dashboard/chat",
+									icon: MessageCircle,
+								},
+								{
+									label: "Schedule",
+									description: "Manage appointments",
+									href: "#appointments",
+									icon: CalendarDays,
+									disabled: !isVerified,
+								},
+								{
+									label: "My Reports",
+									description: "View or submit reports",
+									href: "#reports",
+									icon: ClipboardList,
+								},
 							]}
 						/>
 					</div>
@@ -177,13 +292,28 @@ export default function ProfessionalView({
 							{appointments.length > 0 ? (
 								<div className="space-y-2 text-sm">
 									{[...appointments]
-										.filter(a => a.appointment_date)
-										.sort((a,b) => new Date(a.appointment_date).getTime() - new Date(b.appointment_date).getTime())
-										.slice(0,2)
-										.map((a,idx) => (
+										.filter((a) => a.appointment_date)
+										.sort(
+											(a, b) =>
+												new Date(a.appointment_date).getTime() -
+												new Date(b.appointment_date).getTime()
+										)
+										.slice(0, 2)
+										.map((a, idx) => (
 											<div key={idx} className="flex items-center justify-between">
-												<span>{new Date(a.appointment_date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} • {(a.matched_service?.support_service?.name) || 'Session'}</span>
-												<Link href="/dashboard?tab=appointments" className="text-sauti-orange">Open</Link>
+												<span>
+													{new Date(a.appointment_date).toLocaleTimeString([], {
+														hour: "2-digit",
+														minute: "2-digit",
+													})}{" "}
+													• {a.matched_service?.support_service?.name || "Session"}
+												</span>
+												<Link
+													href="/dashboard?tab=appointments"
+													className="text-sauti-orange"
+												>
+													Open
+												</Link>
 											</div>
 										))}
 								</div>
@@ -192,11 +322,21 @@ export default function ProfessionalView({
 									<div className="space-y-2 text-sm">
 										<div className="flex items-center justify-between">
 											<span>10:00 • Intake call</span>
-											<Link href="/dashboard?tab=appointments" className="text-sauti-orange">Open</Link>
+											<Link
+												href="/dashboard?tab=appointments"
+												className="text-sauti-orange"
+											>
+												Open
+											</Link>
 										</div>
 										<div className="flex items-center justify-between">
 											<span>14:00 • Follow-up</span>
-											<Link href="/dashboard?tab=appointments" className="text-sauti-orange">Open</Link>
+											<Link
+												href="/dashboard?tab=appointments"
+												className="text-sauti-orange"
+											>
+												Open
+											</Link>
 										</div>
 									</div>
 								</SamplePlaceholder>
@@ -208,15 +348,24 @@ export default function ProfessionalView({
 								<div className="grid grid-cols-3 gap-2 text-sm">
 									{(() => {
 										const counts = reports.reduce((acc, r) => {
-											const k = (r.urgency || 'low').toLowerCase();
-											acc[k] = (acc[k] || 0) as number + 1;
+											const k = (r.urgency || "low").toLowerCase();
+											acc[k] = ((acc[k] || 0) as number) + 1;
 											return acc;
 										}, {} as Record<string, number>);
 										return (
 											<>
-												<div className="rounded-lg bg-[#FFF5F5] p-3 text-center"><p className="text-xs text-neutral-500">High</p><p className="text-lg font-semibold">{counts['high'] || 0}</p></div>
-												<div className="rounded-lg bg-[#FFF8F0] p-3 text-center"><p className="text-xs text-neutral-500">Medium</p><p className="text-lg font-semibold">{counts['medium'] || 0}</p></div>
-												<div className="rounded-lg bg-[#F0F9FF] p-3 text-center"><p className="text-xs text-neutral-500">Low</p><p className="text-lg font-semibold">{counts['low'] || 0}</p></div>
+												<div className="rounded-lg bg-[#FFF5F5] p-3 text-center">
+													<p className="text-xs text-neutral-500">High</p>
+													<p className="text-lg font-semibold">{counts["high"] || 0}</p>
+												</div>
+												<div className="rounded-lg bg-[#FFF8F0] p-3 text-center">
+													<p className="text-xs text-neutral-500">Medium</p>
+													<p className="text-lg font-semibold">{counts["medium"] || 0}</p>
+												</div>
+												<div className="rounded-lg bg-[#F0F9FF] p-3 text-center">
+													<p className="text-xs text-neutral-500">Low</p>
+													<p className="text-lg font-semibold">{counts["low"] || 0}</p>
+												</div>
 											</>
 										);
 									})()}
@@ -243,21 +392,41 @@ export default function ProfessionalView({
 						<div className="rounded-xl border p-4 bg-white shadow-sm">
 							<p className="text-sm text-neutral-600 mb-2">Quick Chat</p>
 							<p className="text-sm mb-2">Open your messages to coordinate care.</p>
-							<Link href="/dashboard/chat" className="text-sauti-orange">Open chat →</Link>
+							<Link href="/dashboard/chat" className="text-sauti-orange">
+								Open chat →
+							</Link>
 						</div>
 					</div>
 
 					<div className="flex flex-col md:flex-row gap-6">
 						<div className="flex-1">
 							<Tabs defaultValue="overview" className="mb-8">
-									<TabsList className="w-full overflow-x-auto flex whitespace-nowrap">
-										<TabsTrigger value="overview">Overview</TabsTrigger>
-										<TabsTrigger value="reports">Reports</TabsTrigger>
-										<TabsTrigger value="matched-cases">Cases</TabsTrigger>
-										<TabsTrigger value="support-services">Services</TabsTrigger>
-										<TabsTrigger value="appointments">Appointments</TabsTrigger>
-										<TabsTrigger value="scheduling">Scheduling</TabsTrigger>
-									</TabsList>
+								<TabsList className="w-full overflow-x-auto flex whitespace-nowrap gap-1 px-1">
+									<TabsTrigger value="overview" className="text-xs px-2 py-1">
+										Overview
+									</TabsTrigger>
+									<TabsTrigger value="reports" className="text-xs px-2 py-1">
+										Reports
+									</TabsTrigger>
+									<TabsTrigger value="matched-cases" className="text-xs px-2 py-1">
+										Cases
+									</TabsTrigger>
+									<TabsTrigger
+										value="support-services"
+										className="text-xs px-2 py-1 hidden sm:inline-flex"
+									>
+										Services
+									</TabsTrigger>
+									<TabsTrigger value="appointments" className="text-xs px-2 py-1">
+										Appointments
+									</TabsTrigger>
+									<TabsTrigger
+										value="scheduling"
+										className="text-xs px-2 py-1 hidden sm:inline-flex"
+									>
+										Scheduling
+									</TabsTrigger>
+								</TabsList>
 
 								<TabsContent value="overview">
 									<OverviewTab
@@ -285,18 +454,31 @@ export default function ProfessionalView({
 								</TabsContent>
 
 								<TabsContent value="matched-cases">
-									<MatchedCasesTab
-										userId={userId}
-										matchedServices={matchedServices}
-										onRefresh={async () => {
-											const [updatedMatches, updatedServices] = await Promise.all([
-												fetchMatchedServices(userId),
-												fetchUserSupportServices(userId),
-											]);
-											setMatchedServices(updatedMatches);
-											setSupportServices(updatedServices);
-										}}
-									/>
+									<div
+										className={
+											"relative " + (!isVerified ? "opacity-50 pointer-events-none" : "")
+										}
+									>
+										<MatchedCasesTab
+											userId={userId}
+											matchedServices={matchedServices}
+											onRefresh={async () => {
+												const [updatedMatches, updatedServices] = await Promise.all([
+													fetchMatchedServices(userId),
+													fetchUserSupportServices(userId),
+												]);
+												setMatchedServices(updatedMatches);
+												setSupportServices(updatedServices);
+											}}
+										/>
+										{!isVerified && (
+											<div className="absolute inset-0 flex items-center justify-center">
+												<p className="text-sm bg-white/90 px-3 py-1 rounded border">
+													Verification required to manage cases
+												</p>
+											</div>
+										)}
+									</div>
 								</TabsContent>
 
 								<TabsContent value="support-services">
@@ -315,27 +497,43 @@ export default function ProfessionalView({
 								</TabsContent>
 
 								<TabsContent value="appointments">
-									<AppointmentsTab
-										userId={userId}
-										userType="professional"
-										username={profileDetails.first_name || userId}
-										onAppointmentsChange={async () => {
-											const updatedMatches = await fetchMatchedServices(userId);
-											setMatchedServices(updatedMatches);
-										}}
-									/>
+									<div
+										className={
+											"relative " + (!isVerified ? "opacity-50 pointer-events-none" : "")
+										}
+									>
+										<AppointmentsTab
+											userId={userId}
+											userType="professional"
+											username={profileDetails.first_name || userId}
+											onAppointmentsChange={async () => {
+												const updatedMatches = await fetchMatchedServices(userId);
+												setMatchedServices(updatedMatches);
+											}}
+										/>
+										{!isVerified && (
+											<div className="absolute inset-0 flex items-center justify-center">
+												<p className="text-sm bg-white/90 px-3 py-1 rounded border">
+													Verification required to manage appointments
+												</p>
+											</div>
+										)}
+									</div>
 								</TabsContent>
-								
+
 								<TabsContent value="scheduling">
 									<div className="space-y-6">
 										<div>
-											<h2 className="text-xl font-semibold text-[#1A3434] mb-2">Professional Scheduling</h2>
+											<h2 className="text-xl font-semibold text-[#1A3434] mb-2">
+												Professional Scheduling
+											</h2>
 											<p className="text-sm text-gray-500 mb-4">
-												Manage your availability and let clients schedule appointments with you.
+												Manage your availability and let clients schedule appointments with
+												you.
 											</p>
 										</div>
-										
-										<CalScheduler 
+
+										<CalScheduler
 											professionalId={userId}
 											calLink={profileDetails.cal_link || undefined}
 										/>

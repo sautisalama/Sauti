@@ -32,9 +32,9 @@ const COVERAGE_OPTIONS = [
 ] as const;
 
 export function AddSupportServiceForm({
-	onSuccess,
+  onSuccess,
 }: {
-	onSuccess?: () => void;
+  onSuccess?: () => void;
 }) {
 	const { toast } = useToast();
 	const [loading, setLoading] = useState(false);
@@ -109,99 +109,89 @@ export function AddSupportServiceForm({
 		}
 	};
 
-	return (
-		<form onSubmit={handleSubmit} className="space-y-8">
-			<div className="prose prose-sm">
-				<p className="leading-relaxed text-gray-600">
-					We are{" "}
-					<input
-						type="text"
-						className="border-b-2 border-teal-500 focus:outline-none px-2 w-64 bg-transparent"
-						placeholder="organization name"
-						value={formData.name}
-						onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-						required
-					/>
-					, providing{" "}
-					<select
-						value={formData.service_types}
-						onChange={(e) =>
-							setFormData({
-								...formData,
-								service_types: e.target.value as ServiceType,
-							})
-						}
-						required
-						className="border-b-2 border-teal-500 focus:outline-none px-2 bg-transparent"
-					>
-						<option value="">select service type</option>
-						{SERVICE_OPTIONS.map(({ value, label }) => (
-							<option key={value} value={value}>
-								{label}
-							</option>
-						))}
-					</select>
-					. You can reach us at{" "}
-					<input
-						type="tel"
-						className="border-b-2 border-teal-500 focus:outline-none px-2 w-48 bg-transparent"
-						placeholder="phone number"
-						value={formData.phone_number}
-						onChange={(e) =>
-							setFormData({ ...formData, phone_number: e.target.value })
-						}
-						required
-					/>
-					. We are available{" "}
-					<select
-						value={formData.availability}
-						onChange={(e) =>
-							setFormData({ ...formData, availability: e.target.value })
-						}
-						required
-						className="border-b-2 border-teal-500 focus:outline-none px-2 bg-transparent"
-					>
-						<option value="">select availability</option>
-						{AVAILABILITY_OPTIONS.map(({ value, label }) => (
-							<option key={value} value={value}>
-								{label}
-							</option>
-						))}
-					</select>{" "}
-					and can serve clients within{" "}
-					<select
-						value={formData.coverage_area_radius}
-						onChange={(e) =>
-							setFormData({ ...formData, coverage_area_radius: e.target.value })
-						}
-						required
-						className="border-b-2 border-teal-500 focus:outline-none px-2 bg-transparent"
-					>
-						<option value="">select coverage</option>
-						{COVERAGE_OPTIONS.map(({ value, label }) => (
-							<option key={value} value={value}>
-								{label}
-							</option>
-						))}
-					</select>{" "}
-					of our location.
-				</p>
-			</div>
+  return (
+    <form onSubmit={handleSubmit} className="space-y-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <label className="block text-sm font-medium mb-1">Organization / Service Name</label>
+          <input
+            type="text"
+            className="w-full border rounded-md px-3 py-2"
+            placeholder="e.g., SafeCare Counseling"
+            value={formData.name}
+            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+            required
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium mb-1">Service Type</label>
+          <select
+            value={formData.service_types}
+            onChange={(e) => setFormData({ ...formData, service_types: e.target.value as ServiceType })}
+            required
+            className="w-full border rounded-md px-3 py-2"
+          >
+            <option value="">Select a service</option>
+            {SERVICE_OPTIONS.map(({ value, label }) => (
+              <option key={value} value={value}>{label}</option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="block text-sm font-medium mb-1">Contact Phone</label>
+          <input
+            type="tel"
+            className="w-full border rounded-md px-3 py-2"
+            placeholder="Phone number"
+            value={formData.phone_number}
+            onChange={(e) => setFormData({ ...formData, phone_number: e.target.value })}
+            required
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium mb-1">Availability</label>
+          <select
+            value={formData.availability}
+            onChange={(e) => setFormData({ ...formData, availability: e.target.value })}
+            required
+            className="w-full border rounded-md px-3 py-2"
+          >
+            <option value="">Select availability</option>
+            {AVAILABILITY_OPTIONS.map(({ value, label }) => (
+              <option key={value} value={value}>{label}</option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="block text-sm font-medium mb-1">Coverage Radius</label>
+          <select
+            value={formData.coverage_area_radius}
+            onChange={(e) => setFormData({ ...formData, coverage_area_radius: e.target.value })}
+            required
+            className="w-full border rounded-md px-3 py-2"
+          >
+            <option value="">Select coverage</option>
+            {COVERAGE_OPTIONS.map(({ value, label }) => (
+              <option key={value} value={value}>{label}</option>
+            ))}
+          </select>
+        </div>
+        <div className="flex items-end">
+          <span className="text-sm">
+            {location ? (
+              <span className="text-green-600">📍 Location detected</span>
+            ) : (
+              <span className="text-yellow-700">📍 Detecting location...</span>
+            )}
+          </span>
+        </div>
+      </div>
 
-			<div className="flex items-center gap-4">
-				<Button
-					type="submit"
-					className="bg-teal-600 hover:bg-teal-700"
-					disabled={loading || !location}
-				>
-					{loading ? "Adding..." : "Register Service"}
-				</Button>
-				{location ? (
-					<span className="text-sm text-green-600">📍 Location detected</span>
-				) : (
-					<span className="text-sm text-yellow-600">📍 Detecting location...</span>
-				)}
-			</div>
-		</form>
-	);
+      <div className="flex items-center gap-3">
+        <Button type="submit" className="bg-teal-600 hover:bg-teal-700" disabled={loading || !location}>
+          {loading ? "Adding..." : "Register Service"}
+        </Button>
+      </div>
+    </form>
+  );
 }

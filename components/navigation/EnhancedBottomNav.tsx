@@ -6,7 +6,9 @@ import { useState, useEffect } from "react";
 import { 
   MessageCircle, 
   FileText, 
-  LayoutDashboard
+  LayoutDashboard,
+  ClipboardList,
+  Calendar
 } from "lucide-react";
 import { useUser } from "@/hooks/useUser";
 import { cn } from "@/lib/utils";
@@ -45,10 +47,24 @@ export function EnhancedBottomNav({ forceShow = false, className }: EnhancedBott
     setUnreadMessages(3);
   }, []);
 
-  // Navigation: keep it ultra-simple on mobile: Overview, Chat, Resources
+  // Navigation: role-aware mobile nav
   const getNavItems = (): NavItem[] => {
     if (!isDashboard) return [];
 
+    const role = user?.profile?.user_type;
+    const proRestricted = typeof window !== 'undefined' && window.localStorage.getItem('ss_pro_restricted') === '1';
+    if ((role === "professional" || role === "ngo") && !proRestricted) {
+      // Professionals get access to survivor features too
+      return [
+        { id: "overview", label: "Overview", icon: LayoutDashboard, href: "/dashboard" },
+        { id: "cases", label: "Cases", icon: ClipboardList, href: "/dashboard/cases" },
+        { id: "chat", label: "Chat", icon: MessageCircle, href: "/dashboard/chat", badge: unreadMessages },
+        { id: "schedule", label: "Schedule", icon: Calendar, href: "/dashboard/appointments" },
+        { id: "resources", label: "Resources", icon: FileText, href: "/dashboard/resources" },
+      ];
+    }
+
+    // Survivors
     return [
       { id: "overview", label: "Overview", icon: LayoutDashboard, href: "/dashboard" },
       { id: "chat", label: "Chat", icon: MessageCircle, href: "/dashboard/chat", badge: unreadMessages },
@@ -68,14 +84,19 @@ export function EnhancedBottomNav({ forceShow = false, className }: EnhancedBott
     const Icon = item.icon;
     const active = isActive(item);
 
+    const role = user?.profile?.user_type;
+    const verified = typeof window !== 'undefined' && window.localStorage.getItem('ss_pro_verified') === '1';
+    const isPro = role === 'professional' || role === 'ngo';
+    const disabled = isPro && !verified && (item.id === 'cases' || item.id === 'schedule');
 
     const content = (
       <div 
         className={cn(
           "flex flex-col items-center gap-1 py-2 px-3 rounded-xl transition-all duration-200",
-          "hover:bg-white/10 active:scale-95",
+          disabled ? "opacity-50" : "hover:bg-white/10 active:scale-95",
           active ? "text-sauti-orange" : "text-neutral-400 dark:text-neutral-500"
         )}
+        aria-disabled={disabled}
       >
         <div className="relative">
           <Icon className={cn("h-5 w-5", active && "text-sauti-orange")} />
@@ -99,7 +120,11 @@ export function EnhancedBottomNav({ forceShow = false, className }: EnhancedBott
       </div>
     );
 
-    return (
+    return disabled ? (
+      <div className="flex-1 pointer-events-none">
+        {content}
+      </div>
+    ) : (
       <Link href={item.href} className="flex-1">
         {content}
       </Link>
@@ -120,7 +145,14 @@ export function EnhancedBottomNav({ forceShow = false, className }: EnhancedBott
         )}
       >
         <div className="px-2 pt-2 pb-2">
-          <nav className="grid grid-cols-3 items-end">
+          <nav
+            className={cn(
+              "grid items-end",
+              navItems.length === 5 && "grid-cols-5",
+              navItems.length === 4 && "grid-cols-4",
+              navItems.length <= 3 && "grid-cols-3"
+            )}
+          >
             {navItems.map((item) => (
               <NavItemComponent key={item.id} item={item} />
             ))}

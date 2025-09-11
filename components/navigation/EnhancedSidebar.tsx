@@ -94,7 +94,7 @@ export function EnhancedSidebar({ defaultCollapsed = false, className }: Enhance
     if (user?.profile?.user_type === "survivor") {
       return [
         ...baseItems,
-        { id: "appointments", label: "Appointments", icon: Calendar, href: "/dashboard?tab=appointments", section: "main" },
+        { id: "appointments", label: "Appointments", icon: Calendar, href: "/dashboard/appointments", section: "main" },
         { id: "community", label: "Community", icon: Users, href: "/dashboard/community", section: "main" },
         { id: "report", label: "Report Incident", icon: Megaphone, onClick: () => setReportDialogOpen(true), section: "secondary", separator: true },
         { id: "profile", label: "Profile", icon: User, href: "/dashboard/profile", section: "secondary" },
@@ -105,9 +105,9 @@ export function EnhancedSidebar({ defaultCollapsed = false, className }: Enhance
     if (user?.profile?.user_type === "professional" || user?.profile?.user_type === "ngo") {
       return [
         ...baseItems,
-        { id: "cases", label: "Case Management", icon: ClipboardList, href: "/dashboard?tab=matched-cases", badge: 7, section: "main" },
-        { id: "appointments", label: "Schedule", icon: Calendar, href: "/dashboard?tab=appointments", section: "main" },
-        { id: "services", label: "My Services", icon: Plus, href: "/dashboard?tab=support-services", section: "secondary", separator: true },
+        { id: "cases", label: "Case Management", icon: ClipboardList, href: "/dashboard/cases", badge: 7, section: "main" },
+        { id: "appointments", label: "Schedule", icon: Calendar, href: "/dashboard/appointments", section: "main" },
+        { id: "services", label: "My Services", icon: Plus, href: "/dashboard/services", section: "secondary", separator: true },
         { id: "profile", label: "Professional Profile", icon: User, href: "/dashboard/profile", section: "secondary" },
         { id: "settings", label: "Settings", icon: Settings, href: "/dashboard/settings", section: "footer" },
       ];
@@ -270,9 +270,11 @@ export function EnhancedSidebar({ defaultCollapsed = false, className }: Enhance
                 <p className="text-sm font-medium text-neutral-900 dark:text-neutral-100 truncate">
                   {user?.profile?.first_name || user?.email || "User"}
                 </p>
-                <p className="text-xs text-neutral-500 truncate capitalize">
-                  {user?.profile?.user_type || "Member"}
-                </p>
+                {user?.profile?.user_type !== 'survivor' && (
+                  <p className="text-xs text-neutral-500 truncate capitalize">
+                    {user?.profile?.user_type || "Member"}
+                  </p>
+                )}
               </div>
             )}
             
