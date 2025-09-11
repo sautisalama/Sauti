@@ -7,9 +7,11 @@ import { cn } from "@/lib/utils";
 export function MobileTabbar({
   active,
   base = "/dashboard",
+  userType = "survivor", // Add user type to determine navigation behavior
 }: {
   active: "overview" | "reports" | "chat" | "appointments";
   base?: string;
+  userType?: "survivor" | "professional";
 }) {
   const item = (key: string, href: string, label: string, Icon: any) => (
     <Link
@@ -28,9 +30,10 @@ export function MobileTabbar({
     <div className="md:hidden fixed bottom-0 left-0 right-0 bg-[#1A3434] border-t border-[#2A4444] z-40">
       <nav className="flex items-center justify-around px-4 py-2">
         {item("overview", `${base}`, "Overview", LayoutDashboard)}
-        {item("reports", `${base}?tab=reports`, "Reports", FileText)}
+        {item("reports", `${base}/reports`, "Reports", FileText)}
         {item("chat", `${base}/chat`, "Messages", MessageCircle)}
-        {item("appointments", `${base}?tab=appointments`, "Appointments", Calendar)}
+        {/* For survivors, redirect appointments to reports page; for professionals, keep separate */}
+        {item("appointments", userType === "survivor" ? `${base}/reports` : `${base}?tab=appointments`, "Appointments", Calendar)}
       </nav>
     </div>
   );

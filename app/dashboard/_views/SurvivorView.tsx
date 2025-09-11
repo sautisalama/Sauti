@@ -100,10 +100,9 @@ export default function SurvivorView({
 		(searchParams?.get("tab") as
 			| "overview"
 			| "reports"
-			| "appointments"
 			| null) || "overview";
 	const [activeTab, setActiveTab] = useState<
-		"overview" | "reports" | "appointments"
+		"overview" | "reports"
 	>(initialTab);
 	const supabase = createClient();
 	const { toast } = useToast();
@@ -174,6 +173,9 @@ export default function SurvivorView({
 
 					console.log("Reports with appointments:", reportsWithAppointments);
 					setReports(reportsWithAppointments);
+					try {
+						localStorage.setItem(`reports-cache-${userId}`, JSON.stringify(reportsWithAppointments));
+					} catch {}
 					return;
 				}
 			}
@@ -182,6 +184,9 @@ export default function SurvivorView({
 		// If no appointments needed to be fetched or if there was an error, just set the reports
 		console.log("Fetched reports:", data);
 		setReports(data || []);
+		try {
+			localStorage.setItem(`reports-cache-${userId}`, JSON.stringify(data || []));
+		} catch {}
 	};
 
 	const handleDelete = async (reportId: string) => {
@@ -287,7 +292,7 @@ export default function SurvivorView({
 							icon={<CalendarDays className="h-5 w-5 text-sauti-orange" />}
 							title="Appointments"
 							description="Your upcoming sessions"
-							href="/dashboard?tab=appointments"
+							href="/dashboard/reports"
 						/>
 						<QuickActionCard
 							icon={<BookOpen className="h-5 w-5 text-sauti-orange" />}
@@ -384,7 +389,7 @@ export default function SurvivorView({
 									<p className="text-sm text-neutral-600 mb-1">Next Step</p>
 									<p className="font-medium">Review your last report match</p>
 									<Link
-										href="/dashboard?tab=reports"
+										href="/dashboard/reports"
 										className="text-sauti-orange text-sm"
 									>
 										Open reports →
@@ -416,15 +421,12 @@ export default function SurvivorView({
 								onValueChange={(v) => setActiveTab(v as any)}
 								className="mb-8"
 							>
-								<TabsList className="grid w-full grid-cols-3 lg:w-auto lg:inline-flex mb-6">
+								<TabsList className="grid w-full grid-cols-2 lg:w-auto lg:inline-flex mb-6">
 									<TabsTrigger value="overview" className="text-sm">
 										Overview
 									</TabsTrigger>
 									<TabsTrigger value="reports" className="text-sm">
 										My Reports
-									</TabsTrigger>
-									<TabsTrigger value="appointments" className="text-sm">
-										Appointments
 									</TabsTrigger>
 								</TabsList>
 
@@ -914,13 +916,6 @@ export default function SurvivorView({
 									</div>
 								</TabsContent>
 
-								<TabsContent value="appointments">
-									<AppointmentsTab
-										userId={userId}
-										userType="survivor"
-										username={profileDetails.first_name || profileDetails.id.slice(0, 8)}
-									/>
-								</TabsContent>
 							</Tabs>
 
 							<div className="space-y-8">

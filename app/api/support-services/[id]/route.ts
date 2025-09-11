@@ -9,9 +9,9 @@ export async function DELETE(
 
 	try {
 		const {
-			data: { session },
+			data: { user },
 		} = await supabase.auth.getUser();
-		if (!session) {
+		if (!user) {
 			return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 		}
 
@@ -22,7 +22,7 @@ export async function DELETE(
 			.eq("id", params.id)
 			.single();
 
-		if (!service || service.user_id !== session.user.id) {
+		if (!service || service.user_id !== user.id) {
 			return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
 		}
 

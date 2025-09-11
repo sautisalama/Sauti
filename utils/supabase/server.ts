@@ -36,7 +36,7 @@ export async function getSession(): Promise<Session | null> {
 		const {
 			data: { session },
 			error,
-		} = await supabase.auth.getUser();
+		} = await supabase.auth.getSession();
 		if (error) throw error;
 		return session;
 	} catch (error) {

@@ -34,6 +34,8 @@ import { ReportWithRelations, MatchedServiceWithRelations } from "../_types";
 import { MatchCard } from "../_components/MatchCard";
 import { MatchedCasesTab } from "../_components/tabs/MatchedCasesTab";
 import { AppointmentsTab } from "../_components/tabs/AppointmentsTab";
+import { CalScheduler } from "../_components/CalScheduler";
+import { EnhancedAppointmentScheduler } from "../_components/EnhancedAppointmentScheduler";
 import { SafetyPlanCard } from "@/components/SafetyPlanCard";
 import { StatCard } from "@/components/dashboard/StatCard";
 import { QuickActions } from "@/components/dashboard/QuickActions";
@@ -205,13 +207,14 @@ export default function ProfessionalView({
 					<div className="flex flex-col md:flex-row gap-6">
 						<div className="flex-1">
 							<Tabs defaultValue="overview" className="mb-8">
-								<TabsList className="w-full overflow-x-auto flex whitespace-nowrap">
-									<TabsTrigger value="overview">Overview</TabsTrigger>
-									<TabsTrigger value="reports">Reports</TabsTrigger>
-									<TabsTrigger value="matched-cases">Cases</TabsTrigger>
-									<TabsTrigger value="support-services">Services</TabsTrigger>
-									<TabsTrigger value="appointments">Appointments</TabsTrigger>
-								</TabsList>
+									<TabsList className="w-full overflow-x-auto flex whitespace-nowrap">
+										<TabsTrigger value="overview">Overview</TabsTrigger>
+										<TabsTrigger value="reports">Reports</TabsTrigger>
+										<TabsTrigger value="matched-cases">Cases</TabsTrigger>
+										<TabsTrigger value="support-services">Services</TabsTrigger>
+										<TabsTrigger value="appointments">Appointments</TabsTrigger>
+										<TabsTrigger value="scheduling">Scheduling</TabsTrigger>
+									</TabsList>
 
 								<TabsContent value="overview">
 									<OverviewTab
@@ -278,6 +281,22 @@ export default function ProfessionalView({
 											setMatchedServices(updatedMatches);
 										}}
 									/>
+								</TabsContent>
+								
+								<TabsContent value="scheduling">
+									<div className="space-y-6">
+										<div>
+											<h2 className="text-xl font-semibold text-[#1A3434] mb-2">Professional Scheduling</h2>
+											<p className="text-sm text-gray-500 mb-4">
+												Manage your availability and let clients schedule appointments with you.
+											</p>
+										</div>
+										
+										<CalScheduler 
+											professionalId={userId}
+											calLink={profileDetails.cal_link || undefined}
+										/>
+									</div>
 								</TabsContent>
 							</Tabs>
 
