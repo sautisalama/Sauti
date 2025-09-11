@@ -9,7 +9,7 @@ export async function POST(request: Request) {
 		const {
 			data: { session },
 			error: sessionError,
-		} = await supabase.auth.getSession();
+		} = await supabase.auth.getUser();
 
 		if (sessionError || !session) {
 			return NextResponse.json(
@@ -69,7 +69,7 @@ export async function GET(request: Request) {
 		const {
 			data: { session },
 			error: sessionError,
-		} = await supabase.auth.getSession();
+		} = await supabase.auth.getUser();
 
 		if (sessionError || !session) {
 			return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

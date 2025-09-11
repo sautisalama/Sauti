@@ -8,7 +8,7 @@ export async function GET(request: Request) {
 	try {
 		const {
 			data: { session },
-		} = await supabase.auth.getSession();
+		} = await supabase.auth.getUser();
 
 		if (!session) {
 			return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -32,7 +32,8 @@ export async function GET(request: Request) {
 			.single();
 
 		const targetId = useAnon && anonId ? anonId : session.user.id;
-		const targetName = useAnon && anonId ? "Anonymous" : (profile?.first_name || session.user.id);
+		const targetName =
+			useAnon && anonId ? "Anonymous" : profile?.first_name || session.user.id;
 
 		try {
 			// First try to get the user
@@ -51,7 +52,12 @@ export async function GET(request: Request) {
 			}
 
 			const token = streamClient.createToken(targetId);
-			return NextResponse.json({ token, userId: targetId, name: targetName, anon: useAnon });
+			return NextResponse.json({
+				token,
+				userId: targetId,
+				name: targetName,
+				anon: useAnon,
+			});
 		} catch (error: any) {
 			// Check if it's a rate limit error
 			if (error.response?.status === 429) {

@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter, Atkinson_Hyperlegible } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
@@ -25,15 +25,12 @@ export const metadata: Metadata = {
 		apple: "/icons/icons-512.png",
 	},
 	keywords: ["GBV", "Gender Based Violence", "Gender", "Sauti Salama"],
-	themeColor: [{ media: "(prefers-color-scheme: dark)", color: "#fff" }],
 	authors: [
 		{
 			name: "Cashcade",
 			url: "https://www.linkedin.com/sautisalama",
 		},
 	],
-	viewport:
-		"minimum-scale=1, initial-scale=1, width=device-width, shrink-to-fit=no, viewport-fit=cover",
 	appleWebApp: {
 		capable: true,
 		statusBarStyle: "default",
@@ -51,6 +48,17 @@ export const metadata: Metadata = {
 			},
 		],
 	},
+};
+
+export const viewport: Viewport = {
+	width: "device-width",
+	initialScale: 1,
+	minimumScale: 1,
+	viewportFit: "cover",
+	themeColor: [
+		{ media: "(prefers-color-scheme: light)", color: "#fff" },
+		{ media: "(prefers-color-scheme: dark)", color: "#000" },
+	],
 };
 
 export default function RootLayout({

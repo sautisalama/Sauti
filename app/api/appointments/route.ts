@@ -7,7 +7,7 @@ export async function POST(request: Request) {
 	try {
 		const {
 			data: { session },
-		} = await supabase.auth.getSession();
+		} = await supabase.auth.getUser();
 		if (!session) {
 			return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 		}
@@ -63,7 +63,7 @@ export async function POST(request: Request) {
 				.from("reports")
 				.update({
 					match_status: "accepted",
-					ismatched: true
+					ismatched: true,
 				})
 				.eq("report_id", matchData.reports.report_id),
 		]);
