@@ -53,6 +53,14 @@ import {
 import Link from "next/link";
 import { fetchUserAppointments } from "./actions/appointments";
 import { SamplePlaceholder } from "@/components/dashboard/SamplePlaceholder";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import AuthenticatedReportAbuseForm from "@/components/AuthenticatedReportAbuseForm";
 
 interface ProfessionalViewProps {
 	userId: string;
@@ -222,13 +230,15 @@ export default function ProfessionalView({
 
 					{/* KPI Row */}
 					<div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mt-4">
+<button onClick={() => setReportDialogOpen(true)} className="text-left">
 						<StatCard
 							title="Reports"
 							value={reports.length}
 							icon={<ClipboardList className="h-6 w-6" />}
-							className="bg-[#0f766e]"
+							className="bg-[#0f766e] hover:brightness-110"
 							invertColors
 						/>
+					</button>
 						<StatCard
 							title="Services"
 							value={supportServices.length}
@@ -271,14 +281,14 @@ export default function ProfessionalView({
 								{
 									label: "Schedule",
 									description: "Manage appointments",
-									href: "#appointments",
+href: "/dashboard/appointments",
 									icon: CalendarDays,
 									disabled: !isVerified,
 								},
 								{
 									label: "My Reports",
 									description: "View or submit reports",
-									href: "#reports",
+href: "/dashboard/reports",
 									icon: ClipboardList,
 								},
 							]}
@@ -309,7 +319,7 @@ export default function ProfessionalView({
 													• {a.matched_service?.support_service?.name || "Session"}
 												</span>
 												<Link
-													href="/dashboard?tab=appointments"
+href="/dashboard/appointments"
 													className="text-sauti-orange"
 												>
 													Open
@@ -323,7 +333,7 @@ export default function ProfessionalView({
 										<div className="flex items-center justify-between">
 											<span>10:00 • Intake call</span>
 											<Link
-												href="/dashboard?tab=appointments"
+href="/dashboard/appointments"
 												className="text-sauti-orange"
 											>
 												Open
@@ -607,7 +617,20 @@ export default function ProfessionalView({
 						</AlertDialogAction>
 					</AlertDialogFooter>
 				</AlertDialogContent>
-			</AlertDialog>
+</AlertDialog>
+
+			{/* Global Create Report Dialog */}
+			<Dialog open={reportDialogOpen} onOpenChange={setReportDialogOpen}>
+				<DialogContent className="sm:max-w-4xl z-[1000]">
+					<DialogHeader>
+						<DialogTitle>Report Abuse</DialogTitle>
+						<DialogDescription>
+							Please fill out this form to report an incident. All information will be kept confidential.
+						</DialogDescription>
+					</DialogHeader>
+					<AuthenticatedReportAbuseForm onClose={() => setReportDialogOpen(false)} userId={userId} />
+				</DialogContent>
+			</Dialog>
 		</div>
 	);
 }
