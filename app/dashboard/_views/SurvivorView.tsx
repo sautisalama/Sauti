@@ -12,7 +12,7 @@ import {
 	DialogTrigger,
 } from "@/components/ui/dialog";
 import { Info, Plus, Trash2 } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
 import AuthenticatedReportAbuseForm from "@/components/AuthenticatedReportAbuseForm";
 import {
@@ -61,6 +61,7 @@ import { SafetyPlanCard } from "@/components/SafetyPlanCard";
 import { CommunityCard } from "@/app/components/CommunityCard";
 import { DailyProgress } from "@/app/components/DailyProgress";
 import { JoinCommunity } from "@/app/components/JoinCommunity";
+import { SamplePlaceholder } from "@/components/dashboard/SamplePlaceholder";
 
 // Add this interface to type the joined data
 interface ReportWithRelations extends Tables<"reports"> {
@@ -253,6 +254,25 @@ export default function SurvivorView({
 			.join(" ");
 	};
 
+	const matchedCount = useMemo(() => reports.filter((r) => (r.matched_services?.length || 0) > 0).length, [reports]);
+	const latestReportDate = useMemo(() => {
+		const ts = reports.map(r => r.submission_timestamp).filter(Boolean) as string[];
+		if (ts.length === 0) return null;
+		return new Date(ts.sort((a,b) => new Date(b).getTime() - new Date(a).getTime())[0]);
+	}, [reports]);
+	const daysActive = useMemo(() => {
+		const ts = reports.map(r => r.submission_timestamp).filter(Boolean) as string[];
+		if (ts.length === 0) return null;
+		const minDate = new Date(ts.reduce((min, cur) => (new Date(cur) < new Date(min) ? cur : min), ts[0]));
+		const diff = Math.max(1, Math.ceil((Date.now() - minDate.getTime()) / (1000*60*60*24)));
+		return diff;
+	}, [reports]);
+	const safetyProgress = useMemo(() => {
+		if (reports.length === 0 && matchedCount === 0) return null;
+		const base = reports.length * 10 + matchedCount * 15;
+		return Math.max(15, Math.min(95, base));
+	}, [reports, matchedCount]);
+
 	// Helper function to get time of day
 	const getTimeOfDay = (): "morning" | "afternoon" | "evening" => {
 		const hour = new Date().getHours();
@@ -315,69 +335,107 @@ export default function SurvivorView({
 						</Link>
 						<StatsCard
 							title="Support Matches"
-							value={reports.filter((r) => r.matched_services?.length).length}
+							value={matchedCount}
 							icon={<Heart className="h-4 w-4" />}
 							variant="success"
 							description="Connected to help"
 						/>
-						<StatsCard
-							title="Safety Score"
-							value="87%"
-							icon={<TrendingUp className="h-4 w-4" />}
-							change={{ value: 12, type: "increase" }}
-							variant="success"
-							description="Your progress this month"
-						/>
-						<StatsCard
-							title="Next Steps"
-							value={"2"}
-							icon={<CheckCircle className="h-4 w-4" />}
-							description="Recommended actions"
-							variant="warning"
-						/>
+						{typeof safetyProgress === 'number' ? (
+							<StatsCard
+								title="Safety Score"
+								value={`${safetyProgress}%`}
+								icon={<TrendingUp className="h-4 w-4" />}
+								change={{ value: Math.max(1, Math.round(safetyProgress/10)), type: "increase" }}
+								variant="success"
+								description="Your progress this month"
+							/>
+						) : (
+							<SamplePlaceholder label="Sample">
+								<StatsCard
+									title="Safety Score"
+									value="87%"
+									icon={<TrendingUp className="h-4 w-4" />}
+									change={{ value: 12, type: "increase" }}
+									variant="success"
+									description="Your progress this month"
+								/>
+							</SamplePlaceholder>
+						)}
+						<SamplePlaceholder label="Sample">
+							<StatsCard
+								title="Next Steps"
+								value={"2"}
+								icon={<CheckCircle className="h-4 w-4" />}
+								description="Recommended actions"
+								variant="warning"
+							/>
+						</SamplePlaceholder>
 					</div>
 
 					{/* Safety Progress Ring */}
 					<Card className="mb-6">
 						<CardContent className="p-6">
-							<div className="flex flex-col lg:flex-row items-center gap-6">
-								<div className="flex flex-col items-center">
-									<ProgressRing progress={87} size={120}>
-										<div className="text-center">
-											<div className="text-2xl font-bold text-sauti-orange">87%</div>
-											<div className="text-xs text-neutral-500">Safety</div>
-										</div>
-									</ProgressRing>
-									<p className="text-sm text-neutral-600 mt-2 text-center">
-										Your safety progress
-									</p>
-								</div>
-								<div className="flex-1 w-full">
-									<h3 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100 mb-3">
-										Your Journey to Safety
-									</h3>
-									<p className="text-neutral-600 dark:text-neutral-400 text-sm mb-4">
-										You've made significant progress on your path to safety and healing.
-										Keep taking small steps forward - you're doing great.
-									</p>
-									<div className="grid grid-cols-3 gap-3 text-center">
-										<div>
-											<div className="text-lg font-bold text-success-600">
-												{reports.length}
+							{typeof safetyProgress === 'number' ? (
+								<div className="flex flex-col lg:flex-row items-center gap-6">
+									<div className="flex flex-col items-center">
+										<ProgressRing progress={safetyProgress} size={120}>
+											<div className="text-center">
+												<div className="text-2xl font-bold text-sauti-orange">{safetyProgress}%</div>
+												<div className="text-xs text-neutral-500">Safety</div>
 											</div>
-											<div className="text-xs text-neutral-500">Reports Filed</div>
-										</div>
-										<div>
-											<div className="text-lg font-bold text-sauti-orange">5</div>
-											<div className="text-xs text-neutral-500">Resources Used</div>
-										</div>
-										<div>
-											<div className="text-lg font-bold text-primary-600">12</div>
-											<div className="text-xs text-neutral-500">Days Active</div>
+										</ProgressRing>
+										<p className="text-sm text-neutral-600 mt-2 text-center">
+											Your safety progress
+										</p>
+									</div>
+									<div className="flex-1 w-full">
+										<h3 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100 mb-3">
+											Your Journey to Safety
+										</h3>
+										<p className="text-neutral-600 dark:text-neutral-400 text-sm mb-4">
+											You've made significant progress on your path to safety and healing.
+											Keep taking small steps forward - you're doing great.
+										</p>
+										<div className="grid grid-cols-3 gap-3 text-center">
+											<div>
+												<div className="text-lg font-bold text-success-600">{reports.length}</div>
+												<div className="text-xs text-neutral-500">Reports Filed</div>
+											</div>
+											<div>
+												<div className="text-lg font-bold text-sauti-orange">{Math.max(1, Math.round((safetyProgress/20)) + matchedCount)}</div>
+												<div className="text-xs text-neutral-500">Resources Used</div>
+											</div>
+											<div>
+												<div className="text-lg font-bold text-primary-600">{daysActive ?? 1}</div>
+												<div className="text-xs text-neutral-500">Days Active</div>
+											</div>
 										</div>
 									</div>
 								</div>
-							</div>
+							) : (
+								<SamplePlaceholder label="Sample">
+									<div className="flex flex-col lg:flex-row items-center gap-6">
+										<div className="flex flex-col items-center">
+											<ProgressRing progress={87} size={120}>
+												<div className="text-center">
+													<div className="text-2xl font-bold text-sauti-orange">87%</div>
+													<div className="text-xs text-neutral-500">Safety</div>
+												</div>
+											</ProgressRing>
+											<p className="text-sm text-neutral-600 mt-2 text-center">Your safety progress</p>
+										</div>
+										<div className="flex-1 w-full">
+											<h3 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100 mb-3">Your Journey to Safety</h3>
+											<p className="text-neutral-600 dark:text-neutral-400 text-sm mb-4">You've made significant progress on your path to safety and healing. Keep taking small steps forward - you're doing great.</p>
+											<div className="grid grid-cols-3 gap-3 text-center">
+												<div><div className="text-lg font-bold text-success-600">0</div><div className="text-xs text-neutral-500">Reports Filed</div></div>
+												<div><div className="text-lg font-bold text-sauti-orange">5</div><div className="text-xs text-neutral-500">Resources Used</div></div>
+												<div><div className="text-lg font-bold text-primary-600">12</div><div className="text-xs text-neutral-500">Days Active</div></div>
+											</div>
+										</div>
+									</div>
+								</SamplePlaceholder>
+							)}
 						</CardContent>
 					</Card>
 
@@ -441,36 +499,35 @@ export default function SurvivorView({
 												/>
 											</CardHeader>
 											<CardContent className="p-0">
-												<div className="divide-y divide-neutral-100 dark:divide-neutral-800">
-													<ActivityItem
-														icon={<CheckCircle className="h-4 w-4" />}
-														title="Report submitted successfully"
-														description="Your incident report has been securely recorded and is being reviewed by our team."
-														timestamp="2 hours ago"
-														status="success"
-													/>
-													<ActivityItem
-														icon={<MessageCircle className="h-4 w-4" />}
-														title="New message from Dr. Sarah M."
-														description="Response to your recent consultation request with recommended next steps."
-														timestamp="5 hours ago"
-														onClick={() => (window.location.href = "/dashboard/chat")}
-													/>
-													<ActivityItem
-														icon={<CalendarDays className="h-4 w-4" />}
-														title="Appointment scheduled"
-														description="Counseling session with Jane Smith on March 15th at 2:00 PM."
-														timestamp="1 day ago"
-														status="pending"
-													/>
-													<ActivityItem
-														icon={<Star className="h-4 w-4" />}
-														title="Safety milestone achieved"
-														description="Congratulations! You've completed your safety plan and accessed 3 new resources."
-														timestamp="2 days ago"
-														status="success"
-													/>
-												</div>
+											<div className="divide-y divide-neutral-100 dark:divide-neutral-800">
+												{reports.length > 0 ? (
+													<>
+														<ActivityItem
+															icon={<CheckCircle className="h-4 w-4" />}
+															title="Report submitted"
+															description="Your incident report was recorded successfully."
+															timestamp={latestReportDate ? latestReportDate.toLocaleString() : "Recently"}
+															status="success"
+														/>
+														{matchedCount > 0 && (
+															<ActivityItem
+																icon={<Star className="h-4 w-4" />}
+																title="Service match found"
+																description="You've been matched with a support service."
+																timestamp="Recently"
+																status="success"
+															/>
+														)}
+													</>
+												) : (
+													<SamplePlaceholder label="Sample">
+														<ActivityItem icon={<CheckCircle className="h-4 w-4" />} title="Report submitted successfully" description="Your incident report has been securely recorded and is being reviewed by our team." timestamp="2 hours ago" status="success" />
+														<ActivityItem icon={<MessageCircle className="h-4 w-4" />} title="New message from Dr. Sarah M." description="Response to your recent consultation request with recommended next steps." timestamp="5 hours ago" onClick={() => (window.location.href = "/dashboard/chat")} />
+														<ActivityItem icon={<CalendarDays className="h-4 w-4" />} title="Appointment scheduled" description="Counseling session with Jane Smith on March 15th at 2:00 PM." timestamp="1 day ago" status="pending" />
+														<ActivityItem icon={<Star className="h-4 w-4" />} title="Safety milestone achieved" description="Congratulations! You've completed your safety plan and accessed 3 new resources." timestamp="2 days ago" status="success" />
+													</SamplePlaceholder>
+												)}
+											</div>
 											</CardContent>
 										</Card>
 

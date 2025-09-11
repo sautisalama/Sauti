@@ -26,7 +26,7 @@ import {
 } from "./actions/support-services";
 import { DailyProgress } from "@/app/components/DailyProgress";
 import { fetchMatchedServices } from "./actions/matched-services";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { OverviewTab } from "../_components/tabs/OverviewTab";
 import { ReportsTab } from "../_components/tabs/ReportsTab";
 import { SupportServicesTab } from "../_components/tabs/SupportServicesTab";
@@ -42,6 +42,8 @@ import { QuickActions } from "@/components/dashboard/QuickActions";
 import { SectionHeader } from "@/components/dashboard/SectionHeader";
 import { ClipboardList, Users, CalendarDays, MessageCircle, PlusCircle } from "lucide-react";
 import Link from "next/link";
+import { fetchUserAppointments } from "./actions/appointments";
+import { SamplePlaceholder } from "@/components/dashboard/SamplePlaceholder";
 
 interface ProfessionalViewProps {
 	userId: string;
@@ -66,6 +68,7 @@ export default function ProfessionalView({
 	const [matchedServices, setMatchedServices] = useState<
 		MatchedServiceWithRelations[]
 	>([]);
+	const [appointments, setAppointments] = useState<any[]>([]);
 
 	const handleDelete = async (reportId: string) => {
 		try {
@@ -118,15 +121,17 @@ export default function ProfessionalView({
 	useEffect(() => {
 		const loadData = async () => {
 			try {
-				const [userReports, userServices, userMatches] = await Promise.all([
+				const [userReports, userServices, userMatches, userAppointments] = await Promise.all([
 					fetchUserReports(userId),
 					fetchUserSupportServices(userId),
 					fetchMatchedServices(userId),
+					fetchUserAppointments(userId, "professional", true),
 				]);
 
 				setReports(userReports as ReportWithRelations[]);
 				setSupportServices(userServices);
 				setMatchedServices(userMatches);
+				setAppointments(userAppointments || []);
 			} catch (error) {
 				toast({
 					title: "Error",
@@ -150,7 +155,7 @@ export default function ProfessionalView({
 						<StatCard title="Reports" value={reports.length} icon={<ClipboardList className="h-6 w-6" />} className="bg-[#0f766e]" invertColors />
 						<StatCard title="Services" value={supportServices.length} icon={<Users className="h-6 w-6" />} className="bg-[#2563eb]" invertColors />
 						<StatCard title="Matches" value={matchedServices.length} icon={<MessageCircle className="h-6 w-6" />} className="bg-[#9333ea]" invertColors />
-						<StatCard title="Appointments" value={"–"} icon={<CalendarDays className="h-6 w-6" />} className="bg-[#f59e0b]" invertColors />
+					<StatCard title="Appointments" value={appointments.length} icon={<CalendarDays className="h-6 w-6" />} className="bg-[#f59e0b]" invertColors />
 					</div>
 
 					{/* Quick Actions */}
@@ -169,33 +174,71 @@ export default function ProfessionalView({
 					<div className="grid grid-cols-1 md:grid-cols-3 gap-4 my-4">
 						<div className="rounded-xl border p-4 bg-white shadow-sm">
 							<p className="text-sm text-neutral-600 mb-2">Today’s Agenda</p>
-							<div className="space-y-2 text-sm">
-								<div className="flex items-center justify-between">
-									<span>10:00 • Intake call</span>
-									<Link href="/dashboard?tab=appointments" className="text-sauti-orange">Open</Link>
+							{appointments.length > 0 ? (
+								<div className="space-y-2 text-sm">
+									{[...appointments]
+										.filter(a => a.appointment_date)
+										.sort((a,b) => new Date(a.appointment_date).getTime() - new Date(b.appointment_date).getTime())
+										.slice(0,2)
+										.map((a,idx) => (
+											<div key={idx} className="flex items-center justify-between">
+												<span>{new Date(a.appointment_date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} • {(a.matched_service?.support_service?.name) || 'Session'}</span>
+												<Link href="/dashboard?tab=appointments" className="text-sauti-orange">Open</Link>
+											</div>
+										))}
 								</div>
-								<div className="flex items-center justify-between">
-									<span>14:00 • Follow-up</span>
-									<Link href="/dashboard?tab=appointments" className="text-sauti-orange">Open</Link>
-								</div>
-							</div>
+							) : (
+								<SamplePlaceholder label="Sample">
+									<div className="space-y-2 text-sm">
+										<div className="flex items-center justify-between">
+											<span>10:00 • Intake call</span>
+											<Link href="/dashboard?tab=appointments" className="text-sauti-orange">Open</Link>
+										</div>
+										<div className="flex items-center justify-between">
+											<span>14:00 • Follow-up</span>
+											<Link href="/dashboard?tab=appointments" className="text-sauti-orange">Open</Link>
+										</div>
+									</div>
+								</SamplePlaceholder>
+							)}
 						</div>
 						<div className="rounded-xl border p-4 bg-white shadow-sm">
 							<p className="text-sm text-neutral-600 mb-2">Queues</p>
-							<div className="grid grid-cols-3 gap-2 text-sm">
-								<div className="rounded-lg bg-[#FFF5F5] p-3 text-center">
-									<p className="text-xs text-neutral-500">High</p>
-									<p className="text-lg font-semibold">2</p>
+							{reports.length > 0 ? (
+								<div className="grid grid-cols-3 gap-2 text-sm">
+									{(() => {
+										const counts = reports.reduce((acc, r) => {
+											const k = (r.urgency || 'low').toLowerCase();
+											acc[k] = (acc[k] || 0) as number + 1;
+											return acc;
+										}, {} as Record<string, number>);
+										return (
+											<>
+												<div className="rounded-lg bg-[#FFF5F5] p-3 text-center"><p className="text-xs text-neutral-500">High</p><p className="text-lg font-semibold">{counts['high'] || 0}</p></div>
+												<div className="rounded-lg bg-[#FFF8F0] p-3 text-center"><p className="text-xs text-neutral-500">Medium</p><p className="text-lg font-semibold">{counts['medium'] || 0}</p></div>
+												<div className="rounded-lg bg-[#F0F9FF] p-3 text-center"><p className="text-xs text-neutral-500">Low</p><p className="text-lg font-semibold">{counts['low'] || 0}</p></div>
+											</>
+										);
+									})()}
 								</div>
-								<div className="rounded-lg bg-[#FFF8F0] p-3 text-center">
-									<p className="text-xs text-neutral-500">Medium</p>
-									<p className="text-lg font-semibold">5</p>
-								</div>
-								<div className="rounded-lg bg-[#F0F9FF] p-3 text-center">
-									<p className="text-xs text-neutral-500">Low</p>
-									<p className="text-lg font-semibold">9</p>
-								</div>
-							</div>
+							) : (
+								<SamplePlaceholder label="Sample">
+									<div className="grid grid-cols-3 gap-2 text-sm">
+										<div className="rounded-lg bg-[#FFF5F5] p-3 text-center">
+											<p className="text-xs text-neutral-500">High</p>
+											<p className="text-lg font-semibold">2</p>
+										</div>
+										<div className="rounded-lg bg-[#FFF8F0] p-3 text-center">
+											<p className="text-xs text-neutral-500">Medium</p>
+											<p className="text-lg font-semibold">5</p>
+										</div>
+										<div className="rounded-lg bg-[#F0F9FF] p-3 text-center">
+											<p className="text-xs text-neutral-500">Low</p>
+											<p className="text-lg font-semibold">9</p>
+										</div>
+									</div>
+								</SamplePlaceholder>
+							)}
 						</div>
 						<div className="rounded-xl border p-4 bg-white shadow-sm">
 							<p className="text-sm text-neutral-600 mb-2">Quick Chat</p>
