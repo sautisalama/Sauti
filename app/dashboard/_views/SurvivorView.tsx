@@ -12,7 +12,7 @@ import {
 	DialogTrigger,
 } from "@/components/ui/dialog";
 import { Info, Plus, Trash2 } from "lucide-react";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
 import AuthenticatedReportAbuseForm from "@/components/AuthenticatedReportAbuseForm";
 import {
@@ -111,7 +111,7 @@ export default function SurvivorView({
 	const [showAlert, setShowAlert] = useState(true);
 
 	// Move fetchReports outside useEffect so it can be called from handlers
-	const fetchReports = async () => {
+	const fetchReports = useCallback(async () => {
 		console.log("Fetching reports for user:", userId);
 
 		const { data, error } = await supabase
@@ -188,7 +188,7 @@ export default function SurvivorView({
 		try {
 			localStorage.setItem(`reports-cache-${userId}`, JSON.stringify(data || []));
 		} catch (e) { /* ignore cache write */ }
-	};
+	}, [supabase, userId, toast]);
 
 	const handleDelete = async (reportId: string) => {
 		try {
@@ -244,7 +244,7 @@ export default function SurvivorView({
 		return () => {
 			supabase.removeChannel(channel);
 		};
-	}, [userId, toast, fetchReports]);
+	}, [userId, toast, fetchReports, supabase]);
 
 	// Add formatServiceName inside component
 	const formatServiceName = (service: string) => {

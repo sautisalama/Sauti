@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Button } from "./ui/button";
 import { Toast } from "./ui/toast";
 
@@ -28,17 +28,7 @@ export function PWAInstallPrompt({ onHandlersReady }: { onHandlersReady?: (handl
     return () => window.removeEventListener('beforeinstallprompt', handler);
   }, []);
 
-  useEffect(() => {
-    // Expose handlers to parent components
-    if (onHandlersReady) {
-      onHandlersReady({
-        showInstallPrompt,
-        handleInstallClick
-      });
-    }
-  }, [showInstallPrompt]);
-
-  const handleInstallClick = async () => {
+  const handleInstallClick = useCallback(async () => {
     if (!deferredPrompt) return;
 
     // Show the install prompt
@@ -56,7 +46,17 @@ export function PWAInstallPrompt({ onHandlersReady }: { onHandlersReady?: (handl
     // Clear the deferredPrompt
     setDeferredPrompt(null);
     setShowInstallPrompt(false);
-  };
+  }, [deferredPrompt]);
+
+  useEffect(() => {
+    // Expose handlers to parent components
+    if (onHandlersReady) {
+      onHandlersReady({
+        showInstallPrompt,
+        handleInstallClick
+      });
+    }
+  }, [showInstallPrompt, onHandlersReady, handleInstallClick]);
 
   if (!showInstallPrompt) return null;
 

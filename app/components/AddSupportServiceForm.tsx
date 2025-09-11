@@ -37,7 +37,7 @@ export function AddSupportServiceForm({ onSuccess }: { onSuccess?: () => void })
         }
       );
     }
-  }, []);
+  }, [toast]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
