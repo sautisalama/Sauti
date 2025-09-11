@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Input } from "@/components/ui/input";
@@ -118,11 +118,6 @@ const WeatherDashboard = () => {
 		}
 	}, []);
 
-	// Fetch weather data when location changes
-	useEffect(() => {
-		fetchWeatherData();
-	}, [location]);
-
 	const fetchLocationName = async (lat: number, lon: number) => {
 		const API_KEY = process.env.NEXT_PUBLIC_OPENWEATHER_API_KEY;
 		const response = await fetch(
@@ -142,7 +137,7 @@ const WeatherDashboard = () => {
 		};
 	};
 
-	const fetchWeatherData = async () => {
+	const fetchWeatherData = useCallback(async () => {
 		try {
 			setIsLoading(true);
 			const API_KEY = process.env.NEXT_PUBLIC_OPENWEATHER_API_KEY;
@@ -201,7 +196,12 @@ const WeatherDashboard = () => {
 		} finally {
 			setIsLoading(false);
 		}
-	};
+	}, [location]);
+
+	// Fetch weather data when location or API key changes
+	useEffect(() => {
+		fetchWeatherData();
+	}, [fetchWeatherData]);
 
 	const handleSearch = async () => {
 		try {

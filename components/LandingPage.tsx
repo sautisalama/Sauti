@@ -58,7 +58,7 @@ export function LandingPage() {
 		});
 
 		return () => subscription.unsubscribe();
-	}, []);
+	}, [supabase]);
 
 	return (
 		<div className="flex min-h-screen w-full flex-col">

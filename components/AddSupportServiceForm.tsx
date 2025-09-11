@@ -68,7 +68,7 @@ export function AddSupportServiceForm({
 				}
 			);
 		}
-	}, []);
+	}, [toast]);
 
 	const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
 		e.preventDefault();
