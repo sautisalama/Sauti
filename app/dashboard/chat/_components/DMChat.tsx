@@ -37,7 +37,9 @@ export function DMChat({ userId, username, channelId }: { userId: string; userna
         }
       });
       setMediaCounts({ attachments, links });
-    } catch {}
+    } catch (e) {
+      console.debug('DMChat.collectMedia: unable to compute media counts', e);
+    }
   };
   const collectLinks = (ch: any) => {
     try {
@@ -50,7 +52,9 @@ export function DMChat({ userId, username, channelId }: { userId: string; userna
         }
       });
       setMediaCounts((prev) => ({ attachments: prev.attachments, links }));
-    } catch {}
+    } catch (e) {
+      console.debug('DMChat.collectLinks: unable to compute link counts', e);
+    }
   };
 
   useEffect(() => {
@@ -64,7 +68,9 @@ export function DMChat({ userId, username, channelId }: { userId: string; userna
             const anon = window.localStorage.getItem("ss_anon_mode");
             const anonId = window.localStorage.getItem("ss_anon_id");
             if (anon === "1" && anonId) qs = `?anon=1&anonId=${encodeURIComponent(anonId)}`;
-          } catch {}
+          } catch (e) {
+            console.debug('DMChat: unable to read anonymous mode from localStorage', e);
+          }
         }
         const response = await fetch(`/api/stream/token${qs}`);
         if (!response.ok) {
@@ -75,7 +81,14 @@ export function DMChat({ userId, username, channelId }: { userId: string; userna
         const streamClient = new StreamChatClient(process.env.NEXT_PUBLIC_STREAM_KEY!, { timeout: 6000 });
         let effectiveId = userId, effectiveName = username;
         if (typeof window !== "undefined") {
-          try { if (window.localStorage.getItem("ss_anon_mode") === "1") { effectiveName = "Anonymous"; effectiveId = window.localStorage.getItem("ss_anon_id") || effectiveId; } } catch {}
+          try {
+            if (window.localStorage.getItem("ss_anon_mode") === "1") {
+              effectiveName = "Anonymous";
+              effectiveId = window.localStorage.getItem("ss_anon_id") || effectiveId;
+            }
+          } catch (e) {
+            console.debug('DMChat: failed to read anon identity', e);
+          }
         }
         await streamClient.connectUser({ id: effectiveId, name: effectiveName, image: effectiveName === "Anonymous" ? "/anon.svg" : undefined }, data.token);
         const ch = streamClient.channel("messaging", channelId, {});

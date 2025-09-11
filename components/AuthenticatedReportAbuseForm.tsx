@@ -67,9 +67,11 @@ export default function AuthenticatedReportAbuseForm({
 				setDraft(parsed);
 				if (parsed.description) setDescription(parsed.description);
 				if (parsed.selectedServices) setSelectedServices(parsed.selectedServices);
-			}
-		} catch {}
-	}, []);
+    }
+    } catch (e) {
+      // ignore draft load errors
+    }
+  }, []);
 
 	useEffect(() => {
 		if (!isListening && transcript) {
@@ -134,9 +136,9 @@ export default function AuthenticatedReportAbuseForm({
 				description: "Thank you for your report. We will review it shortly.",
 			});
 
-			form.reset();
-			try { localStorage.removeItem("authReportDraft"); } catch {}
-			setTimeout(() => {
+            form.reset();
+            try { localStorage.removeItem("authReportDraft"); } catch (e) { /* ignore */ }
+            setTimeout(() => {
 				onClose();
 			}, 500);
 		} catch (error) {
@@ -304,16 +306,16 @@ export default function AuthenticatedReportAbuseForm({
 							const form = (e.currentTarget.closest("form") as HTMLFormElement)!;
 							const fd = new FormData(form);
 							const toSave = Object.fromEntries(fd.entries());
-							(toSave as any).description = description;
-							(toSave as any).selectedServices = selectedServices;
-							try { localStorage.setItem("authReportDraft", JSON.stringify(toSave)); setDraft(toSave); } catch {}
+            (toSave as any).description = description;
+            (toSave as any).selectedServices = selectedServices;
+            try { localStorage.setItem("authReportDraft", JSON.stringify(toSave)); setDraft(toSave); } catch (e) { /* ignore */ }
 						}}
 					>
 						Save Draft
 					</Button>
 					<Button
-						variant="ghost"
-						onClick={() => { try { localStorage.removeItem("authReportDraft"); setDraft(null); setDescription(""); setSelectedServices([]); } catch {} }}
+            variant="ghost"
+            onClick={() => { try { localStorage.removeItem("authReportDraft"); setDraft(null); setDescription(""); setSelectedServices([]); } catch (e) { /* ignore */ } }}
 					>
 						Clear Draft
 					</Button>

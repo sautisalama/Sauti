@@ -64,7 +64,7 @@ export async function matchReportWithServices(reportId: string) {
 
 		// Fetch profiles for service owners to check verification completeness
 		const userIds = Array.from(new Set(services.map(s => s.user_id).filter(Boolean))) as string[];
-		let profilesById = new Map<string, { first_name: string | null; phone: string | null; professional_title: string | null }>();
+		const profilesById = new Map<string, { first_name: string | null; phone: string | null; professional_title: string | null }>();
 		if (userIds.length > 0) {
 			const { data: profiles, error: profileErr } = await supabase
 				.from("profiles")

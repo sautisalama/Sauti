@@ -54,7 +54,9 @@ function load(): Omit<AccessibilityState, "set"> {
 }
 
 function save(state: Omit<AccessibilityState, "set">) {
-  try { window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch {}
+  try { window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (e) {
+    // ignore storage errors (private mode or quota exceeded)
+  }
 }
 
 function applyAttrs(state: Omit<AccessibilityState, "set">) {

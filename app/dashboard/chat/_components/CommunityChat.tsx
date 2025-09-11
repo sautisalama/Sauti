@@ -30,7 +30,9 @@ export function CommunityChat({ userId, username }: { userId: string; username: 
             const anon = window.localStorage.getItem("ss_anon_mode");
             const anonId = window.localStorage.getItem("ss_anon_id");
             if (anon === "1" && anonId) qs = `?anon=1&anonId=${encodeURIComponent(anonId)}`;
-          } catch {}
+          } catch (e) {
+            console.debug('CommunityChat: unable to read anonymous mode from localStorage', e);
+          }
         }
         const response = await fetch(`/api/stream/token${qs}`);
         if (!response.ok) {
@@ -41,7 +43,14 @@ export function CommunityChat({ userId, username }: { userId: string; username: 
         const streamClient = new StreamChatClient(process.env.NEXT_PUBLIC_STREAM_KEY!, { timeout: 6000 });
         let effectiveId = userId, effectiveName = username;
         if (typeof window !== "undefined") {
-          try { if (window.localStorage.getItem("ss_anon_mode") === "1") { effectiveName = "Anonymous"; effectiveId = window.localStorage.getItem("ss_anon_id") || effectiveId; } } catch {}
+          try {
+            if (window.localStorage.getItem("ss_anon_mode") === "1") {
+              effectiveName = "Anonymous";
+              effectiveId = window.localStorage.getItem("ss_anon_id") || effectiveId;
+            }
+          } catch (e) {
+            console.debug('CommunityChat: failed to read anon identity', e);
+          }
         }
         await streamClient.connectUser({ id: effectiveId, name: effectiveName, image: effectiveName === "Anonymous" ? "/anon.svg" : undefined }, data.token);
         const ch = streamClient.channel("livestream", "community-global", { name: "Sauti Community" });

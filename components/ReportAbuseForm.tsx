@@ -35,9 +35,11 @@ export default function ReportAbuseForm({ onClose }: { onClose?: () => void }) {
 				const parsed = JSON.parse(saved);
 				setDraft(parsed);
 				if (parsed.description) setDescription(parsed.description);
-			}
-		} catch {}
-	}, []);
+    }
+    } catch (e) {
+      // ignore draft load errors
+    }
+  }, []);
 
 	// Get location on component mount
 	useEffect(() => {
@@ -139,9 +141,9 @@ export default function ReportAbuseForm({ onClose }: { onClose?: () => void }) {
 
 			// Only reset and show success if the submission was successful
 			form.reset();
-			setDescription("");
-			try { localStorage.removeItem("reportDraft"); } catch {}
-			toast({
+        setDescription("");
+        try { localStorage.removeItem("reportDraft"); } catch (e) { /* ignore */ }
+        toast({
 				title: "Report Submitted",
 				description: "Thank you for your report. We will review it shortly.",
 			});
@@ -316,9 +318,9 @@ export default function ReportAbuseForm({ onClose }: { onClose?: () => void }) {
 						const form = (e.currentTarget.closest("form") as HTMLFormElement)!;
 						const fd = new FormData(form);
 						const toSave = Object.fromEntries(fd.entries());
-						(toSave as any).description = description;
-						try { localStorage.setItem("reportDraft", JSON.stringify(toSave)); setDraft(toSave); } catch {}
-						toast({ title: "Draft saved" });
+        (toSave as any).description = description;
+        try { localStorage.setItem("reportDraft", JSON.stringify(toSave)); setDraft(toSave); } catch (e) { /* ignore */ }
+        toast({ title: "Draft saved" });
 					}}
 				>
 					Save Draft
@@ -326,8 +328,8 @@ export default function ReportAbuseForm({ onClose }: { onClose?: () => void }) {
 				<Button
 					type="button"
 					variant="ghost"
-					className="w-full sm:w-auto"
-					onClick={() => { try { localStorage.removeItem("reportDraft"); setDraft(null); setDescription(""); } catch {} }}
+        className="w-full sm:w-auto"
+        onClick={() => { try { localStorage.removeItem("reportDraft"); setDraft(null); setDescription(""); } catch (e) { /* ignore */ } }}
 				>
 					Clear Draft
 				</Button>

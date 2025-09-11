@@ -141,7 +141,7 @@ export default function OnboardingPage() {
     </Card>
   );
 
-  const Credentials = (() => {
+  function CredentialsSection() {
     const [files, setFiles] = useState<File[]>([]);
     return (
       <Card>
@@ -177,7 +177,7 @@ export default function OnboardingPage() {
         </CardContent>
       </Card>
     );
-  })();
+  }
 
   const Services = (
     <Card>
@@ -261,7 +261,7 @@ export default function OnboardingPage() {
     welcome: Welcome,
     basics: Basics,
     pro_profile: ProProfile,
-    credentials: Credentials,
+    credentials: <CredentialsSection />,
     services: Services,
     availability: Availability,
     policies: Policies,
