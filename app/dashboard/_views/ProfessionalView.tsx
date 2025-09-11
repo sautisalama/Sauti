@@ -37,6 +37,7 @@ import { MatchCard } from "../_components/MatchCard";
 import { MatchedCasesTab } from "../_components/tabs/MatchedCasesTab";
 import { AppointmentsTab } from "../_components/tabs/AppointmentsTab";
 import { CalScheduler } from "../_components/CalScheduler";
+import { Calendar as UIDateCalendar } from "@/components/ui/calendar";
 import { EnhancedAppointmentScheduler } from "../_components/EnhancedAppointmentScheduler";
 import { SafetyPlanCard } from "@/components/SafetyPlanCard";
 import { StatCard } from "@/components/dashboard/StatCard";
@@ -54,11 +55,11 @@ import Link from "next/link";
 import { fetchUserAppointments } from "./actions/appointments";
 import { SamplePlaceholder } from "@/components/dashboard/SamplePlaceholder";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
+	Dialog,
+	DialogContent,
+	DialogHeader,
+	DialogTitle,
+	DialogDescription,
 } from "@/components/ui/dialog";
 import AuthenticatedReportAbuseForm from "@/components/AuthenticatedReportAbuseForm";
 
@@ -230,15 +231,15 @@ export default function ProfessionalView({
 
 					{/* KPI Row */}
 					<div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mt-4">
-<button onClick={() => setReportDialogOpen(true)} className="text-left">
-						<StatCard
-							title="Reports"
-							value={reports.length}
-							icon={<ClipboardList className="h-6 w-6" />}
-							className="bg-[#0f766e] hover:brightness-110"
-							invertColors
-						/>
-					</button>
+						<Link href="/dashboard/reports" className="text-left">
+							<StatCard
+								title="Reports"
+								value={reports.length}
+								icon={<ClipboardList className="h-6 w-6" />}
+								className="bg-[#0f766e] hover:brightness-110"
+								invertColors
+							/>
+						</Link>
 						<StatCard
 							title="Services"
 							value={supportServices.length}
@@ -281,14 +282,14 @@ export default function ProfessionalView({
 								{
 									label: "Schedule",
 									description: "Manage appointments",
-href: "/dashboard/appointments",
+									href: "/dashboard/appointments",
 									icon: CalendarDays,
 									disabled: !isVerified,
 								},
 								{
 									label: "My Reports",
 									description: "View or submit reports",
-href: "/dashboard/reports",
+									href: "/dashboard/reports",
 									icon: ClipboardList,
 								},
 							]}
@@ -318,10 +319,7 @@ href: "/dashboard/reports",
 													})}{" "}
 													• {a.matched_service?.support_service?.name || "Session"}
 												</span>
-												<Link
-href="/dashboard/appointments"
-													className="text-sauti-orange"
-												>
+												<Link href="/dashboard/appointments" className="text-sauti-orange">
 													Open
 												</Link>
 											</div>
@@ -332,10 +330,7 @@ href="/dashboard/appointments"
 									<div className="space-y-2 text-sm">
 										<div className="flex items-center justify-between">
 											<span>10:00 • Intake call</span>
-											<Link
-href="/dashboard/appointments"
-												className="text-sauti-orange"
-											>
+											<Link href="/dashboard/appointments" className="text-sauti-orange">
 												Open
 											</Link>
 										</div>
@@ -617,7 +612,7 @@ href="/dashboard/appointments"
 						</AlertDialogAction>
 					</AlertDialogFooter>
 				</AlertDialogContent>
-</AlertDialog>
+			</AlertDialog>
 
 			{/* Global Create Report Dialog */}
 			<Dialog open={reportDialogOpen} onOpenChange={setReportDialogOpen}>
@@ -625,10 +620,14 @@ href="/dashboard/appointments"
 					<DialogHeader>
 						<DialogTitle>Report Abuse</DialogTitle>
 						<DialogDescription>
-							Please fill out this form to report an incident. All information will be kept confidential.
+							Please fill out this form to report an incident. All information will be
+							kept confidential.
 						</DialogDescription>
 					</DialogHeader>
-					<AuthenticatedReportAbuseForm onClose={() => setReportDialogOpen(false)} userId={userId} />
+					<AuthenticatedReportAbuseForm
+						onClose={() => setReportDialogOpen(false)}
+						userId={userId}
+					/>
 				</DialogContent>
 			</Dialog>
 		</div>
