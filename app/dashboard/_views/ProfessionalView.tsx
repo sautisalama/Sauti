@@ -230,7 +230,18 @@ export default function ProfessionalView({
 					{!isVerified && renderGateBanner()}
 
 					{/* KPI Row */}
-					<div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mt-4">
+					<div className="grid grid-cols-2 lg:grid-cols-5 gap-3 mt-4">
+						{/* Reordered to prioritize Matches (cases) */}
+						<Link href="/dashboard/cases" className="text-left">
+							<StatCard
+								title="Cases matched"
+								value={matchedServices.length}
+								icon={<MessageCircle className="h-6 w-6" />}
+								className="bg-[#9333ea] hover:brightness-110"
+								invertColors
+								footer={<span>Cases matched to your services</span>}
+							/>
+						</Link>
 						<Link href="/dashboard/reports" className="text-left">
 							<StatCard
 								title="Reports"
@@ -238,29 +249,29 @@ export default function ProfessionalView({
 								icon={<ClipboardList className="h-6 w-6" />}
 								className="bg-[#0f766e] hover:brightness-110"
 								invertColors
+								footer={<span>Total reports you have filed</span>}
 							/>
 						</Link>
-						<StatCard
-							title="Services"
-							value={supportServices.length}
-							icon={<Users className="h-6 w-6" />}
-							className="bg-[#2563eb]"
-							invertColors
-						/>
-						<StatCard
-							title="Matches"
-							value={matchedServices.length}
-							icon={<MessageCircle className="h-6 w-6" />}
-							className="bg-[#9333ea]"
-							invertColors
-						/>
-						<StatCard
-							title="Appointments"
-							value={appointments.length}
-							icon={<CalendarDays className="h-6 w-6" />}
-							className="bg-[#f59e0b]"
-							invertColors
-						/>
+						<Link href="/dashboard/services" className="text-left">
+							<StatCard
+								title="Services"
+								value={supportServices.length}
+								icon={<Users className="h-6 w-6" />}
+								className="bg-[#2563eb] hover:brightness-110"
+								invertColors
+								footer={<span>Your registered support services</span>}
+							/>
+						</Link>
+						<Link href="/dashboard/cases" className="text-left">
+							<StatCard
+								title="Appointments"
+								value={appointments.length}
+								icon={<CalendarDays className="h-6 w-6" />}
+								className="bg-[#f59e0b] hover:brightness-110"
+								invertColors
+								footer={<span>Upcoming sessions</span>}
+							/>
+						</Link>
 					</div>
 
 					{/* Quick Actions */}

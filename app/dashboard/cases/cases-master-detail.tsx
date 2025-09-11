@@ -164,6 +164,12 @@ const normalized: MatchedServiceItem[] = (matches || []).map((m: any) => ({
             mode="single"
             showOutsideDays
             className="p-0"
+            classNames={{
+              caption: "flex items-center justify-between px-1 py-2",
+              nav: "flex items-center gap-2",
+              nav_button_previous: "relative left-0",
+              nav_button_next: "relative right-0",
+            }}
             modifiers={{ booked: (date) => isDateBooked(date) }}
             modifiersStyles={{ booked: { backgroundColor: '#E0F2FE', color: '#0369A1', borderRadius: 6 } }}
             onSelect={(date) => {

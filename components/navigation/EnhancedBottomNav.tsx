@@ -31,6 +31,7 @@ export function EnhancedBottomNav({ forceShow = false, className }: EnhancedBott
   const pathname = usePathname();
   const user = useUser();
   const [unreadMessages, setUnreadMessages] = useState(0);
+  const [casesCount, setCasesCount] = useState(0);
   const [activeTab, setActiveTab] = useState<string>("");
 
   // Hide on immersive views unless forced to show
@@ -41,11 +42,32 @@ export function EnhancedBottomNav({ forceShow = false, className }: EnhancedBott
 
   const isDashboard = pathname?.startsWith("/dashboard");
 
-  // Mock data - replace with real data fetching
+  // Mock data and dynamic counts
   useEffect(() => {
-    // Simulate unread messages count
     setUnreadMessages(3);
   }, []);
+
+  useEffect(() => {
+    const loadCases = async () => {
+      try {
+        if (user?.profile?.user_type !== 'professional' && user?.profile?.user_type !== 'ngo') {
+          setCasesCount(0);
+          return;
+        }
+        const uid = user?.id;
+        if (!uid) return;
+        const supabase = (await import("@/utils/supabase/client")).createClient();
+        const { data: services } = await supabase.from('support_services').select('id').eq('user_id', uid);
+        const ids = (services || []).map((s: any) => s.id);
+        if (ids.length === 0) { setCasesCount(0); return; }
+        const { count } = await supabase.from('matched_services').select('id', { count: 'exact', head: true }).in('service_id', ids);
+        setCasesCount(count || 0);
+      } catch {
+        // ignore
+      }
+    };
+    loadCases();
+  }, [user?.id, user?.profile?.user_type]);
 
   // Navigation: role-aware mobile nav
   const getNavItems = (): NavItem[] => {
@@ -54,12 +76,12 @@ export function EnhancedBottomNav({ forceShow = false, className }: EnhancedBott
     const role = user?.profile?.user_type;
     const proRestricted = typeof window !== 'undefined' && window.localStorage.getItem('ss_pro_restricted') === '1';
     if ((role === "professional" || role === "ngo") && !proRestricted) {
-      // Professionals get access to survivor features too
+      // Professionals: prioritize cases
       return [
         { id: "overview", label: "Overview", icon: LayoutDashboard, href: "/dashboard" },
-        { id: "cases", label: "Cases", icon: ClipboardList, href: "/dashboard/cases" },
-        { id: "chat", label: "Chat", icon: MessageCircle, href: "/dashboard/chat", badge: unreadMessages },
+        { id: "cases", label: "Cases", icon: ClipboardList, href: "/dashboard/cases", badge: casesCount },
         { id: "schedule", label: "Schedule", icon: Calendar, href: "/dashboard/appointments" },
+        { id: "chat", label: "Chat", icon: MessageCircle, href: "/dashboard/chat", badge: unreadMessages },
         { id: "resources", label: "Resources", icon: FileText, href: "/dashboard/resources" },
       ];
     }
