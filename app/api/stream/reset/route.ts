@@ -6,13 +6,13 @@ export async function POST() {
 	const supabase = await createClient();
 
 	try {
-		const {
-			data: { session },
-		} = await supabase.auth.getUser();
+	const {
+		data: { session },
+	} = await supabase.auth.getSession();
 
-		if (!session) {
-			return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-		}
+	if (!session?.user) {
+		return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+	}
 
 		const streamClient = StreamChat.getInstance(
 			process.env.NEXT_PUBLIC_STREAM_KEY!,

@@ -8,6 +8,7 @@ import { PWAInstallPrompt } from "@/components/PWAInstallPrompt";
 import { AccessibilityProvider } from "@/components/a11y/AccessibilityProvider";
 import { KeyboardFocusScript } from "@/components/a11y/KeyboardFocusScript";
 import AccessibilityFAB from "@/components/a11y/AccessibilityFAB";
+import { ChatWarmupProvider } from "@/components/providers/ChatWarmupProvider";
 
 const inter = Inter({ subsets: ["latin"] });
 const hyper = Atkinson_Hyperlegible({
@@ -77,9 +78,11 @@ export default function RootLayout({
 					Skip to content
 				</a>
 				<AccessibilityProvider>
-					<KeyboardFocusScript />
-					{children}
-					<AccessibilityFAB />
+					<ChatWarmupProvider>
+						<KeyboardFocusScript />
+						{children}
+						<AccessibilityFAB />
+					</ChatWarmupProvider>
 				</AccessibilityProvider>
 				<PWAInstallPrompt />
 				<Toaster />

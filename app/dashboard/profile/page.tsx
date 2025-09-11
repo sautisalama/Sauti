@@ -10,37 +10,15 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
+import { AnonymousModeToggle } from "@/components/chat/AnonymousModeToggle";
 
 export default function ProfilePage() {
   const user = useUser();
   const { toast } = useToast();
   const isProfessional = user?.profile?.user_type === "professional" || user?.profile?.user_type === "ngo";
 
-  // Anonymous mode state (persisted client-side)
-  const anonEnabled = typeof window !== "undefined" ? window.localStorage.getItem("ss_anon_mode") === "1" : false;
-
   const onSave = (section: string) => {
     toast({ title: "Saved", description: `${section} updated (UI only)`, });
-  };
-
-  const toggleAnon = () => {
-    try {
-      if (typeof window === "undefined") return;
-      const current = window.localStorage.getItem("ss_anon_mode") === "1";
-      if (current) {
-        window.localStorage.setItem("ss_anon_mode", "0");
-        window.localStorage.removeItem("ss_anon_id");
-        toast({ title: "Anonymous mode off", description: "You are now using your profile identity." });
-      } else {
-        window.localStorage.setItem("ss_anon_mode", "1");
-        // Generate stable anonymous ID for this user session until turned off
-        const base = (user?.id || "user").slice(0, 12);
-        const rand = Math.random().toString(36).slice(2, 8);
-        const anonId = `anon-${base}-${rand}`;
-        window.localStorage.setItem("ss_anon_id", anonId);
-        toast({ title: "Anonymous mode on", description: "You will appear as Anonymous in chat." });
-      }
-    } catch {}
   };
 
   return (
@@ -208,23 +186,13 @@ export default function ProfilePage() {
             <CardHeader>
               <CardTitle>Privacy & Identity</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-medium">Anonymous mode</p>
-                  <p className="text-sm text-neutral-500">When enabled, you appear as Anonymous in chats.</p>
-                </div>
-                <button
-                  onClick={toggleAnon}
-                  className="relative inline-flex h-6 w-11 items-center rounded-full transition-colors"
-                  style={{ backgroundColor: (typeof window !== "undefined" && window.localStorage.getItem("ss_anon_mode") === "1") ? '#10b981' : '#e5e7eb' }}
-                >
-                  <span
-                    className="inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform"
-                    style={{ transform: (typeof window !== "undefined" && window.localStorage.getItem("ss_anon_mode") === "1") ? 'translateX(20px)' : 'translateX(2px)' }}
-                  />
-                </button>
-              </div>
+            <CardContent>
+              {user?.id && user?.profile?.first_name && (
+                <AnonymousModeToggle 
+                  userId={user.id}
+                  username={user.profile.first_name}
+                />
+              )}
             </CardContent>
           </Card>
         </TabsContent>

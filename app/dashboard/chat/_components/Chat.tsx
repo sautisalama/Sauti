@@ -84,25 +84,35 @@ const [showUserList, setShowUserList] = useState(true);
 	useEffect(() => {
 		const initChat = async () => {
 			try {
-				if (client) return;
-
-				// Prefer preloaded chat if available for this user
+				// Always prefer preloaded chat first for instant loading
 				const pre = getPreloadedChat(userId);
-				if (pre) {
+				if (pre && !client) {
+					console.log(`Using preloaded ${pre.isAnonymous ? 'anonymous' : 'regular'} chat data - instant load!`);
 					setClient(pre.client);
 					setConnectionError(null);
 					setDmChannels(pre.dmChannels || []);
 					communityChannelRef.current = pre.communityChannel;
 					setUsers(pre.users || []);
-				} else {
-					// Kick off preload (will cache), then apply
-					const loaded = await preloadChat(userId, username);
-					setClient(loaded.client);
-					setConnectionError(null);
-					setDmChannels(loaded.dmChannels || []);
-					communityChannelRef.current = loaded.communityChannel;
-					setUsers(loaded.users || []);
+					return; // Exit early for instant load
+				} else if (client) {
+					// Check if current client matches current anonymous mode
+					const currentAnonymous = typeof window !== "undefined" && window.localStorage.getItem("ss_anon_mode") === "1";
+					if (pre && pre.isAnonymous !== currentAnonymous) {
+						console.log(`Mode changed to ${currentAnonymous ? 'anonymous' : 'regular'}, switching client...`);
+						setClient(null); // Reset to trigger reload with correct mode
+						return;
+					}
+					return; // Client already exists and mode matches
 				}
+
+				// Fallback: Load chat data if not preloaded (should rarely happen)
+				console.log('Preloaded data not available, loading chat...');
+				const loaded = await preloadChat(userId, username);
+				setClient(loaded.client);
+				setConnectionError(null);
+				setDmChannels(loaded.dmChannels || []);
+				communityChannelRef.current = loaded.communityChannel;
+				setUsers(loaded.users || []);
 
 				if (appointmentId) {
 					const appointmentResponse = await fetch(
@@ -138,9 +148,22 @@ const [showUserList, setShowUserList] = useState(true);
 
 		initChat();
 
+		// Listen for anonymous mode changes
+		const handleAnonymousModeChange = () => {
+			console.log('Anonymous mode changed, refreshing chat...');
+			setClient(null); // This will trigger a reload with the new mode
+			setChannel(null);
+			setDmChannels([]);
+			setUsers([]);
+			communityChannelRef.current = null;
+		};
+
+		window.addEventListener('anonymousModeChanged', handleAnonymousModeChange);
+
 		// Cleanup function: do not disconnect the shared preloaded client here
 		return () => {
 			setChannel(null);
+			window.removeEventListener('anonymousModeChanged', handleAnonymousModeChange);
 		};
 	}, [userId, username, client, appointmentId]);
 
@@ -167,11 +190,21 @@ const [showUserList, setShowUserList] = useState(true);
 	};
 
 	if (!client) {
+		// Check if we have preloaded data for faster perceived loading
+		const hasPreloadedData = getPreloadedChat(userId);
+		
 		return (
 			<div className="flex flex-col items-center justify-center min-h-screen p-4">
 				<div className="text-center space-y-4">
 					<Animation animationData={animationData} />
-					<p className="text-muted-foreground">Loading chat...</p>
+					<p className="text-muted-foreground">
+						{hasPreloadedData ? 'Initializing chat...' : 'Loading chat...'}
+					</p>
+					{hasPreloadedData && (
+						<div className="w-32 bg-gray-200 rounded-full h-1.5">
+							<div className="bg-teal-600 h-1.5 rounded-full transition-all duration-300 w-4/5"></div>
+						</div>
+					)}
 				</div>
 			</div>
 		);
