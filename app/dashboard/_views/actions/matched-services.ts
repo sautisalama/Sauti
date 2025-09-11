@@ -127,6 +127,15 @@ export async function updateMatchStatus(
 	}
 }
 
+export async function updateMatchFeedback(matchId: string, feedback: string) {
+	const supabase = createClient();
+	const { error } = await supabase
+		.from("matched_services")
+		.update({ feedback, updated_at: new Date().toISOString() })
+		.eq("id", matchId);
+	if (error) throw error;
+}
+
 export async function getServiceIdsByUserId(userId: string) {
 	const supabase = createClient();
 

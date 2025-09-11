@@ -2,7 +2,7 @@ import { StreamChat } from "stream-chat";
 import { NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
 
-export async function GET() {
+export async function GET(request: Request) {
 	const supabase = await createClient();
 
 	try {
@@ -10,7 +10,7 @@ export async function GET() {
 			data: { session },
 		} = await supabase.auth.getSession();
 
-		if (!session) {
+		if (!session?.user) {
 			return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 		}
 
@@ -19,6 +19,11 @@ export async function GET() {
 			process.env.STREAM_CHAT_SECRET!
 		);
 
+		// Parse query params for anonymous mode
+		const { searchParams } = new URL(request.url);
+		const useAnon = searchParams.get("anon") === "1";
+		const anonId = searchParams.get("anonId") || null;
+
 		// Get user details from Supabase
 		const { data: profile } = await supabase
 			.from("profiles")
@@ -26,23 +31,33 @@ export async function GET() {
 			.eq("id", session.user.id)
 			.single();
 
+		const targetId = useAnon && anonId ? anonId : session.user.id;
+		const targetName =
+			useAnon && anonId ? "Anonymous" : profile?.first_name || session.user.id;
+
 		try {
 			// First try to get the user
-			const existingUser = await streamClient.queryUsers({ id: session.user.id });
+			const existingUser = await streamClient.queryUsers({ id: targetId });
 
 			// If user doesn't exist or was deleted, create a new one
 			if (!existingUser.users.length) {
 				await streamClient.upsertUsers([
 					{
-						id: session.user.id,
-						name: profile?.first_name || session.user.id,
+						id: targetId,
+						name: targetName,
 						role: "user",
+						image: useAnon ? "/anon.svg" : undefined,
 					},
 				]);
 			}
 
-			const token = streamClient.createToken(session.user.id);
-			return NextResponse.json({ token });
+			const token = streamClient.createToken(targetId);
+			return NextResponse.json({
+				token,
+				userId: targetId,
+				name: targetName,
+				anon: useAnon,
+			});
 		} catch (error: any) {
 			// Check if it's a rate limit error
 			if (error.response?.status === 429) {

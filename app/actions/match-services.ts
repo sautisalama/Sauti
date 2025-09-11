@@ -62,17 +62,36 @@ export async function matchReportWithServices(reportId: string) {
 			throw new Error("Failed to fetch support services");
 		}
 
+		// Fetch profiles for service owners to check verification completeness
+		const userIds = Array.from(new Set(services.map(s => s.user_id).filter(Boolean))) as string[];
+		let profilesById = new Map<string, { first_name: string | null; phone: string | null; professional_title: string | null }>();
+		if (userIds.length > 0) {
+			const { data: profiles, error: profileErr } = await supabase
+				.from("profiles")
+				.select("id, first_name, phone, professional_title")
+				.in("id", userIds);
+			if (!profileErr && profiles) {
+				profiles.forEach((p: any) => profilesById.set(p.id, p));
+			}
+		}
+		const isVerified = (userId: string | null) => {
+			if (!userId) return false;
+			const p = profilesById.get(userId);
+			if (!p) return false;
+			return Boolean(p.first_name && p.phone && p.professional_title);
+		};
+
 		// Ensure required_services is properly typed and handled
 		const requiredServices = (report.required_services as string[]) || [];
 
-		// First, filter services by type match - updated to handle enum type
+		// First, filter services by type match AND only include verified providers
 		const matchingServices = services.filter((service) => {
-			// Handle the enum type properly - it's not a comma-separated string
 			const serviceType = service.service_types;
-			return requiredServices.some((required: string) => serviceType === required);
+			const typeMatch = requiredServices.some((required: string) => serviceType === required);
+			return typeMatch && isVerified(service.user_id);
 		});
 
-		// Then, calculate distances for matching services
+		// Then, calculate distances and scores for matching services
 		const servicesWithDistances = matchingServices.map((service) => {
 			let distance = Infinity;
 
@@ -90,15 +109,28 @@ export async function matchReportWithServices(reportId: string) {
 				);
 			}
 
+			// Scoring: base for type match + proximity + availability, scaled by urgency
+			const radius = Number(service.coverage_area_radius) || 50;
+			const distanceScore = isFinite(distance)
+				? Math.max(0, 20 * (1 - Math.min(distance / radius, 1)))
+				: 0;
+			const availabilityBonus = /24\/7|open|available|always/i.test(service.availability || "")
+				? 10
+				: 0;
+			const base = 60; // service type match
+			const urgencyMult = report.urgency === "high" ? 1.15 : report.urgency === "medium" ? 1.05 : 1.0;
+			const score = Math.round((base + distanceScore + availabilityBonus) * urgencyMult);
+
 			return {
 				service,
 				distance,
+				score,
 			};
 		});
 
-		// Sort by distance and take the top 5 closest matches
+		// Sort by score desc (then by distance asc) and take top 5
 		const closestMatches = servicesWithDistances
-			.sort((a, b) => a.distance - b.distance)
+			.sort((a, b) => (b.score - a.score) || (a.distance - b.distance))
 			.slice(0, 5);
 
 		// Update the report's match status
@@ -120,8 +152,7 @@ export async function matchReportWithServices(reportId: string) {
 				report_id: reportId,
 				service_id: match.service.id,
 				match_date: new Date().toISOString(),
-				match_score:
-					match.distance === Infinity ? 0 : 100 - Math.min(match.distance, 100),
+				match_score: match.score,
 				match_status_type:
 					"pending" as Database["public"]["Enums"]["match_status_type"],
 				description: report.incident_description,

@@ -6,9 +6,9 @@ export async function POST(request: Request) {
 
 	try {
 		const {
-			data: { session },
-		} = await supabase.auth.getSession();
-		if (!session) {
+			data: { user },
+		} = await supabase.auth.getUser();
+		if (!user) {
 			return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 		}
 
@@ -37,7 +37,7 @@ export async function POST(request: Request) {
 		const { data: appointment, error: appointmentError } = await supabase
 			.from("appointments")
 			.insert({
-				date,
+				appointment_date: date,
 				professional_id: professionalId,
 				status: "confirmed",
 				survivor_id: matchData.reports.user_id,
@@ -63,7 +63,7 @@ export async function POST(request: Request) {
 				.from("reports")
 				.update({
 					match_status: "accepted",
-					ismatched: true
+					ismatched: true,
 				})
 				.eq("report_id", matchData.reports.report_id),
 		]);

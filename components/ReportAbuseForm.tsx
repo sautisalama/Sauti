@@ -4,6 +4,8 @@ import { useToast } from "@/hooks/use-toast";
 import { useState, useEffect } from "react";
 import { Button } from "./ui/button";
 import { submitReport } from "@/app/_actions/unauth_reports";
+import { Mic, Square } from "lucide-react";
+import { useSpeechToText } from "@/hooks/useSpeechToText";
 
 const SUPPORT_SERVICE_OPTIONS = [
 	{ value: "legal", label: "legal support" },
@@ -17,10 +19,25 @@ const SUPPORT_SERVICE_OPTIONS = [
 export default function ReportAbuseForm({ onClose }: { onClose?: () => void }) {
 	const { toast } = useToast();
 	const [loading, setLoading] = useState(false);
+	const [description, setDescription] = useState("");
+	const [draft, setDraft] = useState<any | null>(null);
+	const { isSupported, isListening, transcript, start, stop, reset } = useSpeechToText({ lang: "en-US", interimResults: true });
 	const [location, setLocation] = useState<{
 		latitude: number;
 		longitude: number;
 	} | null>(null);
+
+	// Load draft
+	useEffect(() => {
+		try {
+			const saved = localStorage.getItem("reportDraft");
+			if (saved) {
+				const parsed = JSON.parse(saved);
+				setDraft(parsed);
+				if (parsed.description) setDescription(parsed.description);
+			}
+		} catch {}
+	}, []);
 
 	// Get location on component mount
 	useEffect(() => {
@@ -44,6 +61,14 @@ export default function ReportAbuseForm({ onClose }: { onClose?: () => void }) {
 		}
 	}, []);
 
+	useEffect(() => {
+		// When recording stops and we have a transcript, append it once to the description
+		if (!isListening && transcript) {
+			setDescription((prev) => (prev ? `${prev} ${transcript.trim()}` : transcript.trim()));
+			reset();
+		}
+	}, [isListening, transcript, reset]);
+
 	const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
 		e.preventDefault();
 		const form = e.currentTarget;
@@ -56,7 +81,7 @@ export default function ReportAbuseForm({ onClose }: { onClose?: () => void }) {
 				// Required fields from form
 				first_name: formData.get("first_name") as string,
 				email: formData.get("email") as string,
-				incident_description: formData.get("incident_description") as string,
+				incident_description: description,
 				type_of_incident: formData.get("incident_type") as
 					| "physical"
 					| "emotional"
@@ -114,6 +139,8 @@ export default function ReportAbuseForm({ onClose }: { onClose?: () => void }) {
 
 			// Only reset and show success if the submission was successful
 			form.reset();
+			setDescription("");
+			try { localStorage.removeItem("reportDraft"); } catch {}
 			toast({
 				title: "Report Submitted",
 				description: "Thank you for your report. We will review it shortly.",
@@ -147,6 +174,7 @@ export default function ReportAbuseForm({ onClose }: { onClose?: () => void }) {
 						className="border-b-2 border-teal-500 focus:outline-none px-2 w-48 bg-transparent"
 						placeholder="your name"
 						name="first_name"
+						defaultValue={draft?.first_name || ""}
 						required
 					/>
 					. You can reach me at{" "}
@@ -155,6 +183,7 @@ export default function ReportAbuseForm({ onClose }: { onClose?: () => void }) {
 						className="border-b-2 border-teal-500 focus:outline-none px-2 w-64 bg-transparent"
 						placeholder="your email"
 						name="email"
+						defaultValue={draft?.email || ""}
 						required
 					/>{" "}
 					or by phone at{" "}
@@ -163,11 +192,13 @@ export default function ReportAbuseForm({ onClose }: { onClose?: () => void }) {
 						className="border-b-2 border-teal-500 focus:outline-none px-2 w-48 bg-transparent"
 						placeholder="phone (optional)"
 						name="phone"
+						defaultValue={draft?.phone || ""}
 					/>
 					. I would like to report a case of{" "}
 					<select
 						name="incident_type"
 						required
+						defaultValue={draft?.incident_type || ""}
 						className="border-b-2 border-teal-500 focus:outline-none px-2 bg-transparent"
 					>
 						<option value="">select incident type</option>
@@ -181,6 +212,7 @@ export default function ReportAbuseForm({ onClose }: { onClose?: () => void }) {
 					<select
 						name="urgency"
 						required
+						defaultValue={draft?.urgency || ""}
 						className="border-b-2 border-teal-500 focus:outline-none px-2 bg-transparent"
 					>
 						<option value="">select urgency</option>
@@ -192,6 +224,7 @@ export default function ReportAbuseForm({ onClose }: { onClose?: () => void }) {
 					<select
 						name="support_services"
 						required
+						defaultValue={draft?.support_services || ""}
 						className="border-b-2 border-teal-500 focus:outline-none px-2 bg-transparent"
 					>
 						<option value="">select type of help</option>
@@ -205,18 +238,49 @@ export default function ReportAbuseForm({ onClose }: { onClose?: () => void }) {
 				</p>
 
 				<p className="mt-4">Here's what happened:</p>
-				<Textarea
-					placeholder="Please share what happened..."
-					name="incident_description"
-					required
-					className="min-h-[120px] w-full mt-2"
-				/>
+				<div className="space-y-2">
+					<div className="flex items-center justify-between">
+						<span className="text-xs text-gray-500">You can speak instead of typing</span>
+						<div className="flex items-center gap-2">
+							<Button
+								type="button"
+								variant={isListening ? "destructive" : "outline"}
+								size="sm"
+								onClick={() => (isListening ? stop() : start())}
+							>
+								{isListening ? (
+									<>
+										<Square className="h-4 w-4 mr-2" /> Stop
+									</>
+								) : (
+									<>
+										<Mic className="h-4 w-4 mr-2" /> Speak
+									</>
+								)}
+							</Button>
+						</div>
+					</div>
+					<Textarea
+						placeholder="Please share what happened..."
+						name="incident_description"
+						required
+						className="min-h-[140px] w-full mt-1"
+						value={description}
+						onChange={(e) => setDescription(e.target.value)}
+					/>
+					{!isSupported && (
+						<p className="text-xs text-gray-400">
+							Voice input is not supported on this device/browser.
+						</p>
+					)}
+				</div>
 
 				<p className="mt-4">
 					Please{" "}
 					<select
 						name="contact_preference"
 						required
+						defaultValue={draft?.contact_preference || ""}
 						className="border-b-2 border-teal-500 focus:outline-none px-2 bg-transparent"
 					>
 						<option value="">select contact method</option>
@@ -229,6 +293,7 @@ export default function ReportAbuseForm({ onClose }: { onClose?: () => void }) {
 					<select
 						name="consent"
 						required
+						defaultValue={draft?.consent || ""}
 						className="border-b-2 border-teal-500 focus:outline-none px-2 bg-transparent"
 					>
 						<option value="">select consent</option>
@@ -239,9 +304,34 @@ export default function ReportAbuseForm({ onClose }: { onClose?: () => void }) {
 				</p>
 			</div>
 
-			<Button type="submit" className="w-full" disabled={loading}>
-				{loading ? "Submitting..." : "Submit Report"}
-			</Button>
+			<div className="flex flex-col sm:flex-row gap-2">
+				<Button type="submit" className="w-full sm:flex-1" disabled={loading}>
+					{loading ? "Submitting..." : "Submit Report"}
+				</Button>
+				<Button
+					type="button"
+					variant="outline"
+					className="w-full sm:w-auto"
+					onClick={(e) => {
+						const form = (e.currentTarget.closest("form") as HTMLFormElement)!;
+						const fd = new FormData(form);
+						const toSave = Object.fromEntries(fd.entries());
+						(toSave as any).description = description;
+						try { localStorage.setItem("reportDraft", JSON.stringify(toSave)); setDraft(toSave); } catch {}
+						toast({ title: "Draft saved" });
+					}}
+				>
+					Save Draft
+				</Button>
+				<Button
+					type="button"
+					variant="ghost"
+					className="w-full sm:w-auto"
+					onClick={() => { try { localStorage.removeItem("reportDraft"); setDraft(null); setDescription(""); } catch {} }}
+				>
+					Clear Draft
+				</Button>
+			</div>
 		</form>
 	);
 }

@@ -19,6 +19,7 @@ import { useState } from "react";
 import { AppointmentWithDetails } from "../_types";
 import { ChatModal } from "./ChatModal";
 import { Textarea } from "@/components/ui/textarea";
+import { AddToCalendarButton } from "./AddToCalendarButton";
 
 interface AppointmentCardProps {
 	appointment: AppointmentWithDetails;
@@ -224,6 +225,11 @@ export function AppointmentCard({
 								<span>Call</span>
 							</Button>
 						)}
+						<AddToCalendarButton 
+							appointment={appointment} 
+							size="sm" 
+							variant="ghost" 
+						/>
 					</div>
 				</div>
 

@@ -1,11 +1,21 @@
-import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import type { Metadata, Viewport } from "next";
+import { Inter, Atkinson_Hyperlegible } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
 import "stream-chat-react/dist/css/v2/index.css";
 import { PWAInstallPrompt } from "@/components/PWAInstallPrompt";
+// import { SafetyBar } from "@/components/SafetyBar";
+import { AccessibilityProvider } from "@/components/a11y/AccessibilityProvider";
+import { KeyboardFocusScript } from "@/components/a11y/KeyboardFocusScript";
+import AccessibilityFAB from "@/components/a11y/AccessibilityFAB";
+import { ChatWarmupProvider } from "@/components/providers/ChatWarmupProvider";
 
 const inter = Inter({ subsets: ["latin"] });
+const hyper = Atkinson_Hyperlegible({
+	subsets: ["latin"],
+	weight: ["400", "700"],
+	variable: "--font-dyslexic",
+});
 
 export const metadata: Metadata = {
 	title: "Sauti Salama",
@@ -16,15 +26,12 @@ export const metadata: Metadata = {
 		apple: "/icons/icons-512.png",
 	},
 	keywords: ["GBV", "Gender Based Violence", "Gender", "Sauti Salama"],
-	themeColor: [{ media: "(prefers-color-scheme: dark)", color: "#fff" }],
 	authors: [
 		{
 			name: "Cashcade",
 			url: "https://www.linkedin.com/sautisalama",
 		},
 	],
-	viewport:
-		"minimum-scale=1, initial-scale=1, width=device-width, shrink-to-fit=no, viewport-fit=cover",
 	appleWebApp: {
 		capable: true,
 		statusBarStyle: "default",
@@ -42,6 +49,38 @@ export const metadata: Metadata = {
 			},
 		],
 	},
+	openGraph: {
+		title: "Sauti Salama",
+		description: "Breaking the Silence, Building a Brighter Future",
+		url: process.env.NEXT_PUBLIC_APP_URL || "https://sautisalama.org",
+		siteName: "Sauti Salama",
+		images: [
+			{
+				url: "/dashboard/featured.png",
+				width: 1200,
+				height: 630,
+				alt: "Sauti Salama",
+			},
+		],
+		type: "website",
+	},
+	twitter: {
+		card: "summary_large_image",
+		title: "Sauti Salama",
+		description: "Breaking the Silence, Building a Brighter Future",
+		images: ["/dashboard/featured.png"],
+	},
+};
+
+export const viewport: Viewport = {
+	width: "device-width",
+	initialScale: 1,
+	minimumScale: 1,
+	viewportFit: "cover",
+	themeColor: [
+		{ media: "(prefers-color-scheme: light)", color: "#fff" },
+		{ media: "(prefers-color-scheme: dark)", color: "#000" },
+	],
 };
 
 export default function RootLayout({
@@ -51,8 +90,21 @@ export default function RootLayout({
 }>) {
 	return (
 		<html lang="en">
-			<body className={inter.className}>
-				{children}
+			<body className={`${inter.className} ${hyper.variable}`}>
+				{/* <SafetyBar /> */}
+				<a
+					href="#main-content"
+					className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50 bg-white text-black px-3 py-2 rounded shadow"
+				>
+					Skip to content
+				</a>
+				<AccessibilityProvider>
+					<ChatWarmupProvider>
+						<KeyboardFocusScript />
+						{children}
+						<AccessibilityFAB />
+					</ChatWarmupProvider>
+				</AccessibilityProvider>
 				<PWAInstallPrompt />
 				<Toaster />
 			</body>

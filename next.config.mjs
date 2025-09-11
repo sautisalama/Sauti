@@ -2,27 +2,26 @@ import withPWA from "next-pwa";
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+	distDir: ".build",
 	images: {
-		domains: [
-			"res.cloudinary.com",
-			"lh3.googleusercontent.com",
-			"assets.aceternity.com",
-			"images.unsplash.com",
+		remotePatterns: [
+			{
+				protocol: "https",
+				hostname: "res.cloudinary.com",
+			},
+			{
+				protocol: "https",
+				hostname: "lh3.googleusercontent.com",
+			},
+			{
+				protocol: "https",
+				hostname: "assets.aceternity.com",
+			},
+			{
+				protocol: "https",
+				hostname: "images.unsplash.com",
+			},
 		],
-		// remotePatterns: [
-		// 	{
-		// 		protocol: "https",
-		// 		hostname: "**.googleusercontent.com",
-		// 	},
-		// 	{
-		// 		protocol: "https",
-		// 		hostname: "**.cloudfront.net",
-		// 	},
-		// 	{
-		// 		protocol: "https",
-		// 		hostname: "**.cloudflare.com",
-		// 	},
-		// ],
 	},
 	reactStrictMode: true, // Enable React strict mode for improved error handling
 	swcMinify: true, // Enable SWC minification for improved performance

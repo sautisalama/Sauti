@@ -1,6 +1,6 @@
 import { Tables } from "@/types/db-schema";
 import { Button } from "@/components/ui/button";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, Download, Calendar, Clock } from "lucide-react";
 import {
 	Dialog,
 	DialogContent,
@@ -127,14 +127,32 @@ export function ReportsTab({
 										</div>
 									</div>
 
-									<Button
-										variant="ghost"
-										size="icon"
-										className="text-destructive hover:text-destructive hover:bg-destructive/10"
-										onClick={() => onDeleteReport(report.report_id)}
-									>
-										<Trash2 className="h-4 w-4" />
-									</Button>
+									<div className="flex items-center gap-1">
+										<Button
+											variant="outline"
+											size="icon"
+											onClick={() => {
+												const json = JSON.stringify(report, null, 2);
+												const blob = new Blob([json], { type: "application/json" });
+												const url = URL.createObjectURL(blob);
+												const a = document.createElement("a");
+												a.href = url;
+												a.download = `report-${report.report_id}.json`;
+												a.click();
+												URL.revokeObjectURL(url);
+											}}
+										>
+											<Download className="h-4 w-4" />
+										</Button>
+										<Button
+											variant="ghost"
+											size="icon"
+											className="text-destructive hover:text-destructive hover:bg-destructive/10"
+											onClick={() => onDeleteReport(report.report_id)}
+										>
+											<Trash2 className="h-4 w-4" />
+										</Button>
+									</div>
 								</div>
 
 								{report.incident_description && (
@@ -147,20 +165,38 @@ export function ReportsTab({
 									{acceptedMatch && (
 										<div className="bg-white/50 rounded-md p-3 border border-green-200">
 											<div className="flex items-center justify-between">
-												<div>
+												<div className="flex-1">
 													<span className="text-sm font-medium text-green-700">
-														Accepted by: {acceptedMatch.support_service.name}
+														✅ Accepted by: {acceptedMatch.support_service.name}
 													</span>
 													{appointment && (
-														<div className="text-sm text-gray-600 mt-1">
-															📅 Appointment:{" "}
-															{new Date(appointment.appointment_date).toLocaleDateString()}
-															<span className="ml-2 px-2 py-0.5 rounded-full text-xs bg-green-100 text-green-700">
+														<div className="flex items-center gap-2 mt-2">
+															<div className="flex items-center gap-1 text-sm text-gray-600">
+																<Calendar className="h-4 w-4" />
+																{new Date(appointment.appointment_date).toLocaleDateString()}
+																<Clock className="h-4 w-4 ml-2" />
+																{new Date(appointment.appointment_date).toLocaleTimeString()}
+															</div>
+															<span className="px-2 py-0.5 rounded-full text-xs bg-green-100 text-green-700">
 																{appointment.status}
 															</span>
 														</div>
 													)}
 												</div>
+												{appointment && (
+													<div className="flex gap-2">
+														<Button
+															variant="outline"
+															size="sm"
+															onClick={() =>
+(window.location.href = "/dashboard/appointments")
+															}
+															className="text-xs"
+														>
+															View Appointment
+														</Button>
+													</div>
+												)}
 											</div>
 										</div>
 									)}

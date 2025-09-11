@@ -7,11 +7,11 @@ export async function POST(request: Request) {
 
 	try {
 		const {
-			data: { session },
-			error: sessionError,
-		} = await supabase.auth.getSession();
+			data: { user },
+			error: userError,
+		} = await supabase.auth.getUser();
 
-		if (sessionError || !session) {
+		if (userError || !user) {
 			return NextResponse.json(
 				{ error: "Unauthorized - No valid session" },
 				{ status: 401 }
@@ -29,8 +29,8 @@ export async function POST(request: Request) {
 				availability: data.availability,
 				latitude: data.latitude,
 				longitude: data.longitude,
-				email: session.user.email,
-				user_id: session.user.id,
+				email: user.email,
+				user_id: user.id,
 				// Optional fields from schema
 				helpline: null,
 				website: null,
@@ -67,18 +67,18 @@ export async function GET(request: Request) {
 
 	try {
 		const {
-			data: { session },
-			error: sessionError,
-		} = await supabase.auth.getSession();
+			data: { user },
+			error: userError,
+		} = await supabase.auth.getUser();
 
-		if (sessionError || !session) {
+		if (userError || !user) {
 			return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 		}
 
 		const { data: services, error } = await supabase
 			.from("support_services")
 			.select("*")
-			.eq("user_id", session.user.id);
+			.eq("user_id", user.id);
 
 		if (error) throw error;
 

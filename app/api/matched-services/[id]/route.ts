@@ -9,9 +9,9 @@ export async function PATCH(
 
 	try {
 		const {
-			data: { session },
-		} = await supabase.auth.getSession();
-		if (!session) {
+			data: { user },
+		} = await supabase.auth.getUser();
+		if (!user) {
 			return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 		}
 
@@ -21,7 +21,7 @@ export async function PATCH(
 			.from("matched_services")
 			.update({ status })
 			.eq("id", params.id)
-			.eq("service_id", session.user.id);
+			.eq("service_id", user.id);
 
 		if (error) throw error;
 

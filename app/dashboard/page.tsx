@@ -10,6 +10,7 @@ import { MainSidebar } from "./_views/MainSidebar";
 import ChooseUser from "./_views/ChooseUser";
 import { useUser } from "@/hooks/useUser";
 import { ChatComponent } from "./chat/_components/Chat";
+import { Suspense } from "react";
 
 export default async function Dashboard() {
 	const user = await getUser();
@@ -25,22 +26,19 @@ export default async function Dashboard() {
 
 	return (
 		<div className="flex h-screen overflow-hidden">
-			{/* Sidebar - hidden on mobile */}
-			<div className="hidden md:block fixed left-0 h-full">
-				<MainSidebar />
-			</div>
-
 			{/* Main content area */}
 			<div className="flex-1 overflow-auto md:ml-[72px]">
-				{user.user_type === "survivor" ? (
-					<SurvivorView userId={user.id} profileDetails={user} />
-				) : user.user_type === "professional" || user.user_type === "ngo" ? (
-					<ProfessionalView userId={user.id} profileDetails={user} />
-				) : user.user_type === null ? (
-					<ChooseUser />
-				) : (
-					redirect("/error?message=Invalid user type")
-				)}
+				<Suspense fallback={<div className="p-6">Loading dashboard...</div>}>
+					{user.user_type === "survivor" ? (
+						<SurvivorView userId={user.id} profileDetails={user} />
+					) : user.user_type === "professional" || user.user_type === "ngo" ? (
+						<ProfessionalView userId={user.id} profileDetails={user} />
+					) : user.user_type === null ? (
+						<ChooseUser />
+					) : (
+						redirect("/error?message=Invalid user type")
+					)}
+				</Suspense>
 			</div>
 		</div>
 	);

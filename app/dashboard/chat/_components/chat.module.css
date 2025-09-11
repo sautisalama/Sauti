@@ -1,14 +1,84 @@
 .chatBackground {
-	background-image: url("/Bg.png");
-	background-repeat: repeat;
-	background-size: 500px;
+	/* Soft image background with subtle dark overlay for contrast */
+	background-image: linear-gradient(rgba(16, 16, 16, 0.25), rgba(16, 16, 16, 0.25)), url("/Bg.png");
+	background-repeat: no-repeat;
+	background-size: cover;
 	background-position: center;
 	width: 100%;
 	height: 100%;
 }
 
+/* WhatsApp-like bubble styling overrides for stream-chat-react v2 */
+.chatBackground {
+	--bubble-outgoing: #dcf8c6; /* WhatsApp light green */
+	--bubble-incoming: #ffffff;
+	--bubble-meta: #667085;
+}
+
+/* Message container spacing */
+.str-chat .str-chat__list .str-chat__message-simple {
+	padding: 2px 8px;
+}
+
+/* Outgoing (me) bubble */
+.str-chat .str-chat__message-simple--me .str-chat__message-simple__content {
+	background: var(--bubble-outgoing);
+	border-radius: 18px 18px 4px 18px;
+	box-shadow: 0 1px 2px rgba(0,0,0,0.08);
+	padding: 8px 10px;
+}
+
+/* Incoming bubble */
+.str-chat .str-chat__message-simple__content {
+	background: var(--bubble-incoming);
+	border-radius: 18px 18px 18px 4px;
+	box-shadow: 0 1px 2px rgba(0,0,0,0.06);
+	padding: 8px 10px;
+}
+
+/* Reduce default borders */
+.str-chat .str-chat__message-simple__content > .str-chat__message-simple__actions {
+	display: none;
+}
+
+/* Timestamp/meta */
+.str-chat .str-chat__message-simple__meta {
+	font-size: 11px;
+	color: var(--bubble-meta);
+	margin-top: 2px;
+}
+
+/* Avatar sizing */
+.str-chat .str-chat__avatar {
+	width: 28px !important;
+	height: 28px !important;
+}
+
+/* Input bar rounded with soft shadow */
+.str-chat .str-chat__input-flat {
+	border-radius: 24px !important;
+	border: 1px solid rgba(0,0,0,0.06) !important;
+	box-shadow: 0 2px 12px rgba(16,24,40,0.06) !important;
+	padding: 6px 8px !important;
+	margin: 8px !important;
+}
+
+/* Attachment buttons */
+.str-chat .str-chat__input-flat .str-chat__input-flat-fileupload svg,
+.str-chat .str-chat__input-flat .rfu-file-upload-button svg {
+	color: #475467;
+}
+
+/* Media tiles */
+.str-chat .str-chat__message-attachment--image img {
+	border-radius: 12px;
+}
+
 @media (max-width: 768px) {
 	.chatBackground {
-		background-size: 300px;
+		background-size: cover;
+	}
+	.str-chat .str-chat__message-list {
+		padding: 8px !important;
 	}
 }
