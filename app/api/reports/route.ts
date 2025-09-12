@@ -20,7 +20,7 @@ export async function POST(request: Request) {
 			user_id: formData.user_id,
 			phone: formData.phone,
 			type_of_incident: formData.type_of_incident,
-			incident_description: formData.incident_description,
+			incident_description: formData.incident_description || null,
 			urgency: formData.urgency,
 			consent: formData.consent,
 			contact_preference: formData.contact_preference,
@@ -28,6 +28,7 @@ export async function POST(request: Request) {
 			latitude: formData.latitude,
 			longitude: formData.longitude,
 			submission_timestamp: formData.submission_timestamp,
+			administrative: formData.administrative || null,
 			// Initialize match-related fields
 			ismatched: false,
 			match_status: "pending" as Database["public"]["Enums"]["match_status_type"],
@@ -58,8 +59,9 @@ export async function POST(request: Request) {
 					New abuse report submitted:
 					Type of Incident: ${formData.type_of_incident}
 					Urgency: ${formData.urgency}
-					Description: ${formData.incident_description}
-					Required Services: ${formData.required_services.join(", ")}
+					Description: ${formData.incident_description || "(none)"}
+					Required Services: ${Array.isArray(formData.required_services) ? formData.required_services.join(", ") : (formData.required_services || "")}
+					Voice Note: ${formData?.administrative?.audio_path ? `Stored at ${formData.administrative.audio_path}` : "(none)"}
 					Reporter Information:
 					Name: ${formData.first_name}
 					Email: ${formData.email}
