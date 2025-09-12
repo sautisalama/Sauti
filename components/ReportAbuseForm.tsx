@@ -8,6 +8,7 @@ import { createClient } from "@/utils/supabase/client";
 import { MultiSelect } from "@/components/ui/multi-select";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { normalizePhone } from "@/utils/phone";
 
 const SUPPORT_SERVICE_OPTIONS = [
 	{ value: "legal", label: "legal support" },
@@ -112,7 +113,7 @@ const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
 			}
 
 			// Determine primary incident type compatible with DB
-			const allowed: Record<string, string> = { physical:'physical', emotional:'emotional', sexual:'sexual', financial:'financial', other:'other' };
+const allowed: Record<string, string> = { physical:'physical', emotional:'emotional', sexual:'sexual', financial:'financial', child_abuse:'child_abuse', other:'other' };
 			const first = incidentTypes.find(t => allowed[t]);
 			const type_of_incident = (first as any) || 'other';
 
@@ -124,7 +125,7 @@ const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
 			const body = {
 				first_name: formData.get("first_name"),
 				email: formData.get("email"),
-				phone: formData.get("phone") || null,
+				phone: normalizePhone((formData.get("phone") as string) || null),
 				incident_description: description || null,
 				type_of_incident,
 				urgency: formData.get("urgency"),

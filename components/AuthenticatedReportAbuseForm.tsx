@@ -15,6 +15,7 @@ import { useUser } from "@/hooks/useUser";
 import { VoiceRecorderModal } from "@/components/VoiceRecorderModal";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { normalizePhone } from "@/utils/phone";
 
 interface AuthenticatedReportAbuseFormProps {
 	onClose: () => void;
@@ -27,8 +28,9 @@ export default function AuthenticatedReportAbuseForm({
 }: AuthenticatedReportAbuseFormProps) {
 	const { toast } = useToast();
 	const [loading, setLoading] = useState(false);
-	const [selectedServices, setSelectedServices] = useState<string[]>([]);
-	const [description, setDescription] = useState("");
+const [selectedServices, setSelectedServices] = useState<string[]>([]);
+const [incidentTypes, setIncidentTypes] = useState<string[]>([]);
+const [description, setDescription] = useState("");
 	const [draft, setDraft] = useState<any | null>(null);
 	// Voice via modal only for consistency
 	const [location, setLocation] = useState<{
@@ -73,7 +75,8 @@ export default function AuthenticatedReportAbuseForm({
 				const parsed = JSON.parse(saved);
 				setDraft(parsed);
 				if (parsed.description) setDescription(parsed.description);
-				if (parsed.selectedServices) setSelectedServices(parsed.selectedServices);
+if (parsed.selectedServices) setSelectedServices(parsed.selectedServices);
+        if (parsed.incidentTypes) setIncidentTypes(parsed.incidentTypes);
     }
     } catch (e) {
       // ignore draft load errors
@@ -88,7 +91,7 @@ export default function AuthenticatedReportAbuseForm({
 		const form = e.currentTarget;
 		const formData = new FormData(form);
 		const contactPreference = formData.get("contact_preference");
-		const phone = formData.get("phone");
+		const phone = normalizePhone(formData.get("phone") as string);
 
 		if (
 			(contactPreference === "phone_call" || contactPreference === "sms") &&
@@ -116,12 +119,19 @@ export default function AuthenticatedReportAbuseForm({
 			}
 		}
 
-		const data = {
+// Map the first selected enum-allowed incident to type_of_incident
+    const allowed: Record<string, string> = { physical:'physical', emotional:'emotional', sexual:'sexual', financial:'financial', child_abuse:'child_abuse', other:'other' };
+    const first = incidentTypes.find(t => allowed[t]);
+    const type_of_incident = (first as any) || 'other';
+
+    const data = {
 			first_name: user?.profile?.first_name,
 			last_name: user?.profile?.last_name || null,
 			user_id: userId,
 			phone: phone,
-			type_of_incident: formData.get("incident_type"),
+type_of_incident,
+			// With expanded enum, you can also allow multi-select here:
+			// If you add MultiSelect later, map the first choice to type_of_incident and store all in additional_info
 			incident_description: description || null,
 			urgency: formData.get("urgency"),
 			consent: formData.get("consent"),
@@ -133,7 +143,7 @@ export default function AuthenticatedReportAbuseForm({
 			email: user?.profile?.email || null,
 			media,
       is_onBehalf: isOnBehalf,
-      additional_info: { special_needs: { disabled: needsDisabled, queer_support: needsQueer } },
+additional_info: { incident_types: incidentTypes, special_needs: { disabled: needsDisabled, queer_support: needsQueer } },
 		};
 
 		try {
@@ -183,19 +193,22 @@ export default function AuthenticatedReportAbuseForm({
               <Switch id="onbehalf-auth" checked={isOnBehalf} onCheckedChange={setIsOnBehalf} />
               <Label htmlFor="onbehalf-auth">Reporting on behalf of someone else</Label>
             </div>
-					<p className="text-lg text-gray-700">I want to report about</p>
-					<select
-						name="incident_type"
-						required
-						className="border-b-2 border-teal-500 focus:outline-none px-2 bg-transparent"
-					>
-						<option value="">select incident type</option>
-						<option value="physical">physical abuse</option>
-						<option value="emotional">emotional abuse</option>
-						<option value="sexual">sexual abuse</option>
-						<option value="financial">financial abuse</option>
-						<option value="other">other concerns</option>
-					</select>
+<p className="text-lg text-gray-700">I want to report about</p>
+            <div className="min-w-[240px]">
+              <MultiSelect
+                selected={incidentTypes}
+                onChange={setIncidentTypes}
+                options={[
+                  { value: 'physical', label: 'Physical abuse' },
+                  { value: 'emotional', label: 'Emotional abuse' },
+                  { value: 'sexual', label: 'Sexual abuse' },
+                  { value: 'financial', label: 'Financial abuse' },
+                  { value: 'child_abuse', label: 'Child abuse' },
+                  { value: 'other', label: 'Other' },
+                ]}
+                placeholder="Select incident types"
+              />
+            </div>
 					<p className="text-lg text-gray-700">with</p>
 					<select
 						name="urgency"
@@ -321,9 +334,10 @@ export default function AuthenticatedReportAbuseForm({
 						onClick={(e) => {
 							const form = (e.currentTarget.closest("form") as HTMLFormElement)!;
 							const fd = new FormData(form);
-							const toSave = Object.fromEntries(fd.entries());
-            (toSave as any).description = description;
-            (toSave as any).selectedServices = selectedServices;
+const toSave: any = Object.fromEntries(fd.entries());
+            toSave.description = description;
+            toSave.selectedServices = selectedServices;
+            toSave.incidentTypes = incidentTypes;
             try { localStorage.setItem("authReportDraft", JSON.stringify(toSave)); setDraft(toSave); } catch (e) { /* ignore */ }
 						}}
 					>
