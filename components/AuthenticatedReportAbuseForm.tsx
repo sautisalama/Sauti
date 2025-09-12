@@ -14,6 +14,7 @@ import {
 import { useUser } from "@/hooks/useUser";
 import { Mic, Square } from "lucide-react";
 import { useSpeechToText } from "@/hooks/useSpeechToText";
+import { VoiceRecorderModal } from "@/components/VoiceRecorderModal";
 
 interface AuthenticatedReportAbuseFormProps {
 	onClose: () => void;
@@ -34,6 +35,9 @@ export default function AuthenticatedReportAbuseForm({
 		latitude: number;
 		longitude: number;
 	} | null>(null);
+	const [recorderOpen, setRecorderOpen] = useState(false);
+	const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
+	const [audioUrl, setAudioUrl] = useState<string | null>(null);
 	const supabase = createClient();
 	const user = useUser();
 
@@ -103,13 +107,25 @@ export default function AuthenticatedReportAbuseForm({
 			return;
 		}
 
+		// Upload audio first if present
+		let administrative: any = null;
+		if (audioBlob) {
+			try {
+				const filename = `reports/${Date.now()}-${Math.random().toString(36).slice(2)}.webm`;
+				const { error: upErr } = await supabase.storage.from('report-audio').upload(filename, audioBlob, { contentType: audioBlob.type || 'audio/webm' });
+				if (!upErr) administrative = { audio_bucket: 'report-audio', audio_path: filename };
+			} catch (e) {
+				console.debug('auth audio upload failed', e);
+			}
+		}
+
 		const data = {
 			first_name: user?.profile?.first_name,
 			last_name: user?.profile?.last_name || null,
 			user_id: userId,
 			phone: phone,
 			type_of_incident: formData.get("incident_type"),
-			incident_description: description,
+			incident_description: description || null,
 			urgency: formData.get("urgency"),
 			consent: formData.get("consent"),
 			contact_preference: contactPreference,
@@ -118,6 +134,7 @@ export default function AuthenticatedReportAbuseForm({
 			longitude: location?.longitude || null,
 			submission_timestamp: new Date().toISOString(),
 			email: user?.profile?.email || null,
+			administrative,
 		};
 
 		try {
@@ -192,6 +209,14 @@ export default function AuthenticatedReportAbuseForm({
 				<div className="w-full space-y-2">
 					<div className="flex items-center justify-between">
 						<span className="text-xs text-gray-500">You can speak instead of typing</span>
+					<Button
+							type="button"
+							variant="outline"
+							size="sm"
+							onClick={() => setRecorderOpen(true)}
+						>
+						Record voice note
+						</Button>
 						<Button
 							type="button"
 							variant={isListening ? "destructive" : "outline"}
@@ -210,13 +235,18 @@ export default function AuthenticatedReportAbuseForm({
 						</Button>
 					</div>
 					<Textarea
-						placeholder="Please share what happened..."
+						placeholder="Please share what happened... (optional if you attach a voice note)"
 						name="incident_description"
-						required
 						className="min-h-[140px] w-full"
 						value={description}
 						onChange={(e) => setDescription(e.target.value)}
 					/>
+					{audioUrl && (
+						<div className="mt-2 space-y-1">
+							<p className="text-xs text-gray-500">Attached voice note:</p>
+							<audio controls src={audioUrl} className="w-full" />
+						</div>
+					)}
 					{!isSupported && (
 						<p className="text-xs text-gray-400">
 							Voice input is not supported on this device/browser.
@@ -321,6 +351,11 @@ export default function AuthenticatedReportAbuseForm({
 					</Button>
 				</div>
 			</div>
+		<VoiceRecorderModal 
+			open={recorderOpen}
+			onOpenChange={(v) => setRecorderOpen(v)}
+			onRecorded={(blob) => { setAudioBlob(blob); try { const url = URL.createObjectURL(blob); setAudioUrl(url); } catch {} }}
+		/>
 		</form>
 	);
 }

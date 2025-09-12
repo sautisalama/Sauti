@@ -6,6 +6,8 @@ import { Button } from "./ui/button";
 import { submitReport } from "@/app/_actions/unauth_reports";
 import { Mic, Square } from "lucide-react";
 import { useSpeechToText } from "@/hooks/useSpeechToText";
+import { VoiceRecorderModal } from "@/components/VoiceRecorderModal";
+import { createClient } from "@/utils/supabase/client";
 
 const SUPPORT_SERVICE_OPTIONS = [
 	{ value: "legal", label: "legal support" },
@@ -26,6 +28,9 @@ export default function ReportAbuseForm({ onClose }: { onClose?: () => void }) {
 		latitude: number;
 		longitude: number;
 	} | null>(null);
+	const [recorderOpen, setRecorderOpen] = useState(false);
+	const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
+	const [audioUrl, setAudioUrl] = useState<string | null>(null);
 
 	// Load draft
 	useEffect(() => {
@@ -79,11 +84,28 @@ export default function ReportAbuseForm({ onClose }: { onClose?: () => void }) {
 		const formData = new FormData(form);
 
 		try {
+			// Upload audio if present
+			let administrative: any = null;
+			if (audioBlob) {
+				try {
+					const supabase = createClient();
+					const filename = `reports/${Date.now()}-${Math.random().toString(36).slice(2)}.webm`;
+					const { error: upErr } = await supabase.storage.from('report-audio').upload(filename, audioBlob, { contentType: audioBlob.type || 'audio/webm' });
+					if (!upErr) {
+						administrative = { audio_bucket: 'report-audio', audio_path: filename };
+					} else {
+						toast({ title: 'Audio not saved', description: 'We could not save your voice note. Submitting without it.', variant: 'destructive' });
+					}
+				} catch (err) {
+					console.debug('audio upload failed', err);
+				}
+			}
+
 			await submitReport({
 				// Required fields from form
 				first_name: formData.get("first_name") as string,
 				email: formData.get("email") as string,
-				incident_description: description,
+				incident_description: description || null,
 				type_of_incident: formData.get("incident_type") as
 					| "physical"
 					| "emotional"
@@ -112,7 +134,7 @@ export default function ReportAbuseForm({ onClose }: { onClose?: () => void }) {
 				match_status: "pending",
 
 				// Optional fields set to null
-				administrative: null,
+				administrative: administrative,
 				additional_info: null,
 				city: null,
 				country: null,
@@ -243,13 +265,21 @@ export default function ReportAbuseForm({ onClose }: { onClose?: () => void }) {
 				<div className="space-y-2">
 					<div className="flex items-center justify-between">
 						<span className="text-xs text-gray-500">You can speak instead of typing</span>
-						<div className="flex items-center gap-2">
-							<Button
-								type="button"
-								variant={isListening ? "destructive" : "outline"}
-								size="sm"
-								onClick={() => (isListening ? stop() : start())}
-							>
+					<div className="flex items-center gap-2">
+						<Button
+							type="button"
+							variant="outline"
+							size="sm"
+							onClick={() => setRecorderOpen(true)}
+						>
+							Record voice note
+						</Button>
+						<Button
+							type="button"
+							variant={isListening ? "destructive" : "outline"}
+							size="sm"
+							onClick={() => (isListening ? stop() : start())}
+						>
 								{isListening ? (
 									<>
 										<Square className="h-4 w-4 mr-2" /> Stop
@@ -263,13 +293,18 @@ export default function ReportAbuseForm({ onClose }: { onClose?: () => void }) {
 						</div>
 					</div>
 					<Textarea
-						placeholder="Please share what happened..."
+						placeholder="Please share what happened... (optional if you attach a voice note)"
 						name="incident_description"
-						required
 						className="min-h-[140px] w-full mt-1"
 						value={description}
 						onChange={(e) => setDescription(e.target.value)}
 					/>
+					{audioUrl && (
+						<div className="mt-2 space-y-1">
+							<p className="text-xs text-gray-500">Attached voice note:</p>
+							<audio controls src={audioUrl} className="w-full" />
+						</div>
+					)}
 					{!isSupported && (
 						<p className="text-xs text-gray-400">
 							Voice input is not supported on this device/browser.
@@ -334,6 +369,11 @@ export default function ReportAbuseForm({ onClose }: { onClose?: () => void }) {
 					Clear Draft
 				</Button>
 			</div>
+		<VoiceRecorderModal 
+			open={recorderOpen}
+			onOpenChange={(v) => setRecorderOpen(v)}
+			onRecorded={(blob) => { setAudioBlob(blob); try { const url = URL.createObjectURL(blob); setAudioUrl(url); } catch {} }}
+		/>
 		</form>
 	);
 }
