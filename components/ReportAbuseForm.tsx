@@ -20,12 +20,12 @@ const SUPPORT_SERVICE_OPTIONS = [
 ] as const;
 
 const INCIDENT_OPTIONS = [
-  { value: "physical", label: "Physical abuse" },
-  { value: "emotional", label: "Emotional abuse" },
-  { value: "sexual", label: "Sexual abuse" },
-  { value: "financial", label: "Financial abuse" },
-  { value: "child_abuse", label: "Child abuse" },
-  { value: "other", label: "Other" },
+	{ value: "physical", label: "Physical abuse" },
+	{ value: "emotional", label: "Emotional abuse" },
+	{ value: "sexual", label: "Sexual abuse" },
+	{ value: "financial", label: "Financial abuse" },
+	{ value: "child_abuse", label: "Child abuse" },
+	{ value: "other", label: "Other" },
 ] as const;
 
 export default function ReportAbuseForm({ onClose }: { onClose?: () => void }) {
@@ -45,23 +45,23 @@ export default function ReportAbuseForm({ onClose }: { onClose?: () => void }) {
 	const [needsDisabled, setNeedsDisabled] = useState(false);
 	const [needsQueer, setNeedsQueer] = useState(false);
 
-// Load draft
-useEffect(() => {
-	try {
-		const saved = localStorage.getItem("reportDraft");
-		if (saved) {
-			const parsed = JSON.parse(saved);
-			setDraft(parsed);
-			if (parsed.description) setDescription(parsed.description);
-			if (parsed.incidentTypes) setIncidentTypes(parsed.incidentTypes);
-			if (parsed.isOnBehalf) setIsOnBehalf(!!parsed.isOnBehalf);
-			if (parsed.needsDisabled) setNeedsDisabled(!!parsed.needsDisabled);
-			if (parsed.needsQueer) setNeedsQueer(!!parsed.needsQueer);
-    }
-    } catch (e) {
-      // ignore draft load errors
-    }
-  }, []);
+	// Load draft
+	useEffect(() => {
+		try {
+			const saved = localStorage.getItem("reportDraft");
+			if (saved) {
+				const parsed = JSON.parse(saved);
+				setDraft(parsed);
+				if (parsed.description) setDescription(parsed.description);
+				if (parsed.incidentTypes) setIncidentTypes(parsed.incidentTypes);
+				if (parsed.isOnBehalf) setIsOnBehalf(!!parsed.isOnBehalf);
+				if (parsed.needsDisabled) setNeedsDisabled(!!parsed.needsDisabled);
+				if (parsed.needsQueer) setNeedsQueer(!!parsed.needsQueer);
+			}
+		} catch (e) {
+			// ignore draft load errors
+		}
+	}, []);
 
 	// Get location on component mount
 	useEffect(() => {
@@ -83,10 +83,9 @@ useEffect(() => {
 				}
 			);
 		}
-	}, []);
+	}, []); // Empty dependency array is correct here
 
-
-const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+	const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
 		e.preventDefault();
 		const form = e.currentTarget;
 		setLoading(true);
@@ -99,27 +98,46 @@ const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
 			if (audioBlob) {
 				try {
 					const supabase = createClient();
-					const filename = `reports/${Date.now()}-${Math.random().toString(36).slice(2)}.webm`;
-					const { error: upErr } = await supabase.storage.from('report-audio').upload(filename, audioBlob, { contentType: audioBlob.type || 'audio/webm' });
+					const filename = `reports/${Date.now()}-${Math.random()
+						.toString(36)
+						.slice(2)}.webm`;
+					const { error: upErr } = await supabase.storage
+						.from("report-audio")
+						.upload(filename, audioBlob, {
+							contentType: audioBlob.type || "audio/webm",
+						});
 					if (!upErr) {
-						const { data } = supabase.storage.from('report-audio').getPublicUrl(filename);
-						media = { title: 'audio', url: data.publicUrl };
+						const { data } = supabase.storage
+							.from("report-audio")
+							.getPublicUrl(filename);
+						media = { title: "audio", url: data.publicUrl };
 					} else {
-						toast({ title: 'Audio not saved', description: 'We could not save your voice note. Submitting without it.', variant: 'destructive' });
+						toast({
+							title: "Audio not saved",
+							description: "We could not save your voice note. Submitting without it.",
+							variant: "destructive",
+						});
 					}
 				} catch (err) {
-					console.debug('audio upload failed', err);
+					console.debug("audio upload failed", err);
 				}
 			}
 
 			// Determine primary incident type compatible with DB
-const allowed: Record<string, string> = { physical:'physical', emotional:'emotional', sexual:'sexual', financial:'financial', child_abuse:'child_abuse', other:'other' };
-			const first = incidentTypes.find(t => allowed[t]);
-			const type_of_incident = (first as any) || 'other';
+			const allowed: Record<string, string> = {
+				physical: "physical",
+				emotional: "emotional",
+				sexual: "sexual",
+				financial: "financial",
+				child_abuse: "child_abuse",
+				other: "other",
+			};
+			const first = incidentTypes.find((t) => allowed[t]);
+			const type_of_incident = (first as any) || "other";
 
 			const additional_info: any = {
 				incident_types: incidentTypes,
-				special_needs: { disabled: needsDisabled, queer_support: needsQueer }
+				special_needs: { disabled: needsDisabled, queer_support: needsQueer },
 			};
 
 			const body = {
@@ -141,18 +159,22 @@ const allowed: Record<string, string> = { physical:'physical', emotional:'emotio
 				support_services: formData.get("support_services") || null,
 			};
 
-			const response = await fetch('/api/reports/anonymous', {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify(body)
+			const response = await fetch("/api/reports/anonymous", {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify(body),
 			});
-			if (!response.ok) throw new Error('Failed to submit report');
+			if (!response.ok) throw new Error("Failed to submit report");
 
 			// Only reset and show success if the submission was successful
 			form.reset();
-        setDescription("");
-        try { localStorage.removeItem("reportDraft"); } catch (e) { /* ignore */ }
-        toast({
+			setDescription("");
+			try {
+				localStorage.removeItem("reportDraft");
+			} catch (e) {
+				/* ignore */
+			}
+			toast({
 				title: "Report Submitted",
 				description: "Thank you for your report. We will review it shortly.",
 			});
@@ -175,11 +197,15 @@ const allowed: Record<string, string> = { physical:'physical', emotional:'emotio
 		}
 	};
 
-return (
+	return (
 		<form onSubmit={handleSubmit} className="space-y-8">
 			<div className="prose prose-sm">
 				<div className="flex items-center gap-2 mb-3">
-					<Switch id="onbehalf" checked={isOnBehalf} onCheckedChange={setIsOnBehalf} />
+					<Switch
+						id="onbehalf"
+						checked={isOnBehalf}
+						onCheckedChange={setIsOnBehalf}
+					/>
 					<Label htmlFor="onbehalf">Reporting on behalf of someone else</Label>
 				</div>
 				<p className="leading-relaxed text-gray-600">
@@ -250,16 +276,18 @@ return (
 				<p className="mt-4">Here's what happened:</p>
 				<div className="space-y-2">
 					<div className="flex items-center justify-between">
-						<span className="text-xs text-gray-500">You can record a voice note instead of typing</span>
-					<div className="flex items-center gap-2">
-						<Button
-							type="button"
-							variant="outline"
-							size="sm"
-							onClick={() => setRecorderOpen(true)}
-						>
-							Record voice note
-						</Button>
+						<span className="text-xs text-gray-500">
+							You can record a voice note instead of typing
+						</span>
+						<div className="flex items-center gap-2">
+							<Button
+								type="button"
+								variant="outline"
+								size="sm"
+								onClick={() => setRecorderOpen(true)}
+							>
+								Record voice note
+							</Button>
 						</div>
 					</div>
 					<Textarea
@@ -293,8 +321,22 @@ return (
 					</select>{" "}
 					to follow up. In case you need specialized support, you can select:
 					<span className="inline-flex items-center gap-3 ml-3">
-						<label className="inline-flex items-center gap-2 text-sm"><input type="checkbox" checked={needsDisabled} onChange={(e)=>setNeedsDisabled(e.target.checked)} /> I am disabled</label>
-						<label className="inline-flex items-center gap-2 text-sm"><input type="checkbox" checked={needsQueer} onChange={(e)=>setNeedsQueer(e.target.checked)} /> I need queer support</label>
+						<label className="inline-flex items-center gap-2 text-sm">
+							<input
+								type="checkbox"
+								checked={needsDisabled}
+								onChange={(e) => setNeedsDisabled(e.target.checked)}
+							/>{" "}
+							I am disabled
+						</label>
+						<label className="inline-flex items-center gap-2 text-sm">
+							<input
+								type="checkbox"
+								checked={needsQueer}
+								onChange={(e) => setNeedsQueer(e.target.checked)}
+							/>{" "}
+							I need queer support
+						</label>
 					</span>
 					<select
 						name="consent"
@@ -322,13 +364,18 @@ return (
 						const form = (e.currentTarget.closest("form") as HTMLFormElement)!;
 						const fd = new FormData(form);
 						const toSave: any = Object.fromEntries(fd.entries());
-        toSave.description = description;
-        toSave.incidentTypes = incidentTypes;
-        toSave.isOnBehalf = isOnBehalf;
-        toSave.needsDisabled = needsDisabled;
-        toSave.needsQueer = needsQueer;
-        try { localStorage.setItem("reportDraft", JSON.stringify(toSave)); setDraft(toSave); } catch (e) { /* ignore */ }
-        toast({ title: "Draft saved" });
+						toSave.description = description;
+						toSave.incidentTypes = incidentTypes;
+						toSave.isOnBehalf = isOnBehalf;
+						toSave.needsDisabled = needsDisabled;
+						toSave.needsQueer = needsQueer;
+						try {
+							localStorage.setItem("reportDraft", JSON.stringify(toSave));
+							setDraft(toSave);
+						} catch (e) {
+							/* ignore */
+						}
+						toast({ title: "Draft saved" });
 					}}
 				>
 					Save Draft
@@ -336,17 +383,31 @@ return (
 				<Button
 					type="button"
 					variant="ghost"
-        className="w-full sm:w-auto"
-        onClick={() => { try { localStorage.removeItem("reportDraft"); setDraft(null); setDescription(""); } catch (e) { /* ignore */ } }}
+					className="w-full sm:w-auto"
+					onClick={() => {
+						try {
+							localStorage.removeItem("reportDraft");
+							setDraft(null);
+							setDescription("");
+						} catch (e) {
+							/* ignore */
+						}
+					}}
 				>
 					Clear Draft
 				</Button>
 			</div>
-		<VoiceRecorderModal 
-			open={recorderOpen}
-			onOpenChange={(v) => setRecorderOpen(v)}
-			onRecorded={(blob) => { setAudioBlob(blob); try { const url = URL.createObjectURL(blob); setAudioUrl(url); } catch {} }}
-		/>
+			<VoiceRecorderModal
+				open={recorderOpen}
+				onOpenChange={(v) => setRecorderOpen(v)}
+				onRecorded={(blob) => {
+					setAudioBlob(blob);
+					try {
+						const url = URL.createObjectURL(blob);
+						setAudioUrl(url);
+					} catch {}
+				}}
+			/>
 		</form>
 	);
 }

@@ -28,9 +28,9 @@ export default function AuthenticatedReportAbuseForm({
 }: AuthenticatedReportAbuseFormProps) {
 	const { toast } = useToast();
 	const [loading, setLoading] = useState(false);
-const [selectedServices, setSelectedServices] = useState<string[]>([]);
-const [incidentTypes, setIncidentTypes] = useState<string[]>([]);
-const [description, setDescription] = useState("");
+	const [selectedServices, setSelectedServices] = useState<string[]>([]);
+	const [incidentTypes, setIncidentTypes] = useState<string[]>([]);
+	const [description, setDescription] = useState("");
 	const [draft, setDraft] = useState<any | null>(null);
 	// Voice via modal only for consistency
 	const [location, setLocation] = useState<{
@@ -41,8 +41,8 @@ const [description, setDescription] = useState("");
 	const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
 	const [audioUrl, setAudioUrl] = useState<string | null>(null);
 	const [isOnBehalf, setIsOnBehalf] = useState(false);
-  const [needsDisabled, setNeedsDisabled] = useState(false);
-  const [needsQueer, setNeedsQueer] = useState(false);
+	const [needsDisabled, setNeedsDisabled] = useState(false);
+	const [needsQueer, setNeedsQueer] = useState(false);
 	const supabase = createClient();
 	const user = useUser();
 
@@ -66,7 +66,7 @@ const [description, setDescription] = useState("");
 				}
 			);
 		}
-}, []);
+	}, []); // Empty dependency array is correct here
 
 	useEffect(() => {
 		try {
@@ -75,14 +75,13 @@ const [description, setDescription] = useState("");
 				const parsed = JSON.parse(saved);
 				setDraft(parsed);
 				if (parsed.description) setDescription(parsed.description);
-if (parsed.selectedServices) setSelectedServices(parsed.selectedServices);
-        if (parsed.incidentTypes) setIncidentTypes(parsed.incidentTypes);
-    }
-    } catch (e) {
-      // ignore draft load errors
-    }
-  }, []);
-
+				if (parsed.selectedServices) setSelectedServices(parsed.selectedServices);
+				if (parsed.incidentTypes) setIncidentTypes(parsed.incidentTypes);
+			}
+		} catch (e) {
+			// ignore draft load errors
+		}
+	}, []);
 
 	const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
 		e.preventDefault();
@@ -111,25 +110,43 @@ if (parsed.selectedServices) setSelectedServices(parsed.selectedServices);
 		let media: { title: string; url: string } | null = null;
 		if (audioBlob) {
 			try {
-				const filename = `reports/${Date.now()}-${Math.random().toString(36).slice(2)}.webm`;
-				const { error: upErr } = await supabase.storage.from('report-audio').upload(filename, audioBlob, { contentType: audioBlob.type || 'audio/webm' });
-				if (!upErr) { const { data } = supabase.storage.from('report-audio').getPublicUrl(filename); media = { title: 'audio', url: data.publicUrl }; }
+				const filename = `reports/${Date.now()}-${Math.random()
+					.toString(36)
+					.slice(2)}.webm`;
+				const { error: upErr } = await supabase.storage
+					.from("report-audio")
+					.upload(filename, audioBlob, {
+						contentType: audioBlob.type || "audio/webm",
+					});
+				if (!upErr) {
+					const { data } = supabase.storage
+						.from("report-audio")
+						.getPublicUrl(filename);
+					media = { title: "audio", url: data.publicUrl };
+				}
 			} catch (e) {
-				console.debug('auth audio upload failed', e);
+				console.debug("auth audio upload failed", e);
 			}
 		}
 
-// Map the first selected enum-allowed incident to type_of_incident
-    const allowed: Record<string, string> = { physical:'physical', emotional:'emotional', sexual:'sexual', financial:'financial', child_abuse:'child_abuse', other:'other' };
-    const first = incidentTypes.find(t => allowed[t]);
-    const type_of_incident = (first as any) || 'other';
+		// Map the first selected enum-allowed incident to type_of_incident
+		const allowed: Record<string, string> = {
+			physical: "physical",
+			emotional: "emotional",
+			sexual: "sexual",
+			financial: "financial",
+			child_abuse: "child_abuse",
+			other: "other",
+		};
+		const first = incidentTypes.find((t) => allowed[t]);
+		const type_of_incident = (first as any) || "other";
 
-    const data = {
+		const data = {
 			first_name: user?.profile?.first_name,
 			last_name: user?.profile?.last_name || null,
 			user_id: userId,
 			phone: phone,
-type_of_incident,
+			type_of_incident,
 			// With expanded enum, you can also allow multi-select here:
 			// If you add MultiSelect later, map the first choice to type_of_incident and store all in additional_info
 			incident_description: description || null,
@@ -142,8 +159,11 @@ type_of_incident,
 			submission_timestamp: new Date().toISOString(),
 			email: user?.profile?.email || null,
 			media,
-      is_onBehalf: isOnBehalf,
-additional_info: { incident_types: incidentTypes, special_needs: { disabled: needsDisabled, queer_support: needsQueer } },
+			is_onBehalf: isOnBehalf,
+			additional_info: {
+				incident_types: incidentTypes,
+				special_needs: { disabled: needsDisabled, queer_support: needsQueer },
+			},
 		};
 
 		try {
@@ -162,9 +182,13 @@ additional_info: { incident_types: incidentTypes, special_needs: { disabled: nee
 				description: "Thank you for your report. We will review it shortly.",
 			});
 
-            form.reset();
-            try { localStorage.removeItem("authReportDraft"); } catch (e) { /* ignore */ }
-            setTimeout(() => {
+			form.reset();
+			try {
+				localStorage.removeItem("authReportDraft");
+			} catch (e) {
+				/* ignore */
+			}
+			setTimeout(() => {
 				onClose();
 			}, 500);
 		} catch (error) {
@@ -189,26 +213,30 @@ additional_info: { incident_types: incidentTypes, special_needs: { disabled: nee
 		>
 			<div className="flex-1 overflow-y-auto space-y-6 pr-4 pb-20">
 				<div className="flex items-center gap-4 flex-wrap">
-            <div className="flex items-center gap-2">
-              <Switch id="onbehalf-auth" checked={isOnBehalf} onCheckedChange={setIsOnBehalf} />
-              <Label htmlFor="onbehalf-auth">Reporting on behalf of someone else</Label>
-            </div>
-<p className="text-lg text-gray-700">I want to report about</p>
-            <div className="min-w-[240px]">
-              <MultiSelect
-                selected={incidentTypes}
-                onChange={setIncidentTypes}
-                options={[
-                  { value: 'physical', label: 'Physical abuse' },
-                  { value: 'emotional', label: 'Emotional abuse' },
-                  { value: 'sexual', label: 'Sexual abuse' },
-                  { value: 'financial', label: 'Financial abuse' },
-                  { value: 'child_abuse', label: 'Child abuse' },
-                  { value: 'other', label: 'Other' },
-                ]}
-                placeholder="Select incident types"
-              />
-            </div>
+					<div className="flex items-center gap-2">
+						<Switch
+							id="onbehalf-auth"
+							checked={isOnBehalf}
+							onCheckedChange={setIsOnBehalf}
+						/>
+						<Label htmlFor="onbehalf-auth">Reporting on behalf of someone else</Label>
+					</div>
+					<p className="text-lg text-gray-700">I want to report about</p>
+					<div className="min-w-[240px]">
+						<MultiSelect
+							selected={incidentTypes}
+							onChange={setIncidentTypes}
+							options={[
+								{ value: "physical", label: "Physical abuse" },
+								{ value: "emotional", label: "Emotional abuse" },
+								{ value: "sexual", label: "Sexual abuse" },
+								{ value: "financial", label: "Financial abuse" },
+								{ value: "child_abuse", label: "Child abuse" },
+								{ value: "other", label: "Other" },
+							]}
+							placeholder="Select incident types"
+						/>
+					</div>
 					<p className="text-lg text-gray-700">with</p>
 					<select
 						name="urgency"
@@ -224,14 +252,16 @@ additional_info: { incident_types: incidentTypes, special_needs: { disabled: nee
 
 				<div className="w-full space-y-2">
 					<div className="flex items-center justify-between">
-						<span className="text-xs text-gray-500">You can speak instead of typing</span>
-					<Button
+						<span className="text-xs text-gray-500">
+							You can speak instead of typing
+						</span>
+						<Button
 							type="button"
 							variant="outline"
 							size="sm"
 							onClick={() => setRecorderOpen(true)}
 						>
-						Record voice note
+							Record voice note
 						</Button>
 					</div>
 					<Textarea
@@ -254,22 +284,38 @@ additional_info: { incident_types: incidentTypes, special_needs: { disabled: nee
 					<p className="text-sm text-gray-500">
 						Select all that apply in order of priority
 					</p>
-									<MultiSelect
-										selected={selectedServices}
-										onChange={setSelectedServices}
-										options={SUPPORT_SERVICE_OPTIONS}
-										placeholder="Select required services..."
-									/>
-									{draft?.selectedServices && draft.selectedServices.length > 0 && (
-										<p className="text-xs text-gray-400">Draft selected: {draft.selectedServices.join(", ")}</p>
-									)}
+					<MultiSelect
+						selected={selectedServices}
+						onChange={setSelectedServices}
+						options={SUPPORT_SERVICE_OPTIONS}
+						placeholder="Select required services..."
+					/>
+					{draft?.selectedServices && draft.selectedServices.length > 0 && (
+						<p className="text-xs text-gray-400">
+							Draft selected: {draft.selectedServices.join(", ")}
+						</p>
+					)}
 				</div>
 
 				<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="col-span-full flex items-center gap-4">
-              <label className="inline-flex items-center gap-2 text-sm"><input type="checkbox" checked={needsDisabled} onChange={(e)=>setNeedsDisabled(e.target.checked)} /> I am disabled</label>
-              <label className="inline-flex items-center gap-2 text-sm"><input type="checkbox" checked={needsQueer} onChange={(e)=>setNeedsQueer(e.target.checked)} /> I need queer support</label>
-            </div>
+					<div className="col-span-full flex items-center gap-4">
+						<label className="inline-flex items-center gap-2 text-sm">
+							<input
+								type="checkbox"
+								checked={needsDisabled}
+								onChange={(e) => setNeedsDisabled(e.target.checked)}
+							/>{" "}
+							I am disabled
+						</label>
+						<label className="inline-flex items-center gap-2 text-sm">
+							<input
+								type="checkbox"
+								checked={needsQueer}
+								onChange={(e) => setNeedsQueer(e.target.checked)}
+							/>{" "}
+							I need queer support
+						</label>
+					</div>
 					<div className="col-span-full">
 						<p className="text-lg text-gray-700">Contact Preference:</p>
 					</div>
@@ -322,11 +368,7 @@ additional_info: { incident_types: incidentTypes, special_needs: { disabled: nee
 
 			<div className="fixed bottom-0 left-0 right-0 pt-4 pb-4 bg-white border-t mt-4 z-50">
 				<div className="max-w-[1200px] mx-auto px-4 flex flex-col sm:flex-row gap-2">
-					<Button
-						type="submit"
-						className="w-full sm:flex-1"
-						disabled={loading}
-					>
+					<Button type="submit" className="w-full sm:flex-1" disabled={loading}>
 						{loading ? "Submitting..." : "Submit Report"}
 					</Button>
 					<Button
@@ -334,28 +376,48 @@ additional_info: { incident_types: incidentTypes, special_needs: { disabled: nee
 						onClick={(e) => {
 							const form = (e.currentTarget.closest("form") as HTMLFormElement)!;
 							const fd = new FormData(form);
-const toSave: any = Object.fromEntries(fd.entries());
-            toSave.description = description;
-            toSave.selectedServices = selectedServices;
-            toSave.incidentTypes = incidentTypes;
-            try { localStorage.setItem("authReportDraft", JSON.stringify(toSave)); setDraft(toSave); } catch (e) { /* ignore */ }
+							const toSave: any = Object.fromEntries(fd.entries());
+							toSave.description = description;
+							toSave.selectedServices = selectedServices;
+							toSave.incidentTypes = incidentTypes;
+							try {
+								localStorage.setItem("authReportDraft", JSON.stringify(toSave));
+								setDraft(toSave);
+							} catch (e) {
+								/* ignore */
+							}
 						}}
 					>
 						Save Draft
 					</Button>
 					<Button
-            variant="ghost"
-            onClick={() => { try { localStorage.removeItem("authReportDraft"); setDraft(null); setDescription(""); setSelectedServices([]); } catch (e) { /* ignore */ } }}
+						variant="ghost"
+						onClick={() => {
+							try {
+								localStorage.removeItem("authReportDraft");
+								setDraft(null);
+								setDescription("");
+								setSelectedServices([]);
+							} catch (e) {
+								/* ignore */
+							}
+						}}
 					>
 						Clear Draft
 					</Button>
 				</div>
 			</div>
-		<VoiceRecorderModal 
-			open={recorderOpen}
-			onOpenChange={(v) => setRecorderOpen(v)}
-			onRecorded={(blob) => { setAudioBlob(blob); try { const url = URL.createObjectURL(blob); setAudioUrl(url); } catch {} }}
-		/>
+			<VoiceRecorderModal
+				open={recorderOpen}
+				onOpenChange={(v) => setRecorderOpen(v)}
+				onRecorded={(blob) => {
+					setAudioBlob(blob);
+					try {
+						const url = URL.createObjectURL(blob);
+						setAudioUrl(url);
+					} catch {}
+				}}
+			/>
 		</form>
 	);
 }

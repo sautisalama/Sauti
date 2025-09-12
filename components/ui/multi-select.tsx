@@ -25,9 +25,12 @@ export function MultiSelect({
 	const [open, setOpen] = React.useState(false);
 	const [inputValue, setInputValue] = React.useState("");
 
-	const handleUnselect = (option: string) => {
-		onChange(selected.filter((s) => s !== option));
-	};
+	const handleUnselect = React.useCallback(
+		(option: string) => {
+			onChange(selected.filter((s) => s !== option));
+		},
+		[selected, onChange]
+	);
 
 	const handleKeyDown = React.useCallback(
 		(e: React.KeyboardEvent<HTMLDivElement>) => {
@@ -38,15 +41,18 @@ export function MultiSelect({
 		[inputValue, onChange, selected]
 	);
 
-	const handleSelect = (optionValue: string) => {
-		onChange(
-			selected.includes(optionValue)
-				? selected.filter((s) => s !== optionValue)
-				: [...selected, optionValue]
-		);
-		setInputValue("");
-		setOpen(false);
-	};
+	const handleSelect = React.useCallback(
+		(optionValue: string) => {
+			onChange(
+				selected.includes(optionValue)
+					? selected.filter((s) => s !== optionValue)
+					: [...selected, optionValue]
+			);
+			setInputValue("");
+			setOpen(false);
+		},
+		[selected, onChange]
+	);
 
 	return (
 		<div className="relative">

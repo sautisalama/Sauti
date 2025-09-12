@@ -100,13 +100,8 @@ export default function SurvivorView({
 	const [open, setOpen] = useState(false);
 	const searchParams = useSearchParams();
 	const initialTab =
-		(searchParams?.get("tab") as
-			| "overview"
-			| "reports"
-			| null) || "overview";
-	const [activeTab, setActiveTab] = useState<
-		"overview" | "reports"
-	>(initialTab);
+		(searchParams?.get("tab") as "overview" | "reports" | null) || "overview";
+	const [activeTab, setActiveTab] = useState<"overview" | "reports">(initialTab);
 	const supabase = createClient();
 	const { toast } = useToast();
 	const [deleteReport, setDeleteReport] = useState<string | null>(null);
@@ -177,8 +172,13 @@ export default function SurvivorView({
 					console.log("Reports with appointments:", reportsWithAppointments);
 					setReports(reportsWithAppointments);
 					try {
-						localStorage.setItem(`reports-cache-${userId}`, JSON.stringify(reportsWithAppointments));
-					} catch (e) { /* ignore cache write */ }
+						localStorage.setItem(
+							`reports-cache-${userId}`,
+							JSON.stringify(reportsWithAppointments)
+						);
+					} catch (e) {
+						/* ignore cache write */
+					}
 					return;
 				}
 			}
@@ -189,7 +189,9 @@ export default function SurvivorView({
 		setReports(data || []);
 		try {
 			localStorage.setItem(`reports-cache-${userId}`, JSON.stringify(data || []));
-		} catch (e) { /* ignore cache write */ }
+		} catch (e) {
+			/* ignore cache write */
+		}
 	}, [supabase, userId, toast]);
 
 	const handleDelete = async (reportId: string) => {
@@ -221,7 +223,7 @@ export default function SurvivorView({
 		setDeleteReport(null);
 	};
 
-useEffect(() => {
+	useEffect(() => {
 		// Use provider data when present
 		if (dash?.data && dash.data.userId === userId && dash.data.reports) {
 			setReports(dash.data.reports as any);
@@ -251,7 +253,7 @@ useEffect(() => {
 		return () => {
 			supabase.removeChannel(channel);
 		};
-	}, [userId, toast, fetchReports, supabase]);
+	}, [userId, dash?.data, supabase]); // Removed fetchReports from dependencies to prevent infinite loop
 
 	// Add formatServiceName inside component
 	const formatServiceName = (service: string) => {
@@ -261,17 +263,31 @@ useEffect(() => {
 			.join(" ");
 	};
 
-	const matchedCount = useMemo(() => reports.filter((r) => (r.matched_services?.length || 0) > 0).length, [reports]);
+	const matchedCount = useMemo(
+		() => reports.filter((r) => (r.matched_services?.length || 0) > 0).length,
+		[reports]
+	);
 	const latestReportDate = useMemo(() => {
-		const ts = reports.map(r => r.submission_timestamp).filter(Boolean) as string[];
+		const ts = reports
+			.map((r) => r.submission_timestamp)
+			.filter(Boolean) as string[];
 		if (ts.length === 0) return null;
-		return new Date(ts.sort((a,b) => new Date(b).getTime() - new Date(a).getTime())[0]);
+		return new Date(
+			ts.sort((a, b) => new Date(b).getTime() - new Date(a).getTime())[0]
+		);
 	}, [reports]);
 	const daysActive = useMemo(() => {
-		const ts = reports.map(r => r.submission_timestamp).filter(Boolean) as string[];
+		const ts = reports
+			.map((r) => r.submission_timestamp)
+			.filter(Boolean) as string[];
 		if (ts.length === 0) return null;
-		const minDate = new Date(ts.reduce((min, cur) => (new Date(cur) < new Date(min) ? cur : min), ts[0]));
-		const diff = Math.max(1, Math.ceil((Date.now() - minDate.getTime()) / (1000*60*60*24)));
+		const minDate = new Date(
+			ts.reduce((min, cur) => (new Date(cur) < new Date(min) ? cur : min), ts[0])
+		);
+		const diff = Math.max(
+			1,
+			Math.ceil((Date.now() - minDate.getTime()) / (1000 * 60 * 60 * 24))
+		);
 		return diff;
 	}, [reports]);
 	const safetyProgress = useMemo(() => {
@@ -347,12 +363,15 @@ useEffect(() => {
 							variant="success"
 							description="Connected to help"
 						/>
-						{typeof safetyProgress === 'number' ? (
+						{typeof safetyProgress === "number" ? (
 							<StatsCard
 								title="Safety Score"
 								value={`${safetyProgress}%`}
 								icon={<TrendingUp className="h-4 w-4" />}
-								change={{ value: Math.max(1, Math.round(safetyProgress/10)), type: "increase" }}
+								change={{
+									value: Math.max(1, Math.round(safetyProgress / 10)),
+									type: "increase",
+								}}
 								variant="success"
 								description="Your progress this month"
 							/>
@@ -382,12 +401,14 @@ useEffect(() => {
 					{/* Safety Progress Ring */}
 					<Card className="mb-6">
 						<CardContent className="p-6">
-							{typeof safetyProgress === 'number' ? (
+							{typeof safetyProgress === "number" ? (
 								<div className="flex flex-col lg:flex-row items-center gap-6">
 									<div className="flex flex-col items-center">
 										<ProgressRing progress={safetyProgress} size={120}>
 											<div className="text-center">
-												<div className="text-2xl font-bold text-sauti-orange">{safetyProgress}%</div>
+												<div className="text-2xl font-bold text-sauti-orange">
+													{safetyProgress}%
+												</div>
 												<div className="text-xs text-neutral-500">Safety</div>
 											</div>
 										</ProgressRing>
@@ -405,15 +426,21 @@ useEffect(() => {
 										</p>
 										<div className="grid grid-cols-3 gap-3 text-center">
 											<div>
-												<div className="text-lg font-bold text-success-600">{reports.length}</div>
+												<div className="text-lg font-bold text-success-600">
+													{reports.length}
+												</div>
 												<div className="text-xs text-neutral-500">Reports Filed</div>
 											</div>
 											<div>
-												<div className="text-lg font-bold text-sauti-orange">{Math.max(1, Math.round((safetyProgress/20)) + matchedCount)}</div>
+												<div className="text-lg font-bold text-sauti-orange">
+													{Math.max(1, Math.round(safetyProgress / 20) + matchedCount)}
+												</div>
 												<div className="text-xs text-neutral-500">Resources Used</div>
 											</div>
 											<div>
-												<div className="text-lg font-bold text-primary-600">{daysActive ?? 1}</div>
+												<div className="text-lg font-bold text-primary-600">
+													{daysActive ?? 1}
+												</div>
 												<div className="text-xs text-neutral-500">Days Active</div>
 											</div>
 										</div>
@@ -429,15 +456,31 @@ useEffect(() => {
 													<div className="text-xs text-neutral-500">Safety</div>
 												</div>
 											</ProgressRing>
-											<p className="text-sm text-neutral-600 mt-2 text-center">Your safety progress</p>
+											<p className="text-sm text-neutral-600 mt-2 text-center">
+												Your safety progress
+											</p>
 										</div>
 										<div className="flex-1 w-full">
-											<h3 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100 mb-3">Your Journey to Safety</h3>
-											<p className="text-neutral-600 dark:text-neutral-400 text-sm mb-4">You've made significant progress on your path to safety and healing. Keep taking small steps forward - you're doing great.</p>
+											<h3 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100 mb-3">
+												Your Journey to Safety
+											</h3>
+											<p className="text-neutral-600 dark:text-neutral-400 text-sm mb-4">
+												You've made significant progress on your path to safety and healing.
+												Keep taking small steps forward - you're doing great.
+											</p>
 											<div className="grid grid-cols-3 gap-3 text-center">
-												<div><div className="text-lg font-bold text-success-600">0</div><div className="text-xs text-neutral-500">Reports Filed</div></div>
-												<div><div className="text-lg font-bold text-sauti-orange">5</div><div className="text-xs text-neutral-500">Resources Used</div></div>
-												<div><div className="text-lg font-bold text-primary-600">12</div><div className="text-xs text-neutral-500">Days Active</div></div>
+												<div>
+													<div className="text-lg font-bold text-success-600">0</div>
+													<div className="text-xs text-neutral-500">Reports Filed</div>
+												</div>
+												<div>
+													<div className="text-lg font-bold text-sauti-orange">5</div>
+													<div className="text-xs text-neutral-500">Resources Used</div>
+												</div>
+												<div>
+													<div className="text-lg font-bold text-primary-600">12</div>
+													<div className="text-xs text-neutral-500">Days Active</div>
+												</div>
 											</div>
 										</div>
 									</div>
@@ -453,10 +496,7 @@ useEffect(() => {
 								<div className="rounded-xl bg-[#F0F9FF] p-4">
 									<p className="text-sm text-neutral-600 mb-1">Next Step</p>
 									<p className="font-medium">Review your last report match</p>
-									<Link
-										href="/dashboard/reports"
-										className="text-sauti-orange text-sm"
-									>
+									<Link href="/dashboard/reports" className="text-sauti-orange text-sm">
 										Open reports →
 									</Link>
 								</div>
@@ -506,35 +546,63 @@ useEffect(() => {
 												/>
 											</CardHeader>
 											<CardContent className="p-0">
-											<div className="divide-y divide-neutral-100 dark:divide-neutral-800">
-												{reports.length > 0 ? (
-													<>
-														<ActivityItem
-															icon={<CheckCircle className="h-4 w-4" />}
-															title="Report submitted"
-															description="Your incident report was recorded successfully."
-															timestamp={latestReportDate ? latestReportDate.toLocaleString() : "Recently"}
-															status="success"
-														/>
-														{matchedCount > 0 && (
+												<div className="divide-y divide-neutral-100 dark:divide-neutral-800">
+													{reports.length > 0 ? (
+														<>
 															<ActivityItem
-																icon={<Star className="h-4 w-4" />}
-																title="Service match found"
-																description="You've been matched with a support service."
-																timestamp="Recently"
+																icon={<CheckCircle className="h-4 w-4" />}
+																title="Report submitted"
+																description="Your incident report was recorded successfully."
+																timestamp={
+																	latestReportDate
+																		? latestReportDate.toLocaleString()
+																		: "Recently"
+																}
 																status="success"
 															/>
-														)}
-													</>
-												) : (
-													<SamplePlaceholder label="Sample">
-														<ActivityItem icon={<CheckCircle className="h-4 w-4" />} title="Report submitted successfully" description="Your incident report has been securely recorded and is being reviewed by our team." timestamp="2 hours ago" status="success" />
-														<ActivityItem icon={<MessageCircle className="h-4 w-4" />} title="New message from Dr. Sarah M." description="Response to your recent consultation request with recommended next steps." timestamp="5 hours ago" onClick={() => (window.location.href = "/dashboard/chat")} />
-														<ActivityItem icon={<CalendarDays className="h-4 w-4" />} title="Appointment scheduled" description="Counseling session with Jane Smith on March 15th at 2:00 PM." timestamp="1 day ago" status="pending" />
-														<ActivityItem icon={<Star className="h-4 w-4" />} title="Safety milestone achieved" description="Congratulations! You've completed your safety plan and accessed 3 new resources." timestamp="2 days ago" status="success" />
-													</SamplePlaceholder>
-												)}
-											</div>
+															{matchedCount > 0 && (
+																<ActivityItem
+																	icon={<Star className="h-4 w-4" />}
+																	title="Service match found"
+																	description="You've been matched with a support service."
+																	timestamp="Recently"
+																	status="success"
+																/>
+															)}
+														</>
+													) : (
+														<SamplePlaceholder label="Sample">
+															<ActivityItem
+																icon={<CheckCircle className="h-4 w-4" />}
+																title="Report submitted successfully"
+																description="Your incident report has been securely recorded and is being reviewed by our team."
+																timestamp="2 hours ago"
+																status="success"
+															/>
+															<ActivityItem
+																icon={<MessageCircle className="h-4 w-4" />}
+																title="New message from Dr. Sarah M."
+																description="Response to your recent consultation request with recommended next steps."
+																timestamp="5 hours ago"
+																onClick={() => (window.location.href = "/dashboard/chat")}
+															/>
+															<ActivityItem
+																icon={<CalendarDays className="h-4 w-4" />}
+																title="Appointment scheduled"
+																description="Counseling session with Jane Smith on March 15th at 2:00 PM."
+																timestamp="1 day ago"
+																status="pending"
+															/>
+															<ActivityItem
+																icon={<Star className="h-4 w-4" />}
+																title="Safety milestone achieved"
+																description="Congratulations! You've completed your safety plan and accessed 3 new resources."
+																timestamp="2 days ago"
+																status="success"
+															/>
+														</SamplePlaceholder>
+													)}
+												</div>
 											</CardContent>
 										</Card>
 
@@ -979,7 +1047,6 @@ useEffect(() => {
 										)}
 									</div>
 								</TabsContent>
-
 							</Tabs>
 
 							<div className="space-y-8">
