@@ -18,7 +18,7 @@ DROP TYPE IF EXISTS user_type CASCADE;
 
 -- Create or replace ENUMs
 DO $$ BEGIN
-    CREATE TYPE appointment_status_type AS ENUM ('pending', 'confirmed');
+    CREATE TYPE appointment_status_type AS ENUM ('pending', 'confirmed', 'requested');
     CREATE TYPE consent_type AS ENUM ('yes', 'no');
     CREATE TYPE contact_preference_type AS ENUM ('phone_call', 'sms', 'email', 'do_not_contact');
     CREATE TYPE gender_type AS ENUM ('female', 'male', 'non_binary', 'prefer_not_to_say');
@@ -40,6 +40,17 @@ CREATE TABLE profiles (
     email TEXT,
     avatar_url TEXT,
     user_type user_type,
+    bio TEXT,
+    cal_link TEXT,
+    phone TEXT,
+    professional_title TEXT,
+    profile_image_url TEXT,
+    is_public_booking BOOLEAN,
+    settings JSONB,
+    accreditation_files JSONB,
+    accreditation_member_number JSONB,
+    google_calendar_token TEXT,
+    google_calendar_refresh_token TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
@@ -79,6 +90,8 @@ CREATE TABLE reports (
     support_services support_service_type,
     ismatched BOOLEAN DEFAULT FALSE,
     match_status match_status_type,
+    is_onBehalf BOOLEAN,
+    media JSONB,
     submission_timestamp TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -121,6 +134,12 @@ CREATE TABLE appointments (
     matched_services UUID REFERENCES matched_services(id) ON DELETE CASCADE,
     appointment_date TIMESTAMP WITH TIME ZONE,
     status appointment_status_type,
+    appointment_type TEXT,
+    duration_minutes INTEGER,
+    notes TEXT,
+    emergency_contact TEXT,
+    google_calendar_event_id TEXT,
+    created_via TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -217,4 +236,11 @@ ALTER TABLE profiles DISABLE ROW LEVEL SECURITY;
 ALTER TABLE reports DISABLE ROW LEVEL SECURITY;
 ALTER TABLE support_services DISABLE ROW LEVEL SECURITY;
 ALTER TABLE matched_services DISABLE ROW LEVEL SECURITY;
-ALTER TABLE appointments DISABLE ROW LEVEL SECURITY; 
+ALTER TABLE appointments DISABLE ROW LEVEL SECURITY;
+
+-- Create storage buckets
+INSERT INTO storage.buckets (id, name, public) VALUES 
+    ('report-audio', 'report-audio', true),
+    ('report-media', 'report-media', true),
+    ('accreditation-files', 'accreditation-files', true)
+ON CONFLICT (id) DO NOTHING; 
