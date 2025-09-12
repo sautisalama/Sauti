@@ -13,6 +13,7 @@ import {
 import { useUser } from "@/hooks/useUser";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
+import { useDashboardData } from "@/components/providers/DashboardDataProvider";
 
 interface NavItem {
   id: string;
@@ -30,6 +31,7 @@ interface EnhancedBottomNavProps {
 export function EnhancedBottomNav({ forceShow = false, className }: EnhancedBottomNavProps) {
   const pathname = usePathname();
   const user = useUser();
+  const dash = useDashboardData();
   const [unreadMessages, setUnreadMessages] = useState(0);
   const [casesCount, setCasesCount] = useState(0);
   const [activeTab, setActiveTab] = useState<string>("");
@@ -55,12 +57,18 @@ export function EnhancedBottomNav({ forceShow = false, className }: EnhancedBott
 
   const isDashboard = pathname?.startsWith("/dashboard");
 
-  // Mock data and dynamic counts
+  // Use provider unread count when available
   useEffect(() => {
-    setUnreadMessages(3);
-  }, []);
+    if (typeof dash?.data?.unreadChatCount === 'number') {
+      setUnreadMessages(dash.data.unreadChatCount);
+    }
+  }, [dash?.data?.unreadChatCount]);
 
   useEffect(() => {
+    if (typeof dash?.data?.casesCount === 'number') {
+      setCasesCount(dash.data.casesCount);
+      return;
+    }
     const loadCases = async () => {
       try {
         if (user?.profile?.user_type !== 'professional' && user?.profile?.user_type !== 'ngo') {
@@ -80,7 +88,7 @@ export function EnhancedBottomNav({ forceShow = false, className }: EnhancedBott
       }
     };
     loadCases();
-  }, [user?.id, user?.profile?.user_type]);
+  }, [dash?.data, user?.id, user?.profile?.user_type]);
 
   // Navigation: role-aware mobile nav
   const getNavItems = (): NavItem[] => {

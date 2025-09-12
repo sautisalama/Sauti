@@ -45,6 +45,7 @@ import { createClient } from "@/utils/supabase/client";
 import { signOut } from "@/app/(auth)/actions/auth";
 import ReportAbuseForm from "@/components/ReportAbuseForm";
 import { cn } from "@/lib/utils";
+import { useDashboardData } from "@/components/providers/DashboardDataProvider";
 
 interface SidebarItem {
 	id: string;
@@ -70,9 +71,10 @@ export function EnhancedSidebar({
 }: EnhancedSidebarProps) {
 	const pathname = usePathname();
 	const user = useUser();
+	const dash = useDashboardData();
 	const [isCollapsed, setIsCollapsed] = useState(defaultCollapsed);
 	const [reportDialogOpen, setReportDialogOpen] = useState(false);
-	const [notifications, setNotifications] = useState(5);
+	const [notifications, setNotifications] = useState(0);
 	const [casesCount, setCasesCount] = useState<number>(0);
 	const supabase = createClient();
 
@@ -89,7 +91,12 @@ export function EnhancedSidebar({
 		return () => window.removeEventListener("resize", handleResize);
 	}, []);
 
-	useEffect(() => {
+useEffect(() => {
+		// Prefer provider data when available to avoid extra fetches
+		if (dash?.data && typeof dash.data.casesCount === 'number') {
+			setCasesCount(dash.data.casesCount);
+			return;
+		}
 		const loadCases = async () => {
 			try {
 				if (
@@ -120,7 +127,7 @@ export function EnhancedSidebar({
 			}
 		};
 		loadCases();
-	}, [user?.id, user?.profile?.user_type, supabase]);
+	}, [dash?.data, user?.id, user?.profile?.user_type, supabase]);
 
 	const getSidebarItems = (): SidebarItem[] => {
 		const isDashboard = pathname?.startsWith("/dashboard");
@@ -178,7 +185,7 @@ export function EnhancedSidebar({
 					label: "Messages",
 					icon: MessageCircle,
 					href: "/dashboard/chat",
-					badge: 3,
+					badge: dash?.data?.unreadChatCount || 0,
 					section: "main",
 				},
 				{
@@ -295,7 +302,7 @@ export function EnhancedSidebar({
 					label: "Messages",
 					icon: MessageCircle,
 					href: "/dashboard/chat",
-					badge: 3,
+					badge: dash?.data?.unreadChatCount || 0,
 					section: "main",
 				},
 				{

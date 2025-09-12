@@ -63,6 +63,7 @@ import {
 } from "@/components/ui/dialog";
 import AuthenticatedReportAbuseForm from "@/components/AuthenticatedReportAbuseForm";
 import { getPreloadedChat, preloadChat } from "@/utils/chat/preload";
+import { useDashboardData } from "@/components/providers/DashboardDataProvider";
 
 interface ProfessionalViewProps {
 	userId: string;
@@ -73,6 +74,7 @@ export default function ProfessionalView({
 	userId,
 	profileDetails,
 }: ProfessionalViewProps) {
+	const dash = useDashboardData();
 	const [open, setOpen] = useState(false);
 	const [deleteReportId, setDeleteReportId] = useState<string | null>(null);
 	const [deleteServiceId, setDeleteServiceId] = useState<string | null>(null);
@@ -138,7 +140,7 @@ export default function ProfessionalView({
 			.join(" ");
 	};
 
-	useEffect(() => {
+useEffect(() => {
 		const loadData = async () => {
 			try {
 				const [userReports, userServices, userMatches, userAppointments] =
@@ -162,8 +164,16 @@ export default function ProfessionalView({
 			}
 		};
 
+		// If provider data is available, use it and skip initial fetch
+		if (dash?.data && dash.data.userId === userId) {
+			setReports((dash.data.reports as ReportWithRelations[]) || []);
+			setSupportServices(dash.data.supportServices || []);
+			setMatchedServices((dash.data.matchedServices as any) || []);
+			setAppointments(dash.data.appointments || []);
+			return;
+		}
 		loadData();
-	}, [userId, toast]);
+	}, [userId, toast, dash?.data]);
 
 	// Live unread messages count (Stream Chat)
 	useEffect(() => {

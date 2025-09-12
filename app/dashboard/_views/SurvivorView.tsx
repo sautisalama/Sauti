@@ -62,6 +62,7 @@ import { CommunityCard } from "@/app/components/CommunityCard";
 import { DailyProgress } from "@/app/components/DailyProgress";
 import { JoinCommunity } from "@/app/components/JoinCommunity";
 import { SamplePlaceholder } from "@/components/dashboard/SamplePlaceholder";
+import { useDashboardData } from "@/components/providers/DashboardDataProvider";
 
 // Add this interface to type the joined data
 interface ReportWithRelations extends Tables<"reports"> {
@@ -94,6 +95,7 @@ export default function SurvivorView({
 	userId,
 	profileDetails,
 }: SurvivorViewProps) {
+	const dash = useDashboardData();
 	const [reports, setReports] = useState<ReportWithRelations[]>([]);
 	const [open, setOpen] = useState(false);
 	const searchParams = useSearchParams();
@@ -219,8 +221,13 @@ export default function SurvivorView({
 		setDeleteReport(null);
 	};
 
-	useEffect(() => {
-		fetchReports();
+useEffect(() => {
+		// Use provider data when present
+		if (dash?.data && dash.data.userId === userId && dash.data.reports) {
+			setReports(dash.data.reports as any);
+		} else {
+			fetchReports();
+		}
 
 		// Set up real-time subscription
 		const channel = supabase

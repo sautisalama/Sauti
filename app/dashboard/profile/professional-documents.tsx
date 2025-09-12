@@ -111,7 +111,7 @@ export function ProfessionalDocumentsForm({
 	const handleSave = async () => {
 		setIsUploading(true);
 		try {
-			const documentsToSave = [];
+			const documentsToSave: Array<{ title: string; note?: string; url?: string; uploaded?: boolean }> = [];
 
 			for (let i = 0; i < docs.length; i++) {
 				const doc = docs[i];
@@ -144,7 +144,7 @@ export function ProfessionalDocumentsForm({
 			// Update the document state with uploaded URLs
 			setDocs((prevDocs) =>
 				prevDocs.map((doc, idx) => {
-					const savedDoc = documentsToSave[idx];
+					const savedDoc = documentsToSave[idx] as { title: string; note?: string; url?: string; uploaded?: boolean } | undefined;
 					return savedDoc ? { ...doc, ...savedDoc } : doc;
 				})
 			);
