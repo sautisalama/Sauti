@@ -77,6 +77,7 @@ export function EnhancedSidebar({
 	const [notifications, setNotifications] = useState(0);
 	const [casesCount, setCasesCount] = useState<number>(0);
 	const supabase = createClient();
+	const role = (dash?.data?.userType as any) ?? user?.profile?.user_type;
 
 	// Auto-collapse on mobile screen sizes
 	useEffect(() => {
@@ -99,14 +100,11 @@ useEffect(() => {
 		}
 		const loadCases = async () => {
 			try {
-				if (
-					user?.profile?.user_type !== "professional" &&
-					user?.profile?.user_type !== "ngo"
-				) {
+				if (role !== "professional" && role !== "ngo") {
 					setCasesCount(0);
 					return;
 				}
-				const uid = user?.id;
+				const uid = dash?.data?.userId || user?.id;
 				if (!uid) return;
 				const { data: services } = await supabase
 					.from("support_services")
@@ -127,7 +125,7 @@ useEffect(() => {
 			}
 		};
 		loadCases();
-	}, [dash?.data, user?.id, user?.profile?.user_type, supabase]);
+	}, [dash?.data, role, user?.id, supabase]);
 
 	const getSidebarItems = (): SidebarItem[] => {
 		const isDashboard = pathname?.startsWith("/dashboard");
@@ -177,7 +175,7 @@ useEffect(() => {
 			},
 		];
 
-		if (user?.profile?.user_type === "survivor") {
+		if (role === "survivor") {
 			const survivorMain: SidebarItem[] = [
 				...baseItems,
 				{
@@ -277,8 +275,8 @@ useEffect(() => {
 		}
 
 		if (
-			user?.profile?.user_type === "professional" ||
-			user?.profile?.user_type === "ngo"
+			role === "professional" ||
+			role === "ngo"
 		) {
 			const proMain: SidebarItem[] = [
 				...baseItems,
@@ -490,6 +488,13 @@ useEffect(() => {
 	);
 	const footerItems = sidebarItems.filter((item) => item.section === "footer");
 
+	// Keep notifications in sync with unread chat count from provider
+	useEffect(() => {
+		if (typeof dash?.data?.unreadChatCount === 'number') {
+			setNotifications(dash.data.unreadChatCount);
+		}
+	}, [dash?.data?.unreadChatCount]);
+
 	return (
 		<>
 			<div
@@ -560,36 +565,37 @@ useEffect(() => {
 					<div
 						className={cn("flex items-center gap-3", isCollapsed && "justify-center")}
 					>
-						<Avatar className="h-10 w-10">
-							<AvatarImage
-								src={
-									typeof window !== "undefined" &&
-									window.localStorage.getItem("ss_anon_mode") === "1"
-										? "/anon.svg"
-										: user?.profile?.avatar_url || ""
-								}
-							/>
-							<AvatarFallback className="bg-sauti-orange text-white">
-								{user?.profile?.first_name?.[0]?.toUpperCase() ||
-									user?.email?.[0]?.toUpperCase() ||
-									"U"}
-							</AvatarFallback>
-						</Avatar>
+					<Avatar className="h-10 w-10">
+						<AvatarImage
+							src={
+								typeof window !== "undefined" &&
+								window.localStorage.getItem("ss_anon_mode") === "1"
+									? "/anon.svg"
+									: dash?.data?.profile?.avatar_url || user?.profile?.avatar_url || ""
+							}
+						/>
+						<AvatarFallback className="bg-sauti-orange text-white">
+							{dash?.data?.profile?.first_name?.[0]?.toUpperCase() ||
+								user?.profile?.first_name?.[0]?.toUpperCase() ||
+								user?.email?.[0]?.toUpperCase() ||
+								"U"}
+						</AvatarFallback>
+					</Avatar>
 
 						{!isCollapsed && (
 							<div className="flex-1 min-w-0">
 								<p className="text-sm font-medium text-neutral-900 dark:text-neutral-100 truncate">
-									{user?.profile?.first_name || user?.email || "User"}
+									{dash?.data?.profile?.first_name || user?.email || "User"}
 								</p>
-								{user?.profile?.user_type !== "survivor" && (
+								{role !== "survivor" && (
 									<p className="text-xs text-neutral-500 truncate capitalize">
-										{user?.profile?.user_type || "Member"}
+										{role || "Member"}
 									</p>
 								)}
 							</div>
 						)}
 
-						{!isCollapsed && notifications > 0 && (
+						{!isCollapsed && (notifications > 0) && (
 							<Button variant="ghost" size="icon" className="h-8 w-8">
 								<div className="relative">
 									<Bell className="h-4 w-4" />
