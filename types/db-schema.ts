@@ -177,6 +177,7 @@ export type Database = {
           google_calendar_token: string | null
           id: string
           is_public_booking: boolean | null
+          isVerified: boolean | null
           last_name: string | null
           phone: string | null
           professional_title: string | null
@@ -198,6 +199,7 @@ export type Database = {
           google_calendar_token?: string | null
           id: string
           is_public_booking?: boolean | null
+          isVerified?: boolean | null
           last_name?: string | null
           phone?: string | null
           professional_title?: string | null
@@ -219,6 +221,7 @@ export type Database = {
           google_calendar_token?: string | null
           id?: string
           is_public_booking?: boolean | null
+          isVerified?: boolean | null
           last_name?: string | null
           phone?: string | null
           professional_title?: string | null
