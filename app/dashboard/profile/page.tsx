@@ -20,6 +20,7 @@ import {
 	Shield,
 	Building,
 	Settings,
+	Accessibility,
 } from "lucide-react";
 import {
 	Accordion,
@@ -27,6 +28,7 @@ import {
 	AccordionItem,
 	AccordionTrigger,
 } from "@/components/ui/accordion";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 
 interface ProfileData {
 	bio?: string;
@@ -52,6 +54,7 @@ export default function ProfilePage() {
 	const [profileData, setProfileData] = useState<ProfileData>({});
 	const [isLoading, setIsLoading] = useState(true);
 	const [formData, setFormData] = useState<Record<string, any>>({});
+	const [activeTab, setActiveTab] = useState("profile");
 
 	// Load profile data
 	useEffect(() => {
@@ -83,6 +86,39 @@ export default function ProfilePage() {
 		}));
 	};
 
+	const saveVerificationDocuments = async (documents: any[]) => {
+		try {
+			if (!user?.id) return;
+
+			const { error } = await supabase
+				.from("profiles")
+				.update({
+					accreditation_files: documents,
+					updated_at: new Date().toISOString(),
+				})
+				.eq("id", user.id);
+
+			if (error) throw error;
+
+			// Update local state
+			setProfileData((prev) => ({
+				...prev,
+				accreditation_files: documents,
+			}));
+
+			toast({
+				title: "Success",
+				description: "Verification documents saved successfully",
+			});
+		} catch (error) {
+			toast({
+				title: "Error",
+				description: "Failed to save verification documents",
+				variant: "destructive",
+			});
+		}
+	};
+
 	const saveSection = async (section: string) => {
 		try {
 			if (!user?.id) return;
@@ -95,7 +131,6 @@ export default function ProfilePage() {
 					updateData = {
 						first_name: sectionData.first_name || profileData.first_name,
 						last_name: sectionData.last_name || profileData.last_name,
-						email: sectionData.email || profileData.email,
 					};
 					break;
 				case "professional":
@@ -107,22 +142,9 @@ export default function ProfilePage() {
 					};
 					break;
 				case "verification":
-					updateData = {
-						accreditation_files:
-							sectionData.accreditation_files || profileData.accreditation_files,
-						accreditation_member_number:
-							sectionData.accreditation_member_number ||
-							profileData.accreditation_member_number,
-					};
-					break;
-				case "privacy":
-					updateData = {
-						settings: {
-							...profileData.settings,
-							...sectionData,
-						},
-					};
-					break;
+					// This will be handled by the ProfessionalDocumentsForm component
+					// The form will call onSave after uploading files
+					return;
 			}
 
 			const { error } = await supabase
@@ -149,12 +171,6 @@ export default function ProfilePage() {
 
 	const getVerificationStatus = (section: string) => {
 		switch (section) {
-			case "basic":
-				return !!(
-					profileData.first_name &&
-					profileData.last_name &&
-					profileData.email
-				);
 			case "professional":
 				return !!(
 					profileData.bio &&
@@ -165,15 +181,13 @@ export default function ProfilePage() {
 				return !!(
 					profileData.accreditation_files && profileData.accreditation_member_number
 				);
-			case "privacy":
-				return true; // Privacy settings are always considered "complete"
 			default:
 				return false;
 		}
 	};
 
 	const getCompletionPercentage = () => {
-		const sections = ["basic", "professional", "verification", "privacy"];
+		const sections = ["professional", "verification"];
 		const completedSections = sections.filter((section) =>
 			getVerificationStatus(section)
 		);
@@ -229,15 +243,12 @@ export default function ProfilePage() {
 											Verified
 										</Badge>
 									)}
-									<span className="text-gray-500">
-										{getCompletionPercentage()}% Complete
-									</span>
 								</div>
 							</div>
 						</div>
 						<form action={signOut}>
 							<Button type="submit" variant="outline">
-								Log out
+								Sign out
 							</Button>
 						</form>
 					</div>
@@ -246,232 +257,297 @@ export default function ProfilePage() {
 
 			{/* Main Content */}
 			<div className="max-w-4xl mx-auto px-4 py-6">
-				<Accordion type="multiple" className="space-y-4">
-					{/* Basic Information */}
-					<AccordionItem value="basic" className="border rounded-lg">
+				<Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+					<TabsList className="grid w-full grid-cols-2 mb-6">
+						<TabsTrigger value="profile" className="flex items-center gap-2">
+							<User className="h-4 w-4" />
+							Profile
+						</TabsTrigger>
+						<TabsTrigger value="settings" className="flex items-center gap-2">
+							<Settings className="h-4 w-4" />
+							Settings
+						</TabsTrigger>
+					</TabsList>
+
+					<TabsContent value="profile" className="space-y-4">
+						{/* Basic Information Display */}
 						<Card>
-							<AccordionTrigger className="px-6 py-4 hover:no-underline">
-								<div className="flex items-center gap-3 text-left">
+							<CardHeader>
+								<CardTitle className="flex items-center gap-2">
 									<User className="h-5 w-5 text-sauti-orange" />
+									Basic Information
+								</CardTitle>
+							</CardHeader>
+							<CardContent className="space-y-4">
+								<div className="grid grid-cols-2 gap-4">
 									<div>
-										<CardTitle className="text-lg">Basic Information</CardTitle>
-										<p className="text-sm text-gray-600 mt-1">
-											{getVerificationStatus("basic")
-												? "Complete - Your basic information is verified"
-												: "Incomplete - Please fill in your basic information for verification"}
-										</p>
-									</div>
-									{getVerificationStatus("basic") ? (
-										<CheckCircle className="h-5 w-5 text-green-500 ml-auto" />
-									) : (
-										<AlertCircle className="h-5 w-5 text-amber-500 ml-auto" />
-									)}
-								</div>
-							</AccordionTrigger>
-							<AccordionContent>
-								<CardContent className="space-y-4">
-									<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+										<label className="text-sm font-medium text-gray-600">
+											First Name
+										</label>
 										<Input
 											placeholder="First Name"
-											defaultValue={profileData.first_name || ""}
+											value={profileData.first_name || ""}
 											onChange={(e) =>
 												updateFormData("basic", "first_name", e.target.value)
 											}
+											className="mt-1"
 										/>
+									</div>
+									<div>
+										<label className="text-sm font-medium text-gray-600">Last Name</label>
 										<Input
 											placeholder="Last Name"
-											defaultValue={profileData.last_name || ""}
+											value={profileData.last_name || ""}
 											onChange={(e) =>
 												updateFormData("basic", "last_name", e.target.value)
 											}
-										/>
-										<Input
-											placeholder="Email"
-											type="email"
-											defaultValue={profileData.email || ""}
-											onChange={(e) => updateFormData("basic", "email", e.target.value)}
-											className="md:col-span-2"
+											className="mt-1"
 										/>
 									</div>
-									<div className="flex justify-end">
-										<Button onClick={() => saveSection("basic")}>
-											Save Basic Information
-										</Button>
-									</div>
-								</CardContent>
-							</AccordionContent>
-						</Card>
-					</AccordionItem>
-
-					{/* Professional Information (for professionals only) */}
-					{isProfessional && (
-						<AccordionItem value="professional" className="border rounded-lg">
-							<Card>
-								<AccordionTrigger className="px-6 py-4 hover:no-underline">
-									<div className="flex items-center gap-3 text-left">
-										<Building className="h-5 w-5 text-sauti-orange" />
-										<div>
-											<CardTitle className="text-lg">Professional Information</CardTitle>
-											<p className="text-sm text-gray-600 mt-1">
-												{getVerificationStatus("professional")
-													? "Complete - Your professional information is verified"
-													: "Incomplete - Please fill in your professional details for verification"}
-											</p>
-										</div>
-										{getVerificationStatus("professional") ? (
-											<CheckCircle className="h-5 w-5 text-green-500 ml-auto" />
-										) : (
-											<AlertCircle className="h-5 w-5 text-amber-500 ml-auto" />
-										)}
-									</div>
-								</AccordionTrigger>
-								<AccordionContent>
-									<CardContent className="space-y-4">
-										<div className="space-y-4">
-											<Input
-												placeholder="Professional Title"
-												defaultValue={profileData.professional_title || ""}
-												onChange={(e) =>
-													updateFormData(
-														"professional",
-														"professional_title",
-														e.target.value
-													)
-												}
-											/>
-											<Input
-												placeholder="Phone Number"
-												defaultValue={profileData.phone || ""}
-												onChange={(e) =>
-													updateFormData("professional", "phone", e.target.value)
-												}
-											/>
-											<Textarea
-												placeholder="Professional Bio - Describe your expertise, specialties, and languages..."
-												rows={4}
-												defaultValue={profileData.bio || ""}
-												onChange={(e) =>
-													updateFormData("professional", "bio", e.target.value)
-												}
-											/>
-										</div>
-										<div className="flex justify-end">
-											<Button onClick={() => saveSection("professional")}>
-												Save Professional Information
-											</Button>
-										</div>
-									</CardContent>
-								</AccordionContent>
-							</Card>
-						</AccordionItem>
-					)}
-
-					{/* Verification Documents (for professionals only) */}
-					{isProfessional && (
-						<AccordionItem value="verification" className="border rounded-lg">
-							<Card>
-								<AccordionTrigger className="px-6 py-4 hover:no-underline">
-									<div className="flex items-center gap-3 text-left">
-										<Shield className="h-5 w-5 text-sauti-orange" />
-										<div>
-											<CardTitle className="text-lg">Verification Documents</CardTitle>
-											<p className="text-sm text-gray-600 mt-1">
-												{getVerificationStatus("verification")
-													? "Complete - Your verification documents are uploaded"
-													: "Incomplete - Please upload your verification documents for account verification"}
-											</p>
-										</div>
-										{getVerificationStatus("verification") ? (
-											<CheckCircle className="h-5 w-5 text-green-500 ml-auto" />
-										) : (
-											<AlertCircle className="h-5 w-5 text-amber-500 ml-auto" />
-										)}
-									</div>
-								</AccordionTrigger>
-								<AccordionContent>
-									<CardContent className="space-y-4">
-										<ProfessionalDocumentsForm
-											onSave={() => saveSection("verification")}
-										/>
-									</CardContent>
-								</AccordionContent>
-							</Card>
-						</AccordionItem>
-					)}
-
-					{/* Privacy & Identity */}
-					<AccordionItem value="privacy" className="border rounded-lg">
-						<Card>
-							<AccordionTrigger className="px-6 py-4 hover:no-underline">
-								<div className="flex items-center gap-3 text-left">
-									<Settings className="h-5 w-5 text-sauti-orange" />
-									<div>
-										<CardTitle className="text-lg">Privacy & Identity</CardTitle>
-										<p className="text-sm text-gray-600 mt-1">
-											Manage your privacy settings and anonymous mode preferences
-										</p>
-									</div>
-									<CheckCircle className="h-5 w-5 text-green-500 ml-auto" />
 								</div>
-							</AccordionTrigger>
-							<AccordionContent>
-								<CardContent className="space-y-4">
+								<div>
+									<label className="text-sm font-medium text-gray-600">Email</label>
+									<p className="text-lg font-medium text-gray-900 mt-1">
+										{profileData.email || "Not provided"}
+									</p>
+									<p className="text-xs text-gray-500">Email cannot be changed</p>
+								</div>
+								<div className="flex justify-end">
+									<Button onClick={() => saveSection("basic")}>
+										Save Basic Information
+									</Button>
+								</div>
+							</CardContent>
+						</Card>
+
+						{/* Anonymous Mode & Privacy */}
+						<Card>
+							<CardHeader>
+								<CardTitle className="flex items-center gap-2">
+									<Shield className="h-5 w-5 text-sauti-orange" />
+									Privacy & Identity
+								</CardTitle>
+							</CardHeader>
+							<CardContent>
+								{user?.id && user?.profile?.first_name && (
+									<AnonymousModeToggle
+										userId={user.id}
+										username={user.profile.first_name}
+									/>
+								)}
+							</CardContent>
+						</Card>
+
+						{/* Profile Completion Status */}
+						<Card className="border-amber-200 bg-amber-50">
+							<CardContent className="pt-6">
+								<div className="flex items-start gap-3">
+									<AlertCircle className="h-5 w-5 text-amber-600 mt-0.5" />
+									<div className="flex-1">
+										<h3 className="font-semibold text-amber-800">
+											Profile Completion Status
+										</h3>
+										<p className="text-sm text-amber-700 mt-1">
+											Complete your profile to access all features and improve your
+											verification status.
+										</p>
+										<div className="mt-3">
+											<div className="flex items-center gap-2 text-sm text-amber-700">
+												<span>Overall Progress:</span>
+												<div className="flex-1 bg-amber-200 rounded-full h-2">
+													<div
+														className="bg-amber-600 h-2 rounded-full transition-all duration-300"
+														style={{ width: `${getCompletionPercentage()}%` }}
+													></div>
+												</div>
+												<span>{getCompletionPercentage()}%</span>
+											</div>
+										</div>
+									</div>
+								</div>
+							</CardContent>
+						</Card>
+
+						<Accordion type="multiple" className="space-y-4">
+							{/* Professional Information (for professionals only) */}
+							{isProfessional && (
+								<AccordionItem value="professional" className="border rounded-lg">
+									<Card>
+										<AccordionTrigger className="px-6 py-4 hover:no-underline">
+											<div className="flex items-center gap-3 text-left">
+												<Building className="h-5 w-5 text-sauti-orange" />
+												<div>
+													<CardTitle className="text-lg">Professional Information</CardTitle>
+													<p className="text-sm text-gray-600 mt-1">
+														Manage your professional details and credentials
+													</p>
+												</div>
+												{getVerificationStatus("professional") ? (
+													<CheckCircle className="h-5 w-5 text-green-500 ml-auto" />
+												) : (
+													<AlertCircle className="h-5 w-5 text-amber-500 ml-auto" />
+												)}
+											</div>
+										</AccordionTrigger>
+										<AccordionContent>
+											<CardContent className="space-y-4">
+												<div className="space-y-4">
+													<Input
+														placeholder="Professional Title"
+														defaultValue={profileData.professional_title || ""}
+														onChange={(e) =>
+															updateFormData(
+																"professional",
+																"professional_title",
+																e.target.value
+															)
+														}
+													/>
+													<Input
+														placeholder="Phone Number"
+														defaultValue={profileData.phone || ""}
+														onChange={(e) =>
+															updateFormData("professional", "phone", e.target.value)
+														}
+													/>
+													<Textarea
+														placeholder="Professional Bio - Describe your expertise, specialties, and languages..."
+														rows={4}
+														defaultValue={profileData.bio || ""}
+														onChange={(e) =>
+															updateFormData("professional", "bio", e.target.value)
+														}
+													/>
+												</div>
+												<div className="flex justify-end">
+													<Button onClick={() => saveSection("professional")}>
+														Save Professional Information
+													</Button>
+												</div>
+											</CardContent>
+										</AccordionContent>
+									</Card>
+								</AccordionItem>
+							)}
+
+							{/* Verification Documents (for professionals only) */}
+							{isProfessional && (
+								<AccordionItem value="verification" className="border rounded-lg">
+									<Card>
+										<AccordionTrigger className="px-6 py-4 hover:no-underline">
+											<div className="flex items-center gap-3 text-left">
+												<Shield className="h-5 w-5 text-sauti-orange" />
+												<div>
+													<CardTitle className="text-lg">Verification Documents</CardTitle>
+													<p className="text-sm text-gray-600 mt-1">
+														Upload your professional credentials and verification documents
+													</p>
+												</div>
+												{getVerificationStatus("verification") ? (
+													<CheckCircle className="h-5 w-5 text-green-500 ml-auto" />
+												) : (
+													<AlertCircle className="h-5 w-5 text-amber-500 ml-auto" />
+												)}
+											</div>
+										</AccordionTrigger>
+										<AccordionContent>
+											<CardContent className="space-y-4">
+												<ProfessionalDocumentsForm
+													onSave={() => saveSection("verification")}
+													onSaveDocuments={saveVerificationDocuments}
+													initialData={{
+														accreditation_files: profileData.accreditation_files,
+														accreditation_member_number:
+															profileData.accreditation_member_number,
+													}}
+												/>
+											</CardContent>
+										</AccordionContent>
+									</Card>
+								</AccordionItem>
+							)}
+						</Accordion>
+					</TabsContent>
+
+					<TabsContent value="settings" className="space-y-4">
+						<Card>
+							<CardHeader>
+								<CardTitle className="flex items-center gap-2">
+									<Accessibility className="h-5 w-5 text-sauti-orange" />
+									Accessibility Settings
+								</CardTitle>
+							</CardHeader>
+							<CardContent className="space-y-6">
+								<div className="space-y-4">
+									<h4 className="font-medium">Display Preferences</h4>
+									<div className="space-y-3">
+										<div className="flex items-center justify-between">
+											<div>
+												<p className="font-medium">High Contrast Mode</p>
+												<p className="text-sm text-gray-600">
+													Increase contrast for better visibility
+												</p>
+											</div>
+											<input type="checkbox" className="rounded" />
+										</div>
+										<div className="flex items-center justify-between">
+											<div>
+												<p className="font-medium">Large Text</p>
+												<p className="text-sm text-gray-600">
+													Increase text size for better readability
+												</p>
+											</div>
+											<input type="checkbox" className="rounded" />
+										</div>
+										<div className="flex items-center justify-between">
+											<div>
+												<p className="font-medium">Reduced Motion</p>
+												<p className="text-sm text-gray-600">
+													Minimize animations and transitions
+												</p>
+											</div>
+											<input type="checkbox" className="rounded" />
+										</div>
+									</div>
+								</div>
+
+								<div className="space-y-4">
+									<h4 className="font-medium">Privacy & Identity</h4>
 									{user?.id && user?.profile?.first_name && (
 										<AnonymousModeToggle
 											userId={user.id}
 											username={user.profile.first_name}
 										/>
 									)}
-									<div className="space-y-4">
-										<Textarea
-											placeholder="Privacy notes and preferences..."
-											rows={3}
-											onChange={(e) => updateFormData("privacy", "notes", e.target.value)}
-										/>
-										<div className="flex justify-end">
-											<Button onClick={() => saveSection("privacy")}>
-												Save Privacy Settings
-											</Button>
-										</div>
-									</div>
-								</CardContent>
-							</AccordionContent>
-						</Card>
-					</AccordionItem>
-				</Accordion>
+								</div>
 
-				{/* Verification Status Summary */}
-				{!profileData.isVerified && (
-					<Card className="border-amber-200 bg-amber-50 mt-6">
-						<CardContent className="pt-6">
-							<div className="flex items-start gap-3">
-								<AlertCircle className="h-5 w-5 text-amber-600 mt-0.5" />
-								<div>
-									<h3 className="font-semibold text-amber-800">
-										Account Verification Required
-									</h3>
-									<p className="text-sm text-amber-700 mt-1">
-										Complete all required sections above to verify your account.
-										Verification helps build trust and enables access to additional
-										features.
-									</p>
-									<div className="mt-3">
-										<div className="flex items-center gap-2 text-sm text-amber-700">
-											<span>Profile Completion:</span>
-											<div className="flex-1 bg-amber-200 rounded-full h-2">
-												<div
-													className="bg-amber-600 h-2 rounded-full transition-all duration-300"
-													style={{ width: `${getCompletionPercentage()}%` }}
-												></div>
+								<div className="space-y-4">
+									<h4 className="font-medium">Notification Preferences</h4>
+									<div className="space-y-3">
+										<div className="flex items-center justify-between">
+											<div>
+												<p className="font-medium">Email Notifications</p>
+												<p className="text-sm text-gray-600">Receive updates via email</p>
 											</div>
-											<span>{getCompletionPercentage()}%</span>
+											<input type="checkbox" className="rounded" defaultChecked />
+										</div>
+										<div className="flex items-center justify-between">
+											<div>
+												<p className="font-medium">SMS Notifications</p>
+												<p className="text-sm text-gray-600">Receive updates via SMS</p>
+											</div>
+											<input type="checkbox" className="rounded" />
 										</div>
 									</div>
 								</div>
-							</div>
-						</CardContent>
-					</Card>
-				)}
+
+								<div className="flex justify-end">
+									<Button onClick={() => saveSection("settings")}>Save Settings</Button>
+								</div>
+							</CardContent>
+						</Card>
+					</TabsContent>
+				</Tabs>
 			</div>
 		</div>
 	);
