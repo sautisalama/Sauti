@@ -165,6 +165,8 @@ export type Database = {
       }
       profiles: {
         Row: {
+          accreditation_files: Json | null
+          accreditation_member_number: Json | null
           avatar_url: string | null
           bio: string | null
           cal_link: string | null
@@ -179,10 +181,13 @@ export type Database = {
           phone: string | null
           professional_title: string | null
           profile_image_url: string | null
+          settings: Json | null
           updated_at: string | null
           user_type: Database["public"]["Enums"]["user_type"] | null
         }
         Insert: {
+          accreditation_files?: Json | null
+          accreditation_member_number?: Json | null
           avatar_url?: string | null
           bio?: string | null
           cal_link?: string | null
@@ -197,10 +202,13 @@ export type Database = {
           phone?: string | null
           professional_title?: string | null
           profile_image_url?: string | null
+          settings?: Json | null
           updated_at?: string | null
           user_type?: Database["public"]["Enums"]["user_type"] | null
         }
         Update: {
+          accreditation_files?: Json | null
+          accreditation_member_number?: Json | null
           avatar_url?: string | null
           bio?: string | null
           cal_link?: string | null
@@ -215,6 +223,7 @@ export type Database = {
           phone?: string | null
           professional_title?: string | null
           profile_image_url?: string | null
+          settings?: Json | null
           updated_at?: string | null
           user_type?: Database["public"]["Enums"]["user_type"] | null
         }
@@ -238,6 +247,7 @@ export type Database = {
           first_name: string
           gender: Database["public"]["Enums"]["gender_type"] | null
           incident_description: string | null
+          is_onBehalf: boolean | null
           ismatched: boolean | null
           last_name: string | null
           latitude: number | null
@@ -245,6 +255,7 @@ export type Database = {
           location: string | null
           longitude: number | null
           match_status: Database["public"]["Enums"]["match_status_type"] | null
+          media: Json | null
           phone: string | null
           plus_code: string | null
           postcode: string | null
@@ -281,6 +292,7 @@ export type Database = {
           first_name: string
           gender?: Database["public"]["Enums"]["gender_type"] | null
           incident_description?: string | null
+          is_onBehalf?: boolean | null
           ismatched?: boolean | null
           last_name?: string | null
           latitude?: number | null
@@ -288,6 +300,7 @@ export type Database = {
           location?: string | null
           longitude?: number | null
           match_status?: Database["public"]["Enums"]["match_status_type"] | null
+          media?: Json | null
           phone?: string | null
           plus_code?: string | null
           postcode?: string | null
@@ -324,6 +337,7 @@ export type Database = {
           first_name?: string
           gender?: Database["public"]["Enums"]["gender_type"] | null
           incident_description?: string | null
+          is_onBehalf?: boolean | null
           ismatched?: boolean | null
           last_name?: string | null
           latitude?: number | null
@@ -331,6 +345,7 @@ export type Database = {
           location?: string | null
           longitude?: number | null
           match_status?: Database["public"]["Enums"]["match_status_type"] | null
+          media?: Json | null
           phone?: string | null
           plus_code?: string | null
           postcode?: string | null
