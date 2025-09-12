@@ -14,7 +14,7 @@ export async function POST(request: Request) {
 		const formData = await request.json();
 
 		// Transform the data to match the database schema
-		const reportData: TablesInsert<"reports"> = {
+        const reportData: TablesInsert<"reports"> = {
 			first_name: formData.first_name || "Anonymous",
 			last_name: formData.last_name || null,
 			user_id: formData.user_id,
@@ -29,6 +29,9 @@ export async function POST(request: Request) {
 			longitude: formData.longitude,
 			submission_timestamp: formData.submission_timestamp,
 			administrative: formData.administrative || null,
+            media: formData.media || null,
+            is_onBehalf: !!formData.is_onBehalf,
+            additional_info: formData.additional_info || null,
 			// Initialize match-related fields
 			ismatched: false,
 			match_status: "pending" as Database["public"]["Enums"]["match_status_type"],
@@ -43,12 +46,24 @@ export async function POST(request: Request) {
 		if (supabaseError) throw supabaseError;
 
 		// Match the report with support services
-		try {
+        try {
 			await matchReportWithServices(insertedReport.report_id);
 		} catch (matchError) {
 			console.error("Error matching services:", matchError);
 			// Continue with the process even if matching fails
 		}
+
+        // If report includes a phone and belongs to an unauth user, attempt to link to existing profile by phone
+        try {
+          if (!insertedReport.user_id && insertedReport.phone) {
+            const { data: profile } = await supabase.from('profiles').select('id').eq('phone', insertedReport.phone).single();
+            if (profile?.id) {
+              await supabase.from('reports').update({ user_id: profile.id }).eq('report_id', insertedReport.report_id);
+            }
+          }
+        } catch (linkErr) {
+          console.warn('Auto-link by phone failed', linkErr);
+        }
 
 		try {
 			await client.send({

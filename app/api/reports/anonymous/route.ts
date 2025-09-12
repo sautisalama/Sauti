@@ -32,7 +32,10 @@ export async function POST(request: Request) {
             submission_timestamp: formData.submission_timestamp,
             ismatched: false,
             match_status: "pending",
-            user_id: null
+            user_id: null,
+            media: formData.media || null,
+            is_onBehalf: !!formData.is_onBehalf,
+            additional_info: formData.additional_info || null
         };
 
         const { error: supabaseError, data: insertedReport } = await supabase
@@ -48,6 +51,18 @@ export async function POST(request: Request) {
             await matchReportWithServices(insertedReport.report_id);
         } catch (matchError) {
             console.error("Error matching services:", matchError);
+        }
+
+        // Auto-link by phone: if a profile exists with this phone, link the report to that user
+        try {
+          if (insertedReport.phone) {
+            const { data: profile } = await supabase.from('profiles').select('id').eq('phone', insertedReport.phone).single();
+            if (profile?.id) {
+              await supabase.from('reports').update({ user_id: profile.id }).eq('report_id', insertedReport.report_id);
+            }
+          }
+        } catch (linkErr) {
+          console.warn('Anonymous auto-link by phone failed', linkErr);
         }
 
         return new NextResponse(

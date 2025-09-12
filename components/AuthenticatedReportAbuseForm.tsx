@@ -12,9 +12,9 @@ import {
 	type SupportServiceType,
 } from "@/lib/constants";
 import { useUser } from "@/hooks/useUser";
-import { Mic, Square } from "lucide-react";
-import { useSpeechToText } from "@/hooks/useSpeechToText";
 import { VoiceRecorderModal } from "@/components/VoiceRecorderModal";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 
 interface AuthenticatedReportAbuseFormProps {
 	onClose: () => void;
@@ -30,7 +30,7 @@ export default function AuthenticatedReportAbuseForm({
 	const [selectedServices, setSelectedServices] = useState<string[]>([]);
 	const [description, setDescription] = useState("");
 	const [draft, setDraft] = useState<any | null>(null);
-	const { isSupported, isListening, transcript, start, stop, reset } = useSpeechToText({ lang: "en-US", interimResults: true });
+	// Voice via modal only for consistency
 	const [location, setLocation] = useState<{
 		latitude: number;
 		longitude: number;
@@ -38,6 +38,9 @@ export default function AuthenticatedReportAbuseForm({
 	const [recorderOpen, setRecorderOpen] = useState(false);
 	const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
 	const [audioUrl, setAudioUrl] = useState<string | null>(null);
+	const [isOnBehalf, setIsOnBehalf] = useState(false);
+  const [needsDisabled, setNeedsDisabled] = useState(false);
+  const [needsQueer, setNeedsQueer] = useState(false);
 	const supabase = createClient();
 	const user = useUser();
 
@@ -77,12 +80,6 @@ export default function AuthenticatedReportAbuseForm({
     }
   }, []);
 
-	useEffect(() => {
-		if (!isListening && transcript) {
-			setDescription((prev) => (prev ? `${prev} ${transcript.trim()}` : transcript.trim()));
-			reset();
-		}
-	}, [isListening, transcript, reset]);
 
 	const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
 		e.preventDefault();
@@ -108,12 +105,12 @@ export default function AuthenticatedReportAbuseForm({
 		}
 
 		// Upload audio first if present
-		let administrative: any = null;
+		let media: { title: string; url: string } | null = null;
 		if (audioBlob) {
 			try {
 				const filename = `reports/${Date.now()}-${Math.random().toString(36).slice(2)}.webm`;
 				const { error: upErr } = await supabase.storage.from('report-audio').upload(filename, audioBlob, { contentType: audioBlob.type || 'audio/webm' });
-				if (!upErr) administrative = { audio_bucket: 'report-audio', audio_path: filename };
+				if (!upErr) { const { data } = supabase.storage.from('report-audio').getPublicUrl(filename); media = { title: 'audio', url: data.publicUrl }; }
 			} catch (e) {
 				console.debug('auth audio upload failed', e);
 			}
@@ -134,7 +131,9 @@ export default function AuthenticatedReportAbuseForm({
 			longitude: location?.longitude || null,
 			submission_timestamp: new Date().toISOString(),
 			email: user?.profile?.email || null,
-			administrative,
+			media,
+      is_onBehalf: isOnBehalf,
+      additional_info: { special_needs: { disabled: needsDisabled, queer_support: needsQueer } },
 		};
 
 		try {
@@ -180,6 +179,10 @@ export default function AuthenticatedReportAbuseForm({
 		>
 			<div className="flex-1 overflow-y-auto space-y-6 pr-4 pb-20">
 				<div className="flex items-center gap-4 flex-wrap">
+            <div className="flex items-center gap-2">
+              <Switch id="onbehalf-auth" checked={isOnBehalf} onCheckedChange={setIsOnBehalf} />
+              <Label htmlFor="onbehalf-auth">Reporting on behalf of someone else</Label>
+            </div>
 					<p className="text-lg text-gray-700">I want to report about</p>
 					<select
 						name="incident_type"
@@ -217,22 +220,6 @@ export default function AuthenticatedReportAbuseForm({
 						>
 						Record voice note
 						</Button>
-						<Button
-							type="button"
-							variant={isListening ? "destructive" : "outline"}
-							size="sm"
-							onClick={() => (isListening ? stop() : start())}
-						>
-							{isListening ? (
-								<>
-									<Square className="h-4 w-4 mr-2" /> Stop
-								</>
-							) : (
-								<>
-									<Mic className="h-4 w-4 mr-2" /> Speak
-								</>
-							)}
-						</Button>
 					</div>
 					<Textarea
 						placeholder="Please share what happened... (optional if you attach a voice note)"
@@ -246,11 +233,6 @@ export default function AuthenticatedReportAbuseForm({
 							<p className="text-xs text-gray-500">Attached voice note:</p>
 							<audio controls src={audioUrl} className="w-full" />
 						</div>
-					)}
-					{!isSupported && (
-						<p className="text-xs text-gray-400">
-							Voice input is not supported on this device/browser.
-						</p>
 					)}
 				</div>
 
@@ -271,6 +253,10 @@ export default function AuthenticatedReportAbuseForm({
 				</div>
 
 				<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="col-span-full flex items-center gap-4">
+              <label className="inline-flex items-center gap-2 text-sm"><input type="checkbox" checked={needsDisabled} onChange={(e)=>setNeedsDisabled(e.target.checked)} /> I am disabled</label>
+              <label className="inline-flex items-center gap-2 text-sm"><input type="checkbox" checked={needsQueer} onChange={(e)=>setNeedsQueer(e.target.checked)} /> I need queer support</label>
+            </div>
 					<div className="col-span-full">
 						<p className="text-lg text-gray-700">Contact Preference:</p>
 					</div>
