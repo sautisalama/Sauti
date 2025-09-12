@@ -51,6 +51,17 @@ const [showUserList, setShowUserList] = useState(true);
 	const [search, setSearch] = useState("");
 	const [showNewChat, setShowNewChat] = useState(false);
 
+	// Notify mobile nav to hide when actively chatting
+	useEffect(() => {
+		try {
+			const active = !!channel && !showUserList;
+			window.dispatchEvent(new CustomEvent('ss:chat-active', { detail: { active } }));
+		} catch {}
+		return () => {
+			try { window.dispatchEvent(new CustomEvent('ss:chat-active', { detail: { active: false } })); } catch {}
+		};
+	}, [channel, showUserList]);
+
 	// Helpers: count media and links in current channel messages
 	const collectMedia = (ch: any) => {
 		try {
@@ -191,6 +202,7 @@ const [showUserList, setShowUserList] = useState(true);
 		setShowUserList(true);
 		setShowNewChat(false);
 		setChannel(null);
+		try { window.dispatchEvent(new CustomEvent('ss:chat-active', { detail: { active: false } })); } catch {}
 	};
 
 	if (!client) {

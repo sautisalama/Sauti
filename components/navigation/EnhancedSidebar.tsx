@@ -497,7 +497,7 @@ export function EnhancedSidebar({
 					{!isCollapsed && (
 						<Link href="/dashboard" className="flex items-center gap-3">
 							<Image
-								src="/logo-small.png"
+								src="/small-logo.png"
 								alt="Sauti Salama"
 								width={32}
 								height={32}

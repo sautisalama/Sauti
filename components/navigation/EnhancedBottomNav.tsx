@@ -33,11 +33,24 @@ export function EnhancedBottomNav({ forceShow = false, className }: EnhancedBott
   const [unreadMessages, setUnreadMessages] = useState(0);
   const [casesCount, setCasesCount] = useState(0);
   const [activeTab, setActiveTab] = useState<string>("");
+  const [chatActive, setChatActive] = useState(false);
+
+  useEffect(() => {
+    const handler = (e: Event) => {
+      try {
+        const ce = e as CustomEvent;
+        setChatActive(!!(ce?.detail?.active));
+      } catch {}
+    };
+    window.addEventListener('ss:chat-active', handler as EventListener);
+    return () => window.removeEventListener('ss:chat-active', handler as EventListener);
+  }, []);
 
   // Hide on immersive views unless forced to show
   const hide = forceShow ? false : (
     pathname?.startsWith("/dashboard/chat/") ||
-    pathname?.includes("/appointment/")
+    pathname?.includes("/appointment/") ||
+    chatActive
   );
 
   const isDashboard = pathname?.startsWith("/dashboard");
