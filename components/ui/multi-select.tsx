@@ -52,7 +52,13 @@ export function MultiSelect({
 		<div className="relative">
 			<div
 				className="group border border-input px-3 py-2 text-sm ring-offset-background rounded-md focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2"
-				onClick={() => setOpen(true)}
+				onMouseDown={(e) => {
+					// Focus input to open the menu; avoid toggling state if already focused
+					if (document.activeElement !== inputRef.current) {
+						e.preventDefault();
+						inputRef.current?.focus();
+					}
+				}}
 			>
 				<div className="flex gap-1 flex-wrap">
 					{selected.map((option) => {

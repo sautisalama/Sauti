@@ -66,7 +66,7 @@ const [description, setDescription] = useState("");
 				}
 			);
 		}
-	}, [toast]);
+}, []);
 
 	useEffect(() => {
 		try {
