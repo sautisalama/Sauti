@@ -449,7 +449,13 @@ export type Database = {
       consent_type: "yes" | "no"
       contact_preference_type: "phone_call" | "sms" | "email" | "do_not_contact"
       gender_type: "female" | "male" | "non_binary" | "prefer_not_to_say"
-      incident_type: "physical" | "emotional" | "sexual" | "financial" | "other"
+      incident_type:
+        | "physical"
+        | "emotional"
+        | "sexual"
+        | "financial"
+        | "child_abuse"
+        | "other"
       language_type: "english" | "swahili" | "other"
       match_status_type:
         | "pending"
@@ -597,7 +603,14 @@ export const Constants = {
       consent_type: ["yes", "no"],
       contact_preference_type: ["phone_call", "sms", "email", "do_not_contact"],
       gender_type: ["female", "male", "non_binary", "prefer_not_to_say"],
-      incident_type: ["physical", "emotional", "sexual", "financial", "other"],
+      incident_type: [
+        "physical",
+        "emotional",
+        "sexual",
+        "financial",
+        "child_abuse",
+        "other",
+      ],
       language_type: ["english", "swahili", "other"],
       match_status_type: [
         "pending",
