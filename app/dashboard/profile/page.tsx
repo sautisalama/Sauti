@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { AnonymousModeToggle } from "@/components/chat/AnonymousModeToggle";
 import { ProfessionalDocumentsForm } from "./professional-documents";
+import { signOut } from "@/app/(auth)/actions/auth";
 
 export default function ProfilePage() {
   const user = useUser();
@@ -27,7 +28,11 @@ export default function ProfilePage() {
       {/* Header */}
       <div className="flex items-center gap-4">
         {/* CTA to unify onboarding/profile */}
-        <div className="ml-auto">
+        <div className="ml-auto flex items-center gap-2">
+          {/* Mobile logout inside profile */}
+          <form action={signOut} className="md:hidden">
+            <Button type="submit" variant="outline" size="sm">Log out</Button>
+          </form>
           <Button asChild variant="secondary" size="sm">
             <a href="/dashboard/onboarding">Open Profile Setup</a>
           </Button>
