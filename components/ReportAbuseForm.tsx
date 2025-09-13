@@ -7,6 +7,7 @@ import { VoiceRecorderModal } from "@/components/VoiceRecorderModal";
 import { VoiceRecorderEnhanced as InlineRecorder } from "@/components/VoiceRecorderEnhanced";
 import { createClient } from "@/utils/supabase/client";
 import { MultiSelect } from "@/components/ui/multi-select";
+import { AudioMiniPlayer } from "@/components/ui/audio-mini-player";
 import { EnhancedSelect } from "@/components/ui/enhanced-select";
 import { EnhancedToggle } from "@/components/ui/enhanced-toggle";
 import { normalizePhone } from "@/utils/phone";
@@ -430,7 +431,7 @@ export default function ReportAbuseForm({ onClose }: { onClose?: () => void }) {
 									Remove
 								</Button>
 							</div>
-								<audio controls src={audioUrl} className="w-full" />
+								<AudioMiniPlayer src={audioUrl} />
 								{audioUploading && (
 									<p className="text-xs text-gray-500 mt-1">Uploading voice note in background…</p>
 								)}

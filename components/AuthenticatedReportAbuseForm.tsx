@@ -7,6 +7,7 @@ import { Button } from "./ui/button";
 import { createClient } from "@/utils/supabase/client";
 import { Tables } from "@/types/db-schema";
 import { MultiSelect } from "@/components/ui/multi-select";
+import { AudioMiniPlayer } from "@/components/ui/audio-mini-player";
 import {
 	SUPPORT_SERVICE_OPTIONS,
 	type SupportServiceType,
@@ -400,7 +401,7 @@ export default function AuthenticatedReportAbuseForm({
 									Remove
 								</Button>
 							</div>
-							<audio controls src={audioUrl} className="w-full" />
+								<AudioMiniPlayer src={audioUrl || ""} />
 						</div>
 					)}
 
