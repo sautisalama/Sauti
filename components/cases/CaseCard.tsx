@@ -11,6 +11,7 @@ import {
 	FileText,
 	Phone,
 	Mail,
+	MessageCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useMemo } from "react";
@@ -22,6 +23,8 @@ export interface CaseCardData {
 	match_status_type?: string | null;
 	match_score?: number | null;
 	notes?: string | null;
+	completed_at?: string | null;
+	unread_messages?: number;
 	report?: {
 		report_id: string;
 		type_of_incident?: string | null;
@@ -99,10 +102,15 @@ function getMatchStatusColor(matchStatus?: string | null) {
 		case "confirmed":
 		case "accepted":
 			return "bg-green-50 text-green-700 border-green-200";
+		case "completed":
+			return "bg-emerald-50 text-emerald-700 border-emerald-200";
 		case "pending":
 			return "bg-amber-50 text-amber-700 border-amber-200";
 		case "rejected":
+		case "declined":
 			return "bg-red-50 text-red-700 border-red-200";
+		case "cancelled":
+			return "bg-gray-50 text-gray-700 border-gray-200";
 		default:
 			return "bg-gray-50 text-gray-700 border-gray-200";
 	}
@@ -174,6 +182,8 @@ export function CaseCard({
 	const hasMedia = !!data.report?.media?.url;
 	const hasAppointment = !!appointment?.appointment_date;
 	const hasMatch = !!data.match_status_type;
+	const isCompleted = data.match_status_type === "completed";
+	const hasUnreadMessages = (data.unread_messages || 0) > 0;
 
 	const avatarChar = useMemo(
 		() => (data.report?.type_of_incident || "?").charAt(0).toUpperCase(),
@@ -230,13 +240,17 @@ export function CaseCard({
 							<div
 								className={cn(
 									"absolute -top-0.5 -right-0.5 h-3 w-3 rounded-full border border-white flex items-center justify-center",
-									hasAppointment && "bg-green-500",
-									hasMatch && !hasAppointment && "bg-amber-500",
+									isCompleted && "bg-green-500",
+									hasAppointment && !isCompleted && "bg-blue-500",
+									hasMatch && !hasAppointment && !isCompleted && "bg-amber-500",
 									!hasMatch && "bg-gray-400"
 								)}
 							>
-								{hasAppointment && <CheckCircle2 className="h-2 w-2 text-white" />}
-								{hasMatch && !hasAppointment && (
+								{isCompleted && <CheckCircle2 className="h-2 w-2 text-white" />}
+								{hasAppointment && !isCompleted && (
+									<CalendarDays className="h-2 w-2 text-white" />
+								)}
+								{hasMatch && !hasAppointment && !isCompleted && (
 									<Clock className="h-2 w-2 text-white" />
 								)}
 								{!hasMatch && <AlertCircle className="h-2 w-2 text-white" />}
@@ -306,6 +320,13 @@ export function CaseCard({
 										{data.match_status_type || "pending"}
 									</span>
 
+									{/* Completion status */}
+									{isCompleted && (
+										<span className="px-2 py-0.5 rounded-md text-xs font-medium border bg-green-50 text-green-700 border-green-200">
+											Completed
+										</span>
+									)}
+
 									{/* Service name */}
 									{data.support_service?.name && (
 										<span className="text-xs text-gray-500 truncate">
@@ -314,12 +335,22 @@ export function CaseCard({
 									)}
 								</div>
 
-								{/* Media indicator */}
-								{hasMedia && (
-									<div className="flex items-center gap-1 text-xs text-gray-500">
-										<FileText className="h-3 w-3" />
-									</div>
-								)}
+								<div className="flex items-center gap-1">
+									{/* Unread messages indicator */}
+									{hasUnreadMessages && (
+										<div className="flex items-center gap-1 text-xs text-blue-600">
+											<MessageCircle className="h-3 w-3" />
+											<span className="font-medium">{data.unread_messages}</span>
+										</div>
+									)}
+
+									{/* Media indicator */}
+									{hasMedia && (
+										<div className="flex items-center gap-1 text-xs text-gray-500">
+											<FileText className="h-3 w-3" />
+										</div>
+									)}
+								</div>
 							</div>
 
 							{/* Appointment info */}

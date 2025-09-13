@@ -22,16 +22,24 @@ import {
 	Pause,
 	Filter,
 	Search,
+	CheckCircle2,
+	MessageCircle,
 } from "lucide-react";
 import { CaseCard } from "@/components/cases/CaseCard";
 import { CaseCardSkeleton } from "@/components/cases/CaseCardSkeleton";
 import CaseNotesEditor from "./case-notes-editor";
+import {
+	getUnreadMessagesForCases,
+	subscribeToUnreadMessages,
+} from "@/utils/chat/unread-tracker";
 
 interface MatchedServiceItem {
 	id: string;
 	match_date: string | null;
 	match_status_type: string | null;
 	match_score: number | null;
+	completed_at?: string | null;
+	unread_messages?: number;
 	report: any;
 	support_service: any;
 	notes?: string | null;
@@ -55,6 +63,7 @@ export default function CasesMasterDetail({ userId }: { userId: string }) {
 	const [statusFilter, setStatusFilter] = useState<string>("all");
 	const [onBehalfFilter, setOnBehalfFilter] = useState<string>("all");
 	const [showFilters, setShowFilters] = useState(false);
+	const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
 
 	// Load matched services and appointments in parallel
 	useEffect(() => {
@@ -117,6 +126,62 @@ export default function CasesMasterDetail({ userId }: { userId: string }) {
 		};
 		load();
 	}, [userId, supabase]);
+
+	// Track unread messages for each case
+	useEffect(() => {
+		const trackUnreadMessages = async () => {
+			if (cases.length === 0) return;
+
+			try {
+				// Get unread message counts for all cases
+				const caseIds = cases.map((c) => c.id);
+				const unreadData = await getUnreadMessagesForCases(
+					"current-user-id", // This should be the actual user ID
+					"current-username", // This should be the actual username
+					caseIds
+				);
+
+				// Update cases with unread message counts
+				setCases((prev) =>
+					prev.map((c) => {
+						const unreadInfo = unreadData.find((u) => u.caseId === c.id);
+						return {
+							...c,
+							unread_messages: unreadInfo?.unreadCount || 0,
+						};
+					})
+				);
+			} catch (error) {
+				console.error("Error tracking unread messages:", error);
+			}
+		};
+
+		trackUnreadMessages();
+	}, [cases]);
+
+	// Subscribe to real-time unread message updates
+	useEffect(() => {
+		if (cases.length === 0) return;
+
+		const cleanup = subscribeToUnreadMessages(
+			"current-user-id", // This should be the actual user ID
+			"current-username", // This should be the actual username
+			(unreadData) => {
+				// Update cases with new unread message counts
+				setCases((prev) =>
+					prev.map((c) => {
+						const unreadInfo = unreadData.find((u) => u.caseId === c.id);
+						return {
+							...c,
+							unread_messages: unreadInfo?.unreadCount || 0,
+						};
+					})
+				);
+			}
+		);
+
+		return cleanup;
+	}, [cases]);
 
 	const filtered = useMemo(() => {
 		let filteredCases = cases;
@@ -196,6 +261,40 @@ export default function CasesMasterDetail({ userId }: { userId: string }) {
 
 	const formatDate = (d?: string | null) =>
 		d ? new Date(d).toLocaleString() : "";
+
+	// Handle case completion
+	const handleCompleteCase = async (caseId: string) => {
+		try {
+			setIsUpdatingStatus(true);
+			const { error } = await supabase
+				.from("matched_services")
+				.update({
+					match_status_type: "completed",
+					completed_at: new Date().toISOString(),
+					updated_at: new Date().toISOString(),
+				})
+				.eq("id", caseId);
+
+			if (error) throw error;
+
+			// Update local state
+			setCases((prev) =>
+				prev.map((c) =>
+					c.id === caseId
+						? {
+								...c,
+								match_status_type: "completed",
+								completed_at: new Date().toISOString(),
+						  }
+						: c
+				)
+			);
+		} catch (error) {
+			console.error("Error completing case:", error);
+		} finally {
+			setIsUpdatingStatus(false);
+		}
+	};
 
 	// Enhanced Audio Player Component with seek controls
 	const AudioPlayer = ({ src, type }: { src: string; type?: string }) => {
@@ -648,10 +747,21 @@ export default function CasesMasterDetail({ userId }: { userId: string }) {
 								<div className="p-4 space-y-4">
 									{/* Matched Service & Appointment - Combined */}
 									<div className="bg-blue-50 rounded-lg border border-blue-100 p-4">
-										<h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
-											<User className="h-4 w-4 text-blue-600" />
-											Matched Service & Appointment
-										</h3>
+										<div className="flex items-center justify-between mb-3">
+											<h3 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
+												<User className="h-4 w-4 text-blue-600" />
+												Matched Service & Appointment
+											</h3>
+											{/* Unread messages indicator */}
+											{selected.unread_messages && selected.unread_messages > 0 && (
+												<div className="flex items-center gap-1 text-xs text-blue-600 bg-blue-100 px-2 py-1 rounded-full">
+													<MessageCircle className="h-3 w-3" />
+													<span className="font-medium">
+														{selected.unread_messages} unread
+													</span>
+												</div>
+											)}
+										</div>
 										<div className="space-y-3">
 											{/* Service Info */}
 											<div>
@@ -664,6 +774,16 @@ export default function CasesMasterDetail({ userId }: { userId: string }) {
 														{String(selected.match_status_type || "pending")}
 													</span>
 												</p>
+												{/* Completion status */}
+												{selected.match_status_type === "completed" && (
+													<div className="mt-2 flex items-center gap-2 text-xs text-green-700">
+														<CheckCircle2 className="h-3 w-3" />
+														<span className="font-medium">
+															Case completed{" "}
+															{selected.completed_at && formatDate(selected.completed_at)}
+														</span>
+													</div>
+												)}
 											</div>
 
 											{/* Appointment Info */}
@@ -721,6 +841,26 @@ export default function CasesMasterDetail({ userId }: { userId: string }) {
 													<p className="text-xs text-gray-600">
 														No appointment scheduled yet
 													</p>
+												</div>
+											)}
+
+											{/* Completion Actions */}
+											{selected.match_status_type !== "completed" && (
+												<div className="mt-3">
+													<Button
+														variant="outline"
+														size="sm"
+														onClick={() => handleCompleteCase(selected.id)}
+														disabled={isUpdatingStatus}
+														className="w-full border-green-200 text-green-700 hover:bg-green-100 text-xs h-8"
+													>
+														{isUpdatingStatus ? (
+															<Clock className="h-3 w-3 mr-1" />
+														) : (
+															<CheckCircle2 className="h-3 w-3 mr-1" />
+														)}
+														{isUpdatingStatus ? "Completing..." : "Mark as Completed"}
+													</Button>
 												</div>
 											)}
 										</div>
