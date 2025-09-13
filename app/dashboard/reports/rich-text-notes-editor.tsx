@@ -54,6 +54,7 @@ export default function ReportNotesEditor({
 	const initialHtml = useMemo(() => report.notes || "", [report.notes]);
 
 	const editor = useEditor({
+		key: report.report_id,
 		extensions: [
 			StarterKit.configure({
 				heading: false,
@@ -117,7 +118,7 @@ export default function ReportNotesEditor({
 
 	const save = useCallback(
 		async (html?: string, opts?: { autosave?: boolean }) => {
-			if (!editor) return;
+			if (!editor || !editor.getHTML) return;
 			const autosave = opts?.autosave === true;
 			try {
 				setSaving(true);
@@ -183,7 +184,7 @@ export default function ReportNotesEditor({
 	}, [dirty, save]);
 
 	const insertOrEditLink = useCallback(() => {
-		if (!editor) return;
+		if (!editor || !editor.chain) return;
 		const prev = editor.getAttributes("link").href as string | undefined;
 		const url = prompt("Enter URL:", prev ?? "https://");
 		if (url === null) return; // cancelled
@@ -197,7 +198,7 @@ export default function ReportNotesEditor({
 
 	const uploadImage = useCallback(
 		async (file: File) => {
-			if (!file) return;
+			if (!file || !editor || !editor.chain) return;
 			const path = `reports/${report.report_id}/${Date.now()}-${file.name}`;
 			try {
 				const { error } = await supabase.storage
@@ -248,7 +249,7 @@ export default function ReportNotesEditor({
 	// Prevent editor losing selection when toolbar is clicked
 	const prevent = useCallback((e: any) => e.preventDefault(), []);
 
-	if (!editor) return null;
+	if (!editor || !editor.chain) return null;
 
 	return (
 		<div className="flex flex-col h-full">

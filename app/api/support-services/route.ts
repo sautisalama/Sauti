@@ -26,15 +26,15 @@ export async function POST(request: Request) {
 				name: data.name,
 				service_types: data.service_types,
 				phone_number: data.phone_number,
+				email: data.email || user.email,
+				website: data.website || null,
 				availability: data.availability,
 				latitude: data.latitude,
 				longitude: data.longitude,
-				email: user.email,
+				coverage_area_radius: data.coverage_area_radius,
 				user_id: user.id,
 				// Optional fields from schema
 				helpline: null,
-				website: null,
-				coverage_area_radius: null,
 				priority: null,
 				created_at: new Date().toISOString(),
 			};
