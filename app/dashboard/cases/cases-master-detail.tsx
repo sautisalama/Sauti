@@ -21,7 +21,7 @@ interface MatchedServiceItem {
 }
 
 export default function CasesMasterDetail({ userId }: { userId: string }) {
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
   const [cases, setCases] = useState<MatchedServiceItem[]>([]);
   const [q, setQ] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -67,7 +67,7 @@ const normalized: MatchedServiceItem[] = (matches || []).map((m: any) => ({
       setCases(normalized);
     };
     load();
-  }, [supabase, userId]);
+  }, [userId]);
 
   const filtered = useMemo(() => {
     const term = q.trim().toLowerCase();

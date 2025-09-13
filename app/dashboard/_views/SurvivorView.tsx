@@ -102,7 +102,7 @@ export default function SurvivorView({
 	const initialTab =
 		(searchParams?.get("tab") as "overview" | "reports" | null) || "overview";
 	const [activeTab, setActiveTab] = useState<"overview" | "reports">(initialTab);
-	const supabase = createClient();
+	const supabase = useMemo(() => createClient(), []);
 	const { toast } = useToast();
 	const [deleteReport, setDeleteReport] = useState<string | null>(null);
 	const [showAlert, setShowAlert] = useState(true);
@@ -192,7 +192,7 @@ export default function SurvivorView({
 		} catch (e) {
 			/* ignore cache write */
 		}
-	}, [supabase, userId, toast]);
+	}, [userId, toast]);
 
 	const handleDelete = async (reportId: string) => {
 		try {
@@ -253,7 +253,7 @@ export default function SurvivorView({
 		return () => {
 			supabase.removeChannel(channel);
 		};
-	}, [userId, dash?.data, supabase]); // Removed fetchReports from dependencies to prevent infinite loop
+	}, [userId, dash?.data]); // Removed supabase and fetchReports from deps to prevent loop
 
 	// Add formatServiceName inside component
 	const formatServiceName = (service: string) => {

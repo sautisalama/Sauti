@@ -24,7 +24,7 @@ interface ReportWithRelations extends Tables<"reports"> {
 export default function ReportsList({ userId }: { userId: string }) {
   const [reports, setReports] = useState<ReportWithRelations[]>([]);
   const [q, setQ] = useState("");
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
 
   useEffect(() => {
     const load = async () => {
@@ -56,7 +56,7 @@ export default function ReportsList({ userId }: { userId: string }) {
       if (!error) setReports((data as any) || []);
     };
     load();
-  }, [supabase, userId]);
+  }, [userId]);
 
   const filtered = useMemo(() => {
     const term = q.trim().toLowerCase();

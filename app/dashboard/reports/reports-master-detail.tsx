@@ -57,7 +57,7 @@ interface ReportItem extends Tables<"reports"> {
 
 export default function ReportsMasterDetail({ userId }: { userId: string }) {
 	const { toast } = useToast();
-	const supabase = createClient();
+	const supabase = useMemo(() => createClient(), []);
 	const [reports, setReports] = useState<ReportItem[]>([]);
 	const [q, setQ] = useState("");
 	const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -141,7 +141,7 @@ export default function ReportsMasterDetail({ userId }: { userId: string }) {
 			}
 		};
 		load();
-	}, [supabase, userId]);
+	}, [userId]);
 
 	const filtered = useMemo(() => {
 		const term = q.trim().toLowerCase();
