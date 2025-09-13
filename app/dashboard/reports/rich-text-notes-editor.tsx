@@ -174,34 +174,13 @@ export default function ReportNotesEditor({
 		return () => window.removeEventListener("keydown", onKeyDown);
 	}, [save]);
 
-	// 30-second autosave interval (only when there are unsaved changes)
+	// 10-second autosave interval (only when there are unsaved changes)
 	useEffect(() => {
 		const id = window.setInterval(() => {
 			if (dirty) void save(undefined, { autosave: true });
-		}, 30000);
+		}, 10000);
 		return () => window.clearInterval(id);
 	}, [dirty, save]);
-
-	// Save when switching reports (when initialHtml changes and there are unsaved changes)
-	useEffect(() => {
-		if (dirty && editor && initialHtml !== editor.getHTML()) {
-			void save(undefined, { autosave: true });
-		}
-	}, [initialHtml, dirty, editor, save]);
-
-	// Save on component unmount (when switching reports)
-	useEffect(() => {
-		return () => {
-			if (dirty && editor) {
-				// Use a synchronous approach for cleanup
-				const content = editor.getHTML();
-				if (content && content !== initialHtml) {
-					// Save without showing toast
-					void save(content, { autosave: true });
-				}
-			}
-		};
-	}, [dirty, editor, initialHtml, save]);
 
 	const insertOrEditLink = useCallback(() => {
 		if (!editor) return;
