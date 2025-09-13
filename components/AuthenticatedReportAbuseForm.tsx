@@ -13,10 +13,15 @@ import {
 	type SupportServiceType,
 } from "@/lib/constants";
 import { useUser } from "@/hooks/useUser";
-import { VoiceRecorderModal } from "@/components/VoiceRecorderModal";
+import { VoiceRecorderInline as InlineRecorder } from "@/components/VoiceRecorderInline";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { normalizePhone } from "@/utils/phone";
+import {
+	validateAudioBlob,
+	generateAudioFilename,
+	createAudioMediaObject,
+} from "@/utils/media";
 
 interface AuthenticatedReportAbuseFormProps {
 	onClose: () => void;
@@ -67,7 +72,7 @@ export default function AuthenticatedReportAbuseForm({
 				}
 			);
 		}
-	}, []); // Empty dependency array is correct here
+	}, [toast]); // Include toast in dependencies
 
 	useEffect(() => {
 		try {
@@ -108,25 +113,53 @@ export default function AuthenticatedReportAbuseForm({
 		}
 
 		// Upload audio first if present
-		let media: { title: string; url: string } | null = null;
+		let media: { title: string; url: string; type: string; size: number } | null =
+			null;
 		if (audioBlob) {
+			// Validate audio blob before upload
+			const validation = validateAudioBlob(audioBlob);
+			if (!validation.valid) {
+				toast({
+					title: "Invalid Audio",
+					description: validation.error || "Audio file is invalid",
+					variant: "destructive",
+				});
+				setLoading(false);
+				return;
+			}
+
 			try {
-				const filename = `reports/${Date.now()}-${Math.random()
-					.toString(36)
-					.slice(2)}.webm`;
+				const filename = generateAudioFilename(audioBlob);
 				const { error: upErr } = await supabase.storage
 					.from("report-audio")
 					.upload(filename, audioBlob, {
 						contentType: audioBlob.type || "audio/webm",
+						cacheControl: "3600",
+						upsert: false,
 					});
 				if (!upErr) {
 					const { data } = supabase.storage
 						.from("report-audio")
 						.getPublicUrl(filename);
-					media = { title: "audio", url: data.publicUrl };
+					media = createAudioMediaObject(data.publicUrl, audioBlob);
+					console.log("Audio uploaded successfully:", data.publicUrl);
+				} else {
+					console.error("Audio upload failed:", upErr);
+					toast({
+						title: "Audio Upload Failed",
+						description:
+							"Could not save your voice recording. Please try again or submit without it.",
+						variant: "destructive",
+					});
 				}
 			} catch (e) {
-				console.debug("auth audio upload failed", e);
+				console.error("Audio upload error:", e);
+				toast({
+					title: "Audio Upload Error",
+					description:
+						"An error occurred while saving your voice recording. Please try again.",
+					variant: "destructive",
+				});
 			}
 		}
 
@@ -251,32 +284,76 @@ export default function AuthenticatedReportAbuseForm({
 					</select>
 				</div>
 
-				<div className="w-full space-y-2">
+				<div className="w-full space-y-3">
 					<div className="flex items-center justify-between">
-						<span className="text-xs text-gray-500">
-							You can speak instead of typing
+						<span className="text-sm text-gray-600">
+							Share your story in writing or by voice
 						</span>
 						<Button
 							type="button"
 							variant="outline"
 							size="sm"
-							onClick={() => setRecorderOpen(true)}
+							onClick={() => setRecorderOpen((v) => !v)}
 						>
-							Record voice note
+							{recorderOpen ? "Hide voice recorder" : "Record voice note"}
 						</Button>
 					</div>
-					<Textarea
-						placeholder="Please share what happened... (optional if you attach a voice note)"
-						name="incident_description"
-						className="min-h-[140px] w-full"
-						value={description}
-						onChange={(e) => setDescription(e.target.value)}
-					/>
+
+					{recorderOpen && (
+						<div className="mt-2">
+							<InlineRecorder
+								onRecorded={(blob) => {
+									setAudioBlob(blob);
+									try {
+										const url = URL.createObjectURL(blob);
+										setAudioUrl(url);
+									} catch (e) {
+										console.debug("Error creating audio URL:", e);
+									}
+								}}
+								onClose={() => setRecorderOpen(false)}
+							/>
+						</div>
+					)}
+
 					{audioUrl && (
-						<div className="mt-2 space-y-1">
-							<p className="text-xs text-gray-500">Attached voice note:</p>
+						<div className="p-3 bg-green-50 border border-green-200 rounded-lg">
+							<div className="flex items-center justify-between mb-2">
+								<span className="text-sm font-medium text-green-700">
+									Voice note attached
+								</span>
+								<Button
+									type="button"
+									variant="ghost"
+									size="sm"
+									onClick={() => {
+										setAudioUrl(null);
+										setAudioBlob(null);
+									}}
+								>
+									Remove
+								</Button>
+							</div>
 							<audio controls src={audioUrl} className="w-full" />
 						</div>
+					)}
+
+					<Textarea
+						placeholder={
+							audioUrl
+								? "Add additional details (optional)..."
+								: "Please share what happened... (or use voice recording above)"
+						}
+						name="incident_description"
+						className="min-h-[120px] w-full"
+						value={description}
+						onChange={(e) => setDescription(e.target.value)}
+						required={!audioUrl}
+					/>
+					{audioUrl && (
+						<p className="text-xs text-gray-500">
+							✓ Voice note attached - text description is now optional
+						</p>
 					)}
 				</div>
 
@@ -408,17 +485,6 @@ export default function AuthenticatedReportAbuseForm({
 					</Button>
 				</div>
 			</div>
-			<VoiceRecorderModal
-				open={recorderOpen}
-				onOpenChange={(v) => setRecorderOpen(v)}
-				onRecorded={(blob) => {
-					setAudioBlob(blob);
-					try {
-						const url = URL.createObjectURL(blob);
-						setAudioUrl(url);
-					} catch {}
-				}}
-			/>
 		</form>
 	);
 }
