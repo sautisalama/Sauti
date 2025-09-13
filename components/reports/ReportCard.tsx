@@ -105,11 +105,36 @@ function formatDate(d?: string | null) {
 		const now = new Date();
 		const diffTime = Math.abs(now.getTime() - date.getTime());
 		const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+		const diffHours = Math.ceil(diffTime / (1000 * 60 * 60));
+		const diffMinutes = Math.ceil(diffTime / (1000 * 60));
 
-		if (diffDays === 1) return "Yesterday";
-		if (diffDays < 7) return `${diffDays} days ago`;
-		if (diffDays < 30) return `${Math.ceil(diffDays / 7)} weeks ago`;
-		return date.toLocaleDateString();
+		// Show relative time with actual time
+		let relativeTime = "";
+		if (diffMinutes < 60) {
+			relativeTime = diffMinutes <= 1 ? "Just now" : `${diffMinutes}m ago`;
+		} else if (diffHours < 24) {
+			relativeTime = `${diffHours}h ago`;
+		} else if (diffDays === 1) {
+			relativeTime = "Yesterday";
+		} else if (diffDays < 7) {
+			relativeTime = `${diffDays}d ago`;
+		} else if (diffDays < 30) {
+			relativeTime = `${Math.ceil(diffDays / 7)}w ago`;
+		} else {
+			relativeTime = `${Math.ceil(diffDays / 30)}mo ago`;
+		}
+
+		// Format actual time
+		const actualTime = date.toLocaleTimeString([], {
+			hour: "2-digit",
+			minute: "2-digit",
+		});
+		const actualDate = date.toLocaleDateString([], {
+			month: "short",
+			day: "numeric",
+		});
+
+		return `${relativeTime} • ${actualDate} ${actualTime}`;
 	} catch {
 		return String(d);
 	}
@@ -214,9 +239,14 @@ export function ReportCard({
 						{/* Main content */}
 						<div className="min-w-0 flex-1">
 							<div className="flex items-start justify-between gap-2 mb-1">
-								<h3 className="font-medium text-gray-900 text-sm leading-tight">
-									{data.type_of_incident || "Unknown Incident"}
-								</h3>
+								<div className="flex items-center gap-2 min-w-0 flex-1">
+									<h3 className="font-medium text-gray-900 text-sm leading-tight">
+										{data.type_of_incident || "Unknown Incident"}
+									</h3>
+									<span className="text-xs text-gray-500 font-mono whitespace-nowrap">
+										{formatDate(data.submission_timestamp)}
+									</span>
+								</div>
 								<div className="flex items-center gap-1">
 									{actions}
 									{onClick && (
@@ -284,19 +314,9 @@ export function ReportCard({
 					</div>
 				</div>
 
-				{/* Footer with timeline info */}
-				<div className="flex items-center justify-between pt-2 border-t border-gray-100">
-					<div className="flex items-center gap-3 text-xs text-gray-500">
-						<div className="flex items-center gap-1">
-							<Clock className="h-3 w-3" />
-							<span className="font-medium">
-								{formatDate(data.submission_timestamp)}
-							</span>
-						</div>
-					</div>
-
-					{/* Appointment info */}
-					{hasAppointment && (
+				{/* Footer with appointment info */}
+				{hasAppointment && (
+					<div className="flex items-center justify-end pt-2 border-t border-gray-100">
 						<div className="flex items-center gap-1 text-xs text-gray-600">
 							<CalendarDays className="h-3 w-3" />
 							<span className="font-medium">
@@ -307,8 +327,8 @@ export function ReportCard({
 								<span className="capitalize text-xs">{appointment.status}</span>
 							</div>
 						</div>
-					)}
-				</div>
+					</div>
+				)}
 			</div>
 		</div>
 	);

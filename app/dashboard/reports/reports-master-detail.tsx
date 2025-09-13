@@ -179,18 +179,23 @@ export default function ReportsMasterDetail({ userId }: { userId: string }) {
 	const formatDate = (d?: string | null) =>
 		d ? new Date(d).toLocaleString() : "";
 
-	// Custom Audio Player Component
+	// Enhanced Audio Player Component with seek controls
 	const AudioPlayer = ({ src, type }: { src: string; type?: string }) => {
 		const [isPlaying, setIsPlaying] = useState(false);
 		const [duration, setDuration] = useState(0);
 		const [currentTime, setCurrentTime] = useState(0);
+		const [isSeeking, setIsSeeking] = useState(false);
 		const audioRef = useRef<HTMLAudioElement>(null);
 
 		useEffect(() => {
 			const audio = audioRef.current;
 			if (!audio) return;
 
-			const updateTime = () => setCurrentTime(audio.currentTime);
+			const updateTime = () => {
+				if (!isSeeking) {
+					setCurrentTime(audio.currentTime);
+				}
+			};
 			const updateDuration = () => setDuration(audio.duration);
 			const handleEnded = () => setIsPlaying(false);
 
@@ -203,7 +208,7 @@ export default function ReportsMasterDetail({ userId }: { userId: string }) {
 				audio.removeEventListener("loadedmetadata", updateDuration);
 				audio.removeEventListener("ended", handleEnded);
 			};
-		}, []);
+		}, [isSeeking]);
 
 		const togglePlayback = () => {
 			const audio = audioRef.current;
@@ -217,6 +222,18 @@ export default function ReportsMasterDetail({ userId }: { userId: string }) {
 				setIsPlaying(true);
 			}
 		};
+
+		const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
+			const audio = audioRef.current;
+			if (!audio) return;
+
+			const newTime = parseFloat(e.target.value);
+			setCurrentTime(newTime);
+			audio.currentTime = newTime;
+		};
+
+		const handleSeekStart = () => setIsSeeking(true);
+		const handleSeekEnd = () => setIsSeeking(false);
 
 		const formatTime = (seconds: number) => {
 			const mins = Math.floor(seconds / 60);
@@ -235,8 +252,29 @@ export default function ReportsMasterDetail({ userId }: { userId: string }) {
 							</span>
 						</div>
 						<span className="text-sm text-gray-500 font-mono">
-							{formatTime(duration)}
+							{formatTime(currentTime)} / {formatTime(duration)}
 						</span>
+					</div>
+
+					{/* Progress bar */}
+					<div className="space-y-1">
+						<input
+							type="range"
+							min="0"
+							max={duration || 0}
+							value={currentTime}
+							onChange={handleSeek}
+							onMouseDown={handleSeekStart}
+							onMouseUp={handleSeekEnd}
+							onTouchStart={handleSeekStart}
+							onTouchEnd={handleSeekEnd}
+							className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
+							style={{
+								background: `linear-gradient(to right, #8b5cf6 0%, #8b5cf6 ${
+									(currentTime / duration) * 100
+								}%, #e5e7eb ${(currentTime / duration) * 100}%, #e5e7eb 100%)`,
+							}}
+						/>
 					</div>
 
 					<div className="flex items-center gap-2">
@@ -365,20 +403,22 @@ export default function ReportsMasterDetail({ userId }: { userId: string }) {
 				>
 					{/* Search and filters */}
 					<div className="mb-6">
-						<div className="relative">
-							<Input
-								placeholder="Search reports by incident type, description, or urgency..."
-								value={q}
-								onChange={(e) => setQ(e.target.value)}
-								className="pl-10 pr-4 py-3 text-sm border-gray-200 rounded-xl focus:ring-2 focus:ring-[#1A3434]/20 focus:border-[#1A3434]"
-							/>
-							<FileText className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-						</div>
-						{filtered.length > 0 && (
-							<div className="mt-3 text-sm text-gray-600">
-								{filtered.length} report{filtered.length === 1 ? "" : "s"} found
+						<div className="flex items-center gap-4">
+							<div className="relative flex-1">
+								<Input
+									placeholder="Search reports by incident type, description, or urgency..."
+									value={q}
+									onChange={(e) => setQ(e.target.value)}
+									className="pl-10 pr-4 py-3 text-sm border-gray-200 rounded-xl focus:ring-2 focus:ring-[#1A3434]/20 focus:border-[#1A3434]"
+								/>
+								<FileText className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
 							</div>
-						)}
+							{filtered.length > 0 && (
+								<div className="text-sm text-gray-600 whitespace-nowrap">
+									{filtered.length} report{filtered.length === 1 ? "" : "s"} found
+								</div>
+							)}
+						</div>
 					</div>
 
 					{/* Reports list */}
@@ -544,10 +584,6 @@ export default function ReportsMasterDetail({ userId }: { userId: string }) {
 										</div>
 										<div className="flex items-center gap-3 text-xs text-gray-500">
 											<div className="flex items-center gap-1">
-												<Shield className="h-3 w-3" />
-												<span className="font-medium">ID: {selected.report_id}</span>
-											</div>
-											<div className="flex items-center gap-1">
 												<Clock className="h-3 w-3" />
 												<span>{formatDate(selected.submission_timestamp)}</span>
 											</div>
@@ -567,107 +603,109 @@ export default function ReportsMasterDetail({ userId }: { userId: string }) {
 							{/* Body */}
 							<div className="flex-1 overflow-y-auto">
 								<div className="p-4 space-y-4">
-									{/* Appointment and Matched Service - Moved to top */}
-									<div className="space-y-4">
-										{/* Matched Service */}
-										{selected?.matched_services &&
-										selected.matched_services.length > 0 ? (
-											<div className="bg-blue-50 rounded-lg border border-blue-100 p-4">
-												<h3 className="text-sm font-semibold text-gray-900 mb-2 flex items-center gap-2">
-													<User className="h-4 w-4 text-blue-600" />
-													Matched Service
-												</h3>
-												<div className="space-y-2">
-													<div>
-														<p className="text-sm font-medium text-gray-900">
-															{selected.matched_services[0].support_services?.name ||
-																"Pending Match"}
-														</p>
-														<p className="text-xs text-gray-600 mt-1">
-															Status:{" "}
-															<span className="font-medium capitalize">
-																{String(selected.matched_services[0].match_status_type)}
-															</span>
-														</p>
-													</div>
-													<Button
-														variant="outline"
-														size="sm"
-														onClick={() => setShowProfile(true)}
-														className="w-full border-blue-200 text-blue-700 hover:bg-blue-100 text-xs h-8"
-													>
-														View Profile
-													</Button>
+									{/* Matched Service & Appointment - Combined */}
+									{selected?.matched_services && selected.matched_services.length > 0 ? (
+										<div className="bg-blue-50 rounded-lg border border-blue-100 p-4">
+											<h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
+												<User className="h-4 w-4 text-blue-600" />
+												Matched Service & Appointment
+											</h3>
+											<div className="space-y-3">
+												{/* Service Info */}
+												<div>
+													<p className="text-sm font-medium text-gray-900">
+														{selected.matched_services[0].support_services?.name ||
+															"Pending Match"}
+													</p>
+													<p className="text-xs text-gray-600 mt-1">
+														Status:{" "}
+														<span className="font-medium capitalize">
+															{String(selected.matched_services[0].match_status_type)}
+														</span>
+													</p>
 												</div>
-											</div>
-										) : (
-											<div className="bg-gray-50 rounded-lg border border-gray-200 p-4">
-												<h3 className="text-sm font-semibold text-gray-900 mb-2 flex items-center gap-2">
-													<User className="h-4 w-4 text-gray-600" />
-													Matched Service
-												</h3>
-												<p className="text-xs text-gray-600">
-													No match yet - we're working on finding the right professional for
-													you
-												</p>
-											</div>
-										)}
 
-										{/* Appointment */}
-										{selected?.matched_services?.[0]?.appointments?.[0] ? (
-											(() => {
-												const appt = selected?.matched_services?.[0]?.appointments?.[0];
-												if (!appt) return null;
-												return (
-													<div className="bg-green-50 rounded-lg border border-green-100 p-4">
-														<h3 className="text-sm font-semibold text-gray-900 mb-2 flex items-center gap-2">
-															<CalendarDays className="h-4 w-4 text-green-600" />
-															Appointment
-														</h3>
-														<div className="space-y-2">
-															<div className="text-xs text-gray-700">
-																<div className="flex items-center gap-2 mb-1">
-																	<Clock className="h-3 w-3 text-gray-500" />
-																	<span className="font-medium">
-																		{new Date(appt.appointment_date).toLocaleDateString()}
+												{/* Appointment Info */}
+												{selected?.matched_services?.[0]?.appointments?.[0] ? (
+													(() => {
+														const appt = selected?.matched_services?.[0]?.appointments?.[0];
+														if (!appt) return null;
+														return (
+															<div className="bg-white rounded-lg border border-blue-200 p-3">
+																<div className="flex items-center gap-2 mb-2">
+																	<CalendarDays className="h-4 w-4 text-green-600" />
+																	<span className="text-sm font-medium text-gray-900">
+																		Appointment
 																	</span>
 																</div>
-																<div className="text-gray-600">
-																	{new Date(appt.appointment_date).toLocaleTimeString([], {
-																		hour: "2-digit",
-																		minute: "2-digit",
-																	})}
+																<div className="space-y-2">
+																	<div className="text-xs text-gray-700">
+																		<div className="flex items-center gap-2 mb-1">
+																			<Clock className="h-3 w-3 text-gray-500" />
+																			<span className="font-medium">
+																				{new Date(appt.appointment_date).toLocaleDateString()}
+																			</span>
+																		</div>
+																		<div className="text-gray-600">
+																			{new Date(appt.appointment_date).toLocaleTimeString([], {
+																				hour: "2-digit",
+																				minute: "2-digit",
+																			})}
+																		</div>
+																	</div>
+																	<div className="flex items-center gap-2">
+																		<span
+																			className={`px-2 py-1 rounded-md text-xs font-medium ${
+																				appt.status === "confirmed"
+																					? "bg-blue-100 text-blue-700 border border-blue-200"
+																					: appt.status === "completed"
+																					? "bg-green-100 text-green-700 border border-green-200"
+																					: "bg-gray-100 text-gray-700 border border-gray-200"
+																			}`}
+																		>
+																			{appt.status.charAt(0).toUpperCase() + appt.status.slice(1)}
+																		</span>
+																	</div>
 																</div>
 															</div>
-															<div className="flex items-center gap-2">
-																<span
-																	className={`px-2 py-1 rounded-md text-xs font-medium ${
-																		appt.status === "confirmed"
-																			? "bg-blue-100 text-blue-700 border border-blue-200"
-																			: appt.status === "completed"
-																			? "bg-green-100 text-green-700 border border-green-200"
-																			: "bg-gray-100 text-gray-700 border border-gray-200"
-																	}`}
-																>
-																	{appt.status.charAt(0).toUpperCase() + appt.status.slice(1)}
-																</span>
-															</div>
+														);
+													})()
+												) : (
+													<div className="bg-white rounded-lg border border-blue-200 p-3">
+														<div className="flex items-center gap-2 mb-2">
+															<CalendarDays className="h-4 w-4 text-gray-600" />
+															<span className="text-sm font-medium text-gray-900">
+																Appointment
+															</span>
 														</div>
+														<p className="text-xs text-gray-600">
+															No appointment scheduled yet
+														</p>
 													</div>
-												);
-											})()
-										) : (
-											<div className="bg-gray-50 rounded-lg border border-gray-200 p-4">
-												<h3 className="text-sm font-semibold text-gray-900 mb-2 flex items-center gap-2">
-													<CalendarDays className="h-4 w-4 text-gray-600" />
-													Appointment
-												</h3>
-												<p className="text-xs text-gray-600">
-													No appointment scheduled yet
-												</p>
+												)}
+
+												<Button
+													variant="outline"
+													size="sm"
+													onClick={() => setShowProfile(true)}
+													className="w-full border-blue-200 text-blue-700 hover:bg-blue-100 text-xs h-8"
+												>
+													View Professional Profile
+												</Button>
 											</div>
-										)}
-									</div>
+										</div>
+									) : (
+										<div className="bg-gray-50 rounded-lg border border-gray-200 p-4">
+											<h3 className="text-sm font-semibold text-gray-900 mb-2 flex items-center gap-2">
+												<User className="h-4 w-4 text-gray-600" />
+												Matched Service & Appointment
+											</h3>
+											<p className="text-xs text-gray-600">
+												No match yet - we're working on finding the right professional for
+												you
+											</p>
+										</div>
+									)}
 
 									{/* Description with Audio - Combined */}
 									{(selected.incident_description || (selected.media as any)?.url) && (
@@ -692,13 +730,15 @@ export default function ReportsMasterDetail({ userId }: { userId: string }) {
 										</div>
 									)}
 
-									{/* Notes (WYSIWYG) - Expanded */}
-									<div className="bg-white rounded-lg border border-gray-200 p-6">
-										<h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-											<FileText className="h-5 w-5 text-gray-600" />
-											Notes & Updates
-										</h3>
-										<div className="min-h-[300px]">
+									{/* Notes (WYSIWYG) - Full Height */}
+									<div className="bg-white rounded-lg border border-gray-200 flex flex-col h-[500px]">
+										<div className="p-4 border-b border-gray-200">
+											<h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+												<FileText className="h-5 w-5 text-gray-600" />
+												Notes & Updates
+											</h3>
+										</div>
+										<div className="flex-1 overflow-hidden">
 											<RichTextNotesEditor
 												userId={userId}
 												report={selected}

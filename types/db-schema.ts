@@ -259,6 +259,7 @@ export type Database = {
           longitude: number | null
           match_status: Database["public"]["Enums"]["match_status_type"] | null
           media: Json | null
+          notes: string | null
           phone: string | null
           plus_code: string | null
           postcode: string | null
@@ -304,6 +305,7 @@ export type Database = {
           longitude?: number | null
           match_status?: Database["public"]["Enums"]["match_status_type"] | null
           media?: Json | null
+          notes?: string | null
           phone?: string | null
           plus_code?: string | null
           postcode?: string | null
@@ -349,6 +351,7 @@ export type Database = {
           longitude?: number | null
           match_status?: Database["public"]["Enums"]["match_status_type"] | null
           media?: Json | null
+          notes?: string | null
           phone?: string | null
           plus_code?: string | null
           postcode?: string | null
