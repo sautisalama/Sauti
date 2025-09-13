@@ -185,7 +185,7 @@ useEffect(() => {
 					label: "Messages",
 					icon: MessageCircle,
 					href: "/dashboard/chat",
-					badge: dash?.data?.unreadChatCount || 0,
+					badge: (typeof dash?.data?.unreadChatCount === "number" && dash.data.unreadChatCount > 0) ? dash.data.unreadChatCount : undefined,
 					section: "main",
 				},
 				{
@@ -287,14 +287,14 @@ useEffect(() => {
 					label: "Case Management",
 					icon: ClipboardList,
 					href: "/dashboard/cases",
-					badge: casesCount || 0,
+					badge: (casesCount > 0 ? casesCount : undefined),
 					section: "main",
 				},
 				{
-					id: "appointments",
-					label: "Schedule",
-					icon: Calendar,
-					href: "/dashboard/appointments",
+					id: "reports",
+					label: "My reports",
+					icon: ClipboardList,
+					href: "/dashboard/reports",
 					section: "main",
 				},
 				{
@@ -302,7 +302,7 @@ useEffect(() => {
 					label: "Messages",
 					icon: MessageCircle,
 					href: "/dashboard/chat",
-					badge: dash?.data?.unreadChatCount || 0,
+					badge: (typeof dash?.data?.unreadChatCount === "number" && dash.data.unreadChatCount > 0) ? dash.data.unreadChatCount : undefined,
 					section: "main",
 				},
 				{
@@ -349,10 +349,10 @@ useEffect(() => {
 					section: "main",
 				},
 				{
-					id: "appointments",
-					label: "Schedule",
-					icon: Calendar,
-					href: "/dashboard/appointments",
+					id: "reports",
+					label: "My reports",
+					icon: ClipboardList,
+					href: "/dashboard/reports",
 					section: "main",
 				},
 				{

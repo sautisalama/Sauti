@@ -100,9 +100,9 @@ export function EnhancedBottomNav({ forceShow = false, className }: EnhancedBott
       // Professionals: prioritize cases
       return [
         { id: "overview", label: "Overview", icon: LayoutDashboard, href: "/dashboard" },
-        { id: "cases", label: "Cases", icon: ClipboardList, href: "/dashboard/cases", badge: casesCount },
+        { id: "cases", label: "Cases", icon: ClipboardList, href: "/dashboard/cases", badge: (casesCount > 0 ? casesCount : undefined) },
         { id: "schedule", label: "Schedule", icon: Calendar, href: "/dashboard/appointments" },
-        { id: "chat", label: "Chat", icon: MessageCircle, href: "/dashboard/chat", badge: unreadMessages },
+        { id: "chat", label: "Chat", icon: MessageCircle, href: "/dashboard/chat", badge: (unreadMessages > 0 ? unreadMessages : undefined) },
         { id: "resources", label: "Resources", icon: FileText, href: "/dashboard/resources" },
       ];
     }
@@ -111,7 +111,7 @@ export function EnhancedBottomNav({ forceShow = false, className }: EnhancedBott
     return [
       { id: "overview", label: "Overview", icon: LayoutDashboard, href: "/dashboard" },
       { id: "reports", label: "Reports", icon: ClipboardList, href: "/dashboard/reports" },
-      { id: "chat", label: "Chat", icon: MessageCircle, href: "/dashboard/chat", badge: unreadMessages },
+      { id: "chat", label: "Chat", icon: MessageCircle, href: "/dashboard/chat", badge: (unreadMessages > 0 ? unreadMessages : undefined) },
       { id: "resources", label: "Resources", icon: FileText, href: "/dashboard/resources" },
     ];
   };
