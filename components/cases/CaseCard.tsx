@@ -340,10 +340,7 @@ export function CaseCard({
 								<div className="flex items-center gap-1">
 									{/* Unread messages indicator */}
 									{isLoadingMessages ? (
-										<div className="flex items-center gap-1 text-xs text-gray-500">
-											<Clock className="h-3 w-3 animate-spin" />
-											<span className="font-medium">Loading...</span>
-										</div>
+										<div className="h-4 w-12 bg-gray-200 rounded animate-pulse" />
 									) : hasUnreadMessages ? (
 										<div className="flex items-center gap-1 text-xs text-blue-600">
 											<MessageCircle className="h-3 w-3" />

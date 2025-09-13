@@ -777,10 +777,7 @@ export default function CasesMasterDetail({ userId }: { userId: string }) {
 										</div>
 										<div className="flex items-center gap-2">
 											{isLoadingMessages ? (
-												<div className="h-7 px-2 text-xs text-gray-500 bg-gray-100 rounded-md flex items-center gap-1">
-													<Clock className="h-3 w-3 animate-spin" />
-													Loading messages...
-												</div>
+												<div className="h-7 w-16 bg-gray-200 rounded-md animate-pulse" />
 											) : selected.unread_messages && selected.unread_messages > 0 ? (
 												<Button
 													variant="outline"
