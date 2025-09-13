@@ -137,10 +137,18 @@ export default function ReportAbuseForm({ onClose }: { onClose?: () => void }) {
 						console.log("Audio uploaded successfully:", data.publicUrl);
 					} else {
 						console.error("Audio upload failed:", upErr);
+						console.error("Upload error details:", {
+							error: upErr,
+							filename,
+							bucket: "report-audio",
+							blobSize: audioBlob.size,
+							blobType: audioBlob.type,
+						});
 						toast({
 							title: "Audio Upload Failed",
-							description:
-								"Could not save your voice recording. Please try again or submit without it.",
+							description: `Could not save your voice recording: ${
+								upErr.message || "Unknown error"
+							}. Please try again or submit without it.`,
 							variant: "destructive",
 						});
 					}
