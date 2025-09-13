@@ -1,418 +1,362 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import {
-	Bold,
-	Italic,
-	Underline,
-	List,
-	ListOrdered,
-	Save,
-	Undo2,
-	Redo2,
-	Type,
-	Link,
-	Image,
-	AlignLeft,
-	AlignCenter,
-	AlignRight,
-	Quote,
-	Code,
-	Strikethrough,
+  AlignCenter,
+  AlignLeft,
+  AlignRight,
+  AlignJustify,
+  Bold,
+  Code,
+  Heading1,
+  Heading2,
+  Heading3,
+  Heading4,
+  Image as ImageIcon,
+  Italic,
+  Link as LinkIcon,
+  List,
+  ListOrdered,
+  Redo2,
+  Save,
+  Strikethrough,
+  Underline,
+  Undo2,
+  Quote,
 } from "lucide-react";
 import { Tables } from "@/types/db-schema";
 import { createClient } from "@/utils/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
+// Tiptap imports
+import { useEditor, EditorContent } from "@tiptap/react";
+import StarterKit from "@tiptap/starter-kit";
+import UnderlineExt from "@tiptap/extension-underline";
+import LinkExt from "@tiptap/extension-link";
+import ImageExt from "@tiptap/extension-image";
+import TextAlign from "@tiptap/extension-text-align";
+import Placeholder from "@tiptap/extension-placeholder";
+import TextStyle from "@tiptap/extension-text-style";
+
 export default function ReportNotesEditor({
-	userId,
-	report,
-	onSaved,
+  userId,
+  report,
+  onSaved,
 }: {
-	userId: string;
-	report: Tables<"reports">; // using DB type, notes column will be used to store HTML content
-	onSaved: (updated: Tables<"reports">) => void;
+  userId: string;
+  report: Tables<"reports">;
+  onSaved: (updated: Tables<"reports">) => void;
 }) {
-	const supabase = createClient();
-	const { toast } = useToast();
-	const [saving, setSaving] = useState(false);
-	const editorRef = useRef<HTMLDivElement | null>(null);
+  const supabase = createClient();
+  const { toast } = useToast();
+  const [saving, setSaving] = useState(false);
+  const [dirty, setDirty] = useState(false);
+  const [lastSavedAt, setLastSavedAt] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-	const initialHtml = useMemo(() => {
-		return report.notes || "";
-	}, [report.notes]);
+  const initialHtml = useMemo(() => report.notes || "", [report.notes]);
 
-	useEffect(() => {
-		if (editorRef.current) {
-			editorRef.current.innerHTML = initialHtml;
-			// Set initial placeholder
-			if (!initialHtml || initialHtml === "") {
-				editorRef.current.setAttribute(
-					"data-placeholder",
-					"Start writing your notes here... You can format text, add links, images, and more!"
-				);
-			}
-		}
-	}, [initialHtml]);
+  const editor = useEditor({
+    extensions: [
+      StarterKit.configure({
+        heading: { levels: [1, 2, 3, 4] },
+      }),
+      UnderlineExt,
+      TextStyle,
+      LinkExt.configure({
+        openOnClick: false,
+        autolink: true,
+        linkOnPaste: true,
+        HTMLAttributes: { rel: "noopener noreferrer", target: "_blank" },
+      }),
+      ImageExt.configure({ allowBase64: true }),
+      TextAlign.configure({ types: ["heading", "paragraph"], alignments: ["left", "center", "right", "justify"] }),
+      Placeholder.configure({
+        placeholder: "Start writing your notes here...",
+      }),
+    ],
+    content: initialHtml,
+    editable: true,
+    onUpdate: ({ editor }) => {
+      setDirty(true);
+    },
+    editorProps: {
+      handlePaste: (view: any, e: ClipboardEvent) => {
+        const items = (e.clipboardData?.items || []) as unknown as DataTransferItem[];
+        const imageItems = Array.from(items).filter((it) => it.kind === "file" && it.type.startsWith("image/"));
+        if (imageItems.length > 0) {
+          e.preventDefault();
+          imageItems.forEach((it) => {
+            const file = it.getAsFile();
+            if (file) void uploadImage(file);
+          });
+          return true;
+        }
+        return false;
+      },
+      handleDrop: (view: any, e: DragEvent) => {
+        const files = Array.from(e.dataTransfer?.files || []);
+        const imageFiles = files.filter((f) => f.type.startsWith("image/"));
+        if (imageFiles.length > 0) {
+          e.preventDefault();
+          imageFiles.forEach((f) => void uploadImage(f));
+          return true;
+        }
+        return false;
+      },
+      attributes: {
+        class:
+          "tiptap prose-sm max-w-none focus:outline-none break-words whitespace-pre-wrap min-h-[300px] p-4",
+      },
+    },
+  });
 
-	const cmd = (command: string, value?: string) => {
-		document.execCommand(command, false, value);
-		editorRef.current?.focus();
-	};
+  // Keep editor content in sync if the selected report changes
+  useEffect(() => {
+    if (editor && initialHtml !== editor.getHTML()) {
+      editor.commands.setContent(initialHtml || "", false);
+      setDirty(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialHtml]);
 
-	const insertLink = () => {
-		const url = prompt("Enter URL:");
-		if (url && editorRef.current) {
-			const selection = window.getSelection();
-			if (selection && selection.rangeCount > 0) {
-				const range = selection.getRangeAt(0);
-				const link = document.createElement("a");
-				link.href = url;
-				link.textContent = selection.toString() || url;
-				link.target = "_blank";
-				link.rel = "noopener noreferrer";
-				range.deleteContents();
-				range.insertNode(link);
-				selection.removeAllRanges();
-			}
-		}
-	};
 
-	const insertImage = () => {
-		const url = prompt("Enter image URL:");
-		if (url && editorRef.current) {
-			const selection = window.getSelection();
-			if (selection && selection.rangeCount > 0) {
-				const range = selection.getRangeAt(0);
-				const img = document.createElement("img");
-				img.src = url;
-				img.alt = "Inserted image";
-				img.style.maxWidth = "100%";
-				img.style.height = "auto";
-				range.deleteContents();
-				range.insertNode(img);
-				selection.removeAllRanges();
-			}
-		}
-	};
+  const save = useCallback(
+    async (html?: string, opts?: { autosave?: boolean }) => {
+      if (!editor) return;
+      const autosave = opts?.autosave === true;
+      try {
+        setSaving(true);
+        const content = html ?? editor.getHTML();
+        const { data, error } = await supabase
+          .from("reports")
+          .update({ notes: content })
+          .eq("report_id", report.report_id)
+          .select()
+          .single();
+        if (error) throw error;
+        setDirty(false);
+        setLastSavedAt(new Date().toLocaleTimeString());
+        onSaved(data as any);
+        if (!autosave) {
+          toast({ title: "Notes saved", description: "Your notes for this report have been saved." });
+        }
+      } catch (e: any) {
+        if (!autosave) {
+          toast({ title: "Failed to save", description: e?.message || "Please try again.", variant: "destructive" });
+        }
+      } finally {
+        setSaving(false);
+      }
+    },
+    [editor, report.report_id, supabase, toast, onSaved]
+  );
 
-	const setFontSize = (size: string) => {
-		if (editorRef.current) {
-			const selection = window.getSelection();
-			if (selection && selection.rangeCount > 0) {
-				const range = selection.getRangeAt(0);
-				const span = document.createElement("span");
-				span.style.fontSize = `${parseInt(size) * 4}px`;
-				span.appendChild(range.extractContents());
-				range.insertNode(span);
-				selection.removeAllRanges();
-			}
-		}
-	};
+  // Save on Ctrl/Cmd+S
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      const isCtrlS = (e.ctrlKey || e.metaKey) && (e.key === "s" || e.key === "S");
+      if (isCtrlS) {
+        e.preventDefault();
+        void save();
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [save]);
 
-	const insertCode = () => {
-		if (editorRef.current) {
-			const selection = window.getSelection();
-			if (selection && selection.rangeCount > 0) {
-				const range = selection.getRangeAt(0);
-				const code = document.createElement("code");
-				code.style.backgroundColor = "#f3f4f6";
-				code.style.padding = "2px 4px";
-				code.style.borderRadius = "4px";
-				code.style.fontFamily = "monospace";
-				code.appendChild(range.extractContents());
-				range.insertNode(code);
-				selection.removeAllRanges();
-			}
-		}
-	};
+  // 30-second autosave interval (only when there are unsaved changes)
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      if (dirty) void save(undefined, { autosave: true });
+    }, 30000);
+    return () => window.clearInterval(id);
+  }, [dirty, save]);
 
-	const insertHorizontalRule = () => {
-		if (editorRef.current) {
-			const selection = window.getSelection();
-			if (selection && selection.rangeCount > 0) {
-				const range = selection.getRangeAt(0);
-				const hr = document.createElement("hr");
-				hr.style.margin = "8px 0";
-				range.insertNode(hr);
-				selection.removeAllRanges();
-			}
-		}
-	};
+  const insertOrEditLink = useCallback(() => {
+    if (!editor) return;
+    const prev = editor.getAttributes("link").href as string | undefined;
+    const url = prompt("Enter URL:", prev ?? "https://");
+    if (url === null) return; // cancelled
+    if (url === "") {
+      editor.chain().focus().unsetLink().run();
+      return;
+    }
+    const href = /^(https?:)?\/\//i.test(url) ? url : `https://${url}`;
+    editor.chain().focus().extendMarkRange("link").setLink({ href }).run();
+  }, [editor]);
 
-	const save = async () => {
-		try {
-			setSaving(true);
-			const html = editorRef.current?.innerHTML || "";
+  const uploadImage = useCallback(
+    async (file: File) => {
+      if (!file) return;
+      const path = `reports/${report.report_id}/${Date.now()}-${file.name}`;
+      try {
+        const { error } = await supabase.storage
+          .from("report-media")
+          .upload(path, file, { contentType: file.type, upsert: true });
+        if (error) throw error;
+        const { data: urlData } = supabase.storage.from("report-media").getPublicUrl(path);
+        const src = urlData?.publicUrl;
+        if (src) {
+          editor?.chain().focus().setImage({ src, alt: file.name }).run();
+          toast({ title: "Image inserted", description: "Uploaded to report-media and inserted." });
+          return;
+        }
+        throw new Error("Failed to resolve public URL");
+      } catch (err) {
+        // Fallback to inline base64 to avoid data loss
+        try {
+          const dataUrl = await new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(String(reader.result));
+            reader.onerror = () => reject(reader.error);
+            reader.readAsDataURL(file);
+          });
+          editor?.chain().focus().setImage({ src: dataUrl, alt: file.name }).run();
+          toast({
+            title: "Inserted inline image",
+            description: "Upload failed; inserted as inline image instead.",
+          });
+        } catch (e) {
+          toast({ title: "Failed to insert image", description: String(e), variant: "destructive" });
+        }
+      }
+    },
+    [editor, report.report_id, supabase, toast]
+  );
 
-			const { data, error } = await supabase
-				.from("reports")
-				.update({ notes: html })
-				.eq("report_id", report.report_id)
-				.select()
-				.single();
+  const onPickImage = useCallback(() => fileInputRef.current?.click(), []);
 
-			if (error) throw error;
-			onSaved(data as any);
-			toast({
-				title: "Notes saved",
-				description: "Your notes for this report have been saved.",
-			});
-		} catch (e: any) {
-			toast({
-				title: "Failed to save",
-				description: e?.message || "Please try again.",
-				variant: "destructive",
-			});
-		} finally {
-			setSaving(false);
-		}
-	};
+  // Prevent editor losing selection when toolbar is clicked
+  const prevent = useCallback((e: any) => e.preventDefault(), []);
 
-	return (
-		<div className="flex flex-col h-full">
-			<style jsx>{`
-				[contenteditable]:empty:before {
-					content: attr(data-placeholder);
-					color: #9ca3af;
-					pointer-events: none;
-				}
-				[contenteditable]:focus:empty:before {
-					content: attr(data-placeholder);
-					color: #9ca3af;
-				}
-			`}</style>
-			{/* Enhanced Toolbar */}
-			<div className="flex flex-col gap-2 p-3 bg-gray-50 border-b border-gray-200">
-				{/* First row - Basic formatting */}
-				<div className="flex items-center gap-1 flex-wrap">
-					<span className="text-sm font-medium text-gray-700 mr-2">Formatting:</span>
-					<Button
-						type="button"
-						variant="ghost"
-						size="icon"
-						className="h-8 w-8"
-						onClick={() => cmd("undo")}
-						title="Undo"
-					>
-						<Undo2 className="h-4 w-4" />
-					</Button>
-					<Button
-						type="button"
-						variant="ghost"
-						size="icon"
-						className="h-8 w-8"
-						onClick={() => cmd("redo")}
-						title="Redo"
-					>
-						<Redo2 className="h-4 w-4" />
-					</Button>
-					<Separator orientation="vertical" className="h-4" />
-					<Button
-						type="button"
-						variant="ghost"
-						size="icon"
-						className="h-8 w-8"
-						onClick={() => cmd("bold")}
-						title="Bold"
-					>
-						<Bold className="h-4 w-4" />
-					</Button>
-					<Button
-						type="button"
-						variant="ghost"
-						size="icon"
-						className="h-8 w-8"
-						onClick={() => cmd("italic")}
-						title="Italic"
-					>
-						<Italic className="h-4 w-4" />
-					</Button>
-					<Button
-						type="button"
-						variant="ghost"
-						size="icon"
-						className="h-8 w-8"
-						onClick={() => cmd("underline")}
-						title="Underline"
-					>
-						<Underline className="h-4 w-4" />
-					</Button>
-					<Button
-						type="button"
-						variant="ghost"
-						size="icon"
-						className="h-8 w-8"
-						onClick={() => cmd("strikeThrough")}
-						title="Strikethrough"
-					>
-						<Strikethrough className="h-4 w-4" />
-					</Button>
-					<Separator orientation="vertical" className="h-4" />
-					<Button
-						type="button"
-						variant="ghost"
-						size="icon"
-						className="h-8 w-8"
-						onClick={() => cmd("insertUnorderedList")}
-						title="Bullet List"
-					>
-						<List className="h-4 w-4" />
-					</Button>
-					<Button
-						type="button"
-						variant="ghost"
-						size="icon"
-						className="h-8 w-8"
-						onClick={() => cmd("insertOrderedList")}
-						title="Numbered List"
-					>
-						<ListOrdered className="h-4 w-4" />
-					</Button>
-					<Button
-						type="button"
-						variant="ghost"
-						size="icon"
-						className="h-8 w-8"
-						onClick={insertHorizontalRule}
-						title="Horizontal Line"
-					>
-						<Quote className="h-4 w-4" />
-					</Button>
-				</div>
+  if (!editor) return null;
 
-				{/* Second row - Font size, alignment, and media */}
-				<div className="flex items-center gap-1 flex-wrap">
-					<span className="text-sm font-medium text-gray-700 mr-2">Font Size:</span>
-					<select
-						onChange={(e) => setFontSize(e.target.value)}
-						className="h-8 px-2 text-xs border border-gray-300 rounded-md bg-white"
-						defaultValue="3"
-					>
-						<option value="1">Small</option>
-						<option value="2">Normal</option>
-						<option value="3">Medium</option>
-						<option value="4">Large</option>
-						<option value="5">Extra Large</option>
-						<option value="6">Huge</option>
-					</select>
+  return (
+    <div className="flex flex-col h-full">
+      <style jsx>{`
+        /* Tiptap basic styles */
+        .tiptap :global(.ProseMirror) {
+          outline: none;
+        }
+        .tiptap :global(.ProseMirror p.is-editor-empty:first-child::before) {
+          content: attr(data-placeholder);
+          color: #9ca3af;
+          float: left;
+          height: 0;
+          pointer-events: none;
+        }
+        .tiptap :global(img) {
+          max-width: 100%;
+          height: auto;
+        }
+        .tiptap :global(blockquote) {
+          border-left: 3px solid #e5e7eb;
+          margin: 0.75rem 0;
+          padding-left: 0.75rem;
+          color: #374151;
+        }
+        .tiptap :global(pre) {
+          background: #f3f4f6;
+          border-radius: 6px;
+          padding: 0.5rem 0.75rem;
+          font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+          font-size: 0.85rem;
+        }
+      `}</style>
 
-					<Separator orientation="vertical" className="h-4" />
+      {/* Toolbar */}
+      <div className="flex flex-col gap-2 p-3 bg-gray-50 border-b border-gray-200">
+        <div className="flex items-center gap-1 flex-wrap" onMouseDown={prevent}>
+          <span className="text-sm font-medium text-gray-700 mr-2">Formatting:</span>
+          <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={() => editor.chain().focus().undo().run()} title="Undo">
+            <Undo2 className="h-4 w-4" />
+          </Button>
+          <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={() => editor.chain().focus().redo().run()} title="Redo">
+            <Redo2 className="h-4 w-4" />
+          </Button>
+          <Separator orientation="vertical" className="h-4" />
+          <Button type="button" variant={editor.isActive("bold") ? "secondary" : "ghost"} size="icon" className="h-8 w-8" onClick={() => editor.chain().focus().toggleBold().run()} title="Bold">
+            <Bold className="h-4 w-4" />
+          </Button>
+          <Button type="button" variant={editor.isActive("italic") ? "secondary" : "ghost"} size="icon" className="h-8 w-8" onClick={() => editor.chain().focus().toggleItalic().run()} title="Italic">
+            <Italic className="h-4 w-4" />
+          </Button>
+          <Button type="button" variant={editor.isActive("underline") ? "secondary" : "ghost"} size="icon" className="h-8 w-8" onClick={() => editor.chain().focus().toggleUnderline().run()} title="Underline">
+            <Underline className="h-4 w-4" />
+          </Button>
+          <Button type="button" variant={editor.isActive("strike") ? "secondary" : "ghost"} size="icon" className="h-8 w-8" onClick={() => editor.chain().focus().toggleStrike().run()} title="Strikethrough">
+            <Strikethrough className="h-4 w-4" />
+          </Button>
+          <Separator orientation="vertical" className="h-4" />
+          <Button type="button" variant={editor.isActive("heading", { level: 1 }) ? "secondary" : "ghost"} size="icon" className="h-8 w-8" onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()} title="Heading 1">
+            <Heading1 className="h-4 w-4" />
+          </Button>
+          <Button type="button" variant={editor.isActive("heading", { level: 2 }) ? "secondary" : "ghost"} size="icon" className="h-8 w-8" onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()} title="Heading 2">
+            <Heading2 className="h-4 w-4" />
+          </Button>
+          <Button type="button" variant={editor.isActive("heading", { level: 3 }) ? "secondary" : "ghost"} size="icon" className="h-8 w-8" onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()} title="Heading 3">
+            <Heading3 className="h-4 w-4" />
+          </Button>
+          <Button type="button" variant={editor.isActive("heading", { level: 4 }) ? "secondary" : "ghost"} size="icon" className="h-8 w-8" onClick={() => editor.chain().focus().toggleHeading({ level: 4 }).run()} title="Heading 4">
+            <Heading4 className="h-4 w-4" />
+          </Button>
+          <Separator orientation="vertical" className="h-4" />
+          <Button type="button" variant={editor.isActive("bulletList") ? "secondary" : "ghost"} size="icon" className="h-8 w-8" onClick={() => editor.chain().focus().toggleBulletList().run()} title="Bullet List">
+            <List className="h-4 w-4" />
+          </Button>
+          <Button type="button" variant={editor.isActive("orderedList") ? "secondary" : "ghost"} size="icon" className="h-8 w-8" onClick={() => editor.chain().focus().toggleOrderedList().run()} title="Numbered List">
+            <ListOrdered className="h-4 w-4" />
+          </Button>
+          <Button type="button" variant={editor.isActive("blockquote") ? "secondary" : "ghost"} size="icon" className="h-8 w-8" onClick={() => editor.chain().focus().toggleBlockquote().run()} title="Blockquote">
+            <Quote className="h-4 w-4" />
+          </Button>
+          <Button type="button" variant={editor.isActive("codeBlock") ? "secondary" : "ghost"} size="icon" className="h-8 w-8" onClick={() => editor.chain().focus().toggleCodeBlock().run()} title="Code Block">
+            <Code className="h-4 w-4" />
+          </Button>
+        </div>
+        <div className="flex items-center gap-1 flex-wrap" onMouseDown={prevent}>
+          <span className="text-sm font-medium text-gray-700 mr-2">Align:</span>
+          <Button type="button" variant={editor.isActive({ textAlign: "left" }) ? "secondary" : "ghost"} size="icon" className="h-8 w-8" onClick={() => editor.chain().focus().setTextAlign("left").run()} title="Align Left">
+            <AlignLeft className="h-4 w-4" />
+          </Button>
+          <Button type="button" variant={editor.isActive({ textAlign: "center" }) ? "secondary" : "ghost"} size="icon" className="h-8 w-8" onClick={() => editor.chain().focus().setTextAlign("center").run()} title="Align Center">
+            <AlignCenter className="h-4 w-4" />
+          </Button>
+          <Button type="button" variant={editor.isActive({ textAlign: "right" }) ? "secondary" : "ghost"} size="icon" className="h-8 w-8" onClick={() => editor.chain().focus().setTextAlign("right").run()} title="Align Right">
+            <AlignRight className="h-4 w-4" />
+          </Button>
+          <Button type="button" variant={editor.isActive({ textAlign: "justify" }) ? "secondary" : "ghost"} size="icon" className="h-8 w-8" onClick={() => editor.chain().focus().setTextAlign("justify").run()} title="Justify">
+            <AlignJustify className="h-4 w-4" />
+          </Button>
+          <Separator orientation="vertical" className="h-4" />
+          <Button type="button" variant={editor.isActive("link") ? "secondary" : "ghost"} size="icon" className="h-8 w-8" onClick={insertOrEditLink} title="Insert/Edit Link">
+            <LinkIcon className="h-4 w-4" />
+          </Button>
+          <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (file) void uploadImage(file);
+            // reset input so the same file can be picked again
+            if (fileInputRef.current) fileInputRef.current.value = "";
+          }} />
+          <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={onPickImage} title="Insert Image">
+            <ImageIcon className="h-4 w-4" />
+          </Button>
+          <div className="ml-auto flex items-center gap-3 text-xs text-gray-500">
+            {saving ? <span>Saving…</span> : dirty ? <span>Unsaved changes</span> : lastSavedAt ? <span>Saved {lastSavedAt}</span> : null}
+            <Button type="button" size="sm" onClick={() => save()} disabled={saving} className="h-8">
+              <Save className="h-4 w-4 mr-1" /> Save
+            </Button>
+          </div>
+        </div>
+      </div>
 
-					<span className="text-sm font-medium text-gray-700 mr-2">Align:</span>
-					<Button
-						type="button"
-						variant="ghost"
-						size="icon"
-						className="h-8 w-8"
-						onClick={() => cmd("justifyLeft")}
-						title="Align Left"
-					>
-						<AlignLeft className="h-4 w-4" />
-					</Button>
-					<Button
-						type="button"
-						variant="ghost"
-						size="icon"
-						className="h-8 w-8"
-						onClick={() => cmd("justifyCenter")}
-						title="Align Center"
-					>
-						<AlignCenter className="h-4 w-4" />
-					</Button>
-					<Button
-						type="button"
-						variant="ghost"
-						size="icon"
-						className="h-8 w-8"
-						onClick={() => cmd("justifyRight")}
-						title="Align Right"
-					>
-						<AlignRight className="h-4 w-4" />
-					</Button>
-
-					<Separator orientation="vertical" className="h-4" />
-
-					<Button
-						type="button"
-						variant="ghost"
-						size="icon"
-						className="h-8 w-8"
-						onClick={insertLink}
-						title="Insert Link"
-					>
-						<Link className="h-4 w-4" />
-					</Button>
-					<Button
-						type="button"
-						variant="ghost"
-						size="icon"
-						className="h-8 w-8"
-						onClick={insertImage}
-						title="Insert Image"
-					>
-						<Image className="h-4 w-4" />
-					</Button>
-					<Button
-						type="button"
-						variant="ghost"
-						size="icon"
-						className="h-8 w-8"
-						onClick={insertCode}
-						title="Code Block"
-					>
-						<Code className="h-4 w-4" />
-					</Button>
-				</div>
-
-				{/* Third row - Save button */}
-				<div className="flex justify-end">
-					<Button
-						type="button"
-						size="sm"
-						onClick={save}
-						disabled={saving}
-						className="h-8"
-					>
-						<Save className="h-4 w-4 mr-1" />
-						{saving ? "Saving..." : "Save Notes"}
-					</Button>
-				</div>
-			</div>
-
-			{/* Enhanced Editor */}
-			<div
-				ref={editorRef}
-				className="flex-1 p-4 text-sm focus:outline-none break-words whitespace-pre-wrap overflow-y-auto"
-				contentEditable
-				role="textbox"
-				aria-multiline
-				suppressContentEditableWarning
-				style={{
-					whiteSpace: "pre-wrap",
-					minHeight: "300px",
-					maxHeight: "500px",
-				}}
-				onInput={() => {
-					// Handle placeholder visibility
-					if (editorRef.current) {
-						const isEmpty =
-							editorRef.current.innerHTML === "" ||
-							editorRef.current.innerHTML === "<br>";
-						if (isEmpty) {
-							editorRef.current.setAttribute(
-								"data-placeholder",
-								"Start writing your notes here... You can format text, add links, images, and more!"
-							);
-						} else {
-							editorRef.current.removeAttribute("data-placeholder");
-						}
-					}
-				}}
-			/>
-		</div>
-	);
+      {/* Editor */}
+      <div className="flex-1 overflow-hidden">
+        <EditorContent editor={editor} className="h-full overflow-y-auto" />
+      </div>
+    </div>
+  );
 }

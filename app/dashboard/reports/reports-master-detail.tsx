@@ -731,7 +731,7 @@ export default function ReportsMasterDetail({ userId }: { userId: string }) {
 									)}
 
 									{/* Notes (WYSIWYG) - Full Height */}
-									<div className="bg-white rounded-lg border border-gray-200 flex flex-col h-[500px]">
+									<div className="bg-white rounded-lg border border-gray-200 flex flex-col h-[100vh] sm:h-[500px]">
 										<div className="p-4 border-b border-gray-200">
 											<h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
 												<FileText className="h-5 w-5 text-gray-600" />
