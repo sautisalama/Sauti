@@ -2,6 +2,7 @@
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
+import { useMemo } from "react";
 import { useState, useEffect } from "react";
 import { Button } from "./ui/button";
 import { createClient } from "@/utils/supabase/client";
@@ -43,7 +44,7 @@ export default function AuthenticatedReportAbuseForm({
 	const [isOnBehalf, setIsOnBehalf] = useState(false);
 	const [needsDisabled, setNeedsDisabled] = useState(false);
 	const [needsQueer, setNeedsQueer] = useState(false);
-	const supabase = createClient();
+	const supabase = useMemo(() => createClient(), []);
 	const user = useUser();
 
 	useEffect(() => {

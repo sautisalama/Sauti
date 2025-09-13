@@ -623,27 +623,10 @@ export default function SurvivorView({
 												/>
 											</CardHeader>
 											<CardContent>
-												<Dialog open={open} onOpenChange={setOpen}>
-													<DialogTrigger asChild>
-														<Button>
-															<Plus className="h-4 w-4 mr-2" />
-															New Report
-														</Button>
-													</DialogTrigger>
-													<DialogContent className="sm:max-w-4xl">
-														<DialogHeader>
-															<DialogTitle>Report Abuse</DialogTitle>
-															<DialogDescription>
-																Please fill out this form to report an incident. All information
-																will be kept confidential.
-															</DialogDescription>
-														</DialogHeader>
-														<AuthenticatedReportAbuseForm
-															onClose={() => setOpen(false)}
-															userId={userId}
-														/>
-													</DialogContent>
-												</Dialog>
+												<Button onClick={() => setOpen(true)}>
+													<Plus className="h-4 w-4 mr-2" />
+													New Report
+												</Button>
 
 												{reports.length > 0 ? (
 													<div className="space-y-3">
@@ -841,27 +824,10 @@ export default function SurvivorView({
 													found
 												</p>
 											</div>
-											<Dialog open={open} onOpenChange={setOpen}>
-												<DialogTrigger asChild>
-													<Button>
-														<Plus className="h-4 w-4 mr-2" />
-														New Report
-													</Button>
-												</DialogTrigger>
-												<DialogContent className="sm:max-w-4xl">
-													<DialogHeader>
-														<DialogTitle>Report Abuse</DialogTitle>
-														<DialogDescription>
-															Please fill out this form to report an incident. All information
-															will be kept confidential.
-														</DialogDescription>
-													</DialogHeader>
-													<AuthenticatedReportAbuseForm
-														onClose={() => setOpen(false)}
-														userId={userId}
-													/>
-												</DialogContent>
-											</Dialog>
+											<Button onClick={() => setOpen(true)}>
+												<Plus className="h-4 w-4 mr-2" />
+												New Report
+											</Button>
 										</div>
 
 										{reports.length > 0 ? (
@@ -1089,6 +1055,19 @@ export default function SurvivorView({
 					</div>
 				</div>
 			</div>
+
+			{/* Global Create Report Dialog - single source of truth */}
+			<Dialog open={open} onOpenChange={setOpen}>
+				<DialogContent className="sm:max-w-4xl">
+					<DialogHeader>
+						<DialogTitle>Report Abuse</DialogTitle>
+						<DialogDescription>
+							Please fill out this form to report an incident. All information will be kept confidential.
+						</DialogDescription>
+					</DialogHeader>
+					<AuthenticatedReportAbuseForm onClose={() => setOpen(false)} userId={userId} />
+				</DialogContent>
+			</Dialog>
 
 			{/* Alert Dialog */}
 			<AlertDialog

@@ -6,8 +6,10 @@ import { useDashboardData } from "@/components/providers/DashboardDataProvider";
 
 export function UnreadSync({ userId, username }: { userId: string; username: string }) {
   const dash = useDashboardData();
+  const setUnread = dash?.setUnreadChatCount;
 
   useEffect(() => {
+    if (!userId || !setUnread) return;
     let cleanup: (() => void) | undefined;
     const init = async () => {
       try {
@@ -21,9 +23,9 @@ export function UnreadSync({ userId, username }: { userId: string; username: str
               const n = typeof ch.countUnread === "function" ? ch.countUnread() : 0;
               return sum + (Number.isFinite(n) ? n : 0);
             }, 0);
-            dash?.setUnreadChatCount(total);
+            setUnread(total);
           } catch {
-            dash?.setUnreadChatCount(0);
+            setUnread(0);
           }
         };
         compute();
@@ -46,14 +48,14 @@ export function UnreadSync({ userId, username }: { userId: string; username: str
           };
         }
       } catch {
-        dash?.setUnreadChatCount(0);
+        setUnread(0);
       }
     };
     init();
     return () => {
       if (cleanup) cleanup();
     };
-  }, [dash, userId, username]);
+  }, [userId, username, setUnread]);
 
   return null;
 }

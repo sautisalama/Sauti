@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
@@ -76,7 +76,7 @@ export function EnhancedSidebar({
 	const [reportDialogOpen, setReportDialogOpen] = useState(false);
 	const [notifications, setNotifications] = useState(0);
 	const [casesCount, setCasesCount] = useState<number>(0);
-	const supabase = createClient();
+	const supabase = useMemo(() => createClient(), []);
 	const role = (dash?.data?.userType as any) ?? user?.profile?.user_type;
 
 	// Auto-collapse on mobile screen sizes
@@ -94,14 +94,15 @@ export function EnhancedSidebar({
 
 useEffect(() => {
 		// Prefer provider data when available to avoid extra fetches
-		if (dash?.data && typeof dash.data.casesCount === 'number') {
+		if (typeof dash?.data?.casesCount === 'number') {
 			setCasesCount(dash.data.casesCount);
 			return;
 		}
+		let cancelled = false;
 		const loadCases = async () => {
 			try {
 				if (role !== "professional" && role !== "ngo") {
-					setCasesCount(0);
+					if (!cancelled) setCasesCount(0);
 					return;
 				}
 				const uid = dash?.data?.userId || user?.id;
@@ -112,20 +113,21 @@ useEffect(() => {
 					.eq("user_id", uid);
 				const ids = (services || []).map((s: any) => s.id);
 				if (ids.length === 0) {
-					setCasesCount(0);
+					if (!cancelled) setCasesCount(0);
 					return;
 				}
 				const { count } = await supabase
 					.from("matched_services")
 					.select("id", { count: "exact", head: true })
 					.in("service_id", ids);
-				setCasesCount(count || 0);
+				if (!cancelled) setCasesCount(count || 0);
 			} catch {
 				// ignore
 			}
 		};
 		loadCases();
-	}, [dash?.data, role, user?.id, supabase]);
+		return () => { cancelled = true; };
+	}, [dash?.data?.casesCount, dash?.data?.userId, role, user?.id, supabase]);
 
 	const getSidebarItems = (): SidebarItem[] => {
 		const isDashboard = pathname?.startsWith("/dashboard");
@@ -398,7 +400,8 @@ useEffect(() => {
 		];
 	};
 
-	const sidebarItems = getSidebarItems();
+	// Compute items once per relevant inputs to avoid recomputing on each render
+	const sidebarItems = useMemo(() => getSidebarItems(), [pathname, role, casesCount, dash?.data?.unreadChatCount]);
 
 	const isActive = (item: SidebarItem) => {
 		if (!item.href) return false;

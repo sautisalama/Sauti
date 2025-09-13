@@ -35,7 +35,11 @@ export function DashboardDataProvider({
   const [data, setData] = useState<DashboardData | null>(initialData ?? null);
 
   const setUnreadChatCount = useCallback((n: number) => {
-    setData((prev) => (prev ? { ...prev, unreadChatCount: n } : prev));
+    setData((prev) => {
+      if (!prev) return prev;
+      if (prev.unreadChatCount === n) return prev; // avoid unnecessary updates/loops
+      return { ...prev, unreadChatCount: n };
+    });
   }, []);
 
   const updatePartial = useCallback((patch: Partial<DashboardData>) => {

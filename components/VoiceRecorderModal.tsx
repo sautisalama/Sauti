@@ -31,6 +31,8 @@ export function VoiceRecorderModal({ open, onOpenChange, onRecorded }: VoiceReco
     if (!open) {
       reset();
     }
+    // Reset elapsed timer values when closed to avoid lingering state growth
+    // (does not cause loops since open is controlled by parent)
   }, [open]);
 
   const startTimer = () => {
