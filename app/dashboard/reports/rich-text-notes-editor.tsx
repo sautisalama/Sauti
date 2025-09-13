@@ -33,7 +33,7 @@ export default function ReportNotesEditor({
 	onSaved,
 }: {
 	userId: string;
-	report: Tables<"reports">; // using DB type, admin JSON will be used to store notes
+	report: Tables<"reports">; // using DB type, notes column will be used to store HTML content
 	onSaved: (updated: Tables<"reports">) => void;
 }) {
 	const supabase = createClient();
@@ -42,9 +42,8 @@ export default function ReportNotesEditor({
 	const editorRef = useRef<HTMLDivElement | null>(null);
 
 	const initialHtml = useMemo(() => {
-		const admin: any = report.administrative || {};
-		return admin.user_notes_html || "";
-	}, [report.administrative]);
+		return report.notes || "";
+	}, [report.notes]);
 
 	useEffect(() => {
 		if (editorRef.current) {
@@ -148,12 +147,10 @@ export default function ReportNotesEditor({
 		try {
 			setSaving(true);
 			const html = editorRef.current?.innerHTML || "";
-			const currentAdmin: any = report.administrative || {};
-			const updatedAdmin = { ...currentAdmin, user_notes_html: html };
 
 			const { data, error } = await supabase
 				.from("reports")
-				.update({ administrative: updatedAdmin })
+				.update({ notes: html })
 				.eq("report_id", report.report_id)
 				.select()
 				.single();
