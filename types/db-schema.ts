@@ -165,6 +165,8 @@ export type Database = {
       }
       profiles: {
         Row: {
+          accreditation_files: Json | null
+          accreditation_member_number: Json | null
           avatar_url: string | null
           bio: string | null
           cal_link: string | null
@@ -175,14 +177,18 @@ export type Database = {
           google_calendar_token: string | null
           id: string
           is_public_booking: boolean | null
+          isVerified: boolean | null
           last_name: string | null
           phone: string | null
           professional_title: string | null
           profile_image_url: string | null
+          settings: Json | null
           updated_at: string | null
           user_type: Database["public"]["Enums"]["user_type"] | null
         }
         Insert: {
+          accreditation_files?: Json | null
+          accreditation_member_number?: Json | null
           avatar_url?: string | null
           bio?: string | null
           cal_link?: string | null
@@ -193,14 +199,18 @@ export type Database = {
           google_calendar_token?: string | null
           id: string
           is_public_booking?: boolean | null
+          isVerified?: boolean | null
           last_name?: string | null
           phone?: string | null
           professional_title?: string | null
           profile_image_url?: string | null
+          settings?: Json | null
           updated_at?: string | null
           user_type?: Database["public"]["Enums"]["user_type"] | null
         }
         Update: {
+          accreditation_files?: Json | null
+          accreditation_member_number?: Json | null
           avatar_url?: string | null
           bio?: string | null
           cal_link?: string | null
@@ -211,10 +221,12 @@ export type Database = {
           google_calendar_token?: string | null
           id?: string
           is_public_booking?: boolean | null
+          isVerified?: boolean | null
           last_name?: string | null
           phone?: string | null
           professional_title?: string | null
           profile_image_url?: string | null
+          settings?: Json | null
           updated_at?: string | null
           user_type?: Database["public"]["Enums"]["user_type"] | null
         }
@@ -238,6 +250,7 @@ export type Database = {
           first_name: string
           gender: Database["public"]["Enums"]["gender_type"] | null
           incident_description: string | null
+          is_onBehalf: boolean | null
           ismatched: boolean | null
           last_name: string | null
           latitude: number | null
@@ -245,6 +258,8 @@ export type Database = {
           location: string | null
           longitude: number | null
           match_status: Database["public"]["Enums"]["match_status_type"] | null
+          media: Json | null
+          notes: string | null
           phone: string | null
           plus_code: string | null
           postcode: string | null
@@ -281,6 +296,7 @@ export type Database = {
           first_name: string
           gender?: Database["public"]["Enums"]["gender_type"] | null
           incident_description?: string | null
+          is_onBehalf?: boolean | null
           ismatched?: boolean | null
           last_name?: string | null
           latitude?: number | null
@@ -288,6 +304,8 @@ export type Database = {
           location?: string | null
           longitude?: number | null
           match_status?: Database["public"]["Enums"]["match_status_type"] | null
+          media?: Json | null
+          notes?: string | null
           phone?: string | null
           plus_code?: string | null
           postcode?: string | null
@@ -324,6 +342,7 @@ export type Database = {
           first_name?: string
           gender?: Database["public"]["Enums"]["gender_type"] | null
           incident_description?: string | null
+          is_onBehalf?: boolean | null
           ismatched?: boolean | null
           last_name?: string | null
           latitude?: number | null
@@ -331,6 +350,8 @@ export type Database = {
           location?: string | null
           longitude?: number | null
           match_status?: Database["public"]["Enums"]["match_status_type"] | null
+          media?: Json | null
+          notes?: string | null
           phone?: string | null
           plus_code?: string | null
           postcode?: string | null
@@ -431,7 +452,13 @@ export type Database = {
       consent_type: "yes" | "no"
       contact_preference_type: "phone_call" | "sms" | "email" | "do_not_contact"
       gender_type: "female" | "male" | "non_binary" | "prefer_not_to_say"
-      incident_type: "physical" | "emotional" | "sexual" | "financial" | "other"
+      incident_type:
+        | "physical"
+        | "emotional"
+        | "sexual"
+        | "financial"
+        | "child_abuse"
+        | "other"
       language_type: "english" | "swahili" | "other"
       match_status_type:
         | "pending"
@@ -579,7 +606,14 @@ export const Constants = {
       consent_type: ["yes", "no"],
       contact_preference_type: ["phone_call", "sms", "email", "do_not_contact"],
       gender_type: ["female", "male", "non_binary", "prefer_not_to_say"],
-      incident_type: ["physical", "emotional", "sexual", "financial", "other"],
+      incident_type: [
+        "physical",
+        "emotional",
+        "sexual",
+        "financial",
+        "child_abuse",
+        "other",
+      ],
       language_type: ["english", "swahili", "other"],
       match_status_type: [
         "pending",

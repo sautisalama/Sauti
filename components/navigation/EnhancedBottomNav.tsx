@@ -13,6 +13,7 @@ import {
 import { useUser } from "@/hooks/useUser";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
+import { useDashboardData } from "@/components/providers/DashboardDataProvider";
 
 interface NavItem {
   id: string;
@@ -30,24 +31,44 @@ interface EnhancedBottomNavProps {
 export function EnhancedBottomNav({ forceShow = false, className }: EnhancedBottomNavProps) {
   const pathname = usePathname();
   const user = useUser();
+  const dash = useDashboardData();
   const [unreadMessages, setUnreadMessages] = useState(0);
   const [casesCount, setCasesCount] = useState(0);
   const [activeTab, setActiveTab] = useState<string>("");
+  const [chatActive, setChatActive] = useState(false);
+
+  useEffect(() => {
+    const handler = (e: Event) => {
+      try {
+        const ce = e as CustomEvent;
+        setChatActive(!!(ce?.detail?.active));
+      } catch {}
+    };
+    window.addEventListener('ss:chat-active', handler as EventListener);
+    return () => window.removeEventListener('ss:chat-active', handler as EventListener);
+  }, []);
 
   // Hide on immersive views unless forced to show
   const hide = forceShow ? false : (
     pathname?.startsWith("/dashboard/chat/") ||
-    pathname?.includes("/appointment/")
+    pathname?.includes("/appointment/") ||
+    chatActive
   );
 
   const isDashboard = pathname?.startsWith("/dashboard");
 
-  // Mock data and dynamic counts
+  // Use provider unread count when available
   useEffect(() => {
-    setUnreadMessages(3);
-  }, []);
+    if (typeof dash?.data?.unreadChatCount === 'number') {
+      setUnreadMessages(dash.data.unreadChatCount);
+    }
+  }, [dash?.data?.unreadChatCount]);
 
   useEffect(() => {
+    if (typeof dash?.data?.casesCount === 'number') {
+      setCasesCount(dash.data.casesCount);
+      return;
+    }
     const loadCases = async () => {
       try {
         if (user?.profile?.user_type !== 'professional' && user?.profile?.user_type !== 'ngo') {
@@ -67,7 +88,7 @@ export function EnhancedBottomNav({ forceShow = false, className }: EnhancedBott
       }
     };
     loadCases();
-  }, [user?.id, user?.profile?.user_type]);
+  }, [dash?.data, user?.id, user?.profile?.user_type]);
 
   // Navigation: role-aware mobile nav
   const getNavItems = (): NavItem[] => {
@@ -79,9 +100,9 @@ export function EnhancedBottomNav({ forceShow = false, className }: EnhancedBott
       // Professionals: prioritize cases
       return [
         { id: "overview", label: "Overview", icon: LayoutDashboard, href: "/dashboard" },
-        { id: "cases", label: "Cases", icon: ClipboardList, href: "/dashboard/cases", badge: casesCount },
+        { id: "cases", label: "Cases", icon: ClipboardList, href: "/dashboard/cases", badge: (casesCount > 0 ? casesCount : undefined) },
         { id: "schedule", label: "Schedule", icon: Calendar, href: "/dashboard/appointments" },
-        { id: "chat", label: "Chat", icon: MessageCircle, href: "/dashboard/chat", badge: unreadMessages },
+        { id: "chat", label: "Chat", icon: MessageCircle, href: "/dashboard/chat", badge: (unreadMessages > 0 ? unreadMessages : undefined) },
         { id: "resources", label: "Resources", icon: FileText, href: "/dashboard/resources" },
       ];
     }
@@ -90,7 +111,7 @@ export function EnhancedBottomNav({ forceShow = false, className }: EnhancedBott
     return [
       { id: "overview", label: "Overview", icon: LayoutDashboard, href: "/dashboard" },
       { id: "reports", label: "Reports", icon: ClipboardList, href: "/dashboard/reports" },
-      { id: "chat", label: "Chat", icon: MessageCircle, href: "/dashboard/chat", badge: unreadMessages },
+      { id: "chat", label: "Chat", icon: MessageCircle, href: "/dashboard/chat", badge: (unreadMessages > 0 ? unreadMessages : undefined) },
       { id: "resources", label: "Resources", icon: FileText, href: "/dashboard/resources" },
     ];
   };

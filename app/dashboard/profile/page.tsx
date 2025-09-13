@@ -1,242 +1,554 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useUser } from "@/hooks/useUser";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { AnonymousModeToggle } from "@/components/chat/AnonymousModeToggle";
 import { ProfessionalDocumentsForm } from "./professional-documents";
+import { signOut } from "@/app/(auth)/actions/auth";
+import { createClient } from "@/utils/supabase/client";
+import {
+	CheckCircle,
+	AlertCircle,
+	User,
+	Shield,
+	Building,
+	Settings,
+	Accessibility,
+} from "lucide-react";
+import {
+	Accordion,
+	AccordionContent,
+	AccordionItem,
+	AccordionTrigger,
+} from "@/components/ui/accordion";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 
-export default function ProfilePage() {
-  const user = useUser();
-  const { toast } = useToast();
-  const isProfessional = user?.profile?.user_type === "professional" || user?.profile?.user_type === "ngo";
-
-  const onSave = (section: string) => {
-    toast({ title: "Saved", description: `${section} updated (UI only)`, });
-  };
-
-  return (
-    <div className="max-w-5xl mx-auto p-4 md:p-6 space-y-6">
-      {/* Header */}
-      <div className="flex items-center gap-4">
-        {/* CTA to unify onboarding/profile */}
-        <div className="ml-auto">
-          <Button asChild variant="secondary" size="sm">
-            <a href="/dashboard/onboarding">Open Profile Setup</a>
-          </Button>
-        </div>
-        <div className="relative">
-          <Avatar className="h-16 w-16">
-            <AvatarImage src={(typeof window !== "undefined" && window.localStorage.getItem("ss_anon_mode") === "1") ? "/anon.svg" : (user?.profile?.avatar_url || "")} />
-            <AvatarFallback className="bg-sauti-orange text-white">
-              {user?.profile?.first_name?.[0]?.toUpperCase() || user?.email?.[0]?.toUpperCase() || "U"}
-            </AvatarFallback>
-          </Avatar>
-        </div>
-        <div className="min-w-0">
-          <h1 className="text-xl md:text-2xl font-bold truncate">{user?.profile?.first_name || user?.email || "User"}</h1>
-          <div className="flex items-center gap-2 mt-1 text-sm text-neutral-600">
-            {user?.profile?.user_type !== "survivor" && (
-              <Badge variant="secondary" className="capitalize">{user?.profile?.user_type || "member"}</Badge>
-            )}
-            <span className="text-neutral-400">•</span>
-            <span>ID: {user?.id?.slice(0, 8)}</span>
-          </div>
-        </div>
-      </div>
-
-      <Tabs defaultValue={isProfessional ? "overview" : "about"} className="w-full">
-        <TabsList className="w-full overflow-x-auto flex whitespace-nowrap">
-          {isProfessional ? (
-            <>
-              <TabsTrigger value="overview">Overview</TabsTrigger>
-              <TabsTrigger value="credentials">Credentials</TabsTrigger>
-              <TabsTrigger value="services">Services</TabsTrigger>
-              <TabsTrigger value="availability">Availability</TabsTrigger>
-              <TabsTrigger value="documents">Documents</TabsTrigger>
-            </>
-          ) : (
-            <>
-              <TabsTrigger value="about">About</TabsTrigger>
-              <TabsTrigger value="privacy">Privacy</TabsTrigger>
-            </>
-          )}
-        </TabsList>
-
-        {/* Professional: Overview */}
-        {isProfessional && (
-          <TabsContent value="overview" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>About</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <Textarea placeholder="Short bio, specialties, languages..." rows={4} />
-                <div className="flex justify-end">
-                  <Button onClick={() => onSave("About")}>Save</Button>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Contact</CardTitle>
-              </CardHeader>
-              <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <Input placeholder="Phone" />
-                <Input placeholder="Organization" />
-                <Input placeholder="Location / City" />
-                <div className="md:col-span-2 flex justify-end">
-                  <Button onClick={() => onSave("Contact")}>Save</Button>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-        )}
-
-        {/* Professional: Credentials */}
-        {isProfessional && (
-          <TabsContent value="credentials">
-            <Card>
-              <CardHeader>
-                <CardTitle>Credentials & Training</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-<div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                <Input placeholder="Certification / License" />
-                <Input placeholder="Issuing Authority" />
-                <Input placeholder="Year" />
-              </div>
-                <Input placeholder="Issuing Authority" />
-                <Input placeholder="Year" />
-                <Textarea placeholder="Relevant trainings, courses, certificates" rows={4} />
-                <div className="flex justify-end">
-                  <Button onClick={() => onSave("Credentials")}>Save</Button>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-        )}
-
-        {/* Professional: Services */}
-        {isProfessional && (
-          <TabsContent value="services">
-            <Card>
-              <CardHeader>
-                <CardTitle>Service Offerings</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-<div className="flex flex-wrap gap-2">
-                  <button className="px-3 py-1.5 rounded-full bg-neutral-100 text-sm">Counseling</button>
-                  <button className="px-3 py-1.5 rounded-full bg-neutral-100 text-sm">Legal Aid</button>
-                  <button className="px-3 py-1.5 rounded-full bg-neutral-100 text-sm">Shelter</button>
-                </div>
-                <Input placeholder="Add a service (e.g., Counseling, Legal Aid)" />
-                <Textarea placeholder="Service description" rows={3} />
-                <div className="flex justify-end">
-                  <Button onClick={() => onSave("Services")}>Save</Button>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-        )}
-
-        {/* Professional: Availability */}
-        {isProfessional && (
-          <TabsContent value="availability">
-            <Card>
-              <CardHeader>
-                <CardTitle>Availability</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-<div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                  <Input placeholder="Time zone" />
-                  <Input placeholder="Available days (e.g., Mon–Fri)" />
-                  <Input placeholder="Available hours (e.g., 09:00–17:00)" />
-                </div>
-                <p className="text-xs text-neutral-500">This is UI only. Availability does not change scheduling logic.</p>
-                <div className="flex justify-end">
-                  <Button onClick={() => onSave("Availability")}>Save</Button>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-        )}
-
-        {/* Professional: Documents */}
-        {isProfessional && (
-          <TabsContent value="documents">
-            <Card>
-              <CardHeader>
-                <CardTitle>Verification Documents</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <ProfessionalDocumentsForm onSave={() => onSave("Documents")} />
-              </CardContent>
-            </Card>
-          </TabsContent>
-        )}
-
-        {/* Survivor: About & Privacy */}
-        {/* Privacy & Identity */}
-        <TabsContent value={isProfessional ? "overview" : "about"} className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Privacy & Identity</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {user?.id && user?.profile?.first_name && (
-                <AnonymousModeToggle 
-                  userId={user.id}
-                  username={user.profile.first_name}
-                />
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {!isProfessional && (
-          <TabsContent value="about" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>About You</CardTitle>
-              </CardHeader>
-              <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <Input placeholder="First Name" defaultValue={user?.profile?.first_name || ""} />
-                <Input placeholder="Last Name" defaultValue={user?.profile?.last_name || ""} />
-                <Input placeholder="City" />
-                <div className="md:col-span-2 flex justify-end">
-                  <Button onClick={() => onSave("Profile")}>Save</Button>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-        )}
-
-        {!isProfessional && (
-          <TabsContent value="privacy">
-            <Card>
-              <CardHeader>
-                <CardTitle>Privacy Preferences</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <Textarea placeholder="Notes (UI only)" rows={3} />
-                <div className="flex justify-end">
-                  <Button onClick={() => onSave("Privacy")}>Save</Button>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-        )}
-      </Tabs>
-    </div>
-  );
+interface ProfileData {
+	bio?: string;
+	phone?: string;
+	professional_title?: string;
+	first_name?: string;
+	last_name?: string;
+	email?: string;
+	isVerified?: boolean;
+	accreditation_files?: any;
+	accreditation_member_number?: any;
+	settings?: any;
 }
 
+export default function ProfilePage() {
+	const user = useUser();
+	const { toast } = useToast();
+	const isProfessional =
+		user?.profile?.user_type === "professional" ||
+		user?.profile?.user_type === "ngo";
+	const supabase = createClient();
+
+	const [profileData, setProfileData] = useState<ProfileData>({});
+	const [isLoading, setIsLoading] = useState(true);
+	const [formData, setFormData] = useState<Record<string, any>>({});
+	const [activeTab, setActiveTab] = useState("profile");
+
+	// Load profile data
+	useEffect(() => {
+		if (user?.profile) {
+			setProfileData({
+				bio: user.profile.bio || "",
+				phone: user.profile.phone || "",
+				professional_title: user.profile.professional_title || "",
+				first_name: user.profile.first_name || "",
+				last_name: user.profile.last_name || "",
+				email: user.profile.email || "",
+				isVerified: user.profile.isVerified || false,
+				accreditation_files: user.profile.accreditation_files || null,
+				accreditation_member_number:
+					user.profile.accreditation_member_number || null,
+				settings: user.profile.settings || {},
+			});
+			setIsLoading(false);
+		}
+	}, [user]);
+
+	const updateFormData = (section: string, field: string, value: any) => {
+		setFormData((prev) => ({
+			...prev,
+			[section]: {
+				...prev[section],
+				[field]: value,
+			},
+		}));
+	};
+
+	const saveVerificationDocuments = async (documents: any[]) => {
+		try {
+			if (!user?.id) return;
+
+			const { error } = await supabase
+				.from("profiles")
+				.update({
+					accreditation_files: documents,
+					updated_at: new Date().toISOString(),
+				})
+				.eq("id", user.id);
+
+			if (error) throw error;
+
+			// Update local state
+			setProfileData((prev) => ({
+				...prev,
+				accreditation_files: documents,
+			}));
+
+			toast({
+				title: "Success",
+				description: "Verification documents saved successfully",
+			});
+		} catch (error) {
+			toast({
+				title: "Error",
+				description: "Failed to save verification documents",
+				variant: "destructive",
+			});
+		}
+	};
+
+	const saveSection = async (section: string) => {
+		try {
+			if (!user?.id) return;
+
+			const sectionData = formData[section] || {};
+			let updateData: any = {};
+
+			switch (section) {
+				case "basic":
+					updateData = {
+						first_name: sectionData.first_name || profileData.first_name,
+						last_name: sectionData.last_name || profileData.last_name,
+					};
+					break;
+				case "professional":
+					updateData = {
+						bio: sectionData.bio || profileData.bio,
+						professional_title:
+							sectionData.professional_title || profileData.professional_title,
+						phone: sectionData.phone || profileData.phone,
+					};
+					break;
+				case "verification":
+					// This will be handled by the ProfessionalDocumentsForm component
+					// The form will call onSave after uploading files
+					return;
+			}
+
+			const { error } = await supabase
+				.from("profiles")
+				.update(updateData)
+				.eq("id", user.id);
+
+			if (error) throw error;
+
+			// Update local state
+			setProfileData((prev) => ({ ...prev, ...updateData }));
+			toast({
+				title: "Saved",
+				description: `${section} information updated successfully`,
+			});
+		} catch (error) {
+			toast({
+				title: "Error",
+				description: `Failed to save ${section} information`,
+				variant: "destructive",
+			});
+		}
+	};
+
+	const getVerificationStatus = (section: string) => {
+		switch (section) {
+			case "professional":
+				return !!(
+					profileData.bio &&
+					profileData.professional_title &&
+					profileData.phone
+				);
+			case "verification":
+				return !!(
+					profileData.accreditation_files && profileData.accreditation_member_number
+				);
+			default:
+				return false;
+		}
+	};
+
+	const getCompletionPercentage = () => {
+		const sections = ["professional", "verification"];
+		const completedSections = sections.filter((section) =>
+			getVerificationStatus(section)
+		);
+		return Math.round((completedSections.length / sections.length) * 100);
+	};
+
+	if (isLoading) {
+		return (
+			<div className="min-h-screen bg-gray-50 flex items-center justify-center">
+				<div className="text-center">
+					<div className="animate-spin rounded-full h-12 w-12 border-b-2 border-sauti-orange mx-auto"></div>
+					<p className="mt-4 text-gray-600">Loading profile...</p>
+				</div>
+			</div>
+		);
+	}
+
+	return (
+		<div className="min-h-screen bg-gray-50">
+			{/* Header */}
+			<div className="bg-white border-b sticky top-0 z-50">
+				<div className="max-w-4xl mx-auto px-4 py-6">
+					<div className="flex items-center justify-between">
+						<div className="flex items-center gap-4">
+							<Avatar className="h-16 w-16">
+								<AvatarImage
+									src={
+										typeof window !== "undefined" &&
+										window.localStorage.getItem("ss_anon_mode") === "1"
+											? "/anon.svg"
+											: user?.profile?.avatar_url || ""
+									}
+								/>
+								<AvatarFallback className="bg-sauti-orange text-white">
+									{user?.profile?.first_name?.[0]?.toUpperCase() ||
+										user?.email?.[0]?.toUpperCase() ||
+										"U"}
+								</AvatarFallback>
+							</Avatar>
+							<div>
+								<h1 className="text-2xl font-bold">
+									{user?.profile?.first_name || user?.email || "User"}
+								</h1>
+								<div className="flex items-center gap-2 mt-1 text-sm text-gray-600">
+									{user?.profile?.user_type !== "survivor" && (
+										<Badge variant="secondary" className="capitalize">
+											{user?.profile?.user_type || "member"}
+										</Badge>
+									)}
+									{profileData.isVerified && (
+										<Badge variant="default" className="bg-green-100 text-green-800">
+											<CheckCircle className="h-3 w-3 mr-1" />
+											Verified
+										</Badge>
+									)}
+								</div>
+							</div>
+						</div>
+						<form action={signOut}>
+							<Button type="submit" variant="outline">
+								Sign out
+							</Button>
+						</form>
+					</div>
+				</div>
+			</div>
+
+			{/* Main Content */}
+			<div className="max-w-4xl mx-auto px-4 py-6">
+				<Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+					<TabsList className="grid w-full grid-cols-2 mb-6">
+						<TabsTrigger value="profile" className="flex items-center gap-2">
+							<User className="h-4 w-4" />
+							Profile
+						</TabsTrigger>
+						<TabsTrigger value="settings" className="flex items-center gap-2">
+							<Settings className="h-4 w-4" />
+							Settings
+						</TabsTrigger>
+					</TabsList>
+
+					<TabsContent value="profile" className="space-y-4">
+						{/* Basic Information Display */}
+						<Card>
+							<CardHeader>
+								<CardTitle className="flex items-center gap-2">
+									<User className="h-5 w-5 text-sauti-orange" />
+									Basic Information
+								</CardTitle>
+							</CardHeader>
+							<CardContent className="space-y-4">
+								<div className="grid grid-cols-2 gap-4">
+									<div>
+										<label className="text-sm font-medium text-gray-600">
+											First Name
+										</label>
+										<Input
+											placeholder="First Name"
+											value={profileData.first_name || ""}
+											onChange={(e) =>
+												updateFormData("basic", "first_name", e.target.value)
+											}
+											className="mt-1"
+										/>
+									</div>
+									<div>
+										<label className="text-sm font-medium text-gray-600">Last Name</label>
+										<Input
+											placeholder="Last Name"
+											value={profileData.last_name || ""}
+											onChange={(e) =>
+												updateFormData("basic", "last_name", e.target.value)
+											}
+											className="mt-1"
+										/>
+									</div>
+								</div>
+								<div>
+									<label className="text-sm font-medium text-gray-600">Email</label>
+									<p className="text-lg font-medium text-gray-900 mt-1">
+										{profileData.email || "Not provided"}
+									</p>
+									<p className="text-xs text-gray-500">Email cannot be changed</p>
+								</div>
+								<div className="flex justify-end">
+									<Button onClick={() => saveSection("basic")}>
+										Save Basic Information
+									</Button>
+								</div>
+							</CardContent>
+						</Card>
+
+						{/* Anonymous Mode & Privacy */}
+						<Card>
+							<CardHeader>
+								<CardTitle className="flex items-center gap-2">
+									<Shield className="h-5 w-5 text-sauti-orange" />
+									Privacy & Identity
+								</CardTitle>
+							</CardHeader>
+							<CardContent>
+								{user?.id && user?.profile?.first_name && (
+									<AnonymousModeToggle
+										userId={user.id}
+										username={user.profile.first_name}
+									/>
+								)}
+							</CardContent>
+						</Card>
+
+						{/* Profile Completion Status */}
+						<Card className="border-amber-200 bg-amber-50">
+							<CardContent className="pt-6">
+								<div className="flex items-start gap-3">
+									<AlertCircle className="h-5 w-5 text-amber-600 mt-0.5" />
+									<div className="flex-1">
+										<h3 className="font-semibold text-amber-800">
+											Profile Completion Status
+										</h3>
+										<p className="text-sm text-amber-700 mt-1">
+											Complete your profile to access all features and improve your
+											verification status.
+										</p>
+										<div className="mt-3">
+											<div className="flex items-center gap-2 text-sm text-amber-700">
+												<span>Overall Progress:</span>
+												<div className="flex-1 bg-amber-200 rounded-full h-2">
+													<div
+														className="bg-amber-600 h-2 rounded-full transition-all duration-300"
+														style={{ width: `${getCompletionPercentage()}%` }}
+													></div>
+												</div>
+												<span>{getCompletionPercentage()}%</span>
+											</div>
+										</div>
+									</div>
+								</div>
+							</CardContent>
+						</Card>
+
+						<Accordion type="multiple" className="space-y-4">
+							{/* Professional Information (for professionals only) */}
+							{isProfessional && (
+								<AccordionItem value="professional" className="border rounded-lg">
+									<Card>
+										<AccordionTrigger className="px-6 py-4 hover:no-underline">
+											<div className="flex items-center gap-3 text-left">
+												<Building className="h-5 w-5 text-sauti-orange" />
+												<div>
+													<CardTitle className="text-lg">Professional Information</CardTitle>
+													<p className="text-sm text-gray-600 mt-1">
+														Manage your professional details and credentials
+													</p>
+												</div>
+												{getVerificationStatus("professional") ? (
+													<CheckCircle className="h-5 w-5 text-green-500 ml-auto" />
+												) : (
+													<AlertCircle className="h-5 w-5 text-amber-500 ml-auto" />
+												)}
+											</div>
+										</AccordionTrigger>
+										<AccordionContent>
+											<CardContent className="space-y-4">
+												<div className="space-y-4">
+													<Input
+														placeholder="Professional Title"
+														defaultValue={profileData.professional_title || ""}
+														onChange={(e) =>
+															updateFormData(
+																"professional",
+																"professional_title",
+																e.target.value
+															)
+														}
+													/>
+													<Input
+														placeholder="Phone Number"
+														defaultValue={profileData.phone || ""}
+														onChange={(e) =>
+															updateFormData("professional", "phone", e.target.value)
+														}
+													/>
+													<Textarea
+														placeholder="Professional Bio - Describe your expertise, specialties, and languages..."
+														rows={4}
+														defaultValue={profileData.bio || ""}
+														onChange={(e) =>
+															updateFormData("professional", "bio", e.target.value)
+														}
+													/>
+												</div>
+												<div className="flex justify-end">
+													<Button onClick={() => saveSection("professional")}>
+														Save Professional Information
+													</Button>
+												</div>
+											</CardContent>
+										</AccordionContent>
+									</Card>
+								</AccordionItem>
+							)}
+
+							{/* Verification Documents (for professionals only) */}
+							{isProfessional && (
+								<AccordionItem value="verification" className="border rounded-lg">
+									<Card>
+										<AccordionTrigger className="px-6 py-4 hover:no-underline">
+											<div className="flex items-center gap-3 text-left">
+												<Shield className="h-5 w-5 text-sauti-orange" />
+												<div>
+													<CardTitle className="text-lg">Verification Documents</CardTitle>
+													<p className="text-sm text-gray-600 mt-1">
+														Upload your professional credentials and verification documents
+													</p>
+												</div>
+												{getVerificationStatus("verification") ? (
+													<CheckCircle className="h-5 w-5 text-green-500 ml-auto" />
+												) : (
+													<AlertCircle className="h-5 w-5 text-amber-500 ml-auto" />
+												)}
+											</div>
+										</AccordionTrigger>
+										<AccordionContent>
+											<CardContent className="space-y-4">
+												<ProfessionalDocumentsForm
+													onSave={() => saveSection("verification")}
+													onSaveDocuments={saveVerificationDocuments}
+													initialData={{
+														accreditation_files: profileData.accreditation_files,
+														accreditation_member_number:
+															profileData.accreditation_member_number,
+													}}
+												/>
+											</CardContent>
+										</AccordionContent>
+									</Card>
+								</AccordionItem>
+							)}
+						</Accordion>
+					</TabsContent>
+
+					<TabsContent value="settings" className="space-y-4">
+						<Card>
+							<CardHeader>
+								<CardTitle className="flex items-center gap-2">
+									<Accessibility className="h-5 w-5 text-sauti-orange" />
+									Accessibility Settings
+								</CardTitle>
+							</CardHeader>
+							<CardContent className="space-y-6">
+								<div className="space-y-4">
+									<h4 className="font-medium">Display Preferences</h4>
+									<div className="space-y-3">
+										<div className="flex items-center justify-between">
+											<div>
+												<p className="font-medium">High Contrast Mode</p>
+												<p className="text-sm text-gray-600">
+													Increase contrast for better visibility
+												</p>
+											</div>
+											<input type="checkbox" className="rounded" />
+										</div>
+										<div className="flex items-center justify-between">
+											<div>
+												<p className="font-medium">Large Text</p>
+												<p className="text-sm text-gray-600">
+													Increase text size for better readability
+												</p>
+											</div>
+											<input type="checkbox" className="rounded" />
+										</div>
+										<div className="flex items-center justify-between">
+											<div>
+												<p className="font-medium">Reduced Motion</p>
+												<p className="text-sm text-gray-600">
+													Minimize animations and transitions
+												</p>
+											</div>
+											<input type="checkbox" className="rounded" />
+										</div>
+									</div>
+								</div>
+
+								<div className="space-y-4">
+									<h4 className="font-medium">Privacy & Identity</h4>
+									{user?.id && user?.profile?.first_name && (
+										<AnonymousModeToggle
+											userId={user.id}
+											username={user.profile.first_name}
+										/>
+									)}
+								</div>
+
+								<div className="space-y-4">
+									<h4 className="font-medium">Notification Preferences</h4>
+									<div className="space-y-3">
+										<div className="flex items-center justify-between">
+											<div>
+												<p className="font-medium">Email Notifications</p>
+												<p className="text-sm text-gray-600">Receive updates via email</p>
+											</div>
+											<input type="checkbox" className="rounded" defaultChecked />
+										</div>
+										<div className="flex items-center justify-between">
+											<div>
+												<p className="font-medium">SMS Notifications</p>
+												<p className="text-sm text-gray-600">Receive updates via SMS</p>
+											</div>
+											<input type="checkbox" className="rounded" />
+										</div>
+									</div>
+								</div>
+
+								<div className="flex justify-end">
+									<Button onClick={() => saveSection("settings")}>Save Settings</Button>
+								</div>
+							</CardContent>
+						</Card>
+					</TabsContent>
+				</Tabs>
+			</div>
+		</div>
+	);
+}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
@@ -45,6 +45,7 @@ import { createClient } from "@/utils/supabase/client";
 import { signOut } from "@/app/(auth)/actions/auth";
 import ReportAbuseForm from "@/components/ReportAbuseForm";
 import { cn } from "@/lib/utils";
+import { useDashboardData } from "@/components/providers/DashboardDataProvider";
 
 interface SidebarItem {
 	id: string;
@@ -70,11 +71,13 @@ export function EnhancedSidebar({
 }: EnhancedSidebarProps) {
 	const pathname = usePathname();
 	const user = useUser();
+	const dash = useDashboardData();
 	const [isCollapsed, setIsCollapsed] = useState(defaultCollapsed);
 	const [reportDialogOpen, setReportDialogOpen] = useState(false);
-	const [notifications, setNotifications] = useState(5);
+	const [notifications, setNotifications] = useState(0);
 	const [casesCount, setCasesCount] = useState<number>(0);
-	const supabase = createClient();
+	const supabase = useMemo(() => createClient(), []);
+	const role = (dash?.data?.userType as any) ?? user?.profile?.user_type;
 
 	// Auto-collapse on mobile screen sizes
 	useEffect(() => {
@@ -89,17 +92,20 @@ export function EnhancedSidebar({
 		return () => window.removeEventListener("resize", handleResize);
 	}, []);
 
-	useEffect(() => {
+useEffect(() => {
+		// Prefer provider data when available to avoid extra fetches
+		if (typeof dash?.data?.casesCount === 'number') {
+			setCasesCount(dash.data.casesCount);
+			return;
+		}
+		let cancelled = false;
 		const loadCases = async () => {
 			try {
-				if (
-					user?.profile?.user_type !== "professional" &&
-					user?.profile?.user_type !== "ngo"
-				) {
-					setCasesCount(0);
+				if (role !== "professional" && role !== "ngo") {
+					if (!cancelled) setCasesCount(0);
 					return;
 				}
-				const uid = user?.id;
+				const uid = dash?.data?.userId || user?.id;
 				if (!uid) return;
 				const { data: services } = await supabase
 					.from("support_services")
@@ -107,20 +113,21 @@ export function EnhancedSidebar({
 					.eq("user_id", uid);
 				const ids = (services || []).map((s: any) => s.id);
 				if (ids.length === 0) {
-					setCasesCount(0);
+					if (!cancelled) setCasesCount(0);
 					return;
 				}
 				const { count } = await supabase
 					.from("matched_services")
 					.select("id", { count: "exact", head: true })
 					.in("service_id", ids);
-				setCasesCount(count || 0);
+				if (!cancelled) setCasesCount(count || 0);
 			} catch {
 				// ignore
 			}
 		};
 		loadCases();
-	}, [user?.id, user?.profile?.user_type, supabase]);
+		return () => { cancelled = true; };
+	}, [dash?.data?.casesCount, dash?.data?.userId, role, user?.id, supabase]);
 
 	const getSidebarItems = (): SidebarItem[] => {
 		const isDashboard = pathname?.startsWith("/dashboard");
@@ -170,7 +177,7 @@ export function EnhancedSidebar({
 			},
 		];
 
-		if (user?.profile?.user_type === "survivor") {
+		if (role === "survivor") {
 			const survivorMain: SidebarItem[] = [
 				...baseItems,
 				{
@@ -178,7 +185,7 @@ export function EnhancedSidebar({
 					label: "Messages",
 					icon: MessageCircle,
 					href: "/dashboard/chat",
-					badge: 3,
+					badge: (typeof dash?.data?.unreadChatCount === "number" && dash.data.unreadChatCount > 0) ? dash.data.unreadChatCount : undefined,
 					section: "main",
 				},
 				{
@@ -270,8 +277,8 @@ export function EnhancedSidebar({
 		}
 
 		if (
-			user?.profile?.user_type === "professional" ||
-			user?.profile?.user_type === "ngo"
+			role === "professional" ||
+			role === "ngo"
 		) {
 			const proMain: SidebarItem[] = [
 				...baseItems,
@@ -280,14 +287,14 @@ export function EnhancedSidebar({
 					label: "Case Management",
 					icon: ClipboardList,
 					href: "/dashboard/cases",
-					badge: casesCount || 0,
+					badge: (casesCount > 0 ? casesCount : undefined),
 					section: "main",
 				},
 				{
-					id: "appointments",
-					label: "Schedule",
-					icon: Calendar,
-					href: "/dashboard/appointments",
+					id: "reports",
+					label: "My reports",
+					icon: ClipboardList,
+					href: "/dashboard/reports",
 					section: "main",
 				},
 				{
@@ -295,7 +302,7 @@ export function EnhancedSidebar({
 					label: "Messages",
 					icon: MessageCircle,
 					href: "/dashboard/chat",
-					badge: 3,
+					badge: (typeof dash?.data?.unreadChatCount === "number" && dash.data.unreadChatCount > 0) ? dash.data.unreadChatCount : undefined,
 					section: "main",
 				},
 				{
@@ -342,10 +349,10 @@ export function EnhancedSidebar({
 					section: "main",
 				},
 				{
-					id: "appointments",
-					label: "Schedule",
-					icon: Calendar,
-					href: "/dashboard/appointments",
+					id: "reports",
+					label: "My reports",
+					icon: ClipboardList,
+					href: "/dashboard/reports",
 					section: "main",
 				},
 				{
@@ -393,7 +400,8 @@ export function EnhancedSidebar({
 		];
 	};
 
-	const sidebarItems = getSidebarItems();
+	// Compute items once per relevant inputs to avoid recomputing on each render
+	const sidebarItems = useMemo(() => getSidebarItems(), [pathname, role, casesCount, dash?.data?.unreadChatCount]);
 
 	const isActive = (item: SidebarItem) => {
 		if (!item.href) return false;
@@ -483,6 +491,13 @@ export function EnhancedSidebar({
 	);
 	const footerItems = sidebarItems.filter((item) => item.section === "footer");
 
+	// Keep notifications in sync with unread chat count from provider
+	useEffect(() => {
+		if (typeof dash?.data?.unreadChatCount === 'number') {
+			setNotifications(dash.data.unreadChatCount);
+		}
+	}, [dash?.data?.unreadChatCount]);
+
 	return (
 		<>
 			<div
@@ -497,7 +512,7 @@ export function EnhancedSidebar({
 					{!isCollapsed && (
 						<Link href="/dashboard" className="flex items-center gap-3">
 							<Image
-								src="/logo-small.png"
+								src="/small-logo.png"
 								alt="Sauti Salama"
 								width={32}
 								height={32}
@@ -553,36 +568,37 @@ export function EnhancedSidebar({
 					<div
 						className={cn("flex items-center gap-3", isCollapsed && "justify-center")}
 					>
-						<Avatar className="h-10 w-10">
-							<AvatarImage
-								src={
-									typeof window !== "undefined" &&
-									window.localStorage.getItem("ss_anon_mode") === "1"
-										? "/anon.svg"
-										: user?.profile?.avatar_url || ""
-								}
-							/>
-							<AvatarFallback className="bg-sauti-orange text-white">
-								{user?.profile?.first_name?.[0]?.toUpperCase() ||
-									user?.email?.[0]?.toUpperCase() ||
-									"U"}
-							</AvatarFallback>
-						</Avatar>
+					<Avatar className="h-10 w-10">
+						<AvatarImage
+							src={
+								typeof window !== "undefined" &&
+								window.localStorage.getItem("ss_anon_mode") === "1"
+									? "/anon.svg"
+									: dash?.data?.profile?.avatar_url || user?.profile?.avatar_url || ""
+							}
+						/>
+						<AvatarFallback className="bg-sauti-orange text-white">
+							{dash?.data?.profile?.first_name?.[0]?.toUpperCase() ||
+								user?.profile?.first_name?.[0]?.toUpperCase() ||
+								user?.email?.[0]?.toUpperCase() ||
+								"U"}
+						</AvatarFallback>
+					</Avatar>
 
 						{!isCollapsed && (
 							<div className="flex-1 min-w-0">
 								<p className="text-sm font-medium text-neutral-900 dark:text-neutral-100 truncate">
-									{user?.profile?.first_name || user?.email || "User"}
+									{dash?.data?.profile?.first_name || user?.email || "User"}
 								</p>
-								{user?.profile?.user_type !== "survivor" && (
+								{role !== "survivor" && (
 									<p className="text-xs text-neutral-500 truncate capitalize">
-										{user?.profile?.user_type || "Member"}
+										{role || "Member"}
 									</p>
 								)}
 							</div>
 						)}
 
-						{!isCollapsed && notifications > 0 && (
+						{!isCollapsed && (notifications > 0) && (
 							<Button variant="ghost" size="icon" className="h-8 w-8">
 								<div className="relative">
 									<Bell className="h-4 w-4" />

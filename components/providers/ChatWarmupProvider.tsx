@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useEffect, useCallback, ReactNode } from 'react';
+import { createContext, useContext, useEffect, useCallback, ReactNode, useMemo } from 'react';
 import { createClient } from '@/utils/supabase/client';
 import { warmupChat, warmupBothModes, isChatReady, disconnectPreloadedChat, clearAnonymousData } from '@/utils/chat/preload';
 
@@ -12,7 +12,7 @@ interface ChatWarmupContextType {
 const ChatWarmupContext = createContext<ChatWarmupContextType | null>(null);
 
 export function ChatWarmupProvider({ children }: { children: ReactNode }) {
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
 
   const warmupChatForUser = useCallback((userId: string, username: string, bothModes = true) => {
     console.log('🔥 Warming up chat for user:', username, bothModes ? '(both modes)' : '');

@@ -2,18 +2,27 @@
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { Button } from "./ui/button";
 import { createClient } from "@/utils/supabase/client";
 import { Tables } from "@/types/db-schema";
 import { MultiSelect } from "@/components/ui/multi-select";
+import { AudioMiniPlayer } from "@/components/ui/audio-mini-player";
 import {
 	SUPPORT_SERVICE_OPTIONS,
 	type SupportServiceType,
 } from "@/lib/constants";
 import { useUser } from "@/hooks/useUser";
-import { Mic, Square } from "lucide-react";
-import { useSpeechToText } from "@/hooks/useSpeechToText";
+import { VoiceRecorderEnhanced as InlineRecorder } from "@/components/VoiceRecorderEnhanced";
+import { EnhancedSelect } from "@/components/ui/enhanced-select";
+import { EnhancedToggle } from "@/components/ui/enhanced-toggle";
+import { normalizePhone } from "@/utils/phone";
+import {
+	validateAudioBlob,
+	generateAudioFilename,
+	createAudioMediaObject,
+} from "@/utils/media";
+import { getPhoneForAutofill } from "@/utils/phone-autofill";
 
 interface AuthenticatedReportAbuseFormProps {
 	onClose: () => void;
@@ -27,15 +36,65 @@ export default function AuthenticatedReportAbuseForm({
 	const { toast } = useToast();
 	const [loading, setLoading] = useState(false);
 	const [selectedServices, setSelectedServices] = useState<string[]>([]);
+	const [incidentTypes, setIncidentTypes] = useState<string[]>([]);
 	const [description, setDescription] = useState("");
-	const [draft, setDraft] = useState<any | null>(null);
-	const { isSupported, isListening, transcript, start, stop, reset } = useSpeechToText({ lang: "en-US", interimResults: true });
+	// Voice via modal only for consistency
 	const [location, setLocation] = useState<{
 		latitude: number;
 		longitude: number;
 	} | null>(null);
-	const supabase = createClient();
+	const [recorderOpen, setRecorderOpen] = useState(false);
+	const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
+	const [audioUrl, setAudioUrl] = useState<string | null>(null);
+	const [audioUploading, setAudioUploading] = useState(false);
+	const [audioUploadedUrl, setAudioUploadedUrl] = useState<string | null>(null);
+	const [audioUploadError, setAudioUploadError] = useState<string | null>(null);
+	const audioUploadPromiseRef = useRef<Promise<string> | null>(null);
+	const audioFilenameRef = useRef<string | null>(null);
+	const [isOnBehalf, setIsOnBehalf] = useState(false);
+	const [needsDisabled, setNeedsDisabled] = useState(false);
+	const [needsQueer, setNeedsQueer] = useState(false);
+	const [autofilledPhone, setAutofilledPhone] = useState<string | null>(null);
+	const [urgency, setUrgency] = useState<string>("");
+	const [contactPreference, setContactPreference] = useState<string>("");
+	const [consent, setConsent] = useState<string>("");
+	const supabase = useMemo(() => createClient(), []);
 	const user = useUser();
+
+	// Start uploading immediately when voice note is attached
+	const startAudioUpload = (blob: Blob): Promise<string> => {
+		const validation = validateAudioBlob(blob);
+		if (!validation.valid) {
+			setAudioUploadError(validation.error || "Invalid audio");
+			return Promise.reject(new Error(validation.error || "Invalid audio"));
+		}
+		setAudioUploading(true);
+		setAudioUploadError(null);
+		setAudioUploadedUrl(null);
+		const filename = generateAudioFilename(blob);
+		audioFilenameRef.current = filename;
+		const promise = supabase.storage
+			.from("report-audio")
+			.upload(filename, blob, {
+				contentType: blob.type || "audio/webm",
+				cacheControl: "3600",
+				upsert: false,
+			})
+			.then(({ error }) => {
+				if (error) throw error;
+				const { data } = supabase.storage.from("report-audio").getPublicUrl(filename);
+				setAudioUploadedUrl(data.publicUrl);
+				setAudioUploading(false);
+				return data.publicUrl;
+			})
+			.catch((err) => {
+				setAudioUploading(false);
+				setAudioUploadError(err?.message || "Failed to upload audio");
+				throw err;
+			});
+		audioUploadPromiseRef.current = promise;
+		return promise;
+	};
 
 	useEffect(() => {
 		if ("geolocation" in navigator) {
@@ -57,28 +116,20 @@ export default function AuthenticatedReportAbuseForm({
 				}
 			);
 		}
-	}, [toast]);
+	}, [toast]); // Include toast in dependencies
 
+	// Autofill phone number from user profile or previous reports
 	useEffect(() => {
-		try {
-			const saved = localStorage.getItem("authReportDraft");
-			if (saved) {
-				const parsed = JSON.parse(saved);
-				setDraft(parsed);
-				if (parsed.description) setDescription(parsed.description);
-				if (parsed.selectedServices) setSelectedServices(parsed.selectedServices);
-    }
-    } catch (e) {
-      // ignore draft load errors
-    }
-  }, []);
-
-	useEffect(() => {
-		if (!isListening && transcript) {
-			setDescription((prev) => (prev ? `${prev} ${transcript.trim()}` : transcript.trim()));
-			reset();
-		}
-	}, [isListening, transcript, reset]);
+		const autofillPhone = async () => {
+			if (userId) {
+				const result = await getPhoneForAutofill(userId);
+				if (result.phone) {
+					setAutofilledPhone(result.phone);
+				}
+			}
+		};
+		autofillPhone();
+	}, [userId]);
 
 	const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
 		e.preventDefault();
@@ -87,7 +138,12 @@ export default function AuthenticatedReportAbuseForm({
 		const form = e.currentTarget;
 		const formData = new FormData(form);
 		const contactPreference = formData.get("contact_preference");
-		const phone = formData.get("phone");
+		const rawPhone = formData.get("phone") as string;
+		const phone = normalizePhone(rawPhone);
+
+		console.log("Phone validation:", { rawPhone, phone, contactPreference });
+
+		// Description and voice recording are now completely optional
 
 		if (
 			(contactPreference === "phone_call" || contactPreference === "sms") &&
@@ -103,21 +159,77 @@ export default function AuthenticatedReportAbuseForm({
 			return;
 		}
 
+	// Use pre-uploaded audio if available; otherwise finish or start upload now
+	let media: { title: string; url: string; type: string; size: number } | null = null;
+	if (audioBlob) {
+		// Validate first
+		const validation = validateAudioBlob(audioBlob);
+		if (!validation.valid) {
+			toast({
+				title: "Invalid Audio",
+				description: validation.error || "Audio file is invalid",
+				variant: "destructive",
+			});
+			setLoading(false);
+			return;
+		}
+		try {
+			let url = audioUploadedUrl;
+			if (!url && audioUploadPromiseRef.current) {
+				toast({ title: "Finalizing voice note upload..." });
+				url = await audioUploadPromiseRef.current;
+			}
+			if (!url) {
+				url = await startAudioUpload(audioBlob);
+			}
+			if (url) {
+				media = createAudioMediaObject(url, audioBlob);
+			}
+		} catch (e) {
+			console.error("Audio upload error:", e);
+			toast({
+				title: "Audio Upload Failed",
+				description: "Could not upload your voice note. Submitting without it.",
+				variant: "destructive",
+			});
+		}
+	}
+
+		// Map the first selected enum-allowed incident to type_of_incident
+		const allowed: Record<string, string> = {
+			physical: "physical",
+			emotional: "emotional",
+			sexual: "sexual",
+			financial: "financial",
+			child_abuse: "child_abuse",
+			other: "other",
+		};
+		const first = incidentTypes.find((t) => allowed[t]);
+		const type_of_incident = (first as any) || "other";
+
 		const data = {
 			first_name: user?.profile?.first_name,
 			last_name: user?.profile?.last_name || null,
 			user_id: userId,
 			phone: phone,
-			type_of_incident: formData.get("incident_type"),
-			incident_description: description,
+			type_of_incident,
+			// With expanded enum, you can also allow multi-select here:
+			// If you add MultiSelect later, map the first choice to type_of_incident and store all in additional_info
+			incident_description: description || null,
 			urgency: formData.get("urgency"),
-			consent: formData.get("consent"),
+			consent: formData.get("consent") || null,
 			contact_preference: contactPreference,
 			required_services: selectedServices,
 			latitude: location?.latitude || null,
 			longitude: location?.longitude || null,
 			submission_timestamp: new Date().toISOString(),
 			email: user?.profile?.email || null,
+			media,
+			is_onBehalf: isOnBehalf,
+			additional_info: {
+				incident_types: incidentTypes,
+				special_needs: { disabled: needsDisabled, queer_support: needsQueer },
+			},
 		};
 
 		try {
@@ -136,9 +248,8 @@ export default function AuthenticatedReportAbuseForm({
 				description: "Thank you for your report. We will review it shortly.",
 			});
 
-            form.reset();
-            try { localStorage.removeItem("authReportDraft"); } catch (e) { /* ignore */ }
-            setTimeout(() => {
+			form.reset();
+			setTimeout(() => {
 				onClose();
 			}, 500);
 		} catch (error) {
@@ -159,67 +270,157 @@ export default function AuthenticatedReportAbuseForm({
 	return (
 		<form
 			onSubmit={handleSubmit}
-			className="relative w-full max-w-[1200px] max-h-[80vh] flex flex-col"
+			className="relative w-full max-w-[1200px] max-h-[80vh] flex flex-col px-4 sm:px-6"
 		>
-			<div className="flex-1 overflow-y-auto space-y-6 pr-4 pb-20">
-				<div className="flex items-center gap-4 flex-wrap">
-					<p className="text-lg text-gray-700">I want to report about</p>
-					<select
-						name="incident_type"
-						required
-						className="border-b-2 border-teal-500 focus:outline-none px-2 bg-transparent"
-					>
-						<option value="">select incident type</option>
-						<option value="physical">physical abuse</option>
-						<option value="emotional">emotional abuse</option>
-						<option value="sexual">sexual abuse</option>
-						<option value="financial">financial abuse</option>
-						<option value="other">other concerns</option>
-					</select>
-					<p className="text-lg text-gray-700">with</p>
-					<select
-						name="urgency"
-						required
-						className="border-b-2 border-teal-500 focus:outline-none px-2 bg-transparent"
-					>
-						<option value="">select urgency</option>
-						<option value="high">high urgency</option>
-						<option value="medium">medium urgency</option>
-						<option value="low">low urgency</option>
-					</select>
+			<div className="flex-1 overflow-y-auto space-y-6 px-1 sm:px-4 pb-32">
+				<div className="space-y-4">
+					<EnhancedToggle
+						id="onbehalf-auth"
+						checked={isOnBehalf}
+						onCheckedChange={setIsOnBehalf}
+						label="Reporting on behalf of someone else"
+						description="Check this if you're submitting a report for another person"
+					/>
+					<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+						<div>
+							<label className="block text-sm font-medium text-gray-700 mb-2">
+								Incident Type *
+							</label>
+							<MultiSelect
+								selected={incidentTypes}
+								onChange={setIncidentTypes}
+								options={[
+									{ value: "physical", label: "Physical abuse" },
+									{ value: "emotional", label: "Emotional abuse" },
+									{ value: "sexual", label: "Sexual abuse" },
+									{ value: "financial", label: "Financial abuse" },
+									{ value: "child_abuse", label: "Child abuse" },
+									{ value: "other", label: "Other" },
+								]}
+								placeholder="Select incident types"
+							/>
+						</div>
+						<div>
+							<label className="block text-sm font-medium text-gray-700 mb-2">
+								Urgency Level *
+							</label>
+							<EnhancedSelect
+								options={[
+									{ value: "high", label: "High urgency" },
+									{ value: "medium", label: "Medium urgency" },
+									{ value: "low", label: "Low urgency" },
+								]}
+								value={urgency}
+								onChange={(value) => {
+									setUrgency(value);
+									const form = document.querySelector("form") as HTMLFormElement;
+									const select = form.querySelector(
+										'select[name="urgency"]'
+									) as HTMLSelectElement;
+									if (select) select.value = value;
+								}}
+								placeholder="Select urgency level"
+								required
+								name="urgency"
+							/>
+							<select name="urgency" className="hidden">
+								<option value="">select urgency</option>
+								<option value="high">high urgency</option>
+								<option value="medium">medium urgency</option>
+								<option value="low">low urgency</option>
+							</select>
+						</div>
+					</div>
 				</div>
 
-				<div className="w-full space-y-2">
-					<div className="flex items-center justify-between">
-						<span className="text-xs text-gray-500">You can speak instead of typing</span>
+				<div className="w-full space-y-3">
+					<div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
+						<span className="text-sm text-gray-600">
+							Share your story in writing or by voice (you can start with either)
+						</span>
 						<Button
 							type="button"
-							variant={isListening ? "destructive" : "outline"}
+							variant="outline"
 							size="sm"
-							onClick={() => (isListening ? stop() : start())}
+							onClick={() => setRecorderOpen((v) => !v)}
+							className="w-full md:w-auto"
 						>
-							{isListening ? (
-								<>
-									<Square className="h-4 w-4 mr-2" /> Stop
-								</>
-							) : (
-								<>
-									<Mic className="h-4 w-4 mr-2" /> Speak
-								</>
-							)}
+							{recorderOpen ? "Hide voice recorder" : "Record voice note"}
 						</Button>
 					</div>
+
+					{recorderOpen && (
+						<div className="mt-2 fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-3 sm:p-4">
+							<div className="bg-white rounded-2xl p-4 sm:p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
+								<InlineRecorder
+									onRecorded={(blob) => {
+										setAudioBlob(blob);
+										try {
+											const url = URL.createObjectURL(blob);
+											setAudioUrl(url);
+										} catch (e) {
+											console.debug("Error creating audio URL:", e);
+										}
+										try { startAudioUpload(blob); } catch {}
+									}}
+									onClose={() => setRecorderOpen(false)}
+								/>
+								{audioUploading && (
+									<p className="text-xs text-gray-500 mt-2">Uploading voice note in background…</p>
+								)}
+								{audioUploadedUrl && !audioUploading && (
+									<p className="text-xs text-green-600 mt-2">Voice note uploaded ✓</p>
+								)}
+								{audioUploadError && (
+									<p className="text-xs text-red-600 mt-2">{audioUploadError}</p>
+								)}
+							</div>
+						</div>
+					)}
+
+					{audioUrl && (
+						<div className="p-3 bg-green-50 border border-green-200 rounded-lg">
+							<div className="flex items-center justify-between mb-2">
+								<span className="text-sm font-medium text-green-700">
+									Voice note attached
+								</span>
+								<Button
+									type="button"
+									variant="ghost"
+									size="sm"
+									onClick={() => {
+										setAudioUrl(null);
+										setAudioBlob(null);
+										setAudioUploadedUrl(null);
+										setAudioUploadError(null);
+										audioUploadPromiseRef.current = null;
+										audioFilenameRef.current = null;
+										setAudioUploading(false);
+									}}
+								>
+									Remove
+								</Button>
+							</div>
+								<AudioMiniPlayer src={audioUrl || ""} />
+						</div>
+					)}
+
 					<Textarea
-						placeholder="Please share what happened..."
+						placeholder="Please share what happened... (optional)"
 						name="incident_description"
-						required
-						className="min-h-[140px] w-full"
+						className="min-h-[120px] w-full text-base"
 						value={description}
 						onChange={(e) => setDescription(e.target.value)}
 					/>
-					{!isSupported && (
-						<p className="text-xs text-gray-400">
-							Voice input is not supported on this device/browser.
+					{audioUrl && (
+						<p className="text-xs text-gray-500">
+							✓ Voice note attached - you can add additional text details if needed
+						</p>
+					)}
+					{!audioUrl && !description && (
+						<p className="text-xs text-gray-500">
+							💡 You can optionally describe what happened in writing, by voice, or
+							both
 						</p>
 					)}
 				</div>
@@ -229,43 +430,80 @@ export default function AuthenticatedReportAbuseForm({
 					<p className="text-sm text-gray-500">
 						Select all that apply in order of priority
 					</p>
-									<MultiSelect
-										selected={selectedServices}
-										onChange={setSelectedServices}
-										options={SUPPORT_SERVICE_OPTIONS}
-										placeholder="Select required services..."
-									/>
-									{draft?.selectedServices && draft.selectedServices.length > 0 && (
-										<p className="text-xs text-gray-400">Draft selected: {draft.selectedServices.join(", ")}</p>
-									)}
+					<MultiSelect
+						selected={selectedServices}
+						onChange={setSelectedServices}
+						options={SUPPORT_SERVICE_OPTIONS}
+						placeholder="Select required services..."
+					/>
 				</div>
 
 				<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+					<div className="col-span-full flex items-center gap-4">
+						<label className="inline-flex items-center gap-2 text-sm">
+							<input
+								type="checkbox"
+								checked={needsDisabled}
+								onChange={(e) => setNeedsDisabled(e.target.checked)}
+							/>{" "}
+							I am disabled
+						</label>
+						<label className="inline-flex items-center gap-2 text-sm">
+							<input
+								type="checkbox"
+								checked={needsQueer}
+								onChange={(e) => setNeedsQueer(e.target.checked)}
+							/>{" "}
+							I need queer support
+						</label>
+					</div>
 					<div className="col-span-full">
 						<p className="text-lg text-gray-700">Contact Preference:</p>
 					</div>
-					<Input
-						placeholder="Your phone number"
-						name="phone"
-						type="text"
-						pattern="[0-9]{10,}"
-						className="w-full"
-					/>
-					<select
-						name="contact_preference"
-						required
-						className="border-b-2 border-teal-500 focus:outline-none px-2 bg-transparent"
-						onChange={(e) => {
+					<div className="space-y-1">
+						<Input
+							placeholder="Your phone number"
+							name="phone"
+							type="tel"
+							className="w-full"
+							defaultValue={autofilledPhone || ""}
+						/>
+						{autofilledPhone && (
+							<p className="text-xs text-green-600">
+								✓ Phone number filled from your profile
+							</p>
+						)}
+					</div>
+					<EnhancedSelect
+						options={[
+							{ value: "phone_call", label: "Call me" },
+							{ value: "sms", label: "Text me" },
+							{ value: "email", label: "Email me" },
+							{ value: "do_not_contact", label: "Don't contact me" },
+						]}
+						value={contactPreference}
+						onChange={(value) => {
+							setContactPreference(value);
+							const form = document.querySelector("form") as HTMLFormElement;
+							const select = form.querySelector(
+								'select[name="contact_preference"]'
+							) as HTMLSelectElement;
+							if (select) select.value = value;
+
 							const phoneInput = document.querySelector(
 								'input[name="phone"]'
 							) as HTMLInputElement;
-							if (e.target.value === "phone_call" || e.target.value === "sms") {
+							if (value === "phone_call" || value === "sms") {
 								phoneInput.required = true;
 							} else {
 								phoneInput.required = false;
 							}
 						}}
-					>
+						placeholder="Select contact preference"
+						required
+						name="contact_preference"
+					/>
+					<select name="contact_preference" className="hidden">
 						<option value="">select contact preference</option>
 						<option value="phone_call">Call me</option>
 						<option value="sms">Text me</option>
@@ -274,16 +512,29 @@ export default function AuthenticatedReportAbuseForm({
 					</select>
 				</div>
 
-				<div className="flex items-center gap-4 justify-between">
-					<p className="text-lg text-gray-700">
-						Do you consent to share this information with relevant authorities if
-						needed?
-					</p>
-					<select
-						name="consent"
+				<div className="space-y-3">
+					<label className="block text-sm font-medium text-gray-700">
+						Consent to share information with authorities *
+					</label>
+					<EnhancedSelect
+						options={[
+							{ value: "yes", label: "Yes, I consent" },
+							{ value: "no", label: "No, I don't consent" },
+						]}
+						value={consent}
+						onChange={(value) => {
+							setConsent(value);
+							const form = document.querySelector("form") as HTMLFormElement;
+							const select = form.querySelector(
+								'select[name="consent"]'
+							) as HTMLSelectElement;
+							if (select) select.value = value;
+						}}
+						placeholder="Select consent option"
 						required
-						className="border-b-2 border-teal-500 focus:outline-none px-2 bg-transparent w-[200px]"
-					>
+						name="consent"
+					/>
+					<select name="consent" className="hidden">
 						<option value="">select consent</option>
 						<option value="yes">Yes, I consent</option>
 						<option value="no">No, I don't consent</option>
@@ -291,33 +542,14 @@ export default function AuthenticatedReportAbuseForm({
 				</div>
 			</div>
 
-			<div className="fixed bottom-0 left-0 right-0 pt-4 pb-4 bg-white border-t mt-4 z-50">
-				<div className="max-w-[1200px] mx-auto px-4 flex flex-col sm:flex-row gap-2">
+			<div className="fixed bottom-0 left-0 right-0 pt-4 pb-4 bg-white border-t mt-4 z-40">
+				<div className="max-w-[1200px] mx-auto px-4 space-y-2">
 					<Button
 						type="submit"
-						className="w-full sm:flex-1"
+						className="w-full bg-blue-600 hover:bg-blue-700 text-white py-4 text-base sm:text-lg font-medium rounded-xl shadow-lg hover:shadow-xl transition-all duration-200"
 						disabled={loading}
 					>
 						{loading ? "Submitting..." : "Submit Report"}
-					</Button>
-					<Button
-						variant="outline"
-						onClick={(e) => {
-							const form = (e.currentTarget.closest("form") as HTMLFormElement)!;
-							const fd = new FormData(form);
-							const toSave = Object.fromEntries(fd.entries());
-            (toSave as any).description = description;
-            (toSave as any).selectedServices = selectedServices;
-            try { localStorage.setItem("authReportDraft", JSON.stringify(toSave)); setDraft(toSave); } catch (e) { /* ignore */ }
-						}}
-					>
-						Save Draft
-					</Button>
-					<Button
-            variant="ghost"
-            onClick={() => { try { localStorage.removeItem("authReportDraft"); setDraft(null); setDescription(""); setSelectedServices([]); } catch (e) { /* ignore */ } }}
-					>
-						Clear Draft
 					</Button>
 				</div>
 			</div>

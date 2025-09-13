@@ -24,6 +24,12 @@ export function DMChat({ userId, username, channelId }: { userId: string; userna
   const [showSchedule, setShowSchedule] = useState(false);
   const [mediaCounts, setMediaCounts] = useState<{ attachments: number; links: number }>({ attachments: 0, links: 0 });
 
+  // Hide mobile bottom nav while in a DM
+  useEffect(() => {
+    try { window.dispatchEvent(new CustomEvent('ss:chat-active', { detail: { active: true } })); } catch {}
+    return () => { try { window.dispatchEvent(new CustomEvent('ss:chat-active', { detail: { active: false } })); } catch {} };
+  }, []);
+
   const collectMedia = (ch: any) => {
     try {
       const msgs: any[] = ch?.state?.messages || [];

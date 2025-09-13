@@ -20,7 +20,7 @@ export async function POST(request: Request) {
 			user_id: formData.user_id,
 			phone: formData.phone,
 			type_of_incident: formData.type_of_incident,
-			incident_description: formData.incident_description,
+			incident_description: formData.incident_description || null,
 			urgency: formData.urgency,
 			consent: formData.consent,
 			contact_preference: formData.contact_preference,
@@ -28,6 +28,10 @@ export async function POST(request: Request) {
 			latitude: formData.latitude,
 			longitude: formData.longitude,
 			submission_timestamp: formData.submission_timestamp,
+			administrative: formData.administrative || null,
+			media: formData.media || null,
+			is_onBehalf: !!formData.is_onBehalf,
+			additional_info: formData.additional_info || null,
 			// Initialize match-related fields
 			ismatched: false,
 			match_status: "pending" as Database["public"]["Enums"]["match_status_type"],
@@ -49,6 +53,25 @@ export async function POST(request: Request) {
 			// Continue with the process even if matching fails
 		}
 
+		// If report includes a phone and belongs to an unauth user, attempt to link to existing profile by phone
+		try {
+			if (!insertedReport.user_id && insertedReport.phone) {
+				const { data: profile } = await supabase
+					.from("profiles")
+					.select("id")
+					.eq("phone", insertedReport.phone)
+					.single();
+				if (profile?.id) {
+					await supabase
+						.from("reports")
+						.update({ user_id: profile.id })
+						.eq("report_id", insertedReport.report_id);
+				}
+			}
+		} catch (linkErr) {
+			console.warn("Auto-link by phone failed", linkErr);
+		}
+
 		try {
 			await client.send({
 				from: REPORT_EMAIL_SENDER,
@@ -58,8 +81,15 @@ export async function POST(request: Request) {
 					New abuse report submitted:
 					Type of Incident: ${formData.type_of_incident}
 					Urgency: ${formData.urgency}
-					Description: ${formData.incident_description}
-					Required Services: ${formData.required_services.join(", ")}
+					Description: ${formData.incident_description || "(none)"}
+					Required Services: ${
+						Array.isArray(formData.required_services)
+							? formData.required_services.join(", ")
+							: formData.required_services || ""
+					}
+					Voice Note: ${
+						formData?.media?.url ? `Available at ${formData.media.url}` : "(none)"
+					}
 					Reporter Information:
 					Name: ${formData.first_name}
 					Email: ${formData.email}

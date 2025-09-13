@@ -25,9 +25,12 @@ export function MultiSelect({
 	const [open, setOpen] = React.useState(false);
 	const [inputValue, setInputValue] = React.useState("");
 
-	const handleUnselect = (option: string) => {
-		onChange(selected.filter((s) => s !== option));
-	};
+	const handleUnselect = React.useCallback(
+		(option: string) => {
+			onChange(selected.filter((s) => s !== option));
+		},
+		[selected, onChange]
+	);
 
 	const handleKeyDown = React.useCallback(
 		(e: React.KeyboardEvent<HTMLDivElement>) => {
@@ -38,21 +41,30 @@ export function MultiSelect({
 		[inputValue, onChange, selected]
 	);
 
-	const handleSelect = (optionValue: string) => {
-		onChange(
-			selected.includes(optionValue)
-				? selected.filter((s) => s !== optionValue)
-				: [...selected, optionValue]
-		);
-		setInputValue("");
-		setOpen(false);
-	};
+	const handleSelect = React.useCallback(
+		(optionValue: string) => {
+			onChange(
+				selected.includes(optionValue)
+					? selected.filter((s) => s !== optionValue)
+					: [...selected, optionValue]
+			);
+			setInputValue("");
+			setOpen(false);
+		},
+		[selected, onChange]
+	);
 
 	return (
 		<div className="relative">
 			<div
 				className="group border border-input px-3 py-2 text-sm ring-offset-background rounded-md focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2"
-				onClick={() => setOpen(true)}
+				onMouseDown={(e) => {
+					// Focus input to open the menu; avoid toggling state if already focused
+					if (document.activeElement !== inputRef.current) {
+						e.preventDefault();
+						inputRef.current?.focus();
+					}
+				}}
 			>
 				<div className="flex gap-1 flex-wrap">
 					{selected.map((option) => {

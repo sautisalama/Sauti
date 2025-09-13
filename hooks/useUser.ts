@@ -10,15 +10,17 @@ type UserWithProfile = User & {
 
 export function useUser() {
 	const [user, setUser] = useState<UserWithProfile | null>(null);
-	const supabase = createClient();
 
 	useEffect(() => {
+		const supabase = createClient();
+		let cancelled = false;
 		const getUser = async () => {
 			// Get authenticated user
 			const {
 				data: { user: authUser },
 			} = await supabase.auth.getUser();
 
+			if (cancelled) return;
 			if (authUser) {
 				// Fetch profile data
 				const { data: profile } = await supabase
@@ -27,6 +29,7 @@ export function useUser() {
 					.eq("id", authUser.id)
 					.single();
 
+				if (cancelled) return;
 				// Combine auth user with profile data
 				setUser({ ...authUser, profile });
 			} else {
@@ -35,7 +38,10 @@ export function useUser() {
 		};
 
 		getUser();
-	}, [supabase]);
+		return () => {
+			cancelled = true;
+		};
+	}, []);
 
 	return user;
 }

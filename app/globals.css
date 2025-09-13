@@ -188,3 +188,29 @@ html[data-a11y-high-contrast="1"] {
 		@apply absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/60 to-transparent text-white;
 	}
 }
+
+/* Mobile landscape guard overlay for portrait-only experience */
+.orientation-lock-portrait {
+  display: none;
+}
+@media screen and (max-width: 900px) and (orientation: landscape) {
+  .orientation-lock-portrait {
+    display: flex;
+  }
+}
+.recording-pulse {
+  position: relative;
+}
+.recording-pulse::before {
+  content: "";
+  position: absolute;
+  inset: -8px;
+  border-radius: 9999px;
+  background: rgba(239, 68, 68, 0.25);
+  animation: pulseRing 1.2s ease-out infinite;
+}
+@keyframes pulseRing {
+  0% { transform: scale(0.8); opacity: 0.6; }
+  80% { transform: scale(1.4); opacity: 0; }
+  100% { transform: scale(1.4); opacity: 0; }
+}
