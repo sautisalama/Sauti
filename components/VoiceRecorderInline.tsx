@@ -105,6 +105,7 @@ export function VoiceRecorderInline({
 		try {
 			setPermissionError(null);
 			setUnsupported(false);
+			// Request microphone permission - this can be done at any time
 			const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
 			const mr = new MediaRecorder(stream);
 			const localChunks: Blob[] = [];

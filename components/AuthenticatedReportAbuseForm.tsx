@@ -22,6 +22,7 @@ import {
 	generateAudioFilename,
 	createAudioMediaObject,
 } from "@/utils/media";
+import { getPhoneForAutofill } from "@/utils/phone-autofill";
 
 interface AuthenticatedReportAbuseFormProps {
 	onClose: () => void;
@@ -49,6 +50,7 @@ export default function AuthenticatedReportAbuseForm({
 	const [isOnBehalf, setIsOnBehalf] = useState(false);
 	const [needsDisabled, setNeedsDisabled] = useState(false);
 	const [needsQueer, setNeedsQueer] = useState(false);
+	const [autofilledPhone, setAutofilledPhone] = useState<string | null>(null);
 	const supabase = useMemo(() => createClient(), []);
 	const user = useUser();
 
@@ -89,6 +91,19 @@ export default function AuthenticatedReportAbuseForm({
 		}
 	}, []);
 
+	// Autofill phone number from user profile or previous reports
+	useEffect(() => {
+		const autofillPhone = async () => {
+			if (userId) {
+				const result = await getPhoneForAutofill(userId);
+				if (result.phone) {
+					setAutofilledPhone(result.phone);
+				}
+			}
+		};
+		autofillPhone();
+	}, [userId]);
+
 	const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
 		e.preventDefault();
 		setLoading(true);
@@ -97,6 +112,8 @@ export default function AuthenticatedReportAbuseForm({
 		const formData = new FormData(form);
 		const contactPreference = formData.get("contact_preference");
 		const phone = normalizePhone(formData.get("phone") as string);
+
+		// Description and voice recording are now completely optional
 
 		if (
 			(contactPreference === "phone_call" || contactPreference === "sms") &&
@@ -295,7 +312,7 @@ export default function AuthenticatedReportAbuseForm({
 				<div className="w-full space-y-3">
 					<div className="flex items-center justify-between">
 						<span className="text-sm text-gray-600">
-							Share your story in writing or by voice
+							Share your story in writing or by voice (you can start with either)
 						</span>
 						<Button
 							type="button"
@@ -347,20 +364,21 @@ export default function AuthenticatedReportAbuseForm({
 					)}
 
 					<Textarea
-						placeholder={
-							audioUrl
-								? "Add additional details (optional)..."
-								: "Please share what happened... (or use voice recording above)"
-						}
+						placeholder="Please share what happened... (optional)"
 						name="incident_description"
 						className="min-h-[120px] w-full"
 						value={description}
 						onChange={(e) => setDescription(e.target.value)}
-						required={!audioUrl}
 					/>
 					{audioUrl && (
 						<p className="text-xs text-gray-500">
-							✓ Voice note attached - text description is now optional
+							✓ Voice note attached - you can add additional text details if needed
+						</p>
+					)}
+					{!audioUrl && !description && (
+						<p className="text-xs text-gray-500">
+							💡 You can optionally describe what happened in writing, by voice, or
+							both
 						</p>
 					)}
 				</div>
@@ -405,13 +423,21 @@ export default function AuthenticatedReportAbuseForm({
 					<div className="col-span-full">
 						<p className="text-lg text-gray-700">Contact Preference:</p>
 					</div>
-					<Input
-						placeholder="Your phone number"
-						name="phone"
-						type="text"
-						pattern="[0-9]{10,}"
-						className="w-full"
-					/>
+					<div className="space-y-1">
+						<Input
+							placeholder="Your phone number"
+							name="phone"
+							type="text"
+							pattern="[0-9]{10,}"
+							className="w-full"
+							defaultValue={autofilledPhone || ""}
+						/>
+						{autofilledPhone && (
+							<p className="text-xs text-green-600">
+								✓ Phone number filled from your profile
+							</p>
+						)}
+					</div>
 					<select
 						name="contact_preference"
 						required
@@ -453,44 +479,46 @@ export default function AuthenticatedReportAbuseForm({
 			</div>
 
 			<div className="fixed bottom-0 left-0 right-0 pt-4 pb-4 bg-white border-t mt-4 z-50">
-				<div className="max-w-[1200px] mx-auto px-4 flex flex-col sm:flex-row gap-2">
-					<Button type="submit" className="w-full sm:flex-1" disabled={loading}>
-						{loading ? "Submitting..." : "Submit Report"}
-					</Button>
-					<Button
-						variant="outline"
-						onClick={(e) => {
-							const form = (e.currentTarget.closest("form") as HTMLFormElement)!;
-							const fd = new FormData(form);
-							const toSave: any = Object.fromEntries(fd.entries());
-							toSave.description = description;
-							toSave.selectedServices = selectedServices;
-							toSave.incidentTypes = incidentTypes;
-							try {
-								localStorage.setItem("authReportDraft", JSON.stringify(toSave));
-								setDraft(toSave);
-							} catch (e) {
-								/* ignore */
-							}
-						}}
-					>
-						Save Draft
-					</Button>
-					<Button
-						variant="ghost"
-						onClick={() => {
-							try {
-								localStorage.removeItem("authReportDraft");
-								setDraft(null);
-								setDescription("");
-								setSelectedServices([]);
-							} catch (e) {
-								/* ignore */
-							}
-						}}
-					>
-						Clear Draft
-					</Button>
+				<div className="max-w-[1200px] mx-auto px-4 space-y-2">
+					<div className="flex flex-col sm:flex-row gap-2">
+						<Button type="submit" className="w-full sm:flex-1" disabled={loading}>
+							{loading ? "Submitting..." : "Submit Report"}
+						</Button>
+						<Button
+							variant="outline"
+							onClick={(e) => {
+								const form = (e.currentTarget.closest("form") as HTMLFormElement)!;
+								const fd = new FormData(form);
+								const toSave: any = Object.fromEntries(fd.entries());
+								toSave.description = description;
+								toSave.selectedServices = selectedServices;
+								toSave.incidentTypes = incidentTypes;
+								try {
+									localStorage.setItem("authReportDraft", JSON.stringify(toSave));
+									setDraft(toSave);
+								} catch (e) {
+									/* ignore */
+								}
+							}}
+						>
+							Save Draft
+						</Button>
+						<Button
+							variant="ghost"
+							onClick={() => {
+								try {
+									localStorage.removeItem("authReportDraft");
+									setDraft(null);
+									setDescription("");
+									setSelectedServices([]);
+								} catch (e) {
+									/* ignore */
+								}
+							}}
+						>
+							Clear Draft
+						</Button>
+					</div>
 				</div>
 			</div>
 		</form>

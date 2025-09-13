@@ -15,6 +15,7 @@ import {
 	generateAudioFilename,
 	createAudioMediaObject,
 } from "@/utils/media";
+import { getPhoneFromEmail } from "@/utils/phone-autofill";
 
 const SUPPORT_SERVICE_OPTIONS = [
 	{ value: "legal", label: "legal support" },
@@ -50,6 +51,7 @@ export default function ReportAbuseForm({ onClose }: { onClose?: () => void }) {
 	const [incidentTypes, setIncidentTypes] = useState<string[]>([]);
 	const [needsDisabled, setNeedsDisabled] = useState(false);
 	const [needsQueer, setNeedsQueer] = useState(false);
+	const [autofilledPhone, setAutofilledPhone] = useState<string | null>(null);
 
 	// Load draft
 	useEffect(() => {
@@ -91,12 +93,24 @@ export default function ReportAbuseForm({ onClose }: { onClose?: () => void }) {
 		}
 	}, []); // Empty dependency array is correct here
 
+	// Autofill phone number when email is entered
+	const handleEmailChange = async (email: string) => {
+		if (email && email.includes("@")) {
+			const result = await getPhoneFromEmail(email);
+			if (result.phone) {
+				setAutofilledPhone(result.phone);
+			}
+		}
+	};
+
 	const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
 		e.preventDefault();
 		const form = e.currentTarget;
 		setLoading(true);
 
 		const formData = new FormData(form);
+
+		// Description and voice recording are now completely optional
 
 		try {
 			// Upload audio if present
@@ -266,15 +280,23 @@ export default function ReportAbuseForm({ onClose }: { onClose?: () => void }) {
 						name="email"
 						defaultValue={draft?.email || ""}
 						required
+						onChange={(e) => handleEmailChange(e.target.value)}
 					/>{" "}
 					or by phone at{" "}
-					<input
-						type="text"
-						className="border-b-2 border-teal-500 focus:outline-none px-2 w-48 bg-transparent"
-						placeholder="phone (optional)"
-						name="phone"
-						defaultValue={draft?.phone || ""}
-					/>
+					<div className="inline-block">
+						<input
+							type="text"
+							className="border-b-2 border-teal-500 focus:outline-none px-2 w-48 bg-transparent"
+							placeholder="phone (optional)"
+							name="phone"
+							defaultValue={autofilledPhone || draft?.phone || ""}
+						/>
+						{autofilledPhone && (
+							<span className="text-xs text-green-600 ml-2">
+								✓ (from previous report)
+							</span>
+						)}
+					</div>
 					. I would like to report cases of{" "}
 					<span className="inline-flex align-middle">
 						<MultiSelect
@@ -317,7 +339,7 @@ export default function ReportAbuseForm({ onClose }: { onClose?: () => void }) {
 				<div className="space-y-3">
 					<div className="flex items-center justify-between">
 						<span className="text-sm text-gray-600">
-							Share your story in writing or by voice
+							Share your story in writing or by voice (you can start with either)
 						</span>
 						<Button
 							type="button"
@@ -367,20 +389,21 @@ export default function ReportAbuseForm({ onClose }: { onClose?: () => void }) {
 					)}
 
 					<Textarea
-						placeholder={
-							audioUrl
-								? "Add additional details (optional)..."
-								: "Please share what happened... (or use voice recording above)"
-						}
+						placeholder="Please share what happened... (optional)"
 						name="incident_description"
 						className="min-h-[120px] w-full"
 						value={description}
 						onChange={(e) => setDescription(e.target.value)}
-						required={!audioUrl}
 					/>
 					{audioUrl && (
 						<p className="text-xs text-gray-500">
-							✓ Voice note attached - text description is now optional
+							✓ Voice note attached - you can add additional text details if needed
+						</p>
+					)}
+					{!audioUrl && !description && (
+						<p className="text-xs text-gray-500">
+							💡 You can optionally describe what happened in writing, by voice, or
+							both
 						</p>
 					)}
 				</div>
@@ -432,50 +455,52 @@ export default function ReportAbuseForm({ onClose }: { onClose?: () => void }) {
 				</p>
 			</div>
 
-			<div className="flex flex-col sm:flex-row gap-2">
-				<Button type="submit" className="w-full sm:flex-1" disabled={loading}>
-					{loading ? "Submitting..." : "Submit Report"}
-				</Button>
-				<Button
-					type="button"
-					variant="outline"
-					className="w-full sm:w-auto"
-					onClick={(e) => {
-						const form = (e.currentTarget.closest("form") as HTMLFormElement)!;
-						const fd = new FormData(form);
-						const toSave: any = Object.fromEntries(fd.entries());
-						toSave.description = description;
-						toSave.incidentTypes = incidentTypes;
-						toSave.isOnBehalf = isOnBehalf;
-						toSave.needsDisabled = needsDisabled;
-						toSave.needsQueer = needsQueer;
-						try {
-							localStorage.setItem("reportDraft", JSON.stringify(toSave));
-							setDraft(toSave);
-						} catch (e) {
-							/* ignore */
-						}
-						toast({ title: "Draft saved" });
-					}}
-				>
-					Save Draft
-				</Button>
-				<Button
-					type="button"
-					variant="ghost"
-					className="w-full sm:w-auto"
-					onClick={() => {
-						try {
-							localStorage.removeItem("reportDraft");
-							setDraft(null);
-							setDescription("");
-						} catch (e) {
-							/* ignore */
-						}
-					}}
-				>
-					Clear Draft
-				</Button>
+			<div className="space-y-2">
+				<div className="flex flex-col sm:flex-row gap-2">
+					<Button type="submit" className="w-full sm:flex-1" disabled={loading}>
+						{loading ? "Submitting..." : "Submit Report"}
+					</Button>
+					<Button
+						type="button"
+						variant="outline"
+						className="w-full sm:w-auto"
+						onClick={(e) => {
+							const form = (e.currentTarget.closest("form") as HTMLFormElement)!;
+							const fd = new FormData(form);
+							const toSave: any = Object.fromEntries(fd.entries());
+							toSave.description = description;
+							toSave.incidentTypes = incidentTypes;
+							toSave.isOnBehalf = isOnBehalf;
+							toSave.needsDisabled = needsDisabled;
+							toSave.needsQueer = needsQueer;
+							try {
+								localStorage.setItem("reportDraft", JSON.stringify(toSave));
+								setDraft(toSave);
+							} catch (e) {
+								/* ignore */
+							}
+							toast({ title: "Draft saved" });
+						}}
+					>
+						Save Draft
+					</Button>
+					<Button
+						type="button"
+						variant="ghost"
+						className="w-full sm:w-auto"
+						onClick={() => {
+							try {
+								localStorage.removeItem("reportDraft");
+								setDraft(null);
+								setDescription("");
+							} catch (e) {
+								/* ignore */
+							}
+						}}
+					>
+						Clear Draft
+					</Button>
+				</div>
 			</div>
 		</form>
 	);
