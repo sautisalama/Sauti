@@ -24,6 +24,8 @@ import {
 	Search,
 	CheckCircle2,
 	MessageCircle,
+	TrendingUp,
+	MessageSquare,
 } from "lucide-react";
 import { CaseCard } from "@/components/cases/CaseCard";
 import { CaseCardSkeleton } from "@/components/cases/CaseCardSkeleton";
@@ -64,6 +66,7 @@ export default function CasesMasterDetail({ userId }: { userId: string }) {
 	const [onBehalfFilter, setOnBehalfFilter] = useState<string>("all");
 	const [showFilters, setShowFilters] = useState(false);
 	const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
+	const [isLoadingMessages, setIsLoadingMessages] = useState(false);
 
 	// Load matched services and appointments in parallel
 	useEffect(() => {
@@ -127,12 +130,15 @@ export default function CasesMasterDetail({ userId }: { userId: string }) {
 		load();
 	}, [userId, supabase]);
 
-	// Track unread messages for each case
+	// Track unread messages for each case - load after cases are loaded
+	// This prevents delays and freezing during initial case loading
 	useEffect(() => {
-		const trackUnreadMessages = async () => {
-			if (cases.length === 0) return;
+		if (cases.length === 0 || loading) return;
 
+		// Add a small delay to ensure cases are fully rendered first
+		const timeoutId = setTimeout(async () => {
 			try {
+				setIsLoadingMessages(true);
 				// Get unread message counts for all cases
 				const caseIds = cases.map((c) => c.id);
 				const unreadData = await getUnreadMessagesForCases(
@@ -153,35 +159,44 @@ export default function CasesMasterDetail({ userId }: { userId: string }) {
 				);
 			} catch (error) {
 				console.error("Error tracking unread messages:", error);
+			} finally {
+				setIsLoadingMessages(false);
 			}
-		};
+		}, 200); // 200ms delay to ensure cases are rendered first
 
-		trackUnreadMessages();
-	}, [cases]);
+		return () => clearTimeout(timeoutId);
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [cases.length, loading]); // Only depend on cases.length and loading state
 
-	// Subscribe to real-time unread message updates
+	// Subscribe to real-time unread message updates - only after initial load
 	useEffect(() => {
-		if (cases.length === 0) return;
+		if (cases.length === 0 || loading) return;
 
-		const cleanup = subscribeToUnreadMessages(
-			"current-user-id", // This should be the actual user ID
-			"current-username", // This should be the actual username
-			(unreadData) => {
-				// Update cases with new unread message counts
-				setCases((prev) =>
-					prev.map((c) => {
-						const unreadInfo = unreadData.find((u) => u.caseId === c.id);
-						return {
-							...c,
-							unread_messages: unreadInfo?.unreadCount || 0,
-						};
-					})
-				);
-			}
-		);
+		// Add a delay to ensure initial load is complete
+		const timeoutId = setTimeout(() => {
+			const cleanup = subscribeToUnreadMessages(
+				"current-user-id", // This should be the actual user ID
+				"current-username", // This should be the actual username
+				(unreadData) => {
+					// Update cases with new unread message counts
+					setCases((prev) =>
+						prev.map((c) => {
+							const unreadInfo = unreadData.find((u) => u.caseId === c.id);
+							return {
+								...c,
+								unread_messages: unreadInfo?.unreadCount || 0,
+							};
+						})
+					);
+				}
+			);
 
-		return cleanup;
-	}, [cases]);
+			// Store cleanup function for later use
+			return cleanup;
+		}, 1000); // 1 second delay for real-time subscription
+
+		return () => clearTimeout(timeoutId);
+	}, [cases.length, loading]); // Only depend on cases.length and loading state
 
 	const filtered = useMemo(() => {
 		let filteredCases = cases;
@@ -574,18 +589,23 @@ export default function CasesMasterDetail({ userId }: { userId: string }) {
 								))}
 							</>
 						) : filtered.length === 0 ? (
-							<div className="text-center py-16">
-								<div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gray-100 flex items-center justify-center">
-									<FileText className="h-8 w-8 text-gray-400" />
+							<div className="text-center py-20">
+								<div className="w-20 h-20 mx-auto mb-6 rounded-full bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
+									<Shield className="h-10 w-10 text-blue-500" />
 								</div>
-								<h3 className="text-lg font-medium text-gray-900 mb-2">
-									No cases found
+								<h3 className="text-xl font-semibold text-gray-900 mb-3">
+									{q ? "No cases found" : "No cases yet"}
 								</h3>
-								<p className="text-gray-500">
+								<p className="text-gray-500 max-w-md mx-auto leading-relaxed">
 									{q
-										? "Try adjusting your search terms"
-										: "You don't have any cases yet"}
+										? "Try adjusting your search terms or filters to find what you're looking for."
+										: "When survivors report incidents and you're matched as their support professional, your cases will appear here."}
 								</p>
+								{q && (
+									<Button variant="outline" onClick={() => setQ("")} className="mt-4">
+										Clear search
+									</Button>
+								)}
 							</div>
 						) : (
 							filtered.map((c) => {
@@ -596,6 +616,7 @@ export default function CasesMasterDetail({ userId }: { userId: string }) {
 											data={c as any}
 											active={isActive}
 											onClick={() => setSelectedId(c.id)}
+											isLoadingMessages={isLoadingMessages}
 										/>
 									</div>
 								);
@@ -698,48 +719,110 @@ export default function CasesMasterDetail({ userId }: { userId: string }) {
 					{selected && (
 						<div className="h-full flex flex-col bg-gray-50">
 							{/* Header */}
-							<div className="p-4 border-b border-gray-200 bg-white flex items-start justify-between gap-3 sticky top-0 z-10">
+							<div className="p-4 border-b border-gray-200 bg-white sticky top-0 z-10">
 								<div className="absolute left-1/2 -translate-x-1/2 -top-2 sm:hidden w-12 h-1.5 rounded-full bg-gray-300" />
-								<div className="flex items-start gap-3 min-w-0 flex-1">
-									<button
-										onClick={() => setSelectedId(null)}
-										className="sm:hidden -ml-1 p-1.5 rounded-md hover:bg-gray-100 transition-colors"
-									>
-										<ChevronLeft className="h-4 w-4 text-gray-600" />
-									</button>
-									<div className="min-w-0 flex-1">
-										<div className="flex items-center gap-2 mb-1">
-											<h2 className="text-lg font-semibold text-gray-900 truncate">
-												{selected.report?.type_of_incident || "Unknown Incident"}
-											</h2>
-											<span
-												className={`px-2 py-0.5 rounded-md text-xs font-medium ${urgencyColor(
-													selected.report?.urgency
-												)}`}
-											>
-												{selected.report?.urgency || "low"}
-											</span>
-										</div>
-										<div className="flex items-center gap-3 text-xs text-gray-500">
-											<div className="flex items-center gap-1">
-												<Clock className="h-3 w-3" />
-												<span>{formatDate(selected.match_date)}</span>
+
+								{/* Top row with close button */}
+								<div className="flex items-start justify-between gap-3 mb-4">
+									<div className="flex items-start gap-3 min-w-0 flex-1">
+										<button
+											onClick={() => setSelectedId(null)}
+											className="sm:hidden -ml-1 p-1.5 rounded-md hover:bg-gray-100 transition-colors"
+										>
+											<ChevronLeft className="h-4 w-4 text-gray-600" />
+										</button>
+										<div className="min-w-0 flex-1">
+											<div className="flex items-center gap-2 mb-1">
+												<h2 className="text-lg font-semibold text-gray-900 truncate">
+													{selected.report?.type_of_incident || "Unknown Incident"}
+												</h2>
+												<span
+													className={`px-2 py-0.5 rounded-md text-xs font-medium ${urgencyColor(
+														selected.report?.urgency
+													)}`}
+												>
+													{selected.report?.urgency || "low"}
+												</span>
 											</div>
-											<div className="flex items-center gap-1">
-												<Shield className="h-3 w-3" />
-												<span>Case ID: {selected.id}</span>
+											<div className="flex items-center gap-3 text-xs text-gray-500">
+												<div className="flex items-center gap-1">
+													<Clock className="h-3 w-3" />
+													<span>{formatDate(selected.match_date)}</span>
+												</div>
+												<div className="flex items-center gap-1">
+													<Shield className="h-3 w-3" />
+													<span>Case ID: {selected.id}</span>
+												</div>
 											</div>
 										</div>
 									</div>
+									<Button
+										variant="ghost"
+										size="icon"
+										className="rounded-lg hover:bg-gray-100 transition-colors h-8 w-8"
+										onClick={() => setSelectedId(null)}
+									>
+										<X className="h-4 w-4 text-gray-600" />
+									</Button>
 								</div>
-								<Button
-									variant="ghost"
-									size="icon"
-									className="rounded-lg hover:bg-gray-100 transition-colors h-8 w-8"
-									onClick={() => setSelectedId(null)}
-								>
-									<X className="h-4 w-4 text-gray-600" />
-								</Button>
+
+								{/* Progress Status Field */}
+								<div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
+									<div className="flex items-center justify-between">
+										<div className="flex items-center gap-2">
+											<TrendingUp className="h-4 w-4 text-blue-600" />
+											<span className="text-sm font-medium text-gray-900">
+												Progress Status
+											</span>
+										</div>
+										<div className="flex items-center gap-2">
+											{isLoadingMessages ? (
+												<div className="h-7 px-2 text-xs text-gray-500 bg-gray-100 rounded-md flex items-center gap-1">
+													<Clock className="h-3 w-3 animate-spin" />
+													Loading messages...
+												</div>
+											) : selected.unread_messages && selected.unread_messages > 0 ? (
+												<Button
+													variant="outline"
+													size="sm"
+													onClick={() => {
+														// Navigate to chats page with specific chat
+														window.open(`/dashboard/chats?caseId=${selected.id}`, "_blank");
+													}}
+													className="h-7 px-2 text-xs border-blue-200 text-blue-700 hover:bg-blue-50"
+												>
+													<MessageSquare className="h-3 w-3 mr-1" />
+													{selected.unread_messages} unread
+												</Button>
+											) : null}
+											<select
+												value={selected.match_status_type || "pending"}
+												onChange={(e) => {
+													const newStatus = e.target.value;
+													if (newStatus === "completed") {
+														handleCompleteCase(selected.id);
+													} else {
+														// Handle other status changes
+														setCases((prev) =>
+															prev.map((c) =>
+																c.id === selected.id
+																	? { ...c, match_status_type: newStatus }
+																	: c
+															)
+														);
+													}
+												}}
+												className="px-2 py-1 text-xs border border-gray-300 rounded-md bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+											>
+												<option value="pending">Pending</option>
+												<option value="matched">Matched</option>
+												<option value="confirmed">Confirmed</option>
+												<option value="accepted">Accepted</option>
+												<option value="completed">Completed</option>
+											</select>
+										</div>
+									</div>
+								</div>
 							</div>
 
 							{/* Body */}
@@ -747,21 +830,10 @@ export default function CasesMasterDetail({ userId }: { userId: string }) {
 								<div className="p-4 space-y-4">
 									{/* Matched Service & Appointment - Combined */}
 									<div className="bg-blue-50 rounded-lg border border-blue-100 p-4">
-										<div className="flex items-center justify-between mb-3">
-											<h3 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
-												<User className="h-4 w-4 text-blue-600" />
-												Matched Service & Appointment
-											</h3>
-											{/* Unread messages indicator */}
-											{selected.unread_messages && selected.unread_messages > 0 && (
-												<div className="flex items-center gap-1 text-xs text-blue-600 bg-blue-100 px-2 py-1 rounded-full">
-													<MessageCircle className="h-3 w-3" />
-													<span className="font-medium">
-														{selected.unread_messages} unread
-													</span>
-												</div>
-											)}
-										</div>
+										<h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
+											<User className="h-4 w-4 text-blue-600" />
+											Matched Service & Appointment
+										</h3>
 										<div className="space-y-3">
 											{/* Service Info */}
 											<div>
@@ -891,7 +963,7 @@ export default function CasesMasterDetail({ userId }: { userId: string }) {
 									)}
 
 									{/* Notes (WYSIWYG) - Full Height */}
-									<div className="bg-white rounded-lg border border-gray-200 flex flex-col h-[100vh] sm:h-[500px]">
+									<div className="bg-white rounded-lg border border-gray-200 flex flex-col h-[80vh] sm:h-[500px] mb-4">
 										<div className="p-4 border-b border-gray-200">
 											<h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
 												<FileText className="h-5 w-5 text-gray-600" />

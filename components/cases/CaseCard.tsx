@@ -58,6 +58,7 @@ interface CaseCardProps {
 	active?: boolean;
 	actions?: React.ReactNode;
 	className?: string;
+	isLoadingMessages?: boolean;
 }
 
 function urgencyAccent(urgency?: string | null) {
@@ -176,6 +177,7 @@ export function CaseCard({
 	active,
 	actions,
 	className,
+	isLoadingMessages = false,
 }: CaseCardProps) {
 	const appointment = data.appointments?.[0];
 	const professional = appointment?.professional;
@@ -337,12 +339,17 @@ export function CaseCard({
 
 								<div className="flex items-center gap-1">
 									{/* Unread messages indicator */}
-									{hasUnreadMessages && (
+									{isLoadingMessages ? (
+										<div className="flex items-center gap-1 text-xs text-gray-500">
+											<Clock className="h-3 w-3 animate-spin" />
+											<span className="font-medium">Loading...</span>
+										</div>
+									) : hasUnreadMessages ? (
 										<div className="flex items-center gap-1 text-xs text-blue-600">
 											<MessageCircle className="h-3 w-3" />
 											<span className="font-medium">{data.unread_messages}</span>
 										</div>
-									)}
+									) : null}
 
 									{/* Media indicator */}
 									{hasMedia && (

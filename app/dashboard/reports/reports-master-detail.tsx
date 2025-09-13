@@ -568,18 +568,23 @@ export default function ReportsMasterDetail({ userId }: { userId: string }) {
 								))}
 							</>
 						) : filtered.length === 0 ? (
-							<div className="text-center py-16">
-								<div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gray-100 flex items-center justify-center">
-									<FileText className="h-8 w-8 text-gray-400" />
+							<div className="text-center py-20">
+								<div className="w-20 h-20 mx-auto mb-6 rounded-full bg-gradient-to-br from-green-50 to-emerald-100 flex items-center justify-center">
+									<FileText className="h-10 w-10 text-green-500" />
 								</div>
-								<h3 className="text-lg font-medium text-gray-900 mb-2">
-									No reports found
+								<h3 className="text-xl font-semibold text-gray-900 mb-3">
+									{q ? "No reports found" : "No reports yet"}
 								</h3>
-								<p className="text-gray-500">
+								<p className="text-gray-500 max-w-md mx-auto leading-relaxed">
 									{q
-										? "Try adjusting your search terms"
-										: "You haven't submitted any reports yet"}
+										? "Try adjusting your search terms or filters to find what you're looking for."
+										: "Submit your first incident report to get started with getting the support you need."}
 								</p>
+								{q && (
+									<Button variant="outline" onClick={() => setQ("")} className="mt-4">
+										Clear search
+									</Button>
+								)}
 							</div>
 						) : (
 							filtered.map((r) => {
@@ -875,7 +880,7 @@ export default function ReportsMasterDetail({ userId }: { userId: string }) {
 									)}
 
 									{/* Notes (WYSIWYG) - Full Height */}
-									<div className="bg-white rounded-lg border border-gray-200 flex flex-col h-[100vh] sm:h-[500px]">
+									<div className="bg-white rounded-lg border border-gray-200 flex flex-col h-[80vh] sm:h-[500px] mb-4">
 										<div className="p-4 border-b border-gray-200">
 											<h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
 												<FileText className="h-5 w-5 text-gray-600" />
