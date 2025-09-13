@@ -1,5 +1,7 @@
 import withPWA from "next-pwa";
 
+const isWindows = process.platform === "win32";
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
 	images: {
@@ -31,7 +33,8 @@ const nextConfig = {
 
 export default withPWA({
 	dest: "public", // destination directory for the PWA files
-	disable: process.env.NODE_ENV === "development", // disable PWA in the development environment
+	// Disable PWA on Windows to avoid EPERM errors from terser/jest-worker during build
+	disable: isWindows || process.env.NODE_ENV === "development",
 	register: true, // register the PWA service worker
 	skipWaiting: true, // skip waiting for service worker activation
 })(nextConfig);

@@ -54,7 +54,6 @@ export default function ReportNotesEditor({
 	const initialHtml = useMemo(() => report.notes || "", [report.notes]);
 
 	const editor = useEditor({
-		key: report.report_id,
 		extensions: [
 			StarterKit.configure({
 				heading: false,

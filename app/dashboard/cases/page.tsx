@@ -19,7 +19,7 @@ export default async function CasesPage() {
 				</div>
 			</div>
 			<CasesClient userId={user.id} />
-			<MobileTabbar active="cases" base="/dashboard" userType="survivor" />
+			<MobileTabbar active="overview" base="/dashboard" userType="survivor" />
 		</div>
 	);
 }

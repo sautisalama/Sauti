@@ -59,7 +59,6 @@ export default function CaseNotesEditor({
 	const initialContent = useMemo(() => initialHtml || "", [initialHtml]);
 
 	const editor = useEditor({
-		key: matchId,
 		extensions: [
 			StarterKit.configure({ heading: { levels: [1, 2, 3, 4] } }),
 			UnderlineExt,
