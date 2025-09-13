@@ -205,7 +205,7 @@ export function CaseCard({
 				"group relative w-full rounded-lg border bg-white transition-all duration-200",
 				"hover:shadow-md hover:shadow-black/5 hover:-translate-y-0.5",
 				"focus:outline-none focus:ring-2 focus:ring-[#1A3434]/20",
-				active && "ring-2 ring-[#1A3434] shadow-md shadow-[#1A3434]/10",
+				active && "ring-1 ring-blue-300 shadow-sm shadow-blue-100/50 bg-blue-50/30",
 				isHighUrgency && "border-red-200 hover:border-red-300",
 				isMediumUrgency && "border-amber-200 hover:border-amber-300",
 				!isHighUrgency &&

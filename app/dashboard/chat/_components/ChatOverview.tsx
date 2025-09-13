@@ -21,6 +21,8 @@ import styles from "./chat.module.css";
 import { Button } from "@/components/ui/button";
 import { Images, LinkIcon, MessageSquare } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { Suspense } from "react";
+import { ChatLoadingSkeleton } from "@/components/chat/ChatLoadingSkeleton";
 
 interface User {
 	id: string;
@@ -172,14 +174,7 @@ export function ChatOverview({
 	};
 
 	if (!client) {
-		return (
-			<div className="flex flex-col items-center justify-center min-h-screen p-4">
-				<div className="text-center space-y-4">
-					<Animation animationData={animationData} />
-					<p className="text-muted-foreground">Loading chat...</p>
-				</div>
-			</div>
-		);
+		return <ChatLoadingSkeleton />;
 	}
 
 	return (

@@ -795,31 +795,27 @@ export default function CasesMasterDetail({ userId }: { userId: string }) {
 													{selected.unread_messages} unread
 												</Button>
 											) : null}
-											<select
-												value={selected.match_status_type || "pending"}
-												onChange={(e) => {
-													const newStatus = e.target.value;
-													if (newStatus === "completed") {
-														handleCompleteCase(selected.id);
-													} else {
-														// Handle other status changes
-														setCases((prev) =>
-															prev.map((c) =>
-																c.id === selected.id
-																	? { ...c, match_status_type: newStatus }
-																	: c
-															)
-														);
-													}
-												}}
-												className="px-2 py-1 text-xs border border-gray-300 rounded-md bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-											>
-												<option value="pending">Pending</option>
-												<option value="matched">Matched</option>
-												<option value="confirmed">Confirmed</option>
-												<option value="accepted">Accepted</option>
-												<option value="completed">Completed</option>
-											</select>
+											{selected.match_status_type === "completed" ? (
+												<div className="flex items-center gap-2 text-xs text-green-700 bg-green-50 px-2 py-1 rounded-md border border-green-200">
+													<CheckCircle2 className="h-3 w-3" />
+													<span className="font-medium">Completed</span>
+												</div>
+											) : (
+												<Button
+													variant="outline"
+													size="sm"
+													onClick={() => handleCompleteCase(selected.id)}
+													disabled={isUpdatingStatus}
+													className="h-7 px-2 text-xs border-green-200 text-green-700 hover:bg-green-50"
+												>
+													{isUpdatingStatus ? (
+														<Clock className="h-3 w-3 mr-1" />
+													) : (
+														<CheckCircle2 className="h-3 w-3 mr-1" />
+													)}
+													{isUpdatingStatus ? "Completing..." : "Mark as Completed"}
+												</Button>
+											)}
 										</div>
 									</div>
 								</div>
@@ -846,16 +842,6 @@ export default function CasesMasterDetail({ userId }: { userId: string }) {
 														{String(selected.match_status_type || "pending")}
 													</span>
 												</p>
-												{/* Completion status */}
-												{selected.match_status_type === "completed" && (
-													<div className="mt-2 flex items-center gap-2 text-xs text-green-700">
-														<CheckCircle2 className="h-3 w-3" />
-														<span className="font-medium">
-															Case completed{" "}
-															{selected.completed_at && formatDate(selected.completed_at)}
-														</span>
-													</div>
-												)}
 											</div>
 
 											{/* Appointment Info */}
@@ -913,26 +899,6 @@ export default function CasesMasterDetail({ userId }: { userId: string }) {
 													<p className="text-xs text-gray-600">
 														No appointment scheduled yet
 													</p>
-												</div>
-											)}
-
-											{/* Completion Actions */}
-											{selected.match_status_type !== "completed" && (
-												<div className="mt-3">
-													<Button
-														variant="outline"
-														size="sm"
-														onClick={() => handleCompleteCase(selected.id)}
-														disabled={isUpdatingStatus}
-														className="w-full border-green-200 text-green-700 hover:bg-green-100 text-xs h-8"
-													>
-														{isUpdatingStatus ? (
-															<Clock className="h-3 w-3 mr-1" />
-														) : (
-															<CheckCircle2 className="h-3 w-3 mr-1" />
-														)}
-														{isUpdatingStatus ? "Completing..." : "Mark as Completed"}
-													</Button>
 												</div>
 											)}
 										</div>
