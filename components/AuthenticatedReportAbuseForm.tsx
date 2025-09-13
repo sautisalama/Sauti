@@ -2,8 +2,7 @@
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { useMemo } from "react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { Button } from "./ui/button";
 import { createClient } from "@/utils/supabase/client";
 import { Tables } from "@/types/db-schema";
@@ -46,6 +45,11 @@ export default function AuthenticatedReportAbuseForm({
 	const [recorderOpen, setRecorderOpen] = useState(false);
 	const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
 	const [audioUrl, setAudioUrl] = useState<string | null>(null);
+	const [audioUploading, setAudioUploading] = useState(false);
+	const [audioUploadedUrl, setAudioUploadedUrl] = useState<string | null>(null);
+	const [audioUploadError, setAudioUploadError] = useState<string | null>(null);
+	const audioUploadPromiseRef = useRef<Promise<string> | null>(null);
+	const audioFilenameRef = useRef<string | null>(null);
 	const [isOnBehalf, setIsOnBehalf] = useState(false);
 	const [needsDisabled, setNeedsDisabled] = useState(false);
 	const [needsQueer, setNeedsQueer] = useState(false);
@@ -55,6 +59,41 @@ export default function AuthenticatedReportAbuseForm({
 	const [consent, setConsent] = useState<string>("");
 	const supabase = useMemo(() => createClient(), []);
 	const user = useUser();
+
+	// Start uploading immediately when voice note is attached
+	const startAudioUpload = (blob: Blob): Promise<string> => {
+		const validation = validateAudioBlob(blob);
+		if (!validation.valid) {
+			setAudioUploadError(validation.error || "Invalid audio");
+			return Promise.reject(new Error(validation.error || "Invalid audio"));
+		}
+		setAudioUploading(true);
+		setAudioUploadError(null);
+		setAudioUploadedUrl(null);
+		const filename = generateAudioFilename(blob);
+		audioFilenameRef.current = filename;
+		const promise = supabase.storage
+			.from("report-audio")
+			.upload(filename, blob, {
+				contentType: blob.type || "audio/webm",
+				cacheControl: "3600",
+				upsert: false,
+			})
+			.then(({ error }) => {
+				if (error) throw error;
+				const { data } = supabase.storage.from("report-audio").getPublicUrl(filename);
+				setAudioUploadedUrl(data.publicUrl);
+				setAudioUploading(false);
+				return data.publicUrl;
+			})
+			.catch((err) => {
+				setAudioUploading(false);
+				setAudioUploadError(err?.message || "Failed to upload audio");
+				throw err;
+			});
+		audioUploadPromiseRef.current = promise;
+		return promise;
+	};
 
 	useEffect(() => {
 		if ("geolocation" in navigator) {
@@ -119,64 +158,41 @@ export default function AuthenticatedReportAbuseForm({
 			return;
 		}
 
-		// Upload audio first if present
-		let media: { title: string; url: string; type: string; size: number } | null =
-			null;
-		if (audioBlob) {
-			// Validate audio blob before upload
-			const validation = validateAudioBlob(audioBlob);
-			if (!validation.valid) {
-				toast({
-					title: "Invalid Audio",
-					description: validation.error || "Audio file is invalid",
-					variant: "destructive",
-				});
-				setLoading(false);
-				return;
-			}
-
-			try {
-				const filename = generateAudioFilename(audioBlob);
-				const { error: upErr } = await supabase.storage
-					.from("report-audio")
-					.upload(filename, audioBlob, {
-						contentType: audioBlob.type || "audio/webm",
-						cacheControl: "3600",
-						upsert: false,
-					});
-				if (!upErr) {
-					const { data } = supabase.storage
-						.from("report-audio")
-						.getPublicUrl(filename);
-					media = createAudioMediaObject(data.publicUrl, audioBlob);
-					console.log("Audio uploaded successfully:", data.publicUrl);
-				} else {
-					console.error("Audio upload failed:", upErr);
-					console.error("Upload error details:", {
-						error: upErr,
-						filename,
-						bucket: "report-audio",
-						blobSize: audioBlob.size,
-						blobType: audioBlob.type,
-					});
-					toast({
-						title: "Audio Upload Failed",
-						description: `Could not save your voice recording: ${
-							upErr.message || "Unknown error"
-						}. Please try again or submit without it.`,
-						variant: "destructive",
-					});
-				}
-			} catch (e) {
-				console.error("Audio upload error:", e);
-				toast({
-					title: "Audio Upload Error",
-					description:
-						"An error occurred while saving your voice recording. Please try again.",
-					variant: "destructive",
-				});
-			}
+	// Use pre-uploaded audio if available; otherwise finish or start upload now
+	let media: { title: string; url: string; type: string; size: number } | null = null;
+	if (audioBlob) {
+		// Validate first
+		const validation = validateAudioBlob(audioBlob);
+		if (!validation.valid) {
+			toast({
+				title: "Invalid Audio",
+				description: validation.error || "Audio file is invalid",
+				variant: "destructive",
+			});
+			setLoading(false);
+			return;
 		}
+		try {
+			let url = audioUploadedUrl;
+			if (!url && audioUploadPromiseRef.current) {
+				toast({ title: "Finalizing voice note upload..." });
+				url = await audioUploadPromiseRef.current;
+			}
+			if (!url) {
+				url = await startAudioUpload(audioBlob);
+			}
+			if (url) {
+				media = createAudioMediaObject(url, audioBlob);
+			}
+		} catch (e) {
+			console.error("Audio upload error:", e);
+			toast({
+				title: "Audio Upload Failed",
+				description: "Could not upload your voice note. Submitting without it.",
+				variant: "destructive",
+			});
+		}
+	}
 
 		// Map the first selected enum-allowed incident to type_of_incident
 		const allowed: Record<string, string> = {
@@ -326,6 +342,7 @@ export default function AuthenticatedReportAbuseForm({
 							variant="outline"
 							size="sm"
 							onClick={() => setRecorderOpen((v) => !v)}
+							className="w-full md:w-auto"
 						>
 							{recorderOpen ? "Hide voice recorder" : "Record voice note"}
 						</Button>
@@ -343,9 +360,19 @@ export default function AuthenticatedReportAbuseForm({
 										} catch (e) {
 											console.debug("Error creating audio URL:", e);
 										}
+										try { startAudioUpload(blob); } catch {}
 									}}
 									onClose={() => setRecorderOpen(false)}
 								/>
+								{audioUploading && (
+									<p className="text-xs text-gray-500 mt-2">Uploading voice note in background…</p>
+								)}
+								{audioUploadedUrl && !audioUploading && (
+									<p className="text-xs text-green-600 mt-2">Voice note uploaded ✓</p>
+								)}
+								{audioUploadError && (
+									<p className="text-xs text-red-600 mt-2">{audioUploadError}</p>
+								)}
 							</div>
 						</div>
 					)}
@@ -363,6 +390,11 @@ export default function AuthenticatedReportAbuseForm({
 									onClick={() => {
 										setAudioUrl(null);
 										setAudioBlob(null);
+										setAudioUploadedUrl(null);
+										setAudioUploadError(null);
+										audioUploadPromiseRef.current = null;
+										audioFilenameRef.current = null;
+										setAudioUploading(false);
 									}}
 								>
 									Remove

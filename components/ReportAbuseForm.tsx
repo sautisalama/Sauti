@@ -1,7 +1,7 @@
 "use client";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "./ui/button";
 import { VoiceRecorderModal } from "@/components/VoiceRecorderModal";
 import { VoiceRecorderEnhanced as InlineRecorder } from "@/components/VoiceRecorderEnhanced";
@@ -46,6 +46,11 @@ export default function ReportAbuseForm({ onClose }: { onClose?: () => void }) {
 	const [recorderOpen, setRecorderOpen] = useState(false);
 	const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
 	const [audioUrl, setAudioUrl] = useState<string | null>(null);
+	const [audioUploading, setAudioUploading] = useState(false);
+	const [audioUploadedUrl, setAudioUploadedUrl] = useState<string | null>(null);
+	const [audioUploadError, setAudioUploadError] = useState<string | null>(null);
+	const audioUploadPromiseRef = useRef<Promise<string> | null>(null);
+	const audioFilenameRef = useRef<string | null>(null);
 	const [isOnBehalf, setIsOnBehalf] = useState(false);
 	const [incidentTypes, setIncidentTypes] = useState<string[]>([]);
 	const [needsDisabled, setNeedsDisabled] = useState(false);
@@ -86,6 +91,53 @@ export default function ReportAbuseForm({ onClose }: { onClose?: () => void }) {
 				setAutofilledPhone(result.phone);
 			}
 		}
+};
+
+	// Start uploading the voice note in the background as soon as it's attached
+	const startAudioUpload = (blob: Blob): Promise<string> => {
+		const validation = validateAudioBlob(blob);
+		if (!validation.valid) {
+			setAudioUploadError(validation.error || "Invalid audio");
+			return Promise.reject(new Error(validation.error || "Invalid audio"));
+		}
+		setAudioUploading(true);
+		setAudioUploadError(null);
+		setAudioUploadedUrl(null);
+		const supabase = createClient();
+		const filename = generateAudioFilename(blob);
+		audioFilenameRef.current = filename;
+		toast({
+			title: "Uploading voice note...",
+			description: "We'll keep uploading while you fill in the report.",
+		});
+		const promise = supabase.storage
+			.from("report-audio")
+			.upload(filename, blob, {
+				contentType: blob.type || "audio/webm",
+				cacheControl: "3600",
+				upsert: false,
+			})
+			.then(({ error }) => {
+				if (error) throw error;
+				const { data } = supabase.storage.from("report-audio").getPublicUrl(filename);
+				setAudioUploadedUrl(data.publicUrl);
+				setAudioUploading(false);
+				toast({ title: "Voice note uploaded", description: "It will be attached to your report." });
+				return data.publicUrl;
+			})
+			.catch((err) => {
+				setAudioUploading(false);
+				setAudioUploadError(err?.message || "Failed to upload audio");
+				toast({
+					title: "Audio Upload Failed",
+					description:
+						(err?.message || "We couldn't upload your voice note. You can still submit the report without it."),
+					variant: "destructive",
+				});
+				throw err;
+			});
+		audioUploadPromiseRef.current = promise;
+		return promise;
 	};
 
 	const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -102,7 +154,7 @@ export default function ReportAbuseForm({ onClose }: { onClose?: () => void }) {
 		// Description and voice recording are now completely optional
 
 		try {
-			// Upload audio if present
+			// Use pre-uploaded audio if available; otherwise finish or start upload now
 			let media: {
 				title: string;
 				url: string;
@@ -110,7 +162,7 @@ export default function ReportAbuseForm({ onClose }: { onClose?: () => void }) {
 				size: number;
 			} | null = null;
 			if (audioBlob) {
-				// Validate audio blob before upload
+				// Validate audio blob before proceeding
 				const validation = validateAudioBlob(audioBlob);
 				if (!validation.valid) {
 					toast({
@@ -121,46 +173,23 @@ export default function ReportAbuseForm({ onClose }: { onClose?: () => void }) {
 					setLoading(false);
 					return;
 				}
-
 				try {
-					const supabase = createClient();
-					const filename = generateAudioFilename(audioBlob);
-					const { error: upErr } = await supabase.storage
-						.from("report-audio")
-						.upload(filename, audioBlob, {
-							contentType: audioBlob.type || "audio/webm",
-							cacheControl: "3600",
-							upsert: false,
-						});
-					if (!upErr) {
-						const { data } = supabase.storage
-							.from("report-audio")
-							.getPublicUrl(filename);
-						media = createAudioMediaObject(data.publicUrl, audioBlob);
-						console.log("Audio uploaded successfully:", data.publicUrl);
-					} else {
-						console.error("Audio upload failed:", upErr);
-						console.error("Upload error details:", {
-							error: upErr,
-							filename,
-							bucket: "report-audio",
-							blobSize: audioBlob.size,
-							blobType: audioBlob.type,
-						});
-						toast({
-							title: "Audio Upload Failed",
-							description: `Could not save your voice recording: ${
-								upErr.message || "Unknown error"
-							}. Please try again or submit without it.`,
-							variant: "destructive",
-						});
+					let url = audioUploadedUrl;
+					if (!url && audioUploadPromiseRef.current) {
+						toast({ title: "Finalizing voice note upload..." });
+						url = await audioUploadPromiseRef.current;
+					}
+					if (!url) {
+						url = await startAudioUpload(audioBlob);
+					}
+					if (url) {
+						media = createAudioMediaObject(url, audioBlob);
 					}
 				} catch (err) {
 					console.error("Audio upload error:", err);
 					toast({
-						title: "Audio Upload Error",
-						description:
-							"An error occurred while saving your voice recording. Please try again.",
+						title: "Audio Upload Failed",
+						description: "Could not upload your voice note. Submitting report without it.",
 						variant: "destructive",
 					});
 				}
@@ -368,6 +397,9 @@ export default function ReportAbuseForm({ onClose }: { onClose?: () => void }) {
 											const url = URL.createObjectURL(blob);
 											setAudioUrl(url);
 										} catch {}
+										try {
+											startAudioUpload(blob);
+										} catch {}
 									}}
 									onClose={() => setRecorderOpen(false)}
 								/>
@@ -388,12 +420,26 @@ export default function ReportAbuseForm({ onClose }: { onClose?: () => void }) {
 									onClick={() => {
 										setAudioUrl(null);
 										setAudioBlob(null);
+										setAudioUploadedUrl(null);
+										setAudioUploadError(null);
+										audioUploadPromiseRef.current = null;
+										audioFilenameRef.current = null;
+										setAudioUploading(false);
 									}}
 								>
 									Remove
 								</Button>
 							</div>
-							<audio controls src={audioUrl} className="w-full" />
+								<audio controls src={audioUrl} className="w-full" />
+								{audioUploading && (
+									<p className="text-xs text-gray-500 mt-1">Uploading voice note in background…</p>
+								)}
+								{audioUploadedUrl && !audioUploading && (
+									<p className="text-xs text-green-600 mt-1">Voice note uploaded ✓</p>
+								)}
+								{audioUploadError && (
+									<p className="text-xs text-red-600 mt-1">{audioUploadError}</p>
+								)}
 						</div>
 					)}
 
