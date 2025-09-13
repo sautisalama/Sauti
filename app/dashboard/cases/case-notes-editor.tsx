@@ -300,6 +300,21 @@ export default function CaseNotesEditor({
       </div>
 
       {/* Editor */}
+      <style jsx>{`
+        .tiptap :global(.ProseMirror) { outline: none; }
+        .tiptap :global(img) { max-width: 100%; height: auto; }
+        .tiptap :global(blockquote) { border-left: 3px solid #e5e7eb; margin: 0.75rem 0; padding-left: 0.75rem; color: #374151; }
+        .tiptap :global(pre) { background: #f3f4f6; border-radius: 6px; padding: 0.5rem 0.75rem; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; font-size: 0.85rem; }
+        .tiptap :global(h1) { font-size: 1.25rem; line-height: 1.75rem; font-weight: 700; margin: 0.5rem 0; }
+        .tiptap :global(h2) { font-size: 1.125rem; line-height: 1.75rem; font-weight: 700; margin: 0.5rem 0; }
+        .tiptap :global(h3) { font-size: 1rem; line-height: 1.5rem; font-weight: 600; margin: 0.5rem 0; }
+        .tiptap :global(h4) { font-size: 0.95rem; line-height: 1.4rem; font-weight: 600; margin: 0.5rem 0; }
+        .tiptap :global(ul) { list-style: disc; padding-left: 1.25rem; margin: 0.5rem 0; }
+        .tiptap :global(ol) { list-style: decimal; padding-left: 1.25rem; margin: 0.5rem 0; }
+        .tiptap :global(li) { margin: 0.25rem 0; }
+        .tiptap :global(ul ul) { list-style: circle; }
+        .tiptap :global(ol ol) { list-style: lower-alpha; }
+      `}</style>
       <EditorContent editor={editor} className="min-h-[200px] sm:min-h-[160px]" />
     </Card>
   );
