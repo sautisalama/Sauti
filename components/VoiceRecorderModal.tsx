@@ -21,7 +21,7 @@ export function VoiceRecorderModal({ open, onOpenChange, onRecorded }: VoiceReco
   const [recording, setRecording] = useState(false);
   const [paused, setPaused] = useState(false);
   const [elapsed, setElapsed] = useState(0);
-  const [chunks, setChunks] = useState<Blob[]>([]);
+  const chunksRef = useRef<Blob[]>([]);
   const [levels, setLevels] = useState<number[]>(Array.from({ length: 24 }, () => 6));
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [previewBlob, setPreviewBlob] = useState<Blob | null>(null);
@@ -66,7 +66,7 @@ export function VoiceRecorderModal({ open, onOpenChange, onRecorded }: VoiceReco
     setRecording(false);
     setPaused(false);
     setElapsed(0);
-    setChunks([]);
+    chunksRef.current = [];
     setLevels(Array.from({ length: 24 }, () => 6));
     setPreviewUrl(null);
     setPreviewBlob(null);
@@ -87,7 +87,19 @@ export function VoiceRecorderModal({ open, onOpenChange, onRecorded }: VoiceReco
         if (e.data && e.data.size > 0) localChunks.push(e.data);
       };
       mr.onstop = () => {
-        setChunks(localChunks);
+        try {
+          const blob = new Blob(localChunks, { type: 'audio/webm' });
+          chunksRef.current = localChunks;
+          if (blob.size > 0) {
+            setPreviewBlob(blob);
+            try {
+              const url = URL.createObjectURL(blob);
+              setPreviewUrl(url);
+            } catch {}
+          }
+        } finally {
+          cleanupAudio();
+        }
       };
       mr.start();
       mediaRecorderRef.current = mr;
@@ -159,17 +171,6 @@ export function VoiceRecorderModal({ open, onOpenChange, onRecorded }: VoiceReco
       stopTimer();
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
       rafRef.current = null;
-      setTimeout(() => {
-        const blob = new Blob(chunks, { type: 'audio/webm' });
-        if (blob.size > 0) {
-          setPreviewBlob(blob);
-          try {
-            const url = URL.createObjectURL(blob);
-            setPreviewUrl(url);
-          } catch {}
-        }
-        cleanupAudio();
-      }, 50);
     } catch {}
   };
 

@@ -130,7 +130,19 @@ export function VoiceRecorderEnhanced({
 				if (e.data && e.data.size > 0) localChunks.push(e.data);
 			};
 			mr.onstop = () => {
-				chunksRef.current = localChunks;
+				try {
+					const blob = new Blob(localChunks, { type: "audio/webm" });
+					chunksRef.current = localChunks;
+					if (blob.size > 0) {
+						setPreviewBlob(blob);
+						try {
+							const url = URL.createObjectURL(blob);
+							setPreviewUrl(url);
+						} catch {}
+					}
+				} finally {
+					cleanupAudioGraph();
+				}
 			};
 			mr.start();
 			mediaRecorderRef.current = mr;
@@ -213,18 +225,6 @@ export function VoiceRecorderEnhanced({
 			stopTimer();
 			if (rafRef.current) cancelAnimationFrame(rafRef.current);
 			rafRef.current = null;
-			setTimeout(() => {
-				const collected = chunksRef.current;
-				const blob = new Blob(collected, { type: "audio/webm" });
-				if (blob.size > 0) {
-					setPreviewBlob(blob);
-					try {
-						const url = URL.createObjectURL(blob);
-						setPreviewUrl(url);
-					} catch {}
-				}
-				cleanupAudioGraph();
-			}, 50);
 		} catch {}
 	};
 
