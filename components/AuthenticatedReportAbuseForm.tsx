@@ -253,9 +253,9 @@ export default function AuthenticatedReportAbuseForm({
 	return (
 		<form
 			onSubmit={handleSubmit}
-			className="relative w-full max-w-[1200px] max-h-[80vh] flex flex-col"
+			className="relative w-full max-w-[1200px] max-h-[80vh] flex flex-col px-4 sm:px-6"
 		>
-			<div className="flex-1 overflow-y-auto space-y-6 pr-4 pb-32">
+			<div className="flex-1 overflow-y-auto space-y-6 px-1 sm:px-4 pb-32">
 				<div className="space-y-4">
 					<EnhancedToggle
 						id="onbehalf-auth"
@@ -317,7 +317,7 @@ export default function AuthenticatedReportAbuseForm({
 				</div>
 
 				<div className="w-full space-y-3">
-					<div className="flex items-center justify-between">
+					<div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
 						<span className="text-sm text-gray-600">
 							Share your story in writing or by voice (you can start with either)
 						</span>
@@ -332,8 +332,8 @@ export default function AuthenticatedReportAbuseForm({
 					</div>
 
 					{recorderOpen && (
-						<div className="mt-2 fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
-							<div className="bg-white rounded-2xl p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
+						<div className="mt-2 fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-3 sm:p-4">
+							<div className="bg-white rounded-2xl p-4 sm:p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
 								<InlineRecorder
 									onRecorded={(blob) => {
 										setAudioBlob(blob);
@@ -375,7 +375,7 @@ export default function AuthenticatedReportAbuseForm({
 					<Textarea
 						placeholder="Please share what happened... (optional)"
 						name="incident_description"
-						className="min-h-[120px] w-full"
+						className="min-h-[120px] w-full text-base"
 						value={description}
 						onChange={(e) => setDescription(e.target.value)}
 					/>
@@ -513,7 +513,7 @@ export default function AuthenticatedReportAbuseForm({
 				<div className="max-w-[1200px] mx-auto px-4 space-y-2">
 					<Button
 						type="submit"
-						className="w-full bg-blue-600 hover:bg-blue-700 text-white py-4 text-lg font-medium rounded-xl shadow-lg hover:shadow-xl transition-all duration-200"
+						className="w-full bg-blue-600 hover:bg-blue-700 text-white py-4 text-base sm:text-lg font-medium rounded-xl shadow-lg hover:shadow-xl transition-all duration-200"
 						disabled={loading}
 					>
 						{loading ? "Submitting..." : "Submit Report"}

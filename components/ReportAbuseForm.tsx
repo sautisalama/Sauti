@@ -236,7 +236,7 @@ export default function ReportAbuseForm({ onClose }: { onClose?: () => void }) {
 	};
 
 	return (
-		<form onSubmit={handleSubmit} className="space-y-8">
+		<form onSubmit={handleSubmit} className="space-y-8 max-w-2xl mx-auto px-4 sm:px-6">
 			<div className="space-y-6">
 				<EnhancedToggle
 					id="onbehalf"
@@ -245,104 +245,105 @@ export default function ReportAbuseForm({ onClose }: { onClose?: () => void }) {
 					label="Reporting on behalf of someone else"
 					description="Check this if you're submitting a report for another person"
 				/>
+
 				<p className="leading-relaxed text-gray-600">
-					Hello, my name is{" "}
-					<input
-						type="text"
-						className="border-b-2 border-teal-500 focus:outline-none px-2 w-48 bg-transparent"
-						placeholder="your name"
-						name="first_name"
-						required
-					/>
-					. You can reach me at{" "}
-					<input
-						type="email"
-						className="border-b-2 border-teal-500 focus:outline-none px-2 w-64 bg-transparent"
-						placeholder="your email"
-						name="email"
-						required
-						onChange={(e) => handleEmailChange(e.target.value)}
-					/>{" "}
-					or by phone at{" "}
-					<div className="inline-block">
+						Hello, my name is{" "}
 						<input
-							type="tel"
-							className="border-b-2 border-teal-500 focus:outline-none px-2 w-48 bg-transparent"
-							placeholder="phone (optional)"
-							name="phone"
-							defaultValue={autofilledPhone || ""}
+							type="text"
+							className="border-b-2 border-teal-500 focus:outline-none px-2 w-full sm:w-64 md:w-48 bg-transparent"
+							placeholder="your name"
+							name="first_name"
+							required
 						/>
-						{autofilledPhone && (
-							<span className="text-xs text-green-600 ml-2">
-								✓ (from previous report)
-							</span>
-						)}
-					</div>
-					. I would like to report cases of{" "}
-					<span className="inline-flex align-middle">
-						<MultiSelect
-							selected={incidentTypes}
-							onChange={setIncidentTypes}
-							options={INCIDENT_OPTIONS}
-							placeholder="select incident types"
+						. You can reach me at{" "}
+						<input
+							type="email"
+							className="border-b-2 border-teal-500 focus:outline-none px-2 w-full sm:w-72 md:w-64 bg-transparent"
+							placeholder="your email"
+							name="email"
+							required
+							onChange={(e) => handleEmailChange(e.target.value)}
+						/>{" "}
+						or by phone at{" "}
+						<div className="inline-block">
+							<input
+								type="tel"
+								className="border-b-2 border-teal-500 focus:outline-none px-2 w-full sm:w-56 md:w-48 bg-transparent"
+								placeholder="phone (optional)"
+								name="phone"
+								defaultValue={autofilledPhone || ""}
+							/>
+							{autofilledPhone && (
+								<span className="text-xs text-green-600 ml-2">
+									✓ (from previous report)
+								</span>
+							)}
+						</div>
+						. I would like to report cases of{" "}
+						<span className="inline-flex align-middle w-full sm:w-auto">
+							<MultiSelect
+								selected={incidentTypes}
+								onChange={setIncidentTypes}
+								options={INCIDENT_OPTIONS}
+								placeholder="select incident types"
+							/>
+						</span>{" "}
+						which requires{" "}
+						<EnhancedSelect
+							options={[
+								{ value: "high", label: "high urgency" },
+								{ value: "medium", label: "medium urgency" },
+								{ value: "low", label: "low urgency" },
+							]}
+							value={urgency}
+							onChange={(value) => {
+								setUrgency(value);
+								const form = document.querySelector("form") as HTMLFormElement;
+								const select = form.querySelector(
+									'select[name="urgency"]'
+								) as HTMLSelectElement;
+								if (select) select.value = value;
+							}}
+							placeholder="select urgency"
+							required
+							name="urgency"
 						/>
-					</span>{" "}
-					which requires{" "}
-					<EnhancedSelect
-						options={[
-							{ value: "high", label: "high urgency" },
-							{ value: "medium", label: "medium urgency" },
-							{ value: "low", label: "low urgency" },
-						]}
-						value={urgency}
-						onChange={(value) => {
-							setUrgency(value);
-							const form = document.querySelector("form") as HTMLFormElement;
-							const select = form.querySelector(
-								'select[name="urgency"]'
-							) as HTMLSelectElement;
-							if (select) select.value = value;
-						}}
-						placeholder="select urgency"
-						required
-						name="urgency"
-					/>
-					<select name="urgency" className="hidden">
-						<option value="">select urgency</option>
-						<option value="high">high urgency</option>
-						<option value="medium">medium urgency</option>
-						<option value="low">low urgency</option>
-					</select>{" "}
-					attention. I most urgently need{" "}
-					<EnhancedSelect
-						options={SUPPORT_SERVICE_OPTIONS as any}
-						value={supportServices}
-						onChange={(value) => {
-							setSupportServices(value);
-							const form = document.querySelector("form") as HTMLFormElement;
-							const select = form.querySelector(
-								'select[name="support_services"]'
-							) as HTMLSelectElement;
-							if (select) select.value = value;
-						}}
-						placeholder="select type of help"
-						required
-						name="support_services"
-					/>
-					<select name="support_services" className="hidden">
-						<option value="">select type of help</option>
-						{SUPPORT_SERVICE_OPTIONS.map(({ value, label }) => (
-							<option key={value} value={value}>
-								{label}
-							</option>
-						))}
-					</select>
-					.
+						<select name="urgency" className="hidden">
+							<option value="">select urgency</option>
+							<option value="high">high urgency</option>
+							<option value="medium">medium urgency</option>
+							<option value="low">low urgency</option>
+						</select>{" "}
+						attention. I most urgently need{" "}
+						<EnhancedSelect
+							options={SUPPORT_SERVICE_OPTIONS as any}
+							value={supportServices}
+							onChange={(value) => {
+								setSupportServices(value);
+								const form = document.querySelector("form") as HTMLFormElement;
+								const select = form.querySelector(
+									'select[name="support_services"]'
+								) as HTMLSelectElement;
+								if (select) select.value = value;
+							}}
+							placeholder="select type of help"
+							required
+							name="support_services"
+						/>
+						<select name="support_services" className="hidden">
+							<option value="">select type of help</option>
+							{SUPPORT_SERVICE_OPTIONS.map(({ value, label }) => (
+								<option key={value} value={value}>
+									{label}
+								</option>
+							))}
+						</select>
+						.
 				</p>
 
-				<p className="mt-4">Here's what happened:</p>
+				<p className="mt-4 text-base md:text-lg">Here's what happened:</p>
 				<div className="space-y-3">
-					<div className="flex items-center justify-between">
+					<div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
 						<span className="text-sm text-gray-600">
 							Share your story in writing or by voice (you can start with either)
 						</span>
@@ -351,14 +352,15 @@ export default function ReportAbuseForm({ onClose }: { onClose?: () => void }) {
 							variant="outline"
 							size="sm"
 							onClick={() => setRecorderOpen((v) => !v)}
+							className="w-full md:w-auto"
 						>
 							{recorderOpen ? "Hide voice recorder" : "Record voice note"}
 						</Button>
 					</div>
 
 					{recorderOpen && (
-						<div className="mt-2 fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
-							<div className="bg-white rounded-2xl p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
+						<div className="mt-2 fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-3 sm:p-4">
+							<div className="bg-white rounded-2xl p-4 sm:p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
 								<InlineRecorder
 									onRecorded={(blob) => {
 										setAudioBlob(blob);
@@ -398,7 +400,7 @@ export default function ReportAbuseForm({ onClose }: { onClose?: () => void }) {
 					<Textarea
 						placeholder="Please share what happened... (optional)"
 						name="incident_description"
-						className="min-h-[120px] w-full"
+						className="min-h-[120px] w-full text-base"
 						value={description}
 						onChange={(e) => setDescription(e.target.value)}
 					/>
@@ -417,26 +419,28 @@ export default function ReportAbuseForm({ onClose }: { onClose?: () => void }) {
 
 				<p className="mt-4">
 					Please{" "}
-					<EnhancedSelect
-						options={[
-							{ value: "phone_call", label: "call me" },
-							{ value: "sms", label: "text me" },
-							{ value: "email", label: "email me" },
-							{ value: "do_not_contact", label: "don't contact me" },
-						]}
-						value={contactPreference}
-						onChange={(value) => {
-							setContactPreference(value);
-							const form = document.querySelector("form") as HTMLFormElement;
-							const select = form.querySelector(
-								'select[name="contact_preference"]'
-							) as HTMLSelectElement;
-							if (select) select.value = value;
-						}}
-						placeholder="select contact method"
-						required
-						name="contact_preference"
-					/>
+					<span className="inline-block w-full md:w-auto">
+						<EnhancedSelect
+							options={[
+								{ value: "phone_call", label: "call me" },
+								{ value: "sms", label: "text me" },
+								{ value: "email", label: "email me" },
+								{ value: "do_not_contact", label: "don't contact me" },
+							]}
+							value={contactPreference}
+							onChange={(value) => {
+								setContactPreference(value);
+								const form = document.querySelector("form") as HTMLFormElement;
+								const select = form.querySelector(
+									'select[name="contact_preference"]'
+								) as HTMLSelectElement;
+								if (select) select.value = value;
+							}}
+							placeholder="select contact method"
+							required
+							name="contact_preference"
+						/>
+					</span>
 					<select name="contact_preference" className="hidden">
 						<option value="">select contact method</option>
 						<option value="phone_call">call me</option>
@@ -445,7 +449,7 @@ export default function ReportAbuseForm({ onClose }: { onClose?: () => void }) {
 						<option value="do_not_contact">don't contact me</option>
 					</select>{" "}
 					to follow up. In case you need specialized support, you can select:
-					<span className="inline-flex items-center gap-3 ml-3">
+					<span className="mt-3 md:mt-0 inline-flex flex-wrap items-center gap-3 md:ml-3">
 						<label className="inline-flex items-center gap-2 text-sm">
 							<input
 								type="checkbox"
@@ -463,24 +467,26 @@ export default function ReportAbuseForm({ onClose }: { onClose?: () => void }) {
 							I need queer support
 						</label>
 					</span>
-					<EnhancedSelect
-						options={[
-							{ value: "yes", label: "I consent" },
-							{ value: "no", label: "I don't consent" },
-						]}
-						value={consent}
-						onChange={(value) => {
-							setConsent(value);
-							const form = document.querySelector("form") as HTMLFormElement;
-							const select = form.querySelector(
-								'select[name="consent"]'
-							) as HTMLSelectElement;
-							if (select) select.value = value;
-						}}
-						placeholder="select consent"
-						required
-						name="consent"
-					/>
+					<span className="block mt-3 w-full md:inline-block md:w-auto">
+						<EnhancedSelect
+							options={[
+								{ value: "yes", label: "I consent" },
+								{ value: "no", label: "I don't consent" },
+							]}
+							value={consent}
+							onChange={(value) => {
+								setConsent(value);
+								const form = document.querySelector("form") as HTMLFormElement;
+								const select = form.querySelector(
+									'select[name="consent"]'
+								) as HTMLSelectElement;
+								if (select) select.value = value;
+							}}
+							placeholder="select consent"
+							required
+							name="consent"
+						/>
+					</span>
 					<select name="consent" className="hidden">
 						<option value="">select consent</option>
 						<option value="yes">I consent</option>
@@ -490,15 +496,15 @@ export default function ReportAbuseForm({ onClose }: { onClose?: () => void }) {
 				</p>
 			</div>
 
-			<div className="space-y-2">
-				<Button
-					type="submit"
-					className="w-full bg-blue-600 hover:bg-blue-700 text-white py-4 text-lg font-medium rounded-xl shadow-lg hover:shadow-xl transition-all duration-200"
-					disabled={loading}
-				>
-					{loading ? "Submitting..." : "Submit Report"}
-				</Button>
-			</div>
+				<div className="space-y-2">
+					<Button
+						type="submit"
+						className="w-full bg-blue-600 hover:bg-blue-700 text-white py-4 text-base sm:text-lg font-medium rounded-xl shadow-lg hover:shadow-xl transition-all duration-200"
+						disabled={loading}
+					>
+						{loading ? "Submitting..." : "Submit Report"}
+					</Button>
+				</div>
 		</form>
 	);
 }
