@@ -25,6 +25,7 @@ export interface ReportCardData {
 	incident_description?: string | null;
 	submission_timestamp?: string | null;
 	urgency?: string | null;
+	is_onBehalf?: boolean | null;
 	media?: { url?: string; type?: string; size?: number } | null;
 	matched_services?: Array<{
 		match_status_type?: string;
@@ -238,6 +239,15 @@ export function ReportCard({
 
 						{/* Main content */}
 						<div className="min-w-0 flex-1">
+							{/* On behalf indicator */}
+							{data.is_onBehalf && (
+								<div className="mb-2">
+									<span className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium bg-purple-50 text-purple-700 border border-purple-200">
+										<User className="h-3 w-3" />
+										On behalf of someone
+									</span>
+								</div>
+							)}
 							<div className="flex items-start justify-between gap-2 mb-1">
 								<div className="flex items-center gap-2 min-w-0 flex-1">
 									<h3 className="font-medium text-gray-900 text-sm leading-tight">

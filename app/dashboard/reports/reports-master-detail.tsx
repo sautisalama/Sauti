@@ -29,6 +29,8 @@ import {
 	Mic,
 	Play,
 	Pause,
+	Filter,
+	Search,
 } from "lucide-react";
 import { Tables } from "@/types/db-schema";
 import RichTextNotesEditor from "./rich-text-notes-editor";
@@ -70,6 +72,11 @@ export default function ReportsMasterDetail({ userId }: { userId: string }) {
 	const [loading, setLoading] = useState(true);
 	// Mobile view toggle between list and calendar
 	const [mobileView, setMobileView] = useState<"list" | "calendar">("list");
+	// Filters
+	const [urgencyFilter, setUrgencyFilter] = useState<string>("all");
+	const [statusFilter, setStatusFilter] = useState<string>("all");
+	const [onBehalfFilter, setOnBehalfFilter] = useState<string>("all");
+	const [showFilters, setShowFilters] = useState(false);
 
 	useEffect(() => {
 		// Try to hydrate from cache first for instant load
@@ -154,15 +161,56 @@ export default function ReportsMasterDetail({ userId }: { userId: string }) {
 	}, [userId, supabase]);
 
 	const filtered = useMemo(() => {
+		let filteredReports = reports;
+
+		// Text search filter
 		const term = q.trim().toLowerCase();
-		if (!term) return reports;
-		return reports.filter(
-			(r) =>
-				(r.type_of_incident || "").toLowerCase().includes(term) ||
-				(r.incident_description || "").toLowerCase().includes(term) ||
-				(r.urgency || "").toLowerCase().includes(term)
-		);
-	}, [reports, q]);
+		if (term) {
+			filteredReports = filteredReports.filter(
+				(r) =>
+					(r.type_of_incident || "").toLowerCase().includes(term) ||
+					(r.incident_description || "").toLowerCase().includes(term) ||
+					(r.urgency || "").toLowerCase().includes(term)
+			);
+		}
+
+		// Urgency filter
+		if (urgencyFilter !== "all") {
+			filteredReports = filteredReports.filter(
+				(r) => (r.urgency || "low").toLowerCase() === urgencyFilter
+			);
+		}
+
+		// Status filter (based on match status)
+		if (statusFilter !== "all") {
+			filteredReports = filteredReports.filter((r) => {
+				const matchStatus = r.matched_services?.[0]?.match_status_type;
+				if (statusFilter === "matched") {
+					return (
+						matchStatus &&
+						["matched", "confirmed", "accepted"].includes(matchStatus.toLowerCase())
+					);
+				} else if (statusFilter === "pending") {
+					return !matchStatus || matchStatus.toLowerCase() === "pending";
+				} else if (statusFilter === "appointment") {
+					return r.matched_services?.some(
+						(m) => m.appointments && m.appointments.length > 0
+					);
+				}
+				return true;
+			});
+		}
+
+		// On behalf filter
+		if (onBehalfFilter !== "all") {
+			const isOnBehalf = onBehalfFilter === "yes";
+			filteredReports = filteredReports.filter(
+				(r) => !!r.is_onBehalf === isOnBehalf
+			);
+		}
+
+		return filteredReports;
+	}, [reports, q, urgencyFilter, statusFilter, onBehalfFilter]);
 
 	const selected = useMemo(
 		() => filtered.find((r) => r.report_id === selectedId) || null,
@@ -401,24 +449,113 @@ export default function ReportsMasterDetail({ userId }: { userId: string }) {
 						mobileView !== "list" ? "hidden lg:block" : ""
 					}`}
 				>
-					{/* Search and filters */}
-					<div className="mb-6">
-						<div className="flex items-center gap-4">
+					{/* Compact Search and Filter Bar */}
+					<div className="mb-4">
+						<div className="flex items-center gap-3">
+							{/* Search Bar */}
 							<div className="relative flex-1">
 								<Input
-									placeholder="Search reports by incident type, description, or urgency..."
+									placeholder="Search reports..."
 									value={q}
 									onChange={(e) => setQ(e.target.value)}
-									className="pl-10 pr-4 py-3 text-sm border-gray-200 rounded-xl focus:ring-2 focus:ring-[#1A3434]/20 focus:border-[#1A3434]"
+									className="pl-10 pr-4 py-2 text-sm border-gray-200 rounded-lg focus:ring-2 focus:ring-[#1A3434]/20 focus:border-[#1A3434]"
 								/>
-								<FileText className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+								<Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
 							</div>
-							{filtered.length > 0 && (
-								<div className="text-sm text-gray-600 whitespace-nowrap">
-									{filtered.length} report{filtered.length === 1 ? "" : "s"} found
-								</div>
-							)}
+
+							{/* Filter Toggle Button */}
+							<Button
+								variant="outline"
+								size="sm"
+								onClick={() => setShowFilters(!showFilters)}
+								className={`h-9 px-3 border-gray-200 hover:bg-gray-50 ${
+									urgencyFilter !== "all" ||
+									statusFilter !== "all" ||
+									onBehalfFilter !== "all"
+										? "bg-blue-50 text-blue-700 border-blue-200"
+										: ""
+								}`}
+							>
+								<Filter className="h-4 w-4 mr-1" />
+								Filters
+								{(urgencyFilter !== "all" ||
+									statusFilter !== "all" ||
+									onBehalfFilter !== "all") && (
+									<span className="ml-1 h-2 w-2 bg-blue-500 rounded-full"></span>
+								)}
+							</Button>
 						</div>
+
+						{/* Collapsible Filter Panel */}
+						{showFilters && (
+							<div className="mt-3 p-4 bg-gray-50 rounded-lg border border-gray-200">
+								<div className="flex flex-col sm:flex-row sm:items-center gap-4">
+									<div className="flex flex-wrap items-center gap-3">
+										{/* Urgency Filter */}
+										<div className="flex flex-col gap-1">
+											<label className="text-xs font-medium text-gray-600">Urgency</label>
+											<select
+												value={urgencyFilter}
+												onChange={(e) => setUrgencyFilter(e.target.value)}
+												className="px-3 py-1.5 text-sm border border-gray-200 rounded-md bg-white focus:ring-2 focus:ring-[#1A3434]/20 focus:border-[#1A3434] min-w-[100px]"
+											>
+												<option value="all">All</option>
+												<option value="high">High</option>
+												<option value="medium">Medium</option>
+												<option value="low">Low</option>
+											</select>
+										</div>
+
+										{/* Status Filter */}
+										<div className="flex flex-col gap-1">
+											<label className="text-xs font-medium text-gray-600">Status</label>
+											<select
+												value={statusFilter}
+												onChange={(e) => setStatusFilter(e.target.value)}
+												className="px-3 py-1.5 text-sm border border-gray-200 rounded-md bg-white focus:ring-2 focus:ring-[#1A3434]/20 focus:border-[#1A3434] min-w-[120px]"
+											>
+												<option value="all">All</option>
+												<option value="pending">Pending</option>
+												<option value="matched">Matched</option>
+												<option value="appointment">With Appointment</option>
+											</select>
+										</div>
+
+										{/* On Behalf Filter */}
+										<div className="flex flex-col gap-1">
+											<label className="text-xs font-medium text-gray-600">Type</label>
+											<select
+												value={onBehalfFilter}
+												onChange={(e) => setOnBehalfFilter(e.target.value)}
+												className="px-3 py-1.5 text-sm border border-gray-200 rounded-md bg-white focus:ring-2 focus:ring-[#1A3434]/20 focus:border-[#1A3434] min-w-[100px]"
+											>
+												<option value="all">All</option>
+												<option value="yes">On Behalf</option>
+												<option value="no">Personal</option>
+											</select>
+										</div>
+									</div>
+
+									{/* Clear Filters */}
+									{(urgencyFilter !== "all" ||
+										statusFilter !== "all" ||
+										onBehalfFilter !== "all") && (
+										<Button
+											variant="ghost"
+											size="sm"
+											onClick={() => {
+												setUrgencyFilter("all");
+												setStatusFilter("all");
+												setOnBehalfFilter("all");
+											}}
+											className="h-8 px-3 text-xs text-gray-600 hover:text-gray-900 hover:bg-gray-100 self-end sm:self-center"
+										>
+											Clear all
+										</Button>
+									)}
+								</div>
+							</div>
+						)}
 					</div>
 
 					{/* Reports list */}
@@ -470,10 +607,17 @@ export default function ReportsMasterDetail({ userId }: { userId: string }) {
 					<Card className="p-4 shadow-sm border-gray-200 rounded-lg">
 						<div className="flex items-center justify-between mb-4">
 							<div>
-								<h3 className="text-base font-semibold text-gray-900">
-									Appointments Calendar
-								</h3>
-								<p className="text-xs text-gray-500 mt-1">
+								<div className="flex items-center gap-2 mb-1">
+									<h3 className="text-base font-semibold text-gray-900">
+										Appointments Calendar
+									</h3>
+									{filtered.length > 0 && (
+										<span className="px-2 py-1 bg-blue-100 text-blue-700 text-xs font-medium rounded-full">
+											{filtered.length} report{filtered.length === 1 ? "" : "s"}
+										</span>
+									)}
+								</div>
+								<p className="text-xs text-gray-500">
 									Click on a date to view related reports
 								</p>
 							</div>
