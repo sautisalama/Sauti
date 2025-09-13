@@ -4,11 +4,11 @@ import { useToast } from "@/hooks/use-toast";
 import { useState, useEffect } from "react";
 import { Button } from "./ui/button";
 import { VoiceRecorderModal } from "@/components/VoiceRecorderModal";
-import { VoiceRecorderInline as InlineRecorder } from "@/components/VoiceRecorderInline";
+import { VoiceRecorderEnhanced as InlineRecorder } from "@/components/VoiceRecorderEnhanced";
 import { createClient } from "@/utils/supabase/client";
 import { MultiSelect } from "@/components/ui/multi-select";
-import { Switch } from "@/components/ui/switch";
-import { Label } from "@/components/ui/label";
+import { EnhancedSelect } from "@/components/ui/enhanced-select";
+import { EnhancedToggle } from "@/components/ui/enhanced-toggle";
 import { normalizePhone } from "@/utils/phone";
 import {
 	validateAudioBlob,
@@ -39,7 +39,6 @@ export default function ReportAbuseForm({ onClose }: { onClose?: () => void }) {
 	const { toast } = useToast();
 	const [loading, setLoading] = useState(false);
 	const [description, setDescription] = useState("");
-	const [draft, setDraft] = useState<any | null>(null);
 	const [location, setLocation] = useState<{
 		latitude: number;
 		longitude: number;
@@ -52,24 +51,10 @@ export default function ReportAbuseForm({ onClose }: { onClose?: () => void }) {
 	const [needsDisabled, setNeedsDisabled] = useState(false);
 	const [needsQueer, setNeedsQueer] = useState(false);
 	const [autofilledPhone, setAutofilledPhone] = useState<string | null>(null);
-
-	// Load draft
-	useEffect(() => {
-		try {
-			const saved = localStorage.getItem("reportDraft");
-			if (saved) {
-				const parsed = JSON.parse(saved);
-				setDraft(parsed);
-				if (parsed.description) setDescription(parsed.description);
-				if (parsed.incidentTypes) setIncidentTypes(parsed.incidentTypes);
-				if (parsed.isOnBehalf) setIsOnBehalf(!!parsed.isOnBehalf);
-				if (parsed.needsDisabled) setNeedsDisabled(!!parsed.needsDisabled);
-				if (parsed.needsQueer) setNeedsQueer(!!parsed.needsQueer);
-			}
-		} catch (e) {
-			// ignore draft load errors
-		}
-	}, []);
+	const [urgency, setUrgency] = useState<string>("");
+	const [supportServices, setSupportServices] = useState<string>("");
+	const [contactPreference, setContactPreference] = useState<string>("");
+	const [consent, setConsent] = useState<string>("");
 
 	// Get location on component mount
 	useEffect(() => {
@@ -109,6 +94,10 @@ export default function ReportAbuseForm({ onClose }: { onClose?: () => void }) {
 		setLoading(true);
 
 		const formData = new FormData(form);
+		const rawPhone = formData.get("phone") as string;
+		const phone = normalizePhone(rawPhone);
+
+		console.log("Phone validation:", { rawPhone, phone });
 
 		// Description and voice recording are now completely optional
 
@@ -201,7 +190,7 @@ export default function ReportAbuseForm({ onClose }: { onClose?: () => void }) {
 				incident_description: description || null,
 				type_of_incident,
 				urgency: formData.get("urgency"),
-				consent: formData.get("consent"),
+				consent: formData.get("consent") || null,
 				contact_preference: formData.get("contact_preference"),
 				required_services: [],
 				latitude: location?.latitude || null,
@@ -223,11 +212,6 @@ export default function ReportAbuseForm({ onClose }: { onClose?: () => void }) {
 			// Only reset and show success if the submission was successful
 			form.reset();
 			setDescription("");
-			try {
-				localStorage.removeItem("reportDraft");
-			} catch (e) {
-				/* ignore */
-			}
 			toast({
 				title: "Report Submitted",
 				description: "Thank you for your report. We will review it shortly.",
@@ -253,15 +237,14 @@ export default function ReportAbuseForm({ onClose }: { onClose?: () => void }) {
 
 	return (
 		<form onSubmit={handleSubmit} className="space-y-8">
-			<div className="prose prose-sm">
-				<div className="flex items-center gap-2 mb-3">
-					<Switch
-						id="onbehalf"
-						checked={isOnBehalf}
-						onCheckedChange={setIsOnBehalf}
-					/>
-					<Label htmlFor="onbehalf">Reporting on behalf of someone else</Label>
-				</div>
+			<div className="space-y-6">
+				<EnhancedToggle
+					id="onbehalf"
+					checked={isOnBehalf}
+					onCheckedChange={setIsOnBehalf}
+					label="Reporting on behalf of someone else"
+					description="Check this if you're submitting a report for another person"
+				/>
 				<p className="leading-relaxed text-gray-600">
 					Hello, my name is{" "}
 					<input
@@ -269,7 +252,6 @@ export default function ReportAbuseForm({ onClose }: { onClose?: () => void }) {
 						className="border-b-2 border-teal-500 focus:outline-none px-2 w-48 bg-transparent"
 						placeholder="your name"
 						name="first_name"
-						defaultValue={draft?.first_name || ""}
 						required
 					/>
 					. You can reach me at{" "}
@@ -278,18 +260,17 @@ export default function ReportAbuseForm({ onClose }: { onClose?: () => void }) {
 						className="border-b-2 border-teal-500 focus:outline-none px-2 w-64 bg-transparent"
 						placeholder="your email"
 						name="email"
-						defaultValue={draft?.email || ""}
 						required
 						onChange={(e) => handleEmailChange(e.target.value)}
 					/>{" "}
 					or by phone at{" "}
 					<div className="inline-block">
 						<input
-							type="text"
+							type="tel"
 							className="border-b-2 border-teal-500 focus:outline-none px-2 w-48 bg-transparent"
 							placeholder="phone (optional)"
 							name="phone"
-							defaultValue={autofilledPhone || draft?.phone || ""}
+							defaultValue={autofilledPhone || ""}
 						/>
 						{autofilledPhone && (
 							<span className="text-xs text-green-600 ml-2">
@@ -307,24 +288,48 @@ export default function ReportAbuseForm({ onClose }: { onClose?: () => void }) {
 						/>
 					</span>{" "}
 					which requires{" "}
-					<select
-						name="urgency"
+					<EnhancedSelect
+						options={[
+							{ value: "high", label: "high urgency" },
+							{ value: "medium", label: "medium urgency" },
+							{ value: "low", label: "low urgency" },
+						]}
+						value={urgency}
+						onChange={(value) => {
+							setUrgency(value);
+							const form = document.querySelector("form") as HTMLFormElement;
+							const select = form.querySelector(
+								'select[name="urgency"]'
+							) as HTMLSelectElement;
+							if (select) select.value = value;
+						}}
+						placeholder="select urgency"
 						required
-						defaultValue={draft?.urgency || ""}
-						className="border-b-2 border-teal-500 focus:outline-none px-2 bg-transparent"
-					>
+						name="urgency"
+					/>
+					<select name="urgency" className="hidden">
 						<option value="">select urgency</option>
 						<option value="high">high urgency</option>
 						<option value="medium">medium urgency</option>
 						<option value="low">low urgency</option>
 					</select>{" "}
 					attention. I most urgently need{" "}
-					<select
-						name="support_services"
+					<EnhancedSelect
+						options={SUPPORT_SERVICE_OPTIONS as any}
+						value={supportServices}
+						onChange={(value) => {
+							setSupportServices(value);
+							const form = document.querySelector("form") as HTMLFormElement;
+							const select = form.querySelector(
+								'select[name="support_services"]'
+							) as HTMLSelectElement;
+							if (select) select.value = value;
+						}}
+						placeholder="select type of help"
 						required
-						defaultValue={draft?.support_services || ""}
-						className="border-b-2 border-teal-500 focus:outline-none px-2 bg-transparent"
-					>
+						name="support_services"
+					/>
+					<select name="support_services" className="hidden">
 						<option value="">select type of help</option>
 						{SUPPORT_SERVICE_OPTIONS.map(({ value, label }) => (
 							<option key={value} value={value}>
@@ -352,17 +357,19 @@ export default function ReportAbuseForm({ onClose }: { onClose?: () => void }) {
 					</div>
 
 					{recorderOpen && (
-						<div className="mt-2">
-							<InlineRecorder
-								onRecorded={(blob) => {
-									setAudioBlob(blob);
-									try {
-										const url = URL.createObjectURL(blob);
-										setAudioUrl(url);
-									} catch {}
-								}}
-								onClose={() => setRecorderOpen(false)}
-							/>
+						<div className="mt-2 fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+							<div className="bg-white rounded-2xl p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
+								<InlineRecorder
+									onRecorded={(blob) => {
+										setAudioBlob(blob);
+										try {
+											const url = URL.createObjectURL(blob);
+											setAudioUrl(url);
+										} catch {}
+									}}
+									onClose={() => setRecorderOpen(false)}
+								/>
+							</div>
 						</div>
 					)}
 
@@ -410,12 +417,27 @@ export default function ReportAbuseForm({ onClose }: { onClose?: () => void }) {
 
 				<p className="mt-4">
 					Please{" "}
-					<select
-						name="contact_preference"
+					<EnhancedSelect
+						options={[
+							{ value: "phone_call", label: "call me" },
+							{ value: "sms", label: "text me" },
+							{ value: "email", label: "email me" },
+							{ value: "do_not_contact", label: "don't contact me" },
+						]}
+						value={contactPreference}
+						onChange={(value) => {
+							setContactPreference(value);
+							const form = document.querySelector("form") as HTMLFormElement;
+							const select = form.querySelector(
+								'select[name="contact_preference"]'
+							) as HTMLSelectElement;
+							if (select) select.value = value;
+						}}
+						placeholder="select contact method"
 						required
-						defaultValue={draft?.contact_preference || ""}
-						className="border-b-2 border-teal-500 focus:outline-none px-2 bg-transparent"
-					>
+						name="contact_preference"
+					/>
+					<select name="contact_preference" className="hidden">
 						<option value="">select contact method</option>
 						<option value="phone_call">call me</option>
 						<option value="sms">text me</option>
@@ -441,12 +463,25 @@ export default function ReportAbuseForm({ onClose }: { onClose?: () => void }) {
 							I need queer support
 						</label>
 					</span>
-					<select
-						name="consent"
+					<EnhancedSelect
+						options={[
+							{ value: "yes", label: "I consent" },
+							{ value: "no", label: "I don't consent" },
+						]}
+						value={consent}
+						onChange={(value) => {
+							setConsent(value);
+							const form = document.querySelector("form") as HTMLFormElement;
+							const select = form.querySelector(
+								'select[name="consent"]'
+							) as HTMLSelectElement;
+							if (select) select.value = value;
+						}}
+						placeholder="select consent"
 						required
-						defaultValue={draft?.consent || ""}
-						className="border-b-2 border-teal-500 focus:outline-none px-2 bg-transparent"
-					>
+						name="consent"
+					/>
+					<select name="consent" className="hidden">
 						<option value="">select consent</option>
 						<option value="yes">I consent</option>
 						<option value="no">I don't consent</option>
@@ -456,51 +491,13 @@ export default function ReportAbuseForm({ onClose }: { onClose?: () => void }) {
 			</div>
 
 			<div className="space-y-2">
-				<div className="flex flex-col sm:flex-row gap-2">
-					<Button type="submit" className="w-full sm:flex-1" disabled={loading}>
-						{loading ? "Submitting..." : "Submit Report"}
-					</Button>
-					<Button
-						type="button"
-						variant="outline"
-						className="w-full sm:w-auto"
-						onClick={(e) => {
-							const form = (e.currentTarget.closest("form") as HTMLFormElement)!;
-							const fd = new FormData(form);
-							const toSave: any = Object.fromEntries(fd.entries());
-							toSave.description = description;
-							toSave.incidentTypes = incidentTypes;
-							toSave.isOnBehalf = isOnBehalf;
-							toSave.needsDisabled = needsDisabled;
-							toSave.needsQueer = needsQueer;
-							try {
-								localStorage.setItem("reportDraft", JSON.stringify(toSave));
-								setDraft(toSave);
-							} catch (e) {
-								/* ignore */
-							}
-							toast({ title: "Draft saved" });
-						}}
-					>
-						Save Draft
-					</Button>
-					<Button
-						type="button"
-						variant="ghost"
-						className="w-full sm:w-auto"
-						onClick={() => {
-							try {
-								localStorage.removeItem("reportDraft");
-								setDraft(null);
-								setDescription("");
-							} catch (e) {
-								/* ignore */
-							}
-						}}
-					>
-						Clear Draft
-					</Button>
-				</div>
+				<Button
+					type="submit"
+					className="w-full bg-blue-600 hover:bg-blue-700 text-white py-4 text-lg font-medium rounded-xl shadow-lg hover:shadow-xl transition-all duration-200"
+					disabled={loading}
+				>
+					{loading ? "Submitting..." : "Submit Report"}
+				</Button>
 			</div>
 		</form>
 	);

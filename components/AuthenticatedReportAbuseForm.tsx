@@ -13,9 +13,9 @@ import {
 	type SupportServiceType,
 } from "@/lib/constants";
 import { useUser } from "@/hooks/useUser";
-import { VoiceRecorderInline as InlineRecorder } from "@/components/VoiceRecorderInline";
-import { Switch } from "@/components/ui/switch";
-import { Label } from "@/components/ui/label";
+import { VoiceRecorderEnhanced as InlineRecorder } from "@/components/VoiceRecorderEnhanced";
+import { EnhancedSelect } from "@/components/ui/enhanced-select";
+import { EnhancedToggle } from "@/components/ui/enhanced-toggle";
 import { normalizePhone } from "@/utils/phone";
 import {
 	validateAudioBlob,
@@ -38,7 +38,6 @@ export default function AuthenticatedReportAbuseForm({
 	const [selectedServices, setSelectedServices] = useState<string[]>([]);
 	const [incidentTypes, setIncidentTypes] = useState<string[]>([]);
 	const [description, setDescription] = useState("");
-	const [draft, setDraft] = useState<any | null>(null);
 	// Voice via modal only for consistency
 	const [location, setLocation] = useState<{
 		latitude: number;
@@ -51,6 +50,9 @@ export default function AuthenticatedReportAbuseForm({
 	const [needsDisabled, setNeedsDisabled] = useState(false);
 	const [needsQueer, setNeedsQueer] = useState(false);
 	const [autofilledPhone, setAutofilledPhone] = useState<string | null>(null);
+	const [urgency, setUrgency] = useState<string>("");
+	const [contactPreference, setContactPreference] = useState<string>("");
+	const [consent, setConsent] = useState<string>("");
 	const supabase = useMemo(() => createClient(), []);
 	const user = useUser();
 
@@ -76,21 +78,6 @@ export default function AuthenticatedReportAbuseForm({
 		}
 	}, [toast]); // Include toast in dependencies
 
-	useEffect(() => {
-		try {
-			const saved = localStorage.getItem("authReportDraft");
-			if (saved) {
-				const parsed = JSON.parse(saved);
-				setDraft(parsed);
-				if (parsed.description) setDescription(parsed.description);
-				if (parsed.selectedServices) setSelectedServices(parsed.selectedServices);
-				if (parsed.incidentTypes) setIncidentTypes(parsed.incidentTypes);
-			}
-		} catch (e) {
-			// ignore draft load errors
-		}
-	}, []);
-
 	// Autofill phone number from user profile or previous reports
 	useEffect(() => {
 		const autofillPhone = async () => {
@@ -111,7 +98,10 @@ export default function AuthenticatedReportAbuseForm({
 		const form = e.currentTarget;
 		const formData = new FormData(form);
 		const contactPreference = formData.get("contact_preference");
-		const phone = normalizePhone(formData.get("phone") as string);
+		const rawPhone = formData.get("phone") as string;
+		const phone = normalizePhone(rawPhone);
+
+		console.log("Phone validation:", { rawPhone, phone, contactPreference });
 
 		// Description and voice recording are now completely optional
 
@@ -210,7 +200,7 @@ export default function AuthenticatedReportAbuseForm({
 			// If you add MultiSelect later, map the first choice to type_of_incident and store all in additional_info
 			incident_description: description || null,
 			urgency: formData.get("urgency"),
-			consent: formData.get("consent"),
+			consent: formData.get("consent") || null,
 			contact_preference: contactPreference,
 			required_services: selectedServices,
 			latitude: location?.latitude || null,
@@ -242,11 +232,6 @@ export default function AuthenticatedReportAbuseForm({
 			});
 
 			form.reset();
-			try {
-				localStorage.removeItem("authReportDraft");
-			} catch (e) {
-				/* ignore */
-			}
 			setTimeout(() => {
 				onClose();
 			}, 500);
@@ -270,43 +255,65 @@ export default function AuthenticatedReportAbuseForm({
 			onSubmit={handleSubmit}
 			className="relative w-full max-w-[1200px] max-h-[80vh] flex flex-col"
 		>
-			<div className="flex-1 overflow-y-auto space-y-6 pr-4 pb-20">
-				<div className="flex items-center gap-4 flex-wrap">
-					<div className="flex items-center gap-2">
-						<Switch
-							id="onbehalf-auth"
-							checked={isOnBehalf}
-							onCheckedChange={setIsOnBehalf}
-						/>
-						<Label htmlFor="onbehalf-auth">Reporting on behalf of someone else</Label>
+			<div className="flex-1 overflow-y-auto space-y-6 pr-4 pb-32">
+				<div className="space-y-4">
+					<EnhancedToggle
+						id="onbehalf-auth"
+						checked={isOnBehalf}
+						onCheckedChange={setIsOnBehalf}
+						label="Reporting on behalf of someone else"
+						description="Check this if you're submitting a report for another person"
+					/>
+					<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+						<div>
+							<label className="block text-sm font-medium text-gray-700 mb-2">
+								Incident Type *
+							</label>
+							<MultiSelect
+								selected={incidentTypes}
+								onChange={setIncidentTypes}
+								options={[
+									{ value: "physical", label: "Physical abuse" },
+									{ value: "emotional", label: "Emotional abuse" },
+									{ value: "sexual", label: "Sexual abuse" },
+									{ value: "financial", label: "Financial abuse" },
+									{ value: "child_abuse", label: "Child abuse" },
+									{ value: "other", label: "Other" },
+								]}
+								placeholder="Select incident types"
+							/>
+						</div>
+						<div>
+							<label className="block text-sm font-medium text-gray-700 mb-2">
+								Urgency Level *
+							</label>
+							<EnhancedSelect
+								options={[
+									{ value: "high", label: "High urgency" },
+									{ value: "medium", label: "Medium urgency" },
+									{ value: "low", label: "Low urgency" },
+								]}
+								value={urgency}
+								onChange={(value) => {
+									setUrgency(value);
+									const form = document.querySelector("form") as HTMLFormElement;
+									const select = form.querySelector(
+										'select[name="urgency"]'
+									) as HTMLSelectElement;
+									if (select) select.value = value;
+								}}
+								placeholder="Select urgency level"
+								required
+								name="urgency"
+							/>
+							<select name="urgency" className="hidden">
+								<option value="">select urgency</option>
+								<option value="high">high urgency</option>
+								<option value="medium">medium urgency</option>
+								<option value="low">low urgency</option>
+							</select>
+						</div>
 					</div>
-					<p className="text-lg text-gray-700">I want to report about</p>
-					<div className="min-w-[240px]">
-						<MultiSelect
-							selected={incidentTypes}
-							onChange={setIncidentTypes}
-							options={[
-								{ value: "physical", label: "Physical abuse" },
-								{ value: "emotional", label: "Emotional abuse" },
-								{ value: "sexual", label: "Sexual abuse" },
-								{ value: "financial", label: "Financial abuse" },
-								{ value: "child_abuse", label: "Child abuse" },
-								{ value: "other", label: "Other" },
-							]}
-							placeholder="Select incident types"
-						/>
-					</div>
-					<p className="text-lg text-gray-700">with</p>
-					<select
-						name="urgency"
-						required
-						className="border-b-2 border-teal-500 focus:outline-none px-2 bg-transparent"
-					>
-						<option value="">select urgency</option>
-						<option value="high">high urgency</option>
-						<option value="medium">medium urgency</option>
-						<option value="low">low urgency</option>
-					</select>
 				</div>
 
 				<div className="w-full space-y-3">
@@ -325,19 +332,21 @@ export default function AuthenticatedReportAbuseForm({
 					</div>
 
 					{recorderOpen && (
-						<div className="mt-2">
-							<InlineRecorder
-								onRecorded={(blob) => {
-									setAudioBlob(blob);
-									try {
-										const url = URL.createObjectURL(blob);
-										setAudioUrl(url);
-									} catch (e) {
-										console.debug("Error creating audio URL:", e);
-									}
-								}}
-								onClose={() => setRecorderOpen(false)}
-							/>
+						<div className="mt-2 fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+							<div className="bg-white rounded-2xl p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
+								<InlineRecorder
+									onRecorded={(blob) => {
+										setAudioBlob(blob);
+										try {
+											const url = URL.createObjectURL(blob);
+											setAudioUrl(url);
+										} catch (e) {
+											console.debug("Error creating audio URL:", e);
+										}
+									}}
+									onClose={() => setRecorderOpen(false)}
+								/>
+							</div>
 						</div>
 					)}
 
@@ -394,11 +403,6 @@ export default function AuthenticatedReportAbuseForm({
 						options={SUPPORT_SERVICE_OPTIONS}
 						placeholder="Select required services..."
 					/>
-					{draft?.selectedServices && draft.selectedServices.length > 0 && (
-						<p className="text-xs text-gray-400">
-							Draft selected: {draft.selectedServices.join(", ")}
-						</p>
-					)}
 				</div>
 
 				<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -427,8 +431,7 @@ export default function AuthenticatedReportAbuseForm({
 						<Input
 							placeholder="Your phone number"
 							name="phone"
-							type="text"
-							pattern="[0-9]{10,}"
+							type="tel"
 							className="w-full"
 							defaultValue={autofilledPhone || ""}
 						/>
@@ -438,21 +441,36 @@ export default function AuthenticatedReportAbuseForm({
 							</p>
 						)}
 					</div>
-					<select
-						name="contact_preference"
-						required
-						className="border-b-2 border-teal-500 focus:outline-none px-2 bg-transparent"
-						onChange={(e) => {
+					<EnhancedSelect
+						options={[
+							{ value: "phone_call", label: "Call me" },
+							{ value: "sms", label: "Text me" },
+							{ value: "email", label: "Email me" },
+							{ value: "do_not_contact", label: "Don't contact me" },
+						]}
+						value={contactPreference}
+						onChange={(value) => {
+							setContactPreference(value);
+							const form = document.querySelector("form") as HTMLFormElement;
+							const select = form.querySelector(
+								'select[name="contact_preference"]'
+							) as HTMLSelectElement;
+							if (select) select.value = value;
+
 							const phoneInput = document.querySelector(
 								'input[name="phone"]'
 							) as HTMLInputElement;
-							if (e.target.value === "phone_call" || e.target.value === "sms") {
+							if (value === "phone_call" || value === "sms") {
 								phoneInput.required = true;
 							} else {
 								phoneInput.required = false;
 							}
 						}}
-					>
+						placeholder="Select contact preference"
+						required
+						name="contact_preference"
+					/>
+					<select name="contact_preference" className="hidden">
 						<option value="">select contact preference</option>
 						<option value="phone_call">Call me</option>
 						<option value="sms">Text me</option>
@@ -461,16 +479,29 @@ export default function AuthenticatedReportAbuseForm({
 					</select>
 				</div>
 
-				<div className="flex items-center gap-4 justify-between">
-					<p className="text-lg text-gray-700">
-						Do you consent to share this information with relevant authorities if
-						needed?
-					</p>
-					<select
-						name="consent"
+				<div className="space-y-3">
+					<label className="block text-sm font-medium text-gray-700">
+						Consent to share information with authorities *
+					</label>
+					<EnhancedSelect
+						options={[
+							{ value: "yes", label: "Yes, I consent" },
+							{ value: "no", label: "No, I don't consent" },
+						]}
+						value={consent}
+						onChange={(value) => {
+							setConsent(value);
+							const form = document.querySelector("form") as HTMLFormElement;
+							const select = form.querySelector(
+								'select[name="consent"]'
+							) as HTMLSelectElement;
+							if (select) select.value = value;
+						}}
+						placeholder="Select consent option"
 						required
-						className="border-b-2 border-teal-500 focus:outline-none px-2 bg-transparent w-[200px]"
-					>
+						name="consent"
+					/>
+					<select name="consent" className="hidden">
 						<option value="">select consent</option>
 						<option value="yes">Yes, I consent</option>
 						<option value="no">No, I don't consent</option>
@@ -478,47 +509,15 @@ export default function AuthenticatedReportAbuseForm({
 				</div>
 			</div>
 
-			<div className="fixed bottom-0 left-0 right-0 pt-4 pb-4 bg-white border-t mt-4 z-50">
+			<div className="fixed bottom-0 left-0 right-0 pt-4 pb-4 bg-white border-t mt-4 z-40">
 				<div className="max-w-[1200px] mx-auto px-4 space-y-2">
-					<div className="flex flex-col sm:flex-row gap-2">
-						<Button type="submit" className="w-full sm:flex-1" disabled={loading}>
-							{loading ? "Submitting..." : "Submit Report"}
-						</Button>
-						<Button
-							variant="outline"
-							onClick={(e) => {
-								const form = (e.currentTarget.closest("form") as HTMLFormElement)!;
-								const fd = new FormData(form);
-								const toSave: any = Object.fromEntries(fd.entries());
-								toSave.description = description;
-								toSave.selectedServices = selectedServices;
-								toSave.incidentTypes = incidentTypes;
-								try {
-									localStorage.setItem("authReportDraft", JSON.stringify(toSave));
-									setDraft(toSave);
-								} catch (e) {
-									/* ignore */
-								}
-							}}
-						>
-							Save Draft
-						</Button>
-						<Button
-							variant="ghost"
-							onClick={() => {
-								try {
-									localStorage.removeItem("authReportDraft");
-									setDraft(null);
-									setDescription("");
-									setSelectedServices([]);
-								} catch (e) {
-									/* ignore */
-								}
-							}}
-						>
-							Clear Draft
-						</Button>
-					</div>
+					<Button
+						type="submit"
+						className="w-full bg-blue-600 hover:bg-blue-700 text-white py-4 text-lg font-medium rounded-xl shadow-lg hover:shadow-xl transition-all duration-200"
+						disabled={loading}
+					>
+						{loading ? "Submitting..." : "Submit Report"}
+					</Button>
 				</div>
 			</div>
 		</form>
