@@ -13,6 +13,8 @@ import {
 } from "./ui/card";
 import { Switch } from "./ui/switch";
 import { Database } from "@/types/db-schema";
+import { serviceValidationService } from "@/lib/service-validation";
+import { useDashboardData } from "@/components/providers/DashboardDataProvider";
 import {
 	MapPin,
 	Globe,
@@ -25,7 +27,10 @@ import {
 	MessageCircle,
 	Plus,
 	Loader2,
+	AlertCircle,
+	CheckCircle,
 } from "lucide-react";
+import { Alert, AlertDescription } from "./ui/alert";
 
 type ServiceType = Database["public"]["Enums"]["support_service_type"];
 
@@ -61,10 +66,18 @@ export function AddSupportServiceForm({
 	onSuccess?: () => void;
 }) {
 	const { toast } = useToast();
+	const dash = useDashboardData();
+	const profile = dash?.data?.profile;
 	const [loading, setLoading] = useState(false);
 	const [location, setLocation] = useState<{ lat: number; lng: number } | null>(
 		null
 	);
+	const [existingServices, setExistingServices] = useState<ServiceType[]>([]);
+	const [validationResult, setValidationResult] = useState<{
+		valid: boolean;
+		reason?: string;
+		suggestions?: string[];
+	} | null>(null);
 	const [formData, setFormData] = useState({
 		name: "",
 		service_types: "" as ServiceType,
@@ -97,8 +110,58 @@ export function AddSupportServiceForm({
 		}
 	}, [toast]);
 
+	// Load existing services for validation
+	useEffect(() => {
+		if (profile?.user_type === "ngo") {
+			loadExistingServices();
+		}
+	}, [profile?.user_type]);
+
+	// Validate service when service type changes
+	useEffect(() => {
+		if (formData.service_types && profile?.user_type) {
+			validateService();
+		}
+	}, [formData.service_types, profile?.user_type, existingServices]);
+
+	const loadExistingServices = async () => {
+		try {
+			const response = await fetch("/api/support-services");
+			if (response.ok) {
+				const services = await response.json();
+				const serviceTypes = services.map((service: any) => service.service_types);
+				setExistingServices(serviceTypes);
+			}
+		} catch (error) {
+			console.error("Error loading existing services:", error);
+		}
+	};
+
+	const validateService = () => {
+		if (!formData.service_types || !profile?.user_type) return;
+
+		const validation = serviceValidationService.validateServiceCreation(
+			existingServices,
+			formData.service_types,
+			profile.user_type
+		);
+
+		setValidationResult(validation);
+	};
+
 	const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
 		e.preventDefault();
+
+		// Check validation before submitting
+		if (validationResult && !validationResult.valid) {
+			toast({
+				title: "Service Validation Failed",
+				description: validationResult.reason,
+				variant: "destructive",
+			});
+			return;
+		}
+
 		setLoading(true);
 
 		// Validate that at least one service type is selected
@@ -250,6 +313,46 @@ export function AddSupportServiceForm({
 											</option>
 										))}
 									</select>
+
+									{/* Service Validation Feedback */}
+									{validationResult && (
+										<Alert
+											className={
+												validationResult.valid
+													? "border-green-200 bg-green-50"
+													: "border-red-200 bg-red-50"
+											}
+										>
+											{validationResult.valid ? (
+												<CheckCircle className="h-4 w-4 text-green-600" />
+											) : (
+												<AlertCircle className="h-4 w-4 text-red-600" />
+											)}
+											<AlertDescription
+												className={
+													validationResult.valid ? "text-green-800" : "text-red-800"
+												}
+											>
+												{validationResult.valid ? (
+													"Service type is valid and can be created."
+												) : (
+													<div>
+														<p className="font-medium">{validationResult.reason}</p>
+														{validationResult.suggestions &&
+															validationResult.suggestions.length > 0 && (
+																<ul className="mt-2 list-disc list-inside space-y-1">
+																	{validationResult.suggestions.map((suggestion, index) => (
+																		<li key={index} className="text-sm">
+																			{suggestion}
+																		</li>
+																	))}
+																</ul>
+															)}
+													</div>
+												)}
+											</AlertDescription>
+										</Alert>
+									)}
 								</div>
 							</div>
 						</div>

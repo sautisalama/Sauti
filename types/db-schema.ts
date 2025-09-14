@@ -166,6 +166,7 @@ export type Database = {
       profiles: {
         Row: {
           accreditation_files: Json | null
+          accreditation_files_metadata: Json | null
           accreditation_member_number: Json | null
           avatar_url: string | null
           bio: string | null
@@ -179,15 +180,20 @@ export type Database = {
           is_public_booking: boolean | null
           isVerified: boolean | null
           last_name: string | null
+          last_verification_check: string | null
           phone: string | null
           professional_title: string | null
+          profile_image_metadata: Json | null
           profile_image_url: string | null
           settings: Json | null
           updated_at: string | null
           user_type: Database["public"]["Enums"]["user_type"] | null
+          verification_notes: string | null
+          verification_status: string | null
         }
         Insert: {
           accreditation_files?: Json | null
+          accreditation_files_metadata?: Json | null
           accreditation_member_number?: Json | null
           avatar_url?: string | null
           bio?: string | null
@@ -201,15 +207,20 @@ export type Database = {
           is_public_booking?: boolean | null
           isVerified?: boolean | null
           last_name?: string | null
+          last_verification_check?: string | null
           phone?: string | null
           professional_title?: string | null
+          profile_image_metadata?: Json | null
           profile_image_url?: string | null
           settings?: Json | null
           updated_at?: string | null
           user_type?: Database["public"]["Enums"]["user_type"] | null
+          verification_notes?: string | null
+          verification_status?: string | null
         }
         Update: {
           accreditation_files?: Json | null
+          accreditation_files_metadata?: Json | null
           accreditation_member_number?: Json | null
           avatar_url?: string | null
           bio?: string | null
@@ -223,12 +234,16 @@ export type Database = {
           is_public_booking?: boolean | null
           isVerified?: boolean | null
           last_name?: string | null
+          last_verification_check?: string | null
           phone?: string | null
           professional_title?: string | null
+          profile_image_metadata?: Json | null
           profile_image_url?: string | null
           settings?: Json | null
           updated_at?: string | null
           user_type?: Database["public"]["Enums"]["user_type"] | null
+          verification_notes?: string | null
+          verification_status?: string | null
         }
         Relationships: []
       }
@@ -383,12 +398,14 @@ export type Database = {
       }
       support_services: {
         Row: {
+          accreditation_files_metadata: Json | null
           availability: string | null
           coverage_area_radius: number | null
           created_at: string | null
           email: string | null
           helpline: string | null
           id: string
+          last_verification_check: string | null
           latitude: number | null
           longitude: number | null
           name: string
@@ -396,15 +413,19 @@ export type Database = {
           priority: number | null
           service_types: Database["public"]["Enums"]["support_service_type"]
           user_id: string | null
+          verification_notes: string | null
+          verification_status: string | null
           website: string | null
         }
         Insert: {
+          accreditation_files_metadata?: Json | null
           availability?: string | null
           coverage_area_radius?: number | null
           created_at?: string | null
           email?: string | null
           helpline?: string | null
           id?: string
+          last_verification_check?: string | null
           latitude?: number | null
           longitude?: number | null
           name: string
@@ -412,15 +433,19 @@ export type Database = {
           priority?: number | null
           service_types: Database["public"]["Enums"]["support_service_type"]
           user_id?: string | null
+          verification_notes?: string | null
+          verification_status?: string | null
           website?: string | null
         }
         Update: {
+          accreditation_files_metadata?: Json | null
           availability?: string | null
           coverage_area_radius?: number | null
           created_at?: string | null
           email?: string | null
           helpline?: string | null
           id?: string
+          last_verification_check?: string | null
           latitude?: number | null
           longitude?: number | null
           name?: string
@@ -428,6 +453,8 @@ export type Database = {
           priority?: number | null
           service_types?: Database["public"]["Enums"]["support_service_type"]
           user_id?: string | null
+          verification_notes?: string | null
+          verification_status?: string | null
           website?: string | null
         }
         Relationships: [
@@ -445,7 +472,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      cleanup_orphaned_files: {
+        Args: Record<PropertyKey, never>
+        Returns: number
+      }
+      get_user_file_stats: {
+        Args: { user_uuid: string }
+        Returns: Json
+      }
     }
     Enums: {
       appointment_status_type: "pending" | "confirmed" | "requested"

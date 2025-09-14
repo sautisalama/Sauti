@@ -1,6 +1,7 @@
 import { createClient } from "@/utils/supabase/server";
 import { NextResponse } from "next/server";
 import { Database } from "@/types/db-schema";
+import { serviceValidationService } from "@/lib/service-validation";
 
 export async function POST(request: Request) {
 	const supabase = await createClient();
@@ -19,6 +20,46 @@ export async function POST(request: Request) {
 		}
 
 		const data = await request.json();
+
+		// Get user profile to check user type
+		const { data: profile } = await supabase
+			.from("profiles")
+			.select("user_type")
+			.eq("id", user.id)
+			.single();
+
+		if (!profile) {
+			return NextResponse.json(
+				{ error: "User profile not found" },
+				{ status: 404 }
+			);
+		}
+
+		// Get existing services for validation
+		const { data: existingServices } = await supabase
+			.from("support_services")
+			.select("service_types")
+			.eq("user_id", user.id);
+
+		const existingServiceTypes =
+			existingServices?.map((s) => s.service_types) || [];
+
+		// Validate service creation
+		const validation = serviceValidationService.validateServiceCreation(
+			existingServiceTypes,
+			data.service_types,
+			profile.user_type
+		);
+
+		if (!validation.valid) {
+			return NextResponse.json(
+				{
+					error: validation.reason,
+					suggestions: validation.suggestions,
+				},
+				{ status: 400 }
+			);
+		}
 
 		// Transform the data to match the database schema
 		const serviceData: Database["public"]["Tables"]["support_services"]["Insert"] =
