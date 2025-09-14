@@ -672,11 +672,11 @@ export function VerificationSection({
 			</div>
 
 			{/* Document Upload and List Section */}
-			<div className="grid gap-6 lg:grid-cols-3">
-				{/* Document Upload Form - Left Side */}
-				<div className="lg:col-span-2">
-					<Card>
-						<CardHeader>
+			<div className="grid gap-6 xl:grid-cols-6">
+				{/* Document Upload Form - Left Side (3/5 width) */}
+				<div className="xl:col-span-3">
+					<Card className="h-fit">
+						<CardHeader className="pb-4">
 							<CardTitle className="flex items-center gap-2">
 								<FileText className="h-5 w-5 text-sauti-orange" />
 								Professional Credentials
@@ -699,10 +699,10 @@ export function VerificationSection({
 					</Card>
 				</div>
 
-				{/* Uploaded Documents List - Right Side */}
-				<div className="lg:col-span-1">
-					<Card>
-						<CardHeader>
+				{/* Uploaded Documents List - Right Side (2/5 width) */}
+				<div className="xl:col-span-3">
+					<Card className="h-fit">
+						<CardHeader className="pb-4">
 							<CardTitle className="flex items-center gap-2">
 								<CheckSquare className="h-5 w-5 text-sauti-orange" />
 								Uploaded Documents ({documents.length})
@@ -710,167 +710,163 @@ export function VerificationSection({
 						</CardHeader>
 						<CardContent>
 							{documents.length === 0 ? (
-								<div className="text-center py-8">
-									<FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-									<p className="text-gray-500 text-sm">No documents uploaded yet</p>
+								<div className="text-center py-12">
+									<div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gradient-to-br from-blue-50 to-sky-100 flex items-center justify-center">
+										<FileText className="h-8 w-8 text-sky-600" />
+									</div>
+									<h3 className="text-lg font-semibold text-gray-900 mb-2">
+										No documents uploaded yet
+									</h3>
+									<p className="text-gray-500 text-sm">
+										Your uploaded documents will appear here
+									</p>
 								</div>
 							) : (
 								<div className="space-y-3">
 									{documents.map((doc) => (
 										<div
 											key={doc.id}
-											className="border rounded-lg p-3 hover:shadow-sm transition-shadow"
+											className="bg-white rounded-xl border border-gray-200 hover:border-gray-300 transition-all duration-200 hover:shadow-md group"
 										>
-											<div className="flex items-start justify-between mb-2">
-												<div className="flex items-center gap-2 flex-1 min-w-0">
-													<div
-														className={`p-1.5 rounded ${
-															getStatusColor(doc.status).includes("green")
-																? "bg-green-100"
-																: getStatusColor(doc.status).includes("yellow")
-																? "bg-yellow-100"
-																: getStatusColor(doc.status).includes("red")
-																? "bg-red-100"
-																: "bg-gray-100"
-														}`}
-													>
-														<FileText
-															className={`h-4 w-4 ${
+											<div className="p-4">
+												{/* Header */}
+												<div className="flex items-start justify-between mb-3">
+													<div className="flex items-center gap-3 flex-1 min-w-0">
+														<div
+															className={`h-10 w-10 rounded-full flex items-center justify-center font-semibold text-sm flex-shrink-0 ${
 																getStatusColor(doc.status).includes("green")
-																	? "text-green-600"
+																	? "bg-gradient-to-br from-green-100 to-green-200 text-green-700"
 																	: getStatusColor(doc.status).includes("yellow")
-																	? "text-yellow-600"
+																	? "bg-gradient-to-br from-yellow-100 to-yellow-200 text-yellow-700"
 																	: getStatusColor(doc.status).includes("red")
-																	? "text-red-600"
-																	: "text-gray-600"
+																	? "bg-gradient-to-br from-red-100 to-red-200 text-red-700"
+																	: "bg-gradient-to-br from-gray-100 to-gray-200 text-gray-700"
 															}`}
-														/>
-													</div>
-													<div className="flex-1 min-w-0">
-														<h4 className="font-medium text-sm truncate">{doc.title}</h4>
-														<p className="text-xs text-gray-500">
-															{doc.fileType.toUpperCase()}
-														</p>
-													</div>
-												</div>
-												<Badge className={`${getStatusColor(doc.status)} text-xs`}>
-													{doc.status.replace("_", " ")}
-												</Badge>
-											</div>
-
-											<div className="space-y-1 mb-3">
-												<div className="flex justify-between text-xs text-gray-600">
-													<span>Size:</span>
-													<span>{formatFileSize(doc.fileSize)}</span>
-												</div>
-												<div className="flex justify-between text-xs text-gray-600">
-													<span>Uploaded:</span>
-													<span>{formatDate(doc.uploadedAt)}</span>
-												</div>
-											</div>
-
-											<div className="flex gap-2">
-												<Dialog>
-													<DialogTrigger asChild>
-														<Button
-															variant="outline"
-															size="sm"
-															className="flex-1 gap-1 text-xs"
 														>
-															<Eye className="h-3 w-3" />
-															View
-														</Button>
-													</DialogTrigger>
-													<DialogContent className="max-w-2xl">
-														<DialogHeader>
-															<DialogTitle className="flex items-center gap-2">
-																<FileText className="h-5 w-5 text-sauti-orange" />
+															<FileText className="h-5 w-5" />
+														</div>
+														<div className="min-w-0 flex-1">
+															<h4 className="font-semibold text-gray-900 truncate">
 																{doc.title}
-															</DialogTitle>
-															<DialogDescription>
-																Professional credential document details
-															</DialogDescription>
-														</DialogHeader>
-														<div className="space-y-6">
-															<div className="grid grid-cols-2 gap-4">
-																<div className="space-y-1">
-																	<label className="text-sm font-medium text-gray-600">
-																		File Type
-																	</label>
-																	<p className="text-sm font-mono bg-gray-100 px-2 py-1 rounded">
-																		{doc.fileType.toUpperCase()}
-																	</p>
-																</div>
-																<div className="space-y-1">
-																	<label className="text-sm font-medium text-gray-600">
-																		File Size
-																	</label>
-																	<p className="text-sm">{formatFileSize(doc.fileSize)}</p>
-																</div>
-																<div className="space-y-1">
-																	<label className="text-sm font-medium text-gray-600">
-																		Uploaded
-																	</label>
-																	<p className="text-sm">{formatDate(doc.uploadedAt)}</p>
-																</div>
-																<div className="space-y-1">
-																	<label className="text-sm font-medium text-gray-600">
-																		Status
-																	</label>
-																	<Badge className={getStatusColor(doc.status)}>
-																		{doc.status.replace("_", " ")}
-																	</Badge>
-																</div>
-															</div>
-															{doc.notes && (
-																<div className="space-y-1">
-																	<label className="text-sm font-medium text-gray-600">
-																		Notes
-																	</label>
-																	<p className="text-sm bg-gray-50 p-3 rounded border">
-																		{doc.notes}
-																	</p>
-																</div>
-															)}
-															<div className="flex gap-3 pt-4 border-t">
-																<Button
-																	variant="outline"
-																	onClick={() => window.open(doc.url, "_blank")}
-																	className="gap-2 flex-1"
-																>
-																	<ExternalLink className="h-4 w-4" />
-																	View Document
-																</Button>
-																<Button
-																	variant="outline"
-																	onClick={() => {
-																		const link = document.createElement("a");
-																		link.href = doc.url;
-																		link.download = doc.title;
-																		link.click();
-																	}}
-																	className="gap-2 flex-1"
-																>
-																	<Download className="h-4 w-4" />
-																	Download
-																</Button>
+															</h4>
+															<div className="flex items-center gap-2 text-sm text-gray-500">
+																<span className="font-mono text-xs">
+																	{doc.fileType.toUpperCase()}
+																</span>
+																<span>•</span>
+																<span>{formatFileSize(doc.fileSize)}</span>
+																<span>•</span>
+																<span>{formatDate(doc.uploadedAt)}</span>
 															</div>
 														</div>
-													</DialogContent>
-												</Dialog>
-												<Button
-													variant="outline"
-													size="sm"
-													onClick={() => {
-														const link = document.createElement("a");
-														link.href = doc.url;
-														link.download = doc.title;
-														link.click();
-													}}
-													className="gap-1 text-xs"
-												>
-													<Download className="h-3 w-3" />
-												</Button>
+													</div>
+													<div className="flex items-center gap-2 flex-shrink-0">
+														<Badge className={`${getStatusColor(doc.status)} border`}>
+															{doc.status.replace("_", " ")}
+														</Badge>
+													</div>
+												</div>
+
+												{/* Actions */}
+												<div className="flex gap-2">
+													<Dialog>
+														<DialogTrigger asChild>
+															<Button variant="outline" size="sm" className="flex-1 gap-2">
+																<Eye className="h-4 w-4" />
+																View Details
+															</Button>
+														</DialogTrigger>
+														<DialogContent className="max-w-2xl">
+															<DialogHeader>
+																<DialogTitle className="flex items-center gap-2">
+																	<FileText className="h-5 w-5 text-sauti-orange" />
+																	{doc.title}
+																</DialogTitle>
+																<DialogDescription>
+																	Professional credential document details
+																</DialogDescription>
+															</DialogHeader>
+															<div className="space-y-6">
+																<div className="grid grid-cols-2 gap-4">
+																	<div className="space-y-1">
+																		<label className="text-sm font-medium text-gray-600">
+																			File Type
+																		</label>
+																		<p className="text-sm font-mono bg-gray-100 px-2 py-1 rounded">
+																			{doc.fileType.toUpperCase()}
+																		</p>
+																	</div>
+																	<div className="space-y-1">
+																		<label className="text-sm font-medium text-gray-600">
+																			File Size
+																		</label>
+																		<p className="text-sm">{formatFileSize(doc.fileSize)}</p>
+																	</div>
+																	<div className="space-y-1">
+																		<label className="text-sm font-medium text-gray-600">
+																			Uploaded
+																		</label>
+																		<p className="text-sm">{formatDate(doc.uploadedAt)}</p>
+																	</div>
+																	<div className="space-y-1">
+																		<label className="text-sm font-medium text-gray-600">
+																			Status
+																		</label>
+																		<Badge className={getStatusColor(doc.status)}>
+																			{doc.status.replace("_", " ")}
+																		</Badge>
+																	</div>
+																</div>
+																{doc.notes && (
+																	<div className="space-y-1">
+																		<label className="text-sm font-medium text-gray-600">
+																			Notes
+																		</label>
+																		<p className="text-sm bg-gray-50 p-3 rounded border">
+																			{doc.notes}
+																		</p>
+																	</div>
+																)}
+																<div className="flex gap-3 pt-4 border-t">
+																	<Button
+																		variant="outline"
+																		onClick={() => window.open(doc.url, "_blank")}
+																		className="gap-2 flex-1"
+																	>
+																		<ExternalLink className="h-4 w-4" />
+																		View Document
+																	</Button>
+																	<Button
+																		variant="outline"
+																		onClick={() => {
+																			const link = document.createElement("a");
+																			link.href = doc.url;
+																			link.download = doc.title;
+																			link.click();
+																		}}
+																		className="gap-2 flex-1"
+																	>
+																		<Download className="h-4 w-4" />
+																		Download
+																	</Button>
+																</div>
+															</div>
+														</DialogContent>
+													</Dialog>
+													<Button
+														variant="outline"
+														size="sm"
+														onClick={() => {
+															const link = document.createElement("a");
+															link.href = doc.url;
+															link.download = doc.title;
+															link.click();
+														}}
+														className="gap-2"
+													>
+														<Download className="h-4 w-4" />
+													</Button>
+												</div>
 											</div>
 										</div>
 									))}

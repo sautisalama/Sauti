@@ -297,7 +297,7 @@ export default function ProfilePage() {
 			</div>
 
 			{/* Main Content */}
-			<div className="max-w-4xl mx-auto px-4 py-6">
+			<div className="max-w-6xl mx-auto px-4 py-6">
 				<Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
 					<TabsList className="grid w-full grid-cols-3 mb-6">
 						<TabsTrigger value="profile" className="flex items-center gap-2">
