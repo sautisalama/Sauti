@@ -11,6 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { AnonymousModeToggle } from "@/components/chat/AnonymousModeToggle";
 import { ProfessionalDocumentsForm } from "./professional-documents";
 import { EnhancedProfessionalDocumentsForm } from "./enhanced-professional-documents";
+import { VerificationSection } from "./verification-section";
 import { signOut } from "@/app/(auth)/actions/auth";
 import { createClient } from "@/utils/supabase/client";
 import { useDashboardData } from "@/components/providers/DashboardDataProvider";
@@ -22,6 +23,7 @@ import {
 	Building,
 	Settings,
 	Accessibility,
+	FileCheck,
 } from "lucide-react";
 import {
 	Accordion,
@@ -297,11 +299,17 @@ export default function ProfilePage() {
 			{/* Main Content */}
 			<div className="max-w-4xl mx-auto px-4 py-6">
 				<Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-					<TabsList className="grid w-full grid-cols-2 mb-6">
+					<TabsList className="grid w-full grid-cols-3 mb-6">
 						<TabsTrigger value="profile" className="flex items-center gap-2">
 							<User className="h-4 w-4" />
 							Profile
 						</TabsTrigger>
+						{isProfessional && (
+							<TabsTrigger value="verification" className="flex items-center gap-2">
+								<FileCheck className="h-4 w-4" />
+								Verification
+							</TabsTrigger>
+						)}
 						<TabsTrigger value="settings" className="flex items-center gap-2">
 							<Settings className="h-4 w-4" />
 							Settings
@@ -519,6 +527,21 @@ export default function ProfilePage() {
 							)}
 						</Accordion>
 					</TabsContent>
+
+					{/* Verification Tab - Only for Professionals and NGOs */}
+					{isProfessional && (
+						<TabsContent value="verification" className="space-y-4">
+							<VerificationSection
+								userId={userId || ""}
+								userType={profile?.user_type || "professional"}
+								profile={profile}
+								onUpdate={() => {
+									// Refresh profile data when verification is updated
+									window.location.reload();
+								}}
+							/>
+						</TabsContent>
+					)}
 
 					<TabsContent value="settings" className="space-y-4">
 						<Card>
