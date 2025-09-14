@@ -174,11 +174,11 @@ export default function ReportNotesEditor({
 		return () => window.removeEventListener("keydown", onKeyDown);
 	}, [save]);
 
-	// 10-second autosave interval (only when there are unsaved changes)
+	// 30-second autosave interval (only when there are unsaved changes)
 	useEffect(() => {
 		const id = window.setInterval(() => {
 			if (dirty) void save(undefined, { autosave: true });
-		}, 10000);
+		}, 30000);
 		return () => window.clearInterval(id);
 	}, [dirty, save]);
 

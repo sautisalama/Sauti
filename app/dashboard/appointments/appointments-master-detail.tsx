@@ -8,8 +8,10 @@ import { Card } from "@/components/ui/card";
 import { Calendar as UIDateCalendar } from "@/components/ui/calendar";
 import { AppointmentCard } from "@/app/dashboard/_components/AppointmentCard";
 import { useToast } from "@/hooks/use-toast";
-import { CalendarDays, Clock, Filter, Search, FileText } from "lucide-react";
+import { CalendarDays, Clock, Filter, Search, FileText, X } from "lucide-react";
 import type { AppointmentWithDetails } from "@/app/dashboard/_types";
+import ReportNotesEditor from "@/app/dashboard/reports/rich-text-notes-editor";
+import { Tables } from "@/types/db-schema";
 
 export default function AppointmentsMasterDetail({ userId, username }: { userId: string; username: string }) {
   const { toast } = useToast();
@@ -67,13 +69,17 @@ export default function AppointmentsMasterDetail({ userId, username }: { userId:
   }, [userId, supabase, toast]);
 
   const term = q.trim().toLowerCase();
-  const filtered = appointments.filter((a) => {
-    const matchesText = !term ||
-      (a.matched_service?.support_service?.name || "").toLowerCase().includes(term) ||
-      (a.matched_service?.report?.incident_description || "").toLowerCase().includes(term);
-    const matchesStatus = statusFilter === "all" || (a.status || "").toLowerCase() === statusFilter;
-    return matchesText && matchesStatus;
-  });
+  const filtered = useMemo(() => {
+    return appointments.filter((a) => {
+      const matchesText = !term ||
+        (a.matched_service?.support_service?.name || "").toLowerCase().includes(term) ||
+        (a.matched_service?.report?.incident_description || "").toLowerCase().includes(term);
+      const matchesStatus = statusFilter === "all" || (a.status || "").toLowerCase() === statusFilter;
+      return matchesText && matchesStatus;
+    });
+  }, [appointments, term, statusFilter]);
+
+  const selected = useMemo(() => filtered.find(a => a.appointment_id === selectedId) || null, [filtered, selectedId]);
 
   // Calendar markers
   const appointmentDates = new Set<string>();
@@ -231,6 +237,200 @@ export default function AppointmentsMasterDetail({ userId, username }: { userId:
             </div>
           </Card>
         </div>
+      </div>
+
+      {/* Side panel overlay for selected appointment */}
+      <div
+        className={`fixed inset-0 sm:inset-y-0 sm:right-0 sm:left-auto w-full sm:w-[520px] lg:w-[640px] bg-white shadow-2xl border-l z-40 transform transition-transform duration-300 ease-out ${
+          selected ? "translate-y-0 sm:translate-x-0" : "translate-y-full sm:translate-x-full"
+        }`}
+        aria-hidden={!selected}
+      >
+        {selected && (
+          <div className="h-full flex flex-col bg-gray-50">
+            {/* Header */}
+            <div className="p-4 border-b border-gray-200 bg-white flex items-start justify-between gap-3 sticky top-0 z-10">
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2 mb-1">
+                  <h2 className="text-lg font-semibold text-gray-900 truncate">
+                    {selected.matched_service?.support_service?.name || "Appointment"}
+                  </h2>
+                  <span
+                    className={`px-2 py-0.5 rounded-md text-xs font-medium ${
+                      selected.status === "confirmed"
+                        ? "bg-blue-100 text-blue-700 border border-blue-200"
+                        : selected.status === "completed"
+                        ? "bg-green-100 text-green-700 border border-green-200"
+                        : "bg-gray-100 text-gray-700 border border-gray-200"
+                    }`}
+                  >
+                    {selected.status?.charAt(0).toUpperCase() + selected.status?.slice(1)}
+                  </span>
+                </div>
+                <div className="flex items-center gap-3 text-xs text-gray-500">
+                  <div className="flex items-center gap-1">
+                    <Clock className="h-3 w-3" />
+                    <span>
+                      {selected.appointment_date
+                        ? new Date(selected.appointment_date).toLocaleString()
+                        : ""}
+                    </span>
+                  </div>
+                </div>
+              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="rounded-lg hover:bg-gray-100 transition-colors h-8 w-8"
+                onClick={() => setSelectedId(null)}
+              >
+                <X className="h-4 w-4 text-gray-600" />
+              </Button>
+            </div>
+
+            {/* Body */}
+            <div className="flex-1 overflow-y-auto">
+              <div className="p-4 space-y-4">
+                {/* Matched Service & Appointment - Combined */}
+                <div className="bg-blue-50 rounded-lg border border-blue-100 p-4">
+                  <h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                    <CalendarDays className="h-4 w-4 text-blue-600" />
+                    Matched Service & Appointment
+                  </h3>
+                  <div className="space-y-3">
+                    {/* Service Info */}
+                    <div>
+                      <p className="text-sm font-medium text-gray-900">
+                        {selected.matched_service?.support_service?.name || "Pending Match"}
+                      </p>
+                      {(selected.matched_service as any)?.match_status_type && (
+                        <p className="text-xs text-gray-600 mt-1">
+                          Status: <span className="font-medium capitalize">{String((selected.matched_service as any).match_status_type)}</span>
+                        </p>
+                      )}
+                    </div>
+                    {/* Appointment Info */}
+                    <div className="bg-white rounded-lg border border-blue-200 p-3">
+                      <div className="text-xs text-gray-700">
+                        <div className="flex items-center gap-2 mb-1">
+                          <Clock className="h-3 w-3 text-gray-500" />
+                          <span className="font-medium">
+                            {selected.appointment_date ? new Date(selected.appointment_date).toLocaleDateString() : ""}
+                          </span>
+                        </div>
+                        <div className="text-gray-600">
+                          {selected.appointment_date
+                            ? new Date(selected.appointment_date).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+                            : ""}
+                        </div>
+                        <div className="mt-2">
+                          <span
+                            className={`px-2 py-1 rounded-md text-xs font-medium ${
+                              selected.status === "confirmed"
+                                ? "bg-blue-100 text-blue-700 border border-blue-200"
+                                : selected.status === "completed"
+                                ? "bg-green-100 text-green-700 border border-green-200"
+                                : "bg-gray-100 text-gray-700 border border-gray-200"
+                            }`}
+                          >
+                            {selected.status?.charAt(0).toUpperCase() + selected.status?.slice(1)}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Description with Audio - Combined (from report) */}
+                {(selected.matched_service?.report?.incident_description || (selected.matched_service?.report?.media as any)?.url) && (
+                  <div className="bg-white rounded-lg border border-gray-200 p-4">
+                    <h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                      <FileText className="h-4 w-4 text-gray-600" />
+                      Description
+                    </h3>
+                    <div className="space-y-3">
+                      {selected.matched_service?.report?.incident_description && (
+                        <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">
+                          {selected.matched_service.report.incident_description}
+                        </p>
+                      )}
+                      {(selected.matched_service?.report?.media as any)?.url && (
+                        <audio controls className="w-full">
+                          <source src={(selected.matched_service?.report?.media as any).url} />
+                        </audio>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Notes (WYSIWYG) - Full Height */}
+                <div className="bg-white rounded-lg border border-gray-200 flex flex-col h-[70vh] sm:h-[480px]">
+                  <div className="p-4 border-b border-gray-200">
+                    <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                      <FileText className="h-5 w-5 text-gray-600" />
+                      Notes & Updates
+                    </h3>
+                  </div>
+                  <div className="flex-1 overflow-hidden">
+                    {selected.matched_service?.report && (
+                      <ReportNotesEditor
+                        userId={userId}
+                        report={selected.matched_service.report as unknown as Tables<"reports">}
+                        onSaved={(updated) => {
+                          // Update nested report notes in appointments list and cache
+                          setAppointments((prev) => {
+                            const next = prev.map((a) => {
+                              if (a.matched_service?.report?.report_id === updated.report_id) {
+                                return { ...a, matched_service: { ...a.matched_service, report: updated as any } } as any;
+                              }
+                              return a;
+                            });
+                            try { localStorage.setItem(`appointments-cache-${userId}`, JSON.stringify(next)); } catch {}
+                            return next;
+                          });
+                        }}
+                      />
+                    )}
+                  </div>
+                </div>
+
+                {/* Attachments (if any in administrative JSON) */}
+                {(() => {
+                  const attachments = (selected.matched_service?.report as any)?.administrative?.attachments as
+                    | Array<{ name: string; url: string }>
+                    | undefined;
+                  if (!attachments || attachments.length === 0) return null;
+                  return (
+                    <div className="bg-white rounded-lg border border-gray-200 p-4">
+                      <h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                        <FileText className="h-4 w-4 text-gray-600" />
+                        Attachments
+                      </h3>
+                      <div className="space-y-2">
+                        {attachments.map((a, idx) => (
+                          <div key={idx} className="flex items-center justify-between p-2 bg-gray-50 rounded-md border border-gray-200">
+                            <div className="flex items-center gap-2 min-w-0 flex-1">
+                              <FileText className="h-4 w-4 text-gray-500 flex-shrink-0" />
+                              <span className="text-sm font-medium text-gray-900 truncate">{a.name}</span>
+                            </div>
+                            <a
+                              href={a.url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="ml-2 px-2 py-1 text-xs font-medium text-[#1A3434] bg-[#1A3434]/10 rounded-md hover:bg-[#1A3434]/20 transition-colors"
+                            >
+                              Open
+                            </a>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
