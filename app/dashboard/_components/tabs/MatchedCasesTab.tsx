@@ -1,7 +1,6 @@
 import { Tables } from "@/types/db-schema";
 import { MatchCard } from "../../_components/MatchCard";
-import { useEffect, useState } from "react";
-import { createClient } from "@/utils/supabase/client";
+import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -27,42 +26,10 @@ export function MatchedCasesTab({
 	matchedServices,
 	onRefresh,
 }: MatchedCasesTabProps) {
-	const supabase = createClient();
 	const { toast } = useToast();
 	const [feedbackOpen, setFeedbackOpen] = useState(false);
 	const [feedbackText, setFeedbackText] = useState("");
 	const [feedbackMatchId, setFeedbackMatchId] = useState<string | null>(null);
-
-	useEffect(() => {
-		// Subscribe to changes in matched_services table with filter for this user
-		const channel = supabase
-			.channel("matched-services-changes")
-			.on(
-				"postgres_changes",
-				{
-					event: "*",
-					schema: "public",
-					table: "matched_services",
-					filter: `professional_id=eq.${userId}`,
-				},
-				async () => {
-					await onRefresh();
-				}
-			)
-			.subscribe((status) => {
-				if (status === "CHANNEL_ERROR") {
-					toast({
-						title: "Connection Error",
-						description: "Failed to connect to real-time updates",
-						variant: "destructive",
-					});
-				}
-			});
-
-		return () => {
-			supabase.removeChannel(channel);
-		};
-	}, [supabase, onRefresh, toast, userId]);
 
 	return (
 		<div className="space-y-6">

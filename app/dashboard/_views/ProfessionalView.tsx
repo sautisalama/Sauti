@@ -140,7 +140,7 @@ export default function ProfessionalView({
 			.join(" ");
 	};
 
-useEffect(() => {
+	useEffect(() => {
 		const loadData = async () => {
 			try {
 				const [userReports, userServices, userMatches, userAppointments] =
@@ -273,7 +273,7 @@ useEffect(() => {
 				<AlertDescription>
 					{description}
 					<div className="mt-3 flex flex-wrap gap-2">
-						<Link href="/dashboard/onboarding">
+						<Link href="/dashboard/profile">
 							<Button size="sm" variant="default">
 								Update profile
 							</Button>
@@ -377,7 +377,7 @@ useEffect(() => {
 					{/* Quick Agenda + Queues */}
 					<div className="grid grid-cols-1 md:grid-cols-3 gap-4 my-4">
 						<div className="rounded-xl border p-4 bg-white shadow-sm">
-							<p className="text-sm text-neutral-600 mb-2">Today’s Agenda</p>
+							<p className="text-sm text-neutral-600 mb-2">My Services</p>
 							{appointments.length > 0 ? (
 								<div className="space-y-2 text-sm">
 									{[...appointments]

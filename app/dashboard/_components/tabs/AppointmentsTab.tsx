@@ -4,7 +4,6 @@ import { AppointmentCard } from "../AppointmentCard";
 import { fetchUserAppointments } from "../../_views/actions/appointments";
 import { useToast } from "@/hooks/use-toast";
 import { AppointmentWithDetails } from "@/app/dashboard/_types";
-import { createClient } from "@/utils/supabase/client";
 
 interface AppointmentsTabProps {
 	userId: string;
@@ -22,7 +21,6 @@ export function AppointmentsTab({
 	const [appointments, setAppointments] = useState<AppointmentWithDetails[]>([]);
 	const [isLoading, setIsLoading] = useState(true);
 	const { toast } = useToast();
-	const supabase = createClient();
 
 	const loadAppointments = useCallback(async () => {
 		try {
@@ -42,38 +40,7 @@ export function AppointmentsTab({
 
 	useEffect(() => {
 		loadAppointments();
-
-		const channel = supabase
-			.channel("appointments-changes")
-			.on(
-				"postgres_changes",
-				{
-					event: "*",
-					schema: "public",
-					table: "appointments",
-					filter:
-						userType === "professional"
-							? `professional_id=eq.${userId}`
-							: `survivor_id=eq.${userId}`,
-				},
-				() => {
-					loadAppointments();
-				}
-			)
-			.subscribe((status) => {
-				if (status === "CHANNEL_ERROR") {
-					toast({
-						title: "Connection Error",
-						description: "Failed to connect to real-time updates",
-						variant: "destructive",
-					});
-				}
-			});
-
-		return () => {
-			supabase.removeChannel(channel);
-		};
-	}, [userId, userType, loadAppointments, supabase, toast]);
+	}, [loadAppointments]);
 
 	if (isLoading) {
 		return <div>Loading appointments...</div>;

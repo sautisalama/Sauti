@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useUser } from "@/hooks/useUser";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,6 +12,7 @@ import { AnonymousModeToggle } from "@/components/chat/AnonymousModeToggle";
 import { ProfessionalDocumentsForm } from "./professional-documents";
 import { signOut } from "@/app/(auth)/actions/auth";
 import { createClient } from "@/utils/supabase/client";
+import { useDashboardData } from "@/components/providers/DashboardDataProvider";
 import {
 	CheckCircle,
 	AlertCircle,
@@ -44,11 +44,13 @@ interface ProfileData {
 }
 
 export default function ProfilePage() {
-	const user = useUser();
+	const dash = useDashboardData();
+	const profile = dash?.data?.profile;
+	const userId = dash?.data?.userId;
 	const { toast } = useToast();
 	const isProfessional =
-		user?.profile?.user_type === "professional" ||
-		user?.profile?.user_type === "ngo";
+		profile?.user_type === "professional" ||
+		profile?.user_type === "ngo";
 	const supabase = createClient();
 
 	const [profileData, setProfileData] = useState<ProfileData>({});
@@ -58,23 +60,23 @@ export default function ProfilePage() {
 
 	// Load profile data
 	useEffect(() => {
-		if (user?.profile) {
+		if (profile) {
 			setProfileData({
-				bio: user.profile.bio || "",
-				phone: user.profile.phone || "",
-				professional_title: user.profile.professional_title || "",
-				first_name: user.profile.first_name || "",
-				last_name: user.profile.last_name || "",
-				email: user.profile.email || "",
-				isVerified: user.profile.isVerified || false,
-				accreditation_files: user.profile.accreditation_files || null,
+				bio: profile.bio || "",
+				phone: profile.phone || "",
+				professional_title: profile.professional_title || "",
+				first_name: profile.first_name || "",
+				last_name: profile.last_name || "",
+				email: profile.email || "",
+				isVerified: (profile as any).isVerified || false,
+				accreditation_files: (profile as any).accreditation_files || null,
 				accreditation_member_number:
-					user.profile.accreditation_member_number || null,
-				settings: user.profile.settings || {},
+					(profile as any).accreditation_member_number || null,
+				settings: (profile as any).settings || {},
 			});
 			setIsLoading(false);
 		}
-	}, [user]);
+	}, [profile]);
 
 	const updateFormData = (section: string, field: string, value: any) => {
 		setFormData((prev) => ({
@@ -88,7 +90,7 @@ export default function ProfilePage() {
 
 	const saveVerificationDocuments = async (documents: any[]) => {
 		try {
-			if (!user?.id) return;
+			if (!userId) return;
 
 			const { error } = await supabase
 				.from("profiles")
@@ -96,15 +98,16 @@ export default function ProfilePage() {
 					accreditation_files: documents,
 					updated_at: new Date().toISOString(),
 				})
-				.eq("id", user.id);
+				.eq("id", userId);
 
 			if (error) throw error;
 
-			// Update local state
+			// Update local state and provider cache
 			setProfileData((prev) => ({
 				...prev,
 				accreditation_files: documents,
 			}));
+			dash?.updatePartial({ profile: { ...(profile as any), accreditation_files: documents, updated_at: new Date().toISOString() } as any });
 
 			toast({
 				title: "Success",
@@ -121,7 +124,7 @@ export default function ProfilePage() {
 
 	const saveSection = async (section: string) => {
 		try {
-			if (!user?.id) return;
+			if (!userId) return;
 
 			const sectionData = formData[section] || {};
 			let updateData: any = {};
@@ -150,12 +153,13 @@ export default function ProfilePage() {
 			const { error } = await supabase
 				.from("profiles")
 				.update(updateData)
-				.eq("id", user.id);
+				.eq("id", userId);
 
 			if (error) throw error;
 
-			// Update local state
+			// Update local state and provider cache
 			setProfileData((prev) => ({ ...prev, ...updateData }));
+			dash?.updatePartial({ profile: { ...(profile as any), ...updateData, updated_at: new Date().toISOString() } as any });
 			toast({
 				title: "Saved",
 				description: `${section} information updated successfully`,
@@ -212,29 +216,29 @@ export default function ProfilePage() {
 				<div className="max-w-4xl mx-auto px-4 py-6">
 					<div className="flex items-center justify-between">
 						<div className="flex items-center gap-4">
-							<Avatar className="h-16 w-16">
-								<AvatarImage
-									src={
-										typeof window !== "undefined" &&
-										window.localStorage.getItem("ss_anon_mode") === "1"
-											? "/anon.svg"
-											: user?.profile?.avatar_url || ""
-									}
-								/>
-								<AvatarFallback className="bg-sauti-orange text-white">
-									{user?.profile?.first_name?.[0]?.toUpperCase() ||
-										user?.email?.[0]?.toUpperCase() ||
-										"U"}
-								</AvatarFallback>
+									<Avatar className="h-16 w-16">
+										<AvatarImage
+											src={
+												typeof window !== "undefined" &&
+												window.localStorage.getItem("ss_anon_mode") === "1"
+													? "/anon.svg"
+													: profile?.avatar_url || ""
+												}
+											/>
+											<AvatarFallback className="bg-sauti-orange text-white">
+												{profile?.first_name?.[0]?.toUpperCase() ||
+													profile?.email?.[0]?.toUpperCase() ||
+													"U"}
+											</AvatarFallback>
 							</Avatar>
 							<div>
-								<h1 className="text-2xl font-bold">
-									{user?.profile?.first_name || user?.email || "User"}
-								</h1>
-								<div className="flex items-center gap-2 mt-1 text-sm text-gray-600">
-									{user?.profile?.user_type !== "survivor" && (
+									<h1 className="text-2xl font-bold">
+										{profile?.first_name || profile?.email || "User"}
+									</h1>
+									<div className="flex items-center gap-2 mt-1 text-sm text-gray-600">
+										{profile?.user_type !== "survivor" && (
 										<Badge variant="secondary" className="capitalize">
-											{user?.profile?.user_type || "member"}
+											{profile?.user_type || "member"}
 										</Badge>
 									)}
 									{profileData.isVerified && (
@@ -329,10 +333,10 @@ export default function ProfilePage() {
 								</CardTitle>
 							</CardHeader>
 							<CardContent>
-								{user?.id && user?.profile?.first_name && (
+								{userId && profile?.first_name && (
 									<AnonymousModeToggle
-										userId={user.id}
-										username={user.profile.first_name}
+										userId={userId}
+										username={profile.first_name}
 									/>
 								)}
 							</CardContent>
@@ -513,10 +517,10 @@ export default function ProfilePage() {
 
 								<div className="space-y-4">
 									<h4 className="font-medium">Privacy & Identity</h4>
-									{user?.id && user?.profile?.first_name && (
+									{userId && profile?.first_name && (
 										<AnonymousModeToggle
-											userId={user.id}
-											username={user.profile.first_name}
+											userId={userId}
+											username={profile.first_name}
 										/>
 									)}
 								</div>
