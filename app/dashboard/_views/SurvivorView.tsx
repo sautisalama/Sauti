@@ -96,7 +96,17 @@ export default function SurvivorView({
 	profileDetails,
 }: SurvivorViewProps) {
 	const dash = useDashboardData();
-	const [reports, setReports] = useState<ReportWithRelations[]>([]);
+	const [reports, setReports] = useState<ReportWithRelations[]>(() => {
+		// Seed from provider if available, else from localStorage cache
+		const seeded = (dash?.data?.reports as any) || [];
+		if (seeded && Array.isArray(seeded) && seeded.length) return seeded as any;
+		try {
+			const cached = localStorage.getItem(`reports-cache-${userId}`);
+			return cached ? (JSON.parse(cached) as any) : [];
+		} catch {
+			return [];
+		}
+	});
 	const [open, setOpen] = useState(false);
 	const searchParams = useSearchParams();
 	const initialTab =
@@ -107,7 +117,7 @@ export default function SurvivorView({
 	const [deleteReport, setDeleteReport] = useState<string | null>(null);
 	const [showAlert, setShowAlert] = useState(true);
 
-	// Move fetchReports outside useEffect so it can be called from handlers
+	// Single fetch function used when explicitly refreshing
 	const fetchReports = useCallback(async () => {
 		console.log("Fetching reports for user:", userId);
 
@@ -142,57 +152,11 @@ export default function SurvivorView({
 			return;
 		}
 
-		// If we need appointments data, we'll need to fetch it separately
-		if (data && data.length > 0) {
-			// Get all matched service IDs
-			const matchedServiceIds = data
-				.flatMap((report) => report.matched_services || [])
-				.map((service) => service.id);
-
-			if (matchedServiceIds.length > 0) {
-				const { data: appointmentsData, error: appointmentsError } = await supabase
-					.from("appointments")
-					.select("*")
-					.in("professional_id", matchedServiceIds);
-
-				if (!appointmentsError && appointmentsData) {
-					// Merge appointments data with the reports
-					const reportsWithAppointments = data.map((report) => ({
-						...report,
-						matched_services: report.matched_services?.map(
-							(service: { id: string }) => ({
-								...service,
-								appointments: appointmentsData.filter(
-									(apt) => apt.professional_id === service.id
-								),
-							})
-						),
-					}));
-
-					console.log("Reports with appointments:", reportsWithAppointments);
-					setReports(reportsWithAppointments);
-					try {
-						localStorage.setItem(
-							`reports-cache-${userId}`,
-							JSON.stringify(reportsWithAppointments)
-						);
-					} catch (e) {
-						/* ignore cache write */
-					}
-					return;
-				}
-			}
-		}
-
-		// If no appointments needed to be fetched or if there was an error, just set the reports
-		console.log("Fetched reports:", data);
 		setReports(data || []);
 		try {
 			localStorage.setItem(`reports-cache-${userId}`, JSON.stringify(data || []));
-		} catch (e) {
-			/* ignore cache write */
-		}
-	}, [userId, toast]);
+		} catch {}
+	}, [userId, supabase, toast]);
 
 	const handleDelete = async (reportId: string) => {
 		try {
@@ -224,13 +188,15 @@ export default function SurvivorView({
 	};
 
 	useEffect(() => {
-		// Use provider data when present
+		// If provider has reports and user matches, prefer that;
+		// otherwise keep whatever seed we had and only fetch when explicitly asked.
 		if (dash?.data && dash.data.userId === userId && dash.data.reports) {
 			setReports(dash.data.reports as any);
-		} else {
-			fetchReports();
+			try {
+				localStorage.setItem(`reports-cache-${userId}`, JSON.stringify(dash.data.reports || []));
+			} catch {}
 		}
-	}, [userId, dash?.data]); // Removed supabase and fetchReports from deps to prevent loop
+	}, [userId, dash?.data]);
 
 	// Add formatServiceName inside component
 	const formatServiceName = (service: string) => {

@@ -377,7 +377,7 @@ export default function ProfessionalView({
 					{/* Quick Agenda + Queues */}
 					<div className="grid grid-cols-1 md:grid-cols-3 gap-4 my-4">
 						<div className="rounded-xl border p-4 bg-white shadow-sm">
-							<p className="text-sm text-neutral-600 mb-2">Today’s Agenda</p>
+							<p className="text-sm text-neutral-600 mb-2">My Services</p>
 							{appointments.length > 0 ? (
 								<div className="space-y-2 text-sm">
 									{[...appointments]
