@@ -89,8 +89,12 @@ export class FileUploadService {
 		}
 
 		// Check for potentially dangerous file names
-		const dangerousPatterns = /[<>:"/\\|?*\x00-\x1f]/;
-		if (dangerousPatterns.test(file.name)) {
+		const dangerousPatterns = /[<>:"/\\|?*]/;
+		const hasControlChars = Array.from(file.name).some((char) => {
+			const code = char.charCodeAt(0);
+			return code >= 0 && code <= 31; // Control characters 0x00-0x1f
+		});
+		if (dangerousPatterns.test(file.name) || hasControlChars) {
 			throw new FileUploadError(
 				"File name contains invalid characters",
 				"INVALID_FILE_NAME"

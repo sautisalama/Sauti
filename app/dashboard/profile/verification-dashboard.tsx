@@ -85,6 +85,12 @@ export function VerificationDashboard({
 	});
 	const [isLoading, setIsLoading] = useState(true);
 	const [activeTab, setActiveTab] = useState("overview");
+	const [servicesData, setServicesData] = useState<
+		Array<{
+			verification_status: string | null;
+			accreditation_files_metadata: any;
+		}>
+	>([]);
 	const supabase = createClient();
 	const { toast } = useToast();
 
@@ -105,13 +111,14 @@ export function VerificationDashboard({
 				.single();
 
 			// Load services verification data for NGO users
-			let servicesData = [];
 			if (userType === "ngo") {
 				const { data: services } = await supabase
 					.from("support_services")
 					.select("verification_status, accreditation_files_metadata")
 					.eq("user_id", userId);
-				servicesData = services || [];
+				setServicesData(services || []);
+			} else {
+				setServicesData([]);
 			}
 
 			// Calculate metrics
@@ -571,7 +578,7 @@ export function VerificationDashboard({
 										<div>
 											<p className="text-sm font-medium">Support Services Registered</p>
 											<p className="text-xs text-gray-600">
-												{services.length} service{services.length !== 1 ? "s" : ""}{" "}
+												{servicesData.length} service{servicesData.length !== 1 ? "s" : ""}{" "}
 												registered with accreditation requirements
 											</p>
 										</div>

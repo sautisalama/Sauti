@@ -66,17 +66,34 @@ export class ServiceValidationService {
 			// Check if new service is in a different field group
 			if (newFieldGroup && existingFieldGroups.includes(newFieldGroup)) {
 				const conflictingServices = existingServices.filter((service) =>
-					this.RELATED_FIELDS[newFieldGroup].includes(service)
+					this.RELATED_FIELDS[
+						newFieldGroup as keyof typeof this.RELATED_FIELDS
+					].includes(service)
 				);
 
 				return {
 					valid: false,
-					reason: `Cannot create ${this.FIELD_DESCRIPTIONS[newServiceType]} service - you already have services in the ${this.FIELD_DESCRIPTIONS[newFieldGroup]} field`,
+					reason: `Cannot create ${
+						this.FIELD_DESCRIPTIONS[
+							newServiceType as keyof typeof this.FIELD_DESCRIPTIONS
+						]
+					} service - you already have services in the ${
+						this.FIELD_DESCRIPTIONS[
+							newFieldGroup as keyof typeof this.FIELD_DESCRIPTIONS
+						]
+					} field`,
 					suggestions: [
-						`Consider consolidating your ${this.FIELD_DESCRIPTIONS[newFieldGroup]} services`,
+						`Consider consolidating your ${
+							this.FIELD_DESCRIPTIONS[
+								newFieldGroup as keyof typeof this.FIELD_DESCRIPTIONS
+							]
+						} services`,
 						"Create a separate NGO account for different service fields",
 						`Remove existing ${conflictingServices
-							.map((s) => this.FIELD_DESCRIPTIONS[s])
+							.map(
+								(s) =>
+									this.FIELD_DESCRIPTIONS[s as keyof typeof this.FIELD_DESCRIPTIONS]
+							)
 							.join(", ")} services first`,
 					],
 				};
