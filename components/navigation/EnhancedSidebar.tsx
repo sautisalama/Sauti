@@ -181,6 +181,13 @@ useEffect(() => {
 			const survivorMain: SidebarItem[] = [
 				...baseItems,
 				{
+					id: "reports",
+					label: "My Reports",
+					icon: ClipboardList,
+					href: "/dashboard/reports",
+					section: "main",
+				},
+				{
 					id: "chat",
 					label: "Messages",
 					icon: MessageCircle,
@@ -200,13 +207,6 @@ useEffect(() => {
 					label: "Appointments",
 					icon: Calendar,
 					href: "/dashboard/appointments",
-					section: "main",
-				},
-				{
-					id: "community",
-					label: "Community",
-					icon: Users,
-					href: "/dashboard/community",
 					section: "main",
 				},
 			];
