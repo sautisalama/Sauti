@@ -4,6 +4,7 @@ import { AppointmentCard } from "../AppointmentCard";
 import { fetchUserAppointments } from "../../_views/actions/appointments";
 import { useToast } from "@/hooks/use-toast";
 import { AppointmentWithDetails } from "@/app/dashboard/_types";
+import { useDashboardData } from "@/components/providers/DashboardDataProvider";
 
 interface AppointmentsTabProps {
 	userId: string;
@@ -18,7 +19,11 @@ export function AppointmentsTab({
 	username,
 	onAppointmentsChange,
 }: AppointmentsTabProps) {
-	const [appointments, setAppointments] = useState<AppointmentWithDetails[]>([]);
+	const dash = useDashboardData();
+	const [appointments, setAppointments] = useState<AppointmentWithDetails[]>(() => {
+		const seeded = (dash?.data?.appointments as any) || [];
+		return Array.isArray(seeded) && seeded.length ? seeded : [];
+	});
 	const [isLoading, setIsLoading] = useState(true);
 	const { toast } = useToast();
 
@@ -38,9 +43,14 @@ export function AppointmentsTab({
 		}
 	}, [userId, userType, toast, onAppointmentsChange]);
 
-	useEffect(() => {
+useEffect(() => {
+		if (dash?.data?.appointments && Array.isArray(dash.data.appointments)) {
+			setAppointments(dash.data.appointments as any);
+			setIsLoading(false);
+			return;
+		}
 		loadAppointments();
-	}, [loadAppointments]);
+	}, [loadAppointments, dash?.data?.appointments]);
 
 	if (isLoading) {
 		return <div>Loading appointments...</div>;
