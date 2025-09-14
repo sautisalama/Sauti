@@ -8,6 +8,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Trash2, Plus, Upload, FileText, CheckCircle } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { fileUploadService, FileUploadError } from "@/lib/file-upload";
 
 interface Document {
 	title: string;
@@ -78,32 +79,45 @@ export function ProfessionalDocumentsForm({
 		title: string
 	): Promise<string | null> => {
 		try {
-			const fileExt = file.name.split(".").pop();
-			const fileName = `${Date.now()}-${Math.random()
-				.toString(36)
-				.substring(2)}.${fileExt}`;
-			const filePath = `accreditation-files/${fileName}`;
-
-			const { error: uploadError } = await supabase.storage
-				.from("accreditation-files")
-				.upload(filePath, file);
-
-			if (uploadError) {
-				throw uploadError;
+			// Get current user ID
+			const {
+				data: { user },
+			} = await supabase.auth.getUser();
+			if (!user) {
+				throw new Error("User not authenticated");
 			}
 
-			const { data } = supabase.storage
-				.from("accreditation-files")
-				.getPublicUrl(filePath);
+			// Get user profile to determine user type
+			const { data: profile } = await supabase
+				.from("profiles")
+				.select("user_type")
+				.eq("id", user.id)
+				.single();
 
-			return data.publicUrl;
+			const result = await fileUploadService.uploadFile({
+				userId: user.id,
+				userType: profile?.user_type || "professional",
+				fileType: "accreditation",
+				fileName: file.name,
+				file,
+			});
+
+			return result.url;
 		} catch (error) {
 			console.error("Error uploading file:", error);
-			toast({
-				title: "Upload Error",
-				description: "Failed to upload file. Please try again.",
-				variant: "destructive",
-			});
+			if (error instanceof FileUploadError) {
+				toast({
+					title: "Upload Error",
+					description: error.message,
+					variant: "destructive",
+				});
+			} else {
+				toast({
+					title: "Upload Error",
+					description: "Failed to upload file. Please try again.",
+					variant: "destructive",
+				});
+			}
 			return null;
 		}
 	};
@@ -111,7 +125,12 @@ export function ProfessionalDocumentsForm({
 	const handleSave = async () => {
 		setIsUploading(true);
 		try {
-			const documentsToSave: Array<{ title: string; note?: string; url?: string; uploaded?: boolean }> = [];
+			const documentsToSave: Array<{
+				title: string;
+				note?: string;
+				url?: string;
+				uploaded?: boolean;
+			}> = [];
 
 			for (let i = 0; i < docs.length; i++) {
 				const doc = docs[i];
@@ -144,7 +163,9 @@ export function ProfessionalDocumentsForm({
 			// Update the document state with uploaded URLs
 			setDocs((prevDocs) =>
 				prevDocs.map((doc, idx) => {
-					const savedDoc = documentsToSave[idx] as { title: string; note?: string; url?: string; uploaded?: boolean } | undefined;
+					const savedDoc = documentsToSave[idx] as
+						| { title: string; note?: string; url?: string; uploaded?: boolean }
+						| undefined;
 					return savedDoc ? { ...doc, ...savedDoc } : doc;
 				})
 			);

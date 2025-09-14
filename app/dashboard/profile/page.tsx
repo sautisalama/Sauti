@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { AnonymousModeToggle } from "@/components/chat/AnonymousModeToggle";
 import { ProfessionalDocumentsForm } from "./professional-documents";
+import { EnhancedProfessionalDocumentsForm } from "./enhanced-professional-documents";
 import { signOut } from "@/app/(auth)/actions/auth";
 import { createClient } from "@/utils/supabase/client";
 import { useDashboardData } from "@/components/providers/DashboardDataProvider";
@@ -49,14 +50,14 @@ export default function ProfilePage() {
 	const userId = dash?.data?.userId;
 	const { toast } = useToast();
 	const isProfessional =
-		profile?.user_type === "professional" ||
-		profile?.user_type === "ngo";
+		profile?.user_type === "professional" || profile?.user_type === "ngo";
 	const supabase = createClient();
 
 	const [profileData, setProfileData] = useState<ProfileData>({});
 	const [isLoading, setIsLoading] = useState(true);
 	const [formData, setFormData] = useState<Record<string, any>>({});
 	const [activeTab, setActiveTab] = useState("profile");
+	const [userServices, setUserServices] = useState<any[]>([]);
 
 	// Load profile data
 	useEffect(() => {
@@ -77,6 +78,27 @@ export default function ProfilePage() {
 			setIsLoading(false);
 		}
 	}, [profile]);
+
+	// Load user services for NGO users
+	useEffect(() => {
+		if (profile?.user_type === "ngo" && userId) {
+			loadUserServices();
+		}
+	}, [profile?.user_type, userId]);
+
+	const loadUserServices = async () => {
+		try {
+			const { data, error } = await supabase
+				.from("support_services")
+				.select("id, name, service_types")
+				.eq("user_id", userId);
+
+			if (error) throw error;
+			setUserServices(data || []);
+		} catch (error) {
+			console.error("Error loading services:", error);
+		}
+	};
 
 	const updateFormData = (section: string, field: string, value: any) => {
 		setFormData((prev) => ({
@@ -107,13 +129,20 @@ export default function ProfilePage() {
 				...prev,
 				accreditation_files: documents,
 			}));
-			dash?.updatePartial({ profile: { ...(profile as any), accreditation_files: documents, updated_at: new Date().toISOString() } as any });
+			dash?.updatePartial({
+				profile: {
+					...(profile as any),
+					accreditation_files: documents,
+					updated_at: new Date().toISOString(),
+				} as any,
+			});
 
 			toast({
 				title: "Success",
 				description: "Verification documents saved successfully",
 			});
 		} catch (error) {
+			console.error("Error saving verification documents:", error);
 			toast({
 				title: "Error",
 				description: "Failed to save verification documents",
@@ -159,7 +188,13 @@ export default function ProfilePage() {
 
 			// Update local state and provider cache
 			setProfileData((prev) => ({ ...prev, ...updateData }));
-			dash?.updatePartial({ profile: { ...(profile as any), ...updateData, updated_at: new Date().toISOString() } as any });
+			dash?.updatePartial({
+				profile: {
+					...(profile as any),
+					...updateData,
+					updated_at: new Date().toISOString(),
+				} as any,
+			});
 			toast({
 				title: "Saved",
 				description: `${section} information updated successfully`,
@@ -216,27 +251,27 @@ export default function ProfilePage() {
 				<div className="max-w-4xl mx-auto px-4 py-6">
 					<div className="flex items-center justify-between">
 						<div className="flex items-center gap-4">
-									<Avatar className="h-16 w-16">
-										<AvatarImage
-											src={
-												typeof window !== "undefined" &&
-												window.localStorage.getItem("ss_anon_mode") === "1"
-													? "/anon.svg"
-													: profile?.avatar_url || ""
-												}
-											/>
-											<AvatarFallback className="bg-sauti-orange text-white">
-												{profile?.first_name?.[0]?.toUpperCase() ||
-													profile?.email?.[0]?.toUpperCase() ||
-													"U"}
-											</AvatarFallback>
+							<Avatar className="h-16 w-16">
+								<AvatarImage
+									src={
+										typeof window !== "undefined" &&
+										window.localStorage.getItem("ss_anon_mode") === "1"
+											? "/anon.svg"
+											: profile?.avatar_url || ""
+									}
+								/>
+								<AvatarFallback className="bg-sauti-orange text-white">
+									{profile?.first_name?.[0]?.toUpperCase() ||
+										profile?.email?.[0]?.toUpperCase() ||
+										"U"}
+								</AvatarFallback>
 							</Avatar>
 							<div>
-									<h1 className="text-2xl font-bold">
-										{profile?.first_name || profile?.email || "User"}
-									</h1>
-									<div className="flex items-center gap-2 mt-1 text-sm text-gray-600">
-										{profile?.user_type !== "survivor" && (
+								<h1 className="text-2xl font-bold">
+									{profile?.first_name || profile?.email || "User"}
+								</h1>
+								<div className="flex items-center gap-2 mt-1 text-sm text-gray-600">
+									{profile?.user_type !== "survivor" && (
 										<Badge variant="secondary" className="capitalize">
 											{profile?.user_type || "member"}
 										</Badge>
@@ -334,10 +369,7 @@ export default function ProfilePage() {
 							</CardHeader>
 							<CardContent>
 								{userId && profile?.first_name && (
-									<AnonymousModeToggle
-										userId={userId}
-										username={profile.first_name}
-									/>
+									<AnonymousModeToggle userId={userId} username={profile.first_name} />
 								)}
 							</CardContent>
 						</Card>
@@ -456,15 +488,30 @@ export default function ProfilePage() {
 										</AccordionTrigger>
 										<AccordionContent>
 											<CardContent className="space-y-4">
-												<ProfessionalDocumentsForm
-													onSave={() => saveSection("verification")}
-													onSaveDocuments={saveVerificationDocuments}
-													initialData={{
-														accreditation_files: profileData.accreditation_files,
-														accreditation_member_number:
-															profileData.accreditation_member_number,
-													}}
-												/>
+												{profile?.user_type === "ngo" ? (
+													<EnhancedProfessionalDocumentsForm
+														onSave={() => saveSection("verification")}
+														onSaveDocuments={saveVerificationDocuments}
+														initialData={{
+															accreditation_files: profileData.accreditation_files,
+															accreditation_member_number:
+																profileData.accreditation_member_number,
+														}}
+														userId={userId || ""}
+														userType={profile?.user_type || "professional"}
+														existingServices={userServices}
+													/>
+												) : (
+													<ProfessionalDocumentsForm
+														onSave={() => saveSection("verification")}
+														onSaveDocuments={saveVerificationDocuments}
+														initialData={{
+															accreditation_files: profileData.accreditation_files,
+															accreditation_member_number:
+																profileData.accreditation_member_number,
+														}}
+													/>
+												)}
 											</CardContent>
 										</AccordionContent>
 									</Card>
@@ -518,10 +565,7 @@ export default function ProfilePage() {
 								<div className="space-y-4">
 									<h4 className="font-medium">Privacy & Identity</h4>
 									{userId && profile?.first_name && (
-										<AnonymousModeToggle
-											userId={userId}
-											username={profile.first_name}
-										/>
+										<AnonymousModeToggle userId={userId} username={profile.first_name} />
 									)}
 								</div>
 
