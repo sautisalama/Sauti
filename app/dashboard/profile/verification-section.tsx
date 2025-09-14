@@ -220,47 +220,59 @@ export function DocumentUploadForm({
 	};
 
 	return (
-		<div className="space-y-4">
+		<div className="space-y-3 sm:space-y-4">
 			{/* Add Document Button */}
-			<div className="flex items-center justify-between">
-				<h3 className="text-lg font-semibold">Add Professional Documents</h3>
-				<Button onClick={addDocument} className="gap-2">
-					<Plus className="h-4 w-4" />
+			<div className="flex items-center justify-between gap-2">
+				<h3 className="text-base sm:text-lg font-semibold">
+					Add Professional Documents
+				</h3>
+				<Button
+					onClick={addDocument}
+					className="gap-1 sm:gap-2 text-xs sm:text-sm"
+					size="sm"
+				>
+					<Plus className="h-3 w-3 sm:h-4 sm:w-4" />
 					Add Document
 				</Button>
 			</div>
 
 			{/* Document Forms */}
-			<div className="space-y-4">
+			<div className="space-y-3 sm:space-y-4">
 				{documents.map((doc) => (
-					<Card key={doc.id} className="border-2 border-dashed border-gray-200">
-						<CardContent className="p-4">
-							<div className="flex items-center justify-between mb-4">
-								<h4 className="font-medium">Document {documents.indexOf(doc) + 1}</h4>
+					<Card
+						key={doc.id}
+						className="border border-gray-200 sm:border-2 sm:border-dashed"
+					>
+						<CardContent className="p-3 sm:p-4">
+							<div className="flex items-center justify-between mb-3 sm:mb-4">
+								<h4 className="font-medium text-sm sm:text-base">
+									Document {documents.indexOf(doc) + 1}
+								</h4>
 								<Button
 									variant="ghost"
 									size="sm"
 									onClick={() => removeDocument(doc.id)}
-									className="text-red-600 hover:text-red-700"
+									className="text-red-600 hover:text-red-700 p-1 sm:p-2"
 								>
-									<Trash2 className="h-4 w-4" />
+									<Trash2 className="h-3 w-3 sm:h-4 sm:w-4" />
 								</Button>
 							</div>
 
-							<div className="grid gap-4 md:grid-cols-2">
+							<div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2">
 								<div className="space-y-2">
-									<label className="text-sm font-medium text-gray-700">
+									<label className="text-xs sm:text-sm font-medium text-gray-700">
 										Document Title *
 									</label>
 									<Input
 										placeholder="e.g., Medical License, PhD Certificate"
 										value={doc.title}
 										onChange={(e) => updateDocument(doc.id, "title", e.target.value)}
+										className="text-sm sm:text-base"
 									/>
 								</div>
 
 								<div className="space-y-2">
-									<label className="text-sm font-medium text-gray-700">
+									<label className="text-xs sm:text-sm font-medium text-gray-700">
 										Certificate/License Number *
 									</label>
 									<Input
@@ -269,12 +281,13 @@ export function DocumentUploadForm({
 										onChange={(e) =>
 											updateDocument(doc.id, "certificateNumber", e.target.value)
 										}
+										className="text-sm sm:text-base"
 									/>
 								</div>
 							</div>
 
-							<div className="space-y-2 mt-4">
-								<label className="text-sm font-medium text-gray-700">
+							<div className="space-y-2 mt-3 sm:mt-4">
+								<label className="text-xs sm:text-sm font-medium text-gray-700">
 									Upload File *
 								</label>
 								<Input
@@ -283,7 +296,7 @@ export function DocumentUploadForm({
 									onChange={(e) =>
 										updateDocument(doc.id, "file", e.target.files?.[0] || null)
 									}
-									className="file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-sauti-orange file:text-white hover:file:bg-sauti-orange/90"
+									className="file:mr-2 sm:file:mr-4 file:py-1 sm:file:py-2 file:px-2 sm:file:px-4 file:rounded-md sm:file:rounded-full file:border-0 file:text-xs sm:file:text-sm file:font-semibold file:bg-sauti-orange file:text-white hover:file:bg-sauti-orange/90 text-sm sm:text-base"
 								/>
 								<p className="text-xs text-gray-500">
 									Supported formats: PDF, JPG, PNG, DOC, DOCX (Max 10MB)
@@ -302,17 +315,22 @@ export function DocumentUploadForm({
 						disabled={
 							isUploading || documents.some((doc) => !doc.title.trim() || !doc.file)
 						}
-						className="gap-2 bg-sauti-orange hover:bg-sauti-orange/90"
+						className="gap-1 sm:gap-2 bg-sauti-orange hover:bg-sauti-orange/90 text-xs sm:text-sm"
+						size="sm"
 					>
 						{isUploading ? (
 							<>
-								<div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-								Uploading...
+								<div className="animate-spin rounded-full h-3 w-3 sm:h-4 sm:w-4 border-b-2 border-white"></div>
+								<span className="hidden sm:inline">Uploading...</span>
+								<span className="sm:hidden">Uploading...</span>
 							</>
 						) : (
 							<>
-								<Upload className="h-4 w-4" />
-								Upload {documents.length} Document{documents.length !== 1 ? "s" : ""}
+								<Upload className="h-3 w-3 sm:h-4 sm:w-4" />
+								<span className="hidden sm:inline">
+									Upload {documents.length} Document{documents.length !== 1 ? "s" : ""}
+								</span>
+								<span className="sm:hidden">Upload {documents.length}</span>
 							</>
 						)}
 					</Button>
@@ -320,19 +338,20 @@ export function DocumentUploadForm({
 			)}
 
 			{documents.length === 0 && (
-				<div className="text-center py-8 bg-gray-50 rounded-lg border-2 border-dashed border-gray-200">
-					<FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-					<h3 className="text-lg font-semibold text-gray-700 mb-2">
+				<div className="text-center py-6 sm:py-8 bg-gray-50 rounded-lg border border-gray-200 sm:border-2 sm:border-dashed">
+					<FileText className="h-10 w-10 sm:h-12 sm:w-12 text-gray-400 mx-auto mb-3 sm:mb-4" />
+					<h3 className="text-base sm:text-lg font-semibold text-gray-700 mb-2">
 						No Documents Added
 					</h3>
-					<p className="text-gray-500 mb-4">
+					<p className="text-gray-500 mb-3 sm:mb-4 text-sm">
 						Click "Add Document" to start uploading your professional credentials
 					</p>
 					<Button
 						onClick={addDocument}
-						className="gap-2 bg-sauti-orange hover:bg-sauti-orange/90"
+						className="gap-1 sm:gap-2 bg-sauti-orange hover:bg-sauti-orange/90 text-xs sm:text-sm"
+						size="sm"
 					>
-						<Plus className="h-4 w-4" />
+						<Plus className="h-3 w-3 sm:h-4 sm:w-4" />
 						Add Your First Document
 					</Button>
 				</div>
@@ -672,16 +691,16 @@ export function VerificationSection({
 			</div>
 
 			{/* Document Upload and List Section */}
-			<div className="grid gap-6 xl:grid-cols-6">
-				{/* Document Upload Form - Left Side (3/5 width) */}
-				<div className="xl:col-span-3">
+			<div className="grid gap-4 sm:gap-6 lg:grid-cols-2 xl:grid-cols-6">
+				{/* Document Upload Form - Left Side */}
+				<div className="lg:col-span-1 xl:col-span-3">
 					<Card className="h-fit">
-						<CardHeader className="pb-4">
-							<CardTitle className="flex items-center gap-2">
-								<FileText className="h-5 w-5 text-sauti-orange" />
+						<CardHeader className="pb-3 sm:pb-4">
+							<CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+								<FileText className="h-4 w-4 sm:h-5 sm:w-5 text-sauti-orange" />
 								Professional Credentials
 							</CardTitle>
-							<p className="text-sm text-gray-600">
+							<p className="text-xs sm:text-sm text-gray-600">
 								Upload your professional licenses, certifications, and academic
 								documents
 							</p>
@@ -699,41 +718,41 @@ export function VerificationSection({
 					</Card>
 				</div>
 
-				{/* Uploaded Documents List - Right Side (2/5 width) */}
-				<div className="xl:col-span-3">
+				{/* Uploaded Documents List - Right Side */}
+				<div className="lg:col-span-1 xl:col-span-3">
 					<Card className="h-fit">
-						<CardHeader className="pb-4">
-							<CardTitle className="flex items-center gap-2">
-								<CheckSquare className="h-5 w-5 text-sauti-orange" />
+						<CardHeader className="pb-3 sm:pb-4">
+							<CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+								<CheckSquare className="h-4 w-4 sm:h-5 sm:w-5 text-sauti-orange" />
 								Uploaded Documents ({documents.length})
 							</CardTitle>
 						</CardHeader>
 						<CardContent>
 							{documents.length === 0 ? (
-								<div className="text-center py-12">
-									<div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gradient-to-br from-blue-50 to-sky-100 flex items-center justify-center">
-										<FileText className="h-8 w-8 text-sky-600" />
+								<div className="text-center py-8 sm:py-12">
+									<div className="w-12 h-12 sm:w-16 sm:h-16 mx-auto mb-3 sm:mb-4 rounded-full bg-gradient-to-br from-blue-50 to-sky-100 flex items-center justify-center">
+										<FileText className="h-6 w-6 sm:h-8 sm:w-8 text-sky-600" />
 									</div>
-									<h3 className="text-lg font-semibold text-gray-900 mb-2">
+									<h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-2">
 										No documents uploaded yet
 									</h3>
-									<p className="text-gray-500 text-sm">
+									<p className="text-gray-500 text-xs sm:text-sm">
 										Your uploaded documents will appear here
 									</p>
 								</div>
 							) : (
-								<div className="space-y-3">
+								<div className="space-y-2 sm:space-y-3">
 									{documents.map((doc) => (
 										<div
 											key={doc.id}
-											className="bg-white rounded-xl border border-gray-200 hover:border-gray-300 transition-all duration-200 hover:shadow-md group"
+											className="bg-white rounded-lg sm:rounded-xl border border-gray-200 hover:border-gray-300 transition-all duration-200 hover:shadow-md group"
 										>
-											<div className="p-4">
+											<div className="p-3 sm:p-4">
 												{/* Header */}
-												<div className="flex items-start justify-between mb-3">
-													<div className="flex items-center gap-3 flex-1 min-w-0">
+												<div className="flex items-start justify-between mb-2 sm:mb-3">
+													<div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
 														<div
-															className={`h-10 w-10 rounded-full flex items-center justify-center font-semibold text-sm flex-shrink-0 ${
+															className={`h-8 w-8 sm:h-10 sm:w-10 rounded-full flex items-center justify-center font-semibold text-xs sm:text-sm flex-shrink-0 ${
 																getStatusColor(doc.status).includes("green")
 																	? "bg-gradient-to-br from-green-100 to-green-200 text-green-700"
 																	: getStatusColor(doc.status).includes("yellow")
@@ -743,37 +762,50 @@ export function VerificationSection({
 																	: "bg-gradient-to-br from-gray-100 to-gray-200 text-gray-700"
 															}`}
 														>
-															<FileText className="h-5 w-5" />
+															<FileText className="h-4 w-4 sm:h-5 sm:w-5" />
 														</div>
 														<div className="min-w-0 flex-1">
-															<h4 className="font-semibold text-gray-900 truncate">
+															<h4 className="font-semibold text-gray-900 truncate text-sm sm:text-base">
 																{doc.title}
 															</h4>
-															<div className="flex items-center gap-2 text-sm text-gray-500">
+															<div className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm text-gray-500 flex-wrap">
 																<span className="font-mono text-xs">
 																	{doc.fileType.toUpperCase()}
 																</span>
-																<span>•</span>
-																<span>{formatFileSize(doc.fileSize)}</span>
-																<span>•</span>
-																<span>{formatDate(doc.uploadedAt)}</span>
+																<span className="hidden sm:inline">•</span>
+																<span className="hidden sm:inline">
+																	{formatFileSize(doc.fileSize)}
+																</span>
+																<span className="hidden sm:inline">•</span>
+																<span className="hidden sm:inline">
+																	{formatDate(doc.uploadedAt)}
+																</span>
+																{/* Mobile: Show on separate line */}
+																<div className="sm:hidden w-full text-xs text-gray-400 mt-1">
+																	{formatFileSize(doc.fileSize)} • {formatDate(doc.uploadedAt)}
+																</div>
 															</div>
 														</div>
 													</div>
-													<div className="flex items-center gap-2 flex-shrink-0">
-														<Badge className={`${getStatusColor(doc.status)} border`}>
+													<div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
+														<Badge className={`${getStatusColor(doc.status)} border text-xs`}>
 															{doc.status.replace("_", " ")}
 														</Badge>
 													</div>
 												</div>
 
 												{/* Actions */}
-												<div className="flex gap-2">
+												<div className="flex gap-1 sm:gap-2">
 													<Dialog>
 														<DialogTrigger asChild>
-															<Button variant="outline" size="sm" className="flex-1 gap-2">
-																<Eye className="h-4 w-4" />
-																View Details
+															<Button
+																variant="outline"
+																size="sm"
+																className="flex-1 gap-1 sm:gap-2 text-xs sm:text-sm"
+															>
+																<Eye className="h-3 w-3 sm:h-4 sm:w-4" />
+																<span className="hidden sm:inline">View Details</span>
+																<span className="sm:hidden">View</span>
 															</Button>
 														</DialogTrigger>
 														<DialogContent className="max-w-2xl">
@@ -862,9 +894,9 @@ export function VerificationSection({
 															link.download = doc.title;
 															link.click();
 														}}
-														className="gap-2"
+														className="gap-1 sm:gap-2 text-xs sm:text-sm"
 													>
-														<Download className="h-4 w-4" />
+														<Download className="h-3 w-3 sm:h-4 sm:w-4" />
 													</Button>
 												</div>
 											</div>
@@ -880,58 +912,67 @@ export function VerificationSection({
 			{/* Support Services (NGO only) */}
 			{userType === "ngo" && (
 				<Card>
-					<CardHeader>
-						<CardTitle className="flex items-center gap-2">
-							<Building className="h-5 w-5 text-sauti-orange" />
+					<CardHeader className="pb-3 sm:pb-6">
+						<CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+							<Building className="h-4 w-4 sm:h-5 sm:w-5 text-sauti-orange" />
 							Support Services ({services.length})
 						</CardTitle>
 					</CardHeader>
 					<CardContent>
 						{services.length === 0 ? (
-							<div className="text-center py-8 bg-gray-50 rounded-lg border-2 border-dashed border-gray-200">
-								<Building className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-								<h3 className="text-lg font-semibold text-gray-700 mb-2">
+							<div className="text-center py-6 sm:py-8 bg-gray-50 rounded-lg border-2 border-dashed border-gray-200">
+								<Building className="h-10 w-10 sm:h-12 sm:w-12 text-gray-400 mx-auto mb-3 sm:mb-4" />
+								<h3 className="text-base sm:text-lg font-semibold text-gray-700 mb-2">
 									No Services Registered
 								</h3>
-								<p className="text-gray-500 mb-4">
+								<p className="text-gray-500 mb-3 sm:mb-4 text-sm">
 									Register your support services to get verified
 								</p>
-								<Button className="gap-2 bg-sauti-orange hover:bg-sauti-orange/90">
-									<Plus className="h-4 w-4" />
+								<Button
+									className="gap-2 bg-sauti-orange hover:bg-sauti-orange/90 text-xs sm:text-sm"
+									size="sm"
+								>
+									<Plus className="h-3 w-3 sm:h-4 sm:w-4" />
 									Add Support Service
 								</Button>
 							</div>
 						) : (
-							<div className="space-y-4">
+							<div className="space-y-3 sm:space-y-4">
 								{services.map((service) => (
-									<div key={service.id} className="border rounded-lg p-4">
-										<div className="flex items-center justify-between mb-3">
-											<div>
-												<h4 className="font-semibold">{service.name}</h4>
-												<p className="text-sm text-gray-600 capitalize">
+									<div key={service.id} className="border rounded-lg p-3 sm:p-4">
+										<div className="flex items-center justify-between mb-2 sm:mb-3">
+											<div className="flex-1 min-w-0">
+												<h4 className="font-semibold text-sm sm:text-base truncate">
+													{service.name}
+												</h4>
+												<p className="text-xs sm:text-sm text-gray-600 capitalize">
 													{service.serviceType.replace("_", " ")} Service
 												</p>
 											</div>
-											<Badge className={getStatusColor(service.status)}>
+											<Badge className={`${getStatusColor(service.status)} text-xs`}>
 												{service.status.replace("_", " ")}
 											</Badge>
 										</div>
 										{service.documents.length > 0 && (
-											<div className="mt-3">
-												<p className="text-sm font-medium text-gray-600 mb-2">
+											<div className="mt-2 sm:mt-3">
+												<p className="text-xs sm:text-sm font-medium text-gray-600 mb-2">
 													Documents ({service.documents.length})
 												</p>
-												<div className="space-y-2">
+												<div className="space-y-1 sm:space-y-2">
 													{service.documents.map((doc) => (
 														<div
 															key={doc.id}
 															className="flex items-center justify-between p-2 bg-gray-50 rounded"
 														>
-															<div className="flex items-center gap-2">
-																<FileText className="h-4 w-4 text-gray-600" />
-																<span className="text-sm">{doc.title}</span>
+															<div className="flex items-center gap-2 min-w-0 flex-1">
+																<FileText className="h-3 w-3 sm:h-4 sm:w-4 text-gray-600 flex-shrink-0" />
+																<span className="text-xs sm:text-sm truncate">{doc.title}</span>
 															</div>
-															<Badge className={getStatusColor(doc.status)}>
+															<Badge
+																className={`${getStatusColor(
+																	doc.status
+																)} text-xs flex-shrink-0`}
+															>
 																{doc.status.replace("_", " ")}
 															</Badge>
 														</div>

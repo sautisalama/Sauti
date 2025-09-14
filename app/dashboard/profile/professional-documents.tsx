@@ -191,16 +191,17 @@ export function ProfessionalDocumentsForm({
 	};
 
 	return (
-		<div className="space-y-4">
+		<div className="space-y-3 sm:space-y-4">
 			<div className="grid gap-3">
 				{docs.map((doc, idx) => (
 					<Card key={idx} className="border rounded-lg">
-						<CardContent className="p-4 space-y-3">
-							<div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+						<CardContent className="p-3 sm:p-4 space-y-3">
+							<div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
 								<Input
 									placeholder="Document title (e.g., License, Certificate)"
 									value={doc.title}
 									onChange={(e) => updateDoc(idx, { title: e.target.value })}
+									className="text-sm sm:text-base"
 								/>
 								<div className="flex items-center gap-2">
 									<Input
@@ -208,11 +209,11 @@ export function ProfessionalDocumentsForm({
 										onChange={(e) =>
 											updateDoc(idx, { file: e.target.files?.[0] || null })
 										}
-										className="flex-1"
+										className="flex-1 text-sm sm:text-base file:rounded-md sm:file:rounded-full file:border-0 file:text-xs sm:file:text-sm file:font-semibold file:bg-sauti-orange file:text-white hover:file:bg-sauti-orange/90"
 									/>
 									{doc.uploaded && (
 										<div className="flex items-center gap-1 text-green-600">
-											<CheckCircle className="h-4 w-4" />
+											<CheckCircle className="h-3 w-3 sm:h-4 sm:w-4" />
 											<span className="text-xs">Uploaded</span>
 										</div>
 									)}
@@ -224,15 +225,15 @@ export function ProfessionalDocumentsForm({
 									placeholder="Notes (optional)"
 									value={doc.note || ""}
 									onChange={(e) => updateDoc(idx, { note: e.target.value })}
-									className="flex-1 min-h-[60px]"
+									className="flex-1 min-h-[50px] sm:min-h-[60px] text-sm sm:text-base resize-none"
 								/>
 								<Button
 									type="button"
 									variant="ghost"
-									className="shrink-0 text-destructive p-2"
+									className="shrink-0 text-destructive p-1 sm:p-2"
 									onClick={() => removeDoc(idx)}
 								>
-									<Trash2 className="h-4 w-4" />
+									<Trash2 className="h-3 w-3 sm:h-4 sm:w-4" />
 								</Button>
 							</div>
 
@@ -254,31 +255,37 @@ export function ProfessionalDocumentsForm({
 				))}
 			</div>
 
-			<div className="flex items-center justify-between">
+			<div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
 				<Button
 					type="button"
 					variant="secondary"
 					onClick={addDoc}
-					className="gap-2"
+					className="gap-1 sm:gap-2 text-xs sm:text-sm"
+					size="sm"
 				>
-					<Plus className="h-4 w-4" /> Add Document
+					<Plus className="h-3 w-3 sm:h-4 sm:w-4" /> Add Document
 				</Button>
 
 				<div className="flex items-center gap-2">
 					{isUploading && (
-						<div className="flex items-center gap-2 text-sm text-gray-600">
-							<div className="animate-spin rounded-full h-4 w-4 border-b-2 border-sauti-orange"></div>
-							Uploading...
+						<div className="flex items-center gap-2 text-xs sm:text-sm text-gray-600">
+							<div className="animate-spin rounded-full h-3 w-3 sm:h-4 sm:w-4 border-b-2 border-sauti-orange"></div>
+							<span className="hidden sm:inline">Uploading...</span>
+							<span className="sm:hidden">Uploading...</span>
 						</div>
 					)}
 					<Button
 						type="button"
 						onClick={handleSave}
 						disabled={isUploading}
-						className="gap-2"
+						className="gap-1 sm:gap-2 text-xs sm:text-sm"
+						size="sm"
 					>
-						<Upload className="h-4 w-4" />
-						{isUploading ? "Saving..." : "Save Documents"}
+						<Upload className="h-3 w-3 sm:h-4 sm:w-4" />
+						<span className="hidden sm:inline">
+							{isUploading ? "Saving..." : "Save Documents"}
+						</span>
+						<span className="sm:hidden">{isUploading ? "Saving..." : "Save"}</span>
 					</Button>
 				</div>
 			</div>

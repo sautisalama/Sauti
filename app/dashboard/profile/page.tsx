@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -81,14 +81,7 @@ export default function ProfilePage() {
 		}
 	}, [profile]);
 
-	// Load user services for NGO users
-	useEffect(() => {
-		if (profile?.user_type === "ngo" && userId) {
-			loadUserServices();
-		}
-	}, [profile?.user_type, userId]);
-
-	const loadUserServices = async () => {
+	const loadUserServices = useCallback(async () => {
 		try {
 			const { data, error } = await supabase
 				.from("support_services")
@@ -100,7 +93,14 @@ export default function ProfilePage() {
 		} catch (error) {
 			console.error("Error loading services:", error);
 		}
-	};
+	}, [userId, supabase]);
+
+	// Load user services for NGO users
+	useEffect(() => {
+		if (profile?.user_type === "ngo" && userId) {
+			loadUserServices();
+		}
+	}, [profile?.user_type, userId, loadUserServices]);
 
 	const updateFormData = (section: string, field: string, value: any) => {
 		setFormData((prev) => ({
@@ -247,13 +247,13 @@ export default function ProfilePage() {
 	}
 
 	return (
-		<div className="min-h-screen bg-gray-50">
+		<div className="min-h-screen bg-gray-50 overflow-x-hidden">
 			{/* Header */}
 			<div className="bg-white border-b sticky top-0 z-50">
-				<div className="max-w-4xl mx-auto px-4 py-6">
-					<div className="flex items-center justify-between">
-						<div className="flex items-center gap-4">
-							<Avatar className="h-16 w-16">
+				<div className="max-w-7xl mx-auto px-3 sm:px-4 py-4 sm:py-6">
+					<div className="flex items-center justify-between gap-3">
+						<div className="flex items-center gap-2 sm:gap-4 min-w-0 flex-1">
+							<Avatar className="h-12 w-12 sm:h-16 sm:w-16 flex-shrink-0">
 								<AvatarImage
 									src={
 										typeof window !== "undefined" &&
@@ -262,24 +262,27 @@ export default function ProfilePage() {
 											: profile?.avatar_url || ""
 									}
 								/>
-								<AvatarFallback className="bg-sauti-orange text-white">
+								<AvatarFallback className="bg-sauti-orange text-white text-sm sm:text-base">
 									{profile?.first_name?.[0]?.toUpperCase() ||
 										profile?.email?.[0]?.toUpperCase() ||
 										"U"}
 								</AvatarFallback>
 							</Avatar>
-							<div>
-								<h1 className="text-2xl font-bold">
+							<div className="min-w-0 flex-1">
+								<h1 className="text-lg sm:text-2xl font-bold truncate">
 									{profile?.first_name || profile?.email || "User"}
 								</h1>
-								<div className="flex items-center gap-2 mt-1 text-sm text-gray-600">
+								<div className="flex items-center gap-1 sm:gap-2 mt-1 text-xs sm:text-sm text-gray-600 flex-wrap">
 									{profile?.user_type !== "survivor" && (
-										<Badge variant="secondary" className="capitalize">
+										<Badge variant="secondary" className="capitalize text-xs">
 											{profile?.user_type || "member"}
 										</Badge>
 									)}
 									{profileData.isVerified && (
-										<Badge variant="default" className="bg-green-100 text-green-800">
+										<Badge
+											variant="default"
+											className="bg-green-100 text-green-800 text-xs"
+										>
 											<CheckCircle className="h-3 w-3 mr-1" />
 											Verified
 										</Badge>
@@ -287,8 +290,13 @@ export default function ProfilePage() {
 								</div>
 							</div>
 						</div>
-						<form action={signOut}>
-							<Button type="submit" variant="outline">
+						<form action={signOut} className="flex-shrink-0">
+							<Button
+								type="submit"
+								variant="outline"
+								size="sm"
+								className="text-xs sm:text-sm"
+							>
 								Sign out
 							</Button>
 						</form>
@@ -297,38 +305,54 @@ export default function ProfilePage() {
 			</div>
 
 			{/* Main Content */}
-			<div className="max-w-6xl mx-auto px-4 py-6">
+			<div className="max-w-7xl mx-auto px-3 sm:px-4 py-4 sm:py-6 overflow-x-hidden">
 				<Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-					<TabsList className="grid w-full grid-cols-3 mb-6">
-						<TabsTrigger value="profile" className="flex items-center gap-2">
-							<User className="h-4 w-4" />
-							Profile
+					<TabsList
+						className={`grid w-full mb-4 sm:mb-6 ${
+							isProfessional ? "grid-cols-3" : "grid-cols-2"
+						}`}
+					>
+						<TabsTrigger
+							value="profile"
+							className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-3"
+						>
+							<User className="h-3 w-3 sm:h-4 sm:w-4" />
+							<span className="hidden xs:inline">Profile</span>
+							<span className="xs:hidden">Profile</span>
 						</TabsTrigger>
 						{isProfessional && (
-							<TabsTrigger value="verification" className="flex items-center gap-2">
-								<FileCheck className="h-4 w-4" />
-								Verification
+							<TabsTrigger
+								value="verification"
+								className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-3"
+							>
+								<FileCheck className="h-3 w-3 sm:h-4 sm:w-4" />
+								<span className="hidden xs:inline">Verification</span>
+								<span className="xs:hidden">Verify</span>
 							</TabsTrigger>
 						)}
-						<TabsTrigger value="settings" className="flex items-center gap-2">
-							<Settings className="h-4 w-4" />
-							Settings
+						<TabsTrigger
+							value="settings"
+							className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-3"
+						>
+							<Settings className="h-3 w-3 sm:h-4 sm:w-4" />
+							<span className="hidden xs:inline">Settings</span>
+							<span className="xs:hidden">Settings</span>
 						</TabsTrigger>
 					</TabsList>
 
-					<TabsContent value="profile" className="space-y-4">
+					<TabsContent value="profile" className="space-y-3 sm:space-y-4">
 						{/* Basic Information Display */}
 						<Card>
-							<CardHeader>
-								<CardTitle className="flex items-center gap-2">
-									<User className="h-5 w-5 text-sauti-orange" />
+							<CardHeader className="pb-3 sm:pb-6">
+								<CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+									<User className="h-4 w-4 sm:h-5 sm:w-5 text-sauti-orange" />
 									Basic Information
 								</CardTitle>
 							</CardHeader>
-							<CardContent className="space-y-4">
-								<div className="grid grid-cols-2 gap-4">
+							<CardContent className="space-y-3 sm:space-y-4">
+								<div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
 									<div>
-										<label className="text-sm font-medium text-gray-600">
+										<label className="text-xs sm:text-sm font-medium text-gray-600">
 											First Name
 										</label>
 										<Input
@@ -337,30 +361,38 @@ export default function ProfilePage() {
 											onChange={(e) =>
 												updateFormData("basic", "first_name", e.target.value)
 											}
-											className="mt-1"
+											className="mt-1 text-sm sm:text-base"
 										/>
 									</div>
 									<div>
-										<label className="text-sm font-medium text-gray-600">Last Name</label>
+										<label className="text-xs sm:text-sm font-medium text-gray-600">
+											Last Name
+										</label>
 										<Input
 											placeholder="Last Name"
 											value={profileData.last_name || ""}
 											onChange={(e) =>
 												updateFormData("basic", "last_name", e.target.value)
 											}
-											className="mt-1"
+											className="mt-1 text-sm sm:text-base"
 										/>
 									</div>
 								</div>
 								<div>
-									<label className="text-sm font-medium text-gray-600">Email</label>
-									<p className="text-lg font-medium text-gray-900 mt-1">
+									<label className="text-xs sm:text-sm font-medium text-gray-600">
+										Email
+									</label>
+									<p className="text-sm sm:text-lg font-medium text-gray-900 mt-1 break-all">
 										{profileData.email || "Not provided"}
 									</p>
 									<p className="text-xs text-gray-500">Email cannot be changed</p>
 								</div>
 								<div className="flex justify-end">
-									<Button onClick={() => saveSection("basic")}>
+									<Button
+										onClick={() => saveSection("basic")}
+										size="sm"
+										className="text-xs sm:text-sm"
+									>
 										Save Basic Information
 									</Button>
 								</div>
@@ -369,9 +401,9 @@ export default function ProfilePage() {
 
 						{/* Anonymous Mode & Privacy */}
 						<Card>
-							<CardHeader>
-								<CardTitle className="flex items-center gap-2">
-									<Shield className="h-5 w-5 text-sauti-orange" />
+							<CardHeader className="pb-3 sm:pb-6">
+								<CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+									<Shield className="h-4 w-4 sm:h-5 sm:w-5 text-sauti-orange" />
 									Privacy & Identity
 								</CardTitle>
 							</CardHeader>
@@ -384,27 +416,29 @@ export default function ProfilePage() {
 
 						{/* Profile Completion Status */}
 						<Card className="border-amber-200 bg-amber-50">
-							<CardContent className="pt-6">
-								<div className="flex items-start gap-3">
-									<AlertCircle className="h-5 w-5 text-amber-600 mt-0.5" />
-									<div className="flex-1">
-										<h3 className="font-semibold text-amber-800">
+							<CardContent className="pt-4 sm:pt-6">
+								<div className="flex items-start gap-2 sm:gap-3">
+									<AlertCircle className="h-4 w-4 sm:h-5 sm:w-5 text-amber-600 mt-0.5 flex-shrink-0" />
+									<div className="flex-1 min-w-0">
+										<h3 className="font-semibold text-amber-800 text-sm sm:text-base">
 											Profile Completion Status
 										</h3>
-										<p className="text-sm text-amber-700 mt-1">
+										<p className="text-xs sm:text-sm text-amber-700 mt-1">
 											Complete your profile to access all features and improve your
 											verification status.
 										</p>
 										<div className="mt-3">
-											<div className="flex items-center gap-2 text-sm text-amber-700">
-												<span>Overall Progress:</span>
-												<div className="flex-1 bg-amber-200 rounded-full h-2">
+											<div className="flex items-center gap-2 text-xs sm:text-sm text-amber-700">
+												<span className="flex-shrink-0">Progress:</span>
+												<div className="flex-1 bg-amber-200 rounded-full h-2 min-w-0">
 													<div
 														className="bg-amber-600 h-2 rounded-full transition-all duration-300"
 														style={{ width: `${getCompletionPercentage()}%` }}
 													></div>
 												</div>
-												<span>{getCompletionPercentage()}%</span>
+												<span className="flex-shrink-0 text-xs">
+													{getCompletionPercentage()}%
+												</span>
 											</div>
 										</div>
 									</div>
@@ -412,30 +446,32 @@ export default function ProfilePage() {
 							</CardContent>
 						</Card>
 
-						<Accordion type="multiple" className="space-y-4">
+						<Accordion type="multiple" className="space-y-3 sm:space-y-4">
 							{/* Professional Information (for professionals only) */}
 							{isProfessional && (
 								<AccordionItem value="professional" className="border rounded-lg">
 									<Card>
-										<AccordionTrigger className="px-6 py-4 hover:no-underline">
-											<div className="flex items-center gap-3 text-left">
-												<Building className="h-5 w-5 text-sauti-orange" />
-												<div>
-													<CardTitle className="text-lg">Professional Information</CardTitle>
-													<p className="text-sm text-gray-600 mt-1">
+										<AccordionTrigger className="px-2 sm:px-6 py-3 sm:py-4 hover:no-underline">
+											<div className="flex items-center gap-2 sm:gap-3 text-left w-full">
+												<Building className="h-4 w-4 sm:h-5 sm:w-5 text-sauti-orange flex-shrink-0" />
+												<div className="flex-1 min-w-0">
+													<CardTitle className="text-sm sm:text-lg">
+														Professional Information
+													</CardTitle>
+													<p className="text-xs sm:text-sm text-gray-600 mt-1">
 														Manage your professional details and credentials
 													</p>
 												</div>
 												{getVerificationStatus("professional") ? (
-													<CheckCircle className="h-5 w-5 text-green-500 ml-auto" />
+													<CheckCircle className="h-4 w-4 sm:h-5 sm:w-5 text-green-500 flex-shrink-0" />
 												) : (
-													<AlertCircle className="h-5 w-5 text-amber-500 ml-auto" />
+													<AlertCircle className="h-4 w-4 sm:h-5 sm:w-5 text-amber-500 flex-shrink-0" />
 												)}
 											</div>
 										</AccordionTrigger>
 										<AccordionContent>
-											<CardContent className="space-y-4">
-												<div className="space-y-4">
+											<CardContent className="space-y-3 sm:space-y-4 px-2 sm:px-6">
+												<div className="space-y-3 sm:space-y-4">
 													<Input
 														placeholder="Professional Title"
 														defaultValue={profileData.professional_title || ""}
@@ -446,6 +482,7 @@ export default function ProfilePage() {
 																e.target.value
 															)
 														}
+														className="text-sm sm:text-base"
 													/>
 													<Input
 														placeholder="Phone Number"
@@ -453,19 +490,28 @@ export default function ProfilePage() {
 														onChange={(e) =>
 															updateFormData("professional", "phone", e.target.value)
 														}
+														className="text-sm sm:text-base"
 													/>
 													<Textarea
 														placeholder="Professional Bio - Describe your expertise, specialties, and languages..."
-														rows={4}
+														rows={3}
 														defaultValue={profileData.bio || ""}
 														onChange={(e) =>
 															updateFormData("professional", "bio", e.target.value)
 														}
+														className="text-sm sm:text-base resize-none"
 													/>
 												</div>
 												<div className="flex justify-end">
-													<Button onClick={() => saveSection("professional")}>
-														Save Professional Information
+													<Button
+														onClick={() => saveSection("professional")}
+														size="sm"
+														className="text-xs sm:text-sm"
+													>
+														<span className="hidden sm:inline">
+															Save Professional Information
+														</span>
+														<span className="sm:hidden">Save Info</span>
 													</Button>
 												</div>
 											</CardContent>
@@ -478,24 +524,26 @@ export default function ProfilePage() {
 							{isProfessional && (
 								<AccordionItem value="verification" className="border rounded-lg">
 									<Card>
-										<AccordionTrigger className="px-6 py-4 hover:no-underline">
-											<div className="flex items-center gap-3 text-left">
-												<Shield className="h-5 w-5 text-sauti-orange" />
-												<div>
-													<CardTitle className="text-lg">Verification Documents</CardTitle>
-													<p className="text-sm text-gray-600 mt-1">
+										<AccordionTrigger className="px-2 sm:px-6 py-3 sm:py-4 hover:no-underline">
+											<div className="flex items-center gap-2 sm:gap-3 text-left w-full">
+												<Shield className="h-4 w-4 sm:h-5 sm:w-5 text-sauti-orange flex-shrink-0" />
+												<div className="flex-1 min-w-0">
+													<CardTitle className="text-sm sm:text-lg">
+														Verification Documents
+													</CardTitle>
+													<p className="text-xs sm:text-sm text-gray-600 mt-1">
 														Upload your professional credentials and verification documents
 													</p>
 												</div>
 												{getVerificationStatus("verification") ? (
-													<CheckCircle className="h-5 w-5 text-green-500 ml-auto" />
+													<CheckCircle className="h-4 w-4 sm:h-5 sm:w-5 text-green-500 flex-shrink-0" />
 												) : (
-													<AlertCircle className="h-5 w-5 text-amber-500 ml-auto" />
+													<AlertCircle className="h-4 w-4 sm:h-5 sm:w-5 text-amber-500 flex-shrink-0" />
 												)}
 											</div>
 										</AccordionTrigger>
 										<AccordionContent>
-											<CardContent className="space-y-4">
+											<CardContent className="space-y-3 sm:space-y-4 px-2 sm:px-6">
 												{profile?.user_type === "ngo" ? (
 													<EnhancedProfessionalDocumentsForm
 														onSave={() => saveSection("verification")}
@@ -530,7 +578,7 @@ export default function ProfilePage() {
 
 					{/* Verification Tab - Only for Professionals and NGOs */}
 					{isProfessional && (
-						<TabsContent value="verification" className="space-y-4">
+						<TabsContent value="verification" className="space-y-3 sm:space-y-4">
 							<VerificationSection
 								userId={userId || ""}
 								userType={profile?.user_type || "professional"}
@@ -543,77 +591,103 @@ export default function ProfilePage() {
 						</TabsContent>
 					)}
 
-					<TabsContent value="settings" className="space-y-4">
+					<TabsContent value="settings" className="space-y-3 sm:space-y-4">
 						<Card>
-							<CardHeader>
-								<CardTitle className="flex items-center gap-2">
-									<Accessibility className="h-5 w-5 text-sauti-orange" />
+							<CardHeader className="pb-3 sm:pb-6">
+								<CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+									<Accessibility className="h-4 w-4 sm:h-5 sm:w-5 text-sauti-orange" />
 									Accessibility Settings
 								</CardTitle>
 							</CardHeader>
-							<CardContent className="space-y-6">
-								<div className="space-y-4">
-									<h4 className="font-medium">Display Preferences</h4>
+							<CardContent className="space-y-4 sm:space-y-6">
+								<div className="space-y-3 sm:space-y-4">
+									<h4 className="font-medium text-sm sm:text-base">
+										Display Preferences
+									</h4>
 									<div className="space-y-3">
-										<div className="flex items-center justify-between">
-											<div>
-												<p className="font-medium">High Contrast Mode</p>
-												<p className="text-sm text-gray-600">
+										<div className="flex items-start justify-between gap-2 sm:gap-3">
+											<div className="flex-1 min-w-0">
+												<p className="font-medium text-sm sm:text-base">
+													High Contrast Mode
+												</p>
+												<p className="text-xs sm:text-sm text-gray-600">
 													Increase contrast for better visibility
 												</p>
 											</div>
-											<input type="checkbox" className="rounded" />
+											<input type="checkbox" className="rounded flex-shrink-0 mt-1" />
 										</div>
-										<div className="flex items-center justify-between">
-											<div>
-												<p className="font-medium">Large Text</p>
-												<p className="text-sm text-gray-600">
+										<div className="flex items-start justify-between gap-2 sm:gap-3">
+											<div className="flex-1 min-w-0">
+												<p className="font-medium text-sm sm:text-base">Large Text</p>
+												<p className="text-xs sm:text-sm text-gray-600">
 													Increase text size for better readability
 												</p>
 											</div>
-											<input type="checkbox" className="rounded" />
+											<input type="checkbox" className="rounded flex-shrink-0 mt-1" />
 										</div>
-										<div className="flex items-center justify-between">
-											<div>
-												<p className="font-medium">Reduced Motion</p>
-												<p className="text-sm text-gray-600">
+										<div className="flex items-start justify-between gap-2 sm:gap-3">
+											<div className="flex-1 min-w-0">
+												<p className="font-medium text-sm sm:text-base">Reduced Motion</p>
+												<p className="text-xs sm:text-sm text-gray-600">
 													Minimize animations and transitions
 												</p>
 											</div>
-											<input type="checkbox" className="rounded" />
+											<input type="checkbox" className="rounded flex-shrink-0 mt-1" />
 										</div>
 									</div>
 								</div>
 
-								<div className="space-y-4">
-									<h4 className="font-medium">Privacy & Identity</h4>
+								<div className="space-y-3 sm:space-y-4">
+									<h4 className="font-medium text-sm sm:text-base">
+										Privacy & Identity
+									</h4>
 									{userId && profile?.first_name && (
 										<AnonymousModeToggle userId={userId} username={profile.first_name} />
 									)}
 								</div>
 
-								<div className="space-y-4">
-									<h4 className="font-medium">Notification Preferences</h4>
+								<div className="space-y-3 sm:space-y-4">
+									<h4 className="font-medium text-sm sm:text-base">
+										Notification Preferences
+									</h4>
 									<div className="space-y-3">
-										<div className="flex items-center justify-between">
-											<div>
-												<p className="font-medium">Email Notifications</p>
-												<p className="text-sm text-gray-600">Receive updates via email</p>
+										<div className="flex items-start justify-between gap-2 sm:gap-3">
+											<div className="flex-1 min-w-0">
+												<p className="font-medium text-sm sm:text-base">
+													Email Notifications
+												</p>
+												<p className="text-xs sm:text-sm text-gray-600">
+													Receive updates via email
+												</p>
 											</div>
-											<input type="checkbox" className="rounded" defaultChecked />
+											<input
+												type="checkbox"
+												className="rounded flex-shrink-0 mt-1"
+												defaultChecked
+											/>
 										</div>
-										<div className="flex items-center justify-between">
-											<div>
-												<p className="font-medium">SMS Notifications</p>
-												<p className="text-sm text-gray-600">Receive updates via SMS</p>
+										<div className="flex items-start justify-between gap-2 sm:gap-3">
+											<div className="flex-1 min-w-0">
+												<p className="font-medium text-sm sm:text-base">
+													SMS Notifications
+												</p>
+												<p className="text-xs sm:text-sm text-gray-600">
+													Receive updates via SMS
+												</p>
 											</div>
-											<input type="checkbox" className="rounded" />
+											<input type="checkbox" className="rounded flex-shrink-0 mt-1" />
 										</div>
 									</div>
 								</div>
 
 								<div className="flex justify-end">
-									<Button onClick={() => saveSection("settings")}>Save Settings</Button>
+									<Button
+										onClick={() => saveSection("settings")}
+										size="sm"
+										className="text-xs sm:text-sm"
+									>
+										Save Settings
+									</Button>
 								</div>
 							</CardContent>
 						</Card>
