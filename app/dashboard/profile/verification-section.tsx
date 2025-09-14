@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -41,12 +41,16 @@ import {
 	ExternalLink,
 	TrendingUp,
 	Plus,
+	CheckSquare,
 } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Database } from "@/types/db-schema";
 import { fileUploadService } from "@/lib/file-upload";
 import { VerificationDashboard } from "./verification-dashboard";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Trash2 } from "lucide-react";
 
 type SupportServiceType = Database["public"]["Enums"]["support_service_type"];
 type UserType = Database["public"]["Enums"]["user_type"];
@@ -90,6 +94,253 @@ interface VerificationSectionProps {
 	onUpdate?: () => void;
 }
 
+interface DocumentUploadFormProps {
+	userId: string;
+	userType: UserType;
+	onUploadSuccess?: () => void;
+}
+
+interface DocumentFormData {
+	id: string;
+	title: string;
+	certificateNumber: string;
+	file: File | null;
+	uploaded: boolean;
+}
+
+export function DocumentUploadForm({
+	userId,
+	userType,
+	onUploadSuccess,
+}: DocumentUploadFormProps) {
+	const [documents, setDocuments] = useState<DocumentFormData[]>([]);
+	const [isUploading, setIsUploading] = useState(false);
+	const supabase = createClient();
+	const { toast } = useToast();
+
+	const addDocument = () => {
+		const newDoc: DocumentFormData = {
+			id: `doc-${Date.now()}`,
+			title: "",
+			certificateNumber: "",
+			file: null,
+			uploaded: false,
+		};
+		setDocuments((prev) => [...prev, newDoc]);
+	};
+
+	const removeDocument = (id: string) => {
+		setDocuments((prev) => prev.filter((doc) => doc.id !== id));
+	};
+
+	const updateDocument = (
+		id: string,
+		field: keyof DocumentFormData,
+		value: any
+	) => {
+		setDocuments((prev) =>
+			prev.map((doc) => (doc.id === id ? { ...doc, [field]: value } : doc))
+		);
+	};
+
+	const uploadDocument = async (doc: DocumentFormData) => {
+		if (!doc.file) return null;
+
+		try {
+			const result = await fileUploadService.uploadFile({
+				userId,
+				userType,
+				fileType: "accreditation",
+				fileName: doc.file.name,
+				file: doc.file,
+			});
+
+			return result.url;
+		} catch (error) {
+			console.error("Error uploading file:", error);
+			throw error;
+		}
+	};
+
+	const saveDocuments = async () => {
+		if (documents.length === 0) return;
+
+		setIsUploading(true);
+		try {
+			const documentsToSave: any[] = [];
+
+			for (const doc of documents) {
+				if (!doc.title.trim() || !doc.file) continue;
+
+				const url = await uploadDocument(doc);
+				if (url) {
+					documentsToSave.push({
+						title: doc.title,
+						certificateNumber: doc.certificateNumber,
+						url,
+						fileType: doc.file?.type || "unknown",
+						fileSize: doc.file?.size || 0,
+						uploadedAt: new Date().toISOString(),
+						uploaded: true,
+					});
+				}
+			}
+
+			if (documentsToSave.length > 0) {
+				// Update profile with new documents
+				const { error } = await supabase
+					.from("profiles")
+					.update({
+						accreditation_files_metadata: documentsToSave,
+						updated_at: new Date().toISOString(),
+					})
+					.eq("id", userId);
+
+				if (error) throw error;
+
+				toast({
+					title: "Success",
+					description: `${documentsToSave.length} document(s) uploaded successfully`,
+				});
+
+				// Clear form
+				setDocuments([]);
+				onUploadSuccess?.();
+			}
+		} catch (error) {
+			console.error("Error saving documents:", error);
+			toast({
+				title: "Error",
+				description: "Failed to upload documents. Please try again.",
+				variant: "destructive",
+			});
+		} finally {
+			setIsUploading(false);
+		}
+	};
+
+	return (
+		<div className="space-y-4">
+			{/* Add Document Button */}
+			<div className="flex items-center justify-between">
+				<h3 className="text-lg font-semibold">Add Professional Documents</h3>
+				<Button onClick={addDocument} className="gap-2">
+					<Plus className="h-4 w-4" />
+					Add Document
+				</Button>
+			</div>
+
+			{/* Document Forms */}
+			<div className="space-y-4">
+				{documents.map((doc) => (
+					<Card key={doc.id} className="border-2 border-dashed border-gray-200">
+						<CardContent className="p-4">
+							<div className="flex items-center justify-between mb-4">
+								<h4 className="font-medium">Document {documents.indexOf(doc) + 1}</h4>
+								<Button
+									variant="ghost"
+									size="sm"
+									onClick={() => removeDocument(doc.id)}
+									className="text-red-600 hover:text-red-700"
+								>
+									<Trash2 className="h-4 w-4" />
+								</Button>
+							</div>
+
+							<div className="grid gap-4 md:grid-cols-2">
+								<div className="space-y-2">
+									<label className="text-sm font-medium text-gray-700">
+										Document Title *
+									</label>
+									<Input
+										placeholder="e.g., Medical License, PhD Certificate"
+										value={doc.title}
+										onChange={(e) => updateDocument(doc.id, "title", e.target.value)}
+									/>
+								</div>
+
+								<div className="space-y-2">
+									<label className="text-sm font-medium text-gray-700">
+										Certificate/License Number *
+									</label>
+									<Input
+										placeholder="e.g., MD-12345, PhD-2023-001"
+										value={doc.certificateNumber}
+										onChange={(e) =>
+											updateDocument(doc.id, "certificateNumber", e.target.value)
+										}
+									/>
+								</div>
+							</div>
+
+							<div className="space-y-2 mt-4">
+								<label className="text-sm font-medium text-gray-700">
+									Upload File *
+								</label>
+								<Input
+									type="file"
+									accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx"
+									onChange={(e) =>
+										updateDocument(doc.id, "file", e.target.files?.[0] || null)
+									}
+									className="file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-sauti-orange file:text-white hover:file:bg-sauti-orange/90"
+								/>
+								<p className="text-xs text-gray-500">
+									Supported formats: PDF, JPG, PNG, DOC, DOCX (Max 10MB)
+								</p>
+							</div>
+						</CardContent>
+					</Card>
+				))}
+			</div>
+
+			{/* Save Button */}
+			{documents.length > 0 && (
+				<div className="flex justify-end">
+					<Button
+						onClick={saveDocuments}
+						disabled={
+							isUploading || documents.some((doc) => !doc.title.trim() || !doc.file)
+						}
+						className="gap-2 bg-sauti-orange hover:bg-sauti-orange/90"
+					>
+						{isUploading ? (
+							<>
+								<div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+								Uploading...
+							</>
+						) : (
+							<>
+								<Upload className="h-4 w-4" />
+								Upload {documents.length} Document{documents.length !== 1 ? "s" : ""}
+							</>
+						)}
+					</Button>
+				</div>
+			)}
+
+			{documents.length === 0 && (
+				<div className="text-center py-8 bg-gray-50 rounded-lg border-2 border-dashed border-gray-200">
+					<FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+					<h3 className="text-lg font-semibold text-gray-700 mb-2">
+						No Documents Added
+					</h3>
+					<p className="text-gray-500 mb-4">
+						Click "Add Document" to start uploading your professional credentials
+					</p>
+					<Button
+						onClick={addDocument}
+						className="gap-2 bg-sauti-orange hover:bg-sauti-orange/90"
+					>
+						<Plus className="h-4 w-4" />
+						Add Your First Document
+					</Button>
+				</div>
+			)}
+		</div>
+	);
+}
+
 export function VerificationSection({
 	userId,
 	userType,
@@ -114,31 +365,7 @@ export function VerificationSection({
 	const supabase = createClient();
 	const { toast } = useToast();
 
-	useEffect(() => {
-		loadVerificationData();
-	}, [userId, userType]);
-
-	const loadVerificationData = async () => {
-		setIsLoading(true);
-		try {
-			await Promise.all([
-				loadVerificationStatus(),
-				loadDocuments(),
-				userType === "ngo" ? loadServices() : Promise.resolve(),
-			]);
-		} catch (error) {
-			console.error("Error loading verification data:", error);
-			toast({
-				title: "Error",
-				description: "Failed to load verification data",
-				variant: "destructive",
-			});
-		} finally {
-			setIsLoading(false);
-		}
-	};
-
-	const loadVerificationStatus = async () => {
+	const loadVerificationStatus = useCallback(async () => {
 		try {
 			const { data, error } = await supabase
 				.from("profiles")
@@ -159,9 +386,9 @@ export function VerificationSection({
 		} catch (error) {
 			console.error("Error loading verification status:", error);
 		}
-	};
+	}, [userId, supabase]);
 
-	const loadDocuments = async () => {
+	const loadDocuments = useCallback(async () => {
 		try {
 			// Load documents from profile accreditation_files_metadata
 			const { data: profileData } = await supabase
@@ -193,9 +420,9 @@ export function VerificationSection({
 		} catch (error) {
 			console.error("Error loading documents:", error);
 		}
-	};
+	}, [userId, supabase]);
 
-	const loadServices = async () => {
+	const loadServices = useCallback(async () => {
 		try {
 			const { data, error } = await supabase
 				.from("support_services")
@@ -236,7 +463,31 @@ export function VerificationSection({
 		} catch (error) {
 			console.error("Error loading services:", error);
 		}
-	};
+	}, [userId, supabase]);
+
+	const loadVerificationData = useCallback(async () => {
+		setIsLoading(true);
+		try {
+			await Promise.all([
+				loadVerificationStatus(),
+				loadDocuments(),
+				userType === "ngo" ? loadServices() : Promise.resolve(),
+			]);
+		} catch (error) {
+			console.error("Error loading verification data:", error);
+			toast({
+				title: "Error",
+				description: "Failed to load verification data",
+				variant: "destructive",
+			});
+		} finally {
+			setIsLoading(false);
+		}
+	}, [userType, loadVerificationStatus, loadDocuments, loadServices, toast]);
+
+	useEffect(() => {
+		loadVerificationData();
+	}, [loadVerificationData]);
 
 	const refreshVerification = async () => {
 		setIsRefreshing(true);
@@ -372,233 +623,197 @@ export function VerificationSection({
 
 	return (
 		<div className="space-y-6">
-			{/* Header with Refresh */}
-			<div className="flex items-center justify-between">
-				<div>
-					<h2 className="text-2xl font-bold text-gray-900">Verification Status</h2>
-					<p className="text-gray-600 mt-1">
-						Track your professional verification progress and document status
-					</p>
-				</div>
-				<div className="flex gap-2">
-					<Button
-						variant="outline"
-						onClick={() => setViewMode("dashboard")}
-						className="gap-2"
+			{/* Notifications at the top */}
+			<div className="space-y-3">
+				{/* Verification Status Alert */}
+				<Alert
+					className={`${
+						verificationStatus.overall === "verified"
+							? "border-green-200 bg-green-50"
+							: verificationStatus.overall === "rejected"
+							? "border-red-200 bg-red-50"
+							: "border-yellow-200 bg-yellow-50"
+					}`}
+				>
+					{getStatusIcon(verificationStatus.overall)}
+					<AlertDescription
+						className={`${
+							verificationStatus.overall === "verified"
+								? "text-green-800"
+								: verificationStatus.overall === "rejected"
+								? "text-red-800"
+								: "text-yellow-800"
+						}`}
 					>
-						<TrendingUp className="h-4 w-4" />
-						Dashboard
-					</Button>
-					<Button
-						variant="outline"
-						onClick={refreshVerification}
-						disabled={isRefreshing}
-						className="gap-2"
-					>
-						<RefreshCw className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`} />
-						Refresh
-					</Button>
-				</div>
+						<strong>Verification Status:</strong>{" "}
+						{verificationStatus.overall.replace("_", " ").toUpperCase()}
+						{verificationStatus.verificationNotes && (
+							<span className="block mt-1 text-sm">
+								<strong>Notes:</strong> {verificationStatus.verificationNotes}
+							</span>
+						)}
+					</AlertDescription>
+				</Alert>
+
+				{/* Progress Alert */}
+				<Alert className="border-blue-200 bg-blue-50">
+					<Info className="h-4 w-4 text-blue-600" />
+					<AlertDescription className="text-blue-800">
+						<strong>Progress:</strong> {getProgressPercentage()}% complete (
+						{documents.length} document{documents.length !== 1 ? "s" : ""} uploaded)
+						{userType === "ngo" && (
+							<span>
+								{" "}
+								• {services.length} service{services.length !== 1 ? "s" : ""} registered
+							</span>
+						)}
+					</AlertDescription>
+				</Alert>
 			</div>
 
-			{/* Overall Status Card */}
-			<Card className="border-2">
-				<CardHeader>
-					<CardTitle className="flex items-center gap-2">
-						<Shield className="h-6 w-6 text-sauti-orange" />
-						Overall Verification Status
-					</CardTitle>
-				</CardHeader>
-				<CardContent className="space-y-4">
-					<div className="flex items-center justify-between">
-						<div className="flex items-center gap-3">
-							{getStatusIcon(verificationStatus.overall)}
-							<div>
-								<h3 className="text-lg font-semibold capitalize">
-									{verificationStatus.overall.replace("_", " ")}
-								</h3>
-								<p className="text-sm text-gray-600">
-									Last checked: {formatDate(verificationStatus.lastChecked)}
-								</p>
-							</div>
-						</div>
-						<Badge className={getStatusColor(verificationStatus.overall)}>
-							{verificationStatus.overall.replace("_", " ")}
-						</Badge>
-					</div>
-
-					<div className="space-y-2">
-						<div className="flex justify-between text-sm">
-							<span>Verification Progress</span>
-							<span>{getProgressPercentage()}%</span>
-						</div>
-						<Progress value={getProgressPercentage()} className="h-2" />
-					</div>
-
-					{verificationStatus.verificationNotes && (
-						<Alert>
-							<Info className="h-4 w-4" />
-							<AlertDescription>
-								<strong>Admin Notes:</strong> {verificationStatus.verificationNotes}
-							</AlertDescription>
-						</Alert>
-					)}
-				</CardContent>
-			</Card>
-
-			{/* Professional Verification Steps */}
-			<div className="grid gap-6 md:grid-cols-2">
-				{/* Professional Credentials Verification */}
-				<Card>
-					<CardHeader className="pb-3">
-						<CardTitle className="flex items-center gap-2 text-lg">
-							<FileText className="h-5 w-5 text-sauti-orange" />
-							Professional Credentials
-						</CardTitle>
-					</CardHeader>
-					<CardContent className="space-y-3">
-						<div className="flex items-center justify-between">
-							<span className="text-sm text-gray-600">Status</span>
-							<Badge className={getStatusColor(verificationStatus.documents)}>
-								{verificationStatus.documents.replace("_", " ")}
-							</Badge>
-						</div>
-						<div className="text-xs text-gray-500">
-							{documents.length} credential document{documents.length !== 1 ? "s" : ""}{" "}
-							uploaded
-						</div>
-						<div className="text-xs text-gray-400">
-							Licenses, certifications, degrees, and professional qualifications
-						</div>
-					</CardContent>
-				</Card>
-
-				{/* Support Services Verification (NGO only) */}
-				{userType === "ngo" && (
+			{/* Document Upload and List Section */}
+			<div className="grid gap-6 lg:grid-cols-3">
+				{/* Document Upload Form - Left Side */}
+				<div className="lg:col-span-2">
 					<Card>
-						<CardHeader className="pb-3">
-							<CardTitle className="flex items-center gap-2 text-lg">
-								<Building className="h-5 w-5 text-sauti-orange" />
-								Support Services
+						<CardHeader>
+							<CardTitle className="flex items-center gap-2">
+								<FileText className="h-5 w-5 text-sauti-orange" />
+								Professional Credentials
 							</CardTitle>
+							<p className="text-sm text-gray-600">
+								Upload your professional licenses, certifications, and academic
+								documents
+							</p>
 						</CardHeader>
-						<CardContent className="space-y-3">
-							<div className="flex items-center justify-between">
-								<span className="text-sm text-gray-600">Status</span>
-								<Badge className={getStatusColor(verificationStatus.services)}>
-									{verificationStatus.services.replace("_", " ")}
-								</Badge>
-							</div>
-							<div className="text-xs text-gray-500">
-								{services.length} service{services.length !== 1 ? "s" : ""} registered
-								with credentials
-							</div>
-							<div className="text-xs text-gray-400">
-								Each service requires appropriate accreditation documents
-							</div>
+						<CardContent>
+							<DocumentUploadForm
+								userId={userId}
+								userType={userType}
+								onUploadSuccess={() => {
+									loadVerificationData();
+									onUpdate?.();
+								}}
+							/>
 						</CardContent>
 					</Card>
-				)}
-			</div>
+				</div>
 
-			{/* Professional Credentials Section */}
-			<Card>
-				<CardHeader>
-					<CardTitle className="flex items-center gap-2">
-						<FileText className="h-5 w-5 text-sauti-orange" />
-						Professional Credentials & Accreditation
-					</CardTitle>
-					<p className="text-sm text-gray-600 mt-2">
-						Upload your professional licenses, certifications, degrees, and other
-						qualifying documents
-					</p>
-				</CardHeader>
-				<CardContent>
-					{documents.length === 0 ? (
-						<div className="text-center py-8">
-							<FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-							<p className="text-gray-500">No professional credentials uploaded yet</p>
-							<p className="text-sm text-gray-400 mt-1">
-								Upload your professional licenses, certifications, and degrees to get
-								verified
-							</p>
-							<div className="mt-4">
-								<Button className="gap-2">
-									<Upload className="h-4 w-4" />
-									Upload Credentials
-								</Button>
-							</div>
-						</div>
-					) : (
-						<Table>
-							<TableHeader>
-								<TableRow>
-									<TableHead>Document</TableHead>
-									<TableHead>Type</TableHead>
-									<TableHead>Size</TableHead>
-									<TableHead>Uploaded</TableHead>
-									<TableHead>Status</TableHead>
-									<TableHead>Actions</TableHead>
-								</TableRow>
-							</TableHeader>
-							<TableBody>
-								{documents.map((doc) => (
-									<TableRow key={doc.id}>
-										<TableCell className="font-medium">{doc.title}</TableCell>
-										<TableCell className="text-sm text-gray-600">
-											{doc.fileType.toUpperCase()}
-										</TableCell>
-										<TableCell className="text-sm text-gray-600">
-											{formatFileSize(doc.fileSize)}
-										</TableCell>
-										<TableCell className="text-sm text-gray-600">
-											{formatDate(doc.uploadedAt)}
-										</TableCell>
-										<TableCell>
-											<Badge className={getStatusColor(doc.status)}>
-												{doc.status.replace("_", " ")}
-											</Badge>
-										</TableCell>
-										<TableCell>
-											<div className="flex items-center gap-2">
+				{/* Uploaded Documents List - Right Side */}
+				<div className="lg:col-span-1">
+					<Card>
+						<CardHeader>
+							<CardTitle className="flex items-center gap-2">
+								<CheckSquare className="h-5 w-5 text-sauti-orange" />
+								Uploaded Documents ({documents.length})
+							</CardTitle>
+						</CardHeader>
+						<CardContent>
+							{documents.length === 0 ? (
+								<div className="text-center py-8">
+									<FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+									<p className="text-gray-500 text-sm">No documents uploaded yet</p>
+								</div>
+							) : (
+								<div className="space-y-3">
+									{documents.map((doc) => (
+										<div
+											key={doc.id}
+											className="border rounded-lg p-3 hover:shadow-sm transition-shadow"
+										>
+											<div className="flex items-start justify-between mb-2">
+												<div className="flex items-center gap-2 flex-1 min-w-0">
+													<div
+														className={`p-1.5 rounded ${
+															getStatusColor(doc.status).includes("green")
+																? "bg-green-100"
+																: getStatusColor(doc.status).includes("yellow")
+																? "bg-yellow-100"
+																: getStatusColor(doc.status).includes("red")
+																? "bg-red-100"
+																: "bg-gray-100"
+														}`}
+													>
+														<FileText
+															className={`h-4 w-4 ${
+																getStatusColor(doc.status).includes("green")
+																	? "text-green-600"
+																	: getStatusColor(doc.status).includes("yellow")
+																	? "text-yellow-600"
+																	: getStatusColor(doc.status).includes("red")
+																	? "text-red-600"
+																	: "text-gray-600"
+															}`}
+														/>
+													</div>
+													<div className="flex-1 min-w-0">
+														<h4 className="font-medium text-sm truncate">{doc.title}</h4>
+														<p className="text-xs text-gray-500">
+															{doc.fileType.toUpperCase()}
+														</p>
+													</div>
+												</div>
+												<Badge className={`${getStatusColor(doc.status)} text-xs`}>
+													{doc.status.replace("_", " ")}
+												</Badge>
+											</div>
+
+											<div className="space-y-1 mb-3">
+												<div className="flex justify-between text-xs text-gray-600">
+													<span>Size:</span>
+													<span>{formatFileSize(doc.fileSize)}</span>
+												</div>
+												<div className="flex justify-between text-xs text-gray-600">
+													<span>Uploaded:</span>
+													<span>{formatDate(doc.uploadedAt)}</span>
+												</div>
+											</div>
+
+											<div className="flex gap-2">
 												<Dialog>
 													<DialogTrigger asChild>
 														<Button
-															variant="ghost"
+															variant="outline"
 															size="sm"
-															onClick={() => setSelectedDocument(doc)}
+															className="flex-1 gap-1 text-xs"
 														>
-															<Eye className="h-4 w-4" />
+															<Eye className="h-3 w-3" />
+															View
 														</Button>
 													</DialogTrigger>
 													<DialogContent className="max-w-2xl">
 														<DialogHeader>
-															<DialogTitle>{doc.title}</DialogTitle>
+															<DialogTitle className="flex items-center gap-2">
+																<FileText className="h-5 w-5 text-sauti-orange" />
+																{doc.title}
+															</DialogTitle>
 															<DialogDescription>
-																Document details and preview
+																Professional credential document details
 															</DialogDescription>
 														</DialogHeader>
-														<div className="space-y-4">
+														<div className="space-y-6">
 															<div className="grid grid-cols-2 gap-4">
-																<div>
+																<div className="space-y-1">
 																	<label className="text-sm font-medium text-gray-600">
 																		File Type
 																	</label>
-																	<p className="text-sm">{doc.fileType.toUpperCase()}</p>
+																	<p className="text-sm font-mono bg-gray-100 px-2 py-1 rounded">
+																		{doc.fileType.toUpperCase()}
+																	</p>
 																</div>
-																<div>
+																<div className="space-y-1">
 																	<label className="text-sm font-medium text-gray-600">
 																		File Size
 																	</label>
 																	<p className="text-sm">{formatFileSize(doc.fileSize)}</p>
 																</div>
-																<div>
+																<div className="space-y-1">
 																	<label className="text-sm font-medium text-gray-600">
 																		Uploaded
 																	</label>
 																	<p className="text-sm">{formatDate(doc.uploadedAt)}</p>
 																</div>
-																<div>
+																<div className="space-y-1">
 																	<label className="text-sm font-medium text-gray-600">
 																		Status
 																	</label>
@@ -608,18 +823,20 @@ export function VerificationSection({
 																</div>
 															</div>
 															{doc.notes && (
-																<div>
+																<div className="space-y-1">
 																	<label className="text-sm font-medium text-gray-600">
 																		Notes
 																	</label>
-																	<p className="text-sm">{doc.notes}</p>
+																	<p className="text-sm bg-gray-50 p-3 rounded border">
+																		{doc.notes}
+																	</p>
 																</div>
 															)}
-															<div className="flex gap-2">
+															<div className="flex gap-3 pt-4 border-t">
 																<Button
 																	variant="outline"
 																	onClick={() => window.open(doc.url, "_blank")}
-																	className="gap-2"
+																	className="gap-2 flex-1"
 																>
 																	<ExternalLink className="h-4 w-4" />
 																	View Document
@@ -632,7 +849,7 @@ export function VerificationSection({
 																		link.download = doc.title;
 																		link.click();
 																	}}
-																	className="gap-2"
+																	className="gap-2 flex-1"
 																>
 																	<Download className="h-4 w-4" />
 																	Download
@@ -641,43 +858,52 @@ export function VerificationSection({
 														</div>
 													</DialogContent>
 												</Dialog>
+												<Button
+													variant="outline"
+													size="sm"
+													onClick={() => {
+														const link = document.createElement("a");
+														link.href = doc.url;
+														link.download = doc.title;
+														link.click();
+													}}
+													className="gap-1 text-xs"
+												>
+													<Download className="h-3 w-3" />
+												</Button>
 											</div>
-										</TableCell>
-									</TableRow>
-								))}
-							</TableBody>
-						</Table>
-					)}
-				</CardContent>
-			</Card>
+										</div>
+									))}
+								</div>
+							)}
+						</CardContent>
+					</Card>
+				</div>
+			</div>
 
-			{/* Support Services Accreditation (NGO only) */}
+			{/* Support Services (NGO only) */}
 			{userType === "ngo" && (
 				<Card>
 					<CardHeader>
 						<CardTitle className="flex items-center gap-2">
 							<Building className="h-5 w-5 text-sauti-orange" />
-							Support Services Accreditation
+							Support Services ({services.length})
 						</CardTitle>
-						<p className="text-sm text-gray-600 mt-2">
-							Each support service requires appropriate accreditation documents for
-							verification
-						</p>
 					</CardHeader>
 					<CardContent>
 						{services.length === 0 ? (
-							<div className="text-center py-8">
+							<div className="text-center py-8 bg-gray-50 rounded-lg border-2 border-dashed border-gray-200">
 								<Building className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-								<p className="text-gray-500">No support services registered yet</p>
-								<p className="text-sm text-gray-400 mt-1">
-									Register your support services and upload their accreditation documents
+								<h3 className="text-lg font-semibold text-gray-700 mb-2">
+									No Services Registered
+								</h3>
+								<p className="text-gray-500 mb-4">
+									Register your support services to get verified
 								</p>
-								<div className="mt-4">
-									<Button className="gap-2">
-										<Plus className="h-4 w-4" />
-										Add Support Service
-									</Button>
-								</div>
+								<Button className="gap-2 bg-sauti-orange hover:bg-sauti-orange/90">
+									<Plus className="h-4 w-4" />
+									Add Support Service
+								</Button>
 							</div>
 						) : (
 							<div className="space-y-4">
@@ -694,11 +920,10 @@ export function VerificationSection({
 												{service.status.replace("_", " ")}
 											</Badge>
 										</div>
-
-										{service.documents.length > 0 ? (
+										{service.documents.length > 0 && (
 											<div className="mt-3">
 												<p className="text-sm font-medium text-gray-600 mb-2">
-													Service Accreditation Documents ({service.documents.length})
+													Documents ({service.documents.length})
 												</p>
 												<div className="space-y-2">
 													{service.documents.map((doc) => (
@@ -717,25 +942,6 @@ export function VerificationSection({
 													))}
 												</div>
 											</div>
-										) : (
-											<div className="mt-3 p-3 bg-yellow-50 rounded border border-yellow-200">
-												<p className="text-sm text-yellow-800">
-													<strong>Action Required:</strong> This service needs accreditation
-													documents for verification
-												</p>
-												<Button size="sm" variant="outline" className="mt-2 gap-2">
-													<Upload className="h-3 w-3" />
-													Upload Documents
-												</Button>
-											</div>
-										)}
-
-										{service.notes && (
-											<div className="mt-3 p-2 bg-blue-50 rounded">
-												<p className="text-sm text-blue-800">
-													<strong>Verification Notes:</strong> {service.notes}
-												</p>
-											</div>
 										)}
 									</div>
 								))}
@@ -744,54 +950,6 @@ export function VerificationSection({
 					</CardContent>
 				</Card>
 			)}
-
-			{/* Verification Timeline */}
-			<Card>
-				<CardHeader>
-					<CardTitle className="flex items-center gap-2">
-						<Calendar className="h-5 w-5 text-sauti-orange" />
-						Verification Timeline
-					</CardTitle>
-				</CardHeader>
-				<CardContent>
-					<div className="space-y-4">
-						<div className="flex items-center gap-3">
-							<div className="w-3 h-3 bg-green-500 rounded-full"></div>
-							<div>
-								<p className="text-sm font-medium">Profile Created</p>
-								<p className="text-xs text-gray-600">
-									{formatDate(profile?.created_at || new Date().toISOString())}
-								</p>
-							</div>
-						</div>
-
-						{documents.length > 0 && (
-							<div className="flex items-center gap-3">
-								<div className="w-3 h-3 bg-blue-500 rounded-full"></div>
-								<div>
-									<p className="text-sm font-medium">Documents Uploaded</p>
-									<p className="text-xs text-gray-600">
-										{documents.length} document{documents.length !== 1 ? "s" : ""}{" "}
-										uploaded
-									</p>
-								</div>
-							</div>
-						)}
-
-						{verificationStatus.lastChecked && (
-							<div className="flex items-center gap-3">
-								<div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
-								<div>
-									<p className="text-sm font-medium">Last Verification Check</p>
-									<p className="text-xs text-gray-600">
-										{formatDate(verificationStatus.lastChecked)}
-									</p>
-								</div>
-							</div>
-						)}
-					</div>
-				</CardContent>
-			</Card>
 		</div>
 	);
 }
