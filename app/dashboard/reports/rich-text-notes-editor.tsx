@@ -14,6 +14,7 @@ import {
 	Italic,
 	Link as LinkIcon,
 	List,
+	ListOrdered,
 	Redo2,
 	Save,
 	Strikethrough,
@@ -34,6 +35,9 @@ import ImageExt from "@tiptap/extension-image";
 import TextAlign from "@tiptap/extension-text-align";
 import Placeholder from "@tiptap/extension-placeholder";
 import TextStyle from "@tiptap/extension-text-style";
+import OrderedList from "@tiptap/extension-ordered-list";
+import BulletList from "@tiptap/extension-bullet-list";
+import ListItem from "@tiptap/extension-list-item";
 
 export default function ReportNotesEditor({
 	userId,
@@ -53,12 +57,15 @@ export default function ReportNotesEditor({
 
 	const initialHtml = useMemo(() => report.notes || "", [report.notes]);
 
-	const editor = useEditor({
+const editor = useEditor({
 		extensions: [
 			StarterKit.configure({
 				heading: false,
-				orderedList: false,
 			}),
+			// Explicit list extensions to ensure list behavior works reliably
+			BulletList,
+			OrderedList,
+			ListItem,
 			UnderlineExt,
 			TextStyle,
 			LinkExt.configure({
@@ -288,11 +295,19 @@ export default function ReportNotesEditor({
 					padding-left: 1.5rem;
 					margin: 0.5rem 0;
 				}
+				.tiptap :global(ol) {
+					list-style: decimal;
+					padding-left: 1.5rem;
+					margin: 0.5rem 0;
+				}
 				.tiptap :global(li) {
 					margin: 0.25rem 0;
 				}
 				.tiptap :global(ul ul) {
 					list-style: circle;
+				}
+				.tiptap :global(ol ol) {
+					list-style: lower-alpha;
 				}
 			`}</style>
 
@@ -399,6 +414,20 @@ export default function ReportNotesEditor({
 						title="Bullet List"
 					>
 						<List className="h-4 w-4" />
+					</Button>
+					<Button
+						type="button"
+						variant={editor.isActive("orderedList") ? "secondary" : "ghost"}
+						size="icon"
+						className={`h-8 w-8 ${
+							editor.isActive("orderedList")
+								? "bg-blue-100 text-blue-700 border border-blue-200 shadow-sm"
+								: "hover:bg-gray-100"
+						}`}
+						onClick={() => editor.chain().focus().toggleOrderedList().run()}
+						title="Numbered List"
+					>
+						<ListOrdered className="h-4 w-4" />
 					</Button>
 					<Button
 						type="button"
