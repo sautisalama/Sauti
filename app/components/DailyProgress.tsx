@@ -26,7 +26,7 @@ export function DailyProgress() {
 					matched_services (
 						match_status_type
 					)
-				`
+					`
 				)
 				.eq("user_id", user.id);
 
@@ -48,26 +48,6 @@ export function DailyProgress() {
 		};
 
 		fetchProgress();
-
-		// Set up real-time subscription
-		const channel = supabase
-			.channel("reports-progress")
-			.on(
-				"postgres_changes",
-				{
-					event: "*",
-					schema: "public",
-					table: "matched_services",
-				},
-				() => {
-					fetchProgress();
-				}
-			)
-			.subscribe();
-
-		return () => {
-			supabase.removeChannel(channel);
-		};
 	}, []);
 
 	// Calculate stroke-dashoffset

@@ -140,7 +140,7 @@ export default function ProfessionalView({
 			.join(" ");
 	};
 
-useEffect(() => {
+	useEffect(() => {
 		const loadData = async () => {
 			try {
 				const [userReports, userServices, userMatches, userAppointments] =
@@ -273,7 +273,7 @@ useEffect(() => {
 				<AlertDescription>
 					{description}
 					<div className="mt-3 flex flex-wrap gap-2">
-						<Link href="/dashboard/onboarding">
+						<Link href="/dashboard/profile">
 							<Button size="sm" variant="default">
 								Update profile
 							</Button>

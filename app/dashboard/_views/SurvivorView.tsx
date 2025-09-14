@@ -230,29 +230,6 @@ export default function SurvivorView({
 		} else {
 			fetchReports();
 		}
-
-		// Set up real-time subscription
-		const channel = supabase
-			.channel("reports_changes")
-			.on(
-				"postgres_changes",
-				{
-					event: "*",
-					schema: "public",
-					table: "reports",
-					filter: `user_id=eq.${userId}`,
-				},
-				(payload) => {
-					console.log("Real-time update received:", payload); // Debug log
-					fetchReports();
-				}
-			)
-			.subscribe();
-
-		// Cleanup subscription
-		return () => {
-			supabase.removeChannel(channel);
-		};
 	}, [userId, dash?.data]); // Removed supabase and fetchReports from deps to prevent loop
 
 	// Add formatServiceName inside component

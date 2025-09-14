@@ -7,12 +7,10 @@ import { Plus, Trash2 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { AddSupportServiceForm } from "@/components/AddSupportServiceForm";
 import { fetchUserSupportServices } from "@/app/dashboard/_views/actions/support-services";
-import { createClient } from "@/utils/supabase/client";
 
 export default function ServicesClient({ userId }: { userId: string }) {
   const [services, setServices] = useState<Tables<"support_services">[]>([]);
   const [open, setOpen] = useState(false);
-  const supabase = createClient();
 
   useEffect(() => {
     const load = async () => {
@@ -20,16 +18,7 @@ export default function ServicesClient({ userId }: { userId: string }) {
       setServices(data);
     };
     load();
-
-    // Real time updates
-    const ch = supabase
-      .channel("services")
-      .on("postgres_changes", { event: "*", schema: "public", table: "support_services", filter: `user_id=eq.${userId}` }, () => {
-        load();
-      })
-      .subscribe();
-    return () => { supabase.removeChannel(ch); };
-  }, [userId, supabase]);
+  }, [userId]);
 
   const formatServiceName = (s: string) => s.split("_").map(w => w[0]?.toUpperCase() + w.slice(1)).join(" ");
 
