@@ -193,7 +193,10 @@ export default function SurvivorView({
 		if (dash?.data && dash.data.userId === userId && dash.data.reports) {
 			setReports(dash.data.reports as any);
 			try {
-				localStorage.setItem(`reports-cache-${userId}`, JSON.stringify(dash.data.reports || []));
+				localStorage.setItem(
+					`reports-cache-${userId}`,
+					JSON.stringify(dash.data.reports || [])
+				);
 			} catch {}
 		}
 	}, [userId, dash?.data]);
@@ -641,7 +644,7 @@ export default function SurvivorView({
 
 																		<div className="bg-white/50 p-2 rounded-md">
 																			<p className="font-medium text-sm">
-																				{matchedService?.support_services.name || "Pending Match"}
+																				{matchedService?.support_services?.name || "Pending Match"}
 																			</p>
 																			<p className="text-xs text-gray-500">
 																				{matchedService?.match_status_type
@@ -707,7 +710,7 @@ export default function SurvivorView({
 																	<div className="hidden md:flex flex-col md:flex-row items-start md:items-center gap-4 md:gap-6">
 																		<div className="w-full md:w-auto">
 																			<p className="font-medium">
-																				{matchedService?.support_services.name || "Pending Match"}
+																				{matchedService?.support_services?.name || "Pending Match"}
 																			</p>
 																			<p className="text-sm text-gray-500">
 																				{matchedService?.match_status_type
@@ -843,7 +846,7 @@ export default function SurvivorView({
 
 																<div className="bg-white/50 p-2 rounded-md">
 																	<p className="font-medium text-sm">
-																		{matchedService?.support_services.name || "Pending Match"}
+																		{matchedService?.support_services?.name || "Pending Match"}
 																	</p>
 																	<p className="text-xs text-gray-500">
 																		{matchedService?.match_status_type
@@ -909,7 +912,7 @@ export default function SurvivorView({
 															<div className="hidden md:flex flex-col md:flex-row items-start md:items-center gap-4 md:gap-6">
 																<div className="w-full md:w-auto">
 																	<p className="font-medium">
-																		{matchedService?.support_services.name || "Pending Match"}
+																		{matchedService?.support_services?.name || "Pending Match"}
 																	</p>
 																	<p className="text-sm text-gray-500">
 																		{matchedService?.match_status_type
@@ -1005,10 +1008,14 @@ export default function SurvivorView({
 					<DialogHeader>
 						<DialogTitle>Report Abuse</DialogTitle>
 						<DialogDescription>
-							Please fill out this form to report an incident. All information will be kept confidential.
+							Please fill out this form to report an incident. All information will be
+							kept confidential.
 						</DialogDescription>
 					</DialogHeader>
-					<AuthenticatedReportAbuseForm onClose={() => setOpen(false)} userId={userId} />
+					<AuthenticatedReportAbuseForm
+						onClose={() => setOpen(false)}
+						userId={userId}
+					/>
 				</DialogContent>
 			</Dialog>
 

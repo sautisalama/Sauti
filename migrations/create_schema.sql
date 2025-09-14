@@ -22,7 +22,7 @@ DO $$ BEGIN
     CREATE TYPE consent_type AS ENUM ('yes', 'no');
     CREATE TYPE contact_preference_type AS ENUM ('phone_call', 'sms', 'email', 'do_not_contact');
     CREATE TYPE gender_type AS ENUM ('female', 'male', 'non_binary', 'prefer_not_to_say');
-    CREATE TYPE incident_type AS ENUM ('physical', 'emotional', 'sexual', 'financial', 'other');
+    CREATE TYPE incident_type AS ENUM ('physical', 'emotional', 'sexual', 'financial', 'child_abuse', 'other');
     CREATE TYPE language_type AS ENUM ('english', 'swahili', 'other');
     CREATE TYPE match_status_type AS ENUM ('pending', 'accepted', 'declined', 'completed', 'cancelled');
     CREATE TYPE support_service_type AS ENUM ('legal', 'medical', 'mental_health', 'shelter', 'financial_assistance', 'other');
@@ -46,6 +46,7 @@ CREATE TABLE profiles (
     professional_title TEXT,
     profile_image_url TEXT,
     is_public_booking BOOLEAN,
+    isVerified BOOLEAN,
     settings JSONB,
     accreditation_files JSONB,
     accreditation_member_number JSONB,
@@ -92,6 +93,7 @@ CREATE TABLE reports (
     match_status match_status_type,
     is_onBehalf BOOLEAN,
     media JSONB,
+    notes TEXT,
     submission_timestamp TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
