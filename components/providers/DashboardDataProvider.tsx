@@ -15,6 +15,11 @@ export type DashboardData = {
   casesCount: number;
   unreadChatCount: number;
   preloaded: boolean;
+  verification?: {
+    overallStatus: string;
+    lastChecked?: string | null;
+    documentsCount?: number;
+  };
 };
 
 export type DashboardDataContextType = {

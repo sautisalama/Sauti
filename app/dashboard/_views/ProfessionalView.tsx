@@ -245,7 +245,8 @@ export default function ProfessionalView({
 		];
 		return required.some((v) => !v || (typeof v === "string" && v.trim() === ""));
 	}, [profileDetails]);
-	const isVerified = !profileIncomplete; // simple heuristic until backend verification exists
+	// Prefer backend verification status from provider when available, fallback to profile completeness heuristic
+	const isVerified = (dash?.data as any)?.verification?.overallStatus === "verified" ? true : !profileIncomplete;
 
 	// Persist verification state for mobile nav to adapt
 	useEffect(() => {
@@ -273,7 +274,7 @@ export default function ProfessionalView({
 				<AlertDescription>
 					{description}
 					<div className="mt-3 flex flex-wrap gap-2">
-						<Link href="/dashboard/profile">
+						<Link href="/dashboard/profile?tab=verification">
 							<Button size="sm" variant="default">
 								Update profile
 							</Button>

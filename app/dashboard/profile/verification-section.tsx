@@ -48,6 +48,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Database } from "@/types/db-schema";
 import { fileUploadService } from "@/lib/file-upload";
 import { VerificationDashboard } from "./verification-dashboard";
+import { useDashboardData } from "@/components/providers/DashboardDataProvider";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Trash2 } from "lucide-react";
@@ -374,6 +375,7 @@ export function VerificationSection({
 			services: "pending",
 			lastChecked: new Date().toISOString(),
 		});
+	const dash = useDashboardData();
 	const [documents, setDocuments] = useState<VerificationDocument[]>([]);
 	const [services, setServices] = useState<ServiceVerification[]>([]);
 	const [isLoading, setIsLoading] = useState(true);
@@ -409,33 +411,55 @@ export function VerificationSection({
 
 	const loadDocuments = useCallback(async () => {
 		try {
-			// Load documents from profile accreditation_files_metadata
+			// Load documents from profile accreditation_files_metadata; seed from provider if available to avoid skeleton flicker
+			// Instant seed from provider snapshot
+			const seededDocCount = (dash?.data as any)?.verification?.documentsCount;
+			if (typeof seededDocCount === "number" && seededDocCount >= 0) {
+				// We can't reconstruct full docs without metadata, so we proceed to fetch; seeding could drive counters/UI elsewhere
+			}
 			const { data: profileData } = await supabase
 				.from("profiles")
-				.select("accreditation_files_metadata")
+				.select("accreditation_files_metadata, accreditation_files")
 				.eq("id", userId)
 				.single();
 
-			if (profileData?.accreditation_files_metadata) {
-				const docs = Array.isArray(profileData.accreditation_files_metadata)
+			const metaDocsRaw = profileData?.accreditation_files_metadata
+				? (Array.isArray(profileData.accreditation_files_metadata)
 					? profileData.accreditation_files_metadata
-					: JSON.parse(profileData.accreditation_files_metadata);
+					: JSON.parse(profileData.accreditation_files_metadata))
+				: [];
+			const legacyDocsRaw = profileData?.accreditation_files
+				? (Array.isArray(profileData.accreditation_files)
+					? profileData.accreditation_files
+					: JSON.parse(profileData.accreditation_files))
+				: [];
+			// Build lookup by url or title to merge notes/description from legacy docs
+			const legacyByUrl = new Map<string, any>();
+			const legacyByTitle = new Map<string, any>();
+			(legacyDocsRaw || []).forEach((ld: any) => {
+				if (ld?.url) legacyByUrl.set(ld.url, ld);
+				if (ld?.title) legacyByTitle.set(ld.title, ld);
+			});
 
-				setDocuments(
-					docs.map((doc: any, index: number) => ({
-						id: `doc-${index}`,
-						title: doc.title || "Untitled Document",
-						url: doc.url || "",
-						fileType: doc.fileType || "unknown",
-						fileSize: doc.fileSize || 0,
-						uploadedAt: doc.uploadedAt || new Date().toISOString(),
-						serviceId: doc.serviceId,
-						serviceType: doc.serviceType,
-						status: "under_review" as const,
-						notes: doc.notes,
-					}))
-				);
-			}
+			const merged = (metaDocsRaw || []).map((doc: any, index: number) => {
+				const keyUrl = doc?.url;
+				const keyTitle = doc?.title;
+				const legacy = (keyUrl && legacyByUrl.get(keyUrl)) || (keyTitle && legacyByTitle.get(keyTitle)) || {};
+				return {
+					id: `doc-${index}`,
+					title: doc.title || legacy.title || "Untitled Document",
+					url: doc.url || legacy.url || "",
+					fileType: doc.fileType || legacy.fileType || "unknown",
+					fileSize: doc.fileSize || legacy.fileSize || 0,
+					uploadedAt: doc.uploadedAt || legacy.uploadedAt || new Date().toISOString(),
+					serviceId: doc.serviceId || legacy.serviceId,
+					serviceType: doc.serviceType || legacy.serviceType,
+					status: (doc.status || legacy.status || "under_review") as any,
+					notes: doc.notes || legacy.note || legacy.notes,
+				};
+			});
+
+			setDocuments(merged);
 		} catch (error) {
 			console.error("Error loading documents:", error);
 		}
@@ -512,6 +536,26 @@ export function VerificationSection({
 		setIsRefreshing(true);
 		try {
 			await loadVerificationData();
+			// update provider snapshot with a light refresh
+			try {
+				const { data } = await supabase
+					.from("profiles")
+					.select("verification_status, last_verification_check, accreditation_files_metadata")
+					.eq("id", userId)
+					.single();
+				const docs = data?.accreditation_files_metadata
+					? (Array.isArray(data.accreditation_files_metadata)
+						? data.accreditation_files_metadata
+						: JSON.parse(data.accreditation_files_metadata))
+					: [];
+				(dash as any)?.updatePartial?.({
+					verification: {
+						overallStatus: data?.verification_status || "pending",
+						lastChecked: data?.last_verification_check || null,
+						documentsCount: (docs || []).length,
+					},
+				});
+			} catch {}
 			toast({
 				title: "Refreshed",
 				description: "Verification data has been updated",
@@ -574,11 +618,23 @@ export function VerificationSection({
 		return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
 	};
 
+	// Long, detailed date for modal and detailed views
 	const formatDate = (dateString: string) => {
 		return new Date(dateString).toLocaleDateString("en-US", {
 			year: "numeric",
 			month: "long",
 			day: "numeric",
+			hour: "2-digit",
+			minute: "2-digit",
+		});
+	};
+
+	// Compact date for list rows
+	const formatDateCompact = (dateString: string) => {
+		const d = new Date(dateString);
+		return d.toLocaleString(undefined, {
+			day: "2-digit",
+			month: "short",
 			hour: "2-digit",
 			minute: "2-digit",
 		});
@@ -769,22 +825,13 @@ export function VerificationSection({
 																{doc.title}
 															</h4>
 															<div className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm text-gray-500 flex-wrap">
-																<span className="font-mono text-xs">
-																	{doc.fileType.toUpperCase()}
-																</span>
-																<span className="hidden sm:inline">•</span>
-																<span className="hidden sm:inline">
-																	{formatFileSize(doc.fileSize)}
-																</span>
-																<span className="hidden sm:inline">•</span>
-																<span className="hidden sm:inline">
-																	{formatDate(doc.uploadedAt)}
-																</span>
-																{/* Mobile: Show on separate line */}
-																<div className="sm:hidden w-full text-xs text-gray-400 mt-1">
-																	{formatFileSize(doc.fileSize)} • {formatDate(doc.uploadedAt)}
-																</div>
+																<span>{formatDateCompact(doc.uploadedAt)}</span>
 															</div>
+															{doc.notes && (
+																<p className="mt-1 text-xs sm:text-sm text-gray-600 line-clamp-2">
+																	{doc.notes}
+																</p>
+															)}
 														</div>
 													</div>
 													<div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">

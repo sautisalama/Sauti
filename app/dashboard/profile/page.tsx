@@ -32,6 +32,7 @@ import {
 	AccordionTrigger,
 } from "@/components/ui/accordion";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { useSearchParams } from "next/navigation";
 
 interface ProfileData {
 	bio?: string;
@@ -58,10 +59,19 @@ export default function ProfilePage() {
 	const [profileData, setProfileData] = useState<ProfileData>({});
 	const [isLoading, setIsLoading] = useState(true);
 	const [formData, setFormData] = useState<Record<string, any>>({});
-	const [activeTab, setActiveTab] = useState("profile");
+const [activeTab, setActiveTab] = useState("profile");
+const searchParams = useSearchParams();
 	const [userServices, setUserServices] = useState<any[]>([]);
 
-	// Load profile data
+// Respect ?tab=verification to open the verification tab directly
+useEffect(() => {
+	const tab = searchParams?.get("tab");
+	if (tab === "verification") {
+		setActiveTab("verification");
+	}
+}, [searchParams]);
+
+// Load profile data
 	useEffect(() => {
 		if (profile) {
 			setProfileData({
@@ -583,9 +593,31 @@ export default function ProfilePage() {
 								userId={userId || ""}
 								userType={profile?.user_type || "professional"}
 								profile={profile}
-								onUpdate={() => {
-									// Refresh profile data when verification is updated
-									window.location.reload();
+onUpdate={() => {
+									// Avoid full-page reload; refresh provider snapshot and local state
+									try {
+										// Soft refresh: re-fetch minimal verification info
+										const supabase = createClient();
+										(async () => {
+											const { data } = await supabase
+												.from("profiles")
+												.select("verification_status, last_verification_check, accreditation_files_metadata")
+												.eq("id", userId)
+												.single();
+											const docs = data?.accreditation_files_metadata
+												? (Array.isArray(data.accreditation_files_metadata)
+													? data.accreditation_files_metadata
+													: JSON.parse(data.accreditation_files_metadata))
+												: [];
+											dash?.updatePartial({
+												verification: {
+													overallStatus: data?.verification_status || "pending",
+													lastChecked: data?.last_verification_check || null,
+													documentsCount: (docs || []).length,
+												},
+											});
+										})();
+									} catch {}
 								}}
 							/>
 						</TabsContent>
