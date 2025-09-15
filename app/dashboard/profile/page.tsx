@@ -271,6 +271,86 @@ export default function ProfilePage() {
 		}
 	};
 
+	// Check if user has uploaded documents in both verify and services tabs
+	const hasDocumentsInBothTabs = useCallback(async () => {
+		if (!userId) return false;
+
+		try {
+			// Check for professional credentials (verify tab)
+			const { data: profileData } = await supabase
+				.from("profiles")
+				.select("accreditation_files_metadata")
+				.eq("id", userId)
+				.single();
+
+			const hasProfessionalDocs = profileData?.accreditation_files_metadata
+				? Array.isArray(profileData.accreditation_files_metadata)
+					? profileData.accreditation_files_metadata.length > 0
+					: JSON.parse(profileData.accreditation_files_metadata).length > 0
+				: false;
+
+			// Check for service accreditation documents (services tab)
+			const { data: services } = await supabase
+				.from("support_services")
+				.select("accreditation_files_metadata")
+				.eq("user_id", userId);
+
+			const hasServiceDocs =
+				services?.some((service) => {
+					const docs = service.accreditation_files_metadata
+						? Array.isArray(service.accreditation_files_metadata)
+							? service.accreditation_files_metadata
+							: JSON.parse(service.accreditation_files_metadata)
+						: [];
+					return docs.length > 0;
+				}) || false;
+
+			return hasProfessionalDocs && hasServiceDocs;
+		} catch (error) {
+			console.error("Error checking documents in both tabs:", error);
+			return false;
+		}
+	}, [userId, supabase]);
+
+	// Update verification status when user has documents in both tabs
+	useEffect(() => {
+		const checkAndUpdateStatus = async () => {
+			const hasBoth = await hasDocumentsInBothTabs();
+			if (hasBoth && profile?.verification_status === "pending") {
+				// Update verification status to "under_review" when user has documents in both tabs
+				try {
+					await supabase
+						.from("profiles")
+						.update({
+							verification_status: "under_review",
+							last_verification_check: new Date().toISOString(),
+						})
+						.eq("id", userId);
+
+					// Update local state
+					dash?.updatePartial({
+						profile: {
+							...(profile as any),
+							verification_status: "under_review",
+							last_verification_check: new Date().toISOString(),
+						} as any,
+					});
+				} catch (error) {
+					console.error("Error updating verification status:", error);
+				}
+			}
+		};
+
+		checkAndUpdateStatus();
+	}, [
+		hasDocumentsInBothTabs,
+		profile?.verification_status,
+		userId,
+		supabase,
+		dash,
+		profile,
+	]);
+
 	const getCompletionPercentage = () => {
 		const sections = ["professional", "verification"];
 		const completedSections = sections.filter((section) =>

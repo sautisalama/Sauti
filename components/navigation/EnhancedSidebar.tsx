@@ -92,9 +92,9 @@ export function EnhancedSidebar({
 		return () => window.removeEventListener("resize", handleResize);
 	}, []);
 
-useEffect(() => {
+	useEffect(() => {
 		// Prefer provider data when available to avoid extra fetches
-		if (typeof dash?.data?.casesCount === 'number') {
+		if (typeof dash?.data?.casesCount === "number") {
 			setCasesCount(dash.data.casesCount);
 			return;
 		}
@@ -126,7 +126,9 @@ useEffect(() => {
 			}
 		};
 		loadCases();
-		return () => { cancelled = true; };
+		return () => {
+			cancelled = true;
+		};
 	}, [dash?.data?.casesCount, dash?.data?.userId, role, user?.id, supabase]);
 
 	const getSidebarItems = (): SidebarItem[] => {
@@ -192,7 +194,11 @@ useEffect(() => {
 					label: "Messages",
 					icon: MessageCircle,
 					href: "/dashboard/chat",
-					badge: (typeof dash?.data?.unreadChatCount === "number" && dash.data.unreadChatCount > 0) ? dash.data.unreadChatCount : undefined,
+					badge:
+						typeof dash?.data?.unreadChatCount === "number" &&
+						dash.data.unreadChatCount > 0
+							? dash.data.unreadChatCount
+							: undefined,
 					section: "main",
 				},
 				{
@@ -231,7 +237,7 @@ useEffect(() => {
 					id: "settings",
 					label: "Settings",
 					icon: Settings,
-					href: "/dashboard/settings",
+					href: "/dashboard/profile?tab=settings",
 					section: "footer",
 				},
 			];
@@ -270,16 +276,13 @@ useEffect(() => {
 					id: "settings",
 					label: "Settings",
 					icon: Settings,
-					href: "/dashboard/settings",
+					href: "/dashboard/profile?tab=settings",
 					section: "footer",
 				},
 			];
 		}
 
-		if (
-			role === "professional" ||
-			role === "ngo"
-		) {
+		if (role === "professional" || role === "ngo") {
 			const proMain: SidebarItem[] = [
 				...baseItems,
 				{
@@ -287,7 +290,7 @@ useEffect(() => {
 					label: "Case Management",
 					icon: ClipboardList,
 					href: "/dashboard/cases",
-					badge: (casesCount > 0 ? casesCount : undefined),
+					badge: casesCount > 0 ? casesCount : undefined,
 					section: "main",
 				},
 				{
@@ -302,7 +305,11 @@ useEffect(() => {
 					label: "Messages",
 					icon: MessageCircle,
 					href: "/dashboard/chat",
-					badge: (typeof dash?.data?.unreadChatCount === "number" && dash.data.unreadChatCount > 0) ? dash.data.unreadChatCount : undefined,
+					badge:
+						typeof dash?.data?.unreadChatCount === "number" &&
+						dash.data.unreadChatCount > 0
+							? dash.data.unreadChatCount
+							: undefined,
 					section: "main",
 				},
 				{
@@ -334,7 +341,7 @@ useEffect(() => {
 					id: "settings",
 					label: "Settings",
 					icon: Settings,
-					href: "/dashboard/settings",
+					href: "/dashboard/profile?tab=settings",
 					section: "footer",
 				},
 			];
@@ -374,7 +381,7 @@ useEffect(() => {
 					id: "settings",
 					label: "Settings",
 					icon: Settings,
-					href: "/dashboard/settings",
+					href: "/dashboard/profile?tab=settings",
 					section: "footer",
 				},
 			];
@@ -401,7 +408,10 @@ useEffect(() => {
 	};
 
 	// Compute items once per relevant inputs to avoid recomputing on each render
-	const sidebarItems = useMemo(() => getSidebarItems(), [pathname, role, casesCount, dash?.data?.unreadChatCount]);
+	const sidebarItems = useMemo(
+		() => getSidebarItems(),
+		[pathname, role, casesCount, dash?.data?.unreadChatCount]
+	);
 
 	const isActive = (item: SidebarItem) => {
 		if (!item.href) return false;
@@ -493,7 +503,7 @@ useEffect(() => {
 
 	// Keep notifications in sync with unread chat count from provider
 	useEffect(() => {
-		if (typeof dash?.data?.unreadChatCount === 'number') {
+		if (typeof dash?.data?.unreadChatCount === "number") {
 			setNotifications(dash.data.unreadChatCount);
 		}
 	}, [dash?.data?.unreadChatCount]);
@@ -568,22 +578,22 @@ useEffect(() => {
 					<div
 						className={cn("flex items-center gap-3", isCollapsed && "justify-center")}
 					>
-					<Avatar className="h-10 w-10">
-						<AvatarImage
-							src={
-								typeof window !== "undefined" &&
-								window.localStorage.getItem("ss_anon_mode") === "1"
-									? "/anon.svg"
-									: dash?.data?.profile?.avatar_url || user?.profile?.avatar_url || ""
-							}
-						/>
-						<AvatarFallback className="bg-sauti-orange text-white">
-							{dash?.data?.profile?.first_name?.[0]?.toUpperCase() ||
-								user?.profile?.first_name?.[0]?.toUpperCase() ||
-								user?.email?.[0]?.toUpperCase() ||
-								"U"}
-						</AvatarFallback>
-					</Avatar>
+						<Avatar className="h-10 w-10">
+							<AvatarImage
+								src={
+									typeof window !== "undefined" &&
+									window.localStorage.getItem("ss_anon_mode") === "1"
+										? "/anon.svg"
+										: dash?.data?.profile?.avatar_url || user?.profile?.avatar_url || ""
+								}
+							/>
+							<AvatarFallback className="bg-sauti-orange text-white">
+								{dash?.data?.profile?.first_name?.[0]?.toUpperCase() ||
+									user?.profile?.first_name?.[0]?.toUpperCase() ||
+									user?.email?.[0]?.toUpperCase() ||
+									"U"}
+							</AvatarFallback>
+						</Avatar>
 
 						{!isCollapsed && (
 							<div className="flex-1 min-w-0">
@@ -598,7 +608,7 @@ useEffect(() => {
 							</div>
 						)}
 
-						{!isCollapsed && (notifications > 0) && (
+						{!isCollapsed && notifications > 0 && (
 							<Button variant="ghost" size="icon" className="h-8 w-8">
 								<div className="relative">
 									<Bell className="h-4 w-4" />

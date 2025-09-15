@@ -50,6 +50,7 @@ import {
 	MessageCircle,
 	PlusCircle,
 	Lock,
+	Clock,
 } from "lucide-react";
 import Link from "next/link";
 import { fetchUserAppointments } from "./actions/appointments";
@@ -246,7 +247,10 @@ export default function ProfessionalView({
 		return required.some((v) => !v || (typeof v === "string" && v.trim() === ""));
 	}, [profileDetails]);
 	// Prefer backend verification status from provider when available, fallback to profile completeness heuristic
-	const isVerified = (dash?.data as any)?.verification?.overallStatus === "verified" ? true : !profileIncomplete;
+	const isVerified =
+		(dash?.data as any)?.verification?.overallStatus === "verified"
+			? true
+			: !profileIncomplete;
 
 	// Persist verification state for mobile nav to adapt
 	useEffect(() => {
@@ -261,6 +265,36 @@ export default function ProfessionalView({
 
 	// Tailored banner content
 	const renderGateBanner = () => {
+		const verificationStatus =
+			(dash?.data as any)?.verification?.overallStatus ||
+			profileDetails?.verification_status ||
+			"pending";
+
+		// If user has uploaded documents in both tabs, show awaiting verification message
+		if (verificationStatus === "under_review") {
+			return (
+				<Alert className="mb-4 border-blue-300 bg-blue-50 text-blue-900">
+					<AlertTitle className="font-semibold flex items-center gap-2">
+						<Clock className="h-4 w-4" /> Awaiting Verification
+					</AlertTitle>
+					<AlertDescription>
+						Your documents have been submitted and are under review. You can still
+						report incidents while waiting for verification.
+						<div className="mt-3 flex flex-wrap gap-2">
+							<Button
+								size="sm"
+								variant="default"
+								onClick={() => setReportDialogOpen(true)}
+							>
+								Report Incident
+							</Button>
+						</div>
+					</AlertDescription>
+				</Alert>
+			);
+		}
+
+		// Default verification required message
 		const title = "Complete your professional profile";
 		const description =
 			hasServices && !hasMatches
