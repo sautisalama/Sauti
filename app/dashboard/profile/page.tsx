@@ -57,21 +57,20 @@ export default function ProfilePage() {
 	const supabase = createClient();
 
 	const [profileData, setProfileData] = useState<ProfileData>({});
-	const [isLoading, setIsLoading] = useState(true);
 	const [formData, setFormData] = useState<Record<string, any>>({});
-const [activeTab, setActiveTab] = useState("profile");
-const searchParams = useSearchParams();
+	const [activeTab, setActiveTab] = useState("profile");
+	const searchParams = useSearchParams();
 	const [userServices, setUserServices] = useState<any[]>([]);
 
-// Respect ?tab=verification to open the verification tab directly
-useEffect(() => {
-	const tab = searchParams?.get("tab");
-	if (tab === "verification") {
-		setActiveTab("verification");
-	}
-}, [searchParams]);
+	// Respect ?tab=verification to open the verification tab directly
+	useEffect(() => {
+		const tab = searchParams?.get("tab");
+		if (tab === "verification") {
+			setActiveTab("verification");
+		}
+	}, [searchParams]);
 
-// Load profile data
+	// Load profile data
 	useEffect(() => {
 		if (profile) {
 			setProfileData({
@@ -87,7 +86,6 @@ useEffect(() => {
 					(profile as any).accreditation_member_number || null,
 				settings: (profile as any).settings || {},
 			});
-			setIsLoading(false);
 		}
 	}, [profile]);
 
@@ -245,17 +243,6 @@ useEffect(() => {
 		return Math.round((completedSections.length / sections.length) * 100);
 	};
 
-	if (isLoading) {
-		return (
-			<div className="min-h-screen bg-gray-50 flex items-center justify-center">
-				<div className="text-center">
-					<div className="animate-spin rounded-full h-12 w-12 border-b-2 border-sauti-orange mx-auto"></div>
-					<p className="mt-4 text-gray-600">Loading profile...</p>
-				</div>
-			</div>
-		);
-	}
-
 	return (
 		<div className="min-h-screen bg-gray-50 overflow-x-hidden">
 			{/* Header */}
@@ -367,7 +354,7 @@ useEffect(() => {
 										</label>
 										<Input
 											placeholder="First Name"
-											value={profileData.first_name || ""}
+											value={formData.basic?.first_name ?? profileData.first_name ?? ""}
 											onChange={(e) =>
 												updateFormData("basic", "first_name", e.target.value)
 											}
@@ -380,7 +367,7 @@ useEffect(() => {
 										</label>
 										<Input
 											placeholder="Last Name"
-											value={profileData.last_name || ""}
+											value={formData.basic?.last_name ?? profileData.last_name ?? ""}
 											onChange={(e) =>
 												updateFormData("basic", "last_name", e.target.value)
 											}
@@ -455,135 +442,6 @@ useEffect(() => {
 								</div>
 							</CardContent>
 						</Card>
-
-						<Accordion type="multiple" className="space-y-3 sm:space-y-4">
-							{/* Professional Information (for professionals only) */}
-							{isProfessional && (
-								<AccordionItem value="professional" className="border rounded-lg">
-									<Card>
-										<AccordionTrigger className="px-2 sm:px-6 py-3 sm:py-4 hover:no-underline">
-											<div className="flex items-center gap-2 sm:gap-3 text-left w-full">
-												<Building className="h-4 w-4 sm:h-5 sm:w-5 text-sauti-orange flex-shrink-0" />
-												<div className="flex-1 min-w-0">
-													<CardTitle className="text-sm sm:text-lg">
-														Professional Information
-													</CardTitle>
-													<p className="text-xs sm:text-sm text-gray-600 mt-1">
-														Manage your professional details and credentials
-													</p>
-												</div>
-												{getVerificationStatus("professional") ? (
-													<CheckCircle className="h-4 w-4 sm:h-5 sm:w-5 text-green-500 flex-shrink-0" />
-												) : (
-													<AlertCircle className="h-4 w-4 sm:h-5 sm:w-5 text-amber-500 flex-shrink-0" />
-												)}
-											</div>
-										</AccordionTrigger>
-										<AccordionContent>
-											<CardContent className="space-y-3 sm:space-y-4 px-2 sm:px-6">
-												<div className="space-y-3 sm:space-y-4">
-													<Input
-														placeholder="Professional Title"
-														defaultValue={profileData.professional_title || ""}
-														onChange={(e) =>
-															updateFormData(
-																"professional",
-																"professional_title",
-																e.target.value
-															)
-														}
-														className="text-sm sm:text-base"
-													/>
-													<Input
-														placeholder="Phone Number"
-														defaultValue={profileData.phone || ""}
-														onChange={(e) =>
-															updateFormData("professional", "phone", e.target.value)
-														}
-														className="text-sm sm:text-base"
-													/>
-													<Textarea
-														placeholder="Professional Bio - Describe your expertise, specialties, and languages..."
-														rows={3}
-														defaultValue={profileData.bio || ""}
-														onChange={(e) =>
-															updateFormData("professional", "bio", e.target.value)
-														}
-														className="text-sm sm:text-base resize-none"
-													/>
-												</div>
-												<div className="flex justify-end">
-													<Button
-														onClick={() => saveSection("professional")}
-														size="sm"
-														className="text-xs sm:text-sm"
-													>
-														<span className="hidden sm:inline">
-															Save Professional Information
-														</span>
-														<span className="sm:hidden">Save Info</span>
-													</Button>
-												</div>
-											</CardContent>
-										</AccordionContent>
-									</Card>
-								</AccordionItem>
-							)}
-
-							{/* Verification Documents (for professionals only) */}
-							{isProfessional && (
-								<AccordionItem value="verification" className="border rounded-lg">
-									<Card>
-										<AccordionTrigger className="px-2 sm:px-6 py-3 sm:py-4 hover:no-underline">
-											<div className="flex items-center gap-2 sm:gap-3 text-left w-full">
-												<Shield className="h-4 w-4 sm:h-5 sm:w-5 text-sauti-orange flex-shrink-0" />
-												<div className="flex-1 min-w-0">
-													<CardTitle className="text-sm sm:text-lg">
-														Verification Documents
-													</CardTitle>
-													<p className="text-xs sm:text-sm text-gray-600 mt-1">
-														Upload your professional credentials and verification documents
-													</p>
-												</div>
-												{getVerificationStatus("verification") ? (
-													<CheckCircle className="h-4 w-4 sm:h-5 sm:w-5 text-green-500 flex-shrink-0" />
-												) : (
-													<AlertCircle className="h-4 w-4 sm:h-5 sm:w-5 text-amber-500 flex-shrink-0" />
-												)}
-											</div>
-										</AccordionTrigger>
-										<AccordionContent>
-											<CardContent className="space-y-3 sm:space-y-4 px-2 sm:px-6">
-												{profile?.user_type === "ngo" ? (
-													<EnhancedProfessionalDocumentsForm
-														onSave={() => saveSection("verification")}
-														onSaveDocuments={saveVerificationDocuments}
-														initialData={{
-															accreditation_files: profileData.accreditation_files,
-															accreditation_member_number:
-																profileData.accreditation_member_number,
-														}}
-														userId={userId || ""}
-														userType={profile?.user_type || "professional"}
-														existingServices={userServices}
-													/>
-												) : (
-													<ProfessionalDocumentsForm
-														onSave={() => saveSection("verification")}
-														onSaveDocuments={saveVerificationDocuments}
-														initialData={{
-															accreditation_files: profileData.accreditation_files,
-															accreditation_member_number:
-																profileData.accreditation_member_number,
-														}}
-													/>
-												)}
-											</CardContent>
-										</AccordionContent>
-									</Card>
-								</AccordionItem>
-							)}
-						</Accordion>
 					</TabsContent>
 
 					{/* Verification Tab - Only for Professionals and NGOs */}
@@ -593,7 +451,7 @@ useEffect(() => {
 								userId={userId || ""}
 								userType={profile?.user_type || "professional"}
 								profile={profile}
-onUpdate={() => {
+								onUpdate={() => {
 									// Avoid full-page reload; refresh provider snapshot and local state
 									try {
 										// Soft refresh: re-fetch minimal verification info
@@ -601,13 +459,15 @@ onUpdate={() => {
 										(async () => {
 											const { data } = await supabase
 												.from("profiles")
-												.select("verification_status, last_verification_check, accreditation_files_metadata")
+												.select(
+													"verification_status, last_verification_check, accreditation_files_metadata"
+												)
 												.eq("id", userId)
 												.single();
 											const docs = data?.accreditation_files_metadata
-												? (Array.isArray(data.accreditation_files_metadata)
+												? Array.isArray(data.accreditation_files_metadata)
 													? data.accreditation_files_metadata
-													: JSON.parse(data.accreditation_files_metadata))
+													: JSON.parse(data.accreditation_files_metadata)
 												: [];
 											dash?.updatePartial({
 												verification: {
@@ -667,15 +527,6 @@ onUpdate={() => {
 											<input type="checkbox" className="rounded flex-shrink-0 mt-1" />
 										</div>
 									</div>
-								</div>
-
-								<div className="space-y-3 sm:space-y-4">
-									<h4 className="font-medium text-sm sm:text-base">
-										Privacy & Identity
-									</h4>
-									{userId && profile?.first_name && (
-										<AnonymousModeToggle userId={userId} username={profile.first_name} />
-									)}
 								</div>
 
 								<div className="space-y-3 sm:space-y-4">
