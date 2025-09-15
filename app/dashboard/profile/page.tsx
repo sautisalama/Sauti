@@ -11,7 +11,8 @@ import { useToast } from "@/hooks/use-toast";
 import { AnonymousModeToggle } from "@/components/chat/AnonymousModeToggle";
 import { ProfessionalDocumentsForm } from "./professional-documents";
 import { EnhancedProfessionalDocumentsForm } from "./enhanced-professional-documents";
-import { VerificationSection } from "./verification-section";
+import { VerificationWrapper } from "./verification-wrapper";
+import { SupportServicesManager } from "./support-services-manager";
 import { signOut } from "@/app/(auth)/actions/auth";
 import { createClient } from "@/utils/supabase/client";
 import { useDashboardData } from "@/components/providers/DashboardDataProvider";
@@ -32,6 +33,7 @@ import {
 	AccordionTrigger,
 } from "@/components/ui/accordion";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { useSearchParams } from "next/navigation";
 
 interface ProfileData {
 	bio?: string;
@@ -56,10 +58,19 @@ export default function ProfilePage() {
 	const supabase = createClient();
 
 	const [profileData, setProfileData] = useState<ProfileData>({});
-	const [isLoading, setIsLoading] = useState(true);
 	const [formData, setFormData] = useState<Record<string, any>>({});
 	const [activeTab, setActiveTab] = useState("profile");
+	const searchParams = useSearchParams();
 	const [userServices, setUserServices] = useState<any[]>([]);
+	const [hasMatches, setHasMatches] = useState(false);
+
+	// Respect ?tab=verification to open the verification tab directly
+	useEffect(() => {
+		const tab = searchParams?.get("tab");
+		if (tab === "verification") {
+			setActiveTab("verification");
+		}
+	}, [searchParams]);
 
 	// Load profile data
 	useEffect(() => {
@@ -77,7 +88,6 @@ export default function ProfilePage() {
 					(profile as any).accreditation_member_number || null,
 				settings: (profile as any).settings || {},
 			});
-			setIsLoading(false);
 		}
 	}, [profile]);
 
@@ -95,12 +105,46 @@ export default function ProfilePage() {
 		}
 	}, [userId, supabase]);
 
+	const checkMatches = useCallback(async () => {
+		if (!isProfessional || !userId) return;
+
+		try {
+			const { data: services } = await supabase
+				.from("support_services")
+				.select("id")
+				.eq("user_id", userId);
+
+			if (!services || services.length === 0) {
+				setHasMatches(false);
+				return;
+			}
+
+			const serviceIds = services.map((s) => s.id);
+			const { data: matches } = await supabase
+				.from("matched_services")
+				.select("id")
+				.in("service_id", serviceIds)
+				.limit(1);
+
+			setHasMatches(!!matches && matches.length > 0);
+		} catch (error) {
+			console.error("Error checking matches:", error);
+		}
+	}, [isProfessional, userId, supabase]);
+
 	// Load user services for NGO users
 	useEffect(() => {
 		if (profile?.user_type === "ngo" && userId) {
 			loadUserServices();
 		}
 	}, [profile?.user_type, userId, loadUserServices]);
+
+	// Check for matches
+	useEffect(() => {
+		if (isProfessional && userId) {
+			checkMatches();
+		}
+	}, [isProfessional, userId, checkMatches]);
 
 	const updateFormData = (section: string, field: string, value: any) => {
 		setFormData((prev) => ({
@@ -227,6 +271,86 @@ export default function ProfilePage() {
 		}
 	};
 
+	// Check if user has uploaded documents in both verify and services tabs
+	const hasDocumentsInBothTabs = useCallback(async () => {
+		if (!userId) return false;
+
+		try {
+			// Check for professional credentials (verify tab)
+			const { data: profileData } = await supabase
+				.from("profiles")
+				.select("accreditation_files_metadata")
+				.eq("id", userId)
+				.single();
+
+			const hasProfessionalDocs = profileData?.accreditation_files_metadata
+				? Array.isArray(profileData.accreditation_files_metadata)
+					? profileData.accreditation_files_metadata.length > 0
+					: JSON.parse(profileData.accreditation_files_metadata).length > 0
+				: false;
+
+			// Check for service accreditation documents (services tab)
+			const { data: services } = await supabase
+				.from("support_services")
+				.select("accreditation_files_metadata")
+				.eq("user_id", userId);
+
+			const hasServiceDocs =
+				services?.some((service) => {
+					const docs = service.accreditation_files_metadata
+						? Array.isArray(service.accreditation_files_metadata)
+							? service.accreditation_files_metadata
+							: JSON.parse(service.accreditation_files_metadata)
+						: [];
+					return docs.length > 0;
+				}) || false;
+
+			return hasProfessionalDocs && hasServiceDocs;
+		} catch (error) {
+			console.error("Error checking documents in both tabs:", error);
+			return false;
+		}
+	}, [userId, supabase]);
+
+	// Update verification status when user has documents in both tabs
+	useEffect(() => {
+		const checkAndUpdateStatus = async () => {
+			const hasBoth = await hasDocumentsInBothTabs();
+			if (hasBoth && profile?.verification_status === "pending") {
+				// Update verification status to "under_review" when user has documents in both tabs
+				try {
+					await supabase
+						.from("profiles")
+						.update({
+							verification_status: "under_review",
+							last_verification_check: new Date().toISOString(),
+						})
+						.eq("id", userId);
+
+					// Update local state
+					dash?.updatePartial({
+						profile: {
+							...(profile as any),
+							verification_status: "under_review",
+							last_verification_check: new Date().toISOString(),
+						} as any,
+					});
+				} catch (error) {
+					console.error("Error updating verification status:", error);
+				}
+			}
+		};
+
+		checkAndUpdateStatus();
+	}, [
+		hasDocumentsInBothTabs,
+		profile?.verification_status,
+		userId,
+		supabase,
+		dash,
+		profile,
+	]);
+
 	const getCompletionPercentage = () => {
 		const sections = ["professional", "verification"];
 		const completedSections = sections.filter((section) =>
@@ -235,81 +359,39 @@ export default function ProfilePage() {
 		return Math.round((completedSections.length / sections.length) * 100);
 	};
 
-	if (isLoading) {
-		return (
-			<div className="min-h-screen bg-gray-50 flex items-center justify-center">
-				<div className="text-center">
-					<div className="animate-spin rounded-full h-12 w-12 border-b-2 border-sauti-orange mx-auto"></div>
-					<p className="mt-4 text-gray-600">Loading profile...</p>
-				</div>
-			</div>
-		);
-	}
-
 	return (
 		<div className="min-h-screen bg-gray-50 overflow-x-hidden">
-			{/* Header */}
-			<div className="bg-white border-b sticky top-0 z-50">
-				<div className="max-w-7xl mx-auto px-3 sm:px-4 py-4 sm:py-6">
-					<div className="flex items-center justify-between gap-3">
-						<div className="flex items-center gap-2 sm:gap-4 min-w-0 flex-1">
-							<Avatar className="h-12 w-12 sm:h-16 sm:w-16 flex-shrink-0">
-								<AvatarImage
-									src={
-										typeof window !== "undefined" &&
-										window.localStorage.getItem("ss_anon_mode") === "1"
-											? "/anon.svg"
-											: profile?.avatar_url || ""
-									}
-								/>
-								<AvatarFallback className="bg-sauti-orange text-white text-sm sm:text-base">
-									{profile?.first_name?.[0]?.toUpperCase() ||
-										profile?.email?.[0]?.toUpperCase() ||
-										"U"}
-								</AvatarFallback>
-							</Avatar>
-							<div className="min-w-0 flex-1">
-								<h1 className="text-lg sm:text-2xl font-bold truncate">
-									{profile?.first_name || profile?.email || "User"}
-								</h1>
-								<div className="flex items-center gap-1 sm:gap-2 mt-1 text-xs sm:text-sm text-gray-600 flex-wrap">
-									{profile?.user_type !== "survivor" && (
-										<Badge variant="secondary" className="capitalize text-xs">
-											{profile?.user_type || "member"}
-										</Badge>
-									)}
-									{profileData.isVerified && (
-										<Badge
-											variant="default"
-											className="bg-green-100 text-green-800 text-xs"
-										>
-											<CheckCircle className="h-3 w-3 mr-1" />
-											Verified
-										</Badge>
-									)}
-								</div>
-							</div>
+			{/* Header - Mobile Only */}
+			<div className="sm:hidden fixed top-0 left-0 right-0 z-50 bg-white border-b border-gray-200 px-4 py-3">
+				<div className="flex items-center justify-between">
+					<div className="flex items-center gap-3">
+						<Avatar className="h-10 w-10">
+							<AvatarImage src={profile?.avatar_url || ""} />
+							<AvatarFallback className="bg-sauti-orange text-white">
+								{profile?.first_name?.[0] || "U"}
+							</AvatarFallback>
+						</Avatar>
+						<div>
+							<h1 className="font-semibold text-gray-900">{profile?.first_name}</h1>
 						</div>
-						<form action={signOut} className="flex-shrink-0">
-							<Button
-								type="submit"
-								variant="outline"
-								size="sm"
-								className="text-xs sm:text-sm"
-							>
-								Sign out
-							</Button>
-						</form>
 					</div>
+					<Button
+						variant="outline"
+						size="sm"
+						onClick={() => signOut()}
+						className="text-red-600 border-red-200 hover:bg-red-50"
+					>
+						Sign Out
+					</Button>
 				</div>
 			</div>
 
 			{/* Main Content */}
-			<div className="max-w-7xl mx-auto px-3 sm:px-4 py-4 sm:py-6 overflow-x-hidden">
+			<div className="max-w-7xl mx-auto px-3 sm:px-4 pt-16 sm:pt-4 pb-4 sm:py-6 overflow-x-hidden">
 				<Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
 					<TabsList
 						className={`grid w-full mb-4 sm:mb-6 ${
-							isProfessional ? "grid-cols-3" : "grid-cols-2"
+							isProfessional ? "grid-cols-4" : "grid-cols-2"
 						}`}
 					>
 						<TabsTrigger
@@ -328,6 +410,16 @@ export default function ProfilePage() {
 								<FileCheck className="h-3 w-3 sm:h-4 sm:w-4" />
 								<span className="hidden xs:inline">Verification</span>
 								<span className="xs:hidden">Verify</span>
+							</TabsTrigger>
+						)}
+						{isProfessional && (
+							<TabsTrigger
+								value="services"
+								className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-3"
+							>
+								<Building className="h-3 w-3 sm:h-4 sm:w-4" />
+								<span className="hidden xs:inline">Services</span>
+								<span className="xs:hidden">Services</span>
 							</TabsTrigger>
 						)}
 						<TabsTrigger
@@ -357,7 +449,7 @@ export default function ProfilePage() {
 										</label>
 										<Input
 											placeholder="First Name"
-											value={profileData.first_name || ""}
+											value={formData.basic?.first_name ?? profileData.first_name ?? ""}
 											onChange={(e) =>
 												updateFormData("basic", "first_name", e.target.value)
 											}
@@ -370,7 +462,7 @@ export default function ProfilePage() {
 										</label>
 										<Input
 											placeholder="Last Name"
-											value={profileData.last_name || ""}
+											value={formData.basic?.last_name ?? profileData.last_name ?? ""}
 											onChange={(e) =>
 												updateFormData("basic", "last_name", e.target.value)
 											}
@@ -445,148 +537,68 @@ export default function ProfilePage() {
 								</div>
 							</CardContent>
 						</Card>
-
-						<Accordion type="multiple" className="space-y-3 sm:space-y-4">
-							{/* Professional Information (for professionals only) */}
-							{isProfessional && (
-								<AccordionItem value="professional" className="border rounded-lg">
-									<Card>
-										<AccordionTrigger className="px-2 sm:px-6 py-3 sm:py-4 hover:no-underline">
-											<div className="flex items-center gap-2 sm:gap-3 text-left w-full">
-												<Building className="h-4 w-4 sm:h-5 sm:w-5 text-sauti-orange flex-shrink-0" />
-												<div className="flex-1 min-w-0">
-													<CardTitle className="text-sm sm:text-lg">
-														Professional Information
-													</CardTitle>
-													<p className="text-xs sm:text-sm text-gray-600 mt-1">
-														Manage your professional details and credentials
-													</p>
-												</div>
-												{getVerificationStatus("professional") ? (
-													<CheckCircle className="h-4 w-4 sm:h-5 sm:w-5 text-green-500 flex-shrink-0" />
-												) : (
-													<AlertCircle className="h-4 w-4 sm:h-5 sm:w-5 text-amber-500 flex-shrink-0" />
-												)}
-											</div>
-										</AccordionTrigger>
-										<AccordionContent>
-											<CardContent className="space-y-3 sm:space-y-4 px-2 sm:px-6">
-												<div className="space-y-3 sm:space-y-4">
-													<Input
-														placeholder="Professional Title"
-														defaultValue={profileData.professional_title || ""}
-														onChange={(e) =>
-															updateFormData(
-																"professional",
-																"professional_title",
-																e.target.value
-															)
-														}
-														className="text-sm sm:text-base"
-													/>
-													<Input
-														placeholder="Phone Number"
-														defaultValue={profileData.phone || ""}
-														onChange={(e) =>
-															updateFormData("professional", "phone", e.target.value)
-														}
-														className="text-sm sm:text-base"
-													/>
-													<Textarea
-														placeholder="Professional Bio - Describe your expertise, specialties, and languages..."
-														rows={3}
-														defaultValue={profileData.bio || ""}
-														onChange={(e) =>
-															updateFormData("professional", "bio", e.target.value)
-														}
-														className="text-sm sm:text-base resize-none"
-													/>
-												</div>
-												<div className="flex justify-end">
-													<Button
-														onClick={() => saveSection("professional")}
-														size="sm"
-														className="text-xs sm:text-sm"
-													>
-														<span className="hidden sm:inline">
-															Save Professional Information
-														</span>
-														<span className="sm:hidden">Save Info</span>
-													</Button>
-												</div>
-											</CardContent>
-										</AccordionContent>
-									</Card>
-								</AccordionItem>
-							)}
-
-							{/* Verification Documents (for professionals only) */}
-							{isProfessional && (
-								<AccordionItem value="verification" className="border rounded-lg">
-									<Card>
-										<AccordionTrigger className="px-2 sm:px-6 py-3 sm:py-4 hover:no-underline">
-											<div className="flex items-center gap-2 sm:gap-3 text-left w-full">
-												<Shield className="h-4 w-4 sm:h-5 sm:w-5 text-sauti-orange flex-shrink-0" />
-												<div className="flex-1 min-w-0">
-													<CardTitle className="text-sm sm:text-lg">
-														Verification Documents
-													</CardTitle>
-													<p className="text-xs sm:text-sm text-gray-600 mt-1">
-														Upload your professional credentials and verification documents
-													</p>
-												</div>
-												{getVerificationStatus("verification") ? (
-													<CheckCircle className="h-4 w-4 sm:h-5 sm:w-5 text-green-500 flex-shrink-0" />
-												) : (
-													<AlertCircle className="h-4 w-4 sm:h-5 sm:w-5 text-amber-500 flex-shrink-0" />
-												)}
-											</div>
-										</AccordionTrigger>
-										<AccordionContent>
-											<CardContent className="space-y-3 sm:space-y-4 px-2 sm:px-6">
-												{profile?.user_type === "ngo" ? (
-													<EnhancedProfessionalDocumentsForm
-														onSave={() => saveSection("verification")}
-														onSaveDocuments={saveVerificationDocuments}
-														initialData={{
-															accreditation_files: profileData.accreditation_files,
-															accreditation_member_number:
-																profileData.accreditation_member_number,
-														}}
-														userId={userId || ""}
-														userType={profile?.user_type || "professional"}
-														existingServices={userServices}
-													/>
-												) : (
-													<ProfessionalDocumentsForm
-														onSave={() => saveSection("verification")}
-														onSaveDocuments={saveVerificationDocuments}
-														initialData={{
-															accreditation_files: profileData.accreditation_files,
-															accreditation_member_number:
-																profileData.accreditation_member_number,
-														}}
-													/>
-												)}
-											</CardContent>
-										</AccordionContent>
-									</Card>
-								</AccordionItem>
-							)}
-						</Accordion>
 					</TabsContent>
 
 					{/* Verification Tab - Only for Professionals and NGOs */}
 					{isProfessional && (
 						<TabsContent value="verification" className="space-y-3 sm:space-y-4">
-							<VerificationSection
+							<VerificationWrapper
 								userId={userId || ""}
-								userType={profile?.user_type || "professional"}
+								userType={
+									(profile?.user_type as "professional" | "ngo" | "survivor") ||
+									"professional"
+								}
 								profile={profile}
 								onUpdate={() => {
-									// Refresh profile data when verification is updated
-									window.location.reload();
+									// Avoid full-page reload; refresh provider snapshot and local state
+									try {
+										// Soft refresh: re-fetch minimal verification info
+										const supabase = createClient();
+										(async () => {
+											const { data } = await supabase
+												.from("profiles")
+												.select(
+													"verification_status, last_verification_check, accreditation_files_metadata"
+												)
+												.eq("id", userId)
+												.single();
+											const docs = data?.accreditation_files_metadata
+												? Array.isArray(data.accreditation_files_metadata)
+													? data.accreditation_files_metadata
+													: JSON.parse(data.accreditation_files_metadata)
+												: [];
+											dash?.updatePartial({
+												verification: {
+													overallStatus: data?.verification_status || "pending",
+													lastChecked: data?.last_verification_check || null,
+													documentsCount: (docs || []).length,
+												},
+											});
+										})();
+									} catch {}
 								}}
+								onNavigateToServices={() => setActiveTab("services")}
+							/>
+						</TabsContent>
+					)}
+
+					{/* Services Tab - Only for Professionals and NGOs */}
+					{isProfessional && (
+						<TabsContent value="services" className="space-y-3 sm:space-y-4">
+							<SupportServicesManager
+								userId={userId || ""}
+								userType={profile?.user_type || "professional"}
+								verificationStatus={profile?.verification_status || "pending"}
+								hasAccreditation={!!profileData.accreditation_files}
+								hasMatches={hasMatches}
+								verificationNotes={profile?.verification_notes || undefined}
+								documentsCount={
+									profileData.accreditation_files
+										? Array.isArray(profileData.accreditation_files)
+											? profileData.accreditation_files.length
+											: JSON.parse(profileData.accreditation_files).length
+										: 0
+								}
 							/>
 						</TabsContent>
 					)}
@@ -635,15 +647,6 @@ export default function ProfilePage() {
 											<input type="checkbox" className="rounded flex-shrink-0 mt-1" />
 										</div>
 									</div>
-								</div>
-
-								<div className="space-y-3 sm:space-y-4">
-									<h4 className="font-medium text-sm sm:text-base">
-										Privacy & Identity
-									</h4>
-									{userId && profile?.first_name && (
-										<AnonymousModeToggle userId={userId} username={profile.first_name} />
-									)}
 								</div>
 
 								<div className="space-y-3 sm:space-y-4">

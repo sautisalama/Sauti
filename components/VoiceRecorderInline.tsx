@@ -35,13 +35,30 @@ export function VoiceRecorderInline({
 	const [isPlaying, setIsPlaying] = useState(false);
 	const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+	const cleanupAll = () => {
+		try {
+			if (
+				mediaRecorderRef.current &&
+				mediaRecorderRef.current.state !== "inactive"
+			) {
+				mediaRecorderRef.current.stop();
+			}
+		} catch {}
+		try {
+			mediaRecorderRef.current?.stream.getTracks().forEach((t) => t.stop());
+		} catch {}
+		mediaRecorderRef.current = null;
+		stopTimer();
+		cleanupAudioGraph();
+	};
+
 	useEffect(() => {
 		if (typeof window === "undefined") return;
 		if (!(navigator.mediaDevices && window.MediaRecorder)) {
 			setUnsupported(true);
 		}
 		return () => cleanupAll();
-	}, []);
+	}, [cleanupAll]);
 
 	const startTimer = () => {
 		if (timerRef.current) return;
@@ -69,23 +86,6 @@ export function VoiceRecorderInline({
 		sourceRef.current = null;
 		analyserRef.current = null;
 		audioContextRef.current = null;
-	};
-
-	const cleanupAll = () => {
-		try {
-			if (
-				mediaRecorderRef.current &&
-				mediaRecorderRef.current.state !== "inactive"
-			) {
-				mediaRecorderRef.current.stop();
-			}
-		} catch {}
-		try {
-			mediaRecorderRef.current?.stream.getTracks().forEach((t) => t.stop());
-		} catch {}
-		mediaRecorderRef.current = null;
-		stopTimer();
-		cleanupAudioGraph();
 	};
 
 	const reset = () => {

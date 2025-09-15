@@ -1,9 +1,10 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
+import { Textarea } from "./ui/textarea";
 import {
 	Card,
 	CardContent,
@@ -12,9 +13,12 @@ import {
 	CardTitle,
 } from "./ui/card";
 import { Switch } from "./ui/switch";
+import { Badge } from "./ui/badge";
 import { Database } from "@/types/db-schema";
 import { serviceValidationService } from "@/lib/service-validation";
 import { useDashboardData } from "@/components/providers/DashboardDataProvider";
+import { fileUploadService } from "@/lib/file-upload";
+import { createClient } from "@/utils/supabase/client";
 import {
 	MapPin,
 	Globe,
@@ -29,6 +33,11 @@ import {
 	Loader2,
 	AlertCircle,
 	CheckCircle,
+	FileText,
+	Upload,
+	Trash2,
+	X,
+	Link,
 } from "lucide-react";
 import { Alert, AlertDescription } from "./ui/alert";
 
@@ -78,6 +87,21 @@ export function AddSupportServiceForm({
 		reason?: string;
 		suggestions?: string[];
 	} | null>(null);
+	const [previousDocuments, setPreviousDocuments] = useState<any[]>([]);
+	const [documents, setDocuments] = useState<
+		{
+			id: string;
+			title: string;
+			file: File | null;
+			note?: string;
+			uploaded: boolean;
+			url?: string;
+			isLinked?: boolean;
+			originalDocId?: string;
+		}[]
+	>([]);
+	const [isUploading, setIsUploading] = useState(false);
+	const [dragOverDocId, setDragOverDocId] = useState<string | null>(null);
 	const [formData, setFormData] = useState({
 		name: "",
 		service_types: "" as ServiceType,
@@ -110,20 +134,6 @@ export function AddSupportServiceForm({
 		}
 	}, [toast]);
 
-	// Load existing services for validation
-	useEffect(() => {
-		if (profile?.user_type === "ngo") {
-			loadExistingServices();
-		}
-	}, [profile?.user_type]);
-
-	// Validate service when service type changes
-	useEffect(() => {
-		if (formData.service_types && profile?.user_type) {
-			validateService();
-		}
-	}, [formData.service_types, profile?.user_type, existingServices]);
-
 	const loadExistingServices = async () => {
 		try {
 			const response = await fetch("/api/support-services");
@@ -137,7 +147,130 @@ export function AddSupportServiceForm({
 		}
 	};
 
-	const validateService = () => {
+	const loadPreviousDocuments = useCallback(async () => {
+		if (!profile?.id) return;
+
+		try {
+			const supabase = createClient();
+			const { data } = await supabase
+				.from("profiles")
+				.select("accreditation_files_metadata")
+				.eq("id", profile.id)
+				.single();
+
+			if (data?.accreditation_files_metadata) {
+				const docs = Array.isArray(data.accreditation_files_metadata)
+					? data.accreditation_files_metadata
+					: JSON.parse(data.accreditation_files_metadata);
+				setPreviousDocuments(docs || []);
+			}
+		} catch (error) {
+			console.error("Error loading previous documents:", error);
+		}
+	}, [profile?.id]);
+
+	const addDocument = () => {
+		const newDoc = {
+			id: `doc-${Date.now()}`,
+			title: "",
+			file: null,
+			note: "",
+			uploaded: false,
+		};
+		setDocuments([...documents, newDoc]);
+	};
+
+	const removeDocument = (id: string) => {
+		setDocuments(documents.filter((doc) => doc.id !== id));
+	};
+
+	const updateDocument = (id: string, field: string, value: any) => {
+		setDocuments(
+			documents.map((doc) => (doc.id === id ? { ...doc, [field]: value } : doc))
+		);
+	};
+
+	const linkPreviousDocument = (docId: string, originalDoc: any) => {
+		const linkedDoc = {
+			id: `linked-${Date.now()}`,
+			title: originalDoc.title,
+			file: null,
+			note: originalDoc.note || "",
+			uploaded: true,
+			url: originalDoc.url,
+			isLinked: true,
+			originalDocId: docId,
+		};
+		setDocuments([...documents, linkedDoc]);
+	};
+
+	const uploadDocument = async (doc: any) => {
+		if (!doc.file || !profile?.id) return null;
+
+		try {
+			const result = await fileUploadService.uploadFile({
+				userId: profile.id,
+				userType: profile.user_type || "professional",
+				serviceId: undefined, // Will be set after service creation
+				serviceType: formData.service_types,
+				fileType: "accreditation",
+				fileName: doc.file.name,
+				file: doc.file,
+			});
+			return result.url;
+		} catch (error) {
+			console.error("Error uploading document:", error);
+			throw error;
+		}
+	};
+
+	// Drag and drop handlers
+	const handleDragOver = (e: React.DragEvent, docId: string) => {
+		e.preventDefault();
+		setDragOverDocId(docId);
+	};
+
+	const handleDragLeave = (e: React.DragEvent) => {
+		e.preventDefault();
+		setDragOverDocId(null);
+	};
+
+	const handleDrop = (e: React.DragEvent, docId: string) => {
+		e.preventDefault();
+		setDragOverDocId(null);
+
+		const droppedFiles = Array.from(e.dataTransfer.files);
+		if (droppedFiles.length > 0) {
+			const droppedFile = droppedFiles[0];
+			// Validate file type
+			const allowedTypes = [
+				"application/pdf",
+				"image/jpeg",
+				"image/jpg",
+				"image/png",
+				"image/webp",
+				"application/msword",
+				"application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+			];
+
+			if (allowedTypes.includes(droppedFile.type)) {
+				updateDocument(docId, "file", droppedFile);
+				// Auto-fill title if empty
+				const doc = documents.find((d) => d.id === docId);
+				if (doc && !doc.title) {
+					updateDocument(docId, "title", droppedFile.name.replace(/\.[^/.]+$/, ""));
+				}
+			} else {
+				toast({
+					title: "Invalid File Type",
+					description: "Please select a valid file type (PDF, JPG, PNG, DOC, DOCX)",
+					variant: "destructive",
+				});
+			}
+		}
+	};
+
+	const validateService = useCallback(() => {
 		if (!formData.service_types || !profile?.user_type) return;
 
 		const validation = serviceValidationService.validateServiceCreation(
@@ -147,7 +280,33 @@ export function AddSupportServiceForm({
 		);
 
 		setValidationResult(validation);
-	};
+	}, [formData.service_types, profile?.user_type, existingServices]);
+
+	// Load existing services for validation
+	useEffect(() => {
+		if (profile?.user_type === "ngo") {
+			loadExistingServices();
+		}
+	}, [profile?.user_type]);
+
+	// Load previous documents when service type changes
+	useEffect(() => {
+		if (formData.service_types && profile?.id) {
+			loadPreviousDocuments();
+		}
+	}, [formData.service_types, profile?.id, loadPreviousDocuments]);
+
+	// Validate service when service type changes
+	useEffect(() => {
+		if (formData.service_types && profile?.user_type) {
+			validateService();
+		}
+	}, [
+		formData.service_types,
+		profile?.user_type,
+		existingServices,
+		validateService,
+	]);
 
 	const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
 		e.preventDefault();
@@ -191,7 +350,8 @@ export function AddSupportServiceForm({
 		}
 
 		try {
-			const data = {
+			// First create the service
+			const serviceData = {
 				...formData,
 				latitude: hasLocalServices ? location?.lat : null,
 				longitude: hasLocalServices ? location?.lng : null,
@@ -203,14 +363,68 @@ export function AddSupportServiceForm({
 			const response = await fetch("/api/support-services", {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify(data),
+				body: JSON.stringify(serviceData),
 			});
 
 			if (!response.ok) throw new Error("Failed to add service");
 
+			const newService = await response.json();
+
+			// Upload documents if any
+			if (documents.length > 0) {
+				setIsUploading(true);
+				const uploadedDocs = [];
+
+				for (const doc of documents) {
+					if (doc.isLinked) {
+						// Link existing document
+						uploadedDocs.push({
+							title: doc.title,
+							note: doc.note,
+							url: doc.url,
+							uploaded: true,
+							serviceId: newService.id,
+							serviceType: formData.service_types,
+						});
+					} else if (doc.file) {
+						// Upload new document
+						const url = await uploadDocument(doc);
+						if (url) {
+							uploadedDocs.push({
+								title: doc.title,
+								note: doc.note,
+								url: url,
+								uploaded: true,
+								serviceId: newService.id,
+								serviceType: formData.service_types,
+							});
+						}
+					}
+				}
+
+				// Update service with documents
+				if (uploadedDocs.length > 0) {
+					const updateResponse = await fetch(
+						`/api/support-services/${newService.id}`,
+						{
+							method: "PATCH",
+							headers: { "Content-Type": "application/json" },
+							body: JSON.stringify({
+								accreditation_files_metadata: uploadedDocs,
+							}),
+						}
+					);
+
+					if (!updateResponse.ok) {
+						console.error("Failed to update service with documents");
+					}
+				}
+			}
+
 			toast({
 				title: "Success",
-				description: "Support service has been successfully added.",
+				description:
+					"Support service has been successfully added with accreditation documents.",
 			});
 
 			onSuccess?.();
@@ -222,6 +436,7 @@ export function AddSupportServiceForm({
 			});
 		} finally {
 			setLoading(false);
+			setIsUploading(false);
 		}
 	};
 
@@ -313,46 +528,6 @@ export function AddSupportServiceForm({
 											</option>
 										))}
 									</select>
-
-									{/* Service Validation Feedback */}
-									{validationResult && (
-										<Alert
-											className={
-												validationResult.valid
-													? "border-green-200 bg-green-50"
-													: "border-red-200 bg-red-50"
-											}
-										>
-											{validationResult.valid ? (
-												<CheckCircle className="h-4 w-4 text-green-600" />
-											) : (
-												<AlertCircle className="h-4 w-4 text-red-600" />
-											)}
-											<AlertDescription
-												className={
-													validationResult.valid ? "text-green-800" : "text-red-800"
-												}
-											>
-												{validationResult.valid ? (
-													"Service type is valid and can be created."
-												) : (
-													<div>
-														<p className="font-medium">{validationResult.reason}</p>
-														{validationResult.suggestions &&
-															validationResult.suggestions.length > 0 && (
-																<ul className="mt-2 list-disc list-inside space-y-1">
-																	{validationResult.suggestions.map((suggestion, index) => (
-																		<li key={index} className="text-sm">
-																			{suggestion}
-																		</li>
-																	))}
-																</ul>
-															)}
-													</div>
-												)}
-											</AlertDescription>
-										</Alert>
-									)}
 								</div>
 							</div>
 						</div>
@@ -702,17 +877,198 @@ export function AddSupportServiceForm({
 							</div>
 						</div>
 
+						{/* Accreditation Documents */}
+						<div className="space-y-4">
+							<div className="flex items-center gap-2 mb-3">
+								<FileText className="h-4 w-4 text-blue-600" />
+								<h3 className="text-base font-semibold text-gray-900">
+									Accreditation Documents
+								</h3>
+							</div>
+
+							{/* Previous Documents Section */}
+							{previousDocuments.length > 0 && (
+								<div className="space-y-3">
+									<Label className="text-sm font-medium text-gray-700">
+										Link Previous Documents
+									</Label>
+									<p className="text-xs text-gray-600">
+										You can link previously uploaded documents that are relevant to this
+										service type.
+									</p>
+									<div className="grid gap-2 max-h-32 overflow-y-auto">
+										{previousDocuments.map((doc, index) => (
+											<div
+												key={index}
+												className="flex items-center justify-between p-2 bg-gray-50 rounded border"
+											>
+												<div className="flex items-center gap-2">
+													<FileText className="h-4 w-4 text-gray-600" />
+													<div>
+														<p className="text-sm font-medium">{doc.title}</p>
+														<p className="text-xs text-gray-500">
+															{doc.serviceType ? doc.serviceType.replace("_", " ") : "General"}
+														</p>
+													</div>
+												</div>
+												<Button
+													type="button"
+													variant="outline"
+													size="sm"
+													onClick={() => linkPreviousDocument(`prev-${index}`, doc)}
+													className="gap-1"
+												>
+													<Link className="h-3 w-3" />
+													Link
+												</Button>
+											</div>
+										))}
+									</div>
+								</div>
+							)}
+
+							{/* Document Upload Section */}
+							<div className="space-y-3">
+								<div className="flex items-center justify-between">
+									<Label className="text-sm font-medium text-gray-700">
+										Upload New Documents
+									</Label>
+									<Button
+										type="button"
+										variant="outline"
+										size="sm"
+										onClick={addDocument}
+										className="gap-1"
+									>
+										<Plus className="h-3 w-3" />
+										Add Document
+									</Button>
+								</div>
+
+								{documents.length === 0 ? (
+									<div className="text-center py-6 bg-gray-50 rounded-lg border border-dashed">
+										<FileText className="h-8 w-8 text-gray-400 mx-auto mb-2" />
+										<p className="text-sm text-gray-500">
+											No documents added yet. Click "Add Document" to upload accreditation
+											files.
+										</p>
+									</div>
+								) : (
+									<div className="space-y-3">
+										{documents.map((doc) => (
+											<div key={doc.id} className="p-3 bg-white rounded-lg border">
+												<div className="space-y-3">
+													<div className="flex items-center justify-between">
+														<div className="flex items-center gap-2">
+															<FileText className="h-4 w-4 text-gray-600" />
+															{doc.isLinked && (
+																<Badge variant="outline" className="text-xs">
+																	<Link className="h-3 w-3 mr-1" />
+																	Linked
+																</Badge>
+															)}
+														</div>
+														<Button
+															type="button"
+															variant="ghost"
+															size="sm"
+															onClick={() => removeDocument(doc.id)}
+															className="text-red-600 hover:text-red-700"
+														>
+															<X className="h-4 w-4" />
+														</Button>
+													</div>
+
+													<div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+														<Input
+															placeholder="Document title (e.g., License, Certificate)"
+															value={doc.title}
+															onChange={(e) => updateDocument(doc.id, "title", e.target.value)}
+															className="h-9"
+														/>
+														<div className="flex items-center gap-2">
+															{/* Drag and Drop File Input */}
+															<div
+																className={`flex-1 border-2 border-dashed rounded-md p-3 text-center transition-colors ${
+																	dragOverDocId === doc.id
+																		? "border-sauti-orange bg-orange-50"
+																		: doc.file
+																		? "border-green-300 bg-green-50"
+																		: "border-gray-300 hover:border-gray-400"
+																}`}
+																onDragOver={(e) => handleDragOver(e, doc.id)}
+																onDragLeave={handleDragLeave}
+																onDrop={(e) => handleDrop(e, doc.id)}
+															>
+																{doc.file ? (
+																	<div className="space-y-1">
+																		<FileText className="h-5 w-5 text-green-600 mx-auto" />
+																		<p className="text-xs font-medium text-green-800 truncate">
+																			{doc.file.name}
+																		</p>
+																		<p className="text-xs text-green-600">
+																			{(doc.file.size / 1024 / 1024).toFixed(2)} MB
+																		</p>
+																	</div>
+																) : (
+																	<div className="space-y-1">
+																		<Upload className="h-5 w-5 text-gray-400 mx-auto" />
+																		<p className="text-xs text-gray-600">
+																			<span className="font-medium text-sauti-orange">Click</span>{" "}
+																			or drag file
+																		</p>
+																		<p className="text-xs text-gray-500">
+																			PDF, JPG, PNG, DOC, DOCX
+																		</p>
+																	</div>
+																)}
+																<input
+																	type="file"
+																	onChange={(e) =>
+																		updateDocument(doc.id, "file", e.target.files?.[0] || null)
+																	}
+																	accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx"
+																	className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+																	disabled={doc.isLinked}
+																/>
+															</div>
+															{doc.uploaded && (
+																<Badge
+																	variant="outline"
+																	className="text-green-600 border-green-200"
+																>
+																	<CheckCircle className="h-3 w-3 mr-1" />
+																	Uploaded
+																</Badge>
+															)}
+														</div>
+													</div>
+
+													<Textarea
+														placeholder="Notes (optional)"
+														value={doc.note || ""}
+														onChange={(e) => updateDocument(doc.id, "note", e.target.value)}
+														className="min-h-[60px] resize-none"
+													/>
+												</div>
+											</div>
+										))}
+									</div>
+								)}
+							</div>
+						</div>
+
 						{/* Submit Button */}
 						<div className="flex justify-center pt-4 sticky bottom-0 bg-white border-t border-gray-200 -mx-4 md:-mx-6 px-4 md:px-6 py-3">
 							<Button
 								type="submit"
-								disabled={loading}
+								disabled={loading || isUploading}
 								className="w-full md:w-auto bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 h-10 text-sm font-medium"
 							>
-								{loading ? (
+								{loading || isUploading ? (
 									<div className="flex items-center gap-2">
 										<div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-										Registering Service...
+										{isUploading ? "Uploading Documents..." : "Registering Service..."}
 									</div>
 								) : (
 									"Register Support Service"

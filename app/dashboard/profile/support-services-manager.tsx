@@ -1,29 +1,23 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
-import { Tables } from "@/types/db-schema";
+import { useState, useEffect, useCallback } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
 	Dialog,
 	DialogContent,
+	DialogDescription,
 	DialogHeader,
 	DialogTitle,
-	DialogDescription,
+	DialogTrigger,
 } from "@/components/ui/dialog";
-import { AddSupportServiceForm } from "@/components/AddSupportServiceForm";
-import { fetchUserSupportServices } from "@/app/dashboard/_views/actions/support-services";
-import { createClient } from "@/utils/supabase/client";
-import { useToast } from "@/hooks/use-toast";
-import { Database } from "@/types/db-schema";
-import { SupportServiceSidepanel } from "../profile/support-services-sidepanel";
-import { VerificationProgressBar } from "../profile/verification-progress-bar";
 import {
 	Building,
 	Plus,
 	Eye,
+	Edit,
 	Trash2,
 	Shield,
 	CheckCircle,
@@ -31,6 +25,12 @@ import {
 	Clock,
 	XCircle,
 } from "lucide-react";
+import { createClient } from "@/utils/supabase/client";
+import { useToast } from "@/hooks/use-toast";
+import { Database } from "@/types/db-schema";
+import { SupportServiceSidepanel } from "./support-services-sidepanel";
+import { VerificationProgressBar } from "./verification-progress-bar";
+import { AddSupportServiceForm } from "@/components/AddSupportServiceForm";
 
 type SupportServiceType = Database["public"]["Enums"]["support_service_type"];
 type UserType = Database["public"]["Enums"]["user_type"];
@@ -50,7 +50,25 @@ interface SupportService {
 	created_at?: string;
 }
 
-export default function ServicesClient({ userId }: { userId: string }) {
+interface SupportServicesManagerProps {
+	userId: string;
+	userType: UserType;
+	verificationStatus?: string;
+	hasAccreditation?: boolean;
+	hasMatches?: boolean;
+	verificationNotes?: string;
+	documentsCount?: number;
+}
+
+export function SupportServicesManager({
+	userId,
+	userType,
+	verificationStatus = "pending",
+	hasAccreditation = false,
+	hasMatches = false,
+	verificationNotes,
+	documentsCount = 0,
+}: SupportServicesManagerProps) {
 	const [services, setServices] = useState<SupportService[]>([]);
 	const [isLoading, setIsLoading] = useState(true);
 	const [selectedService, setSelectedService] = useState<SupportService | null>(
@@ -58,15 +76,6 @@ export default function ServicesClient({ userId }: { userId: string }) {
 	);
 	const [showAddForm, setShowAddForm] = useState(false);
 	const [isDeleting, setIsDeleting] = useState<string | null>(null);
-	const [userType, setUserType] = useState<UserType>("professional");
-	const [verificationStatus, setVerificationStatus] = useState("pending");
-	const [hasAccreditation, setHasAccreditation] = useState(false);
-	const [hasMatches, setHasMatches] = useState(false);
-	const [verificationNotes, setVerificationNotes] = useState<
-		string | undefined
-	>();
-	const [documentsCount, setDocumentsCount] = useState(0);
-
 	const supabase = createClient();
 	const { toast } = useToast();
 
@@ -104,56 +113,9 @@ export default function ServicesClient({ userId }: { userId: string }) {
 		}
 	}, [userId, supabase, toast]);
 
-	const loadUserProfile = useCallback(async () => {
-		try {
-			const { data: profile } = await supabase
-				.from("profiles")
-				.select(
-					"user_type, verification_status, verification_notes, accreditation_files_metadata"
-				)
-				.eq("id", userId)
-				.single();
-
-			if (profile) {
-				setUserType(profile.user_type || "professional");
-				setVerificationStatus(profile.verification_status || "pending");
-				setVerificationNotes(profile.verification_notes);
-
-				// Check if user has accreditation files
-				const docs = profile.accreditation_files_metadata
-					? Array.isArray(profile.accreditation_files_metadata)
-						? profile.accreditation_files_metadata
-						: JSON.parse(profile.accreditation_files_metadata)
-					: [];
-				setHasAccreditation(docs.length > 0);
-				setDocumentsCount(docs.length);
-			}
-
-			// Check for matches
-			const { data: services } = await supabase
-				.from("support_services")
-				.select("id")
-				.eq("user_id", userId);
-
-			if (services && services.length > 0) {
-				const serviceIds = services.map((s) => s.id);
-				const { data: matches } = await supabase
-					.from("matched_services")
-					.select("id")
-					.in("service_id", serviceIds)
-					.limit(1);
-
-				setHasMatches(!!matches && matches.length > 0);
-			}
-		} catch (error) {
-			console.error("Error loading user profile:", error);
-		}
-	}, [userId, supabase]);
-
 	useEffect(() => {
-		loadUserProfile();
 		loadServices();
-	}, [loadUserProfile, loadServices]);
+	}, [loadServices]);
 
 	const deleteService = async (serviceId: string) => {
 		setIsDeleting(serviceId);

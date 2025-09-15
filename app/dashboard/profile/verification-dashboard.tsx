@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -84,6 +84,7 @@ export function VerificationDashboard({
 		lastActivity: new Date().toISOString(),
 	});
 	const [isLoading, setIsLoading] = useState(true);
+	const [initialized, setInitialized] = useState(false);
 	const [activeTab, setActiveTab] = useState("overview");
 	const [servicesData, setServicesData] = useState<
 		Array<{
@@ -94,11 +95,7 @@ export function VerificationDashboard({
 	const supabase = createClient();
 	const { toast } = useToast();
 
-	useEffect(() => {
-		loadVerificationMetrics();
-	}, [userId, userType]);
-
-	const loadVerificationMetrics = async () => {
+	const loadVerificationMetrics = useCallback(async () => {
 		setIsLoading(true);
 		try {
 			// Load profile verification data
@@ -174,8 +171,13 @@ export function VerificationDashboard({
 			});
 		} finally {
 			setIsLoading(false);
+			setInitialized(true);
 		}
-	};
+	}, [userId, userType, supabase, toast]);
+
+	useEffect(() => {
+		loadVerificationMetrics();
+	}, [loadVerificationMetrics]);
 
 	const calculateVerificationScore = (
 		profileData: any,
@@ -230,19 +232,6 @@ export function VerificationDashboard({
 		return "Poor";
 	};
 
-	if (isLoading) {
-		return (
-			<div className="space-y-6">
-				<div className="flex items-center justify-center py-12">
-					<div className="text-center">
-						<div className="animate-spin rounded-full h-12 w-12 border-b-2 border-sauti-orange mx-auto"></div>
-						<p className="mt-4 text-gray-600">Loading verification dashboard...</p>
-					</div>
-				</div>
-			</div>
-		);
-	}
-
 	return (
 		<div className="space-y-6">
 			{/* Header */}
@@ -266,6 +255,14 @@ export function VerificationDashboard({
 			</div>
 
 			{/* Key Metrics Cards */}
+			{!initialized && (
+				<div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+					<div className="animate-pulse h-28 bg-gray-100 rounded" />
+					<div className="animate-pulse h-28 bg-gray-100 rounded" />
+					<div className="animate-pulse h-28 bg-gray-100 rounded" />
+					<div className="animate-pulse h-28 bg-gray-100 rounded" />
+				</div>
+			)}
 			<div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
 				<Card>
 					<CardContent className="p-6">

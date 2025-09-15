@@ -29,7 +29,7 @@ export default async function DashboardLayout({
 					{/* Desktop Sidebar */}
 					<EnhancedSidebar />
 					{/* Main Content */}
-					<main className="flex-1 lg:ml-0">
+					<main className="flex-1 lg:ml-72">
 						{/* Keep Stream client warm across all dashboard pages */}
 						<ChatPreloader userId={user.id} username={user.first_name || user.id} />
 						{/* Sync unread count into provider */}
@@ -47,7 +47,7 @@ export default async function DashboardLayout({
 			) : (
 				<>
 					<EnhancedSidebar />
-					<main className="flex-1 lg:ml-0">
+					<main className="flex-1 lg:ml-72">
 						<ChatPreloader userId={user.id} username={user.first_name || user.id} />
 						<div id="main-content" className="pb-20 lg:pb-0">
 							{children}

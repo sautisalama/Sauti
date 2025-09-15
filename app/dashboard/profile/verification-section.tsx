@@ -48,6 +48,8 @@ import { useToast } from "@/hooks/use-toast";
 import { Database } from "@/types/db-schema";
 import { fileUploadService } from "@/lib/file-upload";
 import { VerificationDashboard } from "./verification-dashboard";
+import { VerificationProgressBar } from "./verification-progress-bar";
+import { useDashboardData } from "@/components/providers/DashboardDataProvider";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Trash2 } from "lucide-react";
@@ -92,6 +94,7 @@ interface VerificationSectionProps {
 	userType: UserType;
 	profile: any;
 	onUpdate?: () => void;
+	onNavigateToServices?: () => void;
 }
 
 interface DocumentUploadFormProps {
@@ -115,6 +118,7 @@ export function DocumentUploadForm({
 }: DocumentUploadFormProps) {
 	const [documents, setDocuments] = useState<DocumentFormData[]>([]);
 	const [isUploading, setIsUploading] = useState(false);
+	const [dragOverDocId, setDragOverDocId] = useState<string | null>(null);
 	const supabase = createClient();
 	const { toast } = useToast();
 
@@ -167,14 +171,30 @@ export function DocumentUploadForm({
 
 		setIsUploading(true);
 		try {
+			// First, get existing documents
+			const { data: profileData } = await supabase
+				.from("profiles")
+				.select("accreditation_files_metadata")
+				.eq("id", userId)
+				.single();
+
+			const existingDocs = profileData?.accreditation_files_metadata
+				? Array.isArray(profileData.accreditation_files_metadata)
+					? profileData.accreditation_files_metadata
+					: JSON.parse(profileData.accreditation_files_metadata)
+				: [];
+
 			const documentsToSave: any[] = [];
 
+			// Process all documents in the current form
 			for (const doc of documents) {
-				if (!doc.title.trim() || !doc.file) continue;
+				if (!doc.title.trim() || !doc.file) {
+					continue;
+				}
 
 				const url = await uploadDocument(doc);
 				if (url) {
-					documentsToSave.push({
+					const savedDoc = {
 						title: doc.title,
 						certificateNumber: doc.certificateNumber,
 						url,
@@ -182,16 +202,20 @@ export function DocumentUploadForm({
 						fileSize: doc.file?.size || 0,
 						uploadedAt: new Date().toISOString(),
 						uploaded: true,
-					});
+					};
+					documentsToSave.push(savedDoc);
 				}
 			}
 
 			if (documentsToSave.length > 0) {
-				// Update profile with new documents
+				// Merge existing documents with new ones
+				const allDocuments = [...existingDocs, ...documentsToSave];
+
+				// Update profile with all documents
 				const { error } = await supabase
 					.from("profiles")
 					.update({
-						accreditation_files_metadata: documentsToSave,
+						accreditation_files_metadata: allDocuments,
 						updated_at: new Date().toISOString(),
 					})
 					.eq("id", userId);
@@ -203,9 +227,16 @@ export function DocumentUploadForm({
 					description: `${documentsToSave.length} document(s) uploaded successfully`,
 				});
 
-				// Clear form
+				// Clear form only after successful save
 				setDocuments([]);
 				onUploadSuccess?.();
+			} else {
+				toast({
+					title: "Warning",
+					description:
+						"No documents were uploaded. Please check your files and try again.",
+					variant: "destructive",
+				});
 			}
 		} catch (error) {
 			console.error("Error saving documents:", error);
@@ -216,6 +247,55 @@ export function DocumentUploadForm({
 			});
 		} finally {
 			setIsUploading(false);
+		}
+	};
+
+	// Drag and drop handlers
+	const handleDragOver = (e: React.DragEvent, docId: string) => {
+		e.preventDefault();
+		e.stopPropagation();
+		setDragOverDocId(docId);
+	};
+
+	const handleDragLeave = (e: React.DragEvent) => {
+		e.preventDefault();
+		e.stopPropagation();
+		setDragOverDocId(null);
+	};
+
+	const handleDrop = (e: React.DragEvent, docId: string) => {
+		e.preventDefault();
+		e.stopPropagation();
+		setDragOverDocId(null);
+
+		const droppedFiles = Array.from(e.dataTransfer.files);
+		if (droppedFiles.length > 0) {
+			const droppedFile = droppedFiles[0];
+			// Validate file type
+			const allowedTypes = [
+				"application/pdf",
+				"image/jpeg",
+				"image/jpg",
+				"image/png",
+				"image/webp",
+				"application/msword",
+				"application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+			];
+
+			if (allowedTypes.includes(droppedFile.type)) {
+				updateDocument(docId, "file", droppedFile);
+				// Auto-fill title if empty
+				const doc = documents.find((d) => d.id === docId);
+				if (doc && !doc.title) {
+					updateDocument(docId, "title", droppedFile.name.replace(/\.[^/.]+$/, ""));
+				}
+			} else {
+				toast({
+					title: "Invalid File Type",
+					description: "Please select a valid file type (PDF, JPG, PNG, DOC, DOCX)",
+					variant: "destructive",
+				});
+			}
 		}
 	};
 
@@ -290,17 +370,75 @@ export function DocumentUploadForm({
 								<label className="text-xs sm:text-sm font-medium text-gray-700">
 									Upload File *
 								</label>
-								<Input
+
+								{/* Drag and Drop File Input */}
+								<div
+									className={`border-2 border-dashed rounded-lg p-4 text-center transition-colors cursor-pointer ${
+										dragOverDocId === doc.id
+											? "border-sauti-orange bg-orange-50"
+											: doc.file
+											? "border-green-300 bg-green-50"
+											: "border-gray-300 hover:border-gray-400"
+									}`}
+									onDragOver={(e) => handleDragOver(e, doc.id)}
+									onDragEnter={(e) => handleDragOver(e, doc.id)}
+									onDragLeave={handleDragLeave}
+									onDrop={(e) => handleDrop(e, doc.id)}
+									onClick={() =>
+										document.getElementById(`file-upload-${doc.id}`)?.click()
+									}
+									style={{ minHeight: "120px" }}
+								>
+									{doc.file ? (
+										<div className="space-y-2">
+											<FileText className="h-6 w-6 text-green-600 mx-auto" />
+											<p className="text-sm font-medium text-green-800 truncate">
+												{doc.file.name}
+											</p>
+											<p className="text-xs text-green-600">
+												{(doc.file.size / 1024 / 1024).toFixed(2)} MB
+											</p>
+											<Button
+												type="button"
+												variant="outline"
+												size="sm"
+												onClick={(e) => {
+													e.stopPropagation();
+													updateDocument(doc.id, "file", null);
+												}}
+												className="text-red-600 hover:text-red-700"
+											>
+												Remove
+											</Button>
+										</div>
+									) : (
+										<div className="space-y-2">
+											<Upload className="h-6 w-6 text-gray-400 mx-auto" />
+											<div>
+												<p className="text-sm text-gray-600">
+													<span className="font-medium text-sauti-orange">
+														Click to upload
+													</span>{" "}
+													or drag and drop
+												</p>
+												<p className="text-xs text-gray-500 mt-1">
+													PDF, JPG, PNG, DOC, DOCX (Max 10MB)
+												</p>
+											</div>
+										</div>
+									)}
+								</div>
+
+								{/* Hidden File Input */}
+								<input
 									type="file"
 									accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx"
 									onChange={(e) =>
 										updateDocument(doc.id, "file", e.target.files?.[0] || null)
 									}
-									className="file:mr-2 sm:file:mr-4 file:py-1 sm:file:py-2 file:px-2 sm:file:px-4 file:rounded-md sm:file:rounded-full file:border-0 file:text-xs sm:file:text-sm file:font-semibold file:bg-sauti-orange file:text-white hover:file:bg-sauti-orange/90 text-sm sm:text-base"
+									className="hidden"
+									id={`file-upload-${doc.id}`}
 								/>
-								<p className="text-xs text-gray-500">
-									Supported formats: PDF, JPG, PNG, DOC, DOCX (Max 10MB)
-								</p>
 							</div>
 						</CardContent>
 					</Card>
@@ -336,26 +474,6 @@ export function DocumentUploadForm({
 					</Button>
 				</div>
 			)}
-
-			{documents.length === 0 && (
-				<div className="text-center py-6 sm:py-8 bg-gray-50 rounded-lg border border-gray-200 sm:border-2 sm:border-dashed">
-					<FileText className="h-10 w-10 sm:h-12 sm:w-12 text-gray-400 mx-auto mb-3 sm:mb-4" />
-					<h3 className="text-base sm:text-lg font-semibold text-gray-700 mb-2">
-						No Documents Added
-					</h3>
-					<p className="text-gray-500 mb-3 sm:mb-4 text-sm">
-						Click "Add Document" to start uploading your professional credentials
-					</p>
-					<Button
-						onClick={addDocument}
-						className="gap-1 sm:gap-2 bg-sauti-orange hover:bg-sauti-orange/90 text-xs sm:text-sm"
-						size="sm"
-					>
-						<Plus className="h-3 w-3 sm:h-4 sm:w-4" />
-						Add Your First Document
-					</Button>
-				</div>
-			)}
 		</div>
 	);
 }
@@ -365,6 +483,7 @@ export function VerificationSection({
 	userType,
 	profile,
 	onUpdate,
+	onNavigateToServices,
 }: VerificationSectionProps) {
 	const [verificationStatus, setVerificationStatus] =
 		useState<VerificationStatus>({
@@ -374,6 +493,7 @@ export function VerificationSection({
 			services: "pending",
 			lastChecked: new Date().toISOString(),
 		});
+	const dash = useDashboardData();
 	const [documents, setDocuments] = useState<VerificationDocument[]>([]);
 	const [services, setServices] = useState<ServiceVerification[]>([]);
 	const [isLoading, setIsLoading] = useState(true);
@@ -409,37 +529,63 @@ export function VerificationSection({
 
 	const loadDocuments = useCallback(async () => {
 		try {
-			// Load documents from profile accreditation_files_metadata
+			// Load documents from profile accreditation_files_metadata; seed from provider if available to avoid skeleton flicker
+			// Instant seed from provider snapshot
+			const seededDocCount = (dash?.data as any)?.verification?.documentsCount;
+			if (typeof seededDocCount === "number" && seededDocCount >= 0) {
+				// We can't reconstruct full docs without metadata, so we proceed to fetch; seeding could drive counters/UI elsewhere
+			}
 			const { data: profileData } = await supabase
 				.from("profiles")
-				.select("accreditation_files_metadata")
+				.select("accreditation_files_metadata, accreditation_files")
 				.eq("id", userId)
 				.single();
 
-			if (profileData?.accreditation_files_metadata) {
-				const docs = Array.isArray(profileData.accreditation_files_metadata)
+			const metaDocsRaw = profileData?.accreditation_files_metadata
+				? Array.isArray(profileData.accreditation_files_metadata)
 					? profileData.accreditation_files_metadata
-					: JSON.parse(profileData.accreditation_files_metadata);
+					: JSON.parse(profileData.accreditation_files_metadata)
+				: [];
+			const legacyDocsRaw = profileData?.accreditation_files
+				? Array.isArray(profileData.accreditation_files)
+					? profileData.accreditation_files
+					: JSON.parse(profileData.accreditation_files)
+				: [];
+			// Build lookup by url or title to merge notes/description from legacy docs
+			const legacyByUrl = new Map<string, any>();
+			const legacyByTitle = new Map<string, any>();
+			(legacyDocsRaw || []).forEach((ld: any) => {
+				if (ld?.url) legacyByUrl.set(ld.url, ld);
+				if (ld?.title) legacyByTitle.set(ld.title, ld);
+			});
 
-				setDocuments(
-					docs.map((doc: any, index: number) => ({
-						id: `doc-${index}`,
-						title: doc.title || "Untitled Document",
-						url: doc.url || "",
-						fileType: doc.fileType || "unknown",
-						fileSize: doc.fileSize || 0,
-						uploadedAt: doc.uploadedAt || new Date().toISOString(),
-						serviceId: doc.serviceId,
-						serviceType: doc.serviceType,
-						status: "under_review" as const,
-						notes: doc.notes,
-					}))
-				);
-			}
+			const merged = (metaDocsRaw || []).map((doc: any, index: number) => {
+				const keyUrl = doc?.url;
+				const keyTitle = doc?.title;
+				const legacy =
+					(keyUrl && legacyByUrl.get(keyUrl)) ||
+					(keyTitle && legacyByTitle.get(keyTitle)) ||
+					{};
+				return {
+					id: `doc-${index}`,
+					title: doc.title || legacy.title || "Untitled Document",
+					url: doc.url || legacy.url || "",
+					fileType: doc.fileType || legacy.fileType || "unknown",
+					fileSize: doc.fileSize || legacy.fileSize || 0,
+					uploadedAt:
+						doc.uploadedAt || legacy.uploadedAt || new Date().toISOString(),
+					serviceId: doc.serviceId || legacy.serviceId,
+					serviceType: doc.serviceType || legacy.serviceType,
+					status: (doc.status || legacy.status || "under_review") as any,
+					notes: doc.notes || legacy.note || legacy.notes,
+				};
+			});
+
+			setDocuments(merged);
 		} catch (error) {
 			console.error("Error loading documents:", error);
 		}
-	}, [userId, supabase]);
+	}, [userId, supabase, dash?.data]);
 
 	const loadServices = useCallback(async () => {
 		try {
@@ -490,7 +636,7 @@ export function VerificationSection({
 			await Promise.all([
 				loadVerificationStatus(),
 				loadDocuments(),
-				userType === "ngo" ? loadServices() : Promise.resolve(),
+				loadServices(), // Load services for all user types
 			]);
 		} catch (error) {
 			console.error("Error loading verification data:", error);
@@ -502,7 +648,7 @@ export function VerificationSection({
 		} finally {
 			setIsLoading(false);
 		}
-	}, [userType, loadVerificationStatus, loadDocuments, loadServices, toast]);
+	}, [loadVerificationStatus, loadDocuments, loadServices, toast]);
 
 	useEffect(() => {
 		loadVerificationData();
@@ -512,6 +658,28 @@ export function VerificationSection({
 		setIsRefreshing(true);
 		try {
 			await loadVerificationData();
+			// update provider snapshot with a light refresh
+			try {
+				const { data } = await supabase
+					.from("profiles")
+					.select(
+						"verification_status, last_verification_check, accreditation_files_metadata"
+					)
+					.eq("id", userId)
+					.single();
+				const docs = data?.accreditation_files_metadata
+					? Array.isArray(data.accreditation_files_metadata)
+						? data.accreditation_files_metadata
+						: JSON.parse(data.accreditation_files_metadata)
+					: [];
+				(dash as any)?.updatePartial?.({
+					verification: {
+						overallStatus: data?.verification_status || "pending",
+						lastChecked: data?.last_verification_check || null,
+						documentsCount: (docs || []).length,
+					},
+				});
+			} catch {}
 			toast({
 				title: "Refreshed",
 				description: "Verification data has been updated",
@@ -574,6 +742,7 @@ export function VerificationSection({
 		return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
 	};
 
+	// Long, detailed date for modal and detailed views
 	const formatDate = (dateString: string) => {
 		return new Date(dateString).toLocaleDateString("en-US", {
 			year: "numeric",
@@ -584,18 +753,31 @@ export function VerificationSection({
 		});
 	};
 
-	if (isLoading) {
-		return (
-			<div className="space-y-6">
-				<div className="flex items-center justify-center py-12">
-					<div className="text-center">
-						<div className="animate-spin rounded-full h-12 w-12 border-b-2 border-sauti-orange mx-auto"></div>
-						<p className="mt-4 text-gray-600">Loading verification data...</p>
-					</div>
-				</div>
-			</div>
-		);
-	}
+	// Compact date for list rows
+	const formatDateCompact = (dateString: string) => {
+		const d = new Date(dateString);
+		return d.toLocaleString(undefined, {
+			day: "2-digit",
+			month: "short",
+			hour: "2-digit",
+			minute: "2-digit",
+		});
+	};
+
+	// Helper function to check if services have accreditation files
+	const getServicesWithoutAccreditation = () => {
+		return services.filter((service) => {
+			const hasDocs = service.documents && service.documents.length > 0;
+			return !hasDocs;
+		});
+	};
+
+	// Helper function to check if any service has accreditation files
+	const hasServicesWithAccreditation = () => {
+		return services.some((service) => {
+			return service.documents && service.documents.length > 0;
+		});
+	};
 
 	// Show dashboard view if selected
 	if (viewMode === "dashboard") {
@@ -642,58 +824,21 @@ export function VerificationSection({
 
 	return (
 		<div className="space-y-6">
-			{/* Notifications at the top */}
-			<div className="space-y-3">
-				{/* Verification Status Alert */}
-				<Alert
-					className={`${
-						verificationStatus.overall === "verified"
-							? "border-green-200 bg-green-50"
-							: verificationStatus.overall === "rejected"
-							? "border-red-200 bg-red-50"
-							: "border-yellow-200 bg-yellow-50"
-					}`}
-				>
-					{getStatusIcon(verificationStatus.overall)}
-					<AlertDescription
-						className={`${
-							verificationStatus.overall === "verified"
-								? "text-green-800"
-								: verificationStatus.overall === "rejected"
-								? "text-red-800"
-								: "text-yellow-800"
-						}`}
-					>
-						<strong>Verification Status:</strong>{" "}
-						{verificationStatus.overall.replace("_", " ").toUpperCase()}
-						{verificationStatus.verificationNotes && (
-							<span className="block mt-1 text-sm">
-								<strong>Notes:</strong> {verificationStatus.verificationNotes}
-							</span>
-						)}
-					</AlertDescription>
-				</Alert>
-
-				{/* Progress Alert */}
-				<Alert className="border-blue-200 bg-blue-50">
-					<Info className="h-4 w-4 text-blue-600" />
-					<AlertDescription className="text-blue-800">
-						<strong>Progress:</strong> {getProgressPercentage()}% complete (
-						{documents.length} document{documents.length !== 1 ? "s" : ""} uploaded)
-						{userType === "ngo" && (
-							<span>
-								{" "}
-								• {services.length} service{services.length !== 1 ? "s" : ""} registered
-							</span>
-						)}
-					</AlertDescription>
-				</Alert>
-			</div>
+			{/* Single Consolidated Progress Bar */}
+			<VerificationProgressBar
+				hasAccreditation={documents.length > 0}
+				hasSupportServices={services.length > 0}
+				verificationStatus={verificationStatus.overall}
+				hasMatches={false} // TODO: Add logic to check for matches
+				verificationNotes={verificationStatus.verificationNotes}
+				documentsCount={documents.length}
+				servicesCount={services.length}
+			/>
 
 			{/* Document Upload and List Section */}
 			<div className="grid gap-4 sm:gap-6 lg:grid-cols-2 xl:grid-cols-6">
-				{/* Document Upload Form - Left Side */}
-				<div className="lg:col-span-1 xl:col-span-3">
+				{/* Document Upload Form - Desktop Only */}
+				<div className="hidden sm:block lg:col-span-1 xl:col-span-3">
 					<Card className="h-fit">
 						<CardHeader className="pb-3 sm:pb-4">
 							<CardTitle className="flex items-center gap-2 text-base sm:text-lg">
@@ -715,6 +860,42 @@ export function VerificationSection({
 								}}
 							/>
 						</CardContent>
+					</Card>
+				</div>
+
+				{/* Mobile Documents Header */}
+				<div className="sm:hidden">
+					<Card>
+						<CardHeader className="pb-3">
+							<div className="flex items-center justify-between">
+								<div>
+									<CardTitle className="flex items-center gap-2 text-base">
+										<FileText className="h-4 w-4 text-sauti-orange" />
+										Professional Credentials
+									</CardTitle>
+									<p className="text-xs text-gray-600 mt-1">
+										{documents.length} document{documents.length !== 1 ? "s" : ""}{" "}
+										uploaded
+									</p>
+								</div>
+								<Button
+									size="sm"
+									className="gap-2 bg-sauti-orange hover:bg-sauti-orange/90"
+									onClick={() => {
+										// Navigate to services tab to add documents
+										const servicesTab = document.querySelector(
+											'[data-value="services"]'
+										) as HTMLElement;
+										if (servicesTab) {
+											servicesTab.click();
+										}
+									}}
+								>
+									<Plus className="h-4 w-4" />
+									Add
+								</Button>
+							</div>
+						</CardHeader>
 					</Card>
 				</div>
 
@@ -769,22 +950,13 @@ export function VerificationSection({
 																{doc.title}
 															</h4>
 															<div className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm text-gray-500 flex-wrap">
-																<span className="font-mono text-xs">
-																	{doc.fileType.toUpperCase()}
-																</span>
-																<span className="hidden sm:inline">•</span>
-																<span className="hidden sm:inline">
-																	{formatFileSize(doc.fileSize)}
-																</span>
-																<span className="hidden sm:inline">•</span>
-																<span className="hidden sm:inline">
-																	{formatDate(doc.uploadedAt)}
-																</span>
-																{/* Mobile: Show on separate line */}
-																<div className="sm:hidden w-full text-xs text-gray-400 mt-1">
-																	{formatFileSize(doc.fileSize)} • {formatDate(doc.uploadedAt)}
-																</div>
+																<span>{formatDateCompact(doc.uploadedAt)}</span>
 															</div>
+															{doc.notes && (
+																<p className="mt-1 text-xs sm:text-sm text-gray-600 line-clamp-2">
+																	{doc.notes}
+																</p>
+															)}
 														</div>
 													</div>
 													<div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
@@ -931,6 +1103,15 @@ export function VerificationSection({
 								<Button
 									className="gap-2 bg-sauti-orange hover:bg-sauti-orange/90 text-xs sm:text-sm"
 									size="sm"
+									onClick={() => {
+										// Navigate to services tab
+										const servicesTab = document.querySelector(
+											'[data-value="services"]'
+										) as HTMLElement;
+										if (servicesTab) {
+											servicesTab.click();
+										}
+									}}
 								>
 									<Plus className="h-3 w-3 sm:h-4 sm:w-4" />
 									Add Support Service
@@ -987,6 +1168,60 @@ export function VerificationSection({
 					</CardContent>
 				</Card>
 			)}
+			{/* Verification Actions - Desktop Only */}
+			{services.length === 0 || !hasServicesWithAccreditation() ? (
+				<Card className="hidden sm:block">
+					<CardContent className="p-4">
+						<div className="flex items-center justify-between">
+							<div>
+								<h3 className="text-lg font-semibold text-gray-900">
+									Verification Actions
+								</h3>
+								<p className="text-sm text-gray-600">
+									{services.length === 0
+										? "Add support services to start helping survivors"
+										: "Add accreditation files for your support services"}
+								</p>
+							</div>
+							<div className="flex gap-2">
+								{services.length === 0 ? (
+									<Button
+										className="gap-2 bg-sauti-orange hover:bg-sauti-orange/90"
+										onClick={() => {
+											// Navigate to services tab
+											const servicesTab = document.querySelector(
+												'[data-value="services"]'
+											) as HTMLElement;
+											if (servicesTab) {
+												servicesTab.click();
+											}
+										}}
+									>
+										<Plus className="h-4 w-4" />
+										Add Support Service
+									</Button>
+								) : (
+									<Button
+										className="gap-2 bg-sauti-orange hover:bg-sauti-orange/90"
+										onClick={() => {
+											// Navigate to services tab to add accreditation files
+											const servicesTab = document.querySelector(
+												'[data-value="services"]'
+											) as HTMLElement;
+											if (servicesTab) {
+												servicesTab.click();
+											}
+										}}
+									>
+										<FileText className="h-4 w-4" />
+										Add Accreditation
+									</Button>
+								)}
+							</div>
+						</div>
+					</CardContent>
+				</Card>
+			) : null}
 		</div>
 	);
 }

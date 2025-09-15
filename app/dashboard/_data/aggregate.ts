@@ -16,6 +16,11 @@ export type AggregatedDashboardData = {
   casesCount: number;
   unreadChatCount: number; // to be filled client-side quickly
   preloaded: boolean;
+  verification?: {
+    overallStatus: string;
+    lastChecked?: string | null;
+    documentsCount?: number;
+  };
 };
 
 export async function fetchDashboardData(): Promise<AggregatedDashboardData | null> {
@@ -92,12 +97,35 @@ export async function fetchDashboardData(): Promise<AggregatedDashboardData | nu
     return count || 0;
   })();
 
-  const [supportServices, reports, matchedServices, appointments, casesCount] = await Promise.all([
+  const verificationPromise = (async () => {
+    try {
+      const { data } = await supabase
+        .from("profiles")
+        .select("verification_status, last_verification_check, accreditation_files_metadata")
+        .eq("id", userId)
+        .single();
+      const docs = data?.accreditation_files_metadata
+        ? (Array.isArray(data.accreditation_files_metadata)
+            ? data.accreditation_files_metadata
+            : JSON.parse(data.accreditation_files_metadata))
+        : [];
+      return {
+        overallStatus: data?.verification_status || "pending",
+        lastChecked: data?.last_verification_check || null,
+        documentsCount: (docs || []).length,
+      };
+    } catch {
+      return { overallStatus: "pending", lastChecked: null, documentsCount: 0 };
+    }
+  })();
+
+  const [supportServices, reports, matchedServices, appointments, casesCount, verification] = await Promise.all([
     supportServicesPromise,
     reportsPromise,
     matchedServicesPromise,
     appointmentsPromise,
     casesCountPromise,
+    verificationPromise,
   ]);
 
   return {
@@ -111,5 +139,6 @@ export async function fetchDashboardData(): Promise<AggregatedDashboardData | nu
     casesCount: casesCount || 0,
     unreadChatCount: 0, // computed on client quickly
     preloaded: true,
+    verification,
   };
 }

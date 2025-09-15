@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -84,40 +84,7 @@ export function EnhancedProfessionalDocumentsForm({
 	const supabase = createClient();
 	const { toast } = useToast();
 
-	// Load existing services
-	useEffect(() => {
-		loadServices();
-	}, [userId]);
-
-	// Load existing documents from initialData
-	useEffect(() => {
-		if (initialData?.accreditation_files) {
-			try {
-				const existingDocs = Array.isArray(initialData.accreditation_files)
-					? initialData.accreditation_files
-					: JSON.parse(initialData.accreditation_files);
-
-				if (existingDocs.length > 0) {
-					setDocs(
-						existingDocs.map((doc: any, index: number) => ({
-							id: `existing-${index}`,
-							title: doc.title || "",
-							note: doc.note || "",
-							file: null,
-							url: doc.url || "",
-							uploaded: true,
-							serviceId: doc.serviceId,
-							serviceType: doc.serviceType,
-						}))
-					);
-				}
-			} catch (error) {
-				console.error("Error parsing existing documents:", error);
-			}
-		}
-	}, [initialData]);
-
-	const loadServices = async () => {
+	const loadServices = useCallback(async () => {
 		if (userType !== "ngo") return;
 
 		setIsLoadingServices(true);
@@ -146,7 +113,40 @@ export function EnhancedProfessionalDocumentsForm({
 		} finally {
 			setIsLoadingServices(false);
 		}
-	};
+	}, [userType, userId, supabase, toast]);
+
+	// Load existing services
+	useEffect(() => {
+		loadServices();
+	}, [loadServices]);
+
+	// Load existing documents from initialData
+	useEffect(() => {
+		if (initialData?.accreditation_files) {
+			try {
+				const existingDocs = Array.isArray(initialData.accreditation_files)
+					? initialData.accreditation_files
+					: JSON.parse(initialData.accreditation_files);
+
+				if (existingDocs.length > 0) {
+					setDocs(
+						existingDocs.map((doc: any, index: number) => ({
+							id: `existing-${index}`,
+							title: doc.title || "",
+							note: doc.note || "",
+							file: null,
+							url: doc.url || "",
+							uploaded: true,
+							serviceId: doc.serviceId,
+							serviceType: doc.serviceType,
+						}))
+					);
+				}
+			} catch (error) {
+				console.error("Error parsing existing documents:", error);
+			}
+		}
+	}, [initialData]);
 
 	const addDoc = () => {
 		if (userType === "ngo" && !selectedServiceId) {
@@ -229,7 +229,7 @@ export function EnhancedProfessionalDocumentsForm({
 			for (const doc of docs) {
 				if (!doc.title.trim()) continue;
 
-				let documentData: any = {
+				const documentData: any = {
 					title: doc.title,
 					note: doc.note || "",
 					serviceId: doc.serviceId,
