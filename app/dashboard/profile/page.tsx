@@ -12,6 +12,7 @@ import { AnonymousModeToggle } from "@/components/chat/AnonymousModeToggle";
 import { ProfessionalDocumentsForm } from "./professional-documents";
 import { EnhancedProfessionalDocumentsForm } from "./enhanced-professional-documents";
 import { VerificationSection } from "./verification-section";
+import { SupportServicesManager } from "./support-services-manager";
 import { signOut } from "@/app/(auth)/actions/auth";
 import { createClient } from "@/utils/supabase/client";
 import { useDashboardData } from "@/components/providers/DashboardDataProvider";
@@ -245,68 +246,12 @@ export default function ProfilePage() {
 
 	return (
 		<div className="min-h-screen bg-gray-50 overflow-x-hidden">
-			{/* Header */}
-			<div className="bg-white border-b sticky top-0 z-50">
-				<div className="max-w-7xl mx-auto px-3 sm:px-4 py-4 sm:py-6">
-					<div className="flex items-center justify-between gap-3">
-						<div className="flex items-center gap-2 sm:gap-4 min-w-0 flex-1">
-							<Avatar className="h-12 w-12 sm:h-16 sm:w-16 flex-shrink-0">
-								<AvatarImage
-									src={
-										typeof window !== "undefined" &&
-										window.localStorage.getItem("ss_anon_mode") === "1"
-											? "/anon.svg"
-											: profile?.avatar_url || ""
-									}
-								/>
-								<AvatarFallback className="bg-sauti-orange text-white text-sm sm:text-base">
-									{profile?.first_name?.[0]?.toUpperCase() ||
-										profile?.email?.[0]?.toUpperCase() ||
-										"U"}
-								</AvatarFallback>
-							</Avatar>
-							<div className="min-w-0 flex-1">
-								<h1 className="text-lg sm:text-2xl font-bold truncate">
-									{profile?.first_name || profile?.email || "User"}
-								</h1>
-								<div className="flex items-center gap-1 sm:gap-2 mt-1 text-xs sm:text-sm text-gray-600 flex-wrap">
-									{profile?.user_type !== "survivor" && (
-										<Badge variant="secondary" className="capitalize text-xs">
-											{profile?.user_type || "member"}
-										</Badge>
-									)}
-									{profileData.isVerified && (
-										<Badge
-											variant="default"
-											className="bg-green-100 text-green-800 text-xs"
-										>
-											<CheckCircle className="h-3 w-3 mr-1" />
-											Verified
-										</Badge>
-									)}
-								</div>
-							</div>
-						</div>
-						<form action={signOut} className="flex-shrink-0">
-							<Button
-								type="submit"
-								variant="outline"
-								size="sm"
-								className="text-xs sm:text-sm"
-							>
-								Sign out
-							</Button>
-						</form>
-					</div>
-				</div>
-			</div>
-
 			{/* Main Content */}
 			<div className="max-w-7xl mx-auto px-3 sm:px-4 py-4 sm:py-6 overflow-x-hidden">
 				<Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
 					<TabsList
 						className={`grid w-full mb-4 sm:mb-6 ${
-							isProfessional ? "grid-cols-3" : "grid-cols-2"
+							isProfessional ? "grid-cols-4" : "grid-cols-2"
 						}`}
 					>
 						<TabsTrigger
@@ -325,6 +270,16 @@ export default function ProfilePage() {
 								<FileCheck className="h-3 w-3 sm:h-4 sm:w-4" />
 								<span className="hidden xs:inline">Verification</span>
 								<span className="xs:hidden">Verify</span>
+							</TabsTrigger>
+						)}
+						{isProfessional && (
+							<TabsTrigger
+								value="services"
+								className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-3"
+							>
+								<Building className="h-3 w-3 sm:h-4 sm:w-4" />
+								<span className="hidden xs:inline">Services</span>
+								<span className="xs:hidden">Services</span>
 							</TabsTrigger>
 						)}
 						<TabsTrigger
@@ -479,6 +434,16 @@ export default function ProfilePage() {
 										})();
 									} catch {}
 								}}
+							/>
+						</TabsContent>
+					)}
+
+					{/* Services Tab - Only for Professionals and NGOs */}
+					{isProfessional && (
+						<TabsContent value="services" className="space-y-3 sm:space-y-4">
+							<SupportServicesManager
+								userId={userId || ""}
+								userType={profile?.user_type || "professional"}
 							/>
 						</TabsContent>
 					)}
