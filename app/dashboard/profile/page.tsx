@@ -11,7 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { AnonymousModeToggle } from "@/components/chat/AnonymousModeToggle";
 import { ProfessionalDocumentsForm } from "./professional-documents";
 import { EnhancedProfessionalDocumentsForm } from "./enhanced-professional-documents";
-import { VerificationSection } from "./verification-section";
+import { VerificationWrapper } from "./verification-wrapper";
 import { SupportServicesManager } from "./support-services-manager";
 import { signOut } from "@/app/(auth)/actions/auth";
 import { createClient } from "@/utils/supabase/client";
@@ -282,7 +282,7 @@ export default function ProfilePage() {
 	return (
 		<div className="min-h-screen bg-gray-50 overflow-x-hidden">
 			{/* Header - Mobile Only */}
-			<div className="sm:hidden bg-white border-b border-gray-200 px-4 py-3">
+			<div className="sm:hidden fixed top-0 left-0 right-0 z-50 bg-white border-b border-gray-200 px-4 py-3">
 				<div className="flex items-center justify-between">
 					<div className="flex items-center gap-3">
 						<Avatar className="h-10 w-10">
@@ -307,7 +307,7 @@ export default function ProfilePage() {
 			</div>
 
 			{/* Main Content */}
-			<div className="max-w-7xl mx-auto px-3 sm:px-4 py-4 sm:py-6 overflow-x-hidden">
+			<div className="max-w-7xl mx-auto px-3 sm:px-4 pt-16 sm:pt-4 pb-4 sm:py-6 overflow-x-hidden">
 				<Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
 					<TabsList
 						className={`grid w-full mb-4 sm:mb-6 ${
@@ -462,7 +462,7 @@ export default function ProfilePage() {
 					{/* Verification Tab - Only for Professionals and NGOs */}
 					{isProfessional && (
 						<TabsContent value="verification" className="space-y-3 sm:space-y-4">
-							<VerificationSection
+							<VerificationWrapper
 								userId={userId || ""}
 								userType={profile?.user_type || "professional"}
 								profile={profile}

@@ -9,14 +9,6 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import {
-	Dialog,
-	DialogContent,
-	DialogDescription,
-	DialogHeader,
-	DialogTitle,
-	DialogTrigger,
-} from "@/components/ui/dialog";
-import {
 	X,
 	FileText,
 	Download,
@@ -47,17 +39,75 @@ function AddDocumentForm({
 	onSave,
 	isUploading,
 }: {
-	onSave: (title: string, file: File, note?: string) => void;
+	onSave: (title: string, file: File) => void;
 	isUploading: boolean;
 }) {
 	const [title, setTitle] = useState("");
-	const [note, setNote] = useState("");
 	const [file, setFile] = useState<File | null>(null);
+	const [isDragOver, setIsDragOver] = useState(false);
 
 	const handleSubmit = (e: React.FormEvent) => {
 		e.preventDefault();
-		if (title && file) {
-			onSave(title, file, note);
+		if (!title.trim()) {
+			alert("Please enter a document title");
+			return;
+		}
+		if (!file) {
+			alert("Please select a file to upload");
+			return;
+		}
+		onSave(title, file);
+		// Clear form after successful upload
+		setTitle("");
+		setFile(null);
+	};
+
+	const handleDragOver = (e: React.DragEvent) => {
+		e.preventDefault();
+		setIsDragOver(true);
+	};
+
+	const handleDragLeave = (e: React.DragEvent) => {
+		e.preventDefault();
+		setIsDragOver(false);
+	};
+
+	const handleDrop = (e: React.DragEvent) => {
+		e.preventDefault();
+		setIsDragOver(false);
+
+		const droppedFiles = Array.from(e.dataTransfer.files);
+		if (droppedFiles.length > 0) {
+			const droppedFile = droppedFiles[0];
+			// Validate file type
+			const allowedTypes = [
+				"application/pdf",
+				"image/jpeg",
+				"image/jpg",
+				"image/png",
+				"image/webp",
+				"application/msword",
+				"application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+			];
+
+			if (allowedTypes.includes(droppedFile.type)) {
+				setFile(droppedFile);
+				// Auto-fill title if empty
+				if (!title) {
+					setTitle(droppedFile.name.replace(/\.[^/.]+$/, ""));
+				}
+			} else {
+				// Show error for invalid file type
+				alert("Please select a valid file type (PDF, JPG, PNG, DOC, DOCX)");
+			}
+		}
+	};
+
+	const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+		const selectedFile = e.target.files?.[0] || null;
+		setFile(selectedFile);
+		if (selectedFile && !title) {
+			setTitle(selectedFile.name.replace(/\.[^/.]+$/, ""));
 		}
 	};
 
@@ -79,28 +129,61 @@ function AddDocumentForm({
 
 			<div>
 				<label className="text-sm font-medium text-gray-700">Upload File *</label>
+
+				{/* Drag and Drop Area */}
+				<div
+					className={`mt-1 border-2 border-dashed rounded-lg p-6 text-center transition-colors cursor-pointer ${
+						isDragOver
+							? "border-sauti-orange bg-orange-50"
+							: file
+							? "border-green-300 bg-green-50"
+							: "border-gray-300 hover:border-gray-400"
+					}`}
+					onDragOver={handleDragOver}
+					onDragLeave={handleDragLeave}
+					onDrop={handleDrop}
+					onClick={() => document.getElementById("file-upload")?.click()}
+				>
+					{file ? (
+						<div className="space-y-2">
+							<FileText className="h-8 w-8 text-green-600 mx-auto" />
+							<p className="text-sm font-medium text-green-800">{file.name}</p>
+							<p className="text-xs text-green-600">
+								{(file.size / 1024 / 1024).toFixed(2)} MB
+							</p>
+							<Button
+								type="button"
+								variant="outline"
+								size="sm"
+								onClick={() => setFile(null)}
+								className="text-red-600 hover:text-red-700"
+							>
+								Remove
+							</Button>
+						</div>
+					) : (
+						<div className="space-y-2">
+							<Upload className="h-8 w-8 text-gray-400 mx-auto" />
+							<div>
+								<p className="text-sm text-gray-600">
+									<span className="font-medium text-sauti-orange">Click to upload</span>{" "}
+									or drag and drop
+								</p>
+								<p className="text-xs text-gray-500 mt-1">
+									PDF, JPG, PNG, DOC, DOCX (Max 10MB)
+								</p>
+							</div>
+						</div>
+					)}
+				</div>
+
+				{/* Hidden File Input */}
 				<input
 					type="file"
-					onChange={(e) => setFile(e.target.files?.[0] || null)}
+					onChange={handleFileChange}
 					accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx"
-					className="w-full mt-1 px-3 py-2 border border-gray-200 rounded-md focus:ring-2 focus:ring-sauti-orange/20 focus:border-sauti-orange"
-					required
-				/>
-				<p className="text-xs text-gray-500 mt-1">
-					Supported formats: PDF, JPG, PNG, DOC, DOCX (Max 10MB)
-				</p>
-			</div>
-
-			<div>
-				<label className="text-sm font-medium text-gray-700">
-					Notes (Optional)
-				</label>
-				<textarea
-					value={note}
-					onChange={(e) => setNote(e.target.value)}
-					className="w-full mt-1 px-3 py-2 border border-gray-200 rounded-md focus:ring-2 focus:ring-sauti-orange/20 focus:border-sauti-orange"
-					placeholder="Additional notes about this document"
-					rows={3}
+					className="hidden"
+					id="file-upload"
 				/>
 			</div>
 
@@ -110,7 +193,6 @@ function AddDocumentForm({
 					variant="outline"
 					onClick={() => {
 						setTitle("");
-						setNote("");
 						setFile(null);
 					}}
 				>
@@ -171,7 +253,6 @@ export function SupportServiceSidepanel({
 	const [documents, setDocuments] = useState<any[]>([]);
 	const [isLoading, setIsLoading] = useState(false);
 	const [isUploading, setIsUploading] = useState(false);
-	const [showAddDocument, setShowAddDocument] = useState(false);
 	const [isEditing, setIsEditing] = useState(false);
 	const [editData, setEditData] = useState({
 		name: "",
@@ -257,7 +338,6 @@ export function SupportServiceSidepanel({
 					phone_number: editData.phone_number || null,
 					website: editData.website || null,
 					availability: editData.availability || null,
-					updated_at: new Date().toISOString(),
 				})
 				.eq("id", service.id);
 
@@ -281,7 +361,7 @@ export function SupportServiceSidepanel({
 		}
 	};
 
-	const uploadDocument = async (file: File, title: string, note?: string) => {
+	const uploadDocument = async (file: File, title: string) => {
 		try {
 			const result = await fileUploadService.uploadFile({
 				userId,
@@ -295,7 +375,6 @@ export function SupportServiceSidepanel({
 
 			return {
 				title,
-				note: note || "",
 				url: result.url,
 				fileType: file.type,
 				fileSize: file.size,
@@ -317,7 +396,6 @@ export function SupportServiceSidepanel({
 				.from("support_services")
 				.update({
 					accreditation_files_metadata: newDocuments,
-					updated_at: new Date().toISOString(),
 				})
 				.eq("id", service.id);
 
@@ -388,7 +466,7 @@ export function SupportServiceSidepanel({
 	if (!service) return null;
 
 	return (
-		<div className="fixed inset-0 sm:inset-y-0 sm:right-0 sm:left-auto w-full sm:w-[540px] lg:w-[720px] bg-white shadow-2xl border-l z-40 transform transition-transform duration-300 ease-out translate-y-0 sm:translate-x-0">
+		<div className="fixed inset-0 sm:inset-y-0 sm:right-0 sm:left-auto w-full sm:w-[540px] lg:w-[720px] bg-white shadow-2xl border-l z-[60] transform transition-transform duration-300 ease-out translate-y-0 sm:translate-x-0">
 			<div className="h-full flex flex-col bg-gray-50">
 				{/* Header */}
 				<div className="p-4 border-b border-gray-200 bg-white sticky top-0 z-10">
@@ -576,47 +654,33 @@ export function SupportServiceSidepanel({
 						{/* Documents Section */}
 						<Card>
 							<CardHeader className="pb-3">
-								<div className="flex items-center justify-between">
-									<CardTitle className="flex items-center gap-2 text-base">
-										<FileText className="h-4 w-4 text-sauti-orange" />
-										Accreditation Documents ({documents.length})
-									</CardTitle>
-									<Dialog open={showAddDocument} onOpenChange={setShowAddDocument}>
-										<DialogTrigger asChild>
-											<Button size="sm" className="gap-2 hidden sm:flex">
-												<Plus className="h-4 w-4" />
-												Add Document
-											</Button>
-										</DialogTrigger>
-										<DialogContent className="max-w-md">
-											<DialogHeader>
-												<DialogTitle>Add Document</DialogTitle>
-												<DialogDescription>
-													Upload accreditation documents for this service
-												</DialogDescription>
-											</DialogHeader>
-											<AddDocumentForm
-												onSave={async (title, file, note) => {
-													try {
-														const newDoc = await uploadDocument(file, title, note);
-														const updatedDocs = [...documents, newDoc];
-														await saveDocuments(updatedDocs);
-														setShowAddDocument(false);
-													} catch (error) {
-														toast({
-															title: "Error",
-															description: "Failed to upload document",
-															variant: "destructive",
-														});
-													}
-												}}
-												isUploading={isUploading}
-											/>
-										</DialogContent>
-									</Dialog>
-								</div>
+								<CardTitle className="flex items-center gap-2 text-base">
+									<FileText className="h-4 w-4 text-sauti-orange" />
+									Accreditation Documents ({documents.length})
+								</CardTitle>
 							</CardHeader>
 							<CardContent>
+								{/* Drag and Drop Upload Area */}
+								<div className="mb-4">
+									<AddDocumentForm
+										onSave={async (title, file) => {
+											try {
+												const newDoc = await uploadDocument(file, title);
+												const updatedDocs = [...documents, newDoc];
+												await saveDocuments(updatedDocs);
+											} catch (error) {
+												toast({
+													title: "Error",
+													description: "Failed to upload document",
+													variant: "destructive",
+												});
+											}
+										}}
+										isUploading={isUploading}
+									/>
+								</div>
+
+								{/* Documents List */}
 								{isLoading ? (
 									<div className="space-y-3">
 										{Array.from({ length: 2 }).map((_, i) => (
@@ -626,13 +690,11 @@ export function SupportServiceSidepanel({
 										))}
 									</div>
 								) : documents.length === 0 ? (
-									<div className="text-center py-8">
-										<FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-										<h3 className="text-lg font-semibold text-gray-700 mb-2">
-											No documents uploaded
-										</h3>
-										<p className="text-gray-500 text-sm">
-											Upload accreditation documents for this service
+									<div className="text-center py-6 border-2 border-dashed border-gray-300 rounded-lg">
+										<FileText className="h-8 w-8 text-gray-400 mx-auto mb-2" />
+										<p className="text-sm text-gray-500">
+											No documents uploaded yet. Use the upload area above to add
+											documents.
 										</p>
 									</div>
 								) : (
@@ -647,19 +709,32 @@ export function SupportServiceSidepanel({
 														<FileText className="h-5 w-5 text-blue-600" />
 													</div>
 													<div className="min-w-0 flex-1">
-														<h4 className="font-medium text-gray-900 truncate">
-															{doc.title}
-														</h4>
+														<div className="flex items-center gap-2 mb-1">
+															<h4 className="font-medium text-gray-900 truncate">
+																{doc.title}
+															</h4>
+															{doc.uploaded && (
+																<Badge
+																	variant="outline"
+																	className="text-xs bg-green-50 text-green-700 border-green-200"
+																>
+																	Uploaded
+																</Badge>
+															)}
+															{doc.linked && (
+																<Badge
+																	variant="outline"
+																	className="text-xs bg-blue-50 text-blue-700 border-blue-200"
+																>
+																	Linked
+																</Badge>
+															)}
+														</div>
 														<div className="flex items-center gap-2 text-xs text-gray-500">
 															<span>{formatFileSize(doc.fileSize || 0)}</span>
 															<span>•</span>
 															<span>{formatDate(doc.uploadedAt)}</span>
 														</div>
-														{doc.note && (
-															<p className="text-xs text-gray-600 mt-1 line-clamp-1">
-																{doc.note}
-															</p>
-														)}
 													</div>
 												</div>
 												<div className="flex items-center gap-2 flex-shrink-0">

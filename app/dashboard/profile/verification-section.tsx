@@ -118,6 +118,7 @@ export function DocumentUploadForm({
 }: DocumentUploadFormProps) {
 	const [documents, setDocuments] = useState<DocumentFormData[]>([]);
 	const [isUploading, setIsUploading] = useState(false);
+	const [dragOverDocId, setDragOverDocId] = useState<string | null>(null);
 	const supabase = createClient();
 	const { toast } = useToast();
 
@@ -170,6 +171,19 @@ export function DocumentUploadForm({
 
 		setIsUploading(true);
 		try {
+			// First, get existing documents
+			const { data: profileData } = await supabase
+				.from("profiles")
+				.select("accreditation_files_metadata")
+				.eq("id", userId)
+				.single();
+
+			const existingDocs = profileData?.accreditation_files_metadata
+				? Array.isArray(profileData.accreditation_files_metadata)
+					? profileData.accreditation_files_metadata
+					: JSON.parse(profileData.accreditation_files_metadata)
+				: [];
+
 			const documentsToSave: any[] = [];
 
 			for (const doc of documents) {
@@ -190,11 +204,14 @@ export function DocumentUploadForm({
 			}
 
 			if (documentsToSave.length > 0) {
-				// Update profile with new documents
+				// Merge existing documents with new ones
+				const allDocuments = [...existingDocs, ...documentsToSave];
+
+				// Update profile with all documents
 				const { error } = await supabase
 					.from("profiles")
 					.update({
-						accreditation_files_metadata: documentsToSave,
+						accreditation_files_metadata: allDocuments,
 						updated_at: new Date().toISOString(),
 					})
 					.eq("id", userId);
@@ -219,6 +236,55 @@ export function DocumentUploadForm({
 			});
 		} finally {
 			setIsUploading(false);
+		}
+	};
+
+	// Drag and drop handlers
+	const handleDragOver = (e: React.DragEvent, docId: string) => {
+		e.preventDefault();
+		e.stopPropagation();
+		setDragOverDocId(docId);
+	};
+
+	const handleDragLeave = (e: React.DragEvent) => {
+		e.preventDefault();
+		e.stopPropagation();
+		setDragOverDocId(null);
+	};
+
+	const handleDrop = (e: React.DragEvent, docId: string) => {
+		e.preventDefault();
+		e.stopPropagation();
+		setDragOverDocId(null);
+
+		const droppedFiles = Array.from(e.dataTransfer.files);
+		if (droppedFiles.length > 0) {
+			const droppedFile = droppedFiles[0];
+			// Validate file type
+			const allowedTypes = [
+				"application/pdf",
+				"image/jpeg",
+				"image/jpg",
+				"image/png",
+				"image/webp",
+				"application/msword",
+				"application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+			];
+
+			if (allowedTypes.includes(droppedFile.type)) {
+				updateDocument(docId, "file", droppedFile);
+				// Auto-fill title if empty
+				const doc = documents.find((d) => d.id === docId);
+				if (doc && !doc.title) {
+					updateDocument(docId, "title", droppedFile.name.replace(/\.[^/.]+$/, ""));
+				}
+			} else {
+				toast({
+					title: "Invalid File Type",
+					description: "Please select a valid file type (PDF, JPG, PNG, DOC, DOCX)",
+					variant: "destructive",
+				});
+			}
 		}
 	};
 
@@ -293,17 +359,75 @@ export function DocumentUploadForm({
 								<label className="text-xs sm:text-sm font-medium text-gray-700">
 									Upload File *
 								</label>
-								<Input
+
+								{/* Drag and Drop File Input */}
+								<div
+									className={`border-2 border-dashed rounded-lg p-4 text-center transition-colors cursor-pointer ${
+										dragOverDocId === doc.id
+											? "border-sauti-orange bg-orange-50"
+											: doc.file
+											? "border-green-300 bg-green-50"
+											: "border-gray-300 hover:border-gray-400"
+									}`}
+									onDragOver={(e) => handleDragOver(e, doc.id)}
+									onDragEnter={(e) => handleDragOver(e, doc.id)}
+									onDragLeave={handleDragLeave}
+									onDrop={(e) => handleDrop(e, doc.id)}
+									onClick={() =>
+										document.getElementById(`file-upload-${doc.id}`)?.click()
+									}
+									style={{ minHeight: "120px" }}
+								>
+									{doc.file ? (
+										<div className="space-y-2">
+											<FileText className="h-6 w-6 text-green-600 mx-auto" />
+											<p className="text-sm font-medium text-green-800 truncate">
+												{doc.file.name}
+											</p>
+											<p className="text-xs text-green-600">
+												{(doc.file.size / 1024 / 1024).toFixed(2)} MB
+											</p>
+											<Button
+												type="button"
+												variant="outline"
+												size="sm"
+												onClick={(e) => {
+													e.stopPropagation();
+													updateDocument(doc.id, "file", null);
+												}}
+												className="text-red-600 hover:text-red-700"
+											>
+												Remove
+											</Button>
+										</div>
+									) : (
+										<div className="space-y-2">
+											<Upload className="h-6 w-6 text-gray-400 mx-auto" />
+											<div>
+												<p className="text-sm text-gray-600">
+													<span className="font-medium text-sauti-orange">
+														Click to upload
+													</span>{" "}
+													or drag and drop
+												</p>
+												<p className="text-xs text-gray-500 mt-1">
+													PDF, JPG, PNG, DOC, DOCX (Max 10MB)
+												</p>
+											</div>
+										</div>
+									)}
+								</div>
+
+								{/* Hidden File Input */}
+								<input
 									type="file"
 									accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx"
 									onChange={(e) =>
 										updateDocument(doc.id, "file", e.target.files?.[0] || null)
 									}
-									className="file:mr-2 sm:file:mr-4 file:py-1 sm:file:py-2 file:px-2 sm:file:px-4 file:rounded-md sm:file:rounded-full file:border-0 file:text-xs sm:file:text-sm file:font-semibold file:bg-sauti-orange file:text-white hover:file:bg-sauti-orange/90 text-sm sm:text-base"
+									className="hidden"
+									id={`file-upload-${doc.id}`}
 								/>
-								<p className="text-xs text-gray-500">
-									Supported formats: PDF, JPG, PNG, DOC, DOCX (Max 10MB)
-								</p>
 							</div>
 						</CardContent>
 					</Card>
@@ -339,26 +463,6 @@ export function DocumentUploadForm({
 					</Button>
 				</div>
 			)}
-
-			{documents.length === 0 && (
-				<div className="text-center py-6 sm:py-8 bg-gray-50 rounded-lg border border-gray-200 sm:border-2 sm:border-dashed">
-					<FileText className="h-10 w-10 sm:h-12 sm:w-12 text-gray-400 mx-auto mb-3 sm:mb-4" />
-					<h3 className="text-base sm:text-lg font-semibold text-gray-700 mb-2">
-						No Documents Added
-					</h3>
-					<p className="text-gray-500 mb-3 sm:mb-4 text-sm">
-						Click "Add Document" to start uploading your professional credentials
-					</p>
-					<Button
-						onClick={addDocument}
-						className="gap-1 sm:gap-2 bg-sauti-orange hover:bg-sauti-orange/90 text-xs sm:text-sm"
-						size="sm"
-					>
-						<Plus className="h-3 w-3 sm:h-4 sm:w-4" />
-						Add Your First Document
-					</Button>
-				</div>
-			)}
 		</div>
 	);
 }
@@ -382,7 +486,6 @@ export function VerificationSection({
 	const [documents, setDocuments] = useState<VerificationDocument[]>([]);
 	const [services, setServices] = useState<ServiceVerification[]>([]);
 	const [isLoading, setIsLoading] = useState(true);
-	const [initialized, setInitialized] = useState(false);
 	const [isRefreshing, setIsRefreshing] = useState(false);
 	const [selectedDocument, setSelectedDocument] =
 		useState<VerificationDocument | null>(null);
@@ -533,7 +636,6 @@ export function VerificationSection({
 			});
 		} finally {
 			setIsLoading(false);
-			setInitialized(true);
 		}
 	}, [loadVerificationStatus, loadDocuments, loadServices, toast]);
 
@@ -711,13 +813,6 @@ export function VerificationSection({
 
 	return (
 		<div className="space-y-6">
-			{/* Notifications at the top */}
-			{!initialized && (
-				<div className="space-y-3">
-					<div className="h-14 rounded bg-yellow-50 border border-yellow-100 animate-pulse" />
-					<div className="h-10 rounded bg-blue-50 border border-blue-100 animate-pulse" />
-				</div>
-			)}
 			{/* Single Consolidated Progress Bar */}
 			<VerificationProgressBar
 				hasAccreditation={documents.length > 0}
