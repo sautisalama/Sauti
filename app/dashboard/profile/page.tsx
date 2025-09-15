@@ -544,7 +544,10 @@ export default function ProfilePage() {
 						<TabsContent value="verification" className="space-y-3 sm:space-y-4">
 							<VerificationWrapper
 								userId={userId || ""}
-								userType={profile?.user_type || "professional"}
+								userType={
+									(profile?.user_type as "professional" | "ngo" | "survivor") ||
+									"professional"
+								}
 								profile={profile}
 								onUpdate={() => {
 									// Avoid full-page reload; refresh provider snapshot and local state

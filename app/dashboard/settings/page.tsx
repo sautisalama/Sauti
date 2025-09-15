@@ -63,6 +63,7 @@ function A11yToggle({
 export default function SettingsPage() {
 	const user = useUser();
 	const { toast } = useToast();
+	const a11y = useAccessibility();
 	const isProfessional =
 		user?.profile?.user_type === "professional" ||
 		user?.profile?.user_type === "ngo";
@@ -316,7 +317,6 @@ export default function SettingsPage() {
 												String(n)
 											);
 											// Also update the accessibility provider
-											const a11y = useAccessibility();
 											a11y.set({ textScale: n });
 										}}
 									>

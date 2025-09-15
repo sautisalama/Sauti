@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -95,11 +95,7 @@ export function VerificationDashboard({
 	const supabase = createClient();
 	const { toast } = useToast();
 
-	useEffect(() => {
-		loadVerificationMetrics();
-	}, [userId, userType]);
-
-	const loadVerificationMetrics = async () => {
+	const loadVerificationMetrics = useCallback(async () => {
 		setIsLoading(true);
 		try {
 			// Load profile verification data
@@ -177,7 +173,11 @@ export function VerificationDashboard({
 			setIsLoading(false);
 			setInitialized(true);
 		}
-	};
+	}, [userId, userType, supabase, toast]);
+
+	useEffect(() => {
+		loadVerificationMetrics();
+	}, [loadVerificationMetrics]);
 
 	const calculateVerificationScore = (
 		profileData: any,
@@ -231,7 +231,6 @@ export function VerificationDashboard({
 		if (score >= 40) return "Needs Improvement";
 		return "Poor";
 	};
-
 
 	return (
 		<div className="space-y-6">

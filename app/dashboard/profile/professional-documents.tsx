@@ -137,7 +137,7 @@ export function ProfessionalDocumentsForm({
 
 				if (!doc.title.trim()) continue; // Skip empty documents
 
-				let documentData: any = {
+				const documentData: any = {
 					title: doc.title,
 					note: doc.note || "",
 				};

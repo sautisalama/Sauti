@@ -45,13 +45,30 @@ export function VoiceRecorderEnhanced({
 	const [isHovering, setIsHovering] = useState(false);
 	const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+	const cleanupAll = () => {
+		try {
+			if (
+				mediaRecorderRef.current &&
+				mediaRecorderRef.current.state !== "inactive"
+			) {
+				mediaRecorderRef.current.stop();
+			}
+		} catch {}
+		try {
+			mediaRecorderRef.current?.stream.getTracks().forEach((t) => t.stop());
+		} catch {}
+		mediaRecorderRef.current = null;
+		stopTimer();
+		cleanupAudioGraph();
+	};
+
 	useEffect(() => {
 		if (typeof window === "undefined") return;
 		if (!(navigator.mediaDevices && window.MediaRecorder)) {
 			setUnsupported(true);
 		}
 		return () => cleanupAll();
-	}, []);
+	}, [cleanupAll]);
 
 	// Initialize audio element when previewUrl changes
 	useEffect(() => {
@@ -87,23 +104,6 @@ export function VoiceRecorderEnhanced({
 		sourceRef.current = null;
 		analyserRef.current = null;
 		audioContextRef.current = null;
-	};
-
-	const cleanupAll = () => {
-		try {
-			if (
-				mediaRecorderRef.current &&
-				mediaRecorderRef.current.state !== "inactive"
-			) {
-				mediaRecorderRef.current.stop();
-			}
-		} catch {}
-		try {
-			mediaRecorderRef.current?.stream.getTracks().forEach((t) => t.stop());
-		} catch {}
-		mediaRecorderRef.current = null;
-		stopTimer();
-		cleanupAudioGraph();
 	};
 
 	const reset = () => {

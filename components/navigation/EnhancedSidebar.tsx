@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
@@ -131,7 +131,7 @@ export function EnhancedSidebar({
 		};
 	}, [dash?.data?.casesCount, dash?.data?.userId, role, user?.id, supabase]);
 
-	const getSidebarItems = (): SidebarItem[] => {
+	const getSidebarItems = useCallback((): SidebarItem[] => {
 		const isDashboard = pathname?.startsWith("/dashboard");
 
 		if (!isDashboard) {
@@ -405,12 +405,12 @@ export function EnhancedSidebar({
 				section: "footer",
 			},
 		];
-	};
+	}, [pathname, role, casesCount, dash?.data?.unreadChatCount]);
 
 	// Compute items once per relevant inputs to avoid recomputing on each render
 	const sidebarItems = useMemo(
 		() => getSidebarItems(),
-		[pathname, role, casesCount, dash?.data?.unreadChatCount]
+		[pathname, role, casesCount, dash?.data?.unreadChatCount, getSidebarItems]
 	);
 
 	const isActive = (item: SidebarItem) => {

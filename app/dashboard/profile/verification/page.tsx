@@ -25,31 +25,30 @@ export default function VerificationPage() {
 			userId={userId}
 			userType={profile.user_type || "professional"}
 			profile={profile}
-			onUpdate={() => {
+			onUpdate={async () => {
 				// Refresh provider data
 				try {
-					const supabase = require("@/utils/supabase/client").createClient();
-					(async () => {
-						const { data } = await supabase
-							.from("profiles")
-							.select(
-								"verification_status, last_verification_check, accreditation_files_metadata"
-							)
-							.eq("id", userId)
-							.single();
-						const docs = data?.accreditation_files_metadata
-							? Array.isArray(data.accreditation_files_metadata)
-								? data.accreditation_files_metadata
-								: JSON.parse(data.accreditation_files_metadata)
-							: [];
-						dash?.updatePartial({
-							verification: {
-								overallStatus: data?.verification_status || "pending",
-								lastChecked: data?.last_verification_check || null,
-								documentsCount: (docs || []).length,
-							},
-						});
-					})();
+					const { createClient } = await import("@/utils/supabase/client");
+					const supabase = createClient();
+					const { data } = await supabase
+						.from("profiles")
+						.select(
+							"verification_status, last_verification_check, accreditation_files_metadata"
+						)
+						.eq("id", userId)
+						.single();
+					const docs = data?.accreditation_files_metadata
+						? Array.isArray(data.accreditation_files_metadata)
+							? data.accreditation_files_metadata
+							: JSON.parse(data.accreditation_files_metadata)
+						: [];
+					dash?.updatePartial({
+						verification: {
+							overallStatus: data?.verification_status || "pending",
+							lastChecked: data?.last_verification_check || null,
+							documentsCount: (docs || []).length,
+						},
+					});
 				} catch {}
 			}}
 			onNavigateToServices={() => setActiveTab("services")}

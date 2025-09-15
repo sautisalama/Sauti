@@ -3,10 +3,13 @@
 import { Suspense } from "react";
 import { VerificationSection } from "./verification-section";
 import VerificationLoading from "./verification/loading";
+import { Database } from "@/types/db-schema";
+
+type UserType = Database["public"]["Enums"]["user_type"];
 
 interface VerificationWrapperProps {
 	userId: string;
-	userType: string;
+	userType: UserType;
 	profile: any;
 	onUpdate: () => void;
 	onNavigateToServices: () => void;
