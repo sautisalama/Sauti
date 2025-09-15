@@ -38,6 +38,7 @@ function A11yToggle({
 		if (attr === "data-a11y-lg-text") patch.largeText = next === "1";
 		if (attr === "data-a11y-readable-font") patch.readableFont = next === "1";
 		if (attr === "data-a11y-underline-links") patch.underlineLinks = next === "1";
+		if (attr === "data-a11y-dyslexic") patch.dyslexic = next === "1";
 		a11y.set(patch);
 	};
 	return (
@@ -259,12 +260,12 @@ export default function SettingsPage() {
 					<Card>
 						<CardHeader>
 							<CardTitle>Accessibility</CardTitle>
-						</CardHeader>
-						<CardContent className="space-y-4">
 							<p className="text-sm text-muted-foreground">
 								Adjust settings to improve readability and comfort. These apply on this
-								device.
+								device and are synced with the floating accessibility button.
 							</p>
+						</CardHeader>
+						<CardContent className="space-y-4">
 							<div className="space-y-3">
 								<A11yToggle
 									label="High contrast"
@@ -275,6 +276,11 @@ export default function SettingsPage() {
 									label="Reduce motion"
 									attr="data-a11y-reduce-motion"
 									storageKey="ss_a11y_motion"
+								/>
+								<A11yToggle
+									label="Large text"
+									attr="data-a11y-lg-text"
+									storageKey="ss_a11y_large"
 								/>
 								<A11yToggle
 									label="Dyslexic-friendly font"
@@ -297,13 +303,21 @@ export default function SettingsPage() {
 									<select
 										aria-label="Text size"
 										className="w-full rounded-md border px-2 py-1 text-sm"
-										defaultValue={typeof document !== "undefined" ? (document.documentElement.getAttribute("data-a11y-text-scale") || "100") : "100"}
+										defaultValue={
+											typeof document !== "undefined"
+												? document.documentElement.getAttribute("data-a11y-text-scale") ||
+												  "100"
+												: "100"
+										}
 										onChange={(e) => {
 											const n = Number(e.target.value) || 100;
 											document.documentElement.setAttribute(
 												"data-a11y-text-scale",
 												String(n)
 											);
+											// Also update the accessibility provider
+											const a11y = useAccessibility();
+											a11y.set({ textScale: n });
 										}}
 									>
 										<option value="100">100%</option>

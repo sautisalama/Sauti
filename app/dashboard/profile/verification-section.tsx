@@ -186,12 +186,15 @@ export function DocumentUploadForm({
 
 			const documentsToSave: any[] = [];
 
+			// Process all documents in the current form
 			for (const doc of documents) {
-				if (!doc.title.trim() || !doc.file) continue;
+				if (!doc.title.trim() || !doc.file) {
+					continue;
+				}
 
 				const url = await uploadDocument(doc);
 				if (url) {
-					documentsToSave.push({
+					const savedDoc = {
 						title: doc.title,
 						certificateNumber: doc.certificateNumber,
 						url,
@@ -199,7 +202,8 @@ export function DocumentUploadForm({
 						fileSize: doc.file?.size || 0,
 						uploadedAt: new Date().toISOString(),
 						uploaded: true,
-					});
+					};
+					documentsToSave.push(savedDoc);
 				}
 			}
 
@@ -223,9 +227,16 @@ export function DocumentUploadForm({
 					description: `${documentsToSave.length} document(s) uploaded successfully`,
 				});
 
-				// Clear form
+				// Clear form only after successful save
 				setDocuments([]);
 				onUploadSuccess?.();
+			} else {
+				toast({
+					title: "Warning",
+					description:
+						"No documents were uploaded. Please check your files and try again.",
+					variant: "destructive",
+				});
 			}
 		} catch (error) {
 			console.error("Error saving documents:", error);
