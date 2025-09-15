@@ -84,6 +84,7 @@ export function VerificationDashboard({
 		lastActivity: new Date().toISOString(),
 	});
 	const [isLoading, setIsLoading] = useState(true);
+	const [initialized, setInitialized] = useState(false);
 	const [activeTab, setActiveTab] = useState("overview");
 	const [servicesData, setServicesData] = useState<
 		Array<{
@@ -174,6 +175,7 @@ export function VerificationDashboard({
 			});
 		} finally {
 			setIsLoading(false);
+			setInitialized(true);
 		}
 	};
 
@@ -230,18 +232,6 @@ export function VerificationDashboard({
 		return "Poor";
 	};
 
-	if (isLoading) {
-		return (
-			<div className="space-y-6">
-				<div className="flex items-center justify-center py-12">
-					<div className="text-center">
-						<div className="animate-spin rounded-full h-12 w-12 border-b-2 border-sauti-orange mx-auto"></div>
-						<p className="mt-4 text-gray-600">Loading verification dashboard...</p>
-					</div>
-				</div>
-			</div>
-		);
-	}
 
 	return (
 		<div className="space-y-6">
@@ -266,6 +256,14 @@ export function VerificationDashboard({
 			</div>
 
 			{/* Key Metrics Cards */}
+			{!initialized && (
+				<div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+					<div className="animate-pulse h-28 bg-gray-100 rounded" />
+					<div className="animate-pulse h-28 bg-gray-100 rounded" />
+					<div className="animate-pulse h-28 bg-gray-100 rounded" />
+					<div className="animate-pulse h-28 bg-gray-100 rounded" />
+				</div>
+			)}
 			<div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
 				<Card>
 					<CardContent className="p-6">

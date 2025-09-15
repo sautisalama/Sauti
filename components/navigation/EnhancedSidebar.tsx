@@ -502,7 +502,7 @@ useEffect(() => {
 		<>
 			<div
 				className={cn(
-					"hidden lg:flex flex-col h-screen bg-white dark:bg-neutral-900 border-r border-neutral-200 dark:border-neutral-800 transition-all duration-300",
+					"hidden lg:flex lg:fixed lg:inset-y-0 lg:left-0 lg:z-40 lg:overflow-y-auto flex-col h-screen bg-white dark:bg-neutral-900 border-r border-neutral-200 dark:border-neutral-800 transition-all duration-300",
 					isCollapsed ? "w-20" : "w-72",
 					className
 				)}

@@ -379,6 +379,7 @@ export function VerificationSection({
 	const [documents, setDocuments] = useState<VerificationDocument[]>([]);
 	const [services, setServices] = useState<ServiceVerification[]>([]);
 	const [isLoading, setIsLoading] = useState(true);
+	const [initialized, setInitialized] = useState(false);
 	const [isRefreshing, setIsRefreshing] = useState(false);
 	const [selectedDocument, setSelectedDocument] =
 		useState<VerificationDocument | null>(null);
@@ -525,6 +526,7 @@ export function VerificationSection({
 			});
 		} finally {
 			setIsLoading(false);
+			setInitialized(true);
 		}
 	}, [userType, loadVerificationStatus, loadDocuments, loadServices, toast]);
 
@@ -640,18 +642,6 @@ export function VerificationSection({
 		});
 	};
 
-	if (isLoading) {
-		return (
-			<div className="space-y-6">
-				<div className="flex items-center justify-center py-12">
-					<div className="text-center">
-						<div className="animate-spin rounded-full h-12 w-12 border-b-2 border-sauti-orange mx-auto"></div>
-						<p className="mt-4 text-gray-600">Loading verification data...</p>
-					</div>
-				</div>
-			</div>
-		);
-	}
 
 	// Show dashboard view if selected
 	if (viewMode === "dashboard") {
@@ -699,6 +689,12 @@ export function VerificationSection({
 	return (
 		<div className="space-y-6">
 			{/* Notifications at the top */}
+			{!initialized && (
+				<div className="space-y-3">
+					<div className="h-14 rounded bg-yellow-50 border border-yellow-100 animate-pulse" />
+					<div className="h-10 rounded bg-blue-50 border border-blue-100 animate-pulse" />
+				</div>
+			)}
 			<div className="space-y-3">
 				{/* Verification Status Alert */}
 				<Alert
