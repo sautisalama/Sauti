@@ -48,6 +48,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Database } from "@/types/db-schema";
 import { fileUploadService } from "@/lib/file-upload";
 import { VerificationDashboard } from "./verification-dashboard";
+import { VerificationProgressBar } from "./verification-progress-bar";
 import { useDashboardData } from "@/components/providers/DashboardDataProvider";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -93,6 +94,7 @@ interface VerificationSectionProps {
 	userType: UserType;
 	profile: any;
 	onUpdate?: () => void;
+	onNavigateToServices?: () => void;
 }
 
 interface DocumentUploadFormProps {
@@ -366,6 +368,7 @@ export function VerificationSection({
 	userType,
 	profile,
 	onUpdate,
+	onNavigateToServices,
 }: VerificationSectionProps) {
 	const [verificationStatus, setVerificationStatus] =
 		useState<VerificationStatus>({
@@ -425,14 +428,14 @@ export function VerificationSection({
 				.single();
 
 			const metaDocsRaw = profileData?.accreditation_files_metadata
-				? (Array.isArray(profileData.accreditation_files_metadata)
+				? Array.isArray(profileData.accreditation_files_metadata)
 					? profileData.accreditation_files_metadata
-					: JSON.parse(profileData.accreditation_files_metadata))
+					: JSON.parse(profileData.accreditation_files_metadata)
 				: [];
 			const legacyDocsRaw = profileData?.accreditation_files
-				? (Array.isArray(profileData.accreditation_files)
+				? Array.isArray(profileData.accreditation_files)
 					? profileData.accreditation_files
-					: JSON.parse(profileData.accreditation_files))
+					: JSON.parse(profileData.accreditation_files)
 				: [];
 			// Build lookup by url or title to merge notes/description from legacy docs
 			const legacyByUrl = new Map<string, any>();
@@ -445,14 +448,18 @@ export function VerificationSection({
 			const merged = (metaDocsRaw || []).map((doc: any, index: number) => {
 				const keyUrl = doc?.url;
 				const keyTitle = doc?.title;
-				const legacy = (keyUrl && legacyByUrl.get(keyUrl)) || (keyTitle && legacyByTitle.get(keyTitle)) || {};
+				const legacy =
+					(keyUrl && legacyByUrl.get(keyUrl)) ||
+					(keyTitle && legacyByTitle.get(keyTitle)) ||
+					{};
 				return {
 					id: `doc-${index}`,
 					title: doc.title || legacy.title || "Untitled Document",
 					url: doc.url || legacy.url || "",
 					fileType: doc.fileType || legacy.fileType || "unknown",
 					fileSize: doc.fileSize || legacy.fileSize || 0,
-					uploadedAt: doc.uploadedAt || legacy.uploadedAt || new Date().toISOString(),
+					uploadedAt:
+						doc.uploadedAt || legacy.uploadedAt || new Date().toISOString(),
 					serviceId: doc.serviceId || legacy.serviceId,
 					serviceType: doc.serviceType || legacy.serviceType,
 					status: (doc.status || legacy.status || "under_review") as any,
@@ -464,7 +471,7 @@ export function VerificationSection({
 		} catch (error) {
 			console.error("Error loading documents:", error);
 		}
-	}, [userId, supabase]);
+	}, [userId, supabase, dash?.data]);
 
 	const loadServices = useCallback(async () => {
 		try {
@@ -515,7 +522,7 @@ export function VerificationSection({
 			await Promise.all([
 				loadVerificationStatus(),
 				loadDocuments(),
-				userType === "ngo" ? loadServices() : Promise.resolve(),
+				loadServices(), // Load services for all user types
 			]);
 		} catch (error) {
 			console.error("Error loading verification data:", error);
@@ -528,7 +535,7 @@ export function VerificationSection({
 			setIsLoading(false);
 			setInitialized(true);
 		}
-	}, [userType, loadVerificationStatus, loadDocuments, loadServices, toast]);
+	}, [loadVerificationStatus, loadDocuments, loadServices, toast]);
 
 	useEffect(() => {
 		loadVerificationData();
@@ -542,13 +549,15 @@ export function VerificationSection({
 			try {
 				const { data } = await supabase
 					.from("profiles")
-					.select("verification_status, last_verification_check, accreditation_files_metadata")
+					.select(
+						"verification_status, last_verification_check, accreditation_files_metadata"
+					)
 					.eq("id", userId)
 					.single();
 				const docs = data?.accreditation_files_metadata
-					? (Array.isArray(data.accreditation_files_metadata)
+					? Array.isArray(data.accreditation_files_metadata)
 						? data.accreditation_files_metadata
-						: JSON.parse(data.accreditation_files_metadata))
+						: JSON.parse(data.accreditation_files_metadata)
 					: [];
 				(dash as any)?.updatePartial?.({
 					verification: {
@@ -642,6 +651,20 @@ export function VerificationSection({
 		});
 	};
 
+	// Helper function to check if services have accreditation files
+	const getServicesWithoutAccreditation = () => {
+		return services.filter((service) => {
+			const hasDocs = service.documents && service.documents.length > 0;
+			return !hasDocs;
+		});
+	};
+
+	// Helper function to check if any service has accreditation files
+	const hasServicesWithAccreditation = () => {
+		return services.some((service) => {
+			return service.documents && service.documents.length > 0;
+		});
+	};
 
 	// Show dashboard view if selected
 	if (viewMode === "dashboard") {
@@ -695,57 +718,21 @@ export function VerificationSection({
 					<div className="h-10 rounded bg-blue-50 border border-blue-100 animate-pulse" />
 				</div>
 			)}
-			<div className="space-y-3">
-				{/* Verification Status Alert */}
-				<Alert
-					className={`${
-						verificationStatus.overall === "verified"
-							? "border-green-200 bg-green-50"
-							: verificationStatus.overall === "rejected"
-							? "border-red-200 bg-red-50"
-							: "border-yellow-200 bg-yellow-50"
-					}`}
-				>
-					{getStatusIcon(verificationStatus.overall)}
-					<AlertDescription
-						className={`${
-							verificationStatus.overall === "verified"
-								? "text-green-800"
-								: verificationStatus.overall === "rejected"
-								? "text-red-800"
-								: "text-yellow-800"
-						}`}
-					>
-						<strong>Verification Status:</strong>{" "}
-						{verificationStatus.overall.replace("_", " ").toUpperCase()}
-						{verificationStatus.verificationNotes && (
-							<span className="block mt-1 text-sm">
-								<strong>Notes:</strong> {verificationStatus.verificationNotes}
-							</span>
-						)}
-					</AlertDescription>
-				</Alert>
-
-				{/* Progress Alert */}
-				<Alert className="border-blue-200 bg-blue-50">
-					<Info className="h-4 w-4 text-blue-600" />
-					<AlertDescription className="text-blue-800">
-						<strong>Progress:</strong> {getProgressPercentage()}% complete (
-						{documents.length} document{documents.length !== 1 ? "s" : ""} uploaded)
-						{userType === "ngo" && (
-							<span>
-								{" "}
-								• {services.length} service{services.length !== 1 ? "s" : ""} registered
-							</span>
-						)}
-					</AlertDescription>
-				</Alert>
-			</div>
+			{/* Single Consolidated Progress Bar */}
+			<VerificationProgressBar
+				hasAccreditation={documents.length > 0}
+				hasSupportServices={services.length > 0}
+				verificationStatus={verificationStatus.overall}
+				hasMatches={false} // TODO: Add logic to check for matches
+				verificationNotes={verificationStatus.verificationNotes}
+				documentsCount={documents.length}
+				servicesCount={services.length}
+			/>
 
 			{/* Document Upload and List Section */}
 			<div className="grid gap-4 sm:gap-6 lg:grid-cols-2 xl:grid-cols-6">
-				{/* Document Upload Form - Left Side */}
-				<div className="lg:col-span-1 xl:col-span-3">
+				{/* Document Upload Form - Desktop Only */}
+				<div className="hidden sm:block lg:col-span-1 xl:col-span-3">
 					<Card className="h-fit">
 						<CardHeader className="pb-3 sm:pb-4">
 							<CardTitle className="flex items-center gap-2 text-base sm:text-lg">
@@ -767,6 +754,42 @@ export function VerificationSection({
 								}}
 							/>
 						</CardContent>
+					</Card>
+				</div>
+
+				{/* Mobile Documents Header */}
+				<div className="sm:hidden">
+					<Card>
+						<CardHeader className="pb-3">
+							<div className="flex items-center justify-between">
+								<div>
+									<CardTitle className="flex items-center gap-2 text-base">
+										<FileText className="h-4 w-4 text-sauti-orange" />
+										Professional Credentials
+									</CardTitle>
+									<p className="text-xs text-gray-600 mt-1">
+										{documents.length} document{documents.length !== 1 ? "s" : ""}{" "}
+										uploaded
+									</p>
+								</div>
+								<Button
+									size="sm"
+									className="gap-2 bg-sauti-orange hover:bg-sauti-orange/90"
+									onClick={() => {
+										// Navigate to services tab to add documents
+										const servicesTab = document.querySelector(
+											'[data-value="services"]'
+										) as HTMLElement;
+										if (servicesTab) {
+											servicesTab.click();
+										}
+									}}
+								>
+									<Plus className="h-4 w-4" />
+									Add
+								</Button>
+							</div>
+						</CardHeader>
 					</Card>
 				</div>
 
@@ -974,6 +997,15 @@ export function VerificationSection({
 								<Button
 									className="gap-2 bg-sauti-orange hover:bg-sauti-orange/90 text-xs sm:text-sm"
 									size="sm"
+									onClick={() => {
+										// Navigate to services tab
+										const servicesTab = document.querySelector(
+											'[data-value="services"]'
+										) as HTMLElement;
+										if (servicesTab) {
+											servicesTab.click();
+										}
+									}}
 								>
 									<Plus className="h-3 w-3 sm:h-4 sm:w-4" />
 									Add Support Service
@@ -1030,6 +1062,60 @@ export function VerificationSection({
 					</CardContent>
 				</Card>
 			)}
+			{/* Verification Actions - Desktop Only */}
+			{services.length === 0 || !hasServicesWithAccreditation() ? (
+				<Card className="hidden sm:block">
+					<CardContent className="p-4">
+						<div className="flex items-center justify-between">
+							<div>
+								<h3 className="text-lg font-semibold text-gray-900">
+									Verification Actions
+								</h3>
+								<p className="text-sm text-gray-600">
+									{services.length === 0
+										? "Add support services to start helping survivors"
+										: "Add accreditation files for your support services"}
+								</p>
+							</div>
+							<div className="flex gap-2">
+								{services.length === 0 ? (
+									<Button
+										className="gap-2 bg-sauti-orange hover:bg-sauti-orange/90"
+										onClick={() => {
+											// Navigate to services tab
+											const servicesTab = document.querySelector(
+												'[data-value="services"]'
+											) as HTMLElement;
+											if (servicesTab) {
+												servicesTab.click();
+											}
+										}}
+									>
+										<Plus className="h-4 w-4" />
+										Add Support Service
+									</Button>
+								) : (
+									<Button
+										className="gap-2 bg-sauti-orange hover:bg-sauti-orange/90"
+										onClick={() => {
+											// Navigate to services tab to add accreditation files
+											const servicesTab = document.querySelector(
+												'[data-value="services"]'
+											) as HTMLElement;
+											if (servicesTab) {
+												servicesTab.click();
+											}
+										}}
+									>
+										<FileText className="h-4 w-4" />
+										Add Accreditation
+									</Button>
+								)}
+							</div>
+						</div>
+					</CardContent>
+				</Card>
+			) : null}
 		</div>
 	);
 }

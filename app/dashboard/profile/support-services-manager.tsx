@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -29,6 +29,7 @@ import { createClient } from "@/utils/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Database } from "@/types/db-schema";
 import { SupportServiceSidepanel } from "./support-services-sidepanel";
+import { VerificationProgressBar } from "./verification-progress-bar";
 
 type SupportServiceType = Database["public"]["Enums"]["support_service_type"];
 type UserType = Database["public"]["Enums"]["user_type"];
@@ -51,11 +52,21 @@ interface SupportService {
 interface SupportServicesManagerProps {
 	userId: string;
 	userType: UserType;
+	verificationStatus?: string;
+	hasAccreditation?: boolean;
+	hasMatches?: boolean;
+	verificationNotes?: string;
+	documentsCount?: number;
 }
 
 export function SupportServicesManager({
 	userId,
 	userType,
+	verificationStatus = "pending",
+	hasAccreditation = false,
+	hasMatches = false,
+	verificationNotes,
+	documentsCount = 0,
 }: SupportServicesManagerProps) {
 	const [services, setServices] = useState<SupportService[]>([]);
 	const [isLoading, setIsLoading] = useState(true);
@@ -78,11 +89,7 @@ export function SupportServicesManager({
 		return false;
 	};
 
-	useEffect(() => {
-		loadServices();
-	}, [userId]);
-
-	const loadServices = async () => {
+	const loadServices = useCallback(async () => {
 		setIsLoading(true);
 		try {
 			const { data, error } = await supabase
@@ -103,7 +110,11 @@ export function SupportServicesManager({
 		} finally {
 			setIsLoading(false);
 		}
-	};
+	}, [userId, supabase, toast]);
+
+	useEffect(() => {
+		loadServices();
+	}, [loadServices]);
 
 	const deleteService = async (serviceId: string) => {
 		setIsDeleting(serviceId);
@@ -177,14 +188,19 @@ export function SupportServicesManager({
 
 	return (
 		<div className="space-y-6">
-			{/* Header */}
-			<div className="flex items-center justify-between">
-				<div>
-					<h2 className="text-2xl font-bold text-gray-900">Support Services</h2>
-					<p className="text-gray-600 mt-1">
-						Manage your support services and their documentation
-					</p>
-				</div>
+			{/* Verification Progress Bar */}
+			<VerificationProgressBar
+				hasAccreditation={hasAccreditation}
+				hasSupportServices={services.length > 0}
+				verificationStatus={verificationStatus}
+				hasMatches={hasMatches}
+				verificationNotes={verificationNotes}
+				documentsCount={documentsCount}
+				servicesCount={services.length}
+			/>
+
+			{/* Header - Desktop Only */}
+			<div className="hidden sm:flex items-center justify-between">
 				{canAddService() && (
 					<Dialog open={showAddForm} onOpenChange={setShowAddForm}>
 						<DialogTrigger asChild>
@@ -214,13 +230,36 @@ export function SupportServicesManager({
 			</div>
 
 			{/* Service Limits Alert */}
-			{userType === "professional" && services.length > 0 && (
-				<Alert>
-					<Shield className="h-4 w-4" />
-					<AlertDescription>
-						<strong>Service Limit:</strong> As a professional, you can only have one
-						support service. To add a different service, you'll need to delete the
-						existing one first.
+			{userType === "professional" && services.length > 1 && (
+				<Alert className="border-orange-200 bg-orange-50">
+					<Shield className="h-4 w-4 text-orange-600 flex-shrink-0" />
+					<AlertDescription className="text-orange-800">
+						<span className="hidden sm:inline">
+							<strong>Important:</strong> As a professional, you can only have one
+							support service. Matching will only happen using the first service you
+							added. Please delete the other services to avoid confusion.
+						</span>
+						<span className="sm:hidden">
+							<strong>Important:</strong> You can only have one service. Delete others
+							to avoid confusion.
+						</span>
+					</AlertDescription>
+				</Alert>
+			)}
+
+			{userType === "professional" && services.length === 1 && (
+				<Alert className="border-blue-200 bg-blue-50">
+					<Shield className="h-4 w-4 text-blue-600 flex-shrink-0" />
+					<AlertDescription className="text-blue-800">
+						<span className="hidden sm:inline">
+							<strong>Service Limit:</strong> As a professional, you can only have one
+							support service. To add a different service, you'll need to delete the
+							existing one first.
+						</span>
+						<span className="sm:hidden">
+							<strong>Service Limit:</strong> You can only have one service. Delete
+							existing to add a different one.
+						</span>
 					</AlertDescription>
 				</Alert>
 			)}

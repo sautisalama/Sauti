@@ -62,6 +62,7 @@ export default function ProfilePage() {
 	const [activeTab, setActiveTab] = useState("profile");
 	const searchParams = useSearchParams();
 	const [userServices, setUserServices] = useState<any[]>([]);
+	const [hasMatches, setHasMatches] = useState(false);
 
 	// Respect ?tab=verification to open the verification tab directly
 	useEffect(() => {
@@ -104,12 +105,46 @@ export default function ProfilePage() {
 		}
 	}, [userId, supabase]);
 
+	const checkMatches = useCallback(async () => {
+		if (!isProfessional || !userId) return;
+
+		try {
+			const { data: services } = await supabase
+				.from("support_services")
+				.select("id")
+				.eq("user_id", userId);
+
+			if (!services || services.length === 0) {
+				setHasMatches(false);
+				return;
+			}
+
+			const serviceIds = services.map((s) => s.id);
+			const { data: matches } = await supabase
+				.from("matched_services")
+				.select("id")
+				.in("service_id", serviceIds)
+				.limit(1);
+
+			setHasMatches(!!matches && matches.length > 0);
+		} catch (error) {
+			console.error("Error checking matches:", error);
+		}
+	}, [isProfessional, userId, supabase]);
+
 	// Load user services for NGO users
 	useEffect(() => {
 		if (profile?.user_type === "ngo" && userId) {
 			loadUserServices();
 		}
 	}, [profile?.user_type, userId, loadUserServices]);
+
+	// Check for matches
+	useEffect(() => {
+		if (isProfessional && userId) {
+			checkMatches();
+		}
+	}, [isProfessional, userId, checkMatches]);
 
 	const updateFormData = (section: string, field: string, value: any) => {
 		setFormData((prev) => ({
@@ -246,6 +281,31 @@ export default function ProfilePage() {
 
 	return (
 		<div className="min-h-screen bg-gray-50 overflow-x-hidden">
+			{/* Header - Mobile Only */}
+			<div className="sm:hidden bg-white border-b border-gray-200 px-4 py-3">
+				<div className="flex items-center justify-between">
+					<div className="flex items-center gap-3">
+						<Avatar className="h-10 w-10">
+							<AvatarImage src={profile?.avatar_url || ""} />
+							<AvatarFallback className="bg-sauti-orange text-white">
+								{profile?.first_name?.[0] || "U"}
+							</AvatarFallback>
+						</Avatar>
+						<div>
+							<h1 className="font-semibold text-gray-900">{profile?.first_name}</h1>
+						</div>
+					</div>
+					<Button
+						variant="outline"
+						size="sm"
+						onClick={() => signOut()}
+						className="text-red-600 border-red-200 hover:bg-red-50"
+					>
+						Sign Out
+					</Button>
+				</div>
+			</div>
+
 			{/* Main Content */}
 			<div className="max-w-7xl mx-auto px-3 sm:px-4 py-4 sm:py-6 overflow-x-hidden">
 				<Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
@@ -434,6 +494,7 @@ export default function ProfilePage() {
 										})();
 									} catch {}
 								}}
+								onNavigateToServices={() => setActiveTab("services")}
 							/>
 						</TabsContent>
 					)}
@@ -444,6 +505,17 @@ export default function ProfilePage() {
 							<SupportServicesManager
 								userId={userId || ""}
 								userType={profile?.user_type || "professional"}
+								verificationStatus={profile?.verification_status || "pending"}
+								hasAccreditation={!!profileData.accreditation_files}
+								hasMatches={hasMatches}
+								verificationNotes={profile?.verification_notes || undefined}
+								documentsCount={
+									profileData.accreditation_files
+										? Array.isArray(profileData.accreditation_files)
+											? profileData.accreditation_files.length
+											: JSON.parse(profileData.accreditation_files).length
+										: 0
+								}
 							/>
 						</TabsContent>
 					)}

@@ -1,11 +1,13 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import {
 	Dialog,
 	DialogContent,
@@ -30,6 +32,7 @@ import {
 	Upload,
 	Trash2,
 	Edit,
+	Save,
 } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -38,6 +41,102 @@ import { fileUploadService } from "@/lib/file-upload";
 
 type SupportServiceType = Database["public"]["Enums"]["support_service_type"];
 type UserType = Database["public"]["Enums"]["user_type"];
+
+// Add Document Form Component
+function AddDocumentForm({
+	onSave,
+	isUploading,
+}: {
+	onSave: (title: string, file: File, note?: string) => void;
+	isUploading: boolean;
+}) {
+	const [title, setTitle] = useState("");
+	const [note, setNote] = useState("");
+	const [file, setFile] = useState<File | null>(null);
+
+	const handleSubmit = (e: React.FormEvent) => {
+		e.preventDefault();
+		if (title && file) {
+			onSave(title, file, note);
+		}
+	};
+
+	return (
+		<form onSubmit={handleSubmit} className="space-y-4">
+			<div>
+				<label className="text-sm font-medium text-gray-700">
+					Document Title *
+				</label>
+				<input
+					type="text"
+					value={title}
+					onChange={(e) => setTitle(e.target.value)}
+					className="w-full mt-1 px-3 py-2 border border-gray-200 rounded-md focus:ring-2 focus:ring-sauti-orange/20 focus:border-sauti-orange"
+					placeholder="e.g., License, Certificate"
+					required
+				/>
+			</div>
+
+			<div>
+				<label className="text-sm font-medium text-gray-700">Upload File *</label>
+				<input
+					type="file"
+					onChange={(e) => setFile(e.target.files?.[0] || null)}
+					accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx"
+					className="w-full mt-1 px-3 py-2 border border-gray-200 rounded-md focus:ring-2 focus:ring-sauti-orange/20 focus:border-sauti-orange"
+					required
+				/>
+				<p className="text-xs text-gray-500 mt-1">
+					Supported formats: PDF, JPG, PNG, DOC, DOCX (Max 10MB)
+				</p>
+			</div>
+
+			<div>
+				<label className="text-sm font-medium text-gray-700">
+					Notes (Optional)
+				</label>
+				<textarea
+					value={note}
+					onChange={(e) => setNote(e.target.value)}
+					className="w-full mt-1 px-3 py-2 border border-gray-200 rounded-md focus:ring-2 focus:ring-sauti-orange/20 focus:border-sauti-orange"
+					placeholder="Additional notes about this document"
+					rows={3}
+				/>
+			</div>
+
+			<div className="flex justify-end gap-2">
+				<Button
+					type="button"
+					variant="outline"
+					onClick={() => {
+						setTitle("");
+						setNote("");
+						setFile(null);
+					}}
+				>
+					Cancel
+				</Button>
+				<Button
+					type="submit"
+					disabled={!title || !file || isUploading}
+					className="gap-2"
+				>
+					{isUploading ? (
+						<>
+							<div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
+							Uploading...
+						</>
+					) : (
+						<>
+							<Upload className="h-4 w-4" />
+							Upload Document
+						</>
+					)}
+				</Button>
+			</div>
+		</form>
+	);
+}
 
 interface SupportService {
 	id: string;
@@ -73,16 +172,19 @@ export function SupportServiceSidepanel({
 	const [isLoading, setIsLoading] = useState(false);
 	const [isUploading, setIsUploading] = useState(false);
 	const [showAddDocument, setShowAddDocument] = useState(false);
+	const [isEditing, setIsEditing] = useState(false);
+	const [editData, setEditData] = useState({
+		name: "",
+		email: "",
+		phone_number: "",
+		website: "",
+		availability: "",
+	});
+	const [isSaving, setIsSaving] = useState(false);
 	const supabase = createClient();
 	const { toast } = useToast();
 
-	useEffect(() => {
-		if (service) {
-			loadServiceDocuments();
-		}
-	}, [service]);
-
-	const loadServiceDocuments = async () => {
+	const loadServiceDocuments = useCallback(async () => {
 		if (!service) return;
 
 		setIsLoading(true);
@@ -111,6 +213,71 @@ export function SupportServiceSidepanel({
 			});
 		} finally {
 			setIsLoading(false);
+		}
+	}, [service, supabase, toast]);
+
+	useEffect(() => {
+		if (service) {
+			loadServiceDocuments();
+			setEditData({
+				name: service.name || "",
+				email: service.email || "",
+				phone_number: service.phone_number || "",
+				website: service.website || "",
+				availability: service.availability || "",
+			});
+		}
+	}, [service, loadServiceDocuments]);
+
+	const handleEdit = () => {
+		setIsEditing(true);
+	};
+
+	const handleCancelEdit = () => {
+		setIsEditing(false);
+		setEditData({
+			name: service?.name || "",
+			email: service?.email || "",
+			phone_number: service?.phone_number || "",
+			website: service?.website || "",
+			availability: service?.availability || "",
+		});
+	};
+
+	const handleSaveEdit = async () => {
+		if (!service) return;
+
+		setIsSaving(true);
+		try {
+			const { error } = await supabase
+				.from("support_services")
+				.update({
+					name: editData.name,
+					email: editData.email || null,
+					phone_number: editData.phone_number || null,
+					website: editData.website || null,
+					availability: editData.availability || null,
+					updated_at: new Date().toISOString(),
+				})
+				.eq("id", service.id);
+
+			if (error) throw error;
+
+			toast({
+				title: "Success",
+				description: "Service details updated successfully",
+			});
+			setIsEditing(false);
+			onUpdate();
+		} catch (error) {
+			console.error("Error updating service:", error);
+			toast({
+				title: "Error",
+				description: "Failed to update service details",
+				variant: "destructive",
+			});
+		} finally {
+			setIsSaving(false);
 		}
 	};
 
@@ -239,9 +406,18 @@ export function SupportServiceSidepanel({
 							<div className="min-w-0 flex-1">
 								<div className="flex items-center gap-2 mb-1">
 									<Building className="h-5 w-5 text-sauti-orange" />
-									<h2 className="text-lg font-semibold text-gray-900 truncate">
-										{service.name}
-									</h2>
+									{isEditing ? (
+										<Input
+											value={editData.name}
+											onChange={(e) => setEditData({ ...editData, name: e.target.value })}
+											className="text-lg font-semibold"
+											placeholder="Service name"
+										/>
+									) : (
+										<h2 className="text-lg font-semibold text-gray-900 truncate">
+											{service.name}
+										</h2>
+									)}
 									<Badge className={getStatusColor(service.verification_status)}>
 										{service.verification_status || "pending"}
 									</Badge>
@@ -256,33 +432,102 @@ export function SupportServiceSidepanel({
 								</div>
 							</div>
 						</div>
-						<Button
-							variant="ghost"
-							size="icon"
-							className="rounded-lg hover:bg-gray-100 transition-colors h-8 w-8"
-							onClick={onClose}
-						>
-							<X className="h-4 w-4 text-gray-600" />
-						</Button>
+						<div className="flex items-center gap-2">
+							{isEditing ? (
+								<>
+									<Button
+										variant="outline"
+										size="sm"
+										onClick={handleCancelEdit}
+										disabled={isSaving}
+										className="gap-1"
+									>
+										<X className="h-3 w-3" />
+										Cancel
+									</Button>
+									<Button
+										size="sm"
+										onClick={handleSaveEdit}
+										disabled={isSaving || !editData.name.trim()}
+										className="gap-1"
+									>
+										{isSaving ? (
+											<div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white" />
+										) : (
+											<Save className="h-3 w-3" />
+										)}
+										{isSaving ? "Saving..." : "Save"}
+									</Button>
+								</>
+							) : (
+								<>
+									<Button
+										variant="outline"
+										size="sm"
+										onClick={handleEdit}
+										className="gap-1"
+									>
+										<Edit className="h-3 w-3" />
+										Edit
+									</Button>
+									<Button
+										variant="ghost"
+										size="icon"
+										className="rounded-lg hover:bg-gray-100 transition-colors h-8 w-8"
+										onClick={onClose}
+									>
+										<X className="h-4 w-4 text-gray-600" />
+									</Button>
+								</>
+							)}
+						</div>
 					</div>
 
 					{/* Service Details */}
 					<div className="grid grid-cols-2 gap-4 text-sm">
-						{service.email && (
-							<div>
-								<span className="text-gray-600">Email:</span>
-								<p className="font-medium">{service.email}</p>
-							</div>
-						)}
-						{service.phone_number && (
-							<div>
-								<span className="text-gray-600">Phone:</span>
-								<p className="font-medium">{service.phone_number}</p>
-							</div>
-						)}
-						{service.website && (
-							<div className="col-span-2">
-								<span className="text-gray-600">Website:</span>
+						{/* Email */}
+						<div>
+							<span className="text-gray-600">Email:</span>
+							{isEditing ? (
+								<Input
+									value={editData.email}
+									onChange={(e) => setEditData({ ...editData, email: e.target.value })}
+									placeholder="service@example.com"
+									className="mt-1"
+								/>
+							) : (
+								<p className="font-medium">{service.email || "Not provided"}</p>
+							)}
+						</div>
+
+						{/* Phone */}
+						<div>
+							<span className="text-gray-600">Phone:</span>
+							{isEditing ? (
+								<Input
+									value={editData.phone_number}
+									onChange={(e) =>
+										setEditData({ ...editData, phone_number: e.target.value })
+									}
+									placeholder="+1 (555) 123-4567"
+									className="mt-1"
+								/>
+							) : (
+								<p className="font-medium">{service.phone_number || "Not provided"}</p>
+							)}
+						</div>
+
+						{/* Website */}
+						<div className="col-span-2">
+							<span className="text-gray-600">Website:</span>
+							{isEditing ? (
+								<Input
+									value={editData.website}
+									onChange={(e) => setEditData({ ...editData, website: e.target.value })}
+									placeholder="https://example.com"
+									className="mt-1"
+								/>
+							) : service.website ? (
 								<a
 									href={service.website}
 									target="_blank"
@@ -292,14 +537,27 @@ export function SupportServiceSidepanel({
 									{service.website}
 									<ExternalLink className="h-3 w-3" />
 								</a>
-							</div>
-						)}
-						{service.availability && (
-							<div className="col-span-2">
-								<span className="text-gray-600">Availability:</span>
-								<p className="font-medium">{service.availability}</p>
-							</div>
-						)}
+							) : (
+								<p className="font-medium text-gray-500">Not provided</p>
+							)}
+						</div>
+
+						{/* Availability */}
+						<div className="col-span-2">
+							<span className="text-gray-600">Availability:</span>
+							{isEditing ? (
+								<Input
+									value={editData.availability}
+									onChange={(e) =>
+										setEditData({ ...editData, availability: e.target.value })
+									}
+									placeholder="e.g., 24/7, Mon-Fri 9AM-5PM"
+									className="mt-1"
+								/>
+							) : (
+								<p className="font-medium">{service.availability || "Not specified"}</p>
+							)}
+						</div>
 					</div>
 
 					{service.verification_notes && (
@@ -325,7 +583,7 @@ export function SupportServiceSidepanel({
 									</CardTitle>
 									<Dialog open={showAddDocument} onOpenChange={setShowAddDocument}>
 										<DialogTrigger asChild>
-											<Button size="sm" className="gap-2">
+											<Button size="sm" className="gap-2 hidden sm:flex">
 												<Plus className="h-4 w-4" />
 												Add Document
 											</Button>
@@ -438,101 +696,5 @@ export function SupportServiceSidepanel({
 				</div>
 			</div>
 		</div>
-	);
-}
-
-// Add Document Form Component
-function AddDocumentForm({
-	onSave,
-	isUploading,
-}: {
-	onSave: (title: string, file: File, note?: string) => void;
-	isUploading: boolean;
-}) {
-	const [title, setTitle] = useState("");
-	const [note, setNote] = useState("");
-	const [file, setFile] = useState<File | null>(null);
-
-	const handleSubmit = (e: React.FormEvent) => {
-		e.preventDefault();
-		if (title && file) {
-			onSave(title, file, note);
-		}
-	};
-
-	return (
-		<form onSubmit={handleSubmit} className="space-y-4">
-			<div>
-				<label className="text-sm font-medium text-gray-700">
-					Document Title *
-				</label>
-				<input
-					type="text"
-					value={title}
-					onChange={(e) => setTitle(e.target.value)}
-					className="w-full mt-1 px-3 py-2 border border-gray-200 rounded-md focus:ring-2 focus:ring-sauti-orange/20 focus:border-sauti-orange"
-					placeholder="e.g., License, Certificate"
-					required
-				/>
-			</div>
-
-			<div>
-				<label className="text-sm font-medium text-gray-700">Upload File *</label>
-				<input
-					type="file"
-					onChange={(e) => setFile(e.target.files?.[0] || null)}
-					accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx"
-					className="w-full mt-1 px-3 py-2 border border-gray-200 rounded-md focus:ring-2 focus:ring-sauti-orange/20 focus:border-sauti-orange"
-					required
-				/>
-				<p className="text-xs text-gray-500 mt-1">
-					Supported formats: PDF, JPG, PNG, DOC, DOCX (Max 10MB)
-				</p>
-			</div>
-
-			<div>
-				<label className="text-sm font-medium text-gray-700">
-					Notes (Optional)
-				</label>
-				<textarea
-					value={note}
-					onChange={(e) => setNote(e.target.value)}
-					className="w-full mt-1 px-3 py-2 border border-gray-200 rounded-md focus:ring-2 focus:ring-sauti-orange/20 focus:border-sauti-orange"
-					placeholder="Additional notes about this document"
-					rows={3}
-				/>
-			</div>
-
-			<div className="flex justify-end gap-2">
-				<Button
-					type="button"
-					variant="outline"
-					onClick={() => {
-						setTitle("");
-						setNote("");
-						setFile(null);
-					}}
-				>
-					Cancel
-				</Button>
-				<Button
-					type="submit"
-					disabled={!title || !file || isUploading}
-					className="gap-2"
-				>
-					{isUploading ? (
-						<>
-							<div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
-							Uploading...
-						</>
-					) : (
-						<>
-							<Upload className="h-4 w-4" />
-							Upload Document
-						</>
-					)}
-				</Button>
-			</div>
-		</form>
 	);
 }
