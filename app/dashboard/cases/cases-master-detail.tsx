@@ -520,7 +520,7 @@ export default function CasesMasterDetail({ userId }: { userId: string }) {
 					}`}
 				>
 					{/* Compact Search and Filter Bar */}
-					<div className="mb-4">
+					<div className="mb-4 lg:sticky lg:top-[100px] lg:z-20 lg:bg-white/95 lg:backdrop-blur-sm lg:border-b lg:border-gray-200 lg:pb-4">
 						<div className="flex items-center gap-3">
 							{/* Search Bar */}
 							<div className="relative flex-1">
