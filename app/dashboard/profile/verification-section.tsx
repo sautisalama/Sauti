@@ -68,6 +68,8 @@ interface VerificationDocument {
 	serviceType?: SupportServiceType;
 	status: "pending" | "verified" | "rejected" | "under_review";
 	notes?: string;
+	certificateNumber?: string;
+	isIdCardFront?: boolean;
 }
 
 interface VerificationStatus {
@@ -109,6 +111,7 @@ interface DocumentFormData {
 	certificateNumber: string;
 	file: File | null;
 	uploaded: boolean;
+	isIdCardFront?: boolean;
 }
 
 export function DocumentUploadForm({
@@ -129,6 +132,7 @@ export function DocumentUploadForm({
 			certificateNumber: "",
 			file: null,
 			uploaded: false,
+			isIdCardFront: documents.length === 0, // First document is ID card front
 		};
 		setDocuments((prev) => [...prev, newDoc]);
 	};
@@ -325,9 +329,19 @@ export function DocumentUploadForm({
 					>
 						<CardContent className="p-3 sm:p-4">
 							<div className="flex items-center justify-between mb-3 sm:mb-4">
-								<h4 className="font-medium text-sm sm:text-base">
-									Document {documents.indexOf(doc) + 1}
-								</h4>
+								<div className="flex items-center gap-2">
+									<h4 className="font-medium text-sm sm:text-base">
+										Document {documents.indexOf(doc) + 1}
+									</h4>
+									{doc.isIdCardFront && (
+										<Badge
+											variant="secondary"
+											className="text-xs bg-blue-100 text-blue-700"
+										>
+											ID Card Front
+										</Badge>
+									)}
+								</div>
 								<Button
 									variant="ghost"
 									size="sm"
@@ -504,6 +518,47 @@ export function VerificationSection({
 	const supabase = createClient();
 	const { toast } = useToast();
 
+	const deleteDocument = async (documentUrl: string, serviceId?: string) => {
+		try {
+			await fileUploadService.deleteDocument(
+				userId,
+				documentUrl,
+				"accreditation",
+				serviceId
+			);
+
+			// Remove from local state
+			setDocuments((prev) => prev.filter((doc) => doc.url !== documentUrl));
+
+			// If it's a service document, also update the services state
+			if (serviceId) {
+				setServices((prev) =>
+					prev.map((service) => {
+						if (service.id === serviceId) {
+							return {
+								...service,
+								documents: service.documents.filter((doc) => doc.url !== documentUrl),
+							};
+						}
+						return service;
+					})
+				);
+			}
+
+			toast({
+				title: "Success",
+				description: "Document deleted successfully",
+			});
+		} catch (error) {
+			console.error("Error deleting document:", error);
+			toast({
+				title: "Error",
+				description: "Failed to delete document. Please try again.",
+				variant: "destructive",
+			});
+		}
+	};
+
 	const loadVerificationStatus = useCallback(async () => {
 		try {
 			const { data, error } = await supabase
@@ -529,63 +584,90 @@ export function VerificationSection({
 
 	const loadDocuments = useCallback(async () => {
 		try {
-			// Load documents from profile accreditation_files_metadata; seed from provider if available to avoid skeleton flicker
-			// Instant seed from provider snapshot
-			const seededDocCount = (dash?.data as any)?.verification?.documentsCount;
-			if (typeof seededDocCount === "number" && seededDocCount >= 0) {
-				// We can't reconstruct full docs without metadata, so we proceed to fetch; seeding could drive counters/UI elsewhere
-			}
-			const { data: profileData } = await supabase
-				.from("profiles")
-				.select("accreditation_files_metadata, accreditation_files")
-				.eq("id", userId)
-				.single();
+			// Use the new getAllUserDocuments method to get all documents
+			const allDocuments = await fileUploadService.getAllUserDocuments(
+				userId,
+				"accreditation"
+			);
 
-			const metaDocsRaw = profileData?.accreditation_files_metadata
-				? Array.isArray(profileData.accreditation_files_metadata)
-					? profileData.accreditation_files_metadata
-					: JSON.parse(profileData.accreditation_files_metadata)
-				: [];
-			const legacyDocsRaw = profileData?.accreditation_files
-				? Array.isArray(profileData.accreditation_files)
-					? profileData.accreditation_files
-					: JSON.parse(profileData.accreditation_files)
-				: [];
-			// Build lookup by url or title to merge notes/description from legacy docs
-			const legacyByUrl = new Map<string, any>();
-			const legacyByTitle = new Map<string, any>();
-			(legacyDocsRaw || []).forEach((ld: any) => {
-				if (ld?.url) legacyByUrl.set(ld.url, ld);
-				if (ld?.title) legacyByTitle.set(ld.title, ld);
-			});
+			// Convert to the format expected by the UI
+			const formattedDocuments = allDocuments.map((doc, index) => ({
+				id: `doc-${index}`,
+				title: doc.title || doc.fileName || "Untitled Document",
+				url: doc.url,
+				fileType: doc.fileType || "unknown",
+				fileSize: doc.fileSize || 0,
+				uploadedAt: doc.uploadedAt,
+				serviceId: doc.serviceId,
+				serviceType: doc.serviceType,
+				status: (doc.status || "under_review") as any,
+				notes: doc.notes,
+				certificateNumber: doc.certificateNumber,
+				// Mark the first document as ID card front
+				isIdCardFront: index === 0,
+			}));
 
-			const merged = (metaDocsRaw || []).map((doc: any, index: number) => {
-				const keyUrl = doc?.url;
-				const keyTitle = doc?.title;
-				const legacy =
-					(keyUrl && legacyByUrl.get(keyUrl)) ||
-					(keyTitle && legacyByTitle.get(keyTitle)) ||
-					{};
-				return {
-					id: `doc-${index}`,
-					title: doc.title || legacy.title || "Untitled Document",
-					url: doc.url || legacy.url || "",
-					fileType: doc.fileType || legacy.fileType || "unknown",
-					fileSize: doc.fileSize || legacy.fileSize || 0,
-					uploadedAt:
-						doc.uploadedAt || legacy.uploadedAt || new Date().toISOString(),
-					serviceId: doc.serviceId || legacy.serviceId,
-					serviceType: doc.serviceType || legacy.serviceType,
-					status: (doc.status || legacy.status || "under_review") as any,
-					notes: doc.notes || legacy.note || legacy.notes,
-				};
-			});
-
-			setDocuments(merged);
+			setDocuments(formattedDocuments);
 		} catch (error) {
 			console.error("Error loading documents:", error);
+			// Fallback to old method if new method fails
+			try {
+				const { data: profileData } = await supabase
+					.from("profiles")
+					.select("accreditation_files_metadata, accreditation_files")
+					.eq("id", userId)
+					.single();
+
+				const metaDocsRaw = profileData?.accreditation_files_metadata
+					? Array.isArray(profileData.accreditation_files_metadata)
+						? profileData.accreditation_files_metadata
+						: JSON.parse(profileData.accreditation_files_metadata)
+					: [];
+				const legacyDocsRaw = profileData?.accreditation_files
+					? Array.isArray(profileData.accreditation_files)
+						? profileData.accreditation_files
+						: JSON.parse(profileData.accreditation_files)
+					: [];
+
+				// Build lookup by url or title to merge notes/description from legacy docs
+				const legacyByUrl = new Map<string, any>();
+				const legacyByTitle = new Map<string, any>();
+				(legacyDocsRaw || []).forEach((ld: any) => {
+					if (ld?.url) legacyByUrl.set(ld.url, ld);
+					if (ld?.title) legacyByTitle.set(ld.title, ld);
+				});
+
+				const merged = (metaDocsRaw || []).map((doc: any, index: number) => {
+					const keyUrl = doc?.url;
+					const keyTitle = doc?.title;
+					const legacy =
+						(keyUrl && legacyByUrl.get(keyUrl)) ||
+						(keyTitle && legacyByTitle.get(keyTitle)) ||
+						{};
+					return {
+						id: `doc-${index}`,
+						title: doc.title || legacy.title || "Untitled Document",
+						url: doc.url || legacy.url || "",
+						fileType: doc.fileType || legacy.fileType || "unknown",
+						fileSize: doc.fileSize || legacy.fileSize || 0,
+						uploadedAt:
+							doc.uploadedAt || legacy.uploadedAt || new Date().toISOString(),
+						serviceId: doc.serviceId || legacy.serviceId,
+						serviceType: doc.serviceType || legacy.serviceType,
+						status: (doc.status || legacy.status || "under_review") as any,
+						notes: doc.notes || legacy.note || legacy.notes,
+						certificateNumber: doc.certificateNumber || legacy.certificateNumber,
+						// Mark the first document as ID card front
+						isIdCardFront: index === 0,
+					};
+				});
+
+				setDocuments(merged);
+			} catch (fallbackError) {
+				console.error("Fallback document loading also failed:", fallbackError);
+			}
 		}
-	}, [userId, supabase, dash?.data]);
+	}, [userId, supabase]);
 
 	const loadServices = useCallback(async () => {
 		try {
@@ -946,9 +1028,19 @@ export function VerificationSection({
 															<FileText className="h-4 w-4 sm:h-5 sm:w-5" />
 														</div>
 														<div className="min-w-0 flex-1">
-															<h4 className="font-semibold text-gray-900 truncate text-sm sm:text-base">
-																{doc.title}
-															</h4>
+															<div className="flex items-center gap-2 mb-1">
+																<h4 className="font-semibold text-gray-900 truncate text-sm sm:text-base">
+																	{doc.title}
+																</h4>
+																{doc.isIdCardFront && (
+																	<Badge
+																		variant="secondary"
+																		className="text-xs bg-blue-100 text-blue-700"
+																	>
+																		ID Card Front
+																	</Badge>
+																)}
+															</div>
 															<div className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm text-gray-500 flex-wrap">
 																<span>{formatDateCompact(doc.uploadedAt)}</span>
 															</div>
@@ -980,78 +1072,130 @@ export function VerificationSection({
 																<span className="sm:hidden">View</span>
 															</Button>
 														</DialogTrigger>
-														<DialogContent className="max-w-2xl">
+														<DialogContent className="max-w-3xl">
 															<DialogHeader>
 																<DialogTitle className="flex items-center gap-2">
 																	<FileText className="h-5 w-5 text-sauti-orange" />
 																	{doc.title}
+																	{doc.isIdCardFront && (
+																		<Badge
+																			variant="secondary"
+																			className="text-xs bg-blue-100 text-blue-700"
+																		>
+																			ID Card Front
+																		</Badge>
+																	)}
 																</DialogTitle>
 																<DialogDescription>
 																	Professional credential document details
 																</DialogDescription>
 															</DialogHeader>
 															<div className="space-y-6">
-																<div className="grid grid-cols-2 gap-4">
-																	<div className="space-y-1">
-																		<label className="text-sm font-medium text-gray-600">
-																			File Type
-																		</label>
-																		<p className="text-sm font-mono bg-gray-100 px-2 py-1 rounded">
-																			{doc.fileType.toUpperCase()}
-																		</p>
-																	</div>
-																	<div className="space-y-1">
-																		<label className="text-sm font-medium text-gray-600">
-																			File Size
-																		</label>
-																		<p className="text-sm">{formatFileSize(doc.fileSize)}</p>
-																	</div>
-																	<div className="space-y-1">
-																		<label className="text-sm font-medium text-gray-600">
-																			Uploaded
-																		</label>
-																		<p className="text-sm">{formatDate(doc.uploadedAt)}</p>
-																	</div>
-																	<div className="space-y-1">
-																		<label className="text-sm font-medium text-gray-600">
-																			Status
-																		</label>
-																		<Badge className={getStatusColor(doc.status)}>
+																{/* Document Preview */}
+																<div className="border rounded-lg p-4 bg-gray-50">
+																	<div className="flex items-center gap-3">
+																		<div className="h-12 w-12 rounded-lg bg-sauti-orange/10 flex items-center justify-center">
+																			<FileText className="h-6 w-6 text-sauti-orange" />
+																		</div>
+																		<div className="flex-1 min-w-0">
+																			<h4 className="font-medium text-gray-900 truncate">
+																				{doc.title}
+																			</h4>
+																			<p className="text-sm text-gray-500">
+																				{doc.fileType.toUpperCase()} •{" "}
+																				{formatFileSize(doc.fileSize)}
+																			</p>
+																		</div>
+																		<Badge className={`${getStatusColor(doc.status)} text-xs`}>
 																			{doc.status.replace("_", " ")}
 																		</Badge>
 																	</div>
 																</div>
+
+																{/* Document Details */}
+																<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+																	<div className="space-y-3">
+																		<div>
+																			<label className="text-sm font-medium text-gray-600">
+																				Upload Date
+																			</label>
+																			<p className="text-sm text-gray-900">
+																				{formatDate(doc.uploadedAt)}
+																			</p>
+																		</div>
+																		<div>
+																			<label className="text-sm font-medium text-gray-600">
+																				File Type
+																			</label>
+																			<p className="text-sm text-gray-900 capitalize">
+																				{doc.fileType}
+																			</p>
+																		</div>
+																	</div>
+																	<div className="space-y-3">
+																		<div>
+																			<label className="text-sm font-medium text-gray-600">
+																				File Size
+																			</label>
+																			<p className="text-sm text-gray-900">
+																				{formatFileSize(doc.fileSize)}
+																			</p>
+																		</div>
+																		{doc.certificateNumber && (
+																			<div>
+																				<label className="text-sm font-medium text-gray-600">
+																					Certificate Number
+																				</label>
+																				<p className="text-sm text-gray-900 font-mono">
+																					{doc.certificateNumber}
+																				</p>
+																			</div>
+																		)}
+																	</div>
+																</div>
+
 																{doc.notes && (
-																	<div className="space-y-1">
+																	<div>
 																		<label className="text-sm font-medium text-gray-600">
 																			Notes
 																		</label>
-																		<p className="text-sm bg-gray-50 p-3 rounded border">
-																			{doc.notes}
-																		</p>
+																		<div className="mt-1 p-3 bg-gray-50 rounded-md">
+																			<p className="text-sm text-gray-900">{doc.notes}</p>
+																		</div>
 																	</div>
 																)}
-																<div className="flex gap-3 pt-4 border-t">
+
+																{/* Action Buttons */}
+																<div className="space-y-3 pt-4 border-t">
+																	<div className="flex gap-2">
+																		<Button
+																			onClick={() => window.open(doc.url, "_blank")}
+																			className="gap-2 flex-1"
+																		>
+																			<ExternalLink className="h-4 w-4" />
+																			View Document
+																		</Button>
+																		<Button
+																			variant="outline"
+																			onClick={() => {
+																				const link = document.createElement("a");
+																				link.href = doc.url;
+																				link.download = doc.title;
+																				link.click();
+																			}}
+																			className="gap-2 flex-1"
+																		>
+																			<Download className="h-4 w-4" />
+																			Download
+																		</Button>
+																	</div>
 																	<Button
 																		variant="outline"
-																		onClick={() => window.open(doc.url, "_blank")}
-																		className="gap-2 flex-1"
+																		onClick={() => deleteDocument(doc.url)}
+																		className="w-full gap-2 text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200 hover:border-red-300"
 																	>
-																		<ExternalLink className="h-4 w-4" />
-																		View Document
-																	</Button>
-																	<Button
-																		variant="outline"
-																		onClick={() => {
-																			const link = document.createElement("a");
-																			link.href = doc.url;
-																			link.download = doc.title;
-																			link.click();
-																		}}
-																		className="gap-2 flex-1"
-																	>
-																		<Download className="h-4 w-4" />
-																		Download
+																		<Trash2 className="h-4 w-4" />
+																		Delete Document
 																	</Button>
 																</div>
 															</div>
@@ -1143,19 +1287,150 @@ export function VerificationSection({
 													{service.documents.map((doc) => (
 														<div
 															key={doc.id}
-															className="flex items-center justify-between p-2 bg-gray-50 rounded"
+															className="flex items-center justify-between p-2 bg-gray-50 rounded hover:bg-gray-100 transition-colors"
 														>
 															<div className="flex items-center gap-2 min-w-0 flex-1">
 																<FileText className="h-3 w-3 sm:h-4 sm:w-4 text-gray-600 flex-shrink-0" />
 																<span className="text-xs sm:text-sm truncate">{doc.title}</span>
 															</div>
-															<Badge
-																className={`${getStatusColor(
-																	doc.status
-																)} text-xs flex-shrink-0`}
-															>
-																{doc.status.replace("_", " ")}
-															</Badge>
+															<div className="flex items-center gap-2">
+																<Badge
+																	className={`${getStatusColor(
+																		doc.status
+																	)} text-xs flex-shrink-0`}
+																>
+																	{doc.status.replace("_", " ")}
+																</Badge>
+																<Dialog>
+																	<DialogTrigger asChild>
+																		<Button
+																			variant="ghost"
+																			size="sm"
+																			className="h-6 w-6 p-0 text-gray-600 hover:text-gray-700 hover:bg-gray-200"
+																		>
+																			<Eye className="h-3 w-3" />
+																		</Button>
+																	</DialogTrigger>
+																	<DialogContent className="max-w-3xl">
+																		<DialogHeader>
+																			<DialogTitle className="flex items-center gap-2">
+																				<FileText className="h-5 w-5 text-sauti-orange" />
+																				{doc.title}
+																			</DialogTitle>
+																			<DialogDescription>
+																				Service document details - {service.name}
+																			</DialogDescription>
+																		</DialogHeader>
+																		<div className="space-y-6">
+																			{/* Document Preview */}
+																			<div className="border rounded-lg p-4 bg-gray-50">
+																				<div className="flex items-center gap-3">
+																					<div className="h-12 w-12 rounded-lg bg-sauti-orange/10 flex items-center justify-center">
+																						<FileText className="h-6 w-6 text-sauti-orange" />
+																					</div>
+																					<div className="flex-1 min-w-0">
+																						<h4 className="font-medium text-gray-900 truncate">
+																							{doc.title}
+																						</h4>
+																						<p className="text-sm text-gray-500">
+																							{doc.fileType.toUpperCase()} •{" "}
+																							{formatFileSize(doc.fileSize)}
+																						</p>
+																					</div>
+																					<Badge className={`${getStatusColor(doc.status)} text-xs`}>
+																						{doc.status.replace("_", " ")}
+																					</Badge>
+																				</div>
+																			</div>
+
+																			{/* Document Details */}
+																			<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+																				<div className="space-y-3">
+																					<div>
+																						<label className="text-sm font-medium text-gray-600">
+																							Service
+																						</label>
+																						<p className="text-sm text-gray-900">{service.name}</p>
+																					</div>
+																					<div>
+																						<label className="text-sm font-medium text-gray-600">
+																							Upload Date
+																						</label>
+																						<p className="text-sm text-gray-900">
+																							{formatDateCompact(doc.uploadedAt)}
+																						</p>
+																					</div>
+																				</div>
+																				<div className="space-y-3">
+																					<div>
+																						<label className="text-sm font-medium text-gray-600">
+																							File Type
+																						</label>
+																						<p className="text-sm text-gray-900 capitalize">
+																							{doc.fileType}
+																						</p>
+																					</div>
+																					<div>
+																						<label className="text-sm font-medium text-gray-600">
+																							File Size
+																						</label>
+																						<p className="text-sm text-gray-900">
+																							{formatFileSize(doc.fileSize)}
+																						</p>
+																					</div>
+																				</div>
+																			</div>
+
+																			{doc.notes && (
+																				<div>
+																					<label className="text-sm font-medium text-gray-600">
+																						Notes
+																					</label>
+																					<div className="mt-1 p-3 bg-gray-50 rounded-md">
+																						<p className="text-sm text-gray-900">{doc.notes}</p>
+																					</div>
+																				</div>
+																			)}
+
+																			{/* Action Buttons */}
+																			<div className="space-y-3 pt-4 border-t">
+																				<div className="flex gap-2">
+																					<Button
+																						onClick={() => {
+																							window.open(doc.url, "_blank");
+																						}}
+																						className="gap-2 flex-1"
+																					>
+																						<ExternalLink className="h-4 w-4" />
+																						View Document
+																					</Button>
+																					<Button
+																						variant="outline"
+																						onClick={() => {
+																							const link = document.createElement("a");
+																							link.href = doc.url;
+																							link.download = doc.title;
+																							link.click();
+																						}}
+																						className="gap-2 flex-1"
+																					>
+																						<Download className="h-4 w-4" />
+																						Download
+																					</Button>
+																				</div>
+																				<Button
+																					variant="outline"
+																					onClick={() => deleteDocument(doc.url, service.id)}
+																					className="w-full gap-2 text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200 hover:border-red-300"
+																				>
+																					<Trash2 className="h-4 w-4" />
+																					Delete Document
+																				</Button>
+																			</div>
+																		</div>
+																	</DialogContent>
+																</Dialog>
+															</div>
 														</div>
 													))}
 												</div>

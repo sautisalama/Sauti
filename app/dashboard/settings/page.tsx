@@ -12,6 +12,7 @@ import { useEffect, useState } from "react";
 import { useAccessibility } from "@/components/a11y/AccessibilityProvider";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { CalendarConnectionStatus } from "../_components/CalendarConnectionStatus";
 
 function A11yToggle({
 	label,
@@ -129,6 +130,13 @@ export default function SettingsPage() {
 								</div>
 							</CardContent>
 						</Card>
+
+						{/* Calendar Integration */}
+						<CalendarConnectionStatus
+							userId={user?.id || ""}
+							variant="card"
+							showSettings={false}
+						/>
 
 						{/* Next of Kin Settings - Only for survivors */}
 						{!isProfessional && (

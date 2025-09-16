@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/utils/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -34,6 +34,8 @@ import {
 	getUnreadMessagesForCases,
 	subscribeToUnreadMessages,
 } from "@/utils/chat/unread-tracker";
+import { useDashboardData } from "@/components/providers/DashboardDataProvider";
+import { CalendarConnectionStatus } from "../_components/CalendarConnectionStatus";
 
 interface MatchedServiceItem {
 	id: string;
@@ -55,6 +57,8 @@ interface MatchedServiceItem {
 
 export default function CasesMasterDetail({ userId }: { userId: string }) {
 	const supabase = useMemo(() => createClient(), []);
+	const dash = useDashboardData();
+	const seededFromProviderRef = useRef(false);
 	const [cases, setCases] = useState<MatchedServiceItem[]>([]);
 	const [q, setQ] = useState("");
 	const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -68,9 +72,53 @@ export default function CasesMasterDetail({ userId }: { userId: string }) {
 	const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
 	const [isLoadingMessages, setIsLoadingMessages] = useState(false);
 
-	// Load matched services and appointments in parallel
+	// Seed from provider if available (instant render)
+	useEffect(() => {
+		try {
+			if (
+				!dash?.data ||
+				dash.data.userId !== userId ||
+				seededFromProviderRef.current
+			)
+				return;
+			const apptByMatchId = new Map<string, any[]>();
+			(dash.data.appointments || []).forEach((a: any) => {
+				const mid = a?.matched_service?.id;
+				if (!mid) return;
+				const arr = apptByMatchId.get(mid) || [];
+				arr.push({
+					id: a.id,
+					appointment_id: a.appointment_id,
+					appointment_date: a.appointment_date,
+					status: a.status,
+				});
+				apptByMatchId.set(mid, arr);
+			});
+			const seeded: MatchedServiceItem[] = (dash.data.matchedServices || []).map(
+				(m: any) => ({
+					id: m.id,
+					match_date: m.match_date || null,
+					match_status_type: m.match_status_type || null,
+					match_score: (m as any).match_score ?? null,
+					completed_at: (m as any).completed_at ?? null,
+					unread_messages: 0,
+					report: m.report,
+					support_service: m.support_service,
+					notes: (m as any).notes || null,
+					appointments: apptByMatchId.get(m.id) || [],
+				})
+			);
+			setCases(seeded);
+			setLoading(false);
+			seededFromProviderRef.current = true;
+		} catch {}
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [dash?.data, userId]);
+
+	// Load matched services and appointments in parallel (skip if already seeded)
 	useEffect(() => {
 		const load = async () => {
+			if (seededFromProviderRef.current) return;
 			setLoading(true);
 			try {
 				// Get the user's services
@@ -81,6 +129,7 @@ export default function CasesMasterDetail({ userId }: { userId: string }) {
 				const ids = (services || []).map((s) => s.id);
 				if (ids.length === 0) {
 					setCases([]);
+					setLoading(false);
 					return;
 				}
 
@@ -471,7 +520,7 @@ export default function CasesMasterDetail({ userId }: { userId: string }) {
 					}`}
 				>
 					{/* Compact Search and Filter Bar */}
-					<div className="mb-4">
+					<div className="mb-4 lg:sticky lg:top-[100px] lg:z-20 lg:bg-white/95 lg:backdrop-blur-sm lg:border-b lg:border-gray-200 lg:pb-4">
 						<div className="flex items-center gap-3">
 							{/* Search Bar */}
 							<div className="relative flex-1">
@@ -629,7 +678,7 @@ export default function CasesMasterDetail({ userId }: { userId: string }) {
 				<div
 					className={`lg:col-span-5 xl:col-span-5 ${
 						mobileView !== "calendar" ? "hidden lg:block" : ""
-					} lg:sticky lg:top-4 lg:self-start`}
+					} lg:sticky lg:top-[100px] lg:self-start lg:max-h-[calc(100vh-120px)] lg:overflow-y-auto`}
 				>
 					<Card className="p-4 shadow-sm border-gray-200 rounded-lg">
 						<div className="flex items-center justify-between mb-4">
@@ -659,6 +708,14 @@ export default function CasesMasterDetail({ userId }: { userId: string }) {
 								</Button>
 							)}
 						</div>
+
+						{/* Calendar Connection Status */}
+						<CalendarConnectionStatus
+							userId={userId}
+							variant="inline"
+							className="mb-3"
+						/>
+
 						<UIDateCalendar
 							mode="single"
 							showOutsideDays

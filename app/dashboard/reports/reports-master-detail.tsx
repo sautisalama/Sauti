@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/utils/supabase/client";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -35,6 +35,8 @@ import {
 import { Tables } from "@/types/db-schema";
 import RichTextNotesEditor from "./rich-text-notes-editor";
 import { useToast } from "@/hooks/use-toast";
+import { useDashboardData } from "@/components/providers/DashboardDataProvider";
+import { CalendarConnectionStatus } from "../_components/CalendarConnectionStatus";
 
 interface AppointmentLite {
 	id: string;
@@ -64,6 +66,8 @@ interface ReportItem extends Tables<"reports"> {
 
 export default function ReportsMasterDetail({ userId }: { userId: string }) {
 	const { toast } = useToast();
+	const dash = useDashboardData();
+	const seededFromProviderRef = useRef(false);
 	const supabase = useMemo(() => createClient(), []);
 	const [reports, setReports] = useState<ReportItem[]>([]);
 	const [q, setQ] = useState("");
@@ -79,50 +83,74 @@ export default function ReportsMasterDetail({ userId }: { userId: string }) {
 	const [showFilters, setShowFilters] = useState(false);
 
 	useEffect(() => {
-		// Try to hydrate from cache first for instant load
+		// Prefer provider snapshot when available (no spinner)
 		try {
-			const cached = localStorage.getItem(`reports-cache-${userId}`);
-			if (cached) {
-				const parsed = JSON.parse(cached);
-				if (Array.isArray(parsed)) {
-					setReports(parsed as any);
-					setLoading(false);
-				}
+			if (
+				dash?.data &&
+				dash.data.userId === userId &&
+				!seededFromProviderRef.current
+			) {
+				const normalized = (dash.data.reports as any[])?.map((r: any) => ({
+					...r,
+					matched_services:
+						r.matched_services?.map((m: any) => ({
+							...m,
+							support_services: m.support_service || m.support_services || null,
+						})) || [],
+				}));
+				setReports(normalized || []);
+				setLoading(false);
+				seededFromProviderRef.current = true;
 			}
-		} catch {
-			// Ignore localStorage errors
+		} catch {}
+
+		// Try to hydrate from cache if not seeded
+		if (!seededFromProviderRef.current) {
+			try {
+				const cached = localStorage.getItem(`reports-cache-${userId}`);
+				if (cached) {
+					const parsed = JSON.parse(cached);
+					if (Array.isArray(parsed)) {
+						setReports(parsed as any);
+						setLoading(false);
+					}
+				}
+			} catch {
+				// Ignore localStorage errors
+			}
 		}
 
 		const load = async () => {
+			if (seededFromProviderRef.current) return; // skip network when seeded
 			setLoading(true);
 			try {
 				const { data, error } = await supabase
 					.from("reports")
 					.select(
 						`
-            *,
-            matched_services (
-              id,
-              match_status_type,
-              support_service:support_services (
-                id,
-                name,
-                phone_number,
-                email
-              ),
-              appointments (
-                id,
-                appointment_id,
-                appointment_date,
-                status,
-                professional:profiles!appointments_professional_id_fkey (
-                  first_name,
-                  last_name,
-                  email
-                )
-              )
-            )
-          `
+							*,
+							matched_services (
+								id,
+								match_status_type,
+								support_service:support_services (
+									id,
+									name,
+									phone_number,
+									email
+								),
+								appointments (
+									id,
+									appointment_id,
+									appointment_date,
+									status,
+									professional:profiles!appointments_professional_id_fkey (
+										first_name,
+										last_name,
+										email
+									)
+								)
+							)
+						`
 					)
 					.eq("user_id", userId)
 					.order("submission_timestamp", { ascending: false });
@@ -158,7 +186,7 @@ export default function ReportsMasterDetail({ userId }: { userId: string }) {
 			}
 		};
 		load();
-	}, [userId, supabase]);
+	}, [userId, supabase, dash?.data]);
 
 	const filtered = useMemo(() => {
 		let filteredReports = reports;
@@ -450,7 +478,7 @@ export default function ReportsMasterDetail({ userId }: { userId: string }) {
 					}`}
 				>
 					{/* Compact Search and Filter Bar */}
-					<div className="mb-4">
+					<div className="mb-4 lg:sticky lg:top-[100px] lg:z-20 lg:bg-white/95 lg:backdrop-blur-sm lg:border-b lg:border-gray-200 lg:pb-4">
 						<div className="flex items-center gap-3">
 							{/* Search Bar */}
 							<div className="relative flex-1">
@@ -607,7 +635,7 @@ export default function ReportsMasterDetail({ userId }: { userId: string }) {
 				<div
 					className={`lg:col-span-5 xl:col-span-5 ${
 						mobileView !== "calendar" ? "hidden lg:block" : ""
-					} lg:sticky lg:top-4 lg:self-start`}
+					} lg:sticky lg:top-[100px] lg:self-start lg:max-h-[calc(100vh-120px)] lg:overflow-y-auto`}
 				>
 					<Card className="p-4 shadow-sm border-gray-200 rounded-lg">
 						<div className="flex items-center justify-between mb-4">
@@ -637,6 +665,14 @@ export default function ReportsMasterDetail({ userId }: { userId: string }) {
 								</Button>
 							)}
 						</div>
+
+						{/* Calendar Connection Status */}
+						<CalendarConnectionStatus
+							userId={userId}
+							variant="inline"
+							className="mb-3"
+						/>
+
 						<UIDateCalendar
 							mode="single"
 							showOutsideDays

@@ -20,6 +20,7 @@ import {
 import type { AppointmentWithDetails } from "@/app/dashboard/_types";
 import ReportNotesEditor from "@/app/dashboard/reports/rich-text-notes-editor";
 import { Tables } from "@/types/db-schema";
+import { CalendarConnectionStatus } from "../_components/CalendarConnectionStatus";
 
 export default function AppointmentsMasterDetail({
 	userId,
@@ -157,7 +158,7 @@ export default function AppointmentsMasterDetail({
 					}`}
 				>
 					{/* Search and filters */}
-					<div className="mb-4">
+					<div className="mb-4 lg:sticky lg:top-[100px] lg:z-20 lg:bg-white/95 lg:backdrop-blur-sm lg:border-b lg:border-gray-200 lg:pb-4">
 						<div className="flex items-center gap-3">
 							<div className="relative flex-1">
 								<Input
@@ -260,7 +261,7 @@ export default function AppointmentsMasterDetail({
 				<div
 					className={`lg:col-span-5 xl:col-span-5 ${
 						mobileView !== "calendar" ? "hidden lg:block" : ""
-					} lg:sticky lg:top-4 lg:self-start`}
+					} lg:sticky lg:top-[100px] lg:self-start lg:max-h-[calc(100vh-120px)] lg:overflow-y-auto`}
 				>
 					<Card className="p-4 shadow-sm border-gray-200 rounded-lg">
 						<div className="flex items-center justify-between mb-4">
@@ -275,6 +276,14 @@ export default function AppointmentsMasterDetail({
 								</p>
 							</div>
 						</div>
+
+						{/* Calendar Connection Status */}
+						<CalendarConnectionStatus
+							userId={userId}
+							variant="inline"
+							className="mb-3"
+						/>
+
 						<UIDateCalendar
 							mode="single"
 							showOutsideDays
