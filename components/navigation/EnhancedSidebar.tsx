@@ -23,6 +23,7 @@ import {
 	Users,
 	HelpCircle,
 	Megaphone,
+	Shield,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -46,6 +47,7 @@ import { signOut } from "@/app/(auth)/actions/auth";
 import ReportAbuseForm from "@/components/ReportAbuseForm";
 import { cn } from "@/lib/utils";
 import { useDashboardData } from "@/components/providers/DashboardDataProvider";
+import { RoleSwitcher } from "@/components/RoleSwitcher";
 
 interface SidebarItem {
 	id: string;
@@ -178,6 +180,17 @@ export function EnhancedSidebar({
 				section: "main",
 			},
 		];
+
+		// Add admin navigation if user is admin
+		if (dash?.data?.profile?.is_admin) {
+			baseItems.push({
+				id: "admin",
+				label: "Admin Dashboard",
+				icon: Shield,
+				href: "/dashboard/admin",
+				section: "main",
+			});
+		}
 
 		if (role === "survivor") {
 			const survivorMain: SidebarItem[] = [
@@ -620,6 +633,13 @@ export function EnhancedSidebar({
 						)}
 					</div>
 				</div>
+
+				{/* Role Switcher */}
+				{!isCollapsed && (
+					<div className="px-4 py-2 border-b border-neutral-200 dark:border-neutral-800">
+						<RoleSwitcher />
+					</div>
+				)}
 
 				{/* Navigation */}
 				<div className="flex-1 flex flex-col justify-between px-2 py-4">

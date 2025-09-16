@@ -14,11 +14,71 @@ export type Database = {
   }
   public: {
     Tables: {
+      admin_actions: {
+        Row: {
+          action_type: Database["public"]["Enums"]["admin_action_type"]
+          admin_id: string
+          created_at: string | null
+          details: Json | null
+          id: string
+          target_id: string
+          target_type: Database["public"]["Enums"]["target_type"]
+        }
+        Insert: {
+          action_type: Database["public"]["Enums"]["admin_action_type"]
+          admin_id: string
+          created_at?: string | null
+          details?: Json | null
+          id?: string
+          target_id: string
+          target_type: Database["public"]["Enums"]["target_type"]
+        }
+        Update: {
+          action_type?: Database["public"]["Enums"]["admin_action_type"]
+          admin_id?: string
+          created_at?: string | null
+          details?: Json | null
+          id?: string
+          target_id?: string
+          target_type?: Database["public"]["Enums"]["target_type"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "admin_actions_admin_id_fkey"
+            columns: ["admin_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      admin_statistics: {
+        Row: {
+          id: string
+          stat_data: Json
+          stat_type: Database["public"]["Enums"]["stat_type"]
+          updated_at: string | null
+        }
+        Insert: {
+          id?: string
+          stat_data: Json
+          stat_type: Database["public"]["Enums"]["stat_type"]
+          updated_at?: string | null
+        }
+        Update: {
+          id?: string
+          stat_data?: Json
+          stat_type?: Database["public"]["Enums"]["stat_type"]
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       appointments: {
         Row: {
           appointment_date: string | null
           appointment_id: string
           appointment_type: string | null
+          calendar_sync_status: string | null
           created_at: string | null
           created_via: string | null
           duration_minutes: number | null
@@ -34,6 +94,7 @@ export type Database = {
           appointment_date?: string | null
           appointment_id?: string
           appointment_type?: string | null
+          calendar_sync_status?: string | null
           created_at?: string | null
           created_via?: string | null
           duration_minutes?: number | null
@@ -49,6 +110,7 @@ export type Database = {
           appointment_date?: string | null
           appointment_id?: string
           appointment_type?: string | null
+          calendar_sync_status?: string | null
           created_at?: string | null
           created_via?: string | null
           duration_minutes?: number | null
@@ -168,15 +230,25 @@ export type Database = {
           accreditation_files: Json | null
           accreditation_files_metadata: Json | null
           accreditation_member_number: Json | null
+          admin_verified_at: string | null
+          admin_verified_by: string | null
           avatar_url: string | null
+          ban_reason: string | null
+          banned_at: string | null
+          banned_by: string | null
           bio: string | null
           cal_link: string | null
+          calendar_sync_enabled: boolean | null
+          calendar_sync_settings: Json | null
           created_at: string | null
           email: string | null
           first_name: string | null
           google_calendar_refresh_token: string | null
           google_calendar_token: string | null
+          google_calendar_token_expiry: number | null
           id: string
+          is_admin: boolean | null
+          is_banned: boolean | null
           is_public_booking: boolean | null
           isVerified: boolean | null
           last_name: string | null
@@ -190,20 +262,31 @@ export type Database = {
           user_type: Database["public"]["Enums"]["user_type"] | null
           verification_notes: string | null
           verification_status: string | null
+          verification_updated_at: string | null
         }
         Insert: {
           accreditation_files?: Json | null
           accreditation_files_metadata?: Json | null
           accreditation_member_number?: Json | null
+          admin_verified_at?: string | null
+          admin_verified_by?: string | null
           avatar_url?: string | null
+          ban_reason?: string | null
+          banned_at?: string | null
+          banned_by?: string | null
           bio?: string | null
           cal_link?: string | null
+          calendar_sync_enabled?: boolean | null
+          calendar_sync_settings?: Json | null
           created_at?: string | null
           email?: string | null
           first_name?: string | null
           google_calendar_refresh_token?: string | null
           google_calendar_token?: string | null
+          google_calendar_token_expiry?: number | null
           id: string
+          is_admin?: boolean | null
+          is_banned?: boolean | null
           is_public_booking?: boolean | null
           isVerified?: boolean | null
           last_name?: string | null
@@ -217,20 +300,31 @@ export type Database = {
           user_type?: Database["public"]["Enums"]["user_type"] | null
           verification_notes?: string | null
           verification_status?: string | null
+          verification_updated_at?: string | null
         }
         Update: {
           accreditation_files?: Json | null
           accreditation_files_metadata?: Json | null
           accreditation_member_number?: Json | null
+          admin_verified_at?: string | null
+          admin_verified_by?: string | null
           avatar_url?: string | null
+          ban_reason?: string | null
+          banned_at?: string | null
+          banned_by?: string | null
           bio?: string | null
           cal_link?: string | null
+          calendar_sync_enabled?: boolean | null
+          calendar_sync_settings?: Json | null
           created_at?: string | null
           email?: string | null
           first_name?: string | null
           google_calendar_refresh_token?: string | null
           google_calendar_token?: string | null
+          google_calendar_token_expiry?: number | null
           id?: string
+          is_admin?: boolean | null
+          is_banned?: boolean | null
           is_public_booking?: boolean | null
           isVerified?: boolean | null
           last_name?: string | null
@@ -244,8 +338,24 @@ export type Database = {
           user_type?: Database["public"]["Enums"]["user_type"] | null
           verification_notes?: string | null
           verification_status?: string | null
+          verification_updated_at?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "profiles_admin_verified_by_fkey"
+            columns: ["admin_verified_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "profiles_banned_by_fkey"
+            columns: ["banned_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       reports: {
         Row: {
@@ -400,11 +510,16 @@ export type Database = {
         Row: {
           accreditation_files_metadata: Json | null
           availability: string | null
+          ban_reason: string | null
+          banned_at: string | null
+          banned_by: string | null
           coverage_area_radius: number | null
           created_at: string | null
           email: string | null
           helpline: string | null
           id: string
+          is_active: boolean | null
+          is_banned: boolean | null
           last_verification_check: string | null
           latitude: number | null
           longitude: number | null
@@ -415,16 +530,24 @@ export type Database = {
           user_id: string | null
           verification_notes: string | null
           verification_status: string | null
+          verification_updated_at: string | null
+          verified_at: string | null
+          verified_by: string | null
           website: string | null
         }
         Insert: {
           accreditation_files_metadata?: Json | null
           availability?: string | null
+          ban_reason?: string | null
+          banned_at?: string | null
+          banned_by?: string | null
           coverage_area_radius?: number | null
           created_at?: string | null
           email?: string | null
           helpline?: string | null
           id?: string
+          is_active?: boolean | null
+          is_banned?: boolean | null
           last_verification_check?: string | null
           latitude?: number | null
           longitude?: number | null
@@ -435,16 +558,24 @@ export type Database = {
           user_id?: string | null
           verification_notes?: string | null
           verification_status?: string | null
+          verification_updated_at?: string | null
+          verified_at?: string | null
+          verified_by?: string | null
           website?: string | null
         }
         Update: {
           accreditation_files_metadata?: Json | null
           availability?: string | null
+          ban_reason?: string | null
+          banned_at?: string | null
+          banned_by?: string | null
           coverage_area_radius?: number | null
           created_at?: string | null
           email?: string | null
           helpline?: string | null
           id?: string
+          is_active?: boolean | null
+          is_banned?: boolean | null
           last_verification_check?: string | null
           latitude?: number | null
           longitude?: number | null
@@ -455,12 +586,29 @@ export type Database = {
           user_id?: string | null
           verification_notes?: string | null
           verification_status?: string | null
+          verification_updated_at?: string | null
+          verified_at?: string | null
+          verified_by?: string | null
           website?: string | null
         }
         Relationships: [
           {
+            foreignKeyName: "support_services_banned_by_fkey"
+            columns: ["banned_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "support_services_user_id_fkey"
             columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "support_services_verified_by_fkey"
+            columns: ["verified_by"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
@@ -469,19 +617,74 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      admin_dashboard_stats: {
+        Row: {
+          active_services: number | null
+          banned_services: number | null
+          banned_users: number | null
+          pending_service_verifications: number | null
+          pending_verifications: number | null
+          rejected_services: number | null
+          rejected_users: number | null
+          total_admins: number | null
+          total_ngos: number | null
+          total_professionals: number | null
+          total_survivors: number | null
+          verified_users: number | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
+      cleanup_expired_calendar_tokens: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
       cleanup_orphaned_files: {
         Args: Record<PropertyKey, never>
         Returns: number
+      }
+      get_coverage_map_data: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          coverage_radius: number
+          is_active: boolean
+          latitude: number
+          longitude: number
+          service_id: string
+          service_name: string
+          service_type: string
+          verification_status: Database["public"]["Enums"]["verification_status_type"]
+        }[]
       }
       get_user_file_stats: {
         Args: { user_uuid: string }
         Returns: Json
       }
+      get_user_role_context: {
+        Args: { target_user_id?: string }
+        Returns: {
+          can_switch_to_admin: boolean
+          is_admin: boolean
+          primary_role: Database["public"]["Enums"]["user_type"]
+          user_id: string
+        }[]
+      }
+      is_admin: {
+        Args: { user_id?: string }
+        Returns: boolean
+      }
     }
     Enums: {
+      admin_action_type:
+        | "verify_user"
+        | "ban_user"
+        | "verify_service"
+        | "ban_service"
+        | "unban_user"
+        | "unban_service"
+        | "reject_user"
+        | "reject_service"
       appointment_status_type: "pending" | "confirmed" | "requested"
       consent_type: "yes" | "no"
       contact_preference_type: "phone_call" | "sms" | "email" | "do_not_contact"
@@ -500,6 +703,12 @@ export type Database = {
         | "declined"
         | "completed"
         | "cancelled"
+      stat_type:
+        | "user_counts"
+        | "service_counts"
+        | "verification_stats"
+        | "coverage_map"
+        | "initial_setup"
       support_service_type:
         | "legal"
         | "medical"
@@ -507,8 +716,14 @@ export type Database = {
         | "shelter"
         | "financial_assistance"
         | "other"
+      target_type: "user" | "service"
       urgency_type: "high" | "medium" | "low"
       user_type: "ngo" | "professional" | "survivor"
+      verification_status_type:
+        | "pending"
+        | "verified"
+        | "rejected"
+        | "under_review"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -636,6 +851,16 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      admin_action_type: [
+        "verify_user",
+        "ban_user",
+        "verify_service",
+        "ban_service",
+        "unban_user",
+        "unban_service",
+        "reject_user",
+        "reject_service",
+      ],
       appointment_status_type: ["pending", "confirmed", "requested"],
       consent_type: ["yes", "no"],
       contact_preference_type: ["phone_call", "sms", "email", "do_not_contact"],
@@ -656,6 +881,13 @@ export const Constants = {
         "completed",
         "cancelled",
       ],
+      stat_type: [
+        "user_counts",
+        "service_counts",
+        "verification_stats",
+        "coverage_map",
+        "initial_setup",
+      ],
       support_service_type: [
         "legal",
         "medical",
@@ -664,8 +896,15 @@ export const Constants = {
         "financial_assistance",
         "other",
       ],
+      target_type: ["user", "service"],
       urgency_type: ["high", "medium", "low"],
       user_type: ["ngo", "professional", "survivor"],
+      verification_status_type: [
+        "pending",
+        "verified",
+        "rejected",
+        "under_review",
+      ],
     },
   },
 } as const
