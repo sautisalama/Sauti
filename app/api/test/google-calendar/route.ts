@@ -45,7 +45,7 @@ export async function GET() {
 		return NextResponse.json(
 			{
 				success: false,
-				error: error.message,
+				error: error instanceof Error ? error.message : "Unknown error",
 				message: "Google Calendar test failed",
 			},
 			{ status: 500 }

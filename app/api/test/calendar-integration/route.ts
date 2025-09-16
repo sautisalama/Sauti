@@ -79,7 +79,8 @@ export async function GET() {
 				{
 					success: false,
 					message: "Calendar API access failed",
-					error: calendarError.message,
+					error:
+						calendarError instanceof Error ? calendarError.message : "Unknown error",
 					action: "Check your Google Calendar API configuration",
 				},
 				{ status: 500 }
@@ -90,7 +91,7 @@ export async function GET() {
 			{
 				success: false,
 				message: "Integration test failed",
-				error: error.message,
+				error: error instanceof Error ? error.message : "Unknown error",
 			},
 			{ status: 500 }
 		);

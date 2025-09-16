@@ -26,7 +26,7 @@ export async function GET() {
 		return NextResponse.json(
 			{
 				success: false,
-				error: error.message,
+				error: error instanceof Error ? error.message : "Unknown error",
 				message:
 					"Calendar access failed - may need to re-authenticate with calendar scopes",
 			},

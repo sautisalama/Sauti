@@ -34,7 +34,7 @@ export async function POST() {
 				).toISOString(), // Tomorrow + 1 hour
 				timeZone: "Africa/Nairobi",
 			},
-			attendees: [{ email: user.email }],
+			attendees: user.email ? [{ email: user.email }] : [],
 		};
 
 		const event = await supabaseCalendarService.createEvent(user.id, testEvent);
@@ -56,7 +56,7 @@ export async function POST() {
 			{
 				success: false,
 				message: "Failed to create test calendar event",
-				error: error.message,
+				error: error instanceof Error ? error.message : "Unknown error",
 				action: "Check your Google Calendar permissions and try again",
 			},
 			{ status: 500 }

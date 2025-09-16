@@ -9,7 +9,8 @@ export class SupabaseCalendarService {
 	 */
 	async getAccessToken(userId: string): Promise<string | null> {
 		try {
-			const { data: profile } = await this.supabase
+			const supabase = await this.supabase;
+			const { data: profile } = await supabase
 				.from("profiles")
 				.select("google_calendar_token, google_calendar_token_expiry")
 				.eq("id", userId)

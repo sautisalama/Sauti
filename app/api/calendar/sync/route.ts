@@ -203,7 +203,7 @@ async function syncAllAppointments(
 			results.push({
 				appointmentId: appointment.appointment_id,
 				success: false,
-				error: error.message,
+				error: error instanceof Error ? error.message : "Unknown error",
 			});
 		}
 	}
