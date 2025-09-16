@@ -20,6 +20,7 @@ import {
 import type { AppointmentWithDetails } from "@/app/dashboard/_types";
 import ReportNotesEditor from "@/app/dashboard/reports/rich-text-notes-editor";
 import { Tables } from "@/types/db-schema";
+import { CalendarConnectionStatus } from "../_components/CalendarConnectionStatus";
 
 export default function AppointmentsMasterDetail({
 	userId,
@@ -275,6 +276,14 @@ export default function AppointmentsMasterDetail({
 								</p>
 							</div>
 						</div>
+
+						{/* Calendar Connection Status */}
+						<CalendarConnectionStatus
+							userId={userId}
+							variant="inline"
+							className="mb-3"
+						/>
+
 						<UIDateCalendar
 							mode="single"
 							showOutsideDays

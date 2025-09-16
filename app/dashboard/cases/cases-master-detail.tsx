@@ -35,6 +35,7 @@ import {
 	subscribeToUnreadMessages,
 } from "@/utils/chat/unread-tracker";
 import { useDashboardData } from "@/components/providers/DashboardDataProvider";
+import { CalendarConnectionStatus } from "../_components/CalendarConnectionStatus";
 
 interface MatchedServiceItem {
 	id: string;
@@ -71,105 +72,112 @@ export default function CasesMasterDetail({ userId }: { userId: string }) {
 	const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
 	const [isLoadingMessages, setIsLoadingMessages] = useState(false);
 
-// Seed from provider if available (instant render)
-useEffect(() => {
-	try {
-		if (!dash?.data || dash.data.userId !== userId || seededFromProviderRef.current) return;
-		const apptByMatchId = new Map<string, any[]>();
-		(dash.data.appointments || []).forEach((a: any) => {
-			const mid = a?.matched_service?.id;
-			if (!mid) return;
-			const arr = apptByMatchId.get(mid) || [];
-			arr.push({
-				id: a.id,
-				appointment_id: a.appointment_id,
-				appointment_date: a.appointment_date,
-				status: a.status,
-			});
-			apptByMatchId.set(mid, arr);
-		});
-		const seeded: MatchedServiceItem[] = (dash.data.matchedServices || []).map((m: any) => ({
-			id: m.id,
-			match_date: m.match_date || null,
-			match_status_type: m.match_status_type || null,
-			match_score: (m as any).match_score ?? null,
-			completed_at: (m as any).completed_at ?? null,
-			unread_messages: 0,
-			report: m.report,
-			support_service: m.support_service,
-			notes: (m as any).notes || null,
-			appointments: apptByMatchId.get(m.id) || [],
-		}));
-		setCases(seeded);
-		setLoading(false);
-		seededFromProviderRef.current = true;
-	} catch {}
-// eslint-disable-next-line react-hooks/exhaustive-deps
-}, [dash?.data, userId]);
-
-// Load matched services and appointments in parallel (skip if already seeded)
-useEffect(() => {
-	const load = async () => {
-		if (seededFromProviderRef.current) return;
-		setLoading(true);
+	// Seed from provider if available (instant render)
+	useEffect(() => {
 		try {
-			// Get the user's services
-			const { data: services } = await supabase
-				.from("support_services")
-				.select("id")
-				.eq("user_id", userId);
-			const ids = (services || []).map((s) => s.id);
-			if (ids.length === 0) {
-				setCases([]);
-				setLoading(false);
+			if (
+				!dash?.data ||
+				dash.data.userId !== userId ||
+				seededFromProviderRef.current
+			)
 				return;
-			}
+			const apptByMatchId = new Map<string, any[]>();
+			(dash.data.appointments || []).forEach((a: any) => {
+				const mid = a?.matched_service?.id;
+				if (!mid) return;
+				const arr = apptByMatchId.get(mid) || [];
+				arr.push({
+					id: a.id,
+					appointment_id: a.appointment_id,
+					appointment_date: a.appointment_date,
+					status: a.status,
+				});
+				apptByMatchId.set(mid, arr);
+			});
+			const seeded: MatchedServiceItem[] = (dash.data.matchedServices || []).map(
+				(m: any) => ({
+					id: m.id,
+					match_date: m.match_date || null,
+					match_status_type: m.match_status_type || null,
+					match_score: (m as any).match_score ?? null,
+					completed_at: (m as any).completed_at ?? null,
+					unread_messages: 0,
+					report: m.report,
+					support_service: m.support_service,
+					notes: (m as any).notes || null,
+					appointments: apptByMatchId.get(m.id) || [],
+				})
+			);
+			setCases(seeded);
+			setLoading(false);
+			seededFromProviderRef.current = true;
+		} catch {}
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [dash?.data, userId]);
 
-			const [{ data: matches }, { data: appts }] = await Promise.all([
-				supabase
-					.from("matched_services")
-					.select(`*, report:reports(*), support_service:support_services(*)`)
-					.in("service_id", ids)
-					.order("match_date", { ascending: false }),
-				supabase
-					.from("appointments")
-					.select("*, matched_services")
-					.in(
-						"matched_services",
-						ids.length
-							? (
-									await supabase
-										.from("matched_services")
-										.select("id")
-										.in("service_id", ids)
+	// Load matched services and appointments in parallel (skip if already seeded)
+	useEffect(() => {
+		const load = async () => {
+			if (seededFromProviderRef.current) return;
+			setLoading(true);
+			try {
+				// Get the user's services
+				const { data: services } = await supabase
+					.from("support_services")
+					.select("id")
+					.eq("user_id", userId);
+				const ids = (services || []).map((s) => s.id);
+				if (ids.length === 0) {
+					setCases([]);
+					setLoading(false);
+					return;
+				}
+
+				const [{ data: matches }, { data: appts }] = await Promise.all([
+					supabase
+						.from("matched_services")
+						.select(`*, report:reports(*), support_service:support_services(*)`)
+						.in("service_id", ids)
+						.order("match_date", { ascending: false }),
+					supabase
+						.from("appointments")
+						.select("*, matched_services")
+						.in(
+							"matched_services",
+							ids.length
+								? (
+										await supabase
+											.from("matched_services")
+											.select("id")
+											.in("service_id", ids)
 								  ).data?.map((m: any) => m.id) || []
 								: []
 						),
-			]);
+				]);
 
-			const apptByMatchId = new Map<string, any[]>();
-			(appts || []).forEach((a: any) => {
-				const k = a.matched_services as string;
-				const arr = apptByMatchId.get(k) || [];
-				arr.push(a);
-				apptByMatchId.set(k, arr);
-			});
+				const apptByMatchId = new Map<string, any[]>();
+				(appts || []).forEach((a: any) => {
+					const k = a.matched_services as string;
+					const arr = apptByMatchId.get(k) || [];
+					arr.push(a);
+					apptByMatchId.set(k, arr);
+				});
 
-			const normalized: MatchedServiceItem[] = (matches || []).map((m: any) => ({
-				...m,
-				notes: m.notes || null,
-				appointments: apptByMatchId.get(m.id) || [],
-			}));
+				const normalized: MatchedServiceItem[] = (matches || []).map((m: any) => ({
+					...m,
+					notes: m.notes || null,
+					appointments: apptByMatchId.get(m.id) || [],
+				}));
 
-			setCases(normalized);
-		} catch (error) {
-			console.error("Failed to load cases:", error);
-		} finally {
-			setLoading(false);
-		}
-	};
-	load();
-}, [userId, supabase]);
+				setCases(normalized);
+			} catch (error) {
+				console.error("Failed to load cases:", error);
+			} finally {
+				setLoading(false);
+			}
+		};
+		load();
+	}, [userId, supabase]);
 
 	// Track unread messages for each case - load after cases are loaded
 	// This prevents delays and freezing during initial case loading
@@ -700,6 +708,14 @@ useEffect(() => {
 								</Button>
 							)}
 						</div>
+
+						{/* Calendar Connection Status */}
+						<CalendarConnectionStatus
+							userId={userId}
+							variant="inline"
+							className="mb-3"
+						/>
+
 						<UIDateCalendar
 							mode="single"
 							showOutsideDays

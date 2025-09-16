@@ -36,6 +36,7 @@ import { Tables } from "@/types/db-schema";
 import RichTextNotesEditor from "./rich-text-notes-editor";
 import { useToast } from "@/hooks/use-toast";
 import { useDashboardData } from "@/components/providers/DashboardDataProvider";
+import { CalendarConnectionStatus } from "../_components/CalendarConnectionStatus";
 
 interface AppointmentLite {
 	id: string;
@@ -81,48 +82,52 @@ export default function ReportsMasterDetail({ userId }: { userId: string }) {
 	const [onBehalfFilter, setOnBehalfFilter] = useState<string>("all");
 	const [showFilters, setShowFilters] = useState(false);
 
-useEffect(() => {
-	// Prefer provider snapshot when available (no spinner)
-	try {
-		if (dash?.data && dash.data.userId === userId && !seededFromProviderRef.current) {
-			const normalized = (dash.data.reports as any[])?.map((r: any) => ({
-				...r,
-				matched_services:
-					r.matched_services?.map((m: any) => ({
-						...m,
-						support_services: m.support_service || m.support_services || null,
-					})) || [],
-			}));
-			setReports(normalized || []);
-			setLoading(false);
-			seededFromProviderRef.current = true;
-		}
-	} catch {}
-
-	// Try to hydrate from cache if not seeded
-	if (!seededFromProviderRef.current) {
+	useEffect(() => {
+		// Prefer provider snapshot when available (no spinner)
 		try {
-			const cached = localStorage.getItem(`reports-cache-${userId}`);
-			if (cached) {
-				const parsed = JSON.parse(cached);
-				if (Array.isArray(parsed)) {
-					setReports(parsed as any);
-					setLoading(false);
-				}
+			if (
+				dash?.data &&
+				dash.data.userId === userId &&
+				!seededFromProviderRef.current
+			) {
+				const normalized = (dash.data.reports as any[])?.map((r: any) => ({
+					...r,
+					matched_services:
+						r.matched_services?.map((m: any) => ({
+							...m,
+							support_services: m.support_service || m.support_services || null,
+						})) || [],
+				}));
+				setReports(normalized || []);
+				setLoading(false);
+				seededFromProviderRef.current = true;
 			}
-		} catch {
-			// Ignore localStorage errors
-		}
-	}
+		} catch {}
 
-	const load = async () => {
-		if (seededFromProviderRef.current) return; // skip network when seeded
-		setLoading(true);
-		try {
-			const { data, error } = await supabase
-				.from("reports")
-				.select(
-					`
+		// Try to hydrate from cache if not seeded
+		if (!seededFromProviderRef.current) {
+			try {
+				const cached = localStorage.getItem(`reports-cache-${userId}`);
+				if (cached) {
+					const parsed = JSON.parse(cached);
+					if (Array.isArray(parsed)) {
+						setReports(parsed as any);
+						setLoading(false);
+					}
+				}
+			} catch {
+				// Ignore localStorage errors
+			}
+		}
+
+		const load = async () => {
+			if (seededFromProviderRef.current) return; // skip network when seeded
+			setLoading(true);
+			try {
+				const { data, error } = await supabase
+					.from("reports")
+					.select(
+						`
 							*,
 							matched_services (
 								id,
@@ -146,42 +151,42 @@ useEffect(() => {
 								)
 							)
 						`
-				)
-				.eq("user_id", userId)
-				.order("submission_timestamp", { ascending: false });
-			if (error) throw error;
-			const normalized = (data as any)?.map((r: any) => ({
-				...r,
-				matched_services:
-					r.matched_services?.map((m: any) => ({
-						...m,
-						support_services: m.support_service || m.support_services || null,
-					})) || [],
-			}));
-			setReports(normalized || []);
-			try {
-				localStorage.setItem(
-					`reports-cache-${userId}`,
-					JSON.stringify(normalized || [])
-				);
-			} catch {
-				// Ignore localStorage errors
+					)
+					.eq("user_id", userId)
+					.order("submission_timestamp", { ascending: false });
+				if (error) throw error;
+				const normalized = (data as any)?.map((r: any) => ({
+					...r,
+					matched_services:
+						r.matched_services?.map((m: any) => ({
+							...m,
+							support_services: m.support_service || m.support_services || null,
+						})) || [],
+				}));
+				setReports(normalized || []);
+				try {
+					localStorage.setItem(
+						`reports-cache-${userId}`,
+						JSON.stringify(normalized || [])
+					);
+				} catch {
+					// Ignore localStorage errors
+				}
+			} catch (e: any) {
+				// Fallback: minimal query if nested fails
+				console.error("Failed to fetch reports, retrying minimal:", e);
+				const { data: minimal } = await supabase
+					.from("reports")
+					.select("*")
+					.eq("user_id", userId)
+					.order("submission_timestamp", { ascending: false });
+				setReports((minimal as any) || []);
+			} finally {
+				setLoading(false);
 			}
-		} catch (e: any) {
-			// Fallback: minimal query if nested fails
-			console.error("Failed to fetch reports, retrying minimal:", e);
-			const { data: minimal } = await supabase
-				.from("reports")
-				.select("*")
-				.eq("user_id", userId)
-				.order("submission_timestamp", { ascending: false });
-			setReports((minimal as any) || []);
-		} finally {
-			setLoading(false);
-		}
-	};
-	load();
-}, [userId, supabase, dash?.data]);
+		};
+		load();
+	}, [userId, supabase, dash?.data]);
 
 	const filtered = useMemo(() => {
 		let filteredReports = reports;
@@ -630,7 +635,7 @@ useEffect(() => {
 				<div
 					className={`lg:col-span-5 xl:col-span-5 ${
 						mobileView !== "calendar" ? "hidden lg:block" : ""
-					} lg:sticky lg:top-4 lg:self-start`}
+					} lg:sticky lg:top-4 lg:self-start lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto`}
 				>
 					<Card className="p-4 shadow-sm border-gray-200 rounded-lg">
 						<div className="flex items-center justify-between mb-4">
@@ -660,6 +665,14 @@ useEffect(() => {
 								</Button>
 							)}
 						</div>
+
+						{/* Calendar Connection Status */}
+						<CalendarConnectionStatus
+							userId={userId}
+							variant="inline"
+							className="mb-3"
+						/>
+
 						<UIDateCalendar
 							mode="single"
 							showOutsideDays
