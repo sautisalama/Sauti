@@ -261,7 +261,7 @@ export default function AppointmentsMasterDetail({
 				<div
 					className={`lg:col-span-5 xl:col-span-5 ${
 						mobileView !== "calendar" ? "hidden lg:block" : ""
-					} lg:sticky lg:top-4 lg:self-start`}
+					} lg:sticky lg:top-4 lg:self-start lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto`}
 				>
 					<Card className="p-4 shadow-sm border-gray-200 rounded-lg">
 						<div className="flex items-center justify-between mb-4">
