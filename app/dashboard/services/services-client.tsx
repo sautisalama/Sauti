@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Tables } from "@/types/db-schema";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -31,6 +31,7 @@ import {
 	Clock,
 	XCircle,
 } from "lucide-react";
+import { useDashboardData } from "@/components/providers/DashboardDataProvider";
 
 type SupportServiceType = Database["public"]["Enums"]["support_service_type"];
 type UserType = Database["public"]["Enums"]["user_type"];
@@ -51,6 +52,8 @@ interface SupportService {
 }
 
 export default function ServicesClient({ userId }: { userId: string }) {
+	const dash = useDashboardData();
+	const seededFromProviderRef = useRef(false);
 	const [services, setServices] = useState<SupportService[]>([]);
 	const [isLoading, setIsLoading] = useState(true);
 	const [selectedService, setSelectedService] = useState<SupportService | null>(
@@ -150,10 +153,19 @@ export default function ServicesClient({ userId }: { userId: string }) {
 		}
 	}, [userId, supabase]);
 
-	useEffect(() => {
-		loadUserProfile();
-		loadServices();
-	}, [loadUserProfile, loadServices]);
+useEffect(() => {
+	// Seed from provider snapshot when available
+	try {
+		if (dash?.data && dash.data.userId === userId && !seededFromProviderRef.current) {
+			setServices((dash.data.supportServices as any[]) || []);
+			setIsLoading(false);
+			seededFromProviderRef.current = true;
+		}
+	} catch {}
+
+	loadUserProfile();
+	if (!seededFromProviderRef.current) loadServices();
+}, [loadUserProfile, loadServices, dash?.data, userId]);
 
 	const deleteService = async (serviceId: string) => {
 		setIsDeleting(serviceId);

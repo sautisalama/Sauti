@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/utils/supabase/client";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -35,6 +35,7 @@ import {
 import { Tables } from "@/types/db-schema";
 import RichTextNotesEditor from "./rich-text-notes-editor";
 import { useToast } from "@/hooks/use-toast";
+import { useDashboardData } from "@/components/providers/DashboardDataProvider";
 
 interface AppointmentLite {
 	id: string;
@@ -64,6 +65,8 @@ interface ReportItem extends Tables<"reports"> {
 
 export default function ReportsMasterDetail({ userId }: { userId: string }) {
 	const { toast } = useToast();
+	const dash = useDashboardData();
+	const seededFromProviderRef = useRef(false);
 	const supabase = useMemo(() => createClient(), []);
 	const [reports, setReports] = useState<ReportItem[]>([]);
 	const [q, setQ] = useState("");
@@ -78,8 +81,26 @@ export default function ReportsMasterDetail({ userId }: { userId: string }) {
 	const [onBehalfFilter, setOnBehalfFilter] = useState<string>("all");
 	const [showFilters, setShowFilters] = useState(false);
 
-	useEffect(() => {
-		// Try to hydrate from cache first for instant load
+useEffect(() => {
+	// Prefer provider snapshot when available (no spinner)
+	try {
+		if (dash?.data && dash.data.userId === userId && !seededFromProviderRef.current) {
+			const normalized = (dash.data.reports as any[])?.map((r: any) => ({
+				...r,
+				matched_services:
+					r.matched_services?.map((m: any) => ({
+						...m,
+						support_services: m.support_service || m.support_services || null,
+					})) || [],
+			}));
+			setReports(normalized || []);
+			setLoading(false);
+			seededFromProviderRef.current = true;
+		}
+	} catch {}
+
+	// Try to hydrate from cache if not seeded
+	if (!seededFromProviderRef.current) {
 		try {
 			const cached = localStorage.getItem(`reports-cache-${userId}`);
 			if (cached) {
@@ -92,73 +113,75 @@ export default function ReportsMasterDetail({ userId }: { userId: string }) {
 		} catch {
 			// Ignore localStorage errors
 		}
+	}
 
-		const load = async () => {
-			setLoading(true);
-			try {
-				const { data, error } = await supabase
-					.from("reports")
-					.select(
+	const load = async () => {
+		if (seededFromProviderRef.current) return; // skip network when seeded
+		setLoading(true);
+		try {
+			const { data, error } = await supabase
+				.from("reports")
+				.select(
+					`
+							*,
+							matched_services (
+								id,
+								match_status_type,
+								support_service:support_services (
+									id,
+									name,
+									phone_number,
+									email
+								),
+								appointments (
+									id,
+									appointment_id,
+									appointment_date,
+									status,
+									professional:profiles!appointments_professional_id_fkey (
+										first_name,
+										last_name,
+										email
+									)
+								)
+							)
 						`
-            *,
-            matched_services (
-              id,
-              match_status_type,
-              support_service:support_services (
-                id,
-                name,
-                phone_number,
-                email
-              ),
-              appointments (
-                id,
-                appointment_id,
-                appointment_date,
-                status,
-                professional:profiles!appointments_professional_id_fkey (
-                  first_name,
-                  last_name,
-                  email
-                )
-              )
-            )
-          `
-					)
-					.eq("user_id", userId)
-					.order("submission_timestamp", { ascending: false });
-				if (error) throw error;
-				const normalized = (data as any)?.map((r: any) => ({
-					...r,
-					matched_services:
-						r.matched_services?.map((m: any) => ({
-							...m,
-							support_services: m.support_service || m.support_services || null,
-						})) || [],
-				}));
-				setReports(normalized || []);
-				try {
-					localStorage.setItem(
-						`reports-cache-${userId}`,
-						JSON.stringify(normalized || [])
-					);
-				} catch {
-					// Ignore localStorage errors
-				}
-			} catch (e: any) {
-				// Fallback: minimal query if nested fails
-				console.error("Failed to fetch reports, retrying minimal:", e);
-				const { data: minimal } = await supabase
-					.from("reports")
-					.select("*")
-					.eq("user_id", userId)
-					.order("submission_timestamp", { ascending: false });
-				setReports((minimal as any) || []);
-			} finally {
-				setLoading(false);
+				)
+				.eq("user_id", userId)
+				.order("submission_timestamp", { ascending: false });
+			if (error) throw error;
+			const normalized = (data as any)?.map((r: any) => ({
+				...r,
+				matched_services:
+					r.matched_services?.map((m: any) => ({
+						...m,
+						support_services: m.support_service || m.support_services || null,
+					})) || [],
+			}));
+			setReports(normalized || []);
+			try {
+				localStorage.setItem(
+					`reports-cache-${userId}`,
+					JSON.stringify(normalized || [])
+				);
+			} catch {
+				// Ignore localStorage errors
 			}
-		};
-		load();
-	}, [userId, supabase]);
+		} catch (e: any) {
+			// Fallback: minimal query if nested fails
+			console.error("Failed to fetch reports, retrying minimal:", e);
+			const { data: minimal } = await supabase
+				.from("reports")
+				.select("*")
+				.eq("user_id", userId)
+				.order("submission_timestamp", { ascending: false });
+			setReports((minimal as any) || []);
+		} finally {
+			setLoading(false);
+		}
+	};
+	load();
+}, [userId, supabase, dash?.data]);
 
 	const filtered = useMemo(() => {
 		let filteredReports = reports;
