@@ -146,7 +146,12 @@ function AddDocumentForm({
 						e.preventDefault();
 						document.getElementById("file-upload")?.click();
 					}}
+					onTouchStart={(e) => {
+						// Handle touch start to ensure proper mobile interaction
+						e.preventDefault();
+					}}
 					onTouchEnd={(e) => {
+						// Don't prevent default on touch end to allow proper mobile interaction
 						e.preventDefault();
 						document.getElementById("file-upload")?.click();
 					}}

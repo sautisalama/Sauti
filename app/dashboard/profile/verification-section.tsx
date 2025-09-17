@@ -402,7 +402,12 @@ export function DocumentUploadForm({
 										e.preventDefault();
 										document.getElementById(`file-upload-${doc.id}`)?.click();
 									}}
+									onTouchStart={(e) => {
+										// Handle touch start to ensure proper mobile interaction
+										e.preventDefault();
+									}}
 									onTouchEnd={(e) => {
+										// Don't prevent default on touch end to allow proper mobile interaction
 										e.preventDefault();
 										document.getElementById(`file-upload-${doc.id}`)?.click();
 									}}
@@ -520,6 +525,7 @@ export function VerificationSection({
 	const [selectedDocument, setSelectedDocument] =
 		useState<VerificationDocument | null>(null);
 	const [viewMode, setViewMode] = useState<"overview" | "dashboard">("overview");
+	const [showMobileUpload, setShowMobileUpload] = useState(false);
 	const supabase = createClient();
 	const { toast } = useToast();
 
@@ -589,88 +595,66 @@ export function VerificationSection({
 
 	const loadDocuments = useCallback(async () => {
 		try {
-			// Use the new getAllUserDocuments method to get all documents
-			const allDocuments = await fileUploadService.getAllUserDocuments(
-				userId,
-				"accreditation"
-			);
+			// Only load professional credentials (documents without serviceId)
+			// Support service documents are loaded separately in loadServices
+			const { data: profileData } = await supabase
+				.from("profiles")
+				.select("accreditation_files_metadata, accreditation_files")
+				.eq("id", userId)
+				.single();
 
-			// Convert to the format expected by the UI
-			const formattedDocuments = allDocuments.map((doc, index) => ({
-				id: `doc-${index}`,
-				title: doc.title || doc.fileName || "Untitled Document",
-				url: doc.url,
-				fileType: doc.fileType || "unknown",
-				fileSize: doc.fileSize || 0,
-				uploadedAt: doc.uploadedAt,
-				serviceId: doc.serviceId,
-				serviceType: doc.serviceType,
-				status: (doc.status || "under_review") as any,
-				notes: doc.notes,
-				certificateNumber: doc.certificateNumber,
-				// Mark the first document as ID card front
-				isIdCardFront: index === 0,
-			}));
+			const metaDocsRaw = profileData?.accreditation_files_metadata
+				? Array.isArray(profileData.accreditation_files_metadata)
+					? profileData.accreditation_files_metadata
+					: JSON.parse(profileData.accreditation_files_metadata)
+				: [];
+			const legacyDocsRaw = profileData?.accreditation_files
+				? Array.isArray(profileData.accreditation_files)
+					? profileData.accreditation_files
+					: JSON.parse(profileData.accreditation_files)
+				: [];
 
-			setDocuments(formattedDocuments);
+			// Filter out service-specific documents from metadata
+			// Only include documents that don't have a serviceId (professional credentials)
+			const professionalDocs = metaDocsRaw.filter((doc: any) => !doc.serviceId);
+
+			// Build lookup by url or title to merge notes/description from legacy docs
+			const legacyByUrl = new Map<string, any>();
+			const legacyByTitle = new Map<string, any>();
+			(legacyDocsRaw || []).forEach((ld: any) => {
+				if (ld?.url) legacyByUrl.set(ld.url, ld);
+				if (ld?.title) legacyByTitle.set(ld.title, ld);
+			});
+
+			const merged = professionalDocs.map((doc: any, index: number) => {
+				const keyUrl = doc?.url;
+				const keyTitle = doc?.title;
+				const legacy =
+					(keyUrl && legacyByUrl.get(keyUrl)) ||
+					(keyTitle && legacyByTitle.get(keyTitle)) ||
+					{};
+				return {
+					id: `doc-${index}`,
+					title: doc.title || legacy.title || "Untitled Document",
+					url: doc.url || legacy.url || "",
+					fileType: doc.fileType || legacy.fileType || "unknown",
+					fileSize: doc.fileSize || legacy.fileSize || 0,
+					uploadedAt:
+						doc.uploadedAt || legacy.uploadedAt || new Date().toISOString(),
+					serviceId: doc.serviceId || legacy.serviceId,
+					serviceType: doc.serviceType || legacy.serviceType,
+					status: (doc.status || legacy.status || "under_review") as any,
+					notes: doc.notes || legacy.note || legacy.notes,
+					certificateNumber: doc.certificateNumber || legacy.certificateNumber,
+					// Mark the first document as ID card front
+					isIdCardFront: index === 0,
+				};
+			});
+
+			setDocuments(merged);
 		} catch (error) {
-			console.error("Error loading documents:", error);
-			// Fallback to old method if new method fails
-			try {
-				const { data: profileData } = await supabase
-					.from("profiles")
-					.select("accreditation_files_metadata, accreditation_files")
-					.eq("id", userId)
-					.single();
-
-				const metaDocsRaw = profileData?.accreditation_files_metadata
-					? Array.isArray(profileData.accreditation_files_metadata)
-						? profileData.accreditation_files_metadata
-						: JSON.parse(profileData.accreditation_files_metadata)
-					: [];
-				const legacyDocsRaw = profileData?.accreditation_files
-					? Array.isArray(profileData.accreditation_files)
-						? profileData.accreditation_files
-						: JSON.parse(profileData.accreditation_files)
-					: [];
-
-				// Build lookup by url or title to merge notes/description from legacy docs
-				const legacyByUrl = new Map<string, any>();
-				const legacyByTitle = new Map<string, any>();
-				(legacyDocsRaw || []).forEach((ld: any) => {
-					if (ld?.url) legacyByUrl.set(ld.url, ld);
-					if (ld?.title) legacyByTitle.set(ld.title, ld);
-				});
-
-				const merged = (metaDocsRaw || []).map((doc: any, index: number) => {
-					const keyUrl = doc?.url;
-					const keyTitle = doc?.title;
-					const legacy =
-						(keyUrl && legacyByUrl.get(keyUrl)) ||
-						(keyTitle && legacyByTitle.get(keyTitle)) ||
-						{};
-					return {
-						id: `doc-${index}`,
-						title: doc.title || legacy.title || "Untitled Document",
-						url: doc.url || legacy.url || "",
-						fileType: doc.fileType || legacy.fileType || "unknown",
-						fileSize: doc.fileSize || legacy.fileSize || 0,
-						uploadedAt:
-							doc.uploadedAt || legacy.uploadedAt || new Date().toISOString(),
-						serviceId: doc.serviceId || legacy.serviceId,
-						serviceType: doc.serviceType || legacy.serviceType,
-						status: (doc.status || legacy.status || "under_review") as any,
-						notes: doc.notes || legacy.note || legacy.notes,
-						certificateNumber: doc.certificateNumber || legacy.certificateNumber,
-						// Mark the first document as ID card front
-						isIdCardFront: index === 0,
-					};
-				});
-
-				setDocuments(merged);
-			} catch (fallbackError) {
-				console.error("Fallback document loading also failed:", fallbackError);
-			}
+			console.error("Error loading professional credentials:", error);
+			setDocuments([]);
 		}
 	}, [userId, supabase]);
 
@@ -970,30 +954,31 @@ export function VerificationSection({
 									className="gap-2 bg-sauti-orange hover:bg-sauti-orange/90"
 									onClick={(e) => {
 										e.preventDefault();
-										// Navigate to services tab to add documents
-										const servicesTab = document.querySelector(
-											'[data-value="services"]'
-										) as HTMLElement;
-										if (servicesTab) {
-											servicesTab.click();
-										}
+										setShowMobileUpload(!showMobileUpload);
 									}}
 									onTouchEnd={(e) => {
 										e.preventDefault();
-										// Navigate to services tab to add documents
-										const servicesTab = document.querySelector(
-											'[data-value="services"]'
-										) as HTMLElement;
-										if (servicesTab) {
-											servicesTab.click();
-										}
+										setShowMobileUpload(!showMobileUpload);
 									}}
 								>
 									<Plus className="h-4 w-4" />
-									Add
+									{showMobileUpload ? "Cancel" : "Add"}
 								</Button>
 							</div>
 						</CardHeader>
+						{showMobileUpload && (
+							<CardContent className="pt-0">
+								<DocumentUploadForm
+									userId={userId}
+									userType={userType}
+									onUploadSuccess={() => {
+										loadVerificationData();
+										onUpdate?.();
+										setShowMobileUpload(false);
+									}}
+								/>
+							</CardContent>
+						)}
 					</Card>
 				</div>
 
@@ -1265,12 +1250,7 @@ export function VerificationSection({
 									size="sm"
 									onClick={() => {
 										// Navigate to services tab
-										const servicesTab = document.querySelector(
-											'[data-value="services"]'
-										) as HTMLElement;
-										if (servicesTab) {
-											servicesTab.click();
-										}
+										onNavigateToServices?.();
 									}}
 								>
 									<Plus className="h-3 w-3 sm:h-4 sm:w-4" />
@@ -1480,12 +1460,7 @@ export function VerificationSection({
 										className="gap-2 bg-sauti-orange hover:bg-sauti-orange/90"
 										onClick={() => {
 											// Navigate to services tab
-											const servicesTab = document.querySelector(
-												'[data-value="services"]'
-											) as HTMLElement;
-											if (servicesTab) {
-												servicesTab.click();
-											}
+											onNavigateToServices?.();
 										}}
 									>
 										<Plus className="h-4 w-4" />
@@ -1496,12 +1471,7 @@ export function VerificationSection({
 										className="gap-2 bg-sauti-orange hover:bg-sauti-orange/90"
 										onClick={() => {
 											// Navigate to services tab to add accreditation files
-											const servicesTab = document.querySelector(
-												'[data-value="services"]'
-											) as HTMLElement;
-											if (servicesTab) {
-												servicesTab.click();
-											}
+											onNavigateToServices?.();
 										}}
 									>
 										<FileText className="h-4 w-4" />
