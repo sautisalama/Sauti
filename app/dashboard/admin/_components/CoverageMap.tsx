@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { createClient } from "@/utils/supabase/client";
 import {
 	Card,
@@ -31,7 +31,7 @@ import { CoverageData } from "@/types/admin-types";
 
 interface CoverageMapProps {}
 
-export function CoverageMap({}: CoverageMapProps) {
+export function CoverageMap(_props: CoverageMapProps) {
 	const [coverageData, setCoverageData] = useState<CoverageData[]>([]);
 	const [filteredData, setFilteredData] = useState<CoverageData[]>([]);
 	const [isLoading, setIsLoading] = useState(true);
@@ -43,15 +43,7 @@ export function CoverageMap({}: CoverageMapProps) {
 	const supabase = createClient();
 	const { toast } = useToast();
 
-	useEffect(() => {
-		loadCoverageData();
-	}, []);
-
-	useEffect(() => {
-		filterCoverageData();
-	}, [coverageData, typeFilter, statusFilter, showInactive]);
-
-	const loadCoverageData = async () => {
+	const loadCoverageData = useCallback(async () => {
 		try {
 			setIsLoading(true);
 			const { data, error } = await supabase.rpc("get_coverage_map_data");
@@ -68,9 +60,9 @@ export function CoverageMap({}: CoverageMapProps) {
 		} finally {
 			setIsLoading(false);
 		}
-	};
+	}, [supabase, toast]);
 
-	const filterCoverageData = () => {
+	const filterCoverageData = useCallback(() => {
 		let filtered = coverageData;
 
 		// Type filter
@@ -91,7 +83,15 @@ export function CoverageMap({}: CoverageMapProps) {
 		}
 
 		setFilteredData(filtered);
-	};
+	}, [coverageData, typeFilter, statusFilter, showInactive]);
+
+	useEffect(() => {
+		loadCoverageData();
+	}, [loadCoverageData]);
+
+	useEffect(() => {
+		filterCoverageData();
+	}, [filterCoverageData]);
 
 	const getServiceTypes = () => {
 		const types = new Set(coverageData.map((service) => service.service_type));
