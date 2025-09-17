@@ -142,7 +142,14 @@ function AddDocumentForm({
 					onDragOver={handleDragOver}
 					onDragLeave={handleDragLeave}
 					onDrop={handleDrop}
-					onClick={() => document.getElementById("file-upload")?.click()}
+					onClick={(e) => {
+						e.preventDefault();
+						document.getElementById("file-upload")?.click();
+					}}
+					onTouchEnd={(e) => {
+						e.preventDefault();
+						document.getElementById("file-upload")?.click();
+					}}
 				>
 					{file ? (
 						<div className="space-y-2">

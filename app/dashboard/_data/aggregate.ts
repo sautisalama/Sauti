@@ -178,15 +178,15 @@ export async function fetchDashboardData(): Promise<AggregatedDashboardData | nu
 			verification,
 		};
 
-		console.log("Dashboard data fetched successfully:", {
-			userId: result.userId,
-			userType: result.userType,
-			reportsCount: result.reports.length,
-			supportServicesCount: result.supportServices.length,
-			matchedServicesCount: result.matchedServices.length,
-			appointmentsCount: result.appointments.length,
-			casesCount: result.casesCount,
-		});
+		// console.log("Dashboard data fetched successfully:", {
+		// 	userId: result.userId,
+		// 	userType: result.userType,
+		// 	reportsCount: result.reports.length,
+		// 	supportServicesCount: result.supportServices.length,
+		// 	matchedServicesCount: result.matchedServices.length,
+		// 	appointmentsCount: result.appointments.length,
+		// 	casesCount: result.casesCount,
+		// });
 
 		return result;
 	} catch (error) {
