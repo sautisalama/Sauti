@@ -989,7 +989,7 @@ export function AddSupportServiceForm({
 														<div className="flex items-center gap-2">
 															{/* Drag and Drop File Input */}
 															<div
-																className={`flex-1 border-2 border-dashed rounded-md p-3 text-center transition-colors ${
+																className={`flex-1 border-2 border-dashed rounded-md p-3 text-center transition-colors cursor-pointer ${
 																	dragOverDocId === doc.id
 																		? "border-sauti-orange bg-orange-50"
 																		: doc.file
@@ -999,6 +999,14 @@ export function AddSupportServiceForm({
 																onDragOver={(e) => handleDragOver(e, doc.id)}
 																onDragLeave={handleDragLeave}
 																onDrop={(e) => handleDrop(e, doc.id)}
+																onClick={(e) => {
+																	e.preventDefault();
+																	document.getElementById(`file-upload-${doc.id}`)?.click();
+																}}
+																onTouchEnd={(e) => {
+																	e.preventDefault();
+																	document.getElementById(`file-upload-${doc.id}`)?.click();
+																}}
 															>
 																{doc.file ? (
 																	<div className="space-y-1">

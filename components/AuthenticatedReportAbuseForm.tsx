@@ -82,7 +82,9 @@ export default function AuthenticatedReportAbuseForm({
 			})
 			.then(({ error }) => {
 				if (error) throw error;
-				const { data } = supabase.storage.from("report-audio").getPublicUrl(filename);
+				const { data } = supabase.storage
+					.from("report-audio")
+					.getPublicUrl(filename);
 				setAudioUploadedUrl(data.publicUrl);
 				setAudioUploading(false);
 				return data.publicUrl;
@@ -159,41 +161,42 @@ export default function AuthenticatedReportAbuseForm({
 			return;
 		}
 
-	// Use pre-uploaded audio if available; otherwise finish or start upload now
-	let media: { title: string; url: string; type: string; size: number } | null = null;
-	if (audioBlob) {
-		// Validate first
-		const validation = validateAudioBlob(audioBlob);
-		if (!validation.valid) {
-			toast({
-				title: "Invalid Audio",
-				description: validation.error || "Audio file is invalid",
-				variant: "destructive",
-			});
-			setLoading(false);
-			return;
+		// Use pre-uploaded audio if available; otherwise finish or start upload now
+		let media: { title: string; url: string; type: string; size: number } | null =
+			null;
+		if (audioBlob) {
+			// Validate first
+			const validation = validateAudioBlob(audioBlob);
+			if (!validation.valid) {
+				toast({
+					title: "Invalid Audio",
+					description: validation.error || "Audio file is invalid",
+					variant: "destructive",
+				});
+				setLoading(false);
+				return;
+			}
+			try {
+				let url = audioUploadedUrl;
+				if (!url && audioUploadPromiseRef.current) {
+					toast({ title: "Finalizing voice note upload..." });
+					url = await audioUploadPromiseRef.current;
+				}
+				if (!url) {
+					url = await startAudioUpload(audioBlob);
+				}
+				if (url) {
+					media = createAudioMediaObject(url, audioBlob);
+				}
+			} catch (e) {
+				console.error("Audio upload error:", e);
+				toast({
+					title: "Audio Upload Failed",
+					description: "Could not upload your voice note. Submitting without it.",
+					variant: "destructive",
+				});
+			}
 		}
-		try {
-			let url = audioUploadedUrl;
-			if (!url && audioUploadPromiseRef.current) {
-				toast({ title: "Finalizing voice note upload..." });
-				url = await audioUploadPromiseRef.current;
-			}
-			if (!url) {
-				url = await startAudioUpload(audioBlob);
-			}
-			if (url) {
-				media = createAudioMediaObject(url, audioBlob);
-			}
-		} catch (e) {
-			console.error("Audio upload error:", e);
-			toast({
-				title: "Audio Upload Failed",
-				description: "Could not upload your voice note. Submitting without it.",
-				variant: "destructive",
-			});
-		}
-	}
 
 		// Map the first selected enum-allowed incident to type_of_incident
 		const allowed: Record<string, string> = {
@@ -272,7 +275,7 @@ export default function AuthenticatedReportAbuseForm({
 			onSubmit={handleSubmit}
 			className="relative w-full max-w-[1200px] max-h-[80vh] flex flex-col px-4 sm:px-6"
 		>
-			<div className="flex-1 overflow-y-auto space-y-6 px-1 sm:px-4 pb-32">
+			<div className="flex-1 overflow-y-auto space-y-6 px-1 sm:px-4 pb-32 overflow-x-visible">
 				<div className="space-y-4">
 					<EnhancedToggle
 						id="onbehalf-auth"
@@ -361,12 +364,16 @@ export default function AuthenticatedReportAbuseForm({
 										} catch (e) {
 											console.debug("Error creating audio URL:", e);
 										}
-										try { startAudioUpload(blob); } catch {}
+										try {
+											startAudioUpload(blob);
+										} catch {}
 									}}
 									onClose={() => setRecorderOpen(false)}
 								/>
 								{audioUploading && (
-									<p className="text-xs text-gray-500 mt-2">Uploading voice note in background…</p>
+									<p className="text-xs text-gray-500 mt-2">
+										Uploading voice note in background…
+									</p>
 								)}
 								{audioUploadedUrl && !audioUploading && (
 									<p className="text-xs text-green-600 mt-2">Voice note uploaded ✓</p>
@@ -401,7 +408,7 @@ export default function AuthenticatedReportAbuseForm({
 									Remove
 								</Button>
 							</div>
-								<AudioMiniPlayer src={audioUrl || ""} />
+							<AudioMiniPlayer src={audioUrl || ""} />
 						</div>
 					)}
 

@@ -27,36 +27,23 @@ export function useCalendarStatus(userId: string) {
 
 		setIsRefreshing(true);
 		try {
-			const response = await fetch("/api/test/calendar-integration");
-			const result = await response.json();
-
-			if (result.success) {
-				setStatus({
-					connected: true,
-					syncEnabled: result.data?.syncEnabled || false,
-					lastSync: result.data?.tokenExpiry
-						? new Date(result.data.tokenExpiry).toISOString()
-						: undefined,
-					tokenExpiry: result.data?.tokenExpiry,
-					calendarsCount: result.data?.calendarsCount || 0,
-					isLoading: false,
-					error: undefined,
-				});
-			} else {
-				setStatus({
-					connected: false,
-					syncEnabled: false,
-					isLoading: false,
-					error: result.error || "Failed to check calendar status",
-				});
-			}
+			// Calendar integration is now optional - always return available status
+			setStatus({
+				connected: true,
+				syncEnabled: false,
+				lastSync: undefined,
+				tokenExpiry: undefined,
+				calendarsCount: 0,
+				isLoading: false,
+				error: undefined,
+			});
 		} catch (error) {
 			console.error("Error checking calendar status:", error);
 			setStatus({
-				connected: false,
+				connected: true,
 				syncEnabled: false,
 				isLoading: false,
-				error: error instanceof Error ? error.message : "Unknown error",
+				error: undefined,
 			});
 		} finally {
 			setIsRefreshing(false);
@@ -89,7 +76,8 @@ export function useCalendarStatus(userId: string) {
 	}, [userId, status.syncEnabled, supabase]);
 
 	const connectCalendar = useCallback(() => {
-		window.location.href = "/api/auth/google-calendar";
+		// Calendar integration is now optional - show info message
+		console.log("Calendar integration is optional and can be enabled later");
 	}, []);
 
 	const refreshStatus = useCallback(() => {

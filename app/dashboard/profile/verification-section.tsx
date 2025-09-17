@@ -398,9 +398,14 @@ export function DocumentUploadForm({
 									onDragEnter={(e) => handleDragOver(e, doc.id)}
 									onDragLeave={handleDragLeave}
 									onDrop={(e) => handleDrop(e, doc.id)}
-									onClick={() =>
-										document.getElementById(`file-upload-${doc.id}`)?.click()
-									}
+									onClick={(e) => {
+										e.preventDefault();
+										document.getElementById(`file-upload-${doc.id}`)?.click();
+									}}
+									onTouchEnd={(e) => {
+										e.preventDefault();
+										document.getElementById(`file-upload-${doc.id}`)?.click();
+									}}
 									style={{ minHeight: "120px" }}
 								>
 									{doc.file ? (
@@ -963,7 +968,18 @@ export function VerificationSection({
 								<Button
 									size="sm"
 									className="gap-2 bg-sauti-orange hover:bg-sauti-orange/90"
-									onClick={() => {
+									onClick={(e) => {
+										e.preventDefault();
+										// Navigate to services tab to add documents
+										const servicesTab = document.querySelector(
+											'[data-value="services"]'
+										) as HTMLElement;
+										if (servicesTab) {
+											servicesTab.click();
+										}
+									}}
+									onTouchEnd={(e) => {
+										e.preventDefault();
 										// Navigate to services tab to add documents
 										const servicesTab = document.querySelector(
 											'[data-value="services"]'

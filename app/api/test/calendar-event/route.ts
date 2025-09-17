@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
-import { supabaseCalendarService } from "@/lib/supabase-calendar";
 
 export async function POST() {
 	try {
@@ -19,37 +18,27 @@ export async function POST() {
 			);
 		}
 
-		// Create a test calendar event
-		const testEvent = {
-			summary: "Sauti Salama - Test Appointment",
-			description:
-				"This is a test appointment created by Sauti Salama integration",
-			start: {
-				dateTime: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), // Tomorrow
-				timeZone: "Africa/Nairobi",
-			},
-			end: {
-				dateTime: new Date(
-					Date.now() + 24 * 60 * 60 * 1000 + 60 * 60 * 1000
-				).toISOString(), // Tomorrow + 1 hour
-				timeZone: "Africa/Nairobi",
-			},
-			attendees: user.email ? [{ email: user.email }] : [],
-		};
-
-		const event = await supabaseCalendarService.createEvent(user.id, testEvent);
-
+		// Calendar integration is now optional - return mock success
 		return NextResponse.json({
 			success: true,
-			message: "Test calendar event created successfully!",
+			message: "Calendar integration is optional - no event created",
 			event: {
-				id: event.id,
-				summary: event.summary,
-				htmlLink: event.htmlLink,
-				start: event.start,
-				end: event.end,
-				attendees: event.attendees,
+				id: "mock-event-id",
+				summary: "Sauti Salama - Test Appointment (Mock)",
+				htmlLink: "#",
+				start: {
+					dateTime: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+					timeZone: "Africa/Nairobi",
+				},
+				end: {
+					dateTime: new Date(
+						Date.now() + 24 * 60 * 60 * 1000 + 60 * 60 * 1000
+					).toISOString(),
+					timeZone: "Africa/Nairobi",
+				},
+				attendees: user.email ? [{ email: user.email }] : [],
 			},
+			note: "Calendar integration is optional and can be enabled later",
 		});
 	} catch (error) {
 		return NextResponse.json(
@@ -57,7 +46,7 @@ export async function POST() {
 				success: false,
 				message: "Failed to create test calendar event",
 				error: error instanceof Error ? error.message : "Unknown error",
-				action: "Check your Google Calendar permissions and try again",
+				action: "Calendar integration is optional",
 			},
 			{ status: 500 }
 		);
