@@ -31,6 +31,7 @@ import { Database } from "@/types/db-schema";
 import { SupportServiceSidepanel } from "./support-services-sidepanel";
 import { VerificationProgressBar } from "./verification-progress-bar";
 import { AddSupportServiceForm } from "@/components/AddSupportServiceForm";
+import { useDashboardData } from "@/components/providers/DashboardDataProvider";
 
 type SupportServiceType = Database["public"]["Enums"]["support_service_type"];
 type UserType = Database["public"]["Enums"]["user_type"];
@@ -39,15 +40,15 @@ interface SupportService {
 	id: string;
 	name: string;
 	service_types: SupportServiceType;
-	email?: string;
-	phone_number?: string;
-	website?: string;
-	availability?: string;
-	verification_status?: string;
-	verification_notes?: string;
-	last_verification_check?: string;
+	email?: string | null;
+	phone_number?: string | null;
+	website?: string | null;
+	availability?: string | null;
+	verification_status?: string | null;
+	verification_notes?: string | null;
+	last_verification_check?: string | null;
 	accreditation_files_metadata?: any;
-	created_at?: string;
+	created_at?: string | null;
 }
 
 interface SupportServicesManagerProps {
@@ -58,6 +59,7 @@ interface SupportServicesManagerProps {
 	hasMatches?: boolean;
 	verificationNotes?: string;
 	documentsCount?: number;
+	onDataUpdate: () => void;
 }
 
 export function SupportServicesManager({
@@ -68,9 +70,9 @@ export function SupportServicesManager({
 	hasMatches = false,
 	verificationNotes,
 	documentsCount = 0,
+	onDataUpdate,
 }: SupportServicesManagerProps) {
-	const [services, setServices] = useState<SupportService[]>([]);
-	const [isLoading, setIsLoading] = useState(true);
+	const dash = useDashboardData();
 	const [selectedService, setSelectedService] = useState<SupportService | null>(
 		null
 	);
@@ -78,6 +80,10 @@ export function SupportServicesManager({
 	const [isDeleting, setIsDeleting] = useState<string | null>(null);
 	const supabase = createClient();
 	const { toast } = useToast();
+
+	// Use data from dashboard provider
+	const services = dash?.data?.supportServices || [];
+	const isLoading = !dash?.data?.preloaded;
 
 	// Check if user can add more services
 	const canAddService = () => {
@@ -90,32 +96,7 @@ export function SupportServicesManager({
 		return false;
 	};
 
-	const loadServices = useCallback(async () => {
-		setIsLoading(true);
-		try {
-			const { data, error } = await supabase
-				.from("support_services")
-				.select("*")
-				.eq("user_id", userId)
-				.order("created_at", { ascending: false });
-
-			if (error) throw error;
-			setServices(data || []);
-		} catch (error) {
-			console.error("Error loading services:", error);
-			toast({
-				title: "Error",
-				description: "Failed to load support services",
-				variant: "destructive",
-			});
-		} finally {
-			setIsLoading(false);
-		}
-	}, [userId, supabase, toast]);
-
-	useEffect(() => {
-		loadServices();
-	}, [loadServices]);
+	// Data is loaded by dashboard provider - no need for additional loading
 
 	const deleteService = async (serviceId: string) => {
 		setIsDeleting(serviceId);
@@ -127,7 +108,14 @@ export function SupportServicesManager({
 
 			if (error) throw error;
 
-			setServices((prev) => prev.filter((s) => s.id !== serviceId));
+			// Update provider data
+			const updatedServices = services.filter((s) => s.id !== serviceId);
+			dash?.updatePartial({
+				supportServices: updatedServices,
+			});
+
+			// Notify parent component that data has been updated
+			onDataUpdate?.();
 			toast({
 				title: "Success",
 				description: "Support service deleted successfully",
@@ -157,7 +145,7 @@ export function SupportServicesManager({
 		}
 	};
 
-	const getStatusColor = (status?: string) => {
+	const getStatusColor = (status?: string | null) => {
 		switch (status) {
 			case "verified":
 				return "bg-green-100 text-green-800 border-green-200";
@@ -170,7 +158,7 @@ export function SupportServicesManager({
 		}
 	};
 
-	const formatDate = (dateString?: string) => {
+	const formatDate = (dateString?: string | null) => {
 		if (!dateString) return "";
 		return new Date(dateString).toLocaleDateString("en-US", {
 			year: "numeric",
@@ -370,9 +358,26 @@ export function SupportServicesManager({
 						</DialogDescription>
 					</DialogHeader>
 					<AddSupportServiceForm
-						onSuccess={() => {
+						onSuccess={async () => {
 							setShowAddForm(false);
-							loadServices();
+							// Refresh data from server and update provider
+							try {
+								const { data, error } = await supabase
+									.from("support_services")
+									.select("*")
+									.eq("user_id", userId)
+									.order("created_at", { ascending: false });
+
+								if (!error && data) {
+									dash?.updatePartial({
+										supportServices: data,
+									});
+								}
+							} catch (error) {
+								console.error("Error refreshing services:", error);
+							}
+							// Also notify parent component
+							onDataUpdate?.();
 						}}
 					/>
 				</DialogContent>
@@ -385,7 +390,7 @@ export function SupportServicesManager({
 					userId={userId}
 					userType={userType}
 					onClose={() => setSelectedService(null)}
-					onUpdate={loadServices}
+					onUpdate={onDataUpdate}
 				/>
 			)}
 		</div>

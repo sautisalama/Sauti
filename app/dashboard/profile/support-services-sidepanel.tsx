@@ -236,15 +236,15 @@ interface SupportService {
 	id: string;
 	name: string;
 	service_types: SupportServiceType;
-	email?: string;
-	phone_number?: string;
-	website?: string;
-	availability?: string;
-	verification_status?: string;
-	verification_notes?: string;
-	last_verification_check?: string;
+	email?: string | null;
+	phone_number?: string | null;
+	website?: string | null;
+	availability?: string | null;
+	verification_status?: string | null;
+	verification_notes?: string | null;
+	last_verification_check?: string | null;
 	accreditation_files_metadata?: any;
-	created_at?: string;
+	created_at?: string | null;
 }
 
 interface SupportServiceSidepanelProps {
@@ -431,7 +431,7 @@ export function SupportServiceSidepanel({
 		}
 	};
 
-	const getStatusIcon = (status?: string) => {
+	const getStatusIcon = (status?: string | null) => {
 		switch (status) {
 			case "verified":
 				return <CheckCircle className="h-4 w-4 text-green-600" />;
@@ -444,7 +444,7 @@ export function SupportServiceSidepanel({
 		}
 	};
 
-	const getStatusColor = (status?: string) => {
+	const getStatusColor = (status?: string | null) => {
 		switch (status) {
 			case "verified":
 				return "bg-green-100 text-green-800 border-green-200";
@@ -465,7 +465,8 @@ export function SupportServiceSidepanel({
 		return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
 	};
 
-	const formatDate = (dateString: string) => {
+	const formatDate = (dateString: string | null | undefined) => {
+		if (!dateString) return "";
 		return new Date(dateString).toLocaleDateString("en-US", {
 			year: "numeric",
 			month: "long",
