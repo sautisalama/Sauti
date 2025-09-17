@@ -49,7 +49,16 @@ export function MultiSelect({
 					: [...selected, optionValue]
 			);
 			setInputValue("");
-			setOpen(false);
+			// Keep dropdown open for multiple selections on mobile
+			if (window.innerWidth < 640) {
+				setOpen(true);
+				// Refocus input after selection
+				setTimeout(() => {
+					inputRef.current?.focus();
+				}, 50);
+			} else {
+				setOpen(false);
+			}
 		},
 		[selected, onChange]
 	);
@@ -57,9 +66,21 @@ export function MultiSelect({
 	return (
 		<div className="relative">
 			<div
-				className="group border border-input px-3 py-2 text-sm ring-offset-background rounded-md focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2"
+				className="group border border-input px-3 py-2 text-sm ring-offset-background rounded-md focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 cursor-text"
 				onMouseDown={(e) => {
 					// Focus input to open the menu; avoid toggling state if already focused
+					if (document.activeElement !== inputRef.current) {
+						e.preventDefault();
+						inputRef.current?.focus();
+					}
+				}}
+				onTouchEnd={(e) => {
+					// Handle mobile touch events - always focus on mobile
+					e.preventDefault();
+					inputRef.current?.focus();
+				}}
+				onClick={(e) => {
+					// Ensure input gets focus on click
 					if (document.activeElement !== inputRef.current) {
 						e.preventDefault();
 						inputRef.current?.focus();
@@ -74,7 +95,7 @@ export function MultiSelect({
 							<Badge key={option} variant="secondary">
 								{label}
 								<button
-									className="ml-1 ring-offset-background rounded-full outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+									className="ml-1 ring-offset-background rounded-full outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 touch-manipulation"
 									onKeyDown={(e) => {
 										if (e.key === "Enter") {
 											handleUnselect(option);
@@ -83,6 +104,11 @@ export function MultiSelect({
 									onMouseDown={(e) => {
 										e.preventDefault();
 										e.stopPropagation();
+									}}
+									onTouchEnd={(e) => {
+										e.preventDefault();
+										e.stopPropagation();
+										handleUnselect(option);
 									}}
 									onClick={(e) => {
 										e.stopPropagation();
@@ -98,21 +124,29 @@ export function MultiSelect({
 						ref={inputRef}
 						value={inputValue}
 						onChange={(e) => setInputValue(e.target.value)}
-						onBlur={() => setTimeout(() => setOpen(false), 200)}
+						onBlur={() => {
+							// Shorter delay for mobile, longer for desktop
+							const delay = window.innerWidth < 640 ? 100 : 200;
+							setTimeout(() => setOpen(false), delay);
+						}}
 						onFocus={() => setOpen(true)}
 						placeholder={selected.length === 0 ? placeholder : undefined}
-						className="ml-2 bg-transparent outline-none placeholder:text-muted-foreground flex-1"
+						className="ml-2 bg-transparent outline-none placeholder:text-muted-foreground flex-1 min-w-0"
 					/>
 				</div>
 			</div>
 			{open && (
-				<div className="absolute w-full z-10 top-[calc(100%+4px)] rounded-md border bg-popover text-popover-foreground shadow-md outline-none animate-in">
-					<div className="overflow-auto max-h-60">
+				<div className="absolute w-full z-50 top-[calc(100%+4px)] rounded-md border bg-popover text-popover-foreground shadow-md outline-none animate-in max-h-[50vh] sm:max-h-60 left-0 right-0">
+					<div className="overflow-auto max-h-[50vh] sm:max-h-60">
 						{options.map((option) => (
 							<button
 								key={option.value}
-								className="w-full text-left px-2 py-1.5 text-sm hover:bg-accent hover:text-accent-foreground"
+								className="w-full text-left px-2 py-1.5 text-sm hover:bg-accent hover:text-accent-foreground touch-manipulation"
 								onMouseDown={(e) => {
+									e.preventDefault();
+									handleSelect(option.value);
+								}}
+								onTouchEnd={(e) => {
 									e.preventDefault();
 									handleSelect(option.value);
 								}}
