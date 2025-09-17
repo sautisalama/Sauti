@@ -61,8 +61,7 @@ export default function ProfilePage() {
 	const [formData, setFormData] = useState<Record<string, any>>({});
 	const [activeTab, setActiveTab] = useState("profile");
 	const searchParams = useSearchParams();
-	const [userServices, setUserServices] = useState<any[]>([]);
-	const [hasMatches, setHasMatches] = useState(false);
+	// Remove local state - use dashboard data provider instead
 
 	// Respect ?tab=verification to open the verification tab directly
 	useEffect(() => {
@@ -91,60 +90,11 @@ export default function ProfilePage() {
 		}
 	}, [profile]);
 
-	const loadUserServices = useCallback(async () => {
-		try {
-			const { data, error } = await supabase
-				.from("support_services")
-				.select("id, name, service_types")
-				.eq("user_id", userId);
+	// Get data from dashboard provider
+	const userServices = dash?.data?.supportServices || [];
+	const hasMatches = (dash?.data?.matchedServices?.length || 0) > 0;
 
-			if (error) throw error;
-			setUserServices(data || []);
-		} catch (error) {
-			console.error("Error loading services:", error);
-		}
-	}, [userId, supabase]);
-
-	const checkMatches = useCallback(async () => {
-		if (!isProfessional || !userId) return;
-
-		try {
-			const { data: services } = await supabase
-				.from("support_services")
-				.select("id")
-				.eq("user_id", userId);
-
-			if (!services || services.length === 0) {
-				setHasMatches(false);
-				return;
-			}
-
-			const serviceIds = services.map((s) => s.id);
-			const { data: matches } = await supabase
-				.from("matched_services")
-				.select("id")
-				.in("service_id", serviceIds)
-				.limit(1);
-
-			setHasMatches(!!matches && matches.length > 0);
-		} catch (error) {
-			console.error("Error checking matches:", error);
-		}
-	}, [isProfessional, userId, supabase]);
-
-	// Load user services for NGO users
-	useEffect(() => {
-		if (profile?.user_type === "ngo" && userId) {
-			loadUserServices();
-		}
-	}, [profile?.user_type, userId, loadUserServices]);
-
-	// Check for matches
-	useEffect(() => {
-		if (isProfessional && userId) {
-			checkMatches();
-		}
-	}, [isProfessional, userId, checkMatches]);
+	// Data is already loaded by dashboard provider - no need for additional loading
 
 	const updateFormData = (section: string, field: string, value: any) => {
 		setFormData((prev) => ({
@@ -311,6 +261,35 @@ export default function ProfilePage() {
 			return false;
 		}
 	}, [userId, supabase]);
+
+	// Refresh data using dashboard provider
+	const refreshAllData = useCallback(async () => {
+		if (!userId) return;
+		try {
+			// Refresh verification data in provider
+			const { data } = await supabase
+				.from("profiles")
+				.select(
+					"verification_status, last_verification_check, accreditation_files_metadata"
+				)
+				.eq("id", userId)
+				.single();
+			const docs = data?.accreditation_files_metadata
+				? Array.isArray(data.accreditation_files_metadata)
+					? data.accreditation_files_metadata
+					: JSON.parse(data.accreditation_files_metadata)
+				: [];
+			dash?.updatePartial({
+				verification: {
+					overallStatus: data?.verification_status || "pending",
+					lastChecked: data?.last_verification_check || null,
+					documentsCount: (docs || []).length,
+				},
+			});
+		} catch (error) {
+			console.error("Error refreshing data:", error);
+		}
+	}, [userId, supabase, dash]);
 
 	// Update verification status when user has documents in both tabs
 	useEffect(() => {
@@ -549,34 +528,7 @@ export default function ProfilePage() {
 									"professional"
 								}
 								profile={profile}
-								onUpdate={() => {
-									// Avoid full-page reload; refresh provider snapshot and local state
-									try {
-										// Soft refresh: re-fetch minimal verification info
-										const supabase = createClient();
-										(async () => {
-											const { data } = await supabase
-												.from("profiles")
-												.select(
-													"verification_status, last_verification_check, accreditation_files_metadata"
-												)
-												.eq("id", userId)
-												.single();
-											const docs = data?.accreditation_files_metadata
-												? Array.isArray(data.accreditation_files_metadata)
-													? data.accreditation_files_metadata
-													: JSON.parse(data.accreditation_files_metadata)
-												: [];
-											dash?.updatePartial({
-												verification: {
-													overallStatus: data?.verification_status || "pending",
-													lastChecked: data?.last_verification_check || null,
-													documentsCount: (docs || []).length,
-												},
-											});
-										})();
-									} catch {}
-								}}
+								onUpdate={refreshAllData}
 								onNavigateToServices={() => setActiveTab("services")}
 							/>
 						</TabsContent>
@@ -588,17 +540,14 @@ export default function ProfilePage() {
 							<SupportServicesManager
 								userId={userId || ""}
 								userType={profile?.user_type || "professional"}
-								verificationStatus={profile?.verification_status || "pending"}
-								hasAccreditation={!!profileData.accreditation_files}
+								verificationStatus={
+									dash?.data?.verification?.overallStatus || "pending"
+								}
+								hasAccreditation={!!dash?.data?.verification?.documentsCount}
 								hasMatches={hasMatches}
 								verificationNotes={profile?.verification_notes || undefined}
-								documentsCount={
-									profileData.accreditation_files
-										? Array.isArray(profileData.accreditation_files)
-											? profileData.accreditation_files.length
-											: JSON.parse(profileData.accreditation_files).length
-										: 0
-								}
+								documentsCount={dash?.data?.verification?.documentsCount || 0}
+								onDataUpdate={refreshAllData}
 							/>
 						</TabsContent>
 					)}
