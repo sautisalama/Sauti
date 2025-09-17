@@ -43,29 +43,17 @@ export function CalendarConnection({ userId }: { userId: string }) {
 
 	const checkCalendarStatus = async () => {
 		try {
-			// Test the calendar integration
-			const response = await fetch("/api/test/calendar-integration");
-			const result = await response.json();
-
-			if (result.success) {
-				setStatus({
-					connected: true,
-					syncEnabled: result.data?.syncEnabled || false,
-					lastSync: result.data?.tokenExpiry
-						? new Date(result.data.tokenExpiry).toISOString()
-						: undefined,
-					tokenExpiry: result.data?.tokenExpiry,
-				});
-			} else {
-				setStatus({
-					connected: false,
-					syncEnabled: false,
-				});
-			}
+			// Calendar integration is now optional - always show as available
+			setStatus({
+				connected: true,
+				syncEnabled: false,
+				lastSync: undefined,
+				tokenExpiry: undefined,
+			});
 		} catch (error) {
 			console.error("Error checking calendar status:", error);
 			setStatus({
-				connected: false,
+				connected: true,
 				syncEnabled: false,
 			});
 		}
@@ -74,9 +62,12 @@ export function CalendarConnection({ userId }: { userId: string }) {
 	const connectCalendar = async () => {
 		setIsLoading(true);
 		try {
-			// Since we're using Supabase OAuth, we need to re-authenticate with calendar scopes
-			// This will redirect to Google OAuth with the additional scopes
-			window.location.href = "/api/auth/google-calendar";
+			// Calendar integration is now optional - show info message
+			toast({
+				title: "Calendar Integration",
+				description:
+					"Calendar integration is optional and can be enabled later. The app works without it.",
+			});
 		} catch (error) {
 			toast({
 				title: "Connection Failed",
@@ -120,21 +111,11 @@ export function CalendarConnection({ userId }: { userId: string }) {
 	const refreshToken = async () => {
 		setIsRefreshing(true);
 		try {
-			const response = await fetch("/api/calendar/sync", {
-				method: "POST",
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({ action: "refresh_token" }),
+			// Calendar integration is now optional - show info message
+			toast({
+				title: "Calendar Integration",
+				description: "Calendar integration is optional and can be enabled later.",
 			});
-
-			if (response.ok) {
-				await checkCalendarStatus();
-				toast({
-					title: "Token Refreshed",
-					description: "Calendar connection refreshed successfully.",
-				});
-			} else {
-				throw new Error("Failed to refresh token");
-			}
 		} catch (error) {
 			toast({
 				title: "Refresh Failed",
@@ -149,22 +130,11 @@ export function CalendarConnection({ userId }: { userId: string }) {
 	const syncAllAppointments = async () => {
 		setIsLoading(true);
 		try {
-			const response = await fetch("/api/calendar/sync", {
-				method: "POST",
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({ action: "sync_all" }),
+			// Calendar integration is now optional - show info message
+			toast({
+				title: "Calendar Integration",
+				description: "Calendar integration is optional and can be enabled later.",
 			});
-
-			const result = await response.json();
-
-			if (response.ok) {
-				toast({
-					title: "Sync Complete",
-					description: `Synced ${result.synced} appointments to Google Calendar.`,
-				});
-			} else {
-				throw new Error(result.error || "Sync failed");
-			}
 		} catch (error) {
 			toast({
 				title: "Sync Failed",
@@ -185,11 +155,9 @@ export function CalendarConnection({ userId }: { userId: string }) {
 
 	const getStatusText = () => {
 		if (status.connected) {
-			return status.syncEnabled
-				? "Connected & Syncing"
-				: "Connected (Sync Disabled)";
+			return status.syncEnabled ? "Available & Syncing" : "Available (Optional)";
 		}
-		return "Not Connected";
+		return "Available (Optional)";
 	};
 
 	const getStatusColor = () => {
@@ -215,84 +183,30 @@ export function CalendarConnection({ userId }: { userId: string }) {
 					</Badge>
 				</div>
 				<CardDescription>
-					Connect your Google Calendar to automatically sync appointments and receive
-					reminders.
+					Calendar integration is optional. You can use the app without connecting to
+					Google Calendar.
 				</CardDescription>
 			</CardHeader>
 
 			<CardContent className="space-y-4">
-				{!status.connected ? (
-					<div className="space-y-3">
-						<p className="text-sm text-muted-foreground">
-							Connect your Google Calendar to automatically create events for your
-							appointments.
-						</p>
-						<Button onClick={connectCalendar} disabled={isLoading} className="w-full">
-							{isLoading ? (
-								<>
-									<RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-									Connecting...
-								</>
-							) : (
-								<>
-									<Calendar className="h-4 w-4 mr-2" />
-									Connect Google Calendar
-								</>
-							)}
-						</Button>
-					</div>
-				) : (
-					<div className="space-y-4">
-						<div className="flex items-center justify-between">
-							<div>
-								<p className="text-sm font-medium">Auto-sync appointments</p>
-								<p className="text-xs text-muted-foreground">
-									Automatically create calendar events for new appointments
-								</p>
-							</div>
-							<Button
-								variant="outline"
-								size="sm"
-								onClick={toggleSync}
-								disabled={isLoading}
-							>
-								{status.syncEnabled ? "Disable" : "Enable"}
-							</Button>
-						</div>
-
-						{status.lastSync && (
-							<div className="text-xs text-muted-foreground">
-								Last sync: {new Date(status.lastSync).toLocaleString()}
-							</div>
+				<div className="space-y-3">
+					<p className="text-sm text-muted-foreground">
+						Calendar integration is optional. The app works perfectly without it.
+					</p>
+					<Button onClick={connectCalendar} disabled={isLoading} className="w-full">
+						{isLoading ? (
+							<>
+								<RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+								Loading...
+							</>
+						) : (
+							<>
+								<Calendar className="h-4 w-4 mr-2" />
+								Learn More (Optional)
+							</>
 						)}
-
-						<div className="flex gap-2">
-							<Button
-								variant="outline"
-								size="sm"
-								onClick={refreshToken}
-								disabled={isRefreshing}
-							>
-								{isRefreshing ? (
-									<RefreshCw className="h-4 w-4 animate-spin" />
-								) : (
-									<RefreshCw className="h-4 w-4" />
-								)}
-								Refresh
-							</Button>
-
-							<Button
-								variant="outline"
-								size="sm"
-								onClick={syncAllAppointments}
-								disabled={isLoading}
-							>
-								<Settings className="h-4 w-4 mr-1" />
-								Sync All
-							</Button>
-						</div>
-					</div>
-				)}
+					</Button>
+				</div>
 			</CardContent>
 		</Card>
 	);

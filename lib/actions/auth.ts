@@ -75,8 +75,8 @@ export async function signIn(formData: FormData) {
 
 	if (error) {
 		// Check specifically for invalid login credentials
-		if (error.message === 'Invalid login credentials') {
-			redirect('/error?message=account_not_found');
+		if (error.message === "Invalid login credentials") {
+			redirect("/error?message=account_not_found");
 		}
 		console.error("Sign in error:", error);
 		redirect("/error");
@@ -90,7 +90,6 @@ export async function signIn(formData: FormData) {
 export async function signInWithGoogle() {
 	const supabase = await createClient();
 	const redirectUrl = process.env.NEXT_PUBLIC_APP_URL;
-
 
 	const { data, error } = await supabase.auth.signInWithOAuth({
 		provider: "google",

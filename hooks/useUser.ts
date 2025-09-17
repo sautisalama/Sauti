@@ -23,15 +23,46 @@ export function useUser() {
 			if (cancelled) return;
 			if (authUser) {
 				// Fetch profile data
-				const { data: profile } = await supabase
+				const { data: profile, error } = await supabase
 					.from("profiles")
 					.select("*")
 					.eq("id", authUser.id)
 					.single();
 
 				if (cancelled) return;
-				// Combine auth user with profile data
-				setUser({ ...authUser, profile });
+
+				// If profile doesn't exist, create one
+				if (error && error.code === "PGRST116") {
+					console.log(
+						"Profile not found, creating new profile for user:",
+						authUser.id
+					);
+
+					const { data: newProfile } = await supabase
+						.from("profiles")
+						.insert({
+							id: authUser.id,
+							email: authUser.email,
+							first_name: authUser.user_metadata?.first_name || "",
+							last_name: authUser.user_metadata?.last_name || "",
+							user_type: authUser.user_metadata?.user_type || "survivor",
+							verification_status: "pending",
+							accreditation_files_metadata: "[]",
+							profile_image_metadata: "{}",
+							verification_notes: null,
+							last_verification_check: null,
+							created_at: new Date().toISOString(),
+							updated_at: new Date().toISOString(),
+						})
+						.select("*")
+						.single();
+
+					// Combine auth user with profile data
+					setUser({ ...authUser, profile: newProfile });
+				} else {
+					// Combine auth user with profile data
+					setUser({ ...authUser, profile });
+				}
 			} else {
 				setUser(null);
 			}

@@ -97,9 +97,8 @@ export async function signInWithGoogle() {
 			redirectTo: `${redirectUrl}/api/auth/callback`,
 			queryParams: {
 				access_type: "offline",
-				scope:
-					"openid email profile https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/calendar",
-				prompt: "consent",
+				scope: "openid email profile",
+				prompt: "select_account",
 			},
 		},
 	});
