@@ -38,13 +38,25 @@ type UserType = Database["public"]["Enums"]["user_type"];
 function AddDocumentForm({
 	onSave,
 	isUploading,
+	userId,
+	userType,
+	serviceId,
+	serviceType,
 }: {
 	onSave: (title: string, file: File) => void;
 	isUploading: boolean;
+	userId: string;
+	userType: UserType;
+	serviceId: string;
+	serviceType: SupportServiceType;
 }) {
 	const [title, setTitle] = useState("");
 	const [file, setFile] = useState<File | null>(null);
 	const [isDragOver, setIsDragOver] = useState(false);
+	const [uploading, setUploading] = useState(false);
+	const [uploadProgress, setUploadProgress] = useState(0);
+	const [uploadedUrl, setUploadedUrl] = useState<string | null>(null);
+	const [uploadError, setUploadError] = useState<string | null>(null);
 
 	const handleSubmit = (e: React.FormEvent) => {
 		e.preventDefault();
@@ -56,10 +68,27 @@ function AddDocumentForm({
 			alert("Please select a file to upload");
 			return;
 		}
+		if (!uploadedUrl) {
+			alert("Please wait for the file to finish uploading");
+			return;
+		}
+
+		// Call onSave with the uploaded file
 		onSave(title, file);
-		// Clear form after successful upload
+
+		// Clear form after successful save
 		setTitle("");
 		setFile(null);
+		setUploading(false);
+		setUploadProgress(0);
+		setUploadedUrl(null);
+		setUploadError(null);
+
+		// Clear the file input
+		const fileInput = document.getElementById("file-upload") as HTMLInputElement;
+		if (fileInput) {
+			fileInput.value = "";
+		}
 	};
 
 	const handleDragOver = (e: React.DragEvent) => {
@@ -109,6 +138,51 @@ function AddDocumentForm({
 		if (selectedFile && !title) {
 			setTitle(selectedFile.name.replace(/\.[^/.]+$/, ""));
 		}
+
+		// Start background upload immediately when file is selected
+		if (selectedFile) {
+			startBackgroundUpload(selectedFile);
+		}
+	};
+
+	const startBackgroundUpload = async (file: File) => {
+		setUploading(true);
+		setUploadProgress(0);
+		setUploadError(null);
+		setUploadedUrl(null);
+
+		try {
+			// Simulate progress for better UX
+			const progressInterval = setInterval(() => {
+				setUploadProgress((prev) => {
+					if (prev >= 90) {
+						clearInterval(progressInterval);
+						return prev;
+					}
+					return prev + Math.random() * 10;
+				});
+			}, 200);
+
+			// Upload the file
+			const result = await fileUploadService.uploadFile({
+				userId,
+				userType,
+				serviceId,
+				serviceType,
+				fileType: "accreditation",
+				fileName: file.name,
+				file: file,
+			});
+
+			clearInterval(progressInterval);
+			setUploadProgress(100);
+			setUploadedUrl(result.url);
+			setUploading(false);
+		} catch (error) {
+			console.error("Background upload failed:", error);
+			setUploadError("Upload failed. Please try again.");
+			setUploading(false);
+		}
 	};
 
 	return (
@@ -132,7 +206,7 @@ function AddDocumentForm({
 
 				{/* Drag and Drop Area */}
 				<div
-					className={`mt-1 border-2 border-dashed rounded-lg p-6 text-center transition-colors cursor-pointer ${
+					className={`mt-1 border-2 border-dashed rounded-lg p-4 sm:p-6 text-center transition-colors cursor-pointer ${
 						isDragOver
 							? "border-sauti-orange bg-orange-50"
 							: file
@@ -151,27 +225,94 @@ function AddDocumentForm({
 						e.preventDefault();
 					}}
 					onTouchEnd={(e) => {
-						// Don't prevent default on touch end to allow proper mobile interaction
+						// Allow proper mobile interaction - don't prevent default
 						e.preventDefault();
-						document.getElementById("file-upload")?.click();
+						// Small delay to ensure touch is processed
+						setTimeout(() => {
+							document.getElementById("file-upload")?.click();
+						}, 100);
 					}}
 				>
 					{file ? (
 						<div className="space-y-2">
-							<FileText className="h-8 w-8 text-green-600 mx-auto" />
-							<p className="text-sm font-medium text-green-800">{file.name}</p>
-							<p className="text-xs text-green-600">
-								{(file.size / 1024 / 1024).toFixed(2)} MB
-							</p>
-							<Button
-								type="button"
-								variant="outline"
-								size="sm"
-								onClick={() => setFile(null)}
-								className="text-red-600 hover:text-red-700"
-							>
-								Remove
-							</Button>
+							{uploading ? (
+								<>
+									<div className="animate-spin rounded-full h-8 w-8 border-b-2 border-sauti-orange mx-auto" />
+									<p className="text-sm font-medium text-sauti-orange">Uploading...</p>
+									<div className="w-full bg-gray-200 rounded-full h-2">
+										<div
+											className="bg-sauti-orange h-2 rounded-full transition-all duration-300"
+											style={{ width: `${uploadProgress}%` }}
+										></div>
+									</div>
+									<p className="text-xs text-gray-600">{file.name}</p>
+								</>
+							) : uploadedUrl ? (
+								<>
+									<FileText className="h-8 w-8 text-green-600 mx-auto" />
+									<p className="text-sm font-medium text-green-800">{file.name}</p>
+									<p className="text-xs text-green-600">
+										{(file.size / 1024 / 1024).toFixed(2)} MB
+									</p>
+									<p className="text-xs text-green-600 font-medium">
+										✓ Uploaded successfully
+									</p>
+									<Button
+										type="button"
+										variant="outline"
+										size="sm"
+										onClick={() => {
+											setFile(null);
+											setUploading(false);
+											setUploadProgress(0);
+											setUploadedUrl(null);
+											setUploadError(null);
+										}}
+										className="text-red-600 hover:text-red-700"
+									>
+										Remove
+									</Button>
+								</>
+							) : uploadError ? (
+								<>
+									<FileText className="h-8 w-8 text-red-600 mx-auto" />
+									<p className="text-sm font-medium text-red-800">{file.name}</p>
+									<p className="text-xs text-red-600">{uploadError}</p>
+									<Button
+										type="button"
+										variant="outline"
+										size="sm"
+										onClick={() => startBackgroundUpload(file)}
+										className="text-sauti-orange hover:text-sauti-orange/80"
+									>
+										Retry Upload
+									</Button>
+								</>
+							) : (
+								<>
+									<FileText className="h-8 w-8 text-blue-600 mx-auto" />
+									<p className="text-sm font-medium text-blue-800">{file.name}</p>
+									<p className="text-xs text-blue-600">
+										{(file.size / 1024 / 1024).toFixed(2)} MB
+									</p>
+									<p className="text-xs text-blue-600">Ready to upload</p>
+									<Button
+										type="button"
+										variant="outline"
+										size="sm"
+										onClick={() => {
+											setFile(null);
+											setUploading(false);
+											setUploadProgress(0);
+											setUploadedUrl(null);
+											setUploadError(null);
+										}}
+										className="text-red-600 hover:text-red-700"
+									>
+										Remove
+									</Button>
+								</>
+							)}
 						</div>
 					) : (
 						<div className="space-y-2">
@@ -199,26 +340,42 @@ function AddDocumentForm({
 				/>
 			</div>
 
-			<div className="flex justify-end gap-2">
+			<div className="flex flex-col sm:flex-row justify-end gap-2">
 				<Button
 					type="button"
 					variant="outline"
 					onClick={() => {
 						setTitle("");
 						setFile(null);
+						setUploading(false);
+						setUploadProgress(0);
+						setUploadedUrl(null);
+						setUploadError(null);
+						const fileInput = document.getElementById(
+							"file-upload"
+						) as HTMLInputElement;
+						if (fileInput) {
+							fileInput.value = "";
+						}
 					}}
+					className="w-full sm:w-auto"
 				>
 					Cancel
 				</Button>
 				<Button
 					type="submit"
-					disabled={!title || !file || isUploading}
-					className="gap-2"
+					disabled={!title || !file || isUploading || uploading || !uploadedUrl}
+					className="gap-2 w-full sm:w-auto"
 				>
-					{isUploading ? (
+					{isUploading || uploading ? (
 						<>
 							<div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
-							Uploading...
+							{uploading ? "Uploading..." : "Saving..."}
+						</>
+					) : uploadedUrl ? (
+						<>
+							<Upload className="h-4 w-4" />
+							Save Document
 						</>
 					) : (
 						<>
@@ -486,39 +643,48 @@ export function SupportServiceSidepanel({
 					<div className="absolute left-1/2 -translate-x-1/2 -top-2 sm:hidden w-12 h-1.5 rounded-full bg-gray-300" />
 
 					{/* Top row with close button */}
-					<div className="flex items-start justify-between gap-3 mb-4">
-						<div className="flex items-start gap-3 min-w-0 flex-1">
+					<div className="flex items-start justify-between gap-2 mb-4">
+						<div className="flex items-start gap-2 min-w-0 flex-1">
 							<button
 								onClick={onClose}
-								className="sm:hidden -ml-1 p-1.5 rounded-md hover:bg-gray-100 transition-colors"
+								className="sm:hidden -ml-1 p-1.5 rounded-md hover:bg-gray-100 transition-colors flex-shrink-0"
 							>
 								<X className="h-4 w-4 text-gray-600" />
 							</button>
 							<div className="min-w-0 flex-1">
-								<div className="flex items-center gap-2 mb-1">
-									<Building className="h-5 w-5 text-sauti-orange" />
-									{isEditing ? (
-										<Input
-											value={editData.name}
-											onChange={(e) => setEditData({ ...editData, name: e.target.value })}
-											className="text-lg font-semibold"
-											placeholder="Service name"
-										/>
-									) : (
-										<h2 className="text-lg font-semibold text-gray-900 truncate">
-											{service.name}
-										</h2>
-									)}
-									<Badge className={getStatusColor(service.verification_status)}>
+								<div className="flex flex-col sm:flex-row sm:items-center gap-2 mb-1">
+									<div className="flex items-center gap-2 min-w-0">
+										<Building className="h-5 w-5 text-sauti-orange flex-shrink-0" />
+										{isEditing ? (
+											<Input
+												value={editData.name}
+												onChange={(e) => setEditData({ ...editData, name: e.target.value })}
+												className="text-base sm:text-lg font-semibold min-w-0"
+												placeholder="Service name"
+											/>
+										) : (
+											<h2 className="text-base sm:text-lg font-semibold text-gray-900 truncate min-w-0">
+												{service.name}
+											</h2>
+										)}
+									</div>
+									<Badge
+										className={`${getStatusColor(
+											service.verification_status
+										)} text-xs flex-shrink-0`}
+									>
 										{service.verification_status || "pending"}
 									</Badge>
 								</div>
-								<div className="flex items-center gap-3 text-xs text-gray-500">
+								<div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3 text-xs text-gray-500">
 									<span className="capitalize">
 										{service.service_types.replace("_", " ")} Service
 									</span>
+									{service.created_at && <span className="hidden sm:inline">•</span>}
 									{service.created_at && (
-										<span>Created {formatDate(service.created_at)}</span>
+										<span className="text-xs">
+											Created {formatDate(service.created_at)}
+										</span>
 									)}
 								</div>
 							</div>
@@ -575,25 +741,27 @@ export function SupportServiceSidepanel({
 					</div>
 
 					{/* Service Details */}
-					<div className="grid grid-cols-2 gap-4 text-sm">
+					<div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 text-sm">
 						{/* Email */}
-						<div>
-							<span className="text-gray-600">Email:</span>
+						<div className="min-w-0">
+							<span className="text-gray-600 block text-xs sm:text-sm">Email:</span>
 							{isEditing ? (
 								<Input
 									value={editData.email}
 									onChange={(e) => setEditData({ ...editData, email: e.target.value })}
 									placeholder="service@example.com"
-									className="mt-1"
+									className="mt-1 text-sm"
 								/>
 							) : (
-								<p className="font-medium">{service.email || "Not provided"}</p>
+								<p className="font-medium text-sm truncate">
+									{service.email || "Not provided"}
+								</p>
 							)}
 						</div>
 
 						{/* Phone */}
-						<div>
-							<span className="text-gray-600">Phone:</span>
+						<div className="min-w-0">
+							<span className="text-gray-600 block text-xs sm:text-sm">Phone:</span>
 							{isEditing ? (
 								<Input
 									value={editData.phone_number}
@@ -601,41 +769,45 @@ export function SupportServiceSidepanel({
 										setEditData({ ...editData, phone_number: e.target.value })
 									}
 									placeholder="+1 (555) 123-4567"
-									className="mt-1"
+									className="mt-1 text-sm"
 								/>
 							) : (
-								<p className="font-medium">{service.phone_number || "Not provided"}</p>
+								<p className="font-medium text-sm truncate">
+									{service.phone_number || "Not provided"}
+								</p>
 							)}
 						</div>
 
 						{/* Website */}
-						<div className="col-span-2">
-							<span className="text-gray-600">Website:</span>
+						<div className="col-span-1 sm:col-span-2 min-w-0">
+							<span className="text-gray-600 block text-xs sm:text-sm">Website:</span>
 							{isEditing ? (
 								<Input
 									value={editData.website}
 									onChange={(e) => setEditData({ ...editData, website: e.target.value })}
 									placeholder="https://example.com"
-									className="mt-1"
+									className="mt-1 text-sm"
 								/>
 							) : service.website ? (
 								<a
 									href={service.website}
 									target="_blank"
 									rel="noopener noreferrer"
-									className="font-medium text-blue-600 hover:underline flex items-center gap-1"
+									className="font-medium text-blue-600 hover:underline flex items-center gap-1 text-sm truncate"
 								>
-									{service.website}
-									<ExternalLink className="h-3 w-3" />
+									<span className="truncate">{service.website}</span>
+									<ExternalLink className="h-3 w-3 flex-shrink-0" />
 								</a>
 							) : (
-								<p className="font-medium text-gray-500">Not provided</p>
+								<p className="font-medium text-gray-500 text-sm">Not provided</p>
 							)}
 						</div>
 
 						{/* Availability */}
-						<div className="col-span-2">
-							<span className="text-gray-600">Availability:</span>
+						<div className="col-span-1 sm:col-span-2 min-w-0">
+							<span className="text-gray-600 block text-xs sm:text-sm">
+								Availability:
+							</span>
 							{isEditing ? (
 								<Input
 									value={editData.availability}
@@ -643,10 +815,12 @@ export function SupportServiceSidepanel({
 										setEditData({ ...editData, availability: e.target.value })
 									}
 									placeholder="e.g., 24/7, Mon-Fri 9AM-5PM"
-									className="mt-1"
+									className="mt-1 text-sm"
 								/>
 							) : (
-								<p className="font-medium">{service.availability || "Not specified"}</p>
+								<p className="font-medium text-sm">
+									{service.availability || "Not specified"}
+								</p>
 							)}
 						</div>
 					</div>
@@ -690,6 +864,10 @@ export function SupportServiceSidepanel({
 											}
 										}}
 										isUploading={isUploading}
+										userId={userId}
+										userType={userType}
+										serviceId={service?.id || ""}
+										serviceType={service?.service_types || "counseling"}
 									/>
 								</div>
 
@@ -715,50 +893,52 @@ export function SupportServiceSidepanel({
 										{documents.map((doc, index) => (
 											<div
 												key={index}
-												className="flex items-center justify-between p-3 bg-white rounded-lg border border-gray-200 hover:border-gray-300 transition-colors"
+												className="flex flex-col sm:flex-row sm:items-center gap-3 p-3 bg-white rounded-lg border border-gray-200 hover:border-gray-300 transition-colors"
 											>
 												<div className="flex items-center gap-3 min-w-0 flex-1">
 													<div className="h-10 w-10 rounded-lg bg-blue-100 flex items-center justify-center flex-shrink-0">
 														<FileText className="h-5 w-5 text-blue-600" />
 													</div>
 													<div className="min-w-0 flex-1">
-														<div className="flex items-center gap-2 mb-1">
-															<h4 className="font-medium text-gray-900 truncate">
+														<div className="flex flex-col sm:flex-row sm:items-center gap-2 mb-1">
+															<h4 className="font-medium text-gray-900 truncate text-sm">
 																{doc.title}
 															</h4>
-															{doc.uploaded && (
-																<Badge
-																	variant="outline"
-																	className="text-xs bg-green-50 text-green-700 border-green-200"
-																>
-																	Uploaded
-																</Badge>
-															)}
-															{doc.linked && (
-																<Badge
-																	variant="outline"
-																	className="text-xs bg-blue-50 text-blue-700 border-blue-200"
-																>
-																	Linked
-																</Badge>
-															)}
+															<div className="flex items-center gap-1 flex-wrap">
+																{doc.uploaded && (
+																	<Badge
+																		variant="outline"
+																		className="text-xs bg-green-50 text-green-700 border-green-200"
+																	>
+																		Uploaded
+																	</Badge>
+																)}
+																{doc.linked && (
+																	<Badge
+																		variant="outline"
+																		className="text-xs bg-blue-50 text-blue-700 border-blue-200"
+																	>
+																		Linked
+																	</Badge>
+																)}
+															</div>
 														</div>
-														<div className="flex items-center gap-2 text-xs text-gray-500">
+														<div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 text-xs text-gray-500">
 															<span>{formatFileSize(doc.fileSize || 0)}</span>
-															<span>•</span>
+															<span className="hidden sm:inline">•</span>
 															<span>{formatDate(doc.uploadedAt)}</span>
 														</div>
 													</div>
 												</div>
-												<div className="flex items-center gap-2 flex-shrink-0">
+												<div className="flex items-center gap-2 flex-shrink-0 justify-end sm:justify-start">
 													<Button
 														variant="outline"
 														size="sm"
 														onClick={() => window.open(doc.url, "_blank")}
-														className="gap-1"
+														className="gap-1 text-xs px-2 py-1"
 													>
 														<Eye className="h-3 w-3" />
-														View
+														<span className="hidden sm:inline">View</span>
 													</Button>
 													<Button
 														variant="outline"
@@ -769,9 +949,10 @@ export function SupportServiceSidepanel({
 															link.download = doc.title;
 															link.click();
 														}}
-														className="gap-1"
+														className="gap-1 text-xs px-2 py-1"
 													>
 														<Download className="h-3 w-3" />
+														<span className="hidden sm:inline">Download</span>
 													</Button>
 												</div>
 											</div>
