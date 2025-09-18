@@ -42,6 +42,7 @@ import {
 	TrendingUp,
 	Plus,
 	CheckSquare,
+	X,
 } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -410,15 +411,15 @@ export function DocumentUploadForm({
 						className="border border-gray-200 sm:border-2 sm:border-dashed"
 					>
 						<CardContent className="p-3 sm:p-4">
-							<div className="flex items-center justify-between mb-3 sm:mb-4">
-								<div className="flex items-center gap-2">
-									<h4 className="font-medium text-sm sm:text-base">
+							<div className="flex items-center justify-between mb-3 sm:mb-4 gap-2">
+								<div className="flex items-center gap-2 min-w-0 flex-1">
+									<h4 className="font-medium text-sm sm:text-base truncate">
 										Document {documents.indexOf(doc) + 1}
 									</h4>
 									{doc.isIdCardFront && (
 										<Badge
 											variant="secondary"
-											className="text-xs bg-blue-100 text-blue-700"
+											className="text-xs bg-blue-100 text-blue-700 flex-shrink-0"
 										>
 											ID Card Front
 										</Badge>
@@ -428,7 +429,7 @@ export function DocumentUploadForm({
 									variant="ghost"
 									size="sm"
 									onClick={() => removeDocument(doc.id)}
-									className="text-red-600 hover:text-red-700 p-1 sm:p-2"
+									className="text-red-600 hover:text-red-700 p-1 sm:p-2 flex-shrink-0"
 								>
 									<Trash2 className="h-3 w-3 sm:h-4 sm:w-4" />
 								</Button>
@@ -469,7 +470,7 @@ export function DocumentUploadForm({
 
 								{/* Drag and Drop File Input */}
 								<div
-									className={`border-2 border-dashed rounded-lg p-4 text-center transition-colors cursor-pointer ${
+									className={`border-2 border-dashed rounded-lg p-3 sm:p-4 text-center transition-colors cursor-pointer ${
 										dragOverDocId === doc.id
 											? "border-sauti-orange bg-orange-50"
 											: doc.file
@@ -588,12 +589,13 @@ export function DocumentUploadForm({
 											<div>
 												<p className="text-sm text-gray-600">
 													<span className="font-medium text-sauti-orange">
-														Click to upload
-													</span>{" "}
-													or drag and drop
+														Tap to upload
+													</span>
+													<span className="hidden sm:inline"> or drag and drop</span>
 												</p>
 												<p className="text-xs text-gray-500 mt-1">
-													PDF, JPG, PNG, DOC, DOCX (Max 10MB)
+													PDF, JPG, PNG, DOC, DOCX
+													<span className="hidden sm:inline"> (Max 10MB)</span>
 												</p>
 											</div>
 										</div>
@@ -616,15 +618,36 @@ export function DocumentUploadForm({
 				))}
 			</div>
 
-			{/* Save Button */}
+			{/* Action Buttons */}
 			{documents.length > 0 && (
-				<div className="flex justify-end">
+				<div className="flex flex-col sm:flex-row justify-end gap-2">
+					<Button
+						variant="outline"
+						onClick={() => {
+							setDocuments([]);
+							// Clear all file inputs
+							documents.forEach((doc) => {
+								const fileInput = document.getElementById(
+									`file-upload-${doc.id}`
+								) as HTMLInputElement;
+								if (fileInput) {
+									fileInput.value = "";
+								}
+							});
+						}}
+						disabled={isUploading}
+						className="gap-1 sm:gap-2 text-xs sm:text-sm w-full sm:w-auto"
+						size="sm"
+					>
+						<X className="h-3 w-3 sm:h-4 sm:w-4" />
+						Cancel
+					</Button>
 					<Button
 						onClick={saveDocuments}
 						disabled={
 							isUploading || documents.some((doc) => !doc.title.trim() || !doc.file)
 						}
-						className="gap-1 sm:gap-2 bg-sauti-orange hover:bg-sauti-orange/90 text-xs sm:text-sm"
+						className="gap-1 sm:gap-2 bg-sauti-orange hover:bg-sauti-orange/90 text-xs sm:text-sm w-full sm:w-auto"
 						size="sm"
 					>
 						{isUploading ? (
@@ -1085,20 +1108,24 @@ export function VerificationSection({
 				<div className="sm:hidden">
 					<Card>
 						<CardHeader className="pb-3">
-							<div className="flex items-center justify-between">
-								<div>
+							<div className="flex items-center justify-between gap-3">
+								<div className="min-w-0 flex-1">
 									<CardTitle className="flex items-center gap-2 text-base">
-										<FileText className="h-4 w-4 text-sauti-orange" />
-										Professional Credentials
+										<FileText className="h-4 w-4 text-sauti-orange flex-shrink-0" />
+										<span className="truncate">Professional Credentials</span>
 									</CardTitle>
-									<p className="text-xs text-gray-600 mt-1">
+									<p className="text-xs text-gray-600 mt-1 line-clamp-2">
 										{documents.length} document{documents.length !== 1 ? "s" : ""}{" "}
 										uploaded
 									</p>
 								</div>
 								<Button
 									size="sm"
-									className="gap-2 bg-sauti-orange hover:bg-sauti-orange/90"
+									className={`gap-2 flex-shrink-0 ${
+										showMobileUpload
+											? "bg-red-600 hover:bg-red-700"
+											: "bg-sauti-orange hover:bg-sauti-orange/90"
+									}`}
 									onClick={(e) => {
 										e.preventDefault();
 										setShowMobileUpload(!showMobileUpload);
@@ -1108,7 +1135,11 @@ export function VerificationSection({
 										setShowMobileUpload(!showMobileUpload);
 									}}
 								>
-									<Plus className="h-4 w-4" />
+									{showMobileUpload ? (
+										<X className="h-4 w-4" />
+									) : (
+										<Plus className="h-4 w-4" />
+									)}
 									{showMobileUpload ? "Cancel" : "Add"}
 								</Button>
 							</div>
