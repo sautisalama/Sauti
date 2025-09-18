@@ -112,6 +112,10 @@ interface DocumentFormData {
 	file: File | null;
 	uploaded: boolean;
 	isIdCardFront?: boolean;
+	uploading?: boolean;
+	uploadProgress?: number;
+	uploadedUrl?: string;
+	uploadError?: string;
 }
 
 export function DocumentUploadForm({
@@ -149,6 +153,69 @@ export function DocumentUploadForm({
 		setDocuments((prev) =>
 			prev.map((doc) => (doc.id === id ? { ...doc, [field]: value } : doc))
 		);
+
+		// If a file is selected, start uploading immediately in the background
+		if (field === "file" && value) {
+			const doc = documents.find((d) => d.id === id);
+			if (doc) {
+				startBackgroundUpload(id, value, doc.title);
+			}
+		}
+	};
+
+	const startBackgroundUpload = async (
+		id: string,
+		file: File,
+		title: string
+	) => {
+		// Mark document as uploading
+		setDocuments((prev) =>
+			prev.map((doc) =>
+				doc.id === id
+					? { ...doc, uploading: true, uploadProgress: 0, uploadError: undefined }
+					: doc
+			)
+		);
+
+		try {
+			// Upload the file
+			const result = await fileUploadService.uploadFile({
+				userId,
+				userType,
+				fileType: "accreditation",
+				fileName: file.name,
+				file: file,
+			});
+
+			// Mark as uploaded successfully
+			setDocuments((prev) =>
+				prev.map((doc) =>
+					doc.id === id
+						? {
+								...doc,
+								uploading: false,
+								uploadProgress: 100,
+								uploadedUrl: result.url,
+								uploaded: true,
+						  }
+						: doc
+				)
+			);
+		} catch (error) {
+			console.error("Background upload failed:", error);
+			// Mark as upload failed
+			setDocuments((prev) =>
+				prev.map((doc) =>
+					doc.id === id
+						? {
+								...doc,
+								uploading: false,
+								uploadError: "Upload failed. Please try again.",
+						  }
+						: doc
+				)
+			);
+		}
 	};
 
 	const uploadDocument = async (doc: DocumentFormData) => {
@@ -196,18 +263,33 @@ export function DocumentUploadForm({
 					continue;
 				}
 
-				const url = await uploadDocument(doc);
-				if (url) {
+				// If already uploaded in background, use the uploaded URL
+				if (doc.uploaded && doc.uploadedUrl) {
 					const savedDoc = {
 						title: doc.title,
 						certificateNumber: doc.certificateNumber,
-						url,
+						url: doc.uploadedUrl,
 						fileType: doc.file?.type || "unknown",
 						fileSize: doc.file?.size || 0,
 						uploadedAt: new Date().toISOString(),
 						uploaded: true,
 					};
 					documentsToSave.push(savedDoc);
+				} else {
+					// Upload the file if not already uploaded
+					const url = await uploadDocument(doc);
+					if (url) {
+						const savedDoc = {
+							title: doc.title,
+							certificateNumber: doc.certificateNumber,
+							url,
+							fileType: doc.file?.type || "unknown",
+							fileSize: doc.file?.size || 0,
+							uploadedAt: new Date().toISOString(),
+							uploaded: true,
+						};
+						documentsToSave.push(savedDoc);
+					}
 				}
 			}
 
@@ -415,25 +497,90 @@ export function DocumentUploadForm({
 								>
 									{doc.file ? (
 										<div className="space-y-2">
-											<FileText className="h-6 w-6 text-green-600 mx-auto" />
-											<p className="text-sm font-medium text-green-800 truncate">
-												{doc.file.name}
-											</p>
-											<p className="text-xs text-green-600">
-												{(doc.file.size / 1024 / 1024).toFixed(2)} MB
-											</p>
-											<Button
-												type="button"
-												variant="outline"
-												size="sm"
-												onClick={(e) => {
-													e.stopPropagation();
-													updateDocument(doc.id, "file", null);
-												}}
-												className="text-red-600 hover:text-red-700"
-											>
-												Remove
-											</Button>
+											{doc.uploading ? (
+												<>
+													<div className="animate-spin rounded-full h-6 w-6 border-b-2 border-sauti-orange mx-auto" />
+													<p className="text-sm font-medium text-sauti-orange">
+														Uploading...
+													</p>
+													{doc.uploadProgress !== undefined && (
+														<div className="w-full bg-gray-200 rounded-full h-2">
+															<div
+																className="bg-sauti-orange h-2 rounded-full transition-all duration-300"
+																style={{ width: `${doc.uploadProgress}%` }}
+															></div>
+														</div>
+													)}
+												</>
+											) : doc.uploaded && doc.uploadedUrl ? (
+												<>
+													<FileText className="h-6 w-6 text-green-600 mx-auto" />
+													<p className="text-sm font-medium text-green-800 truncate">
+														{doc.file.name}
+													</p>
+													<p className="text-xs text-green-600">
+														{(doc.file.size / 1024 / 1024).toFixed(2)} MB
+													</p>
+													<p className="text-xs text-green-600 font-medium">
+														✓ Uploaded successfully
+													</p>
+													<Button
+														type="button"
+														variant="outline"
+														size="sm"
+														onClick={(e) => {
+															e.stopPropagation();
+															updateDocument(doc.id, "file", null);
+														}}
+														className="text-red-600 hover:text-red-700"
+													>
+														Remove
+													</Button>
+												</>
+											) : doc.uploadError ? (
+												<>
+													<FileText className="h-6 w-6 text-red-600 mx-auto" />
+													<p className="text-sm font-medium text-red-800 truncate">
+														{doc.file.name}
+													</p>
+													<p className="text-xs text-red-600">{doc.uploadError}</p>
+													<Button
+														type="button"
+														variant="outline"
+														size="sm"
+														onClick={(e) => {
+															e.stopPropagation();
+															startBackgroundUpload(doc.id, doc.file!, doc.title);
+														}}
+														className="text-sauti-orange hover:text-sauti-orange/80"
+													>
+														Retry Upload
+													</Button>
+												</>
+											) : (
+												<>
+													<FileText className="h-6 w-6 text-blue-600 mx-auto" />
+													<p className="text-sm font-medium text-blue-800 truncate">
+														{doc.file.name}
+													</p>
+													<p className="text-xs text-blue-600">
+														{(doc.file.size / 1024 / 1024).toFixed(2)} MB
+													</p>
+													<p className="text-xs text-blue-600">Ready to upload</p>
+													<Button
+														type="button"
+														variant="outline"
+														size="sm"
+														onClick={(e) => {
+															e.stopPropagation();
+															updateDocument(doc.id, "file", null);
+														}}
+														className="text-red-600 hover:text-red-700"
+													>
+														Remove
+													</Button>
+												</>
+											)}
 										</div>
 									) : (
 										<div className="space-y-2">

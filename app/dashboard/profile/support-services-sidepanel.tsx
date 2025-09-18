@@ -38,13 +38,25 @@ type UserType = Database["public"]["Enums"]["user_type"];
 function AddDocumentForm({
 	onSave,
 	isUploading,
+	userId,
+	userType,
+	serviceId,
+	serviceType,
 }: {
 	onSave: (title: string, file: File) => void;
 	isUploading: boolean;
+	userId: string;
+	userType: UserType;
+	serviceId: string;
+	serviceType: SupportServiceType;
 }) {
 	const [title, setTitle] = useState("");
 	const [file, setFile] = useState<File | null>(null);
 	const [isDragOver, setIsDragOver] = useState(false);
+	const [uploading, setUploading] = useState(false);
+	const [uploadProgress, setUploadProgress] = useState(0);
+	const [uploadedUrl, setUploadedUrl] = useState<string | null>(null);
+	const [uploadError, setUploadError] = useState<string | null>(null);
 
 	const handleSubmit = (e: React.FormEvent) => {
 		e.preventDefault();
@@ -56,10 +68,18 @@ function AddDocumentForm({
 			alert("Please select a file to upload");
 			return;
 		}
+		if (!uploadedUrl) {
+			alert("Please wait for the file to finish uploading");
+			return;
+		}
 		onSave(title, file);
 		// Clear form after successful upload
 		setTitle("");
 		setFile(null);
+		setUploading(false);
+		setUploadProgress(0);
+		setUploadedUrl(null);
+		setUploadError(null);
 	};
 
 	const handleDragOver = (e: React.DragEvent) => {
@@ -108,6 +128,51 @@ function AddDocumentForm({
 		setFile(selectedFile);
 		if (selectedFile && !title) {
 			setTitle(selectedFile.name.replace(/\.[^/.]+$/, ""));
+		}
+
+		// Start background upload immediately when file is selected
+		if (selectedFile) {
+			startBackgroundUpload(selectedFile);
+		}
+	};
+
+	const startBackgroundUpload = async (file: File) => {
+		setUploading(true);
+		setUploadProgress(0);
+		setUploadError(null);
+		setUploadedUrl(null);
+
+		try {
+			// Simulate progress for better UX
+			const progressInterval = setInterval(() => {
+				setUploadProgress((prev) => {
+					if (prev >= 90) {
+						clearInterval(progressInterval);
+						return prev;
+					}
+					return prev + Math.random() * 10;
+				});
+			}, 200);
+
+			// Upload the file
+			const result = await fileUploadService.uploadFile({
+				userId,
+				userType,
+				serviceId,
+				serviceType,
+				fileType: "accreditation",
+				fileName: file.name,
+				file: file,
+			});
+
+			clearInterval(progressInterval);
+			setUploadProgress(100);
+			setUploadedUrl(result.url);
+			setUploading(false);
+		} catch (error) {
+			console.error("Background upload failed:", error);
+			setUploadError("Upload failed. Please try again.");
+			setUploading(false);
 		}
 	};
 
@@ -158,20 +223,84 @@ function AddDocumentForm({
 				>
 					{file ? (
 						<div className="space-y-2">
-							<FileText className="h-8 w-8 text-green-600 mx-auto" />
-							<p className="text-sm font-medium text-green-800">{file.name}</p>
-							<p className="text-xs text-green-600">
-								{(file.size / 1024 / 1024).toFixed(2)} MB
-							</p>
-							<Button
-								type="button"
-								variant="outline"
-								size="sm"
-								onClick={() => setFile(null)}
-								className="text-red-600 hover:text-red-700"
-							>
-								Remove
-							</Button>
+							{uploading ? (
+								<>
+									<div className="animate-spin rounded-full h-8 w-8 border-b-2 border-sauti-orange mx-auto" />
+									<p className="text-sm font-medium text-sauti-orange">Uploading...</p>
+									<div className="w-full bg-gray-200 rounded-full h-2">
+										<div
+											className="bg-sauti-orange h-2 rounded-full transition-all duration-300"
+											style={{ width: `${uploadProgress}%` }}
+										></div>
+									</div>
+									<p className="text-xs text-gray-600">{file.name}</p>
+								</>
+							) : uploadedUrl ? (
+								<>
+									<FileText className="h-8 w-8 text-green-600 mx-auto" />
+									<p className="text-sm font-medium text-green-800">{file.name}</p>
+									<p className="text-xs text-green-600">
+										{(file.size / 1024 / 1024).toFixed(2)} MB
+									</p>
+									<p className="text-xs text-green-600 font-medium">
+										✓ Uploaded successfully
+									</p>
+									<Button
+										type="button"
+										variant="outline"
+										size="sm"
+										onClick={() => {
+											setFile(null);
+											setUploading(false);
+											setUploadProgress(0);
+											setUploadedUrl(null);
+											setUploadError(null);
+										}}
+										className="text-red-600 hover:text-red-700"
+									>
+										Remove
+									</Button>
+								</>
+							) : uploadError ? (
+								<>
+									<FileText className="h-8 w-8 text-red-600 mx-auto" />
+									<p className="text-sm font-medium text-red-800">{file.name}</p>
+									<p className="text-xs text-red-600">{uploadError}</p>
+									<Button
+										type="button"
+										variant="outline"
+										size="sm"
+										onClick={() => startBackgroundUpload(file)}
+										className="text-sauti-orange hover:text-sauti-orange/80"
+									>
+										Retry Upload
+									</Button>
+								</>
+							) : (
+								<>
+									<FileText className="h-8 w-8 text-blue-600 mx-auto" />
+									<p className="text-sm font-medium text-blue-800">{file.name}</p>
+									<p className="text-xs text-blue-600">
+										{(file.size / 1024 / 1024).toFixed(2)} MB
+									</p>
+									<p className="text-xs text-blue-600">Ready to upload</p>
+									<Button
+										type="button"
+										variant="outline"
+										size="sm"
+										onClick={() => {
+											setFile(null);
+											setUploading(false);
+											setUploadProgress(0);
+											setUploadedUrl(null);
+											setUploadError(null);
+										}}
+										className="text-red-600 hover:text-red-700"
+									>
+										Remove
+									</Button>
+								</>
+							)}
 						</div>
 					) : (
 						<div className="space-y-2">
@@ -212,13 +341,18 @@ function AddDocumentForm({
 				</Button>
 				<Button
 					type="submit"
-					disabled={!title || !file || isUploading}
+					disabled={!title || !file || isUploading || uploading || !uploadedUrl}
 					className="gap-2"
 				>
-					{isUploading ? (
+					{isUploading || uploading ? (
 						<>
 							<div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
-							Uploading...
+							{uploading ? "Uploading..." : "Saving..."}
+						</>
+					) : uploadedUrl ? (
+						<>
+							<Upload className="h-4 w-4" />
+							Save Document
 						</>
 					) : (
 						<>
@@ -690,6 +824,10 @@ export function SupportServiceSidepanel({
 											}
 										}}
 										isUploading={isUploading}
+										userId={userId}
+										userType={userType}
+										serviceId={service?.id || ""}
+										serviceType={service?.service_types || "counseling"}
 									/>
 								</div>
 
