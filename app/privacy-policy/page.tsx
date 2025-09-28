@@ -209,7 +209,9 @@ export default function PrivacyPolicy() {
 					</div>
 				</div>
 			</main>
-			<Footer />
+			<div className="bg-sauti-black py-10">
+				<Footer />
+			</div>
 		</>
 	);
 }
