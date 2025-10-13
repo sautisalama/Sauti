@@ -30,6 +30,8 @@ import { createClient } from "@/utils/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Database } from "@/types/db-schema";
 import { fileUploadService } from "@/lib/file-upload";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion";
 
 type SupportServiceType = Database["public"]["Enums"]["support_service_type"];
 type UserType = Database["public"]["Enums"]["user_type"];
@@ -431,6 +433,7 @@ export function SupportServiceSidepanel({
 		availability: "",
 	});
 	const [isSaving, setIsSaving] = useState(false);
+	const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
 	const supabase = createClient();
 	const { toast } = useToast();
 
@@ -636,193 +639,265 @@ export function SupportServiceSidepanel({
 	if (!service) return null;
 
 	return (
-		<div className="fixed inset-0 sm:inset-y-0 sm:right-0 sm:left-auto w-full sm:w-[540px] lg:w-[720px] bg-white shadow-2xl border-l z-[60] transform transition-transform duration-300 ease-out translate-y-0 sm:translate-x-0">
-			<div className="h-full flex flex-col bg-gray-50">
-				{/* Header */}
-				<div className="p-4 border-b border-gray-200 bg-white sticky top-0 z-10">
+		<div className="fixed inset-0 sm:inset-y-0 sm:right-0 sm:left-auto w-full sm:w-[540px] lg:w-[720px] xl:w-[800px] bg-white shadow-2xl border-l z-[60] transform transition-transform duration-300 ease-out translate-y-0 sm:translate-x-0">
+			{/* Backdrop for mobile */}
+			<div className="fixed inset-0 bg-black/20 sm:hidden" onClick={onClose} />
+			<div className="relative h-full flex flex-col bg-white">
+				{/* Header - Fixed */}
+				<div className="sticky top-0 z-10 bg-white border-b border-gray-200 max-h-[50vh] overflow-y-auto">
+					{/* Mobile drag handle */}
 					<div className="absolute left-1/2 -translate-x-1/2 -top-2 sm:hidden w-12 h-1.5 rounded-full bg-gray-300" />
-
-					{/* Top row with close button */}
-					<div className="flex items-start justify-between gap-2 mb-4">
-						<div className="flex items-start gap-2 min-w-0 flex-1">
-							<button
-								onClick={onClose}
-								className="sm:hidden -ml-1 p-1.5 rounded-md hover:bg-gray-100 transition-colors flex-shrink-0"
-							>
-								<X className="h-4 w-4 text-gray-600" />
-							</button>
-							<div className="min-w-0 flex-1">
-								<div className="flex flex-col sm:flex-row sm:items-center gap-2 mb-1">
-									<div className="flex items-center gap-2 min-w-0">
-										<Building className="h-5 w-5 text-sauti-orange flex-shrink-0" />
-										{isEditing ? (
-											<Input
-												value={editData.name}
-												onChange={(e) => setEditData({ ...editData, name: e.target.value })}
-												className="text-base sm:text-lg font-semibold min-w-0"
-												placeholder="Service name"
-											/>
-										) : (
-											<h2 className="text-base sm:text-lg font-semibold text-gray-900 truncate min-w-0">
-												{service.name}
-											</h2>
+					
+					{/* Header content */}
+					<div className="p-4 sm:p-6">
+						{/* Top row with close button and actions */}
+						<div className="flex items-start justify-between gap-3 mb-4">
+							<div className="flex items-start gap-3 min-w-0 flex-1">
+								<button
+									onClick={onClose}
+									className="sm:hidden p-2 rounded-lg hover:bg-gray-100 transition-colors flex-shrink-0 -ml-1"
+									aria-label="Close panel"
+								>
+									<X className="h-5 w-5 text-gray-600" />
+								</button>
+								
+								<div className="min-w-0 flex-1">
+									{/* Service name and type */}
+									<div className="flex items-center gap-2 mb-2">
+										<div className="p-1.5 rounded-lg bg-sauti-orange/10">
+											<Building className="h-4 w-4 text-sauti-orange" />
+										</div>
+										<div className="min-w-0 flex-1">
+											{isEditing ? (
+												<Input
+													value={editData.name}
+													onChange={(e) => setEditData({ ...editData, name: e.target.value })}
+													className="text-lg font-semibold min-w-0 border-0 p-0 focus:ring-0 focus:border-b-2 focus:border-sauti-orange rounded-none"
+													placeholder="Enter service name"
+												/>
+											) : (
+												<h1 className="text-lg font-semibold text-gray-900 truncate">
+													{service.name}
+												</h1>
+											)}
+										</div>
+									</div>
+									
+									{/* Service metadata - Compact */}
+									<div className="flex flex-wrap items-center gap-2 text-xs mb-3">
+										<Badge
+											className={`${getStatusColor(service.verification_status)} text-xs font-medium px-2 py-0.5`}
+										>
+											{service.verification_status || "pending"}
+										</Badge>
+										<span className="text-gray-600 capitalize">
+											{service.service_types.replace("_", " ")} Service
+										</span>
+										{service.created_at && (
+											<span className="text-gray-500">
+												{formatDate(service.created_at)}
+											</span>
 										)}
 									</div>
-									<Badge
-										className={`${getStatusColor(
-											service.verification_status
-										)} text-xs flex-shrink-0`}
-									>
-										{service.verification_status || "pending"}
-									</Badge>
-								</div>
-								<div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3 text-xs text-gray-500">
-									<span className="capitalize">
-										{service.service_types.replace("_", " ")} Service
-									</span>
-									{service.created_at && <span className="hidden sm:inline">•</span>}
-									{service.created_at && (
-										<span className="text-xs">
-											Created {formatDate(service.created_at)}
-										</span>
-									)}
+
+									{/* Availability in Header - Compact */}
+									<div className="space-y-1">
+										<div className="flex items-center gap-1.5">
+											<Clock className="h-3 w-3 text-blue-600" />
+											<span className="text-xs font-medium text-gray-700">Availability</span>
+										</div>
+										{isEditing ? (
+											<Textarea
+												value={editData.availability || ""}
+												onChange={(e) =>
+													setEditData({ ...editData, availability: e.target.value })
+												}
+												placeholder="e.g., 24/7, Mon-Fri 9AM-5PM"
+												className="text-xs min-h-[50px] resize-none"
+												rows={2}
+											/>
+										) : (
+											<div className="min-h-[50px] px-2 py-2 bg-gray-50 rounded-md border border-gray-200">
+												<p className="text-xs text-gray-900 whitespace-pre-wrap leading-relaxed">
+													{service.availability || "No availability information provided"}
+												</p>
+											</div>
+										)}
+									</div>
 								</div>
 							</div>
-						</div>
-						<div className="flex items-center gap-2">
-							{isEditing ? (
-								<>
-									<Button
-										variant="outline"
-										size="sm"
-										onClick={handleCancelEdit}
-										disabled={isSaving}
-										className="gap-1"
-									>
-										<X className="h-3 w-3" />
-										Cancel
-									</Button>
-									<Button
-										size="sm"
-										onClick={handleSaveEdit}
-										disabled={isSaving || !editData.name.trim()}
-										className="gap-1"
-									>
-										{isSaving ? (
-											<div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white" />
-										) : (
-											<Save className="h-3 w-3" />
-										)}
-										{isSaving ? "Saving..." : "Save"}
-									</Button>
-								</>
-							) : (
-								<>
-									<Button
-										variant="outline"
-										size="sm"
-										onClick={handleEdit}
-										className="gap-1"
-									>
-										<Edit className="h-3 w-3" />
-										Edit
-									</Button>
-									<Button
-										variant="ghost"
-										size="icon"
-										className="rounded-lg hover:bg-gray-100 transition-colors h-8 w-8"
-										onClick={onClose}
-									>
-										<X className="h-4 w-4 text-gray-600" />
-									</Button>
-								</>
-							)}
+							{/* Action buttons - Compact */}
+							<div className="flex items-center gap-1.5">
+								{isEditing ? (
+									<>
+										<Button
+											variant="outline"
+											size="sm"
+											onClick={handleCancelEdit}
+											disabled={isSaving}
+											className="gap-1 px-3 py-1.5 text-xs font-medium h-8"
+										>
+											<X className="h-3 w-3" />
+											<span className="hidden sm:inline">Cancel</span>
+										</Button>
+										<Button
+											onClick={handleSaveEdit}
+											disabled={isSaving || !editData.name.trim()}
+											className="gap-1 px-3 py-1.5 text-xs font-medium bg-sauti-orange hover:bg-sauti-orange/90 disabled:opacity-50 h-8"
+										>
+											{isSaving ? (
+												<div className="animate-spin rounded-full h-3 w-3 border-2 border-white border-t-transparent" />
+											) : (
+												<Save className="h-3 w-3" />
+											)}
+											<span className="hidden sm:inline">{isSaving ? "Saving..." : "Save"}</span>
+										</Button>
+									</>
+								) : (
+									<>
+										<Button
+											variant="outline"
+											size="sm"
+											onClick={handleEdit}
+											className="gap-1 px-3 py-1.5 text-xs font-medium h-8"
+										>
+											<Edit className="h-3 w-3" />
+											<span className="hidden sm:inline">Edit</span>
+										</Button>
+										<Button
+											variant="ghost"
+											size="icon"
+											className="rounded-lg hover:bg-gray-100 transition-colors h-8 w-8"
+											onClick={onClose}
+											aria-label="Close panel"
+										>
+											<X className="h-4 w-4 text-gray-600" />
+										</Button>
+									</>
+								)}
+							</div>
 						</div>
 					</div>
+				</div>
 
-					{/* Service Details */}
-					<div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 text-sm">
-						{/* Email */}
-						<div className="min-w-0">
-							<span className="text-gray-600 block text-xs sm:text-sm">Email:</span>
-							{isEditing ? (
-								<Input
-									value={editData.email}
-									onChange={(e) => setEditData({ ...editData, email: e.target.value })}
-									placeholder="service@example.com"
-									className="mt-1 text-sm"
-								/>
-							) : (
-								<p className="font-medium text-sm truncate">
-									{service.email || "Not provided"}
-								</p>
-							)}
-						</div>
+				{/* Content */}
+				<div className="">
+					<div className="p-4 sm:p-6 space-y-4">
+						{/* Contact Information Section - Accordion */}
+						<Accordion type="single" collapsible defaultValue="contact" className="w-full">
+							<AccordionItem value="contact" className="border border-gray-200 rounded-lg">
+								<AccordionTrigger className="px-4 py-3 hover:no-underline">
+									<div className="flex items-center gap-2">
+										<Shield className="h-4 w-4 text-sauti-orange" />
+										<span className="text-base font-semibold text-gray-900">Contact Information</span>
+									</div>
+								</AccordionTrigger>
+								<AccordionContent className="px-4 pb-4">
+									<div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+										{/* Email */}
+										<div className="space-y-1">
+											<label className="text-xs font-medium text-gray-600 uppercase tracking-wide">
+												Email
+											</label>
+											{isEditing ? (
+												<Input
+													value={editData.email || ""}
+													onChange={(e) => setEditData({ ...editData, email: e.target.value })}
+													placeholder="service@example.com"
+													className="text-sm h-9"
+													type="email"
+												/>
+											) : (
+												<div className="flex items-center gap-2 h-9 px-3 py-2 bg-gray-50 rounded-md">
+													{service.email ? (
+														<>
+															<a
+																href={`mailto:${service.email}`}
+																className="font-medium text-blue-600 hover:text-blue-700 hover:underline text-sm truncate flex-1"
+															>
+																{service.email}
+															</a>
+															<ExternalLink className="h-3 w-3 text-gray-400 flex-shrink-0" />
+														</>
+													) : (
+														<span className="text-gray-500 text-sm">Not provided</span>
+													)}
+												</div>
+											)}
+										</div>
 
-						{/* Phone */}
-						<div className="min-w-0">
-							<span className="text-gray-600 block text-xs sm:text-sm">Phone:</span>
-							{isEditing ? (
-								<Input
-									value={editData.phone_number}
-									onChange={(e) =>
-										setEditData({ ...editData, phone_number: e.target.value })
-									}
-									placeholder="+1 (555) 123-4567"
-									className="mt-1 text-sm"
-								/>
-							) : (
-								<p className="font-medium text-sm truncate">
-									{service.phone_number || "Not provided"}
-								</p>
-							)}
-						</div>
+										{/* Phone */}
+										<div className="space-y-1">
+											<label className="text-xs font-medium text-gray-600 uppercase tracking-wide">
+												Phone
+											</label>
+											{isEditing ? (
+												<Input
+													value={editData.phone_number || ""}
+													onChange={(e) =>
+														setEditData({ ...editData, phone_number: e.target.value })
+													}
+													placeholder="+1 (555) 123-4567"
+													className="text-sm h-9"
+													type="tel"
+												/>
+											) : (
+												<div className="flex items-center gap-2 h-9 px-3 py-2 bg-gray-50 rounded-md">
+													{service.phone_number ? (
+														<>
+															<a
+																href={`tel:${service.phone_number}`}
+																className="font-medium text-blue-600 hover:text-blue-700 hover:underline text-sm flex-1"
+															>
+																{service.phone_number}
+															</a>
+															<ExternalLink className="h-3 w-3 text-gray-400 flex-shrink-0" />
+														</>
+													) : (
+														<span className="text-gray-500 text-sm">Not provided</span>
+													)}
+												</div>
+											)}
+										</div>
 
-						{/* Website */}
-						<div className="col-span-1 sm:col-span-2 min-w-0">
-							<span className="text-gray-600 block text-xs sm:text-sm">Website:</span>
-							{isEditing ? (
-								<Input
-									value={editData.website}
-									onChange={(e) => setEditData({ ...editData, website: e.target.value })}
-									placeholder="https://example.com"
-									className="mt-1 text-sm"
-								/>
-							) : service.website ? (
-								<a
-									href={service.website}
-									target="_blank"
-									rel="noopener noreferrer"
-									className="font-medium text-blue-600 hover:underline flex items-center gap-1 text-sm truncate"
-								>
-									<span className="truncate">{service.website}</span>
-									<ExternalLink className="h-3 w-3 flex-shrink-0" />
-								</a>
-							) : (
-								<p className="font-medium text-gray-500 text-sm">Not provided</p>
-							)}
-						</div>
+										{/* Website - Full width on mobile, spans both columns on desktop */}
+										<div className="space-y-1 sm:col-span-2">
+											<label className="text-xs font-medium text-gray-600 uppercase tracking-wide">
+												Website
+											</label>
+											{isEditing ? (
+												<Input
+													value={editData.website || ""}
+													onChange={(e) => setEditData({ ...editData, website: e.target.value })}
+													placeholder="https://example.com"
+													className="text-sm h-9"
+													type="url"
+												/>
+											) : (
+												<div className="flex items-center gap-2 h-9 px-3 py-2 bg-gray-50 rounded-md">
+													{service.website ? (
+														<>
+															<a
+																href={service.website}
+																target="_blank"
+																rel="noopener noreferrer"
+																className="font-medium text-blue-600 hover:text-blue-700 hover:underline text-sm truncate flex-1"
+															>
+																{service.website}
+															</a>
+															<ExternalLink className="h-3 w-3 text-gray-400 flex-shrink-0" />
+														</>
+													) : (
+														<span className="text-gray-500 text-sm">Not provided</span>
+													)}
+												</div>
+											)}
+										</div>
+									</div>
+								</AccordionContent>
+							</AccordionItem>
+						</Accordion>
 
-						{/* Availability */}
-						<div className="col-span-1 sm:col-span-2 min-w-0">
-							<span className="text-gray-600 block text-xs sm:text-sm">
-								Availability:
-							</span>
-							{isEditing ? (
-								<Input
-									value={editData.availability}
-									onChange={(e) =>
-										setEditData({ ...editData, availability: e.target.value })
-									}
-									placeholder="e.g., 24/7, Mon-Fri 9AM-5PM"
-									className="mt-1 text-sm"
-								/>
-							) : (
-								<p className="font-medium text-sm">
-									{service.availability || "Not specified"}
-								</p>
-							)}
-						</div>
 					</div>
 
 					{service.verification_notes && (
@@ -838,131 +913,176 @@ export function SupportServiceSidepanel({
 				{/* Content */}
 				<div className="flex-1 overflow-y-auto p-4">
 					<div className="space-y-6">
-						{/* Documents Section */}
-						<Card>
-							<CardHeader className="pb-3">
-								<CardTitle className="flex items-center gap-2 text-base">
+
+						{/* Documents Section - Compact */}
+						<section className="space-y-3">
+							<div className="flex items-center justify-between mb-3">
+								<div className="flex items-center gap-2">
 									<FileText className="h-4 w-4 text-sauti-orange" />
-									Accreditation Documents ({documents.length})
-								</CardTitle>
-							</CardHeader>
-							<CardContent>
-								{/* Drag and Drop Upload Area */}
-								<div className="mb-4">
-									<AddDocumentForm
-										onSave={async (title, file) => {
-											try {
-												const newDoc = await uploadDocument(file, title);
-												const updatedDocs = [...documents, newDoc];
-												await saveDocuments(updatedDocs);
-											} catch (error) {
-												toast({
-													title: "Error",
-													description: "Failed to upload document",
-													variant: "destructive",
-												});
-											}
-										}}
-										isUploading={isUploading}
-										userId={userId}
-										userType={userType}
-										serviceId={service?.id || ""}
-										serviceType={service?.service_types || "counseling"}
-									/>
+									<h2 className="text-base font-semibold text-gray-900">Documents</h2>
+								</div>
+								<Badge variant="outline" className="text-xs font-medium px-2 py-0.5">
+									{documents.length}
+								</Badge>
+							</div>
+						<div className="flex items-center justify-between mb-3">	
+
+							<p className="text-xs text-gray-600 mb-4">
+								Upload professional credentials for verification
+							</p>
+							<Button
+									onClick={() => setIsUploadModalOpen(true)}
+									className="gap-2 px-4 py-2 bg-sauti-orange hover:bg-sauti-orange/90 text-white"
+								>
+									<Plus className="h-4 w-4" />
+									Add Document
+								</Button>
 								</div>
 
-								{/* Documents List */}
-								{isLoading ? (
-									<div className="space-y-3">
-										{Array.from({ length: 2 }).map((_, i) => (
-											<div key={i} className="animate-pulse">
-												<div className="h-16 bg-gray-200 rounded" />
-											</div>
-										))}
+							{/* Documents List */}
+							{isLoading ? (
+								<div className="space-y-4">
+									{Array.from({ length: 2 }).map((_, i) => (
+										<div key={i} className="animate-pulse">
+											<div className="h-24 bg-gray-200 rounded-xl" />
+										</div>
+									))}
+								</div>
+							) : documents.length === 0 ? (
+								<div className="text-center py-8 border-2 border-dashed border-gray-300 rounded-lg bg-gray-50/30">
+									<div className="p-3 rounded-full bg-gray-100 w-12 h-12 mx-auto mb-3 flex items-center justify-center">
+										<FileText className="h-6 w-6 text-gray-400" />
 									</div>
-								) : documents.length === 0 ? (
-									<div className="text-center py-6 border-2 border-dashed border-gray-300 rounded-lg">
-										<FileText className="h-8 w-8 text-gray-400 mx-auto mb-2" />
-										<p className="text-sm text-gray-500">
-											No documents uploaded yet. Use the upload area above to add
-											documents.
-										</p>
-									</div>
-								) : (
-									<div className="space-y-3">
-										{documents.map((doc, index) => (
-											<div
-												key={index}
-												className="flex flex-col sm:flex-row sm:items-center gap-3 p-3 bg-white rounded-lg border border-gray-200 hover:border-gray-300 transition-colors"
-											>
-												<div className="flex items-center gap-3 min-w-0 flex-1">
-													<div className="h-10 w-10 rounded-lg bg-blue-100 flex items-center justify-center flex-shrink-0">
-														<FileText className="h-5 w-5 text-blue-600" />
-													</div>
-													<div className="min-w-0 flex-1">
-														<div className="flex flex-col sm:flex-row sm:items-center gap-2 mb-1">
-															<h4 className="font-medium text-gray-900 truncate text-sm">
-																{doc.title}
-															</h4>
-															<div className="flex items-center gap-1 flex-wrap">
-																{doc.uploaded && (
-																	<Badge
-																		variant="outline"
-																		className="text-xs bg-green-50 text-green-700 border-green-200"
-																	>
-																		Uploaded
-																	</Badge>
-																)}
-																{doc.linked && (
-																	<Badge
-																		variant="outline"
-																		className="text-xs bg-blue-50 text-blue-700 border-blue-200"
-																	>
-																		Linked
-																	</Badge>
-																)}
-															</div>
-														</div>
-														<div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 text-xs text-gray-500">
-															<span>{formatFileSize(doc.fileSize || 0)}</span>
-															<span className="hidden sm:inline">•</span>
-															<span>{formatDate(doc.uploadedAt)}</span>
+									<h3 className="text-sm font-medium text-gray-900 mb-1">No documents uploaded</h3>
+									<p className="text-xs text-gray-500">
+										Upload your professional credentials to get verified
+									</p>
+								</div>
+							) : (
+								<div className="space-y-2">
+									{documents.map((doc, index) => (
+										<div
+											key={index}
+											className="group flex flex-col sm:flex-row sm:items-center gap-3 p-3 bg-white rounded-lg border border-gray-200 hover:border-sauti-orange/30 hover:shadow-sm transition-all duration-200"
+										>
+											<div className="flex items-start gap-3 min-w-0 flex-1">
+												<div className="h-10 w-10 rounded-lg bg-gradient-to-br from-blue-100 to-blue-200 flex items-center justify-center flex-shrink-0 group-hover:from-sauti-orange/10 group-hover:to-sauti-orange/20 transition-colors">
+													<FileText className="h-5 w-5 text-blue-600 group-hover:text-sauti-orange transition-colors" />
+												</div>
+												<div className="min-w-0 flex-1">
+													<div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-1 mb-1">
+														<h4 className="font-medium text-gray-900 text-sm leading-tight">
+															{doc.title}
+														</h4>
+														<div className="flex items-center gap-1 flex-wrap">
+															{doc.linked && (
+																<Badge
+																	variant="outline"
+																	className="text-xs bg-blue-50 text-blue-700 border-blue-200 font-medium px-1.5 py-0.5"
+																>
+																	Linked
+																</Badge>
+															)}
 														</div>
 													</div>
-												</div>
-												<div className="flex items-center gap-2 flex-shrink-0 justify-end sm:justify-start">
-													<Button
-														variant="outline"
-														size="sm"
-														onClick={() => window.open(doc.url, "_blank")}
-														className="gap-1 text-xs px-2 py-1"
-													>
-														<Eye className="h-3 w-3" />
-														<span className="hidden sm:inline">View</span>
-													</Button>
-													<Button
-														variant="outline"
-														size="sm"
-														onClick={() => {
-															const link = document.createElement("a");
-															link.href = doc.url;
-															link.download = doc.title;
-															link.click();
-														}}
-														className="gap-1 text-xs px-2 py-1"
-													>
-														<Download className="h-3 w-3" />
-														<span className="hidden sm:inline">Download</span>
-													</Button>
+													<div className="flex flex-col sm:flex-row sm:items-center gap-1 text-xs text-gray-500">
+														<span className="flex items-center gap-1">
+															<FileText className="h-3 w-3" />
+															{formatFileSize(doc.fileSize || 0)}
+														</span>
+														<span className="hidden sm:inline">•</span>
+														<span className="flex items-center gap-1">
+															<Clock className="h-3 w-3" />
+															{formatDate(doc.uploadedAt)}
+														</span>
+													</div>
 												</div>
 											</div>
-										))}
-									</div>
-								)}
-							</CardContent>
-						</Card>
+											<div className="flex items-center gap-1 flex-shrink-0">
+												<Button
+													variant="outline"
+													size="sm"
+													onClick={() => window.open(doc.url, "_blank")}
+													className="gap-1 text-xs px-2 py-1.5 hover:bg-sauti-orange/5 hover:border-sauti-orange/30 font-medium h-7"
+												>
+													<Eye className="h-3 w-3" />
+													<span className="hidden sm:inline">View</span>
+												</Button>
+												<Button
+													variant="ghost"
+													size="sm"
+													onClick={async () => {
+														try {
+															await fileUploadService.deleteFile(doc.url, "accreditation");
+															const updatedDocs = documents.filter((_, i) => i !== index);
+															await saveDocuments(updatedDocs);
+															toast({
+																title: "Document Deleted",
+																description: "Document has been removed successfully",
+															});
+														} catch (error) {
+															toast({
+																title: "Delete Failed",
+																description: "Failed to delete document",
+																variant: "destructive",
+															});
+														}
+													}}
+													className="gap-1 text-xs px-2 py-1.5 text-red-600 hover:text-red-700 hover:bg-red-50 font-medium h-7"
+												>
+													<Trash2 className="h-3 w-3" />
+													<span className="hidden sm:inline">Delete</span>
+												</Button>
+											</div>
+										</div>
+									))}
+								</div>
+							)}
+						</section>
 					</div>
 				</div>
+
+				{/* Upload Modal */}
+				<Dialog open={isUploadModalOpen} onOpenChange={setIsUploadModalOpen}>
+					<DialogContent className="sm:max-w-md z-[70]">
+						<DialogHeader>
+							<DialogTitle className="flex items-center gap-2">
+								<FileText className="h-5 w-5 text-sauti-orange" />
+								Add Document
+							</DialogTitle>
+							<DialogDescription>
+								Upload your professional credentials and supporting documents for verification
+							</DialogDescription>
+						</DialogHeader>
+						<div className="mt-4">
+							<AddDocumentForm
+								onSave={async (title, file) => {
+									try {
+										const newDoc = await uploadDocument(file, title);
+										const updatedDocs = [...documents, newDoc];
+										await saveDocuments(updatedDocs);
+										setIsUploadModalOpen(false);
+										toast({
+											title: "Document Uploaded",
+											description: "Document has been uploaded successfully",
+										});
+									} catch (error) {
+										toast({
+											title: "Upload Failed",
+											description: "Failed to upload document. Please try again.",
+											variant: "destructive",
+										});
+									}
+								}}
+								isUploading={isUploading}
+								userId={userId}
+								userType={userType}
+								serviceId={service?.id || ""}
+								serviceType={service?.service_types || "counseling"}
+							/>
+						</div>
+					</DialogContent>
+				</Dialog>
 			</div>
 		</div>
 	);

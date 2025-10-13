@@ -29,7 +29,6 @@ import { createClient } from "@/utils/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Database } from "@/types/db-schema";
 import { SupportServiceSidepanel } from "./support-services-sidepanel";
-import { MobileSupportServicesSidepanel } from "./mobile-support-services-sidepanel";
 import { VerificationProgressBar } from "./verification-progress-bar";
 import { AddSupportServiceForm } from "@/components/AddSupportServiceForm";
 import { useDashboardData } from "@/components/providers/DashboardDataProvider";
@@ -386,13 +385,12 @@ export function SupportServicesManager({
 
 			{/* Sidepanel */}
 			{selectedService && (
-				<MobileSupportServicesSidepanel
+				<SupportServiceSidepanel
+					service={selectedService}
 					userId={userId}
 					userType={userType}
-					serviceId={selectedService.id}
-					serviceType={selectedService.service_types}
 					onClose={() => setSelectedService(null)}
-					onUploadSuccess={onDataUpdate}
+					onUpdate={onDataUpdate}
 				/>
 			)}
 		</div>
