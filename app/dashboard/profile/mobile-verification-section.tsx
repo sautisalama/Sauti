@@ -126,11 +126,37 @@ export function MobileVerificationSection({
 	const handleFileDelete = async (fileData: { url: string; fileName: string; filePath: string }) => {
 		try {
 			await fileUploadService.deleteFile(fileData.url, "accreditation");
-			// Remove from saved documents
+			
+			// Update database metadata to remove the deleted file
+			const updatedMetadata = savedDocuments
+				.filter(doc => doc.url !== fileData.url)
+				.map(doc => ({
+					url: doc.url,
+					fileName: doc.fileName,
+					filePath: doc.filePath,
+					uploadedAt: doc.uploadedAt,
+					status: "under_review",
+				}));
+
+			const { error } = await supabase
+				.from("profiles")
+				.update({
+					accreditation_files_metadata: updatedMetadata,
+					updated_at: new Date().toISOString(),
+				})
+				.eq("id", userId);
+
+			if (error) {
+				console.error("Error updating database metadata:", error);
+				// Still show success since file was deleted from storage
+			}
+			
+			// Remove from saved documents after database update
 			setSavedDocuments(prev => prev.filter(doc => doc.url !== fileData.url));
+			
 			toast({
 				title: "File Deleted",
-				description: "File has been removed from storage.",
+				description: "File has been removed from storage and database.",
 			});
 		} catch (error) {
 			console.error("Error deleting file:", error);
@@ -345,11 +371,6 @@ export function MobileVerificationSection({
 										</div>
 									</div>
 
-									{/* File Path (truncated) */}
-									<div className="text-xs text-gray-500">
-										<span className="font-medium">Path:</span>
-										<p className="truncate font-mono">{doc.filePath}</p>
-									</div>
 								</div>
 							</Card>
 						))}

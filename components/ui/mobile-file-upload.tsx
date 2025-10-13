@@ -501,11 +501,6 @@ export function MobileFileUpload({
 										</div>
 									</div>
 
-									{/* File Path (truncated) */}
-									<div className="text-xs text-gray-500">
-										<span className="font-medium">Path:</span>
-										<p className="truncate font-mono">{fileData.filePath}</p>
-									</div>
 								</div>
 							</Card>
 						))}
