@@ -40,6 +40,7 @@ export function MobileVerificationSection({
 	const [isLoading, setIsLoading] = useState(true);
 	const [savedDocuments, setSavedDocuments] = useState<Array<{ url: string; fileName: string; filePath: string; uploadedAt: string }>>([]);
 	const [viewingDocument, setViewingDocument] = useState<{ url: string; fileName: string; filePath: string; uploadedAt: string } | null>(null);
+	const [showForm, setShowForm] = useState(false);
 	const supabase = createClient();
 	const { toast } = useToast();
 
@@ -85,11 +86,16 @@ export function MobileVerificationSection({
 			uploaded: false,
 			uploading: false,
 		};
-		setDocuments(prev => [...prev, newDoc]);
+		setDocuments([newDoc]); // Replace existing documents with new one
+		setShowForm(true);
 	};
 
 	const removeDocument = (id: string) => {
-		setDocuments(prev => prev.filter(doc => doc.id !== id));
+		const updatedDocs = documents.filter(doc => doc.id !== id);
+		setDocuments(updatedDocs);
+		if (updatedDocs.length === 0) {
+			setShowForm(false);
+		}
 	};
 
 	const updateDocument = (id: string, field: keyof DocumentData, value: any) => {
@@ -235,6 +241,7 @@ export function MobileVerificationSection({
 
 			setSavedDocuments(prev => [...prev, ...uploadedDocs]);
 			setDocuments([]); // Clear current documents
+			setShowForm(false); // Hide the form
 
 			toast({
 				title: "Documents Saved",
@@ -282,7 +289,7 @@ export function MobileVerificationSection({
 
 	return (
 		<div className="space-y-6">
-			<div className="flex items-center justify-between">
+			<div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
 				<div>
 					<h3 className="text-lg font-semibold text-gray-900">
 						Verification Documents
@@ -291,8 +298,8 @@ export function MobileVerificationSection({
 						Upload your professional credentials for verification
 					</p>
 				</div>
-				{documents.length === 0 && (
-					<Button onClick={addDocument} size="sm">
+				{!showForm && (
+					<Button onClick={addDocument} size="sm" className="w-full sm:w-auto">
 						<Plus className="h-4 w-4 mr-2" />
 						Add Document
 					</Button>
@@ -394,7 +401,7 @@ export function MobileVerificationSection({
 						</Button>
 					</CardContent>
 				</Card>
-			) : documents.length > 0 ? (
+			) : showForm && documents.length > 0 ? (
 				<div className="space-y-4">
 					{documents.map((doc, index) => (
 						<Card key={doc.id} className="overflow-hidden">
@@ -481,27 +488,33 @@ export function MobileVerificationSection({
 						</Card>
 					))}
 
-					<div className="flex justify-end space-x-3">
-						<Button
-							variant="outline"
-							onClick={() => setDocuments([])}
-							disabled={isSubmitting || documents.some(doc => doc.uploading)}
-						>
-							Clear All
-						</Button>
-						<Button
-							onClick={saveDocuments}
-							disabled={isSubmitting || documents.some(doc => doc.uploading)}
-							className="bg-sauti-orange hover:bg-sauti-orange/90"
-						>
-							{isSubmitting 
-								? "Saving..." 
-								: documents.some(doc => doc.uploading)
-									? "Uploading..."
-									: "Save Documents"
-							}
-						</Button>
-					</div>
+					{showForm && (
+						<div className="flex flex-col sm:flex-row justify-end gap-2 sm:gap-3">
+							<Button
+								variant="outline"
+								onClick={() => {
+									setDocuments([]);
+									setShowForm(false);
+								}}
+								disabled={isSubmitting || documents.some(doc => doc.uploading)}
+								className="w-full sm:w-auto"
+							>
+								Clear All
+							</Button>
+							<Button
+								onClick={saveDocuments}
+								disabled={isSubmitting || documents.some(doc => doc.uploading)}
+								className="bg-sauti-orange hover:bg-sauti-orange/90 w-full sm:w-auto"
+							>
+								{isSubmitting 
+									? "Saving..." 
+									: documents.some(doc => doc.uploading)
+										? "Uploading..."
+										: "Save Documents"
+								}
+							</Button>
+						</div>
+					)}
 				</div>
 			) : null}
 
