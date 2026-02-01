@@ -22,6 +22,10 @@ const nextConfig = {
 				protocol: "https",
 				hostname: "images.unsplash.com",
 			},
+			{
+				protocol: "https",
+				hostname: "i.pravatar.cc",
+			},
 		],
 	},
 	reactStrictMode: true, // Enable React strict mode for improved error handling

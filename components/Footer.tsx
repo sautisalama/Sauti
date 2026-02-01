@@ -1,45 +1,82 @@
 import Link from "next/link";
+import Image from "next/image";
+import { Button } from "./ui/button";
+import { Input } from "./ui/input";
+import { Instagram, Twitter, Linkedin, Facebook, Music2 } from "lucide-react";
 
 export function Footer() {
 	return (
-		<div className="flex flex-col md:flex-row items-start justify-between max-w-[60%] m-auto pb-20 border-landing border-b">
-			<ul className="flex flex-col gap-2 text-landing">
-				<li className="text-base font-bold pb-2 md:pb-4">Professional Services</li>
-				<li className="text-xs">Legal</li>
-				<li className="text-xs">Therapist</li>
-				<li className="text-xs">Counsellors</li>
-				<li className="text-xs">Psychiatrist</li>
-			</ul>
-			<ul className="flex flex-col gap-2 text-landing mt-8 md:mt-0">
-				<li className="text-base font-bold pb-2 md:pb-4">Legal & Privacy</li>
-				<li className="text-xs">
-					<Link href="/privacy-policy" className="hover:text-sauti-orange transition-colors">
-						Privacy Policy
-					</Link>
-				</li>
-				<li className="text-xs">
-					<Link href="/terms-conditions" className="hover:text-sauti-orange transition-colors">
-						Terms & Conditions
-					</Link>
-				</li>
-				<li className="text-xs">
-					<Link href="/data-privacy" className="hover:text-sauti-orange transition-colors">
-						Data Privacy Statement
-					</Link>
-				</li>
-				<li className="text-xs">
-					<Link href="/faq" className="hover:text-sauti-orange transition-colors">
-						Frequently Asked Questions
-					</Link>
-				</li>
-			</ul>
-			<ul className="flex flex-col gap-2 text-landing mt-8 md:mt-0">
-				<li className="text-base font-bold pb-2 md:pb-4">Contact us</li>
-				<li className="text-xs">support@sautisalama.org</li>
-				<li className="text-xs">privacy@sautisalama.org</li>
-				<li className="text-xs">Emergency: 999</li>
-				<li className="text-xs">GBV Hotline: 1195</li>
-			</ul>
-		</div>
+		<footer className="bg-[#00473e] pt-24 pb-12 text-white">
+			<div className="container max-w-7xl mx-auto px-6">
+                <div className="grid grid-cols-1 lg:grid-cols-4 gap-16 mb-20 border-b border-white/10 pb-20">
+                    {/* Brand & Mission */}
+                    <div className="lg:col-span-1">
+                        <div className="mb-8">
+                            <Image 
+                                src="/logo.webp" 
+                                alt="Sauti Salama Logo" 
+                                width={180} 
+                                height={60} 
+                                className="h-14 w-auto brightness-0 invert" 
+                            />
+                        </div>
+                        <p className="text-white/70 text-lg leading-relaxed mb-10 font-medium">
+                            A survivor-led initiative providing safety, care, and justice for all survivors of GBV in Kenya.
+                        </p>
+                        <div className="flex gap-4">
+                            <Link href="#" className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center hover:bg-[#ebc13d] hover:text-[#00473e] transition-all"><Instagram className="h-5 w-5" /></Link>
+                            <Link href="#" className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center hover:bg-[#ebc13d] hover:text-[#00473e] transition-all"><Twitter className="h-5 w-5" /></Link>
+                            <Link href="#" className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center hover:bg-[#ebc13d] hover:text-[#00473e] transition-all"><Linkedin className="h-5 w-5" /></Link>
+                            <Link href="#" className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center hover:bg-[#ebc13d] hover:text-[#00473e] transition-all"><Music2 className="h-5 w-5" /></Link>
+                        </div>
+                    </div>
+
+                    {/* Newsletter */}
+                    <div className="lg:col-span-1">
+                        <h4 className="text-sm font-black mb-8 uppercase tracking-widest text-[#ebc13d]">Newsletter</h4>
+                        <p className="text-white/70 text-sm mb-6 font-medium">Get the latest impact stories and community actions.</p>
+                        <div className="flex flex-col gap-3">
+                            <Input 
+                                placeholder="Email address" 
+                                className="rounded-xl bg-white/5 border-white/10 text-white placeholder:text-white/40 focus:bg-white/10 transition-all h-12"
+                            />
+                            <Button className="rounded-xl bg-[#ebc13d] text-[#00473e] font-black h-12 hover:bg-[#d4ac31] shadow-lg">
+                                Subscribe Now
+                            </Button>
+                        </div>
+                    </div>
+
+                    {/* Navigation */}
+                    <div className="lg:col-span-2 grid grid-cols-2 gap-12 lg:pl-12">
+                        <div>
+                            <h4 className="text-sm font-black mb-8 uppercase tracking-widest text-white/40">Navigation</h4>
+                            <ul className="space-y-4">
+                                <li><Link href="/" className="text-base text-white/70 hover:text-white transition-colors">Home</Link></li>
+                                <li><Link href="/about" className="text-base text-white/70 hover:text-white transition-colors">Our Story</Link></li>
+                                <li><Link href="/programs" className="text-base text-white/70 hover:text-white transition-colors">Programs</Link></li>
+                                <li><Link href="/impact" className="text-base text-white/70 hover:text-white transition-colors">Impact</Link></li>
+                            </ul>
+                        </div>
+                        <div>
+                            <h4 className="text-sm font-black mb-8 uppercase tracking-widest text-white/40">Support</h4>
+                            <ul className="space-y-4">
+                                <li><Link href="/faq" className="text-base text-white/70 hover:text-white transition-colors">Help Center</Link></li>
+                                <li><Link href="/volunteer" className="text-base text-white/70 hover:text-white transition-colors">Volunteer</Link></li>
+                                <li><Link href="/privacy-policy" className="text-base text-white/70 hover:text-white transition-colors">Privacy</Link></li>
+                                <li className="text-base font-bold text-white pt-2">Hotline: 1195</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div className="flex flex-col md:flex-row items-center justify-between gap-6 text-xs font-bold uppercase tracking-widest text-white/40">
+                    <p>© 2026 Sauti Salama Safe Haven. All rights reserved.</p>
+                    <div className="flex gap-8">
+                        <Link href="/about" className="hover:text-white transition-colors">Our Story</Link>
+                        <Link href="/volunteer" className="hover:text-white transition-colors">Volunteer</Link>
+                        <Link href="/impact" className="hover:text-white transition-colors">Impact</Link>
+                    </div>
+                </div>
+			</div>
+		</footer>
 	);
 }

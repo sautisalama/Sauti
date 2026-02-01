@@ -59,6 +59,11 @@ export async function updateSession(request: NextRequest) {
 		!request.nextUrl.pathname.startsWith("/terms-conditions") &&
 		!request.nextUrl.pathname.startsWith("/data-privacy") &&
 		!request.nextUrl.pathname.startsWith("/faq") &&
+		!request.nextUrl.pathname.startsWith("/about") &&
+		!request.nextUrl.pathname.startsWith("/programs") &&
+		!request.nextUrl.pathname.startsWith("/impact") &&
+		!request.nextUrl.pathname.startsWith("/volunteer") &&
+		!request.nextUrl.pathname.startsWith("/learn") &&
 		request.nextUrl.pathname !== "/"
 	) {
 		const url = request.nextUrl.clone();

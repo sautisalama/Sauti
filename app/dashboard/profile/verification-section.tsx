@@ -67,7 +67,7 @@ interface VerificationDocument {
 	uploadedAt: string;
 	serviceId?: string;
 	serviceType?: SupportServiceType;
-	status: "pending" | "verified" | "rejected" | "under_review";
+	status: "pending" | "verified" | "rejected" | "under_review" | "pending_verification";
 	notes?: string;
 	certificateNumber?: string;
 	isIdCardFront?: boolean;
@@ -86,7 +86,7 @@ interface ServiceVerification {
 	id: string;
 	name: string;
 	serviceType: SupportServiceType;
-	status: "pending" | "verified" | "rejected" | "under_review";
+	status: "pending" | "verified" | "rejected" | "under_review" | "pending_verification";
 	documents: VerificationDocument[];
 	lastChecked: string;
 	notes?: string;
@@ -127,6 +127,7 @@ export function DocumentUploadForm({
 	const [documents, setDocuments] = useState<DocumentFormData[]>([]);
 	const [isUploading, setIsUploading] = useState(false);
 	const [dragOverDocId, setDragOverDocId] = useState<string | null>(null);
+	const [showForm, setShowForm] = useState(false);
 	const supabase = createClient();
 	const { toast } = useToast();
 
@@ -137,13 +138,18 @@ export function DocumentUploadForm({
 			certificateNumber: "",
 			file: null,
 			uploaded: false,
-			isIdCardFront: documents.length === 0, // First document is ID card front
+			isIdCardFront: false, // New documents are not ID card front by default
 		};
-		setDocuments((prev) => [...prev, newDoc]);
+		setDocuments((prev) => [...prev, newDoc]); // Allow multiple documents
+		setShowForm(true);
 	};
 
 	const removeDocument = (id: string) => {
-		setDocuments((prev) => prev.filter((doc) => doc.id !== id));
+		const updatedDocs = documents.filter((doc) => doc.id !== id);
+		setDocuments(updatedDocs);
+		if (updatedDocs.length === 0) {
+			setShowForm(false);
+		}
 	};
 
 	const updateDocument = (
@@ -274,6 +280,7 @@ export function DocumentUploadForm({
 						fileSize: doc.file?.size || 0,
 						uploadedAt: new Date().toISOString(),
 						uploaded: true,
+						status: "pending_verification",
 					};
 					documentsToSave.push(savedDoc);
 				} else {
@@ -288,6 +295,7 @@ export function DocumentUploadForm({
 							fileSize: doc.file?.size || 0,
 							uploadedAt: new Date().toISOString(),
 							uploaded: true,
+							status: "pending_verification",
 						};
 						documentsToSave.push(savedDoc);
 					}
@@ -316,6 +324,7 @@ export function DocumentUploadForm({
 
 				// Clear form only after successful save
 				setDocuments([]);
+				setShowForm(false);
 				onUploadSuccess?.();
 			} else {
 				toast({
@@ -389,13 +398,13 @@ export function DocumentUploadForm({
 	return (
 		<div className="space-y-3 sm:space-y-4">
 			{/* Add Document Button */}
-			<div className="flex items-center justify-between gap-2">
+			<div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-4">
 				<h3 className="text-base sm:text-lg font-semibold">
 					Add Professional Documents
 				</h3>
 				<Button
 					onClick={addDocument}
-					className="gap-1 sm:gap-2 text-xs sm:text-sm"
+					className="gap-1 sm:gap-2 text-xs sm:text-sm w-full sm:w-auto"
 					size="sm"
 				>
 					<Plus className="h-3 w-3 sm:h-4 sm:w-4" />
@@ -404,8 +413,9 @@ export function DocumentUploadForm({
 			</div>
 
 			{/* Document Forms */}
-			<div className="space-y-3 sm:space-y-4">
-				{documents.map((doc) => (
+			{showForm && (
+				<div className="space-y-3 sm:space-y-4">
+					{documents.map((doc) => (
 					<Card
 						key={doc.id}
 						className="border border-gray-200 sm:border-2 sm:border-dashed"
@@ -616,15 +626,17 @@ export function DocumentUploadForm({
 						</CardContent>
 					</Card>
 				))}
-			</div>
+				</div>
+			)}
 
 			{/* Action Buttons */}
-			{documents.length > 0 && (
+			{showForm && documents.length > 0 && (
 				<div className="flex flex-col sm:flex-row justify-end gap-2">
 					<Button
 						variant="outline"
 						onClick={() => {
 							setDocuments([]);
+							setShowForm(false);
 							// Clear all file inputs
 							documents.forEach((doc) => {
 								const fileInput = document.getElementById(
@@ -813,7 +825,7 @@ export function VerificationSection({
 						doc.uploadedAt || legacy.uploadedAt || new Date().toISOString(),
 					serviceId: doc.serviceId || legacy.serviceId,
 					serviceType: doc.serviceType || legacy.serviceType,
-					status: (doc.status || legacy.status || "under_review") as any,
+					status: (doc.status || legacy.status || "pending_verification") as any,
 					notes: doc.notes || legacy.note || legacy.notes,
 					certificateNumber: doc.certificateNumber || legacy.certificateNumber,
 					// Mark the first document as ID card front
@@ -860,7 +872,7 @@ export function VerificationSection({
 								uploadedAt: doc.uploadedAt || new Date().toISOString(),
 								serviceId: service.id,
 								serviceType: service.service_types,
-								status: "under_review" as const,
+								status: "pending_verification" as const,
 								notes: doc.notes,
 						  }))
 						: [],
@@ -944,6 +956,8 @@ export function VerificationSection({
 				return <XCircle className="h-5 w-5 text-red-600" />;
 			case "under_review":
 				return <Clock className="h-5 w-5 text-yellow-600" />;
+			case "pending_verification":
+				return <Clock className="h-5 w-5 text-blue-600" />;
 			default:
 				return <AlertCircle className="h-5 w-5 text-gray-600" />;
 		}
@@ -957,6 +971,8 @@ export function VerificationSection({
 				return "bg-red-100 text-red-800 border-red-200";
 			case "under_review":
 				return "bg-yellow-100 text-yellow-800 border-yellow-200";
+			case "pending_verification":
+				return "bg-blue-100 text-blue-800 border-blue-200";
 			default:
 				return "bg-gray-100 text-gray-800 border-gray-200";
 		}
@@ -1164,53 +1180,113 @@ export function VerificationSection({
 				<div className="lg:col-span-1 xl:col-span-3">
 					<Card className="h-fit">
 						<CardHeader className="pb-3 sm:pb-4">
-							<CardTitle className="flex items-center gap-2 text-base sm:text-lg">
-								<CheckSquare className="h-4 w-4 sm:h-5 sm:w-5 text-sauti-orange" />
-								Uploaded Documents ({documents.length})
-							</CardTitle>
+							<div className="flex items-center justify-between">
+								<div>
+									<CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+										<CheckSquare className="h-4 w-4 sm:h-5 sm:w-5 text-sauti-orange" />
+										Uploaded Documents
+									</CardTitle>
+									<p className="text-xs text-gray-600 mt-1">
+										Documents will be reviewed by admin before verification
+									</p>
+								</div>
+								<Badge variant="outline" className="text-xs font-medium px-2 py-0.5">
+									{documents.length}
+								</Badge>
+							</div>
 						</CardHeader>
 						<CardContent>
 							{documents.length === 0 ? (
-								<div className="text-center py-8 sm:py-12">
-									<div className="w-12 h-12 sm:w-16 sm:h-16 mx-auto mb-3 sm:mb-4 rounded-full bg-gradient-to-br from-blue-50 to-sky-100 flex items-center justify-center">
-										<FileText className="h-6 w-6 sm:h-8 sm:w-8 text-sky-600" />
+								<div className="text-center py-8 sm:py-12 border-2 border-dashed border-gray-300 rounded-lg bg-gray-50/30">
+									<div className="p-3 rounded-full bg-gray-100 w-12 h-12 mx-auto mb-3 flex items-center justify-center">
+										<FileText className="h-6 w-6 text-gray-400" />
 									</div>
-									<h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-2">
-										No documents uploaded yet
-									</h3>
-									<p className="text-gray-500 text-xs sm:text-sm">
-										Your uploaded documents will appear here
+									<h3 className="text-sm font-medium text-gray-900 mb-1">No documents uploaded</h3>
+									<p className="text-xs text-gray-500">
+										Upload your professional credentials to get verified
 									</p>
 								</div>
 							) : (
-								<div className="space-y-2 sm:space-y-3">
+								<div className="space-y-2">
 									{documents.map((doc) => (
 										<div
 											key={doc.id}
-											className="bg-white rounded-lg sm:rounded-xl border border-gray-200 hover:border-gray-300 transition-all duration-200 hover:shadow-md group"
+											className="group flex flex-col sm:flex-row sm:items-center gap-3 p-3 bg-white rounded-lg border border-gray-200 hover:border-sauti-orange/30 hover:shadow-sm transition-all duration-200"
 										>
-											<div className="p-3 sm:p-4">
-												{/* Header */}
-												<div className="flex items-start justify-between mb-2 sm:mb-3">
-													<div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
-														<div
-															className={`h-8 w-8 sm:h-10 sm:w-10 rounded-full flex items-center justify-center font-semibold text-xs sm:text-sm flex-shrink-0 ${
-																getStatusColor(doc.status).includes("green")
-																	? "bg-gradient-to-br from-green-100 to-green-200 text-green-700"
-																	: getStatusColor(doc.status).includes("yellow")
-																	? "bg-gradient-to-br from-yellow-100 to-yellow-200 text-yellow-700"
-																	: getStatusColor(doc.status).includes("red")
-																	? "bg-gradient-to-br from-red-100 to-red-200 text-red-700"
-																	: "bg-gradient-to-br from-gray-100 to-gray-200 text-gray-700"
-															}`}
-														>
-															<FileText className="h-4 w-4 sm:h-5 sm:w-5" />
+											<div className="flex items-start gap-3 min-w-0 flex-1">
+												<div className={`h-10 w-10 rounded-lg flex items-center justify-center flex-shrink-0 transition-colors ${
+													doc.status === "verified" 
+														? "bg-gradient-to-br from-green-100 to-green-200" 
+														: doc.status === "rejected"
+														? "bg-gradient-to-br from-red-100 to-red-200"
+														: doc.status === "under_review"
+														? "bg-gradient-to-br from-yellow-100 to-yellow-200"
+														: "bg-gradient-to-br from-blue-100 to-blue-200 group-hover:from-sauti-orange/10 group-hover:to-sauti-orange/20"
+												}`}>
+													<FileText className={`h-5 w-5 transition-colors ${
+														doc.status === "verified" 
+															? "text-green-600" 
+															: doc.status === "rejected"
+															? "text-red-600"
+															: doc.status === "under_review"
+															? "text-yellow-600"
+															: "text-blue-600 group-hover:text-sauti-orange"
+													}`} />
+												</div>
+												<div className="min-w-0 flex-1">
+													<div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-1 mb-1">
+														<h4 className="font-medium text-gray-900 text-sm leading-tight">
+															{doc.title}
+														</h4>
+														<div className="flex items-center gap-1 flex-wrap">
+															{doc.isIdCardFront && (
+																<Badge
+																	variant="outline"
+																	className="text-xs bg-blue-50 text-blue-700 border-blue-200 font-medium px-1.5 py-0.5"
+																>
+																	ID Card Front
+																</Badge>
+															)}
 														</div>
-														<div className="min-w-0 flex-1">
-															<div className="flex items-center gap-2 mb-1">
-																<h4 className="font-semibold text-gray-900 truncate text-sm sm:text-base">
-																	{doc.title}
-																</h4>
+													</div>
+													<div className="flex flex-col sm:flex-row sm:items-center gap-1 text-xs text-gray-500">
+														<span className="flex items-center gap-1">
+															<FileText className="h-3 w-3" />
+															{formatFileSize(doc.fileSize)}
+														</span>
+														<span className="hidden sm:inline">•</span>
+														<span className="flex items-center gap-1">
+															<Clock className="h-3 w-3" />
+															{formatDateCompact(doc.uploadedAt)}
+														</span>
+													</div>
+													{doc.notes && (
+														<p className="mt-1 text-xs text-gray-600 line-clamp-2">
+															{doc.notes}
+														</p>
+													)}
+												</div>
+											</div>
+											<div className="flex items-center gap-1 flex-shrink-0">
+												<Badge className={`${getStatusColor(doc.status)} border text-xs`}>
+													{doc.status === "pending_verification" ? "Pending Verification" : doc.status.replace("_", " ")}
+												</Badge>
+												<Dialog>
+													<DialogTrigger asChild>
+														<Button
+															variant="outline"
+															size="sm"
+															className="gap-1 text-xs px-2 py-1.5 hover:bg-sauti-orange/5 hover:border-sauti-orange/30 font-medium h-7"
+														>
+															<Eye className="h-3 w-3" />
+															<span className="hidden sm:inline">View</span>
+														</Button>
+													</DialogTrigger>
+													<DialogContent className="max-w-3xl">
+														<DialogHeader>
+															<DialogTitle className="flex items-center gap-2">
+																<FileText className="h-5 w-5 text-sauti-orange" />
+																{doc.title}
 																{doc.isIdCardFront && (
 																	<Badge
 																		variant="secondary"
@@ -1219,181 +1295,158 @@ export function VerificationSection({
 																		ID Card Front
 																	</Badge>
 																)}
-															</div>
-															<div className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm text-gray-500 flex-wrap">
-																<span>{formatDateCompact(doc.uploadedAt)}</span>
-															</div>
-															{doc.notes && (
-																<p className="mt-1 text-xs sm:text-sm text-gray-600 line-clamp-2">
-																	{doc.notes}
-																</p>
-															)}
-														</div>
-													</div>
-													<div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
-														<Badge className={`${getStatusColor(doc.status)} border text-xs`}>
-															{doc.status.replace("_", " ")}
-														</Badge>
-													</div>
-												</div>
-
-												{/* Actions */}
-												<div className="flex gap-1 sm:gap-2">
-													<Dialog>
-														<DialogTrigger asChild>
-															<Button
-																variant="outline"
-																size="sm"
-																className="flex-1 gap-1 sm:gap-2 text-xs sm:text-sm"
-															>
-																<Eye className="h-3 w-3 sm:h-4 sm:w-4" />
-																<span className="hidden sm:inline">View Details</span>
-																<span className="sm:hidden">View</span>
-															</Button>
-														</DialogTrigger>
-														<DialogContent className="max-w-3xl">
-															<DialogHeader>
-																<DialogTitle className="flex items-center gap-2">
-																	<FileText className="h-5 w-5 text-sauti-orange" />
-																	{doc.title}
-																	{doc.isIdCardFront && (
-																		<Badge
-																			variant="secondary"
-																			className="text-xs bg-blue-100 text-blue-700"
-																		>
-																			ID Card Front
-																		</Badge>
-																	)}
-																</DialogTitle>
-																<DialogDescription>
-																	Professional credential document details
-																</DialogDescription>
-															</DialogHeader>
-															<div className="space-y-6">
-																{/* Document Preview */}
-																<div className="border rounded-lg p-4 bg-gray-50">
-																	<div className="flex items-center gap-3">
-																		<div className="h-12 w-12 rounded-lg bg-sauti-orange/10 flex items-center justify-center">
-																			<FileText className="h-6 w-6 text-sauti-orange" />
-																		</div>
-																		<div className="flex-1 min-w-0">
-																			<h4 className="font-medium text-gray-900 truncate">
-																				{doc.title}
-																			</h4>
-																			<p className="text-sm text-gray-500">
-																				{doc.fileType.toUpperCase()} •{" "}
-																				{formatFileSize(doc.fileSize)}
-																			</p>
-																		</div>
-																		<Badge className={`${getStatusColor(doc.status)} text-xs`}>
-																			{doc.status.replace("_", " ")}
-																		</Badge>
+															</DialogTitle>
+															<DialogDescription>
+																Professional credential document details
+															</DialogDescription>
+														</DialogHeader>
+														<div className="space-y-6">
+															{/* Document Preview */}
+															<div className="border rounded-lg p-4 bg-gray-50">
+																<div className="flex items-center gap-3">
+																	<div className="h-12 w-12 rounded-lg bg-sauti-orange/10 flex items-center justify-center">
+																		<FileText className="h-6 w-6 text-sauti-orange" />
 																	</div>
+																	<div className="flex-1 min-w-0">
+																		<h4 className="font-medium text-gray-900 truncate">
+																			{doc.title}
+																		</h4>
+																		<p className="text-sm text-gray-500">
+																			{doc.fileType.toUpperCase()} •{" "}
+																			{formatFileSize(doc.fileSize)}
+																		</p>
+																	</div>
+																	<Badge className={`${getStatusColor(doc.status)} text-xs`}>
+																		{doc.status === "pending_verification" ? "Pending Verification" : doc.status.replace("_", " ")}
+																	</Badge>
 																</div>
+															</div>
 
-																{/* Document Details */}
-																<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-																	<div className="space-y-3">
-																		<div>
-																			<label className="text-sm font-medium text-gray-600">
-																				Upload Date
-																			</label>
-																			<p className="text-sm text-gray-900">
-																				{formatDate(doc.uploadedAt)}
-																			</p>
-																		</div>
-																		<div>
-																			<label className="text-sm font-medium text-gray-600">
-																				File Type
-																			</label>
-																			<p className="text-sm text-gray-900 capitalize">
-																				{doc.fileType}
-																			</p>
-																		</div>
-																	</div>
-																	<div className="space-y-3">
-																		<div>
-																			<label className="text-sm font-medium text-gray-600">
-																				File Size
-																			</label>
-																			<p className="text-sm text-gray-900">
-																				{formatFileSize(doc.fileSize)}
-																			</p>
-																		</div>
-																		{doc.certificateNumber && (
-																			<div>
-																				<label className="text-sm font-medium text-gray-600">
-																					Certificate Number
-																				</label>
-																				<p className="text-sm text-gray-900 font-mono">
-																					{doc.certificateNumber}
-																				</p>
-																			</div>
-																		)}
-																	</div>
-																</div>
-
-																{doc.notes && (
+															{/* Document Details */}
+															<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+																<div className="space-y-3">
 																	<div>
 																		<label className="text-sm font-medium text-gray-600">
-																			Notes
+																			Upload Date
 																		</label>
-																		<div className="mt-1 p-3 bg-gray-50 rounded-md">
-																			<p className="text-sm text-gray-900">{doc.notes}</p>
+																		<p className="text-sm text-gray-900">
+																			{formatDate(doc.uploadedAt)}
+																		</p>
+																	</div>
+																	<div>
+																		<label className="text-sm font-medium text-gray-600">
+																			File Type
+																		</label>
+																		<p className="text-sm text-gray-900 capitalize">
+																			{doc.fileType}
+																		</p>
+																	</div>
+																</div>
+																<div className="space-y-3">
+																	<div>
+																		<label className="text-sm font-medium text-gray-600">
+																			File Size
+																		</label>
+																		<p className="text-sm text-gray-900">
+																			{formatFileSize(doc.fileSize)}
+																		</p>
+																	</div>
+																	{doc.certificateNumber && (
+																		<div>
+																			<label className="text-sm font-medium text-gray-600">
+																				Certificate Number
+																			</label>
+																			<p className="text-sm text-gray-900 font-mono">
+																				{doc.certificateNumber}
+																			</p>
 																		</div>
-																	</div>
-																)}
-
-																{/* Action Buttons */}
-																<div className="space-y-3 pt-4 border-t">
-																	<div className="flex gap-2">
-																		<Button
-																			onClick={() => window.open(doc.url, "_blank")}
-																			className="gap-2 flex-1"
-																		>
-																			<ExternalLink className="h-4 w-4" />
-																			View Document
-																		</Button>
-																		<Button
-																			variant="outline"
-																			onClick={() => {
-																				const link = document.createElement("a");
-																				link.href = doc.url;
-																				link.download = doc.title;
-																				link.click();
-																			}}
-																			className="gap-2 flex-1"
-																		>
-																			<Download className="h-4 w-4" />
-																			Download
-																		</Button>
-																	</div>
-																	<Button
-																		variant="outline"
-																		onClick={() => deleteDocument(doc.url)}
-																		className="w-full gap-2 text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200 hover:border-red-300"
-																	>
-																		<Trash2 className="h-4 w-4" />
-																		Delete Document
-																	</Button>
+																	)}
 																</div>
 															</div>
-														</DialogContent>
-													</Dialog>
-													<Button
-														variant="outline"
-														size="sm"
-														onClick={() => {
-															const link = document.createElement("a");
-															link.href = doc.url;
-															link.download = doc.title;
-															link.click();
-														}}
-														className="gap-1 sm:gap-2 text-xs sm:text-sm"
-													>
-														<Download className="h-3 w-3 sm:h-4 sm:w-4" />
-													</Button>
-												</div>
+
+															{doc.notes && (
+																<div>
+																	<label className="text-sm font-medium text-gray-600">
+																		Notes
+																	</label>
+																	<div className="mt-1 p-3 bg-gray-50 rounded-md">
+																		<p className="text-sm text-gray-900">{doc.notes}</p>
+																	</div>
+																</div>
+															)}
+
+															{/* Action Buttons */}
+															<div className="space-y-3 pt-4 border-t">
+																<div className="flex gap-2">
+																	<Button
+																		onClick={() => window.open(doc.url, "_blank")}
+																		className="gap-2 flex-1"
+																	>
+																		<ExternalLink className="h-4 w-4" />
+																		View Document
+																	</Button>
+																	<Button
+																		variant="outline"
+																		onClick={() => {
+																			const link = document.createElement("a");
+																			link.href = doc.url;
+																			link.download = doc.title;
+																			link.click();
+																		}}
+																		className="gap-2 flex-1"
+																	>
+																		<Download className="h-4 w-4" />
+																		Download
+																	</Button>
+																</div>
+																<Button
+																	variant="outline"
+																	onClick={() => deleteDocument(doc.url)}
+																	className="w-full gap-2 text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200 hover:border-red-300"
+																>
+																	<Trash2 className="h-4 w-4" />
+																	Delete Document
+																</Button>
+															</div>
+														</div>
+													</DialogContent>
+												</Dialog>
+												<Button
+													variant="outline"
+													size="sm"
+													onClick={() => {
+														const link = document.createElement("a");
+														link.href = doc.url;
+														link.download = doc.title;
+														link.click();
+													}}
+													className="gap-1 sm:gap-2 text-xs sm:text-sm"
+												>
+													<Download className="h-3 w-3 sm:h-4 sm:w-4" />
+												</Button>
+												<Button
+													variant="ghost"
+													size="sm"
+													onClick={async () => {
+														try {
+															await deleteDocument(doc.url);
+															toast({
+																title: "Document Deleted",
+																description: "Document has been removed successfully",
+															});
+														} catch (error) {
+															toast({
+																title: "Delete Failed",
+																description: "Failed to delete document",
+																variant: "destructive",
+															});
+														}
+													}}
+													className="gap-1 text-xs px-2 py-1.5 text-red-600 hover:text-red-700 hover:bg-red-50 font-medium h-7"
+												>
+													<Trash2 className="h-3 w-3" />
+													<span className="hidden sm:inline">Delete</span>
+												</Button>
 											</div>
 										</div>
 									))}
@@ -1473,7 +1526,7 @@ export function VerificationSection({
 																		doc.status
 																	)} text-xs flex-shrink-0`}
 																>
-																	{doc.status.replace("_", " ")}
+																	{doc.status === "pending_verification" ? "Pending Verification" : doc.status.replace("_", " ")}
 																</Badge>
 																<Dialog>
 																	<DialogTrigger asChild>
@@ -1512,7 +1565,7 @@ export function VerificationSection({
 																						</p>
 																					</div>
 																					<Badge className={`${getStatusColor(doc.status)} text-xs`}>
-																						{doc.status.replace("_", " ")}
+																						{doc.status === "pending_verification" ? "Pending Verification" : doc.status.replace("_", " ")}
 																					</Badge>
 																				</div>
 																			</div>

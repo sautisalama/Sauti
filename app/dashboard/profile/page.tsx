@@ -12,6 +12,7 @@ import { AnonymousModeToggle } from "@/components/chat/AnonymousModeToggle";
 import { ProfessionalDocumentsForm } from "./professional-documents";
 import { EnhancedProfessionalDocumentsForm } from "./enhanced-professional-documents";
 import { VerificationWrapper } from "./verification-wrapper";
+import { MobileVerificationSection } from "./mobile-verification-section";
 import { SupportServicesManager } from "./support-services-manager";
 import { signOut } from "@/app/(auth)/actions/auth";
 import { createClient } from "@/utils/supabase/client";
@@ -521,15 +522,13 @@ export default function ProfilePage() {
 					{/* Verification Tab - Only for Professionals and NGOs */}
 					{isProfessional && (
 						<TabsContent value="verification" className="space-y-3 sm:space-y-4">
-							<VerificationWrapper
+							<MobileVerificationSection
 								userId={userId || ""}
 								userType={
 									(profile?.user_type as "professional" | "ngo" | "survivor") ||
 									"professional"
 								}
-								profile={profile}
-								onUpdate={refreshAllData}
-								onNavigateToServices={() => setActiveTab("services")}
+								onUploadSuccess={refreshAllData}
 							/>
 						</TabsContent>
 					)}
