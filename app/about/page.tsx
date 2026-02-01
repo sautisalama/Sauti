@@ -12,6 +12,7 @@ import {
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { motion } from "framer-motion";
+import { CircledText } from "@/components/ui/CircledText";
 
 export default function AboutPage() {
 	return (
@@ -22,20 +23,20 @@ export default function AboutPage() {
 					<div className="container mx-auto px-4 md:px-16 lg:px-32 max-w-[1400px]">
 						<div className="text-left mb-12 md:mb-20">
 							<h2 className="text-3xl md:text-5xl lg:text-7xl font-black text-sauti-blue">
-								Our Story
+								Our <CircledText circleColor="#F4B400">Story</CircledText>
 							</h2>
 						</div>
 
 						<div className="bg-[#f4f7fa] rounded-[32px] md:rounded-[60px] p-6 md:p-12 lg:p-24 relative overflow-hidden mb-12 md:mb-32">
 							<div className="grid lg:grid-cols-2 gap-12 lg:gap-24 items-start relative z-10">
 								<div>
-									<h1 className="text-2xl md:text-4xl lg:text-5xl font-black text-sauti-blue mb-6 md:mb-10 leading-[1.05]">
+									<h1 className="text-2xl md:text-4xl lg:text-5xl font-black text-sauti-dark mb-6 md:mb-10 leading-[1.05]">
 										2 women killed daily <br/>
-										<span className="text-sauti-orange relative inline-block">
+										<span className="text-sauti-red relative inline-block">
 											as of 2025.
 										</span>
 									</h1>
-									<p className="text-lg md:text-2xl text-gray-600 leading-relaxed font-medium max-w-xl">
+									<p className="text-lg md:text-2xl text-gray-700 leading-relaxed font-medium max-w-xl">
 										Sauti is founded in response to gaps in care, safety, and justice. Our work emerged from community organising where it became clear many navigate harm alone.
 									</p>
 								</div>

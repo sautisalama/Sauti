@@ -6,7 +6,7 @@ import { Instagram, Twitter, Linkedin, Facebook, Music2 } from "lucide-react";
 
 export function Footer() {
 	return (
-		<footer className="bg-[#00473e] pt-24 pb-12 text-white">
+		<footer className="bg-sauti-dark pt-24 pb-12 text-white">
 			<div className="container max-w-7xl mx-auto px-6">
                 <div className="grid grid-cols-1 lg:grid-cols-4 gap-16 mb-20 border-b border-white/10 pb-20">
                     {/* Brand & Mission */}
@@ -24,23 +24,23 @@ export function Footer() {
                             A survivor-led initiative providing safety, care, and justice for all survivors of GBV in Kenya.
                         </p>
                         <div className="flex gap-4">
-                            <Link href="#" className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center hover:bg-[#ebc13d] hover:text-[#00473e] transition-all"><Instagram className="h-5 w-5" /></Link>
-                            <Link href="#" className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center hover:bg-[#ebc13d] hover:text-[#00473e] transition-all"><Twitter className="h-5 w-5" /></Link>
-                            <Link href="#" className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center hover:bg-[#ebc13d] hover:text-[#00473e] transition-all"><Linkedin className="h-5 w-5" /></Link>
-                            <Link href="#" className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center hover:bg-[#ebc13d] hover:text-[#00473e] transition-all"><Music2 className="h-5 w-5" /></Link>
+                            <Link href="#" className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center hover:bg-sauti-yellow hover:text-sauti-dark transition-all"><Instagram className="h-5 w-5" /></Link>
+                            <Link href="#" className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center hover:bg-sauti-yellow hover:text-sauti-dark transition-all"><Twitter className="h-5 w-5" /></Link>
+                            <Link href="#" className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center hover:bg-sauti-yellow hover:text-sauti-dark transition-all"><Linkedin className="h-5 w-5" /></Link>
+                            <Link href="#" className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center hover:bg-sauti-yellow hover:text-sauti-dark transition-all"><Music2 className="h-5 w-5" /></Link>
                         </div>
                     </div>
 
                     {/* Newsletter */}
                     <div className="lg:col-span-1">
-                        <h4 className="text-sm font-black mb-8 uppercase tracking-widest text-[#ebc13d]">Newsletter</h4>
+                        <h4 className="text-sm font-black mb-8 uppercase tracking-widest text-sauti-yellow">Newsletter</h4>
                         <p className="text-white/70 text-sm mb-6 font-medium">Get the latest impact stories and community actions.</p>
                         <div className="flex flex-col gap-3">
                             <Input 
                                 placeholder="Email address" 
                                 className="rounded-xl bg-white/5 border-white/10 text-white placeholder:text-white/40 focus:bg-white/10 transition-all h-12"
                             />
-                            <Button className="rounded-xl bg-[#ebc13d] text-[#00473e] font-black h-12 hover:bg-[#d4ac31] shadow-lg">
+                            <Button className="rounded-xl bg-sauti-yellow text-sauti-dark font-black h-12 hover:bg-sauti-yellow/90 shadow-lg">
                                 Subscribe Now
                             </Button>
                         </div>

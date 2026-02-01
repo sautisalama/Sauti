@@ -46,7 +46,7 @@ export function SafetyBar() {
   };
 
   return (
-    <div className="w-full bg-[#102a2a] text-white px-3 py-2 flex items-center justify-between text-sm md:text-xs">
+    <div className="w-full bg-sauti-dark text-white px-3 py-2 flex items-center justify-between text-sm md:text-xs">
       <div className="truncate opacity-80">
         Press Shift+Esc anytime to Quick Exit
       </div>
