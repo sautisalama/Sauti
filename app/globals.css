@@ -2,69 +2,111 @@
 @tailwind components;
 @tailwind utilities;
 
+@import url("https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&display=swap");
+
+:root {
+	--font-serif: "Playfair Display", serif;
+}
+
+.font-serif {
+	font-family: var(--font-serif);
+}
+
+/* Global ease transitions */
+.ease-base {
+	transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.ease-slow {
+	transition: all 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
 /* Accessibility attribute-driven overrides */
 html[data-a11y-lg-text="1"] {
-  font-size: 112.5%; /* 18px base, scales rem */
+	font-size: 112.5%; /* 18px base, scales rem */
 }
 
 html[data-a11y-readable-font="1"] body {
-  letter-spacing: 0.01em;
-  word-spacing: 0.02em;
-  line-height: 1.7;
+	letter-spacing: 0.01em;
+	word-spacing: 0.02em;
+	line-height: 1.7;
 }
 
 /* Dyslexic-friendly font and spacing */
 html[data-a11y-dyslexic="1"] body {
-  font-family: var(--font-dyslexic), system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Helvetica Neue, Arial, "Noto Sans", sans-serif;
-  letter-spacing: 0.02em;
-  word-spacing: 0.04em;
-  line-height: 1.8;
+	font-family:
+		var(--font-dyslexic),
+		system-ui,
+		-apple-system,
+		Segoe UI,
+		Roboto,
+		Ubuntu,
+		Cantarell,
+		Helvetica Neue,
+		Arial,
+		"Noto Sans",
+		sans-serif;
+	letter-spacing: 0.02em;
+	word-spacing: 0.04em;
+	line-height: 1.8;
 }
 
 /* Text scale mapping */
-html[data-a11y-text-scale="100"] { font-size: 100%; }
-html[data-a11y-text-scale="112.5"] { font-size: 112.5%; }
-html[data-a11y-text-scale="125"] { font-size: 125%; }
-html[data-a11y-text-scale="137.5"] { font-size: 137.5%; }
-html[data-a11y-text-scale="150"] { font-size: 150%; }
+html[data-a11y-text-scale="100"] {
+	font-size: 100%;
+}
+html[data-a11y-text-scale="112.5"] {
+	font-size: 112.5%;
+}
+html[data-a11y-text-scale="125"] {
+	font-size: 125%;
+}
+html[data-a11y-text-scale="137.5"] {
+	font-size: 137.5%;
+}
+html[data-a11y-text-scale="150"] {
+	font-size: 150%;
+}
 
 html[data-a11y-underline-links="1"] a {
-  text-decoration: underline;
+	text-decoration: underline;
 }
 
 html[data-a11y-reduce-motion="1"] * {
-  animation: none !important;
-  transition: none !important;
+	animation: none !important;
+	transition: none !important;
 }
-html[data-a11y-reduce-motion="1"] { scroll-behavior: auto !important; }
+html[data-a11y-reduce-motion="1"] {
+	scroll-behavior: auto !important;
+}
 
 /* Keyboard focus outlines */
 .using-keyboard :focus {
-  outline: 2px solid hsl(var(--ring));
-  outline-offset: 2px;
+	outline: 2px solid hsl(var(--ring));
+	outline-offset: 2px;
 }
 
 /* High contrast by overriding CSS variables used by shadcn/tailwind tokens */
 html[data-a11y-high-contrast="1"] {
-  --background: 0 0% 100%;
-  --foreground: 0 0% 5%;
-  --muted: 0 0% 96%;
-  --muted-foreground: 0 0% 12%;
-  --card: 0 0% 100%;
-  --card-foreground: 0 0% 5%;
-  --popover: 0 0% 100%;
-  --popover-foreground: 0 0% 5%;
-  --primary: 201 96% 36%; /* stronger teal/blue */
-  --primary-foreground: 0 0% 100%;
-  --secondary: 0 0% 96%;
-  --secondary-foreground: 0 0% 7%;
-  --accent: 28 96% 48%;
-  --accent-foreground: 0 0% 100%;
-  --destructive: 0 84% 50%;
-  --destructive-foreground: 0 0% 100%;
-  --border: 0 0% 75%;
-  --input: 0 0% 75%;
-  --ring: 201 96% 36%;
+	--background: 0 0% 100%;
+	--foreground: 0 0% 5%;
+	--muted: 0 0% 96%;
+	--muted-foreground: 0 0% 12%;
+	--card: 0 0% 100%;
+	--card-foreground: 0 0% 5%;
+	--popover: 0 0% 100%;
+	--popover-foreground: 0 0% 5%;
+	--primary: 201 96% 36%; /* stronger teal/blue */
+	--primary-foreground: 0 0% 100%;
+	--secondary: 0 0% 96%;
+	--secondary-foreground: 0 0% 7%;
+	--accent: 28 96% 48%;
+	--accent-foreground: 0 0% 100%;
+	--destructive: 0 84% 50%;
+	--destructive-foreground: 0 0% 100%;
+	--border: 0 0% 75%;
+	--input: 0 0% 75%;
+	--ring: 201 96% 36%;
 }
 
 @layer base {
@@ -191,26 +233,35 @@ html[data-a11y-high-contrast="1"] {
 
 /* Mobile landscape guard overlay for portrait-only experience */
 .orientation-lock-portrait {
-  display: none;
+	display: none;
 }
 @media screen and (max-width: 900px) and (orientation: landscape) {
-  .orientation-lock-portrait {
-    display: flex;
-  }
+	.orientation-lock-portrait {
+		display: flex;
+	}
 }
 .recording-pulse {
-  position: relative;
+	position: relative;
 }
 .recording-pulse::before {
-  content: "";
-  position: absolute;
-  inset: -8px;
-  border-radius: 9999px;
-  background: rgba(239, 68, 68, 0.25);
-  animation: pulseRing 1.2s ease-out infinite;
+	content: "";
+	position: absolute;
+	inset: -8px;
+	border-radius: 9999px;
+	background: rgba(239, 68, 68, 0.25);
+	animation: pulseRing 1.2s ease-out infinite;
 }
 @keyframes pulseRing {
-  0% { transform: scale(0.8); opacity: 0.6; }
-  80% { transform: scale(1.4); opacity: 0; }
-  100% { transform: scale(1.4); opacity: 0; }
+	0% {
+		transform: scale(0.8);
+		opacity: 0.6;
+	}
+	80% {
+		transform: scale(1.4);
+		opacity: 0;
+	}
+	100% {
+		transform: scale(1.4);
+		opacity: 0;
+	}
 }

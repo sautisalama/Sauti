@@ -10,6 +10,7 @@ import { KeyboardFocusScript } from "@/components/a11y/KeyboardFocusScript";
 import AccessibilityFAB from "@/components/a11y/AccessibilityFAB";
 import { ChatWarmupProvider } from "@/components/providers/ChatWarmupProvider";
 import { OrientationGuard } from "@/components/OrientationGuard";
+import { Suspense } from "react";
 
 const inter = Inter({ subsets: ["latin"] });
 const hyper = Atkinson_Hyperlegible({
@@ -19,6 +20,7 @@ const hyper = Atkinson_Hyperlegible({
 });
 
 export const metadata: Metadata = {
+	metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || "https://sautisalama.org"),
 	title: "Sauti Salama",
 	description: "Breaking the Silence, Building a Brighter Future",
 	manifest: "/manifest.json",
@@ -102,7 +104,9 @@ export default function RootLayout({
 				<AccessibilityProvider>
 					<ChatWarmupProvider>
 						<KeyboardFocusScript />
-						{children}
+						<Suspense fallback={null}>
+							{children}
+						</Suspense>
 						<AccessibilityFAB />
 					</ChatWarmupProvider>
 				</AccessibilityProvider>

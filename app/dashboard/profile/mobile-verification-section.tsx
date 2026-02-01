@@ -86,7 +86,7 @@ export function MobileVerificationSection({
 			uploaded: false,
 			uploading: false,
 		};
-		setDocuments([newDoc]); // Replace existing documents with new one
+		setDocuments((prev) => [...prev, newDoc]); // Allow multiple documents
 		setShowForm(true);
 	};
 

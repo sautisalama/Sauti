@@ -140,7 +140,7 @@ export function DocumentUploadForm({
 			uploaded: false,
 			isIdCardFront: false, // New documents are not ID card front by default
 		};
-		setDocuments([newDoc]); // Replace existing documents with new one
+		setDocuments((prev) => [...prev, newDoc]); // Allow multiple documents
 		setShowForm(true);
 	};
 
