@@ -6,7 +6,7 @@ export default function DataPrivacy() {
 	return (
 		<>
 			<Nav />
-			<main className="min-h-screen bg-white py-12 md:py-24 lg:py-32 font-serif">
+			<main className="min-h-screen bg-white py-12 md:py-24 lg:py-32">
 				<div className="container mx-auto px-4 max-w-4xl">
 					<div className="text-left mb-12 md:mb-20">
 						<h1 className="text-3xl md:text-5xl lg:text-7xl font-bold text-sauti-blue mb-8">

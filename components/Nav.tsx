@@ -105,32 +105,41 @@ export function Nav() {
 						Our Story
 					</Link>
 					
-					<div className="group relative">
-						<Link 
-							href="/programs"
-							className={`px-3 py-1.5 rounded-full transition-colors outline-none ${
-								pathname === "/programs" 
-									? "bg-sauti-teal text-white" 
-									: "text-muted-foreground hover:text-sauti-teal underline-offset-4 hover:underline"
-							}`}
-						>
-							Programs
-						</Link>
-						<div className="absolute top-full left-1/2 -translate-x-1/2 pt-2 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200">
-							<div className="rounded-2xl p-2 min-w-[220px] bg-white border-2 border-gray-100 shadow-2xl">
-								<Link href="/programs/access-to-care" className="block rounded-xl px-4 py-3 hover:bg-gray-50 font-bold text-sauti-blue">Access to Care</Link>
-								<Link href="/programs/prevention" className="block rounded-xl px-4 py-3 hover:bg-gray-50 font-bold text-sauti-blue">Prevention</Link>
-								<Link href="/programs/legal-access" className="block rounded-xl px-4 py-3 hover:bg-gray-50 font-bold text-sauti-blue">Legal Access</Link>
-								<Link href="/programs/feminist-tech" className="block rounded-xl px-4 py-3 hover:bg-gray-50 font-bold text-sauti-blue">Feminist Tech</Link>
-								<Link href="/learn" className="block rounded-xl px-4 py-3 hover:bg-gray-50 font-bold text-sauti-blue">Capacity Building</Link>
-							</div>
-						</div>
-					</div>
+					<DropdownMenu>
+						<DropdownMenuTrigger asChild>
+							<button 
+								className={`px-3 py-1.5 rounded-full transition-colors outline-none flex items-center gap-1 ${
+									pathname.startsWith("/programs") 
+										? "bg-sauti-teal text-white" 
+										: "text-muted-foreground hover:text-sauti-teal underline-offset-4 hover:underline"
+								}`}
+							>
+								Programs <ChevronDown className="h-3 w-3" />
+							</button>
+						</DropdownMenuTrigger>
+						<DropdownMenuContent className="rounded-2xl p-2 min-w-[220px] bg-white border-2 border-gray-100 shadow-2xl z-50">
+							<DropdownMenuItem asChild>
+								<Link href="/programs/access-to-care" className="block rounded-xl px-4 py-3 hover:bg-gray-50 font-bold text-sauti-blue cursor-pointer outline-none">Access to Care</Link>
+							</DropdownMenuItem>
+							<DropdownMenuItem asChild>
+								<Link href="/programs/prevention" className="block rounded-xl px-4 py-3 hover:bg-gray-50 font-bold text-sauti-blue cursor-pointer outline-none">Prevention</Link>
+							</DropdownMenuItem>
+							<DropdownMenuItem asChild>
+								<Link href="/programs/legal-access" className="block rounded-xl px-4 py-3 hover:bg-gray-50 font-bold text-sauti-blue cursor-pointer outline-none">Legal Access</Link>
+							</DropdownMenuItem>
+							<DropdownMenuItem asChild>
+								<Link href="/programs/feminist-tech" className="block rounded-xl px-4 py-3 hover:bg-gray-50 font-bold text-sauti-blue cursor-pointer outline-none">Feminist Tech</Link>
+							</DropdownMenuItem>
+							<DropdownMenuItem asChild>
+								<Link href="/learn" className="block rounded-xl px-4 py-3 hover:bg-gray-50 font-bold text-sauti-blue cursor-pointer outline-none">Capacity Building</Link>
+							</DropdownMenuItem>
+						</DropdownMenuContent>
+					</DropdownMenu>
 
 					<Link
 						href="/impact"
 						className={`px-3 py-1.5 rounded-full transition-colors ${
-							isActive("/impact") 
+							pathname.startsWith("/impact") 
 								? "bg-sauti-teal text-white" 
 								: "text-muted-foreground hover:text-sauti-teal underline-offset-4 hover:underline"
 						}`}
@@ -138,44 +147,52 @@ export function Nav() {
 						Our Impact
 					</Link>
 					
-					<div className="group relative">
-						<Link 
-                            href="/learn"
-                            className={`px-3 py-1.5 rounded-full transition-colors outline-none cursor-pointer ${
-                                pathname.startsWith("/learn") 
-                                    ? "bg-sauti-teal text-white" 
-                                    : "text-muted-foreground hover:text-sauti-teal underline-offset-4 hover:underline"
-                            }`}
-                        >
-							Learn
-						</Link>
-						<div className="absolute top-full left-0 pt-2 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200">
-							<div className="rounded-2xl p-2 min-w-[200px] bg-white border-2 border-gray-100 shadow-2xl">
-								<Link href="/learn?type=courses" className="block rounded-xl px-4 py-3 hover:bg-gray-50 font-bold text-sauti-blue">Courses</Link>
-								<Link href="/learn?type=resources" className="block rounded-xl px-4 py-3 hover:bg-gray-50 font-bold text-sauti-blue">Resources</Link>
-							</div>
-						</div>
-					</div>
+					<DropdownMenu>
+						<DropdownMenuTrigger asChild>
+							<button 
+								className={`px-3 py-1.5 rounded-full transition-colors outline-none flex items-center gap-1 ${
+									pathname.startsWith("/learn") 
+										? "bg-sauti-teal text-white" 
+										: "text-muted-foreground hover:text-sauti-teal underline-offset-4 hover:underline"
+								}`}
+							>
+								Learn <ChevronDown className="h-3 w-3" />
+							</button>
+						</DropdownMenuTrigger>
+						<DropdownMenuContent className="rounded-2xl p-2 min-w-[200px] bg-white border-2 border-gray-100 shadow-2xl z-50">
+							<DropdownMenuItem asChild>
+								<Link href="/learn?type=courses" className="block rounded-xl px-4 py-3 hover:bg-gray-50 font-bold text-sauti-blue cursor-pointer outline-none">Courses</Link>
+							</DropdownMenuItem>
+							<DropdownMenuItem asChild>
+								<Link href="/learn?type=resources" className="block rounded-xl px-4 py-3 hover:bg-gray-50 font-bold text-sauti-blue cursor-pointer outline-none">Resources</Link>
+							</DropdownMenuItem>
+						</DropdownMenuContent>
+					</DropdownMenu>
 
-					<div className="group relative">
-						<Link 
-							href="/volunteer"
-							className={`px-3 py-1.5 rounded-full transition-colors outline-none cursor-pointer ${
-								pathname === "/volunteer" 
-									? "bg-sauti-teal text-white" 
-									: "text-muted-foreground hover:text-sauti-teal underline-offset-4 hover:underline"
-							}`}
-						>
-							Get Involved
-						</Link>
-						<div className="absolute top-full left-1/2 -translate-x-1/2 pt-2 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200">
-							<div className="rounded-2xl p-2 min-w-[220px] bg-white border-2 border-gray-100 shadow-2xl">
-								<Link href="/volunteer#professionals" className="block rounded-xl px-4 py-3 hover:bg-gray-50 font-bold text-sauti-blue">For Professionals</Link>
-								<Link href="/volunteer#mapping" className="block rounded-xl px-4 py-3 hover:bg-gray-50 font-bold text-sauti-blue">Resource Mapping</Link>
-								<Link href="/volunteer#community" className="block rounded-xl px-4 py-3 hover:bg-gray-50 font-bold text-sauti-blue">Community Action</Link>
-							</div>
-						</div>
-					</div>
+					<DropdownMenu>
+						<DropdownMenuTrigger asChild>
+							<button 
+								className={`px-3 py-1.5 rounded-full transition-colors outline-none flex items-center gap-1 ${
+									pathname.startsWith("/volunteer") 
+										? "bg-sauti-teal text-white" 
+										: "text-muted-foreground hover:text-sauti-teal underline-offset-4 hover:underline"
+								}`}
+							>
+								Get Involved <ChevronDown className="h-3 w-3" />
+							</button>
+						</DropdownMenuTrigger>
+						<DropdownMenuContent className="rounded-2xl p-2 min-w-[220px] bg-white border-2 border-gray-100 shadow-2xl z-50">
+							<DropdownMenuItem asChild>
+								<Link href="/volunteer#professionals" className="block rounded-xl px-4 py-3 hover:bg-gray-50 font-bold text-sauti-blue cursor-pointer outline-none">For Professionals</Link>
+							</DropdownMenuItem>
+							<DropdownMenuItem asChild>
+								<Link href="/volunteer#mapping" className="block rounded-xl px-4 py-3 hover:bg-gray-50 font-bold text-sauti-blue cursor-pointer outline-none">Resource Mapping</Link>
+							</DropdownMenuItem>
+							<DropdownMenuItem asChild>
+								<Link href="/volunteer#community" className="block rounded-xl px-4 py-3 hover:bg-gray-50 font-bold text-sauti-blue cursor-pointer outline-none">Community Action</Link>
+							</DropdownMenuItem>
+						</DropdownMenuContent>
+					</DropdownMenu>
 				</nav>
 
 				{/* Extreme Right: Buttons (Desktop) & Hamburger (Mobile) */}
@@ -275,7 +292,7 @@ export function Nav() {
 										<Link
 											href="/impact"
 											className={`flex items-center gap-4 rounded-2xl px-5 py-4 text-lg font-black transition-all ${
-												isActive("/impact") ? "bg-sauti-blue text-white shadow-lg shadow-sauti-blue/20" : "hover:bg-gray-50 text-gray-700"
+												pathname.startsWith("/impact") ? "bg-sauti-blue text-white shadow-lg shadow-sauti-blue/20" : "hover:bg-gray-50 text-gray-700"
 											}`}
 										>
 											<LayoutDashboard className="h-6 w-6" />

@@ -24,7 +24,7 @@ export default function VolunteerPage() {
                                 <motion.h1 
                                     initial={{ opacity: 0, y: 20 }}
                                     animate={{ opacity: 1, y: 0 }}
-                                    className="text-3xl md:text-5xl lg:text-7xl font-serif font-bold text-sauti-dark leading-tight relative z-10"
+                                    className="text-3xl md:text-5xl lg:text-7xl font-bold text-sauti-dark leading-tight relative z-10"
                                 >
                                     Collective action for collective freedom.
                                 </motion.h1>

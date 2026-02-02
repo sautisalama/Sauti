@@ -11,7 +11,7 @@ export default function ClimateJusticePage() {
     return (
         <div className="flex min-h-screen flex-col bg-white">
             <Nav />
-            <main className="flex-1">
+            <main id="main-content" className="flex-1">
                 <section className="py-12 md:py-24 lg:py-32 bg-[#ecfdf5]">
                     <div className="container mx-auto px-4 md:px-12 lg:px-32 max-w-[1400px]">
                         <div className="grid lg:grid-cols-2 gap-12 lg:gap-24 items-center">
@@ -22,7 +22,7 @@ export default function ClimateJusticePage() {
                                 <h1 className="text-3xl md:text-5xl lg:text-7xl font-black text-sauti-dark mb-6 md:mb-8 leading-tight">
                                     Climate Justice
                                 </h1>
-                                <p className="text-lg md:text-2xl text-gray-600 leading-relaxed mb-8 md:mb-12 font-medium font-serif">
+                                <p className="text-lg md:text-2xl text-gray-600 leading-relaxed mb-8 md:mb-12 font-medium">
                                     Addressing the disproportionate impact of climate change on gender-based violence and building resilient communities.
                                 </p>
                             </div>

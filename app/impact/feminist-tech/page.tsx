@@ -12,7 +12,7 @@ export default function FeministTechImpactPage() {
     return (
         <div className="flex min-h-screen flex-col bg-white">
             <Nav />
-            <main className="flex-1">
+            <main id="main-content" className="flex-1">
                 <section className="py-12 md:py-24 lg:py-32 bg-[#f8fafc]">
                     <div className="container mx-auto px-4 md:px-12 lg:px-32 max-w-[1400px]">
                         <div className="grid lg:grid-cols-2 gap-12 lg:gap-24 items-center">
@@ -23,7 +23,7 @@ export default function FeministTechImpactPage() {
                                 <h1 className="text-3xl md:text-5xl lg:text-7xl font-black text-sauti-dark mb-6 md:mb-8 leading-tight">
                                     Feminist Tech Impact
                                 </h1>
-                                <p className="text-lg md:text-2xl text-gray-600 leading-relaxed mb-8 md:mb-12 font-medium font-serif">
+                                <p className="text-lg md:text-xl lg:text-2xl text-gray-600 leading-relaxed mb-8 md:mb-12 font-medium">
                                     Scaling safe digital infrastructure to protect survivors and ensure technology serves as a tool for liberation.
                                 </p>
                                 <div className="flex justify-center md:justify-start">

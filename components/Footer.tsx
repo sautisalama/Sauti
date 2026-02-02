@@ -24,10 +24,9 @@ export function Footer() {
                             A survivor-led initiative providing safety, care, and justice for all survivors of GBV in Kenya.
                         </p>
                         <div className="flex gap-4">
-                            <Link href="#" className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center hover:bg-sauti-yellow hover:text-sauti-dark transition-all"><Instagram className="h-5 w-5" /></Link>
-                            <Link href="#" className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center hover:bg-sauti-yellow hover:text-sauti-dark transition-all"><Twitter className="h-5 w-5" /></Link>
-                            <Link href="#" className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center hover:bg-sauti-yellow hover:text-sauti-dark transition-all"><Linkedin className="h-5 w-5" /></Link>
-                            <Link href="#" className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center hover:bg-sauti-yellow hover:text-sauti-dark transition-all"><Music2 className="h-5 w-5" /></Link>
+                            <Link href="https://www.instagram.com/sautisalama" target="_blank" rel="noopener noreferrer" className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center hover:bg-sauti-yellow hover:text-sauti-dark transition-all" aria-label="Visit our Instagram"><Instagram className="h-5 w-5" /></Link>
+                            <Link href="https://x.com/sautisalama" target="_blank" rel="noopener noreferrer" className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center hover:bg-sauti-yellow hover:text-sauti-dark transition-all" aria-label="Visit our X (Twitter) profile"><Twitter className="h-5 w-5" /></Link>
+                            <Link href="https://www.linkedin.com/company/sauti-salama/" target="_blank" rel="noopener noreferrer" className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center hover:bg-sauti-yellow hover:text-sauti-dark transition-all" aria-label="Visit our LinkedIn page"><Linkedin className="h-5 w-5" /></Link>
                         </div>
                     </div>
 
@@ -38,6 +37,7 @@ export function Footer() {
                         <div className="flex flex-col gap-3">
                             <Input 
                                 placeholder="Email address" 
+                                aria-label="Newsletter email address"
                                 className="rounded-xl bg-white/5 border-white/10 text-white placeholder:text-white/40 focus:bg-white/10 transition-all h-12"
                             />
                             <Button className="rounded-xl bg-sauti-yellow text-sauti-dark font-black h-12 hover:bg-sauti-yellow/90 shadow-lg">
