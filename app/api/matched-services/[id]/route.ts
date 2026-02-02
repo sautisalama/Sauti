@@ -3,8 +3,9 @@ import { NextResponse } from "next/server";
 
 export async function PATCH(
 	request: Request,
-	{ params }: { params: { id: string } }
+	{ params }: { params: Promise<{ id: string }> }
 ) {
+	const { id } = await params;
 	const supabase = await createClient();
 
 	try {
@@ -20,7 +21,7 @@ export async function PATCH(
 		const { error } = await supabase
 			.from("matched_services")
 			.update({ status })
-			.eq("id", params.id)
+			.eq("id", id)
 			.eq("service_id", user.id);
 
 		if (error) throw error;

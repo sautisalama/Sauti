@@ -3,8 +3,9 @@ import { NextResponse } from "next/server";
 
 export async function PATCH(
 	request: Request,
-	{ params }: { params: { id: string } }
+	{ params }: { params: Promise<{ id: string }> }
 ) {
+	const { id } = await params;
 	const supabase = await createClient();
 
 	try {
@@ -19,7 +20,7 @@ export async function PATCH(
 		const { data: service } = await supabase
 			.from("support_services")
 			.select("user_id")
-			.eq("id", params.id)
+			.eq("id", id)
 			.single();
 
 		if (!service || service.user_id !== user.id) {
@@ -40,7 +41,7 @@ export async function PATCH(
 		const { data, error } = await supabase
 			.from("support_services")
 			.update(updateData)
-			.eq("id", params.id)
+			.eq("id", id)
 			.select()
 			.single();
 
@@ -58,8 +59,9 @@ export async function PATCH(
 
 export async function DELETE(
 	request: Request,
-	{ params }: { params: { id: string } }
+	{ params }: { params: Promise<{ id: string }> }
 ) {
+	const { id } = await params;
 	const supabase = await createClient();
 
 	try {
@@ -74,7 +76,7 @@ export async function DELETE(
 		const { data: service } = await supabase
 			.from("support_services")
 			.select("user_id")
-			.eq("id", params.id)
+			.eq("id", id)
 			.single();
 
 		if (!service || service.user_id !== user.id) {
@@ -84,7 +86,7 @@ export async function DELETE(
 		const { error } = await supabase
 			.from("support_services")
 			.delete()
-			.eq("id", params.id);
+			.eq("id", id);
 
 		if (error) throw error;
 

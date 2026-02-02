@@ -3,12 +3,12 @@ import Link from "next/link";
 import Animation from "@/components/LottieWrapper";
 import animationData from "@/public/lottie-animations/wellness.json";
 
-export default function ErrorPage({
+export default async function ErrorPage({
 	searchParams,
 }: {
-	searchParams: { message?: string };
+	searchParams: Promise<{ message?: string }>;
 }) {
-	const message = searchParams.message;
+	const { message } = await searchParams;
 
 	const getErrorContent = () => {
 		switch (message) {
