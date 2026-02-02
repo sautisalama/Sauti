@@ -28,7 +28,7 @@ export default function AboutPage() {
 	return (
 		<div className="flex min-h-screen flex-col bg-white">
 			<Nav />
-			<main className="flex-1">
+			<main id="main-content" className="flex-1">
                 {/* 1. HERO SECTION */}
 				<section className="py-12 md:py-24 bg-white">
 					<div className="container px-4 max-w-7xl mx-auto">

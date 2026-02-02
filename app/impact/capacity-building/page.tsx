@@ -10,7 +10,7 @@ export default function CapacityBuildingPage() {
     return (
         <div className="flex min-h-screen flex-col bg-white">
             <Nav />
-            <main className="flex-1">
+            <main id="main-content" className="flex-1">
                 {/* Hero */}
                 <section className="relative h-[60vh] md:h-[80vh] flex items-end pb-20 overflow-hidden">
                     <Image

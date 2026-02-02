@@ -68,7 +68,7 @@ export function LandingPage() {
 	return (
 		<div className="flex min-h-screen w-full flex-col bg-white">
 			<Nav />
-			<main className="min-h-[200vh]">
+			<main id="main-content" className="min-h-[200vh]">
                 {/* 1. HERO SECTION */}
 				<section id="home" className="pt-4 md:pt-8 pb-8 md:pb-16">
 					<div className="container mx-auto px-4 md:px-6 text-center lg:text-left">
@@ -124,13 +124,13 @@ export function LandingPage() {
                                         </p>
                                     </div>
                                     <div className="flex gap-2 md:gap-3">
-                                        <div className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-white/40 border-2 border-white/50 flex items-center justify-center text-sauti-dark" title="Mental Health Support">
+                                        <div className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-white/40 border-2 border-white/50 flex items-center justify-center text-sauti-dark" title="Mental Health Support" aria-label="Mental Health Support">
                                             <Heart className="w-5 h-5 md:w-6 md:h-6" fill="currentColor" fillOpacity={0.2} />
                                         </div>
-                                        <div className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-white/40 border-2 border-white/50 flex items-center justify-center text-sauti-dark" title="Legal Aid">
+                                        <div className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-white/40 border-2 border-white/50 flex items-center justify-center text-sauti-dark" title="Legal Aid" aria-label="Legal Aid">
                                             <Scale className="w-5 h-5 md:w-6 md:h-6" />
                                         </div>
-                                        <div className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-white/40 border-2 border-white/50 flex items-center justify-center text-sauti-dark" title="Safe Shelters">
+                                        <div className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-white/40 border-2 border-white/50 flex items-center justify-center text-sauti-dark" title="Safe Shelters" aria-label="Safe Shelters">
                                             <Shield className="w-5 h-5 md:w-6 md:h-6" />
                                         </div>
                                     </div>

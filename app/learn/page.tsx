@@ -12,7 +12,7 @@ export default function LearnPage() {
 	return (
 		<div className="flex min-h-screen flex-col bg-white">
 			<Nav />
-			<main className="flex-1">
+			<main id="main-content" className="flex-1">
 				<section className="py-12 md:py-24 lg:py-32">
 					<div className="container px-4 max-w-7xl mx-auto text-left">
                         <div className="mb-12 md:mb-20">
@@ -44,7 +44,7 @@ export default function LearnPage() {
                                     <div className="rounded-[24px] md:rounded-[40px] overflow-hidden aspect-[4/3] bg-white/10 relative shadow-2xl border-4 border-white/10">
                                         <Image 
                                             src="/events/programs/AI course.png" 
-                                            alt="AI Course" 
+                                            alt="Visual representation of AI for Impact course modules" 
                                             fill 
                                             className="object-cover group-hover:scale-105 transition-transform duration-700" 
                                         />

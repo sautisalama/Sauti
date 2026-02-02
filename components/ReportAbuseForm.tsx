@@ -283,6 +283,7 @@ export default function ReportAbuseForm({ onClose }: { onClose?: () => void }) {
 							className="border-b-2 border-teal-500 focus:outline-none px-2 w-full sm:w-64 md:w-48 bg-transparent"
 							placeholder="your name"
 							name="first_name"
+							aria-label="Your first name"
 							required
 						/>
 						. You can reach me at{" "}
@@ -291,6 +292,7 @@ export default function ReportAbuseForm({ onClose }: { onClose?: () => void }) {
 							className="border-b-2 border-teal-500 focus:outline-none px-2 w-full sm:w-72 md:w-64 bg-transparent"
 							placeholder="your email"
 							name="email"
+							aria-label="Your email address"
 							required
 							onChange={(e) => handleEmailChange(e.target.value)}
 						/>{" "}
@@ -300,6 +302,7 @@ export default function ReportAbuseForm({ onClose }: { onClose?: () => void }) {
 								type="tel"
 								className="border-b-2 border-teal-500 focus:outline-none px-2 w-full sm:w-56 md:w-48 bg-transparent"
 								placeholder="phone (optional)"
+								aria-label="Your phone number (optional)"
 								name="phone"
 								defaultValue={autofilledPhone || ""}
 							/>

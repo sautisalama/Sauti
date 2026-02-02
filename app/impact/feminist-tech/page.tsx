@@ -12,7 +12,7 @@ export default function FeministTechImpactPage() {
     return (
         <div className="flex min-h-screen flex-col bg-white">
             <Nav />
-            <main className="flex-1">
+            <main id="main-content" className="flex-1">
                 <section className="py-12 md:py-24 lg:py-32 bg-[#f8fafc]">
                     <div className="container mx-auto px-4 md:px-12 lg:px-32 max-w-[1400px]">
                         <div className="grid lg:grid-cols-2 gap-12 lg:gap-24 items-center">

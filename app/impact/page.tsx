@@ -12,14 +12,14 @@ export default function ImpactPage() {
 	return (
 		<div className="flex min-h-screen flex-col bg-white">
 			<Nav />
-			<main className="flex-1">
+			<main id="main-content" className="flex-1">
 				{/* Full-Width Hero - Gradient overlay for text contrast */}
 				<section className="relative min-h-[80vh] flex items-start pt-16 md:pt-24 overflow-hidden">
 					{/* Background Image */}
 					<div className="absolute inset-0 z-0">
 						<Image
-							src="/impact-image.png"
-							alt="Sauti Salama Team Impact"
+							src="/events/impact/impact - banner.png"
+							alt="Group of people participating in community impact session"
 							fill
 							className="object-cover"
 							priority

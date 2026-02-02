@@ -10,7 +10,7 @@ export default function SurvivorCafePage() {
     return (
         <div className="flex min-h-screen flex-col bg-white">
             <Nav />
-            <main className="flex-1">
+            <main id="main-content" className="flex-1">
                 {/* Hero */}
                 <section className="relative h-[60vh] md:h-[80vh] flex items-center md:items-end pb-20 overflow-hidden bg-black">
                     <div className="absolute inset-0 z-0 opacity-60">

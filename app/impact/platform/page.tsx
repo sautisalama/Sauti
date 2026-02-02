@@ -10,7 +10,7 @@ export default function PlatformPage() {
     return (
         <div className="flex min-h-screen flex-col bg-white">
             <Nav />
-            <main className="flex-1">
+            <main id="main-content" className="flex-1">
                 {/* Hero */}
                 <section className="relative pt-24 pb-20 md:pt-32 md:pb-32 overflow-hidden bg-gray-50">
                     <div className="container px-4 max-w-7xl mx-auto grid lg:grid-cols-2 gap-16 items-center">

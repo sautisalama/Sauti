@@ -12,7 +12,7 @@ export default function ProgramsPage() {
 	return (
 		<div className="flex min-h-screen flex-col bg-white">
 			<Nav />
-			<main className="flex-1">
+			<main id="main-content" className="flex-1">
 				<section className="py-12 md:py-24 lg:py-32">
 					<div className="container px-4 max-w-7xl mx-auto">
                         <div className="mb-12 md:mb-24 max-w-3xl">
