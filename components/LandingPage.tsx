@@ -39,6 +39,7 @@ import Link from "next/link";
 import { Footer } from "./Footer";
 import { createClient } from "@/utils/supabase/client";
 import { motion } from "framer-motion";
+import { CircledText } from "@/components/ui/CircledText";
 
 export function LandingPage() {
 	const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -74,15 +75,15 @@ export function LandingPage() {
 						<div className="grid lg:grid-cols-2 gap-6 items-stretch">
 							{/* Left Column */}
 							<div className="flex flex-col gap-6">
-								<div className="bg-[#00473e] rounded-[32px] md:rounded-[40px] px-6 py-10 md:px-8 md:py-16 flex flex-col justify-center flex-1 min-h-[400px] md:min-h-[500px] relative overflow-hidden">
-                                    <div className="absolute top-0 right-0 w-64 h-64 bg-sauti-orange/50 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
-									<span className="relative z-10 inline-flex w-fit px-4 py-2 rounded-full bg-sauti-orange/70 text-[#00473e] text-sm font-bold mb-8 uppercase tracking-wider mx-auto lg:mx-0">
+								<div className="bg-sauti-dark rounded-[32px] md:rounded-[40px] px-6 py-10 md:px-8 md:py-16 flex flex-col justify-center flex-1 min-h-[400px] md:min-h-[500px] relative overflow-hidden">
+                                    <div className="absolute top-0 right-0 w-64 h-64 bg-sauti-teal/20 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
+									<span className="relative z-10 inline-flex w-fit px-4 py-2 rounded-full bg-sauti-teal/20 text-sauti-light-teal text-sm font-bold mb-8 uppercase tracking-wider mx-auto lg:mx-0 border border-sauti-teal/30">
 										Safety, Care, and Justice.
 									</span>
-									<h1 className="relative z-10 font-serif text-3xl md:text-5xl lg:text-6xl font-black text-white leading-tight mb-6 md:mb-8">
+									<h1 className="relative z-10 font-sans text-3xl md:text-5xl lg:text-6xl font-black text-white leading-tight mb-6 md:mb-8 tracking-tight">
 										We are here for you.
 									</h1>
-									<p className="relative z-10 text-white/80 text-base md:text-xl lg:text-2xl leading-relaxed mb-8 md:mb-10 max-w-2xl mx-auto lg:mx-0 font-medium">
+									<p className="relative z-10 text-gray-300 text-base md:text-xl lg:text-2xl leading-relaxed mb-8 md:mb-10 max-w-2xl mx-auto lg:mx-0 font-medium">
                                         44% of Kenyan women have experienced physical or sexual violence from a partner. This is millions of women living in fear, suffering harm, and facing barriers to justice.
 									</p>
 									<div className="relative z-10 flex flex-wrap gap-3 md:gap-4 justify-center lg:justify-start">
@@ -90,7 +91,7 @@ export function LandingPage() {
 											<DialogTrigger asChild>
 												<Button
 													size="lg"
-													className="rounded-full px-6 md:px-8 py-5 md:py-7 text-sm md:text-lg font-bold bg-[#ebc13d] text-[#00473e] hover:bg-[#d4ac31]"
+													className="rounded-full px-6 md:px-8 py-5 md:py-7 text-sm md:text-lg font-bold bg-sauti-yellow text-sauti-dark hover:bg-sauti-yellow/90"
 												>
 													Get Support Now
 												</Button>
@@ -113,12 +114,12 @@ export function LandingPage() {
 								</div>
 
 								{/* Trust Banner */}
-								<div className="bg-sauti-orange/50 rounded-[24px] md:rounded-[32px] p-6 md:p-10 flex flex-col sm:flex-row items-center justify-between shadow-lg gap-6">
+								<div className="bg-sauti-yellow rounded-[24px] md:rounded-[32px] p-6 md:p-10 flex flex-col sm:flex-row items-center justify-between shadow-lg gap-6">
                                     <div className="text-center sm:text-left">
-                                        <h3 className="font-serif text-xl md:text-2xl font-bold text-[#00473e] mb-1 md:mb-2">
+                                        <h3 className="font-sans text-xl md:text-2xl font-bold text-sauti-dark mb-1 md:mb-2 tracking-tight">
                                             How can we help?
                                         </h3>
-                                        <p className="text-[#00473e]/80 text-sm md:text-base max-w-sm font-medium">
+                                        <p className="text-sauti-dark/80 text-sm md:text-base max-w-sm font-medium">
                                            Mental Health • Legal Aid • Safe Shelters.
                                         </p>
                                     </div>
@@ -126,10 +127,10 @@ export function LandingPage() {
                                         {[1, 2, 3, 4].map((i) => (
                                             <div
                                                 key={i}
-                                                className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-[#00473e]/10 border-2 border-sauti-orange/50 flex items-center justify-center overflow-hidden grayscale opacity-80 backdrop-blur-sm"
+                                                className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-white/20 border-2 border-white/50 flex items-center justify-center overflow-hidden"
                                             >
                                                  {i === 4 ? (
-                                                    <span className="text-xs font-bold text-[#00473e]">+</span>
+                                                    <span className="text-xs font-bold text-sauti-dark">+</span>
                                                 ) : (
                                                     <Image src={`https://i.pravatar.cc/150?u=${i + 40}`} alt="" width={48} height={48} />
                                                 )}
@@ -179,46 +180,48 @@ export function LandingPage() {
 				<section id="about" className="py-12 md:py-20 bg-white">
 					<div className="container mx-auto px-4 md:px-8 lg:px-16 max-w-[1400px]">
 						<div className="text-center mb-12 md:mb-20 relative">
-							<h2 className="text-3xl md:text-5xl lg:text-7xl font-black text-sauti-blue relative z-10">
-								Our Story
+							<h2 className="text-3xl md:text-5xl lg:text-7xl font-black text-sauti-dark relative z-10 tracking-tight">
+								Our <CircledText circleColor="#F4B400">Story</CircledText>
 							</h2>
 						</div>
-						<div className="bg-[#f4f7fa] rounded-[32px] md:rounded-[60px] p-6 md:p-12 lg:p-24 relative overflow-hidden">
+						<div className="bg-sauti-light-teal/30 rounded-[32px] md:rounded-[60px] p-6 md:p-12 lg:p-24 relative overflow-hidden">
 							<div className="grid lg:grid-cols-2 gap-16 lg:gap-24 items-start relative z-10">
 								<div>
-									<h2 className="text-3xl md:text-5xl lg:text-7xl font-black text-sauti-blue mb-6 md:mb-10 leading-[1.1]">
-										2 women <br/>
-										killed daily <br/>
-										<span className="text-sauti-orange">in 2025.</span>
+									<h2 className="text-3xl md:text-5xl lg:text-7xl font-black text-sauti-dark mb-4 md:mb-6 leading-[1.1] tracking-tight">
+										<span className="text-lg tracking-widest"> Averagely, </span> <br/>
+										2 women <br/> 
+                                        killed daily <br/>
+										<span className="text-sauti-red">in 2025.</span>
 									</h2>
-                                    <p className="text-base md:text-xl lg:text-2xl text-gray-600 leading-relaxed font-medium max-w-xl mb-8 md:mb-12">
-                                        Sauti Salama is a Kenyan feminist organisation founded by survivors in response to gaps in care, safety, and justice for women and girls.
+                                    <div className="text-lg md:text-xl font-bold text-sauti-red uppercase tracking-widest mb-6 md:mb-10">in Kenya due to GBV</div>
+                                    <p className="text-base md:text-xl lg:text-2xl text-gray-700 leading-relaxed font-medium max-w-xl mb-8 md:mb-12">
+                                        Sauti Salama is a Kenyan feminist organisation founded and led by survivors who understand the challenges of getting help. We work to bridge gaps in access to care, safety, and justice for women and girls.
 									</p>
                                     <Link href="/about">
-                                        <Button id="aboutUsButton" className="rounded-full bg-sauti-blue text-white px-6 md:px-10 py-5 md:py-8 text-base md:text-xl font-black group shadow-xl hover:shadow-sauti-blue/20 transition-all">
-                                            Our Mission
+                                        <Button id="aboutUsButton" className="rounded-full bg-sauti-dark text-white px-6 md:px-10 py-5 md:py-8 text-base md:text-xl font-black group shadow-xl hover:shadow-sauti-dark/20 transition-all">
+                                            Read Our Story
                                             <ArrowRight className="ml-3 w-5 h-5 md:w-6 md:h-6 group-hover:translate-x-2 transition-transform" />
                                         </Button>
                                     </Link>
 								</div>
 								<div className="flex flex-col gap-8 md:gap-12">
-                                    <p className="text-lg md:text-xl lg:text-2xl text-gray-600 leading-relaxed font-medium max-w-xl mb-4">
-                                        Providing safe havens for mental health, legal aid, and survivor-centered justice.
+                                    <p className="text-lg md:text-xl lg:text-2xl text-gray-700 leading-relaxed font-medium max-w-xl mb-4">
+                                        Our work emerges from community organising and survivor support, shaped by those with lived experience of navigating harm alone.
 									</p>
 									<FeatureRow 
-										icon={<Lock className="w-6 h-6 md:w-8 md:h-8 text-sauti-orange" />} 
-										title="Anonymous Mode" 
-										description="Access resources discreetly without revealing your identity." 
+										icon={<UsersRound className="w-6 h-6 md:w-8 md:h-8 text-sauti-teal" />} 
+										title="Survivor-Led" 
+										description="Led by women and survivors who understand the journey." 
 									/>
 									<FeatureRow 
-										icon={<EyeOff className="w-6 h-6 md:w-8 md:h-8 text-sauti-orange" />} 
-										title="Confidentiality" 
-										description="Choose to keep your details private while seeking support." 
+										icon={<HeartHandshake className="w-6 h-6 md:w-8 md:h-8 text-sauti-teal" />} 
+										title="Collective Care" 
+										description="Care is central to justice and community resilience." 
 									/>
 									<FeatureRow 
-										icon={<UserCheck className="w-6 h-6 md:w-8 md:h-8 text-sauti-orange" />} 
-										title="Legal Guidance" 
-										description="Get personalized guidance when you're ready for justice." 
+										icon={<Shield className="w-6 h-6 md:w-8 md:h-8 text-sauti-teal" />} 
+										title="Safety First" 
+										description="Safety requires consent built into institutions and tools." 
 									/>
 								</div>
 							</div>
@@ -236,42 +239,46 @@ export function LandingPage() {
 				<section id="programs" className="py-12 md:py-24 bg-white relative overflow-hidden">
 					<div className="container max-w-7xl mx-auto px-4 md:px-6">
 						<div className="text-center mb-12 md:mb-20 relative">
-							<h2 className="text-3xl md:text-5xl lg:text-7xl font-black text-sauti-blue relative z-10 leading-tight">
-								Programs for Care & Justice
+							<h2 className="text-3xl md:text-5xl lg:text-7xl font-black text-sauti-dark relative z-10 leading-tight tracking-tight">
+								Programs for <CircledText circleColor="#008080">Care & Justice</CircledText>
 							</h2>
 						</div>
 						<p className="text-gray-600 text-lg md:text-xl max-w-2xl mx-auto font-medium text-center mb-10 md:mb-16">Survivor-led, confidential, and designed to break down systems of harm.</p>
 
 						<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 md:gap-8 mb-12 md:mb-20">
 							<ServiceCard 
-								icon={<Heart className="w-8 h-8 md:w-10 md:h-10 text-sauti-orange" />}
+								icon={<Heart className="w-8 h-8 md:w-10 md:h-10 text-sauti-teal" />}
 								title="Access to Care"
 								description="Strengthening pathways to psychosocial support and emergency response safely."
                                 slug="access-to-care"
+                                theme="teal"
 							/>
 							<ServiceCard 
-								icon={<Shield className="w-8 h-8 md:w-10 md:h-10 text-sauti-orange" />}
+								icon={<Shield className="w-8 h-8 md:w-10 md:h-10 text-sauti-yellow" />}
 								title="Prevention"
 								description="Working with youth and community actors to reduce isolation."
                                 slug="prevention"
+                                theme="yellow"
 							/>
 							<ServiceCard 
-								icon={<Scale className="w-8 h-8 md:w-10 md:h-10 text-sauti-orange" />}
+								icon={<Scale className="w-8 h-8 md:w-10 md:h-10 text-sauti-red" />}
 								title="Legal Access"
 								description="Improving justice through legal literacy and advocacy."
                                 slug="legal-access"
+                                theme="red"
 							/>
 							<ServiceCard 
-								icon={<Landmark className="w-8 h-8 md:w-10 md:h-10 text-sauti-orange" />}
+								icon={<Landmark className="w-8 h-8 md:w-10 md:h-10 text-sauti-teal" />}
 								title="Feminist Tech"
 								description="Designing digital tools that prioritise consent and safety."
                                 slug="feminist-tech"
+                                theme="teal"
 							/>
 						</div>
 
                         <div className="flex justify-center">
                             <Link href="/programs">
-                                <Button className="rounded-full bg-sauti-blue text-white px-8 md:px-12 py-6 md:py-10 text-lg md:text-2xl font-black group shadow-xl hover:shadow-sauti-blue/20 transition-all space-x-3 md:x-4">
+                                <Button className="rounded-full bg-sauti-teal text-white px-8 md:px-12 py-6 md:py-10 text-lg md:text-2xl font-black group shadow-xl hover:shadow-sauti-teal/20 transition-all space-x-3 md:x-4">
                                     <span>Detailed Programs</span>
                                     <ArrowRight className="w-6 h-6 md:w-8 md:h-8 group-hover:translate-x-2 transition-transform" />
                                 </Button>
@@ -283,12 +290,12 @@ export function LandingPage() {
                 {/* 4. DIGITAL PLATFORM (STAY CONNECTED) */}
 				<div className="py-12 md:py-20 bg-white">
 					<div className="container px-4">
-						<div className="bg-[#1a365d] rounded-[32px] md:rounded-[80px] p-8 md:p-16 lg:p-24 flex flex-col lg:flex-row gap-12 md:gap-20 items-center text-white overflow-hidden relative">
+						<div className="bg-sauti-dark rounded-[32px] md:rounded-[80px] p-8 md:p-16 lg:p-24 flex flex-col lg:flex-row gap-12 md:gap-20 items-center text-white overflow-hidden relative">
 							<div className="lg:w-1/2 relative z-10">
-                                <span className="inline-block rounded-full px-4 py-1 text-xs md:text-sm font-bold bg-[#ebc13d] text-[#186691] mb-4 md:mb-6 uppercase tracking-wider">
+                                <span className="inline-block rounded-full px-4 py-1 text-xs md:text-sm font-bold bg-sauti-yellow text-sauti-dark mb-4 md:mb-6 uppercase tracking-wider">
                                     Digital Infrastructure
                                 </span>
-								<h2 className="text-3xl md:text-5xl lg:text-6xl font-black mb-6 md:mb-10 leading-tight">Sauti Salama Platform</h2>
+								<h2 className="text-3xl md:text-5xl lg:text-6xl font-black mb-6 md:mb-10 leading-tight tracking-tight">Sauti Salama Platform</h2>
 								<p className="text-white/80 text-lg md:text-2xl mb-8 md:mb-12 leading-relaxed font-light">
 									Our secure ecosystem provides survivors with the tools they need to navigate their journey with complete autonomy.
 								</p>
@@ -302,14 +309,14 @@ export function LandingPage() {
 										"Response Alerts"
 									].map((item, i) => (
 										<li key={i} className="flex items-center gap-3 md:gap-5">
-											<div className="h-3 w-3 md:h-4 md:w-4 rounded-full bg-sauti-orange shadow-[0_0_15px_rgba(235,193,61,0.5)]" />
+											<div className="h-3 w-3 md:h-4 md:w-4 rounded-full bg-sauti-teal shadow-[0_0_15px_rgba(0,128,128,0.5)]" />
 											<span className="text-white/90 text-base md:text-xl font-medium">{item}</span>
 										</li>
 									))}
 								</ul>
                                 <div className="flex flex-wrap gap-4 md:gap-6">
                                     <Link href="/volunteer">
-                                        <Button className="bg-[#ebc13d] text-[#00473e] hover:bg-[#d4ac31] rounded-full px-8 md:px-12 py-6 md:py-10 text-lg md:text-2xl font-black shadow-2xl">
+                                        <Button className="bg-sauti-yellow text-sauti-dark hover:bg-sauti-yellow/90 rounded-full px-8 md:px-12 py-6 md:py-10 text-lg md:text-2xl font-black shadow-2xl">
                                             Join Movement
                                         </Button>
                                     </Link>
@@ -344,7 +351,7 @@ export function LandingPage() {
                     <div className="container px-4 max-w-7xl mx-auto">
                         <div className="text-center mb-12 md:mb-20 relative">
                             <h2 className="text-3xl md:text-5xl lg:text-7xl font-black text-sauti-blue relative z-10 leading-tight">
-                                Collective Change
+                                Collective <CircledText circleColor="#F4B400">Change</CircledText>
                             </h2>
                         </div>
 
@@ -405,7 +412,7 @@ export function LandingPage() {
                     <div className="container mx-auto px-4 max-w-6xl">
                          <div className="text-center mb-12 md:mb-20 relative">
                             <h2 className="text-3xl md:text-5xl lg:text-7xl font-bold text-[#1a365d] relative z-10 leading-tight">
-                                Upcoming Actions
+                                Upcoming <CircledText circleColor="#00cf8d">Actions</CircledText>
                             </h2>
                         </div>
 
@@ -468,10 +475,7 @@ export function LandingPage() {
 						<div className="max-w-4xl mx-auto">
 							<div className="text-center mb-20 relative">
 								<h2 className="text-5xl md:text-7xl font-black text-sauti-blue relative z-10">
-                                    Help <span className="relative inline-block px-4">
-                                        Center
-                                        <div className="absolute bottom-0 left-0 w-full h-full border-[3px] border-[#00cf8d] rounded-[100%] rotate-[2deg] opacity-60 pointer-events-none hidden md:block" />
-                                    </span>
+                                    Help <CircledText circleColor="#00cf8d">Center</CircledText>
                                 </h2>
 							</div>
 							<AccordionFAQs />
@@ -488,18 +492,29 @@ export function LandingPage() {
 	);
 }
 
-function ServiceCard({ icon, title, description, slug }: { icon: React.ReactNode, title: string, description: string, slug: string }) {
+function ServiceCard({ icon, title, description, slug, theme = 'teal' }: { icon: React.ReactNode, title: string, description: string, slug: string, theme?: 'teal' | 'yellow' | 'red' }) {
+    const bgMap = {
+        teal: 'hover:bg-sauti-light-teal/50',
+        yellow: 'hover:bg-sauti-light-yellow/50',
+        red: 'hover:bg-sauti-light-red/50'
+    };
+    const borderMap = {
+        teal: 'hover:border-sauti-teal/30',
+        yellow: 'hover:border-sauti-yellow/30',
+        red: 'hover:border-sauti-red/30'
+    };
+
 	return (
 		<motion.div 
 			whileHover={{ y: -12, boxShadow: "0 40px 60px -15px rgba(0,0,0,0.1)" }}
-			className="bg-white rounded-[24px] md:rounded-[40px] p-6 md:p-10 border border-gray-100 flex flex-col gap-4 md:gap-6 group transition-all"
+			className={`bg-white rounded-[24px] md:rounded-[40px] p-6 md:p-10 border border-gray-100 flex flex-col gap-4 md:gap-6 group transition-all ${bgMap[theme]} ${borderMap[theme]}`}
 		>
-			<div className="flex items-center justify-center w-16 h-16 md:w-20 md:h-20 rounded-[20px] md:rounded-[24px] bg-sauti-orange/5 mb-2 md:mb-4 group-hover:bg-sauti-orange/10 transition-colors">
+			<div className="flex items-center justify-center w-16 h-16 md:w-20 md:h-20 rounded-[20px] md:rounded-[24px] bg-gray-50 mb-2 md:mb-4 group-hover:bg-white transition-colors shadow-sm">
 				{icon}
 			</div>
-			<h3 className="text-2xl md:text-3xl font-bold text-sauti-blue group-hover:text-sauti-orange transition-colors">{title}</h3>
+			<h3 className="text-2xl md:text-3xl font-bold text-sauti-dark group-hover:text-black transition-colors">{title}</h3>
 			<p className="text-gray-600 text-base md:text-lg leading-relaxed">{description}</p>
-			<Link href={`/programs/${slug}`} className="mt-auto pt-4 md:pt-6 flex items-center gap-2 text-sauti-blue font-bold text-lg">
+			<Link href={`/programs/${slug}`} className="mt-auto pt-4 md:pt-6 flex items-center gap-2 text-sauti-dark font-bold text-lg group-hover:underline">
 				Explore <ArrowRight className="w-5 h-5" />
 			</Link>
 		</motion.div>
@@ -509,11 +524,11 @@ function ServiceCard({ icon, title, description, slug }: { icon: React.ReactNode
 function FeatureRow({ icon, title, description }: { icon: React.ReactNode, title: string, description: string }) {
      return (
         <div className="flex gap-4 md:gap-6 items-start">
-             <div className="flex-shrink-0 w-12 h-12 md:w-16 md:h-16 rounded-[16px] md:rounded-[20px] bg-white border border-gray-100 flex items-center justify-center shadow-lg">
+             <div className="flex-shrink-0 w-12 h-12 md:w-16 md:h-16 rounded-[16px] md:rounded-[20px] bg-white border border-gray-100 flex items-center justify-center shadow-lg text-sauti-dark">
                  {icon}
              </div>
              <div>
-                 <h3 className="text-xl md:text-2xl font-bold text-sauti-blue mb-1 md:mb-2">{title}</h3>
+                 <h3 className="text-xl md:text-2xl font-bold text-sauti-dark mb-1 md:mb-2">{title}</h3>
                  <p className="text-gray-500 text-base md:text-lg leading-relaxed">{description}</p>
              </div>
         </div>
@@ -523,7 +538,7 @@ function FeatureRow({ icon, title, description }: { icon: React.ReactNode, title
 function StatCompact({ value, label }: { value: string, label: string }) {
     return (
         <div>
-            <div className="text-4xl md:text-7xl font-black text-sauti-blue mb-1 md:mb-2">{value}</div>
+            <div className="text-4xl md:text-7xl font-black text-sauti-dark mb-1 md:mb-2">{value}</div>
             <div className="text-gray-500 text-xs md:text-lg font-bold tracking-widest uppercase">{label}</div>
         </div>
     );

@@ -30,6 +30,16 @@ const config = {
     			'sauti-black': '#333333',
     			'sauti-footer': '#2C2C2C',
     			landing: '#EEF7F2',
+
+          // New Rebranding Palette
+          'sauti-yellow': '#F4B400', // Gold/Primary
+          'sauti-red': '#E53E3E', // Alert/Secondary
+          'sauti-teal': '#008080', // Linkages/Accent
+          'sauti-dark': '#0B2228', // Rich Dark Background (Softened)
+          
+          'sauti-light-yellow': '#FEF3C7',
+          'sauti-light-teal': '#E6FFFA',
+          'sauti-light-red': '#FED7D7',
     			
     			// Premium design system colors
 'primary': {

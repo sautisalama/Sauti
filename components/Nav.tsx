@@ -88,8 +88,8 @@ export function Nav() {
 						href="/"
 						className={`px-3 py-1.5 rounded-full transition-colors ${
 							isActive("/") 
-								? "bg-sauti-blue text-white" 
-								: "text-muted-foreground hover:text-sauti-blue underline-offset-4 hover:underline"
+								? "bg-sauti-teal text-white" 
+								: "text-muted-foreground hover:text-sauti-teal underline-offset-4 hover:underline"
 						}`}
 					>
 						Home
@@ -98,8 +98,8 @@ export function Nav() {
 						href="/about"
 						className={`px-3 py-1.5 rounded-full transition-colors ${
 							isActive("/about") 
-								? "bg-sauti-blue text-white" 
-								: "text-muted-foreground hover:text-sauti-blue underline-offset-4 hover:underline"
+								? "bg-sauti-teal text-white" 
+								: "text-muted-foreground hover:text-sauti-teal underline-offset-4 hover:underline"
 						}`}
 					>
 						Our Story
@@ -110,8 +110,8 @@ export function Nav() {
 							href="/programs"
 							className={`px-3 py-1.5 rounded-full transition-colors outline-none ${
 								pathname === "/programs" 
-									? "bg-sauti-blue text-white" 
-									: "text-muted-foreground hover:text-sauti-blue underline-offset-4 hover:underline"
+									? "bg-sauti-teal text-white" 
+									: "text-muted-foreground hover:text-sauti-teal underline-offset-4 hover:underline"
 							}`}
 						>
 							Programs
@@ -131,8 +131,8 @@ export function Nav() {
 						href="/impact"
 						className={`px-3 py-1.5 rounded-full transition-colors ${
 							isActive("/impact") 
-								? "bg-sauti-blue text-white" 
-								: "text-muted-foreground hover:text-sauti-blue underline-offset-4 hover:underline"
+								? "bg-sauti-teal text-white" 
+								: "text-muted-foreground hover:text-sauti-teal underline-offset-4 hover:underline"
 						}`}
 					>
 						Our Impact
@@ -143,8 +143,8 @@ export function Nav() {
                             href="/learn"
                             className={`px-3 py-1.5 rounded-full transition-colors outline-none cursor-pointer ${
                                 pathname.startsWith("/learn") 
-                                    ? "bg-sauti-blue text-white" 
-                                    : "text-muted-foreground hover:text-sauti-blue underline-offset-4 hover:underline"
+                                    ? "bg-sauti-teal text-white" 
+                                    : "text-muted-foreground hover:text-sauti-teal underline-offset-4 hover:underline"
                             }`}
                         >
 							Learn
@@ -162,8 +162,8 @@ export function Nav() {
 							href="/volunteer"
 							className={`px-3 py-1.5 rounded-full transition-colors outline-none cursor-pointer ${
 								pathname === "/volunteer" 
-									? "bg-sauti-blue text-white" 
-									: "text-muted-foreground hover:text-sauti-blue underline-offset-4 hover:underline"
+									? "bg-sauti-teal text-white" 
+									: "text-muted-foreground hover:text-sauti-teal underline-offset-4 hover:underline"
 							}`}
 						>
 							Get Involved
@@ -183,7 +183,7 @@ export function Nav() {
 					<Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
 						<DialogTrigger asChild>
 							<Button 
-								className="hidden lg:flex rounded-full bg-[#ebc13d] text-[#186691] hover:bg-[#d4ac31] items-center gap-2 font-bold px-8 h-12"
+								className="hidden lg:flex rounded-full bg-sauti-yellow text-sauti-dark hover:bg-sauti-yellow/90 items-center gap-2 font-bold px-8 h-12"
 							>
 								<Megaphone className="h-5 w-5" /> Report Abuse
 							</Button>
@@ -199,7 +199,7 @@ export function Nav() {
 						</Link>
 					) : (
 						<Link href={`${url}/signin`} className="hidden lg:block">
-							<Button className="rounded-full bg-sauti-blue text-white font-black px-8 h-12 shadow-sm hover:shadow-lg transition-all">Log In</Button>
+							<Button className="rounded-full bg-sauti-teal text-white font-black px-8 h-12 shadow-sm hover:shadow-lg hover:bg-sauti-teal/90 transition-all">Log In</Button>
 						</Link>
 					)}
 
@@ -262,7 +262,7 @@ export function Nav() {
 												{showPrograms ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
 											</button>
 											{showPrograms && (
-												<div className="ml-8 grid gap-2 border-l-4 border-sauti-orange/30 pl-4 py-2">
+												<div className="ml-8 grid gap-2 border-l-4 border-sauti-yellow/30 pl-4 py-2">
 													<Link href="/programs" className="text-gray-600 py-2 font-bold hover:text-sauti-blue">All Programs</Link>
 													<Link href="/programs/access-to-care" className="text-gray-600 py-2 font-bold hover:text-sauti-blue">Access to Care</Link>
 													<Link href="/programs/prevention" className="text-gray-600 py-2 font-bold hover:text-sauti-blue">Prevention</Link>
@@ -297,7 +297,7 @@ export function Nav() {
 												{showLearn ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
 											</button>
 											{showLearn && (
-												<div className="ml-8 grid gap-2 border-l-4 border-sauti-orange/30 pl-4 py-2">
+												<div className="ml-8 grid gap-2 border-l-4 border-sauti-yellow/30 pl-4 py-2">
 													<Link href="/learn" className="text-gray-600 py-2 font-bold hover:text-sauti-blue">Learning Hub</Link>
 													<Link href="/learn?type=courses" className="text-gray-600 py-2 font-bold hover:text-sauti-blue">Courses</Link>
 													<Link href="/learn?type=resources" className="text-gray-600 py-2 font-bold hover:text-sauti-blue">Resources</Link>
@@ -320,7 +320,7 @@ export function Nav() {
 												{showInvolved ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
 											</button>
 											{showInvolved && (
-												<div className="ml-8 grid gap-2 border-l-4 border-sauti-orange/30 pl-4 py-2">
+												<div className="ml-8 grid gap-2 border-l-4 border-sauti-yellow/30 pl-4 py-2">
 													<Link href="/volunteer" className="text-gray-600 py-2 font-bold hover:text-sauti-blue">Overview</Link>
 													<Link href="/volunteer#professionals" className="text-gray-600 py-2 font-bold hover:text-sauti-blue">For Professionals</Link>
 													<Link href="/volunteer#mapping" className="text-gray-600 py-2 font-bold hover:text-sauti-blue">Resource Mapping</Link>
@@ -333,7 +333,7 @@ export function Nav() {
 									{/* Mobile CTAs */}
 									<div className="pt-8 border-t border-gray-100 flex flex-col gap-4">
 										<Button
-											className="w-full h-16 rounded-2xl text-xl font-black bg-[#ebc13d] text-[#186691] shadow-xl hover:bg-[#d4ac31] flex items-center justify-center gap-3 transition-all active:scale-95"
+											className="w-full h-16 rounded-2xl text-xl font-black bg-sauti-yellow text-sauti-dark shadow-xl hover:bg-sauti-yellow/90 flex items-center justify-center gap-3 transition-all active:scale-95"
 											onClick={() => {
 												setDialogOpen(true);
 											}}
