@@ -32,7 +32,7 @@ export const metadata: Metadata = {
 	authors: [
 		{
 			name: "Cashcade",
-			url: "https://www.linkedin.com/sautisalama",
+			url: "https://www.linkedin.com/company/sauti-salama/",
 		},
 	],
 	appleWebApp: {

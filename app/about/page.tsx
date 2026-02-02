@@ -40,7 +40,7 @@ export default function AboutPage() {
                                 <motion.h1 
                                     initial={{ opacity: 0, y: 20 }}
                                     animate={{ opacity: 1, y: 0 }}
-                                    className="text-4xl md:text-6xl lg:text-7xl font-serif font-bold text-sauti-dark leading-tight mb-8"
+                                    className="text-4xl md:text-6xl lg:text-7xl font-bold text-sauti-dark leading-tight mb-8"
                                 >
                                    Reducing barriers to <CircledText circleColor="#F4B400">safety, care,</CircledText> and justice.
                                 </motion.h1>
@@ -53,7 +53,7 @@ export default function AboutPage() {
                                 <div className="flex flex-wrap gap-4">
                                     <Dialog>
                                         <DialogTrigger asChild>
-                                            <Button className="rounded-full bg-sauti-red text-white px-8 py-6 text-lg font-bold shadow-xl hover:bg-sauti-red/90 transition-all">
+                                            <Button className="rounded-full bg-sauti-yellow text-white px-8 py-6 text-lg font-bold shadow-xl hover:bg-sauti-yellow/70 transition-all">
                                                 Get Support
                                             </Button>
                                         </DialogTrigger>
@@ -68,9 +68,9 @@ export default function AboutPage() {
                                     </Link>
                                 </div>
                             </div>
-                            <div className="relative">
-                                <div className="relative rounded-[40px] overflow-hidden shadow-2xl aspect-[4/5] bg-gray-100">
-                                     <Image src="/landing/team.png" alt="Sauti Salama Team" fill className="object-cover" />
+                            <div className="relative flex justify-center">
+                                <div className="relative w-full aspect-[4/5] md:aspect-square lg:aspect-[4/5]">
+                                     <Image src="/matscapades.png" alt="Sauti Salama Water Lorry" fill className="object-contain" />
                                 </div>
                                 {/* Why We Exist Float */}
                                 <div className="absolute -bottom-10 -left-10 bg-white p-8 rounded-[32px] shadow-xl max-w-md hidden md:block">
@@ -88,7 +88,7 @@ export default function AboutPage() {
                 <section className="py-20 md:py-32 bg-gray-50">
                     <div className="container px-4 max-w-7xl mx-auto">
                         <div className="mb-20">
-                            <h2 className="text-3xl md:text-5xl font-bold text-sauti-dark mb-8 font-serif">Who we are</h2>
+                            <h2 className="text-3xl md:text-5xl font-bold text-sauti-dark mb-8">Who we are</h2>
                              <div className="grid md:grid-cols-2 gap-12 text-lg text-gray-700 leading-relaxed">
                                  <div>
                                      <p className="mb-6">
@@ -105,7 +105,7 @@ export default function AboutPage() {
 
                         <div className="grid lg:grid-cols-2 gap-16 items-start">
                             <div className="bg-white p-10 md:p-14 rounded-[40px] shadow-lg">
-                                <h3 className="text-2xl md:text-4xl font-bold text-sauti-dark mb-10 font-serif">Our Values</h3>
+                                <h3 className="text-2xl md:text-4xl font-bold text-sauti-dark mb-10">Our Values</h3>
                                 <ul className="space-y-8">
                                     <ValueItem 
                                         title="Care as a collective responsibility" 
@@ -126,7 +126,7 @@ export default function AboutPage() {
                                 </ul>
                             </div>
                             <div>
-                                <h3 className="text-2xl md:text-4xl font-bold text-sauti-dark mb-8 font-serif">Our Approach</h3>
+                                <h3 className="text-2xl md:text-4xl font-bold text-sauti-dark mb-8">Our Approach</h3>
                                 <div className="bg-sauti-teal/10 p-10 rounded-[40px] mb-8">
                                     <p className="text-lg md:text-xl text-sauti-dark leading-relaxed font-medium">
                                         We work across community organising, digital access, and institutional engagement to strengthen survivor-centred response systems.
@@ -148,7 +148,7 @@ export default function AboutPage() {
                     <div className="container px-4 max-w-7xl mx-auto">
                         <div className="text-center mb-20">
                             <span className="text-sauti-teal font-bold uppercase tracking-widest text-sm mb-4 block">How we do it</span>
-                            <h2 className="text-4xl md:text-6xl font-bold text-sauti-dark font-serif">Our Work</h2>
+                            <h2 className="text-4xl md:text-6xl font-bold text-sauti-dark">Our Work</h2>
                         </div>
 
                         <div className="grid md:grid-cols-2 gap-8 lg:gap-12">
@@ -186,7 +186,7 @@ export default function AboutPage() {
                         <div className="grid lg:grid-cols-2 gap-16 items-center">
                             <div className="order-2 lg:order-1">
                                 <span className="text-sauti-yellow font-bold uppercase tracking-widest text-sm mb-4 block">Our Main Tool</span>
-                                <h2 className="text-3xl md:text-5xl font-bold mb-6 font-serif">The Sauti Salama App</h2>
+                                <h2 className="text-3xl md:text-5xl font-bold mb-6">The Sauti Salama App</h2>
                                 <p className="text-lg md:text-xl text-white/80 leading-relaxed mb-8 font-light">
                                     The Sauti Salama platform is designed to reduce barriers to support. It serves as our primary digital infrastructure, providing anonymous reporting, resource mapping, and secure communication channels.
                                 </p>
@@ -225,14 +225,14 @@ export default function AboutPage() {
                                          <div className="w-3 h-3 rounded-full bg-green-500"/>
                                      </div>
                                      <div className="relative w-full h-full bg-white">
-                                         <Image src="/landing.png" alt="Desktop Dashboard" fill className="object-cover object-top" />
+                                         <Image src="/platform/sauti salama - survivor dashboard - desktop.png" alt="Desktop Dashboard" fill className="object-cover object-top" />
                                      </div>
                                 </div>
 
                                 {/* Mobile Mockup */}
                                 <div className="absolute bottom-0 right-4 lg:right-0 w-[180px] md:w-[240px] aspect-[9/19] bg-gray-900 rounded-[3rem] border-8 border-gray-900 shadow-2xl overflow-hidden z-20 transform translate-y-10 hover:translate-y-6 transition-transform duration-500">
                                      <div className="relative w-full h-full bg-white">
-                                         <Image src="/splash.png" alt="Mobile App" fill className="object-cover" />
+                                         <Image src="/platform/sauti salama - survivor dashboard - mobile.png" alt="Mobile App" fill className="object-cover" />
                                      </div>
                                 </div>
                             </div>
@@ -246,14 +246,14 @@ export default function AboutPage() {
                         <div className="grid lg:grid-cols-2 gap-16 items-center">
                             <div>
                                 <span className="inline-block px-4 py-1 rounded-full bg-sauti-teal text-white text-xs font-bold uppercase tracking-wider mb-6">Climate Justice</span>
-                                <h2 className="text-3xl md:text-5xl font-bold text-sauti-dark mb-8 font-serif">Climate, Care, and Kiwu</h2>
+                                <h2 className="text-3xl md:text-5xl font-bold text-sauti-dark mb-8">Climate, Care, and Kiwu</h2>
                                 <p className="text-lg text-gray-700 leading-relaxed mb-6">
                                     Climate shocks intensify existing inequalities and increase risks of violence. Water scarcity, energy poverty, displacement, and unsafe movement place disproportionate burdens on women and girls.
                                 </p>
                                 <p className="text-lg text-gray-700 leading-relaxed mb-8">
                                     <strong className="text-sauti-teal">Kiwu</strong> is Sauti Salama’s climate and care initiative that responds to these realities through practical, low-cost infrastructure that supports safety, dignity, and resilience in climate-vulnerable communities.
                                 </p>
-                                <p className="text-xl font-serif text-sauti-dark italic mb-10">
+                                <p className="text-xl text-sauti-dark italic mb-10">
                                     For Sauti Salama, climate resilience is inseparable from care and protection.
                                 </p>
                                 <Link href="/programs">
@@ -265,7 +265,7 @@ export default function AboutPage() {
                             </div>
                             <div className="relative">
                                 <div className="relative z-10 rounded-[40px] overflow-hidden shadow-2xl aspect-square rotate-3 hover:rotate-0 transition-all duration-500">
-                                     <Image src="/events/impact/Community -Letu.png" alt="Kiwu Initiative" fill className="object-cover" />
+                                     <Image src="/Kiwu Water lorry.png" alt="Kiwu Initiative" fill className="object-cover" />
                                 </div>
                                 <div className="absolute top-10 -right-10 w-full h-full bg-white/30 rounded-[40px] -rotate-6 z-0" />
                             </div>
@@ -277,7 +277,7 @@ export default function AboutPage() {
                  <section className="py-20 md:py-32 bg-white">
                      <div className="container px-4 max-w-7xl mx-auto">
                         <div className="text-center mb-20">
-                            <h2 className="text-4xl md:text-6xl font-bold text-sauti-dark font-serif mb-6">Our Team</h2>
+                            <h2 className="text-4xl md:text-6xl font-bold text-sauti-dark mb-6">Our Team</h2>
                             <p className="text-lg text-gray-600 max-w-2xl mx-auto">
                                 Sauti Salama is led by young women and youth and supported by a multidisciplinary team.
                             </p>
@@ -286,12 +286,12 @@ export default function AboutPage() {
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-x-8 gap-y-16">
                             {[
                                 { name: "Malkia Mutwoki", role: "Executive Director", image: "/team/malkia mutwoki - executive director.png" },
+                                { name: "Esther Mwende", role: "Administrative lead", image: "/team/Esther Mwende - Administrative Lead.jpeg" },
+                                { name: "Oliver Wainaina", role: "Technology Lead", image: "/team/oliver wainaina - tech lead.jpg" },
                                 { name: "Liza Wanja", role: "Programs Coordinator", image: "/team/liza wanja - programs cordinator.jpeg" },
                                 { name: "Rosemary Kanyi", role: "Partnerships Lead", image: "/team/rosemary kanyi - patnerships lead.png" },
-                                { name: "Elvine", role: "Communications Lead", image: "/team/elvine-communications lead.png" },
-                                { name: "Milligan Nyabuto", role: "Legal", image: "/team/milligan Nyabuto - legal.jpeg" },
-                                { name: "Mwende", role: "Administrator", image: "/team/mwende - administrator.png" },
-                                { name: "Oliver Wainaina", role: "Tech Lead", image: "/team/oliver wainaina - tech lead.jpg" }
+                                { name: "Elvine Tina Ouma", role: "Communications Lead", image: "/team/elvine-communications lead.png" },
+                                { name: "Milligan Nyabuto", role: "Legal and compliance lead", image: "/team/milligan Nyabuto - legal.jpeg" }
                             ].map((member, i) => (
                                 <div key={i} className="group flex flex-col items-center text-center">
                                     <div className="w-48 h-48 rounded-full overflow-hidden mb-6 border-4 border-gray-50 shadow-lg relative group-hover:scale-105 transition-transform duration-500">
@@ -305,35 +305,80 @@ export default function AboutPage() {
                      </div>
                  </section>
 
-                 {/* 7. PARTNERS, IMPACT, GOVERNANCE */}
-                 <section className="py-20 md:py-32 bg-gray-50 border-t border-gray-200">
-                    <div className="container px-4 max-w-5xl mx-auto">
-                        <div className="grid md:grid-cols-2 gap-16">
+                {/* 7. REAL IMPACT (Visual Grid) */}
+                <section className="py-20 md:py-32 bg-gray-50 border-t border-gray-200">
+                    <div className="container px-4 max-w-7xl mx-auto">
+                        <div className="text-center mb-16">
+                            <h2 className="text-3xl md:text-5xl font-bold text-sauti-dark mb-6">Our Impact in Action</h2>
+                            <p className="text-lg text-gray-600 max-w-3xl mx-auto">
+                                We believe in learning as part of accountability. Alongside progress, we reflect on challenges and areas for improvement.
+                            </p>
+                        </div>
+
+                        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8 mb-20">
+                            {/* Card 1: Education */}
+                            <div className="bg-white rounded-[32px] overflow-hidden shadow-lg flex flex-col group">
+                                <div className="relative h-64 overflow-hidden">
+                                     <Image src="/events/impact/Learning Program - 748 registered learners.png" alt="Learning Program" fill className="object-cover group-hover:scale-105 transition-transform duration-500" />
+                                </div>
+                                <div className="p-8 flex-1">
+                                    <h3 className="text-xl font-bold text-sauti-dark mb-2">Education Access</h3>
+                                    <p className="text-sauti-teal font-bold text-sm mb-4 uppercase tracking-wider">748 Registered Learners</p>
+                                    <p className="text-gray-600 text-sm leading-relaxed">
+                                        Providing digital and vocational skills to young women, bridging the gender gap in technology and employment.
+                                    </p>
+                                </div>
+                            </div>
+
+                            {/* Card 2: Advocacy */}
+                            <div className="bg-white rounded-[32px] overflow-hidden shadow-lg flex flex-col group">
+                                <div className="relative h-64 overflow-hidden">
+                                     <Image src="/events/impact/at cop30.png" alt="Global Advocacy" fill className="object-cover group-hover:scale-105 transition-transform duration-500" />
+                                </div>
+                                <div className="p-8 flex-1">
+                                    <h3 className="text-xl font-bold text-sauti-dark mb-2">Global Advocacy</h3>
+                                    <p className="text-sauti-red font-bold text-sm mb-4 uppercase tracking-wider">From Local to Global</p>
+                                    <p className="text-gray-600 text-sm leading-relaxed">
+                                        Amplifying survivor voices at global platforms like COP, linking climate justice with gender-based violence prevention.
+                                    </p>
+                                </div>
+                            </div>
+                            
+                             {/* Card 3: Community Action */}
+                            <div className="bg-white rounded-[32px] overflow-hidden shadow-lg flex flex-col group">
+                                <div className="relative h-64 overflow-hidden">
+                                     <Image src="/events/impact/end femicide march.jpeg" alt="End Femicide March" fill className="object-cover group-hover:scale-105 transition-transform duration-500" />
+                                </div>
+                                <div className="p-8 flex-1">
+                                    <h3 className="text-xl font-bold text-sauti-dark mb-2">Community Action</h3>
+                                    <p className="text-sauti-yellow font-bold text-sm mb-4 uppercase tracking-wider">End Femicide</p>
+                                    <p className="text-gray-600 text-sm leading-relaxed">
+                                        Mobilizing thousands in marches and community dialogues to demand accountability and safer streets.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="grid md:grid-cols-2 gap-16 border-t border-gray-200 pt-16">
                             <div>
                                 <h3 className="text-2xl font-bold text-sauti-dark mb-6">Partners and Networks</h3>
-                                <p className="text-gray-600 leading-relaxed mb-8">
+                                <p className="text-gray-600 leading-relaxed">
                                     We collaborate with community-based organisations, legal actors, health providers, youth networks, and regional and global coalitions. Our partnerships are built on shared values, clarity of roles, and mutual accountability.
                                 </p>
                             </div>
                             <div>
-                                <h3 className="text-2xl font-bold text-sauti-dark mb-6">Impact and Learning</h3>
-                                <p className="text-gray-600 leading-relaxed mb-8">
-                                    We believe in learning as part of accountability. Alongside progress, we reflect on challenges, gaps, and areas for improvement. This allows us to strengthen our work and remain responsive to the communities we serve.
+                                <h3 className="text-2xl font-bold text-sauti-dark mb-6">Governance & Ethics</h3>
+                                <p className="text-gray-600 leading-relaxed">
+                                    Sauti Salama operates with clear governance structures, safeguarding policies, and accountability mechanisms to ensure responsible leadership and ethical practice.
                                 </p>
                             </div>
                         </div>
-                        <div className="mt-16 pt-16 border-t border-gray-200 text-center">
-                             <h3 className="text-xl font-bold text-sauti-dark mb-4">Our Governance</h3>
-                             <p className="text-gray-600 leading-relaxed max-w-3xl mx-auto">
-                                Sauti Salama operates with clear governance structures, safeguarding policies, and accountability mechanisms to ensure responsible leadership and ethical practice.
-                            </p>
-                        </div>
                     </div>
-                 </section>
+                </section>
 
                  <section className="bg-sauti-light-teal py-12 md:py-24">
                       <div className="container px-4 max-w-5xl mx-auto text-center">
-                         <h2 className="text-2xl md:text-5xl font-bold text-sauti-dark mb-8 md:mb-12 relative inline-block px-6 font-serif">
+                         <h2 className="text-2xl md:text-5xl font-bold text-sauti-dark mb-8 md:mb-12 relative inline-block px-6">
                              Join the Movement.
                          </h2>
                          <p className="text-lg md:text-xl text-gray-600 mb-10 md:mb-16 max-w-3xl mx-auto leading-relaxed">

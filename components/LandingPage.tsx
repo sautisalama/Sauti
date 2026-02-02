@@ -91,7 +91,7 @@ export function LandingPage() {
 											<DialogTrigger asChild>
 												<Button
 													size="lg"
-													className="rounded-full px-6 md:px-8 py-5 md:py-7 text-sm md:text-lg font-bold bg-sauti-yellow text-sauti-dark hover:bg-sauti-yellow/90"
+													className="rounded-full px-6 md:px-8 py-5 md:py-7 text-sm md:text-lg font-bold bg-sauti-yellow text-sauti-dark hover:bg-sauti-yellow/50"
 												>
 													Get Support Now
 												</Button>
@@ -114,7 +114,7 @@ export function LandingPage() {
 								</div>
 
 								{/* Trust Banner */}
-								<div className="bg-sauti-yellow rounded-[24px] md:rounded-[32px] p-6 md:p-10 flex flex-col sm:flex-row items-center justify-between shadow-lg gap-6">
+								<div className="bg-sauti-yellow/50 rounded-[24px] md:rounded-[32px] p-6 md:p-10 flex flex-col sm:flex-row items-center justify-between shadow-lg gap-6">
                                     <div className="text-center sm:text-left">
                                         <h3 className="font-sans text-xl md:text-2xl font-bold text-sauti-dark mb-1 md:mb-2 tracking-tight">
                                             How can we help?
@@ -123,19 +123,16 @@ export function LandingPage() {
                                            Mental Health • Legal Aid • Safe Shelters.
                                         </p>
                                     </div>
-                                    <div className="flex -space-x-4">
-                                        {[1, 2, 3, 4].map((i) => (
-                                            <div
-                                                key={i}
-                                                className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-white/20 border-2 border-white/50 flex items-center justify-center overflow-hidden"
-                                            >
-                                                 {i === 4 ? (
-                                                    <span className="text-xs font-bold text-sauti-dark">+</span>
-                                                ) : (
-                                                    <Image src={`https://i.pravatar.cc/150?u=${i + 40}`} alt="" width={48} height={48} />
-                                                )}
-                                            </div>
-                                        ))}
+                                    <div className="flex gap-2 md:gap-3">
+                                        <div className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-white/40 border-2 border-white/50 flex items-center justify-center text-sauti-dark" title="Mental Health Support">
+                                            <Heart className="w-5 h-5 md:w-6 md:h-6" fill="currentColor" fillOpacity={0.2} />
+                                        </div>
+                                        <div className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-white/40 border-2 border-white/50 flex items-center justify-center text-sauti-dark" title="Legal Aid">
+                                            <Scale className="w-5 h-5 md:w-6 md:h-6" />
+                                        </div>
+                                        <div className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-white/40 border-2 border-white/50 flex items-center justify-center text-sauti-dark" title="Safe Shelters">
+                                            <Shield className="w-5 h-5 md:w-6 md:h-6" />
+                                        </div>
                                     </div>
 								</div>
 							</div>
@@ -327,19 +324,24 @@ export function LandingPage() {
                                     </Link>
                                 </div>
 							</div>
-							<div className="lg:w-1/2 w-full hidden md:block">
-								<div className="relative aspect-square w-full bg-white/5 rounded-[32px] md:rounded-[60px] backdrop-blur-xl border border-white/10 p-4 shadow-3xl overflow-hidden group">
-                                     <div className="absolute inset-0 bg-gradient-to-br from-sauti-orange/30 to-transparent opacity-40 group-hover:opacity-60 transition-opacity" />
-                                     <div className="h-full w-full rounded-[45px] bg-white/5 flex items-center justify-center border border-white/5 relative overflow-hidden">
-                                         <div className="w-[85%] h-[85%] bg-white/10 rounded-3xl flex flex-col gap-6 p-10 backdrop-blur-md">
-                                             <div className="w-1/2 h-10 bg-white/30 rounded-full animate-pulse" />
-                                             <div className="w-full h-40 bg-white/10 rounded-2xl border border-white/10" />
-                                             <div className="flex gap-6">
-                                                 <div className="w-1/2 h-24 bg-white/10 rounded-2xl" />
-                                                 <div className="w-1/2 h-24 bg-sauti-orange/30 rounded-2xl border border-sauti-orange/40" />
-                                             </div>
-                                         </div>
-                                     </div>
+							<div className="lg:w-1/2 w-full hidden md:flex items-center justify-center relative h-[400px] lg:h-[500px]">
+								{/* Desktop Mockup */}
+								<div className="absolute top-1/2 -translate-y-1/2 left-0 w-[85%] aspect-video bg-gray-900 rounded-xl border border-gray-700 shadow-2xl overflow-hidden z-10 transform -rotate-3 hover:rotate-0 transition-transform duration-500">
+									<div className="w-full h-6 bg-gray-800 flex items-center px-3 gap-1.5">
+										<div className="w-2.5 h-2.5 rounded-full bg-red-500"/>
+										<div className="w-2.5 h-2.5 rounded-full bg-yellow-500"/>
+										<div className="w-2.5 h-2.5 rounded-full bg-green-500"/>
+									</div>
+									<div className="relative w-full h-full bg-white">
+										<Image src="/platform/sauti salama - survivor dashboard - desktop.png" alt="Desktop Dashboard" fill className="object-cover object-top" />
+									</div>
+								</div>
+
+								{/* Mobile Mockup */}
+								<div className="absolute bottom-4 right-4 w-[140px] lg:w-[160px] aspect-[9/19] bg-gray-900 rounded-[2rem] border-[6px] border-gray-900 shadow-2xl overflow-hidden z-20 transform translate-y-4 hover:translate-y-0 transition-transform duration-500">
+									<div className="relative w-full h-full bg-white">
+										<Image src="/platform/sauti salama - survivor dashboard - mobile.png" alt="Mobile App" fill className="object-cover" />
+									</div>
 								</div>
 							</div>
 						</div>
@@ -391,7 +393,7 @@ export function LandingPage() {
                             {/* Column 3 */}
                             <div className="flex flex-col gap-6 md:gap-10">
                                 <div className="rounded-[24px] md:rounded-[40px] overflow-hidden aspect-video relative shadow-2xl hover:scale-[1.02] transition-transform duration-500">
-                                    <Image src="/events/impact/startegic plan meeting.png" alt="Strategic meeting" fill className="object-cover" />
+                                    <Image src="/events/impact/oliver-teaching-tech.jpg" alt="Strategic meeting" fill className="object-cover" />
                                 </div>
                                 <div className="bg-white rounded-[24px] md:rounded-[40px] p-6 md:p-10 shadow-xl flex-1 flex flex-col">
                                     <h3 className="text-2xl md:text-3xl font-bold text-[#1a365d] mb-4 md:mb-6">Education Access</h3>

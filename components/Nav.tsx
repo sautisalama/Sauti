@@ -130,7 +130,7 @@ export function Nav() {
 					<Link
 						href="/impact"
 						className={`px-3 py-1.5 rounded-full transition-colors ${
-							isActive("/impact") 
+							pathname.startsWith("/impact") 
 								? "bg-sauti-teal text-white" 
 								: "text-muted-foreground hover:text-sauti-teal underline-offset-4 hover:underline"
 						}`}
@@ -275,7 +275,7 @@ export function Nav() {
 										<Link
 											href="/impact"
 											className={`flex items-center gap-4 rounded-2xl px-5 py-4 text-lg font-black transition-all ${
-												isActive("/impact") ? "bg-sauti-blue text-white shadow-lg shadow-sauti-blue/20" : "hover:bg-gray-50 text-gray-700"
+												pathname.startsWith("/impact") ? "bg-sauti-blue text-white shadow-lg shadow-sauti-blue/20" : "hover:bg-gray-50 text-gray-700"
 											}`}
 										>
 											<LayoutDashboard className="h-6 w-6" />

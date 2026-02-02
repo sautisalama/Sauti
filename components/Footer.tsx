@@ -24,10 +24,9 @@ export function Footer() {
                             A survivor-led initiative providing safety, care, and justice for all survivors of GBV in Kenya.
                         </p>
                         <div className="flex gap-4">
-                            <Link href="#" className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center hover:bg-sauti-yellow hover:text-sauti-dark transition-all"><Instagram className="h-5 w-5" /></Link>
-                            <Link href="#" className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center hover:bg-sauti-yellow hover:text-sauti-dark transition-all"><Twitter className="h-5 w-5" /></Link>
-                            <Link href="#" className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center hover:bg-sauti-yellow hover:text-sauti-dark transition-all"><Linkedin className="h-5 w-5" /></Link>
-                            <Link href="#" className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center hover:bg-sauti-yellow hover:text-sauti-dark transition-all"><Music2 className="h-5 w-5" /></Link>
+                            <Link href="https://www.instagram.com/sautisalama" target="_blank" rel="noopener noreferrer" className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center hover:bg-sauti-yellow hover:text-sauti-dark transition-all"><Instagram className="h-5 w-5" /></Link>
+                            <Link href="https://x.com/sautisalama" target="_blank" rel="noopener noreferrer" className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center hover:bg-sauti-yellow hover:text-sauti-dark transition-all"><Twitter className="h-5 w-5" /></Link>
+                            <Link href="https://www.linkedin.com/company/sauti-salama/" target="_blank" rel="noopener noreferrer" className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center hover:bg-sauti-yellow hover:text-sauti-dark transition-all"><Linkedin className="h-5 w-5" /></Link>
                         </div>
                     </div>
 

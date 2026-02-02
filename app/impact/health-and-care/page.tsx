@@ -23,7 +23,7 @@ export default function HealthAndCarePage() {
                                 <h1 className="text-3xl md:text-5xl lg:text-7xl font-black text-sauti-dark mb-6 md:mb-8 leading-tight">
                                     Health & Care
                                 </h1>
-                                <p className="text-lg md:text-2xl text-gray-600 leading-relaxed mb-8 md:mb-12 font-medium font-serif">
+                                <p className="text-lg md:text-2xl text-gray-600 leading-relaxed mb-8 md:mb-12 font-medium">
                                     Integrating medical care and mental health support to ensure a holistic path to healing and restoration for all survivors.
                                 </p>
                                 <div className="flex justify-center md:justify-start">

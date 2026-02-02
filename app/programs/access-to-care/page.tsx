@@ -7,6 +7,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { ArrowRight, HeartPulse, Shield, Phone, Coffee } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { CircledText } from "@/components/ui/CircledText";
 
 export default function AccessToCarePage() {
     return (
@@ -21,13 +22,10 @@ export default function AccessToCarePage() {
                                 <span className="inline-block px-4 py-1 rounded-full bg-sauti-yellow/10 text-sauti-yellow text-sm font-bold mb-6 uppercase tracking-widest">
                                     Our Core Intervention
                                 </span>
-                                <h1 className="text-5xl md:text-7xl font-black text-sauti-dark mb-8 leading-tight">
-                                    Access to <span className="relative inline-block px-4">
-                                        Care
-                                        <div className="absolute bottom-0 left-0 w-full h-full border-[4px] border-[#00cf8d] rounded-[100%] rotate-[-2deg] opacity-60 pointer-events-none" />
-                                    </span>
+                                <h1 className="text-4xl md:text-6xl lg:text-7xl font-black text-sauti-dark mb-6 md:mb-8 leading-tight">
+                                    Access to <CircledText circleColor="#00CF8D">Care</CircledText>
                                 </h1>
-                                <p className="text-xl md:text-2xl text-gray-600 leading-relaxed mb-10 font-medium font-serif">
+                                <p className="text-lg md:text-xl lg:text-2xl text-gray-600 leading-relaxed mb-8 md:mb-10 font-medium">
                                     Trauma-informed psychosocial and medical referral networks designed to provide immediate safety and long-term healing for survivors.
                                 </p>
                                 <div className="flex flex-wrap gap-4">

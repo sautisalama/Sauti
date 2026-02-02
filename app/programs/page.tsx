@@ -23,7 +23,7 @@ export default function ProgramsPage() {
                                 <motion.h1 
                                     initial={{ opacity: 0, y: 20 }}
                                     animate={{ opacity: 1, y: 0 }}
-                                    className="text-3xl md:text-5xl lg:text-7xl font-serif font-bold text-sauti-dark leading-tight relative z-10"
+                                    className="text-3xl md:text-5xl lg:text-7xl font-bold text-sauti-dark leading-tight relative z-10"
                                 >
                                     Structural Change requires <CircledText circleColor="#F4B400">systemic action</CircledText>.
                                 </motion.h1>
@@ -54,7 +54,7 @@ export default function ProgramsPage() {
 								title="Community Prevention"
 								subtitle="Collective Responsibility & Safety"
 								description="Violence prevention starts with community ownership. We work with young people, caregivers, and local leaders to challenge harmful norms and build 'Circles of Safety' that protect the most vulnerable."
-                                image="/events/impact/Learning Program - 748 registered learners.png"
+                                image="/events/programs/community-wangu.jpeg"
                                 slug="prevention"
                                 benefits={[
                                     "Youth-led bystander intervention training",
@@ -68,7 +68,7 @@ export default function ProgramsPage() {
 								title="Legal Access & Advocacy"
 								subtitle="Justice That Serves Survivors"
 								description="Navigating the justice system is often re-traumatising. We provide legal literacy, accompaniment, and advocacy to ensure that laws are not just written but felt in the lives of women and girls."
-                                image="/events/impact/at cop29.png"
+                                image="/events/impact/at cop30.png"
                                 slug="legal-access"
                                 benefits={[
                                     "Pro-bono legal representation",
@@ -110,8 +110,8 @@ export default function ProgramsPage() {
                 
                 <section className="bg-sauti-light-teal py-12 md:py-24">
                      <div className="container px-4 max-w-5xl mx-auto text-center">
-                        <h2 className="text-2xl md:text-5xl font-bold text-sauti-dark mb-8 md:mb-12 relative inline-block px-6 font-serif">
-                            Comprehensive approach to Safety.
+                        <h2 className="text-2xl md:text-5xl font-bold text-sauti-dark mb-8 md:mb-12 relative inline-block px-6">
+                            Comprehensive approach to <CircledText circleColor="#00CF8D">Safety</CircledText>.
                         </h2>
                         <p className="text-lg md:text-xl text-gray-600 mb-10 md:mb-16 max-w-3xl mx-auto leading-relaxed">
                             Our programs are interconnected, ensuring that survivors are supported both psychosocially and legally.

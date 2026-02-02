@@ -22,7 +22,7 @@ export default function ClimateJusticePage() {
                                 <h1 className="text-3xl md:text-5xl lg:text-7xl font-black text-sauti-dark mb-6 md:mb-8 leading-tight">
                                     Climate Justice
                                 </h1>
-                                <p className="text-lg md:text-2xl text-gray-600 leading-relaxed mb-8 md:mb-12 font-medium font-serif">
+                                <p className="text-lg md:text-2xl text-gray-600 leading-relaxed mb-8 md:mb-12 font-medium">
                                     Addressing the disproportionate impact of climate change on gender-based violence and building resilient communities.
                                 </p>
                             </div>

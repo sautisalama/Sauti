@@ -69,7 +69,7 @@ export function JoinCommunity() {
 							<Twitter className="w-5 h-5" />
 						</Link>
 						<Link
-							href="https://www.google.com/url?sa=t&source=web&rct=j&opi=89978449&url=https://www.linkedin.com/company/sauti-salama"
+							href="https://www.linkedin.com/company/sauti-salama/"
 							target="_blank"
 							rel="noopener noreferrer"
 							className="text-slate-700 hover:text-slate-900 transition-colors"

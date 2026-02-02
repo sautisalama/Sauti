@@ -8,6 +8,7 @@ import { ArrowLeft, CheckCircle2, Shield, Heart, Scale, Landmark } from "lucide-
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
+import { CircledText } from "@/components/ui/CircledText";
 
 const PROGRAM_DATA: Record<string, any> = {
     "access-to-care": {
@@ -82,7 +83,7 @@ export default function ProgramDetailPage() {
                         <div className="grid lg:grid-cols-2 gap-20 items-center">
                             <div>
                                 <div className="mb-8">{program.icon}</div>
-                                <h1 className="text-4xl md:text-8xl font-serif font-black text-sauti-dark mb-6 leading-tight">
+                                <h1 className="text-3xl md:text-6xl lg:text-8xl font-black text-sauti-dark mb-4 md:mb-6 leading-tight">
                                     {program.title}
                                 </h1>
                                 <p className="text-xl md:text-2xl text-sauti-yellow font-bold uppercase tracking-widest">{program.subtitle}</p>

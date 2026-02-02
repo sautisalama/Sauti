@@ -22,7 +22,7 @@ export default function YouthLeadershipPage() {
                                 <h1 className="text-3xl md:text-5xl lg:text-7xl font-black text-sauti-dark mb-6 md:mb-8 leading-tight">
                                     Youth Leadership
                                 </h1>
-                                <p className="text-lg md:text-2xl text-gray-600 leading-relaxed mb-8 md:mb-12 font-medium font-serif">
+                                <p className="text-lg md:text-xl lg:text-2xl text-gray-600 leading-relaxed mb-8 md:mb-12 font-medium">
                                     Empowering young leaders to drive community change and advocate for a future free from gender-based violence.
                                 </p>
                             </div>

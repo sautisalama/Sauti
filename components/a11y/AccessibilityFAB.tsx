@@ -6,23 +6,14 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Eye, Type, Contrast } from "lucide-react";
 
-function ToggleRow({ label, attr }: { label: string; attr: string }) {
+// Assuming AccessibilityState is defined in AccessibilityProvider or globally
+// For the purpose of this edit, we'll assume it's available.
+// Example: type AccessibilityState = { highContrast: boolean; reduceMotion: boolean; dyslexic: boolean; textScale: number; set: (patch: Partial<AccessibilityState>) => void; };
+function ToggleRow({ label, property }: { label: string; property: keyof Omit<ReturnType<typeof useAccessibility>, "set"> }) {
 	const a11y = useAccessibility();
-	const isOn =
-		typeof document !== "undefined" &&
-		document.documentElement.getAttribute(attr) === "1";
+	const isOn = !!a11y[property];
 	const toggle = () => {
-		const el = document.documentElement;
-		const next = isOn ? "0" : "1";
-		el.setAttribute(attr, next);
-		const patch: any = {};
-		if (attr === "data-a11y-high-contrast") patch.highContrast = next === "1";
-		if (attr === "data-a11y-reduce-motion") patch.reduceMotion = next === "1";
-		if (attr === "data-a11y-lg-text") patch.largeText = next === "1";
-		if (attr === "data-a11y-readable-font") patch.readableFont = next === "1";
-		if (attr === "data-a11y-underline-links") patch.underlineLinks = next === "1";
-		if (attr === "data-a11y-dyslexic") patch.dyslexic = next === "1";
-		a11y.set(patch);
+		a11y.set({ [property]: !isOn });
 	};
 	return (
 		<button
@@ -49,13 +40,9 @@ export default function AccessibilityFAB() {
 	const a11y = useAccessibility();
 	const [open, setOpen] = useState(false);
 
-	const scale =
-		typeof document !== "undefined"
-			? document.documentElement.getAttribute("data-a11y-text-scale") || "100"
-			: "100";
+	const scale = String(a11y.textScale);
 	const setScale = (val: string) => {
 		const n = Number(val) || 100;
-		document.documentElement.setAttribute("data-a11y-text-scale", String(n));
 		a11y.set({ textScale: n });
 	};
 
@@ -66,9 +53,9 @@ export default function AccessibilityFAB() {
 					<div className="flex items-center gap-2 text-sm font-medium mb-1">
 						<Contrast className="h-4 w-4" /> Accessibility
 					</div>
-					<ToggleRow label="High contrast" attr="data-a11y-high-contrast" />
-					<ToggleRow label="Reduce motion" attr="data-a11y-reduce-motion" />
-					<ToggleRow label="Dyslexic-friendly font" attr="data-a11y-dyslexic" />
+					<ToggleRow label="High contrast" property="highContrast" />
+					<ToggleRow label="Reduce motion" property="reduceMotion" />
+					<ToggleRow label="Dyslexic-friendly font" property="dyslexic" />
 					<div className="text-sm">
 						<div className="mb-1 flex items-center gap-2">
 							<Type className="h-4 w-4" /> Text size
