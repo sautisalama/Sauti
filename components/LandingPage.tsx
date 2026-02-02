@@ -187,39 +187,41 @@ export function LandingPage() {
 						<div className="bg-sauti-light-teal/30 rounded-[32px] md:rounded-[60px] p-6 md:p-12 lg:p-24 relative overflow-hidden">
 							<div className="grid lg:grid-cols-2 gap-16 lg:gap-24 items-start relative z-10">
 								<div>
-									<h2 className="text-3xl md:text-5xl lg:text-7xl font-black text-sauti-dark mb-6 md:mb-10 leading-[1.1] tracking-tight">
-										2 women <br/>
-										killed daily <br/>
+									<h2 className="text-3xl md:text-5xl lg:text-7xl font-black text-sauti-dark mb-4 md:mb-6 leading-[1.1] tracking-tight">
+										<span className="text-lg tracking-widest"> Averagely, </span> <br/>
+										2 women <br/> 
+                                        killed daily <br/>
 										<span className="text-sauti-red">in 2025.</span>
 									</h2>
+                                    <div className="text-lg md:text-xl font-bold text-sauti-red uppercase tracking-widest mb-6 md:mb-10">in Kenya due to GBV</div>
                                     <p className="text-base md:text-xl lg:text-2xl text-gray-700 leading-relaxed font-medium max-w-xl mb-8 md:mb-12">
-                                        Sauti Salama is a Kenyan feminist organisation founded by survivors in response to gaps in care, safety, and justice for women and girls.
+                                        Sauti Salama is a Kenyan feminist organisation founded and led by survivors who understand the challenges of getting help. We work to bridge gaps in access to care, safety, and justice for women and girls.
 									</p>
                                     <Link href="/about">
                                         <Button id="aboutUsButton" className="rounded-full bg-sauti-dark text-white px-6 md:px-10 py-5 md:py-8 text-base md:text-xl font-black group shadow-xl hover:shadow-sauti-dark/20 transition-all">
-                                            Our Mission
+                                            Read Our Story
                                             <ArrowRight className="ml-3 w-5 h-5 md:w-6 md:h-6 group-hover:translate-x-2 transition-transform" />
                                         </Button>
                                     </Link>
 								</div>
 								<div className="flex flex-col gap-8 md:gap-12">
                                     <p className="text-lg md:text-xl lg:text-2xl text-gray-700 leading-relaxed font-medium max-w-xl mb-4">
-                                        Providing safe havens for mental health, legal aid, and survivor-centered justice.
+                                        Our work emerges from community organising and survivor support, shaped by those with lived experience of navigating harm alone.
 									</p>
 									<FeatureRow 
-										icon={<Lock className="w-6 h-6 md:w-8 md:h-8 text-sauti-teal" />} 
-										title="Anonymous Mode" 
-										description="Access resources discreetly without revealing your identity." 
+										icon={<UsersRound className="w-6 h-6 md:w-8 md:h-8 text-sauti-teal" />} 
+										title="Survivor-Led" 
+										description="Led by women and survivors who understand the journey." 
 									/>
 									<FeatureRow 
-										icon={<EyeOff className="w-6 h-6 md:w-8 md:h-8 text-sauti-teal" />} 
-										title="Confidentiality" 
-										description="Choose to keep your details private while seeking support." 
+										icon={<HeartHandshake className="w-6 h-6 md:w-8 md:h-8 text-sauti-teal" />} 
+										title="Collective Care" 
+										description="Care is central to justice and community resilience." 
 									/>
 									<FeatureRow 
-										icon={<UserCheck className="w-6 h-6 md:w-8 md:h-8 text-sauti-teal" />} 
-										title="Legal Guidance" 
-										description="Get personalized guidance when you're ready for justice." 
+										icon={<Shield className="w-6 h-6 md:w-8 md:h-8 text-sauti-teal" />} 
+										title="Safety First" 
+										description="Safety requires consent built into institutions and tools." 
 									/>
 								</div>
 							</div>
