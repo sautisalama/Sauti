@@ -15,12 +15,13 @@ export function ChatWarmupProvider({ children }: { children: ReactNode }) {
   const supabase = useMemo(() => createClient(), []);
 
   const warmupChatForUser = useCallback((userId: string, username: string, bothModes = true) => {
-    console.log('🔥 Warming up chat for user:', username, bothModes ? '(both modes)' : '');
-    if (bothModes) {
-      warmupBothModes(userId, username);
-    } else {
-      warmupChat(userId, username);
-    }
+    console.log('Chat functionality currently deactivated.');
+    // console.log('🔥 Warming up chat for user:', username, bothModes ? '(both modes)' : '');
+    // if (bothModes) {
+    //   warmupBothModes(userId, username);
+    // } else {
+    //   warmupChat(userId, username);
+    // }
   }, []);
 
   useEffect(() => {

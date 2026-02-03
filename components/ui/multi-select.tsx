@@ -66,7 +66,7 @@ export function MultiSelect({
 	return (
 		<div className="relative">
 			<div
-				className="group border border-input px-3 py-2 text-sm ring-offset-background rounded-md focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 cursor-text"
+				className="group border border-gray-400 px-3 py-2 text-sm ring-offset-background rounded-md focus-within:ring-2 focus-within:ring-sauti-teal/50 focus-within:border-sauti-teal cursor-text bg-white"
 				onMouseDown={(e) => {
 					// Focus input to open the menu; avoid toggling state if already focused
 					if (document.activeElement !== inputRef.current) {
@@ -92,7 +92,7 @@ export function MultiSelect({
 						const label =
 							options.find((opt) => opt.value === option)?.label || option;
 						return (
-							<Badge key={option} variant="secondary">
+							<Badge key={option} variant="secondary" className="bg-sauti-teal/10 text-sauti-teal border-sauti-teal/20 hover:bg-sauti-teal/20">
 								{label}
 								<button
 									className="ml-1 ring-offset-background rounded-full outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 touch-manipulation"
@@ -126,22 +126,26 @@ export function MultiSelect({
 						onChange={(e) => setInputValue(e.target.value)}
 						onBlur={() => {
 							// Shorter delay for mobile, longer for desktop
-							const delay = window.innerWidth < 640 ? 100 : 200;
+							const delay = window.innerWidth < 640 ? 150 : 250;
 							setTimeout(() => setOpen(false), delay);
 						}}
 						onFocus={() => setOpen(true)}
 						placeholder={selected.length === 0 ? placeholder : undefined}
-						className="ml-2 bg-transparent outline-none placeholder:text-muted-foreground flex-1 min-w-0"
+						className="ml-2 bg-transparent outline-none placeholder:text-gray-500 text-gray-900 flex-1 min-w-0"
 					/>
 				</div>
 			</div>
 			{open && (
-				<div className="absolute w-full z-50 top-[calc(100%+4px)] rounded-md border bg-popover text-popover-foreground shadow-md outline-none animate-in max-h-[50vh] sm:max-h-60 left-0 right-0">
-					<div className="overflow-auto max-h-[50vh] sm:max-h-60">
+				<div className="absolute w-full z-50 top-[calc(100%+8px)] rounded-xl border border-gray-200 bg-white text-gray-900 shadow-2xl outline-none animate-in fade-in slide-in-from-top-2 duration-200 max-h-[50vh] sm:max-h-60 left-0 right-0 overflow-hidden">
+					<div className="overflow-auto max-h-[50vh] sm:max-h-60 p-1.5">
 						{options.map((option) => (
 							<button
 								key={option.value}
-								className="w-full text-left px-2 py-1.5 text-sm hover:bg-accent hover:text-accent-foreground touch-manipulation"
+								className={`w-full text-left px-3 py-2.5 text-sm rounded-lg transition-colors touch-manipulation flex items-center justify-between group ${
+									selected.includes(option.value) 
+										? "bg-sauti-teal/10 text-sauti-teal font-bold" 
+										: "hover:bg-neutral-100 text-gray-700"
+								}`}
 								onMouseDown={(e) => {
 									e.preventDefault();
 									handleSelect(option.value);
@@ -151,7 +155,10 @@ export function MultiSelect({
 									handleSelect(option.value);
 								}}
 							>
-								{option.label}
+								<span>{option.label}</span>
+								{selected.includes(option.value) && (
+									<div className="h-1.5 w-1.5 rounded-full bg-sauti-teal" />
+								)}
 							</button>
 						))}
 					</div>

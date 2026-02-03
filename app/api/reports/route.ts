@@ -8,10 +8,17 @@ import { matchReportWithServices } from "@/app/actions/match-services";
 const TOKEN = process.env.MAILTRAP_TOKEN!;
 const client = new MailtrapClient({ token: TOKEN });
 
+export const dynamic = "force-dynamic";
+
 export async function POST(request: Request) {
 	try {
 		const supabase = await createClient();
-		const formData = await request.json();
+		let formData;
+		try {
+			formData = await request.json();
+		} catch (e) {
+			return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+		}
 
 		// Transform the data to match the database schema
 		const reportData: TablesInsert<"reports"> = {
@@ -31,7 +38,9 @@ export async function POST(request: Request) {
 			administrative: formData.administrative || null,
 			media: formData.media || null,
 			is_onBehalf: !!formData.is_onBehalf,
-			additional_info: formData.additional_info || null,
+			additional_info: formData.additional_info
+				? JSON.stringify(formData.additional_info)
+				: null,
 			// Initialize match-related fields
 			ismatched: false,
 			match_status: "pending" as Database["public"]["Enums"]["match_status_type"],

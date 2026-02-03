@@ -15,6 +15,10 @@ export default async function Dashboard() {
 
 	// If user exists but has no user_type, show the ChooseUser component
 	if (!user.user_type) {
+		// Anonymous users are always survivors
+		if (user.is_anonymous) {
+			return <SurvivorView userId={user.id} profileDetails={user} />;
+		}
 		return <ChooseUser />;
 	}
 

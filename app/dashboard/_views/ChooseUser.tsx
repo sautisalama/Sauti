@@ -96,7 +96,7 @@ export default function ChooseUser() {
 							<div className="w-16 sm:w-24 aspect-square relative flex justify-center items-center bg-white rounded-2xl shadow-sm border border-neutral-100 group-hover:scale-110 transition-transform duration-500">
 								<Image
 									src="/icons/professional-light.png"
-									alt="Professional"
+									alt="Service Provider"
 									height={100}
 									width={100}
 									className="object-contain p-2"
@@ -104,7 +104,7 @@ export default function ChooseUser() {
 							</div>
 							<div className="flex-1 sm:w-full">
 								<h3 className="text-lg font-black text-sauti-dark left sm:text-center group-hover:text-sauti-teal transition-colors">
-									Professional
+									Service Provider
 								</h3>
 								<p className="text-xs font-medium text-neutral-500 text-left sm:text-center mt-1">
 									Providing expert support

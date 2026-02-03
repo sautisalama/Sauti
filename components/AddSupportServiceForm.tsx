@@ -463,20 +463,31 @@ export function AddSupportServiceForm({
 					box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 				}
 			`}</style>
-			<Card className="w-full max-w-5xl mx-auto max-h-[80vh] flex flex-col">
-				<CardHeader className="text-center pb-4 flex-shrink-0">
-					<CardTitle className="text-xl md:text-2xl font-bold text-gray-900 flex items-center justify-center gap-2">
-						<Building2 className="h-5 w-5 md:h-6 md:w-6 text-blue-600" />
-						Register Your Support Service
-					</CardTitle>
-					<CardDescription className="text-sm text-gray-600">
-						Help survivors by registering your support service. Fill in the details
-						below to get started.
-					</CardDescription>
-				</CardHeader>
+			<div className="flex flex-col h-[90vh] bg-white overflow-hidden shadow-2xl rounded-[32px] border border-neutral-100">
+				{/* Modal Header */}
+				<div className="px-6 py-5 border-b bg-neutral-50 flex items-center justify-between shrink-0">
+					<div>
+						<h2 className="text-xl md:text-2xl font-black text-sauti-dark flex items-center gap-2">
+							Register Support Service
+						</h2>
+						<p className="text-xs text-neutral-500 font-medium tracking-wide">
+							Professional Verification & Accreditation
+						</p>
+					</div>
+					{onSuccess && (
+						<Button
+							variant="ghost"
+							size="sm"
+							onClick={() => onSuccess()}
+							className="rounded-full h-10 w-10 p-0 hover:bg-neutral-200 transition-colors"
+						>
+							✕
+						</Button>
+					)}
+				</div>
 
-				<CardContent className="flex-1 overflow-y-auto px-4 md:px-6">
-					<form onSubmit={handleSubmit} className="space-y-6">
+				<div className="flex-1 overflow-y-auto p-4 sm:p-8 bg-neutral-50/20">
+					<form onSubmit={handleSubmit} className="space-y-10 max-w-4xl mx-auto pb-24">
 						{/* Basic Information */}
 						<div className="space-y-4">
 							<div className="flex items-center gap-2 mb-3">
@@ -1067,25 +1078,27 @@ export function AddSupportServiceForm({
 						</div>
 
 						{/* Submit Button */}
-						<div className="flex justify-center pt-4 sticky bottom-0 bg-white border-t border-gray-200 -mx-4 md:-mx-6 px-4 md:px-6 py-3">
-							<Button
-								type="submit"
-								disabled={loading || isUploading}
-								className="w-full md:w-auto bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 h-10 text-sm font-medium"
-							>
-								{loading || isUploading ? (
-									<div className="flex items-center gap-2">
-										<div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-										{isUploading ? "Uploading Documents..." : "Registering Service..."}
-									</div>
-								) : (
-									"Register Support Service"
-								)}
-							</Button>
-						</div>
+						<div className="shrink-0 pt-4 pb-6 bg-white border-t z-40">
+				<div className="max-w-4xl mx-auto px-4 md:px-8">
+					<Button
+						type="submit"
+						className="w-full bg-sauti-teal hover:bg-sauti-teal/90 text-white py-4 text-base sm:text-lg font-black rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-300"
+						disabled={loading || isUploading}
+					>
+						{loading || isUploading ? (
+							<>
+								<Loader2 className="mr-2 h-5 w-5 animate-spin" />
+								{isUploading ? "Uploading Documents..." : "Registering Service..."}
+							</>
+						) : (
+							"Register Support Service"
+						)}
+					</Button>
+				</div>
+			</div>
 					</form>
-				</CardContent>
-			</Card>
+				</div>
+			</div>
 		</>
 	);
 }

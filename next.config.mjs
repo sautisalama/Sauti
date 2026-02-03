@@ -29,10 +29,10 @@ const nextConfig = {
 		],
 	},
 	reactStrictMode: true, // Enable React strict mode for improved error handling
-	turbopack: {}, // Silence Turbopack vs Webpack warning
 	compiler: {
 		removeConsole: process.env.NODE_ENV !== "development", // Remove console.log in production
 	},
+	turbopack: {},
 };
 
 export default withPWA({

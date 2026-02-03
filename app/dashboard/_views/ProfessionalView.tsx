@@ -739,14 +739,12 @@ export default function ProfessionalView({
 
 			{/* Global Create Report Dialog */}
 			<Dialog open={reportDialogOpen} onOpenChange={setReportDialogOpen}>
-				<DialogContent className="sm:max-w-4xl z-[1000]">
-					<DialogHeader>
-						<DialogTitle>Report Abuse</DialogTitle>
-						<DialogDescription>
-							Please fill out this form to report an incident. All information will be
-							kept confidential.
-						</DialogDescription>
-					</DialogHeader>
+				<DialogContent className="max-w-4xl p-0 overflow-hidden rounded-[32px] h-[90vh] min-h-[600px] z-[1000]">
+					<DialogTitle className="sr-only">Report Abuse</DialogTitle>
+					<DialogDescription className="sr-only">
+						Please fill out this form to report an incident. All information will be
+						kept confidential.
+					</DialogDescription>
 					<AuthenticatedReportAbuseForm
 						onClose={() => setReportDialogOpen(false)}
 						userId={userId}

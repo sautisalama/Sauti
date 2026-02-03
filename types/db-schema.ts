@@ -232,6 +232,7 @@ export type Database = {
           accreditation_member_number: Json | null
           admin_verified_at: string | null
           admin_verified_by: string | null
+          anon_username: string | null
           avatar_url: string | null
           ban_reason: string | null
           banned_at: string | null
@@ -248,6 +249,7 @@ export type Database = {
           google_calendar_token_expiry: number | null
           id: string
           is_admin: boolean | null
+          is_anonymous: boolean | null
           is_banned: boolean | null
           is_public_booking: boolean | null
           isVerified: boolean | null
@@ -270,6 +272,7 @@ export type Database = {
           accreditation_member_number?: Json | null
           admin_verified_at?: string | null
           admin_verified_by?: string | null
+          anon_username?: string | null
           avatar_url?: string | null
           ban_reason?: string | null
           banned_at?: string | null
@@ -286,6 +289,7 @@ export type Database = {
           google_calendar_token_expiry?: number | null
           id: string
           is_admin?: boolean | null
+          is_anonymous?: boolean | null
           is_banned?: boolean | null
           is_public_booking?: boolean | null
           isVerified?: boolean | null
@@ -308,6 +312,7 @@ export type Database = {
           accreditation_member_number?: Json | null
           admin_verified_at?: string | null
           admin_verified_by?: string | null
+          anon_username?: string | null
           avatar_url?: string | null
           ban_reason?: string | null
           banned_at?: string | null
@@ -324,6 +329,7 @@ export type Database = {
           google_calendar_token_expiry?: number | null
           id?: string
           is_admin?: boolean | null
+          is_anonymous?: boolean | null
           is_banned?: boolean | null
           is_public_booking?: boolean | null
           isVerified?: boolean | null
@@ -636,16 +642,10 @@ export type Database = {
       }
     }
     Functions: {
-      cleanup_expired_calendar_tokens: {
-        Args: Record<PropertyKey, never>
-        Returns: undefined
-      }
-      cleanup_orphaned_files: {
-        Args: Record<PropertyKey, never>
-        Returns: number
-      }
+      cleanup_expired_calendar_tokens: { Args: never; Returns: undefined }
+      cleanup_orphaned_files: { Args: never; Returns: number }
       get_coverage_map_data: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
           coverage_radius: number
           is_active: boolean
@@ -657,10 +657,7 @@ export type Database = {
           verification_status: Database["public"]["Enums"]["verification_status_type"]
         }[]
       }
-      get_user_file_stats: {
-        Args: { user_uuid: string }
-        Returns: Json
-      }
+      get_user_file_stats: { Args: { user_uuid: string }; Returns: Json }
       get_user_role_context: {
         Args: { target_user_id?: string }
         Returns: {
@@ -670,10 +667,7 @@ export type Database = {
           user_id: string
         }[]
       }
-      is_admin: {
-        Args: { user_id?: string }
-        Returns: boolean
-      }
+      is_admin: { Args: { user_id?: string }; Returns: boolean }
     }
     Enums: {
       admin_action_type:

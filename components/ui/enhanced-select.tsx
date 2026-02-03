@@ -117,11 +117,11 @@ export function EnhancedSelect({
 				onKeyDown={handleKeyDown}
 				disabled={disabled}
 				className={cn(
-					"w-full px-4 py-3 text-left bg-white border-2 border-gray-200 rounded-xl",
-					"focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent",
-					"transition-all duration-200 ease-in-out",
-					"hover:border-gray-300",
-					isOpen && "border-blue-500 ring-2 ring-blue-100",
+					"w-full px-4 py-3 text-left bg-white border border-neutral-200 rounded-2xl",
+					"focus:outline-none focus:ring-4 focus:ring-sauti-teal/10 focus:border-sauti-teal/50",
+					"transition-all duration-300 ease-out",
+					"hover:border-neutral-300 hover:bg-neutral-50/50",
+					isOpen && "border-sauti-teal/50 ring-4 ring-sauti-teal/10 bg-white",
 					disabled && "opacity-50 cursor-not-allowed bg-gray-50",
 					"flex items-center justify-between min-h-[52px]"
 				)}
@@ -141,7 +141,7 @@ export function EnhancedSelect({
 			</button>
 
 			{isOpen && (
-				<div className="absolute z-[9999] w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg max-h-60 overflow-hidden">
+				<div className="absolute z-[9999] w-full mt-2 bg-white border border-neutral-200 rounded-2xl shadow-xl shadow-sauti-dark/5 max-h-60 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
 					<ul
 						ref={listRef}
 						role="listbox"
@@ -154,19 +154,19 @@ export function EnhancedSelect({
 								onClick={() => handleOptionClick(option)}
 								onMouseEnter={() => setFocusedIndex(index)}
 								className={cn(
-									"px-4 py-3 cursor-pointer transition-colors duration-150",
-									"flex items-center justify-between",
-									"hover:bg-blue-50",
-									focusedIndex === index && "bg-blue-50",
+									"px-4 py-3.5 cursor-pointer transition-colors duration-200",
+									"flex items-center justify-between mx-1.5 rounded-xl my-0.5",
+									"hover:bg-sauti-teal/5 hover:text-sauti-teal",
+									focusedIndex === index && "bg-sauti-teal/5 text-sauti-teal",
 									option.disabled && "opacity-50 cursor-not-allowed",
-									value === option.value && "bg-blue-100 text-blue-900"
+									value === option.value && "bg-sauti-teal/10 text-sauti-teal font-bold"
 								)}
 								role="option"
 								aria-selected={value === option.value}
 								tabIndex={-1}
 							>
 								<span className="truncate">{option.label}</span>
-								{value === option.value && <Check className="h-4 w-4 text-blue-600" />}
+								{value === option.value && <Check className="h-4 w-4 text-sauti-teal" />}
 							</li>
 						))}
 					</ul>

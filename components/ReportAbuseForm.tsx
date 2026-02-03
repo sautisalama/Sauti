@@ -2,6 +2,7 @@
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { useState, useEffect, useRef } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "./ui/button";
 import { VoiceRecorderModal } from "@/components/VoiceRecorderModal";
 import { VoiceRecorderEnhanced as InlineRecorder } from "@/components/VoiceRecorderEnhanced";
@@ -17,6 +18,7 @@ import {
 	createAudioMediaObject,
 } from "@/utils/media";
 import { getPhoneFromEmail } from "@/utils/phone-autofill";
+import { Eye, EyeOff } from "lucide-react";
 
 const SUPPORT_SERVICE_OPTIONS = [
 	{ value: "legal", label: "legal support" },
@@ -38,6 +40,8 @@ const INCIDENT_OPTIONS = [
 
 export default function ReportAbuseForm({ onClose }: { onClose?: () => void }) {
 	const { toast } = useToast();
+	const router = useRouter();
+	const supabase = createClient();
 	const [loading, setLoading] = useState(false);
 	const [description, setDescription] = useState("");
 	const [location, setLocation] = useState<{
@@ -52,7 +56,7 @@ export default function ReportAbuseForm({ onClose }: { onClose?: () => void }) {
 	const [audioUploadError, setAudioUploadError] = useState<string | null>(null);
 	const audioUploadPromiseRef = useRef<Promise<string> | null>(null);
 	const audioFilenameRef = useRef<string | null>(null);
-	const [isOnBehalf, setIsOnBehalf] = useState(false);
+	const [reportingFor, setReportingFor] = useState<'self' | 'someone_else' | 'child'>('self');
 	const [incidentTypes, setIncidentTypes] = useState<string[]>([]);
 	const [needsDisabled, setNeedsDisabled] = useState(false);
 	const [needsQueer, setNeedsQueer] = useState(false);
@@ -61,6 +65,10 @@ export default function ReportAbuseForm({ onClose }: { onClose?: () => void }) {
 	const [supportServices, setSupportServices] = useState<string>("");
 	const [contactPreference, setContactPreference] = useState<string>("");
 	const [consent, setConsent] = useState<string>("");
+	// Password for anonymous account
+	const [password, setPassword] = useState("");
+	const [showPassword, setShowPassword] = useState(false);
+	const [passwordError, setPasswordError] = useState<string | null>(null);;
 
 	// Get location on component mount
 	useEffect(() => {
@@ -147,23 +155,17 @@ export default function ReportAbuseForm({ onClose }: { onClose?: () => void }) {
 		setLoading(true);
 
 		const formData = new FormData(form);
-		const rawPhone = formData.get("phone") as string;
-		const phone = normalizePhone(rawPhone);
-
-		console.log("Phone validation:", { rawPhone, phone });
-
-		// Description and voice recording are now completely optional
 
 		try {
-			// Use pre-uploaded audio if available; otherwise finish or start upload now
+			// Voice recording handling
 			let media: {
 				title: string;
 				url: string;
 				type: string;
 				size: number;
 			} | null = null;
+
 			if (audioBlob) {
-				// Validate audio blob before proceeding
 				const validation = validateAudioBlob(audioBlob);
 				if (!validation.valid) {
 					toast({
@@ -196,7 +198,7 @@ export default function ReportAbuseForm({ onClose }: { onClose?: () => void }) {
 				}
 			}
 
-			// Determine primary incident type compatible with DB
+			// Incident type handling
 			const allowed: Record<string, string> = {
 				physical: "physical",
 				emotional: "emotional",
@@ -208,28 +210,42 @@ export default function ReportAbuseForm({ onClose }: { onClose?: () => void }) {
 			const first = incidentTypes.find((t) => allowed[t]);
 			const type_of_incident = (first as any) || "other";
 
-			const additional_info: any = {
+			const additional_info = {
 				incident_types: incidentTypes,
 				special_needs: { disabled: needsDisabled, queer_support: needsQueer },
+				is_for_child: reportingFor === 'child',
+				reporting_for: reportingFor
 			};
 
+			const urgencyValue = formData.get("urgency");
+			if (!urgencyValue) {
+				toast({
+					title: "Missing Information",
+					description: "Please select an urgency level.",
+					variant: "destructive",
+				});
+				setLoading(false);
+				return;
+			}
+
 			const body = {
-				first_name: formData.get("first_name"),
-				email: formData.get("email"),
-				phone: normalizePhone((formData.get("phone") as string) || null),
+				first_name: "Anonymous",
+				email: null,
+				phone: null,
 				incident_description: description || null,
 				type_of_incident,
-				urgency: formData.get("urgency"),
+				urgency: urgencyValue,
 				consent: formData.get("consent") || null,
-				contact_preference: formData.get("contact_preference"),
+				contact_preference: "do_not_contact",
 				required_services: [],
 				latitude: location?.latitude || null,
 				longitude: location?.longitude || null,
 				submission_timestamp: new Date().toISOString(),
 				media,
-				is_onBehalf: isOnBehalf,
+				is_onBehalf: reportingFor !== 'self',
 				additional_info,
 				support_services: formData.get("support_services") || null,
+				password: password,
 			};
 
 			const response = await fetch("/api/reports/anonymous", {
@@ -237,17 +253,60 @@ export default function ReportAbuseForm({ onClose }: { onClose?: () => void }) {
 				headers: { "Content-Type": "application/json" },
 				body: JSON.stringify(body),
 			});
-			if (!response.ok) throw new Error("Failed to submit report");
 
-			// Only reset and show success if the submission was successful
+			// Safely handle non-JSON responses
+			const contentType = response.headers.get("content-type");
+			if (!contentType || !contentType.includes("application/json")) {
+				const text = await response.text();
+				console.error("Server returned non-JSON response:", text.substring(0, 500)); // Log first 500 chars
+				throw new Error("Server error: Received invalid response format");
+			}
+
+			const result = await response.json();
+
+			if (!response.ok) {
+				throw new Error(result.details || result.error || "Failed to submit report");
+			}
+
+			// If anonymous account was created, sign in and redirect
+			if (result.anonymous && result.email && password) {
+				const { error: signInError } = await supabase.auth.signInWithPassword({
+					email: result.email,
+					password: password,
+				});
+
+				if (signInError) {
+					console.error("Auto sign-in failed:", signInError);
+					toast({
+						title: "Report Submitted",
+						description: `Your username is: ${result.username}. Please sign in manually.`,
+					});
+				} else {
+					toast({
+						title: "Anonymous Report Submitted!",
+						description: "You are being redirected to your incident management page...",
+					});
+					
+					if (typeof window !== "undefined") {
+						sessionStorage.setItem("anon_username", result.username);
+					}
+
+					window.location.href = "/dashboard";
+					return;
+				}
+			} else {
+				toast({
+					title: "Report Submitted",
+					description: "Thank you for your report. We will review it shortly.",
+				});
+			}
+
+			// Reset form
 			form.reset();
 			setDescription("");
-			toast({
-				title: "Report Submitted",
-				description: "Thank you for your report. We will review it shortly.",
-			});
+			setPassword("");
 
-			// Add timeout to close the dialog after successful submission
+			// Close dialog
 			if (onClose) {
 				setTimeout(() => {
 					onClose();
@@ -266,54 +325,74 @@ export default function ReportAbuseForm({ onClose }: { onClose?: () => void }) {
 	};
 
 	return (
-		<form onSubmit={handleSubmit} className="space-y-8 max-w-2xl mx-auto px-4 sm:px-6">
-			<div className="space-y-6">
-				<EnhancedToggle
-					id="onbehalf"
-					checked={isOnBehalf}
-					onCheckedChange={setIsOnBehalf}
-					label="Reporting on behalf of someone else"
-					description="Check this if you're submitting a report for another person"
-				/>
+		<div className="flex flex-col h-[90vh] bg-white overflow-hidden">
+			{/* Modal Header */}
+			<div className="px-6 py-4 border-b bg-neutral-50 flex items-center justify-between shrink-0">
+				<div>
+					<h2 className="text-xl font-bold text-sauti-dark">Report Abuse</h2>
+					<p className="text-xs text-neutral-500">Your safety is our priority. All reports are encrypted.</p>
+				</div>
+				{onClose && (
+					<Button variant="ghost" size="sm" onClick={onClose} className="rounded-full h-8 w-8 p-0">
+						✕
+					</Button>
+				)}
+			</div>
 
-				<p className="leading-relaxed text-gray-600">
-						Hello, my name is{" "}
-						<input
-							type="text"
-							className="border-b-2 border-teal-500 focus:outline-none px-2 w-full sm:w-64 md:w-48 bg-transparent"
-							placeholder="your name"
-							name="first_name"
-							aria-label="Your first name"
-							required
-						/>
-						. You can reach me at{" "}
-						<input
-							type="email"
-							className="border-b-2 border-teal-500 focus:outline-none px-2 w-full sm:w-72 md:w-64 bg-transparent"
-							placeholder="your email"
-							name="email"
-							aria-label="Your email address"
-							required
-							onChange={(e) => handleEmailChange(e.target.value)}
-						/>{" "}
-						or by phone at{" "}
-						<div className="inline-block">
-							<input
-								type="tel"
-								className="border-b-2 border-teal-500 focus:outline-none px-2 w-full sm:w-56 md:w-48 bg-transparent"
-								placeholder="phone (optional)"
-								aria-label="Your phone number (optional)"
-								name="phone"
-								defaultValue={autofilledPhone || ""}
-							/>
-							{autofilledPhone && (
-								<span className="text-xs text-green-600 ml-2">
-									✓ (from previous report)
-								</span>
-							)}
+			<div className="flex-1 overflow-y-auto p-4 sm:p-8 bg-neutral-50/30">
+				<form onSubmit={handleSubmit} className="space-y-10 max-w-2xl mx-auto pb-12">
+					<div className="space-y-6">
+						<div className="bg-white border-2 border-neutral-200 rounded-3xl p-6 shadow-sm hover:border-sauti-teal/30 transition-all">
+							<p className="text-sm font-black text-sauti-dark uppercase tracking-wider mb-4">Who are you reporting for?</p>
+							<div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+								<button
+									type="button"
+									onClick={() => setReportingFor('self')}
+									className={`flex items-center justify-center gap-2 px-4 py-3 rounded-2xl border-2 transition-all font-bold ${
+										reportingFor === 'self' 
+											? "border-sauti-teal bg-sauti-teal/5 text-sauti-teal shadow-inner" 
+											: "border-neutral-100 bg-neutral-50 text-neutral-500 hover:border-neutral-200"
+									}`}
+								>
+									<div className={`h-4 w-4 rounded-full border-2 flex items-center justify-center ${reportingFor === 'self' ? "border-sauti-teal" : "border-neutral-300"}`}>
+										{reportingFor === 'self' && <div className="h-2 w-2 rounded-full bg-sauti-teal" />}
+									</div>
+									Myself
+								</button>
+								<button
+									type="button"
+									onClick={() => setReportingFor('someone_else')}
+									className={`flex items-center justify-center gap-2 px-4 py-3 rounded-2xl border-2 transition-all font-bold ${
+										reportingFor === 'someone_else' 
+											? "border-sauti-teal bg-sauti-teal/5 text-sauti-teal shadow-inner" 
+											: "border-neutral-100 bg-neutral-50 text-neutral-500 hover:border-neutral-200"
+									}`}
+								>
+									<div className={`h-4 w-4 rounded-full border-2 flex items-center justify-center ${reportingFor === 'someone_else' ? "border-sauti-teal" : "border-neutral-300"}`}>
+										{reportingFor === 'someone_else' && <div className="h-2 w-2 rounded-full bg-sauti-teal" />}
+									</div>
+									Someone Else
+								</button>
+								<button
+									type="button"
+									onClick={() => setReportingFor('child')}
+									className={`flex items-center justify-center gap-2 px-4 py-3 rounded-2xl border-2 transition-all font-bold ${
+										reportingFor === 'child' 
+											? "border-sauti-teal bg-sauti-teal/5 text-sauti-teal shadow-inner" 
+											: "border-neutral-100 bg-neutral-50 text-neutral-500 hover:border-neutral-200"
+									}`}
+								>
+									<div className={`h-4 w-4 rounded-full border-2 flex items-center justify-center ${reportingFor === 'child' ? "border-sauti-teal" : "border-neutral-300"}`}>
+										{reportingFor === 'child' && <div className="h-2 w-2 rounded-full bg-sauti-teal" />}
+									</div>
+									A Child
+								</button>
+							</div>
 						</div>
-						. I would like to report cases of{" "}
-						<span className="inline-flex align-middle w-full sm:w-auto">
+
+				<div className="leading-relaxed text-gray-800 bg-neutral-100/70 p-5 rounded-2xl border border-neutral-200/50 shadow-sm text-base md:text-lg">
+						I would like to report {reportingFor !== 'self' ? "a case" : "incident(s)"} of{" "}
+						<span className="inline-flex align-middle w-full sm:w-auto mt-2 mb-2 sm:mt-0 sm:mb-0">
 							<MultiSelect
 								selected={incidentTypes}
 								onChange={setIncidentTypes}
@@ -372,7 +451,7 @@ export default function ReportAbuseForm({ onClose }: { onClose?: () => void }) {
 							))}
 						</select>
 						.
-				</p>
+				</div>
 
 				<p className="mt-4 text-base md:text-lg">Here's what happened:</p>
 				<div className="space-y-3">
@@ -467,56 +546,27 @@ export default function ReportAbuseForm({ onClose }: { onClose?: () => void }) {
 					)}
 				</div>
 
-				<p className="mt-4">
-					Please{" "}
-					<span className="inline-block w-full md:w-auto">
-						<EnhancedSelect
-							options={[
-								{ value: "phone_call", label: "call me" },
-								{ value: "sms", label: "text me" },
-								{ value: "email", label: "email me" },
-								{ value: "do_not_contact", label: "don't contact me" },
-							]}
-							value={contactPreference}
-							onChange={(value) => {
-								setContactPreference(value);
-								const form = document.querySelector("form") as HTMLFormElement;
-								const select = form.querySelector(
-									'select[name="contact_preference"]'
-								) as HTMLSelectElement;
-								if (select) select.value = value;
-							}}
-							placeholder="select contact method"
-							required
-							name="contact_preference"
-						/>
-					</span>
-					<select name="contact_preference" className="hidden">
-						<option value="">select contact method</option>
-						<option value="phone_call">call me</option>
-						<option value="sms">text me</option>
-						<option value="email">email me</option>
-						<option value="do_not_contact">don't contact me</option>
-					</select>{" "}
-					to follow up. In case you need specialized support, you can select:
-					<span className="mt-3 md:mt-0 inline-flex flex-wrap items-center gap-3 md:ml-3">
-						<label className="inline-flex items-center gap-2 text-sm">
+				<div className="mt-4 flex flex-wrap items-center gap-4">
+					<div className="inline-flex flex-wrap items-center gap-4">
+						<label className="inline-flex items-center gap-2 text-sm font-bold text-sauti-dark/80 bg-white px-3 py-2 rounded-xl border border-neutral-200 shadow-sm hover:border-sauti-teal/50 transition-colors cursor-pointer">
 							<input
 								type="checkbox"
+								className="w-4 h-4 accent-sauti-teal"
 								checked={needsDisabled}
 								onChange={(e) => setNeedsDisabled(e.target.checked)}
 							/>{" "}
 							I am disabled
 						</label>
-						<label className="inline-flex items-center gap-2 text-sm">
+						<label className="inline-flex items-center gap-2 text-sm font-bold text-sauti-dark/80 bg-white px-3 py-2 rounded-xl border border-neutral-200 shadow-sm hover:border-sauti-teal/50 transition-colors cursor-pointer">
 							<input
 								type="checkbox"
+								className="w-4 h-4 accent-sauti-teal"
 								checked={needsQueer}
 								onChange={(e) => setNeedsQueer(e.target.checked)}
 							/>{" "}
 							I need queer support
 						</label>
-					</span>
+					</div>
 					<span className="block mt-3 w-full md:inline-block md:w-auto">
 						<EnhancedSelect
 							options={[
@@ -543,18 +593,61 @@ export default function ReportAbuseForm({ onClose }: { onClose?: () => void }) {
 						<option value="no">I don't consent</option>
 					</select>{" "}
 					to share this information with relevant authorities if needed.
+				</div>
+				</div>
+
+			{/* Anonymous Account Password Section */}
+			<div className="bg-blue-50/50 border border-blue-200/50 rounded-2xl p-4 sm:p-5 space-y-3">
+				<div>
+					<h3 className="text-lg font-semibold text-blue-900 mb-1">Create Your Secure Account</h3>
+					<p className="text-sm text-blue-700">
+						Set a password to access your dashboard, track your report, and connect with support services.
+					</p>
+				</div>
+				<div className="relative">
+					<input
+						type={showPassword ? "text" : "password"}
+						className="w-full border-2 border-blue-300 focus:border-blue-500 focus:outline-none rounded-lg px-4 py-3 pr-12 bg-white"
+						placeholder="Create a password (min. 6 characters)"
+						value={password}
+						onChange={(e) => {
+							setPassword(e.target.value);
+							if (e.target.value.length > 0 && e.target.value.length < 6) {
+								setPasswordError("Password must be at least 6 characters");
+							} else {
+								setPasswordError(null);
+							}
+						}}
+						minLength={6}
+						required
+					/>
+					<button
+						type="button"
+						className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+						onClick={() => setShowPassword(!showPassword)}
+					>
+						{showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+					</button>
+				</div>
+				{passwordError && (
+					<p className="text-sm text-red-600">{passwordError}</p>
+				)}
+				<p className="text-xs text-blue-600">
+					💡 You&apos;ll use this password to log in later. A unique username will be generated for you.
 				</p>
 			</div>
 
-				<div className="space-y-2">
+				<div className="pt-2">
 					<Button
 						type="submit"
-						className="w-full bg-blue-600 hover:bg-blue-700 text-white py-4 text-base sm:text-lg font-medium rounded-xl shadow-lg hover:shadow-xl transition-all duration-200"
-						disabled={loading}
+						className="w-full bg-blue-600 hover:bg-blue-700 text-white py-4 text-base sm:text-lg font-bold rounded-2xl shadow-lg hover:shadow-xl transition-all duration-200"
+						disabled={loading || (password.length > 0 && password.length < 6)}
 					>
 						{loading ? "Submitting..." : "Submit Report"}
 					</Button>
 				</div>
-		</form>
+			</form>
+		</div>
+	</div>
 	);
 }

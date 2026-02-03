@@ -65,6 +65,7 @@ import { DailyProgress } from "@/app/components/DailyProgress";
 import { JoinCommunity } from "@/app/components/JoinCommunity";
 import { SamplePlaceholder } from "@/components/dashboard/SamplePlaceholder";
 import { useDashboardData } from "@/components/providers/DashboardDataProvider";
+import { AnonymousCredentialsBanner } from "@/components/dashboard/AnonymousCredentialsBanner";
 
 // Add this interface to type the joined data
 interface ReportWithRelations extends Tables<"reports"> {
@@ -262,6 +263,37 @@ export default function SurvivorView({
 						userType="survivor"
 						timeOfDay={getTimeOfDay()}
 					/>
+
+					{/* Anonymous Credentials Banner */}
+					{profileDetails.is_anonymous && (
+						<div className="space-y-6 mb-6">
+							<AnonymousCredentialsBanner 
+								username={profileDetails.anon_username ?? profileDetails.email?.split('@')[0]} 
+							/>
+							
+							{(!profileDetails.phone) && (
+								<Alert className="bg-sauti-teal/5 border-sauti-teal/20 rounded-2xl p-5 shadow-sm">
+									<Info className="h-5 w-5 text-sauti-teal mt-0.5" />
+									<div className="ml-3">
+										<AlertTitle className="text-sauti-dark font-black text-lg mb-1">
+											Complete Your Secure Profile
+										</AlertTitle>
+										<AlertDescription className="text-neutral-600 font-medium">
+											Add your contact details to receive real-time updates from support services. 
+											Your information remains encrypted and is only shared with your consent.
+											<div className="mt-4 flex gap-3">
+												<Link href="/dashboard/settings">
+													<Button variant="default" size="sm" className="bg-sauti-teal hover:bg-sauti-teal/90 rounded-xl px-6">
+														Add Contact Info
+													</Button>
+												</Link>
+											</div>
+										</AlertDescription>
+									</div>
+								</Alert>
+							)}
+						</div>
+					)}
 
 					{/* Quick Actions Grid */}
 					<div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4 mb-6">
@@ -1019,14 +1051,12 @@ export default function SurvivorView({
 
 			{/* Global Create Report Dialog - single source of truth */}
 			<Dialog open={open} onOpenChange={setOpen}>
-				<DialogContent className="sm:max-w-4xl">
-					<DialogHeader>
-						<DialogTitle>Report Abuse</DialogTitle>
-						<DialogDescription>
-							Please fill out this form to report an incident. All information will be
-							kept confidential.
-						</DialogDescription>
-					</DialogHeader>
+				<DialogContent className="max-w-4xl p-0 overflow-hidden h-[90vh]">
+					<DialogTitle className="sr-only">Report Abuse</DialogTitle>
+					<DialogDescription className="sr-only">
+						Please fill out this form to report an incident. All information will be
+						kept confidential.
+					</DialogDescription>
 					<AuthenticatedReportAbuseForm
 						onClose={() => setOpen(false)}
 						userId={userId}

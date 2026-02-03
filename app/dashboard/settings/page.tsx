@@ -13,6 +13,7 @@ import { useAccessibility } from "@/components/a11y/AccessibilityProvider";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { CalendarConnectionStatus } from "../_components/CalendarConnectionStatus";
+import { useAnonymousMode } from "@/hooks/useAnonymousMode";
 
 function A11yToggle({
 	label,
@@ -65,6 +66,7 @@ export default function SettingsPage() {
 	const user = useUser();
 	const { toast } = useToast();
 	const a11y = useAccessibility();
+	const { isAnonymous, toggleAnonymousMode } = useAnonymousMode();
 	const isProfessional =
 		user?.profile?.user_type === "professional" ||
 		user?.profile?.user_type === "ngo";
@@ -170,6 +172,31 @@ export default function SettingsPage() {
 								<CardTitle>General Preferences</CardTitle>
 							</CardHeader>
 							<CardContent className="space-y-4">
+								<div className="flex items-center justify-between">
+									<div className="space-y-0.5">
+										<Label htmlFor="anonymous-mode" className="text-base font-medium">
+											Anonymous Chat Mode
+										</Label>
+										<p className="text-sm text-muted-foreground">
+											Hide your identity when chatting with support professionals.
+										</p>
+									</div>
+									<Switch
+										id="anonymous-mode"
+										checked={isAnonymous}
+										onCheckedChange={() => {
+											if (user?.id) {
+												toggleAnonymousMode(user.id);
+												toast({
+													title: !isAnonymous ? "Anonymous Mode Enabled" : "Anonymous Mode Disabled",
+													description: !isAnonymous 
+														? "Your identity will be hidden in chats." 
+														: "Your identity will be visible in chats."
+												});
+											}
+										}}
+									/>
+								</div>
 								<Textarea placeholder="Notes (UI only)" rows={3} />
 								<div className="flex justify-end">
 									<Button onClick={() => onSave("Preferences")}>Save</Button>

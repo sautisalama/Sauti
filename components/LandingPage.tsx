@@ -29,6 +29,7 @@ import { Button } from "./ui/button";
 import { 
     Dialog, 
     DialogContent, 
+    DialogDescription,
     DialogHeader, 
     DialogTitle, 
     DialogTrigger 
@@ -96,7 +97,11 @@ export function LandingPage() {
 													Get Support Now
 												</Button>
 											</DialogTrigger>
-											<DialogContent className="max-w-4xl p-0 overflow-hidden rounded-[24px] md:rounded-[32px]">
+											<DialogContent className="max-w-4xl p-0 overflow-hidden rounded-[24px] md:rounded-[32px] h-[90vh] min-h-[600px]">
+												<DialogTitle className="sr-only">Report Abuse</DialogTitle>
+												<DialogDescription className="sr-only">
+													Submit a report about an incident. Your information is secure and encrypted.
+												</DialogDescription>
 												<ReportAbuseForm />
 											</DialogContent>
 										</Dialog>

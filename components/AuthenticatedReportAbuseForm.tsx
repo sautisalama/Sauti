@@ -51,7 +51,7 @@ export default function AuthenticatedReportAbuseForm({
 	const [audioUploadError, setAudioUploadError] = useState<string | null>(null);
 	const audioUploadPromiseRef = useRef<Promise<string> | null>(null);
 	const audioFilenameRef = useRef<string | null>(null);
-	const [isOnBehalf, setIsOnBehalf] = useState(false);
+	const [reportingFor, setReportingFor] = useState<'self' | 'someone_else' | 'child'>('self');
 	const [needsDisabled, setNeedsDisabled] = useState(false);
 	const [needsQueer, setNeedsQueer] = useState(false);
 	const [autofilledPhone, setAutofilledPhone] = useState<string | null>(null);
@@ -228,10 +228,12 @@ export default function AuthenticatedReportAbuseForm({
 			submission_timestamp: new Date().toISOString(),
 			email: user?.profile?.email || null,
 			media,
-			is_onBehalf: isOnBehalf,
+			is_onBehalf: reportingFor !== 'self',
 			additional_info: {
 				incident_types: incidentTypes,
 				special_needs: { disabled: needsDisabled, queer_support: needsQueer },
+				is_for_child: reportingFor === 'child',
+				reporting_for: reportingFor
 			},
 		};
 
@@ -271,19 +273,79 @@ export default function AuthenticatedReportAbuseForm({
 	};
 
 	return (
-		<form
-			onSubmit={handleSubmit}
-			className="relative w-full max-w-[1200px] max-h-[80vh] flex flex-col px-4 sm:px-6"
-		>
-			<div className="flex-1 overflow-y-auto space-y-6 px-1 sm:px-4 pb-32 overflow-x-visible">
+		<div className="flex flex-col h-[90vh] bg-white overflow-hidden shadow-2xl rounded-[32px]">
+			{/* Modal Header */}
+			<div className="px-6 py-5 border-b bg-neutral-50 flex items-center justify-between shrink-0">
+				<div>
+					<h2 className="text-xl md:text-2xl font-black text-sauti-dark flex items-center gap-2">
+						Report Abuse
+					</h2>
+					<p className="text-xs text-neutral-500 font-medium tracking-wide">
+						Professional & Secure Reporting Ecosystem
+					</p>
+				</div>
+				{onClose && (
+					<Button
+						variant="ghost"
+						size="sm"
+						onClick={onClose}
+						className="rounded-full h-10 w-10 p-0 hover:bg-neutral-200 transition-colors"
+					>
+						✕
+					</Button>
+				)}
+			</div>
+
+			<div className="flex-1 overflow-y-auto p-4 sm:p-8 bg-neutral-50/20">
+				<form onSubmit={handleSubmit} className="space-y-10 max-w-4xl mx-auto pb-24">
 				<div className="space-y-4">
-					<EnhancedToggle
-						id="onbehalf-auth"
-						checked={isOnBehalf}
-						onCheckedChange={setIsOnBehalf}
-						label="Reporting on behalf of someone else"
-						description="Check this if you're submitting a report for another person"
-					/>
+						<div className="bg-white border md:border-2 border-neutral-200 rounded-2xl md:rounded-3xl p-4 md:p-6 shadow-sm hover:border-sauti-teal/30 transition-all mb-6">
+							<p className="text-sm font-black text-sauti-dark uppercase tracking-wider mb-4">Who are you reporting for?</p>
+							<div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+								<button
+									type="button"
+									onClick={() => setReportingFor('self')}
+									className={`flex items-center justify-center gap-2 px-4 py-3 rounded-xl md:rounded-2xl border-2 transition-all font-bold ${
+										reportingFor === 'self' 
+											? "border-sauti-teal bg-sauti-teal/5 text-sauti-teal shadow-inner" 
+											: "border-neutral-100 bg-neutral-50 text-neutral-500 hover:border-neutral-200"
+									}`}
+								>
+									<div className={`h-4 w-4 rounded-full border-2 flex items-center justify-center ${reportingFor === 'self' ? "border-sauti-teal" : "border-neutral-300"}`}>
+										{reportingFor === 'self' && <div className="h-2 w-2 rounded-full bg-sauti-teal" />}
+									</div>
+									Myself
+								</button>
+								<button
+									type="button"
+									onClick={() => setReportingFor('someone_else')}
+									className={`flex items-center justify-center gap-2 px-4 py-3 rounded-xl md:rounded-2xl border-2 transition-all font-bold ${
+										reportingFor === 'someone_else' 
+											? "border-sauti-teal bg-sauti-teal/5 text-sauti-teal shadow-inner" 
+											: "border-neutral-100 bg-neutral-50 text-neutral-500 hover:border-neutral-200"
+									}`}
+								>
+									<div className={`h-4 w-4 rounded-full border-2 flex items-center justify-center ${reportingFor === 'someone_else' ? "border-sauti-teal" : "border-neutral-300"}`}>
+										{reportingFor === 'someone_else' && <div className="h-2 w-2 rounded-full bg-sauti-teal" />}
+									</div>
+									Someone Else
+								</button>
+								<button
+									type="button"
+									onClick={() => setReportingFor('child')}
+									className={`flex items-center justify-center gap-2 px-4 py-3 rounded-xl md:rounded-2xl border-2 transition-all font-bold ${
+										reportingFor === 'child' 
+											? "border-sauti-teal bg-sauti-teal/5 text-sauti-teal shadow-inner" 
+											: "border-neutral-100 bg-neutral-50 text-neutral-500 hover:border-neutral-200"
+									}`}
+								>
+									<div className={`h-4 w-4 rounded-full border-2 flex items-center justify-center ${reportingFor === 'child' ? "border-sauti-teal" : "border-neutral-300"}`}>
+										{reportingFor === 'child' && <div className="h-2 w-2 rounded-full bg-sauti-teal" />}
+									</div>
+									A Child
+								</button>
+							</div>
+						</div>
 					<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 						<div>
 							<label className="block text-sm font-medium text-gray-700 mb-2">
@@ -547,19 +609,20 @@ export default function AuthenticatedReportAbuseForm({
 						<option value="no">No, I don't consent</option>
 					</select>
 				</div>
+				</form>
 			</div>
 
-			<div className="fixed bottom-0 left-0 right-0 pt-4 pb-4 bg-white border-t mt-4 z-40">
-				<div className="max-w-[1200px] mx-auto px-4 space-y-2">
+			<div className="shrink-0 pt-4 pb-6 bg-white border-t z-40">
+				<div className="max-w-4xl mx-auto px-4 md:px-8">
 					<Button
 						type="submit"
-						className="w-full bg-blue-600 hover:bg-blue-700 text-white py-4 text-base sm:text-lg font-medium rounded-xl shadow-lg hover:shadow-xl transition-all duration-200"
+						className="w-full bg-sauti-teal hover:bg-sauti-teal/90 text-white py-4 text-base sm:text-lg font-black rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-300"
 						disabled={loading}
 					>
 						{loading ? "Submitting..." : "Submit Report"}
 					</Button>
 				</div>
 			</div>
-		</form>
+		</div>
 	);
 }
