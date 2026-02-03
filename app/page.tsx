@@ -1,6 +1,10 @@
-import { LandingPage } from "@/components/LandingPage";
-import { Nav } from "@/components/Nav";
-import Image from "next/image";
+"use client";
+
+import dynamic from "next/dynamic";
+
+const LandingPage = dynamic(() => import("@/components/LandingPage").then(mod => mod.LandingPage), {
+	ssr: false,
+});
 
 export default function Home() {
 	return (

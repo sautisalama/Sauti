@@ -3,13 +3,13 @@ import { EnhancedPublicScheduler } from '../../_components/EnhancedPublicSchedul
 import { notFound } from 'next/navigation';
 
 interface SchedulePageProps {
-  params: {
+  params: Promise<{
     professional: string;
-  };
+  }>;
 }
 
 export default async function ProfessionalSchedulePage({ params }: SchedulePageProps) {
-  const { professional } = params;
+  const { professional } = await params;
   const supabase = await createClient();
   
   // Extract professional ID from the format: sauti-{professionalId} or custom link

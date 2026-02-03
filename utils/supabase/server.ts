@@ -4,7 +4,7 @@ import { cookies } from "next/headers";
 import { Session } from "@supabase/supabase-js";
 
 export async function createClient() {
-	const cookieStore = cookies();
+	const cookieStore = await cookies();
 
 	const supabaseUrl =
 		process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
