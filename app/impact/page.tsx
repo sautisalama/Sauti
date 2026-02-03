@@ -18,7 +18,7 @@ export default function ImpactPage() {
 					{/* Background Image */}
 					<div className="absolute inset-0 z-0">
 						<Image
-							src="/events/impact/impact - banner.png"
+							src="/impact-image.png"
 							alt="Group of people participating in community impact session"
 							fill
 							className="object-cover"
