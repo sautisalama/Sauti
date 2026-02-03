@@ -165,7 +165,7 @@ export async function preloadChat(userId: string, username: string, forceAnonymo
     try {
       // Quick health check - try to query users with a timeout
       await Promise.race([
-        existingCache.client.queryUsers({ id: cacheKey }, {}, { limit: 1 }),
+        existingCache.client.queryUsers({ id: cacheKey } as any, {}, { limit: 1 }),
         new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 2000))
       ]);
       return existingCache;
@@ -204,7 +204,7 @@ export async function preloadChat(userId: string, username: string, forceAnonymo
       // Community channel
       (async () => {
         try {
-          const community = client.channel("livestream", "community-global", { name: "Sauti Community" });
+          const community = client.channel("livestream", "community-global", { name: "Sauti Community" } as any);
           try { await community.create(); } catch {}
           await community.watch();
           return community;
@@ -218,7 +218,7 @@ export async function preloadChat(userId: string, username: string, forceAnonymo
       (async () => {
         try {
           const { users } = await client.queryUsers(
-            { id: { $ne: cacheKey } },
+            { id: { $ne: cacheKey } } as any,
             { last_active: -1 },
             { limit: 50, presence: true } as any // Start with 50 for faster loading
           );
@@ -245,7 +245,7 @@ export async function preloadChat(userId: string, username: string, forceAnonymo
         
         while (offset < 500) { // Limit to 500 total users for performance
           const { users } = await client.queryUsers(
-            { id: { $ne: cacheKey } },
+            { id: { $ne: cacheKey } } as any,
             { last_active: -1 },
             { limit: pageSize, offset, presence: false } as any // No presence for background loading
           );

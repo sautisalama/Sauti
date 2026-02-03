@@ -380,7 +380,7 @@ export default function OnboardingPage() {
 		</Card>
 	);
 
-	const contentMap: Record<string, JSX.Element> = {
+	const contentMap: Record<string, React.ReactNode> = {
 		welcome: Welcome,
 		basics: Basics,
 		pro_profile: ProProfile,

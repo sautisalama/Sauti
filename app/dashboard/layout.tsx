@@ -22,7 +22,7 @@ export default async function DashboardLayout({
 	const initialData = await fetchDashboardData();
 
 	return (
-		<div className="flex min-h-screen bg-neutral-50 dark:bg-neutral-900">
+		<div className="flex min-h-screen bg-white dark:bg-neutral-950">
 			{/* Wrap the whole dashboard in data provider */}
 			{initialData ? (
 				<DashboardDataProvider initialData={initialData}>

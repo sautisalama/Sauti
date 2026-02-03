@@ -1,4 +1,5 @@
 import { format } from "date-fns";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
 	Calendar,
@@ -100,25 +101,25 @@ export function AppointmentCard({
 		switch (status) {
 			case "confirmed":
 				return {
-					color: "bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-50",
+					color: "bg-sauti-teal text-white shadow-sm",
 					icon: <Timer className="h-3 w-3" />,
 					label: "Confirmed",
 				};
 			case "completed":
 				return {
-					color: "bg-green-50 text-green-700 border-green-200 hover:bg-green-50",
+					color: "bg-sauti-dark text-white shadow-sm",
 					icon: <CheckCircle2 className="h-3 w-3" />,
 					label: "Completed",
 				};
 			case "cancelled":
 				return {
-					color: "bg-red-50 text-red-700 border-red-200 hover:bg-red-50",
+					color: "bg-sauti-red text-white shadow-sm",
 					icon: <XCircle className="h-3 w-3" />,
 					label: "Cancelled",
 				};
 			default:
 				return {
-					color: "bg-gray-50 text-gray-700 border-gray-200",
+					color: "bg-sauti-yellow text-sauti-dark shadow-sm",
 					icon: <Clock className="h-3 w-3" />,
 					label: "Pending",
 				};
@@ -135,7 +136,8 @@ export function AppointmentCard({
 	// Early return if matched_service data is missing
 	if (!appointment.matched_service) {
 		return (
-			<div className="bg-white rounded-xl border border-gray-200 hover:border-gray-300 transition-all duration-200 hover:shadow-md group">
+			<div className="bg-sauti-teal-light rounded-2xl border-0 shadow-sm hover:shadow-md transition-all duration-300 group overflow-hidden relative">
+        <div className="absolute bottom-0 left-0 right-0 h-1.5 bg-sauti-teal/40" />
 				<div className="p-4">
 					{/* Header */}
 					<div className="flex items-start justify-between mb-3">
@@ -154,7 +156,7 @@ export function AppointmentCard({
 								</div>
 							</div>
 						</div>
-						<Badge className={`${statusConfig.color} border`}>
+						<Badge className={cn("rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-wider border-0", statusConfig.color)}>
 							{statusConfig.icon}
 							<span className="ml-1">{statusConfig.label}</span>
 						</Badge>
@@ -236,17 +238,25 @@ export function AppointmentCard({
 	// Main appointment card with matched service
 	return (
 		<>
-			<div className="bg-white rounded-xl border border-gray-200 hover:border-gray-300 transition-all duration-200 hover:shadow-md group">
+			<div className={cn(
+        "rounded-2xl border-0 shadow-sm hover:shadow-md transition-all duration-300 group overflow-hidden relative mb-4",
+        appointment.status === "cancelled" ? "bg-sauti-red-light" : "bg-sauti-teal-light"
+      )}>
+        {/* Bottom Accent Line */}
+        <div className={cn(
+          "absolute bottom-0 left-0 right-0 h-1.5",
+          appointment.status === "cancelled" ? "bg-sauti-red" : "bg-sauti-teal"
+        )} />
 				<div className="p-4">
 					{/* Header */}
 					<div className="flex items-start justify-between mb-3">
 						<div className="flex items-center gap-3 flex-1 min-w-0">
-							<div className="h-10 w-10 rounded-full bg-gradient-to-br from-[#1A3434] to-[#2A4A4A] text-white flex items-center justify-center font-semibold text-sm flex-shrink-0">
+							<div className="h-10 w-10 rounded-xl bg-sauti-dark text-white flex items-center justify-center font-black text-sm flex-shrink-0">
 								{appointment.matched_service?.support_service.name?.[0]?.toUpperCase() ||
 									"A"}
 							</div>
 							<div className="min-w-0 flex-1">
-								<h3 className="font-semibold text-gray-900 truncate">
+								<h3 className="font-black text-sauti-dark truncate">
 									{appointment.matched_service?.support_service.name ||
 										"Direct Appointment"}
 								</h3>
@@ -270,7 +280,7 @@ export function AppointmentCard({
 							</div>
 						</div>
 						<div className="flex items-center gap-2 flex-shrink-0">
-							<Badge className={`${statusConfig.color} border`}>
+							<Badge className={cn("rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-wider border-0", statusConfig.color)}>
 								{statusConfig.icon}
 								<span className="ml-1">{statusConfig.label}</span>
 							</Badge>
@@ -403,7 +413,7 @@ export function AppointmentCard({
 									size="sm"
 									onClick={() => handleStatusUpdate("completed")}
 									disabled={isUpdating}
-									className="flex-1 h-8 text-xs bg-green-600 hover:bg-green-700"
+									className="flex-1 h-8 text-xs bg-sauti-teal hover:bg-sauti-dark font-black rounded-full transition-all duration-300 shadow-md"
 								>
 									<CheckCircle2 className="h-3 w-3 mr-1" />
 									Complete

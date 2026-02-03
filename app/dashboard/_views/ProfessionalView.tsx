@@ -15,7 +15,6 @@ import {
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { CommunityCard } from "@/app/components/CommunityCard";
-import WelcomeHeader from "@/app/components/WelcomeHeader";
 import { JoinCommunity } from "@/app/components/JoinCommunity";
 import { ConditionCheckCard } from "@/app/components/ConditionCheckCard";
 import { Tables } from "@/types/db-schema";
@@ -40,9 +39,12 @@ import { CalScheduler } from "../_components/CalScheduler";
 import { Calendar as UIDateCalendar } from "@/components/ui/calendar";
 import { EnhancedAppointmentScheduler } from "../_components/EnhancedAppointmentScheduler";
 import { SafetyPlanCard } from "@/components/SafetyPlanCard";
-import { StatCard } from "@/components/dashboard/StatCard";
+import {
+	WelcomeHeader,
+	StatsCard,
+	SectionHeader,
+} from "@/components/dashboard/DashboardComponents";
 import { QuickActions } from "@/components/dashboard/QuickActions";
-import { SectionHeader } from "@/components/dashboard/SectionHeader";
 import {
 	ClipboardList,
 	Users,
@@ -323,55 +325,60 @@ export default function ProfessionalView({
 		<div className="flex min-h-screen bg-white">
 			<main className="flex-1 w-full">
 				<div className="p-4 md:p-6 mt-14 md:mt-0 mb-20 md:mb-0">
-					<WelcomeHeader profileDetails={profileDetails} />
+					<WelcomeHeader 
+						name={profileDetails.first_name || "Partner"} 
+						userType={profileDetails.user_type === "ngo" ? "ngo" : "professional"} 
+						timeOfDay={(() => {
+							const hour = new Date().getHours();
+							if (hour < 12) return "morning";
+							if (hour < 18) return "afternoon";
+							return "evening";
+						})()}
+					/>
 
 					{/* Persistent verification banner for unverified */}
 					{!isVerified && renderGateBanner()}
 
 					{/* KPI Row */}
-					<div className="grid grid-cols-2 lg:grid-cols-5 gap-3 mt-4">
+					<div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-8">
 						{/* 1) Cases matched */}
-						<Link href="/dashboard/cases" className="text-left">
-							<StatCard
+						<Link href="/dashboard/cases">
+							<StatsCard
 								title="Cases matched"
 								value={matchedServices.length}
-								icon={<Users className="h-6 w-6" />}
-								className="bg-[#9333ea] hover:brightness-110"
-								invertColors
-								footer={<span>Cases matched to your services</span>}
+								icon={<Users className="h-5 w-5" />}
+								variant="success"
+								description="Direct impact cases"
 							/>
 						</Link>
 						{/* 2) Appointments */}
-						<Link href="/dashboard/appointments" className="text-left">
-							<StatCard
+						<Link href="/dashboard/appointments">
+							<StatsCard
 								title="Appointments"
 								value={appointments.length}
-								icon={<CalendarDays className="h-6 w-6" />}
-								className="bg-[#f59e0b] hover:brightness-110"
-								invertColors
-								footer={<span>Upcoming sessions</span>}
+								icon={<CalendarDays className="h-5 w-5" />}
+								variant="warning"
+								description="Scheduled sessions"
 							/>
 						</Link>
 						{/* 3) Services */}
-						<Link href="/dashboard/services" className="text-left">
-							<StatCard
+						<Link href="/dashboard/services">
+							<StatsCard
 								title="Services"
 								value={supportServices.length}
-								icon={<Users className="h-6 w-6" />}
-								className="bg-[#2563eb] hover:brightness-110"
-								invertColors
-								footer={<span>Your registered support services</span>}
+								icon={<Users className="h-5 w-5" />}
+								variant="default"
+								description="Active service listings"
 							/>
 						</Link>
 						{/* 4) Reports */}
-						<Link href="/dashboard/reports" className="text-left">
-							<StatCard
+						<Link href="/dashboard/reports">
+							<StatsCard
 								title="Reports"
 								value={reports.length}
-								icon={<ClipboardList className="h-6 w-6" />}
-								className="bg-[#0f766e] hover:brightness-110"
-								invertColors
-								footer={<span>Total reports you have filed</span>}
+								icon={<ClipboardList className="h-5 w-5" />}
+								variant="error"
+								description="Total filed reports"
 							/>
 						</Link>
 					</div>
@@ -411,10 +418,11 @@ export default function ProfessionalView({
 
 					{/* Quick Agenda + Queues */}
 					<div className="grid grid-cols-1 md:grid-cols-3 gap-4 my-4">
-						<div className="rounded-xl border p-4 bg-white shadow-sm">
-							<p className="text-sm text-neutral-600 mb-2">My Services</p>
+						<div className="rounded-2xl border-0 p-5 bg-sauti-teal-light shadow-sm relative overflow-hidden group">
+              <div className="absolute bottom-0 left-0 right-0 h-1.5 bg-sauti-teal/40" />
+							<p className="text-xs font-black uppercase tracking-wider text-sauti-teal/60 mb-2">My Agenda</p>
 							{appointments.length > 0 ? (
-								<div className="space-y-2 text-sm">
+								<div className="space-y-3 text-sm relative z-10">
 									{[...appointments]
 										.filter((a) => a.appointment_date)
 										.sort(
@@ -424,15 +432,15 @@ export default function ProfessionalView({
 										)
 										.slice(0, 2)
 										.map((a, idx) => (
-											<div key={idx} className="flex items-center justify-between">
-												<span>
+											<div key={idx} className="flex items-center justify-between bg-white/50 p-2 rounded-xl">
+												<span className="font-bold text-sauti-dark">
 													{new Date(a.appointment_date).toLocaleTimeString([], {
 														hour: "2-digit",
 														minute: "2-digit",
 													})}{" "}
 													• {a.matched_service?.support_service?.name || "Session"}
 												</span>
-												<Link href="/dashboard/appointments" className="text-sauti-orange">
+												<Link href="/dashboard/appointments" className="text-sauti-teal font-black hover:underline px-2 py-1 bg-white rounded-lg text-xs">
 													Open
 												</Link>
 											</div>
@@ -440,18 +448,18 @@ export default function ProfessionalView({
 								</div>
 							) : (
 								<SamplePlaceholder label="Sample">
-									<div className="space-y-2 text-sm">
-										<div className="flex items-center justify-between">
-											<span>10:00 • Intake call</span>
-											<Link href="/dashboard/appointments" className="text-sauti-orange">
+									<div className="space-y-3 text-sm relative z-10">
+										<div className="flex items-center justify-between bg-white/50 p-2 rounded-xl">
+											<span className="font-bold text-sauti-dark">10:00 • Intake call</span>
+											<Link href="/dashboard/appointments" className="text-sauti-teal font-black hover:underline px-2 py-1 bg-white rounded-lg text-xs">
 												Open
 											</Link>
 										</div>
-										<div className="flex items-center justify-between">
-											<span>14:00 • Follow-up</span>
+										<div className="flex items-center justify-between bg-white/50 p-2 rounded-xl">
+											<span className="font-bold text-sauti-dark">14:00 • Follow-up</span>
 											<Link
 												href="/dashboard?tab=appointments"
-												className="text-sauti-orange"
+												className="text-sauti-teal font-black hover:underline px-2 py-1 bg-white rounded-lg text-xs"
 											>
 												Open
 											</Link>
@@ -460,10 +468,11 @@ export default function ProfessionalView({
 								</SamplePlaceholder>
 							)}
 						</div>
-						<div className="rounded-xl border p-4 bg-white shadow-sm">
-							<p className="text-sm text-neutral-600 mb-2">Queues</p>
+						<div className="rounded-2xl border-0 p-5 bg-sauti-red-light shadow-sm relative overflow-hidden group">
+              <div className="absolute bottom-0 left-0 right-0 h-1.5 bg-sauti-red/40" />
+							<p className="text-xs font-black uppercase tracking-wider text-sauti-red/60 mb-2">Queues</p>
 							{reports.length > 0 ? (
-								<div className="grid grid-cols-3 gap-2 text-sm">
+								<div className="grid grid-cols-3 gap-3 text-sm relative z-10">
 									{(() => {
 										const counts = reports.reduce((acc, r) => {
 											const k = (r.urgency || "low").toLowerCase();
@@ -472,17 +481,17 @@ export default function ProfessionalView({
 										}, {} as Record<string, number>);
 										return (
 											<>
-												<div className="rounded-lg bg-[#FFF5F5] p-3 text-center">
-													<p className="text-xs text-neutral-500">High</p>
-													<p className="text-lg font-semibold">{counts["high"] || 0}</p>
+												<div className="rounded-xl bg-white/60 p-3 text-center shadow-sm">
+													<p className="text-[10px] text-sauti-red font-black uppercase tracking-wider">High</p>
+													<p className="text-xl font-black text-sauti-red">{counts["high"] || 0}</p>
 												</div>
-												<div className="rounded-lg bg-[#FFF8F0] p-3 text-center">
-													<p className="text-xs text-neutral-500">Medium</p>
-													<p className="text-lg font-semibold">{counts["medium"] || 0}</p>
+												<div className="rounded-xl bg-white/60 p-3 text-center shadow-sm">
+													<p className="text-[10px] text-sauti-yellow-dark font-black uppercase tracking-wider">Med</p>
+													<p className="text-xl font-black text-sauti-yellow-dark">{counts["medium"] || 0}</p>
 												</div>
-												<div className="rounded-lg bg-[#F0F9FF] p-3 text-center">
-													<p className="text-xs text-neutral-500">Low</p>
-													<p className="text-lg font-semibold">{counts["low"] || 0}</p>
+												<div className="rounded-xl bg-white/60 p-3 text-center shadow-sm">
+													<p className="text-[10px] text-sauti-teal font-black uppercase tracking-wider">Low</p>
+													<p className="text-xl font-black text-sauti-teal">{counts["low"] || 0}</p>
 												</div>
 											</>
 										);
@@ -490,27 +499,28 @@ export default function ProfessionalView({
 								</div>
 							) : (
 								<SamplePlaceholder label="Sample">
-									<div className="grid grid-cols-3 gap-2 text-sm">
-										<div className="rounded-lg bg-[#FFF5F5] p-3 text-center">
-											<p className="text-xs text-neutral-500">High</p>
-											<p className="text-lg font-semibold">2</p>
+									<div className="grid grid-cols-3 gap-3 text-sm relative z-10">
+										<div className="rounded-xl bg-white/60 p-3 text-center shadow-sm">
+											<p className="text-[10px] text-sauti-red font-black uppercase tracking-wider">High</p>
+											<p className="text-xl font-black text-sauti-red">2</p>
 										</div>
-										<div className="rounded-lg bg-[#FFF8F0] p-3 text-center">
-											<p className="text-xs text-neutral-500">Medium</p>
-											<p className="text-lg font-semibold">5</p>
+										<div className="rounded-xl bg-white/60 p-3 text-center shadow-sm">
+											<p className="text-[10px] text-sauti-yellow-dark font-black uppercase tracking-wider">Med</p>
+											<p className="text-xl font-black text-sauti-yellow-dark">5</p>
 										</div>
-										<div className="rounded-lg bg-[#F0F9FF] p-3 text-center">
-											<p className="text-xs text-neutral-500">Low</p>
-											<p className="text-lg font-semibold">9</p>
+										<div className="rounded-xl bg-white/60 p-3 text-center shadow-sm">
+											<p className="text-[10px] text-sauti-teal font-black uppercase tracking-wider">Low</p>
+											<p className="text-xl font-black text-sauti-teal">9</p>
 										</div>
 									</div>
 								</SamplePlaceholder>
 							)}
 						</div>
-						<div className="rounded-xl border p-4 bg-white shadow-sm">
-							<p className="text-sm text-neutral-600 mb-2">Quick Chat</p>
-							<p className="text-sm mb-2">Open your messages to coordinate care.</p>
-							<Link href="/dashboard/chat" className="text-sauti-orange">
+						<div className="rounded-2xl border-0 p-5 bg-sauti-yellow-light shadow-sm relative overflow-hidden group">
+              <div className="absolute bottom-0 left-0 right-0 h-1.5 bg-sauti-yellow/40" />
+							<p className="text-xs font-black uppercase tracking-wider text-sauti-yellow-dark/60 mb-2">Quick Chat</p>
+							<p className="text-sm font-bold text-sauti-dark mb-3 relative z-10">Open your messages to coordinate care.</p>
+							<Link href="/dashboard/chat" className="text-sauti-teal font-black hover:underline bg-white px-3 py-1.5 rounded-lg text-xs shadow-sm relative z-10 inline-block">
 								Open chat →
 							</Link>
 						</div>
@@ -642,10 +652,10 @@ export default function ProfessionalView({
 								<TabsContent value="scheduling">
 									<div className="space-y-6">
 										<div>
-											<h2 className="text-xl font-semibold text-[#1A3434] mb-2">
+											<h2 className="text-xl font-black text-sauti-dark tracking-tight mb-1">
 												Professional Scheduling
 											</h2>
-											<p className="text-sm text-gray-500 mb-4">
+											<p className="text-sm font-bold text-neutral-400 mb-4">
 												Manage your availability and let clients schedule appointments with
 												you.
 											</p>

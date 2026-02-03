@@ -53,7 +53,7 @@ export function CommunityChat({ userId, username }: { userId: string; username: 
           }
         }
         await streamClient.connectUser({ id: effectiveId, name: effectiveName, image: effectiveName === "Anonymous" ? "/anon.svg" : undefined }, data.token);
-        const ch = streamClient.channel("livestream", "community-global", { name: "Sauti Community" });
+        const ch = streamClient.channel("livestream", "community-global", { name: "Sauti Community" } as any);
         await ch.create();
         await ch.watch();
         setClient(streamClient);

@@ -58,7 +58,7 @@ useEffect(() => {
 
 	return (
 		<div className="space-y-6">
-			<h2 className="text-xl font-semibold">Your Appointments</h2>
+			<h2 className="text-xl font-black text-sauti-dark tracking-tight">Your Appointments</h2>
 
 			{appointments.length > 0 ? (
 				<div className="">

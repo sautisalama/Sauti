@@ -27,15 +27,17 @@ export function QuickActions({ actions, className }: { actions: QuickAction[]; c
             variant={a.variant || "secondary"}
             disabled={a.disabled}
             className={cn(
-              "w-full h-24 sm:h-28 flex flex-col items-start justify-between rounded-xl border bg-card hover:shadow-md",
+              "w-full h-28 flex flex-col items-start justify-between rounded-2xl border-0 bg-white hover:bg-neutral-50 shadow-sm hover:shadow-md transition-all duration-300 group",
               a.disabled && "opacity-50 pointer-events-none"
             )}
           >
-            <Icon className="h-5 w-5 text-teal-700" />
+            <div className="p-2 rounded-xl bg-sauti-teal/10 group-hover:bg-sauti-teal/20 transition-colors">
+              <Icon className="h-5 w-5 text-sauti-teal" />
+            </div>
             <div className="text-left">
-              <div className="font-medium text-[#1A3434] leading-tight">{a.label}</div>
+              <div className="font-black text-sauti-dark leading-tight tracking-tight">{a.label}</div>
               {a.description && (
-                <div className="text-xs text-muted-foreground leading-tight mt-1">{a.description}</div>
+                <div className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider leading-tight mt-1">{a.description}</div>
               )}
             </div>
           </Button>

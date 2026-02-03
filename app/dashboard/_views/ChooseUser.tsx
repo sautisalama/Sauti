@@ -45,33 +45,38 @@ export default function ChooseUser() {
 	return (
 		<div className="container mx-auto px-4 py-8">
 			<div className="max-w-2xl mx-auto">
-				<h1 className="text-2xl font-bold text-center mt-14 sm:mt-8 mb-8 text-[#143A43]">
+				<h1 className="text-3xl md:text-4xl font-black text-center mt-14 sm:mt-8 mb-4 text-sauti-dark tracking-tight">
 					Choose Your Role
 				</h1>
+				<p className="text-neutral-500 text-center mb-12 max-w-md mx-auto">
+					Select the role that best describes your needs. You can always change this in your profile settings later.
+				</p>
 
 				<div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
 					{/* Survivor Tile */}
 					<div
-						className={`cursor-pointer rounded-lg border-2 p-4 text-center transition-all ${
+						className={`cursor-pointer rounded-[2rem] border-2 p-6 text-center transition-all duration-300 group relative overflow-hidden ${
 							selectedType === "survivor"
-								? "border-teal-600 bg-teal-50"
-								: "border-gray-200 hover:border-teal-600"
+								? "border-sauti-teal bg-sauti-teal/5 shadow-premium ring-4 ring-sauti-teal/10"
+								: "border-neutral-100 hover:border-sauti-teal/30 hover:bg-neutral-50 shadow-sm"
 						}`}
 						onClick={() => setSelectedType("survivor")}
 					>
-						<div className="flex flex-row sm:flex-col items-center gap-4 sm:gap-0">
-							<div className="w-20 sm:w-full aspect-square relative flex justify-center items-center">
+						<div className="flex flex-row sm:flex-col items-center gap-4 sm:gap-6 relative z-10">
+							<div className="w-16 sm:w-24 aspect-square relative flex justify-center items-center bg-white rounded-2xl shadow-sm border border-neutral-100 group-hover:scale-110 transition-transform duration-500">
 								<Image
 									src="/icons/survivor-light.png"
 									alt="Survivor"
-									className="object-contain"
-									height={120}
-									width={120}
+									className="object-contain p-2"
+									height={80}
+									width={80}
 								/>
 							</div>
 							<div className="flex-1 sm:w-full">
-								<h3 className="font-semibold text-left sm:text-center">Survivor</h3>
-								<p className="text-sm text-gray-600 text-left sm:text-center">
+								<h3 className="text-lg font-black text-sauti-dark left sm:text-center group-hover:text-sauti-teal transition-colors">
+									Survivor
+								</h3>
+								<p className="text-xs font-medium text-neutral-500 text-left sm:text-center mt-1">
 									Seeking support and resources
 								</p>
 							</div>
@@ -80,26 +85,28 @@ export default function ChooseUser() {
 
 					{/* Professional Tile */}
 					<div
-						className={`cursor-pointer rounded-lg border-2 p-4 text-center transition-all ${
+						className={`cursor-pointer rounded-[2rem] border-2 p-6 text-center transition-all duration-300 group relative overflow-hidden ${
 							selectedType === "professional"
-								? "border-teal-600 bg-teal-50"
-								: "border-gray-200 hover:border-teal-600"
+								? "border-sauti-teal bg-sauti-teal/5 shadow-premium ring-4 ring-sauti-teal/10"
+								: "border-neutral-100 hover:border-sauti-teal/30 hover:bg-neutral-50 shadow-sm"
 						}`}
 						onClick={() => setSelectedType("professional")}
 					>
-						<div className="flex flex-row sm:flex-col items-center gap-4 sm:gap-0">
-							<div className="w-20 sm:w-full aspect-square relative flex justify-center items-center">
+						<div className="flex flex-row sm:flex-col items-center gap-4 sm:gap-6 relative z-10">
+							<div className="w-16 sm:w-24 aspect-square relative flex justify-center items-center bg-white rounded-2xl shadow-sm border border-neutral-100 group-hover:scale-110 transition-transform duration-500">
 								<Image
 									src="/icons/professional-light.png"
 									alt="Professional"
-									height={150}
-									width={150}
-									className="object-contain"
+									height={100}
+									width={100}
+									className="object-contain p-2"
 								/>
 							</div>
 							<div className="flex-1 sm:w-full">
-								<h3 className="font-semibold text-left sm:text-center">Professional</h3>
-								<p className="text-sm text-gray-600 text-left sm:text-center">
+								<h3 className="text-lg font-black text-sauti-dark left sm:text-center group-hover:text-sauti-teal transition-colors">
+									Professional
+								</h3>
+								<p className="text-xs font-medium text-neutral-500 text-left sm:text-center mt-1">
 									Providing expert support
 								</p>
 							</div>
@@ -108,26 +115,28 @@ export default function ChooseUser() {
 
 					{/* NGO Tile */}
 					<div
-						className={`cursor-pointer rounded-lg border-2 p-4 text-center transition-all ${
+						className={`cursor-pointer rounded-[2rem] border-2 p-6 text-center transition-all duration-300 group relative overflow-hidden ${
 							selectedType === "ngo"
-								? "border-teal-600 bg-teal-50"
-								: "border-gray-200 hover:border-teal-600"
+								? "border-sauti-teal bg-sauti-teal/5 shadow-premium ring-4 ring-sauti-teal/10"
+								: "border-neutral-100 hover:border-sauti-teal/30 hover:bg-neutral-50 shadow-sm"
 						}`}
 						onClick={() => setSelectedType("ngo")}
 					>
-						<div className="flex flex-row sm:flex-col items-center gap-4 sm:gap-0">
-							<div className="w-20 sm:w-full aspect-square relative flex justify-center items-center">
+						<div className="flex flex-row sm:flex-col items-center gap-4 sm:gap-6 relative z-10">
+							<div className="w-16 sm:w-24 aspect-square relative flex justify-center items-center bg-white rounded-2xl shadow-sm border border-neutral-100 group-hover:scale-110 transition-transform duration-500">
 								<Image
 									src="/icons/ngo-light.png"
 									alt="NGO"
-									height={170}
-									width={170}
-									className="object-contain"
+									height={120}
+									width={120}
+									className="object-contain p-2"
 								/>
 							</div>
 							<div className="flex-1 sm:w-full">
-								<h3 className="font-semibold text-left sm:text-center">NGO</h3>
-								<p className="text-sm text-gray-600 text-left sm:text-center">
+								<h3 className="text-lg font-black text-sauti-dark left sm:text-center group-hover:text-sauti-teal transition-colors">
+									NGO
+								</h3>
+								<p className="text-xs font-medium text-neutral-500 text-left sm:text-center mt-1">
 									Organization providing services
 								</p>
 							</div>
@@ -140,9 +149,9 @@ export default function ChooseUser() {
 					<Button
 						onClick={handleSubmit}
 						disabled={!selectedType || isSubmitting}
-						className="bg-teal-600 hover:bg-teal-700 min-w-[200px]"
+						className="bg-sauti-teal hover:bg-sauti-dark text-white font-black py-6 px-12 rounded-full shadow-lg hover:shadow-xl transition-all duration-300 min-w-[240px]"
 					>
-						{isSubmitting ? "Updating..." : "Continue"}
+						{isSubmitting ? "Updating Role..." : "Continue to Dashboard"}
 					</Button>
 				</div>
 			</div>

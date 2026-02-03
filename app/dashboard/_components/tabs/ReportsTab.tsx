@@ -1,6 +1,7 @@
 import { Tables } from "@/types/db-schema";
 import { Button } from "@/components/ui/button";
 import { Plus, Trash2, Download, Calendar, Clock } from "lucide-react";
+import { cn } from "@/lib/utils";
 import {
 	Dialog,
 	DialogContent,
@@ -45,14 +46,14 @@ export function ReportsTab({
 		<div className="space-y-6">
 			<div className="flex justify-between items-center mb-6">
 				<div>
-					<h2 className="text-xl font-semibold text-[#1A3434]">My Reports</h2>
+					<h2 className="text-xl font-black text-sauti-dark tracking-tight">My Reports</h2>
 					<p className="text-sm text-gray-500">
 						{reports.length} {reports.length === 1 ? "report" : "reports"} found
 					</p>
 				</div>
 				<Dialog open={reportDialogOpen} onOpenChange={setReportDialogOpen}>
 					<DialogTrigger asChild>
-						<Button>
+						<Button className="bg-sauti-teal hover:bg-sauti-dark text-white font-bold rounded-full px-6 transition-all duration-300 shadow-md hover:shadow-lg">
 							<Plus className="h-4 w-4 mr-2" />
 							New Report
 						</Button>
@@ -90,17 +91,22 @@ export function ReportsTab({
 						return (
 							<div
 								key={report.report_id}
-								className={`flex flex-col rounded-lg p-4 ${
+								className={`flex flex-col rounded-2xl p-5 shadow-sm border-0 relative overflow-hidden transition-all duration-300 hover:shadow-md ${
 									report.urgency === "high"
-										? "bg-[#FFF5F5]"
+										? "bg-sauti-red-light"
 										: report.urgency === "medium"
-										? "bg-[#FFF8F0]"
-										: "bg-[#F0F9FF]"
+										? "bg-sauti-yellow-light"
+										: "bg-sauti-teal-light"
 								}`}
 							>
+                {/* Bottom Accent Line */}
+                <div className={cn(
+                  "absolute bottom-0 left-0 right-0 h-1.5",
+                  report.urgency === "high" ? "bg-sauti-red" : report.urgency === "medium" ? "bg-sauti-yellow" : "bg-sauti-teal"
+                )} />
 								<div className="flex items-center justify-between">
 									<div className="flex items-center gap-3">
-										<div className="h-10 w-10 rounded-full bg-[#1A3434] text-white flex items-center justify-center">
+										<div className="h-10 w-10 rounded-xl bg-sauti-dark text-white flex items-center justify-center font-black">
 											{report.type_of_incident?.[0]?.toUpperCase() || "?"}
 										</div>
 										<div>
@@ -113,12 +119,12 @@ export function ReportsTab({
 												</span>
 												<span className="w-1.5 h-1.5 rounded-full bg-gray-300" />
 												<span
-													className={`px-2 py-0.5 rounded-full text-xs ${
+													className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider shadow-sm ${
 														report.urgency === "high"
-															? "bg-red-100 text-red-700"
+															? "bg-sauti-red text-white"
 															: report.urgency === "medium"
-															? "bg-yellow-100 text-yellow-700"
-															: "bg-blue-100 text-blue-700"
+															? "bg-sauti-yellow text-sauti-dark"
+															: "bg-sauti-teal text-white"
 													}`}
 												>
 													{formatServiceName(report.urgency || "low")} Priority
@@ -163,10 +169,10 @@ export function ReportsTab({
 
 								<div className="mt-4 space-y-3">
 									{acceptedMatch && (
-										<div className="bg-white/50 rounded-md p-3 border border-green-200">
+										<div className="bg-white/80 rounded-xl p-4 border border-sauti-teal/20 shadow-sm">
 											<div className="flex items-center justify-between">
 												<div className="flex-1">
-													<span className="text-sm font-medium text-green-700">
+													<span className="text-sm font-black text-sauti-teal">
 														✅ Accepted by: {acceptedMatch.support_service.name}
 													</span>
 													{appointment && (
@@ -202,8 +208,8 @@ export function ReportsTab({
 									)}
 
 									{pendingMatches && pendingMatches.length > 0 && (
-										<div className="bg-white/50 rounded-md p-3 border border-yellow-200">
-											<span className="text-sm font-medium text-yellow-700">
+										<div className="bg-white/80 rounded-xl p-4 border border-sauti-yellow/30 shadow-sm">
+											<span className="text-sm font-black text-sauti-yellow-dark">
 												Pending Matches ({pendingMatches.length}):
 											</span>
 											<div className="mt-2 space-y-2">

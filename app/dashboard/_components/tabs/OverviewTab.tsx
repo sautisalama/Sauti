@@ -1,6 +1,7 @@
 import { Tables } from "@/types/db-schema";
 import { Button } from "@/components/ui/button";
 import { Trash2 } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface MatchedServiceWithRelations {
 	id: string;
@@ -42,7 +43,7 @@ export function OverviewTab({
 			<div className="space-y-6">
 				<div className="flex justify-between items-center">
 					<div>
-						<h2 className="text-xl font-semibold text-[#1A3434]">Recent Reports</h2>
+						<h2 className="text-xl font-black text-sauti-dark tracking-tight">Recent Reports</h2>
 						<p className="text-sm text-gray-500">
 							{reports.length} {reports.length === 1 ? "report" : "reports"} found
 						</p>
@@ -60,17 +61,22 @@ export function OverviewTab({
 							return (
 								<div
 									key={report.report_id}
-									className={`flex flex-col rounded-lg p-4 ${
+									className={`flex flex-col rounded-2xl p-5 shadow-sm border-0 relative overflow-hidden transition-all duration-300 hover:shadow-md ${
 										report.urgency === "high"
-											? "bg-[#FFF5F5]"
+											? "bg-sauti-red-light"
 											: report.urgency === "medium"
-											? "bg-[#FFF8F0]"
-											: "bg-[#F0F9FF]"
+											? "bg-sauti-yellow-light"
+											: "bg-sauti-teal-light"
 									}`}
 								>
+                  {/* Bottom Accent Line */}
+                  <div className={cn(
+                    "absolute bottom-0 left-0 right-0 h-1.5",
+                    report.urgency === "high" ? "bg-sauti-red" : report.urgency === "medium" ? "bg-sauti-yellow" : "bg-sauti-teal"
+                  )} />
 									<div className="flex items-center justify-between">
 										<div className="flex items-center gap-3">
-											<div className="h-10 w-10 rounded-full bg-[#1A3434] text-white flex items-center justify-center">
+											<div className="h-10 w-10 rounded-xl bg-sauti-dark text-white flex items-center justify-center font-black">
 												{report.type_of_incident?.[0]?.toUpperCase() || "?"}
 											</div>
 											<div>
@@ -83,12 +89,12 @@ export function OverviewTab({
 													</span>
 													<span className="w-1.5 h-1.5 rounded-full bg-gray-300" />
 													<span
-														className={`px-2 py-0.5 rounded-full text-xs ${
+														className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${
 															report.urgency === "high"
-																? "bg-red-100 text-red-700"
+																? "bg-sauti-red/10 text-sauti-red"
 																: report.urgency === "medium"
-																? "bg-yellow-100 text-yellow-700"
-																: "bg-blue-100 text-blue-700"
+																? "bg-sauti-yellow/20 text-sauti-yellow-dark"
+																: "bg-sauti-teal/10 text-sauti-teal"
 														}`}
 													>
 														{formatServiceName(report.urgency || "low")} Priority
@@ -143,7 +149,7 @@ export function OverviewTab({
 			{/* Recent Matched Cases Section */}
 			<div className="space-y-6">
 				<div>
-					<h2 className="text-xl font-semibold text-[#1A3434]">
+					<h2 className="text-xl font-black text-sauti-dark tracking-tight">
 						Recent Matched Cases
 					</h2>
 					<p className="text-sm text-gray-500">
@@ -157,14 +163,19 @@ export function OverviewTab({
 						{matchedServices.slice(0, 3).map((matchedCase) => (
 							<div
 								key={matchedCase.id}
-								className={`rounded-lg p-4 ${
+								className={`rounded-2xl p-5 shadow-sm border-0 relative overflow-hidden transition-all duration-300 hover:shadow-md ${
 									matchedCase.report.urgency === "high"
-										? "bg-[#FFF5F5]"
+										? "bg-sauti-red-light"
 										: matchedCase.report.urgency === "medium"
-										? "bg-[#FFF8F0]"
-										: "bg-[#F0F9FF]"
+										? "bg-sauti-yellow-light"
+										: "bg-sauti-teal-light"
 								}`}
 							>
+                {/* Bottom Accent Line */}
+                <div className={cn(
+                  "absolute bottom-0 left-0 right-0 h-1.5",
+                  matchedCase.report.urgency === "high" ? "bg-sauti-red" : matchedCase.report.urgency === "medium" ? "bg-sauti-yellow" : "bg-sauti-teal"
+                )} />
 								<div className="flex items-center justify-between">
 									<div className="flex items-center gap-3">
 										<div className="h-10 w-10 rounded-full bg-[#1A3434] text-white flex items-center justify-center">
@@ -209,7 +220,7 @@ export function OverviewTab({
 			{/* Support Services Section */}
 			<div className="space-y-6">
 				<div>
-					<h2 className="text-xl font-semibold text-[#1A3434]">
+					<h2 className="text-xl font-black text-sauti-dark tracking-tight">
 						Your Support Services
 					</h2>
 					<p className="text-sm text-gray-500">
@@ -223,15 +234,16 @@ export function OverviewTab({
 						{supportServices.slice(0, 3).map((service) => (
 							<div
 								key={service.id}
-								className="p-4 rounded-lg border bg-card flex justify-between items-start"
+								className="p-5 rounded-2xl border-0 bg-sauti-teal-light shadow-sm relative overflow-hidden group hover:shadow-md transition-all duration-300"
 							>
-								<div className="space-y-2">
-									<h3 className="font-medium">{service.name}</h3>
+                <div className="absolute bottom-0 left-0 right-0 h-1.5 bg-sauti-teal/40" />
+								<div className="space-y-3 relative z-10">
+									<h3 className="font-black text-sauti-dark tracking-tight">{service.name}</h3>
 									<div className="flex flex-wrap gap-2">
 										{service.service_types.split(",").map((type, index) => (
 											<span
 												key={index}
-												className="px-2 py-1 text-xs rounded-full bg-secondary text-secondary-foreground"
+												className="px-3 py-1 text-[10px] font-black uppercase tracking-wider rounded-full bg-white text-sauti-teal shadow-sm"
 											>
 												{formatServiceName(type.trim())}
 											</span>
