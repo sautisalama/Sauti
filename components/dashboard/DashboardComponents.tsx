@@ -1,6 +1,7 @@
 "use client";
 
 import { ReactNode } from "react";
+import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -54,23 +55,32 @@ export function WelcomeHeader({ name, userType, timeOfDay = "morning", className
 
   return (
     <div className={cn(
-      "p-6 bg-gradient-to-r from-sauti-blue to-primary-600 text-white rounded-2xl mb-6",
+      "p-6 md:p-8 bg-sauti-teal-light text-sauti-dark rounded-4xl mb-8 relative overflow-hidden shadow-sm border-0",
       className
     )}>
-      <h1 className="text-2xl lg:text-3xl font-bold mb-2">
-        {getGreeting()}, {name}
-      </h1>
-      <p className="text-blue-100 text-sm lg:text-base opacity-90">
-        {getUserTypeMessage()}
-      </p>
-      <div className="mt-4 flex items-center gap-4 text-blue-100">
-        <div className="flex items-center gap-1">
-          <Clock className="h-4 w-4" />
-          <span className="text-sm">{new Date().toLocaleDateString()}</span>
-        </div>
-        <div className="flex items-center gap-1">
-          <MapPin className="h-4 w-4" />
-          <span className="text-sm">Nairobi, Kenya</span>
+      {/* Decorative background elements */}
+      <div className="absolute top-0 right-0 w-64 h-64 bg-sauti-yellow/5 rounded-full -translate-y-1/2 translate-x-1/3 blur-3xl pointer-events-none" />
+      <div className="absolute bottom-0 left-0 w-48 h-48 bg-sauti-red/5 rounded-full translate-y-1/2 -translate-x-1/4 blur-2xl pointer-events-none" />
+      
+      {/* Dynamic bottom accent bar like the cards */}
+      <div className="absolute bottom-0 left-0 right-0 h-2 bg-gradient-to-r from-sauti-yellow via-sauti-teal to-sauti-red opacity-60" />
+      
+      <div className="relative z-10">
+        <h1 className="text-3xl lg:text-4xl font-black mb-3 tracking-tight">
+          {getGreeting()}, <span className="text-sauti-teal">{name}</span>
+        </h1>
+        <p className="text-sauti-dark/80 text-sm lg:text-lg max-w-xl font-bold leading-relaxed">
+          {getUserTypeMessage()}
+        </p>
+        <div className="mt-6 flex flex-wrap items-center gap-4 text-sauti-dark/60">
+          <div className="flex items-center gap-2 px-3 py-1.5 bg-white/40 rounded-full backdrop-blur-sm shadow-sm">
+            <Clock className="h-4 w-4 text-sauti-teal" />
+            <span className="text-xs font-black uppercase tracking-wider">{new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}</span>
+          </div>
+          <div className="flex items-center gap-2 px-3 py-1.5 bg-white/40 rounded-full backdrop-blur-sm shadow-sm">
+            <MapPin className="h-4 w-4 text-sauti-teal" />
+            <span className="text-xs font-black uppercase tracking-wider">Nairobi, Kenya</span>
+          </div>
         </div>
       </div>
     </div>
@@ -100,60 +110,61 @@ export function QuickActionCard({
   className 
 }: QuickActionProps) {
   const baseClasses = cn(
-    "group relative overflow-hidden rounded-xl p-4 transition-all duration-200",
-    "hover:scale-105 hover:shadow-lg active:scale-95 cursor-pointer",
+    "group relative overflow-hidden rounded-2xl p-5 transition-all duration-300",
+    "hover:scale-[1.02] hover:shadow-lg active:scale-95 cursor-pointer border-0 shadow-sm",
     {
-      "bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 hover:border-sauti-orange": variant === "default",
-      "bg-gradient-to-br from-sauti-orange to-accent-600 text-white": variant === "primary",
-      "bg-gradient-to-br from-neutral-100 to-neutral-50 dark:from-neutral-800 dark:to-neutral-700": variant === "secondary",
+      "bg-sauti-teal-light text-sauti-dark": variant === "default",
+      "bg-sauti-yellow-light text-sauti-dark": variant === "primary",
+      "bg-sauti-red-light text-sauti-dark": variant === "secondary",
     },
     className
   );
 
+  const accentColor = {
+    default: "bg-sauti-teal",
+    primary: "bg-sauti-yellow",
+    secondary: "bg-sauti-red",
+  }[variant];
+
   const content = (
     <div className={baseClasses}>
+      {/* Dynamic Accent Bar like the reference image */}
+      <div className={cn("absolute bottom-0 left-0 right-0 h-2 opacity-80", accentColor)} />
+      
       {badge && (
-        <Badge className="absolute top-2 right-2 bg-error-500 text-white border-0">
+        <Badge className="absolute top-2 right-2 bg-sauti-red text-white border-0 font-bold">
           {badge}
         </Badge>
       )}
       
-      <div className="flex items-start justify-between mb-3">
-        <div className={cn(
-          "p-2 rounded-lg",
-          variant === "primary" ? "bg-white/20" : "bg-sauti-orange/10"
-        )}>
-          {icon}
+      <div className="relative z-10">
+        <div className="flex items-start justify-between mb-3">
+          <div className={cn(
+            "p-2.5 rounded-xl transition-colors duration-300 bg-white/50",
+          )}>
+            {icon}
+          </div>
+          <ArrowRight className="h-4 w-4 text-sauti-dark/40 transition-transform group-hover:translate-x-1" />
         </div>
-        <ArrowRight className={cn(
-          "h-4 w-4 transition-transform group-hover:translate-x-1",
-          variant === "primary" ? "text-white/70" : "text-neutral-400"
-        )} />
+        
+        <h3 className="font-black text-sm mb-1 text-sauti-dark tracking-tight">
+          {title}
+        </h3>
+        
+        {description && (
+          <p className="text-xs leading-relaxed text-sauti-dark/70 font-medium">
+            {description}
+          </p>
+        )}
       </div>
-      
-      <h3 className={cn(
-        "font-semibold text-sm mb-1",
-        variant === "primary" ? "text-white" : "text-neutral-900 dark:text-neutral-100"
-      )}>
-        {title}
-      </h3>
-      
-      {description && (
-        <p className={cn(
-          "text-xs leading-relaxed",
-          variant === "primary" ? "text-white/80" : "text-neutral-600 dark:text-neutral-400"
-        )}>
-          {description}
-        </p>
-      )}
     </div>
   );
 
   if (href) {
     return (
-      <a href={href} className="block">
+      <Link href={href} className="block">
         {content}
-      </a>
+      </Link>
     );
   }
 
@@ -190,31 +201,31 @@ export function StatsCard({
   const getVariantClasses = () => {
     switch (variant) {
       case "success":
-        return "border-success-200 bg-success-50 dark:bg-success-950 dark:border-success-800";
+        return "bg-sauti-teal-light border-0 shadow-sm";
       case "warning":
-        return "border-warning-200 bg-warning-50 dark:bg-warning-950 dark:border-warning-800";
+        return "bg-sauti-yellow-light border-0 shadow-sm";
       case "error":
-        return "border-error-200 bg-error-50 dark:bg-error-950 dark:border-error-800";
+        return "bg-sauti-red-light border-0 shadow-sm";
       default:
-        return "border-neutral-200 bg-white dark:bg-neutral-800 dark:border-neutral-700";
+        return "bg-white border-neutral-50 shadow-sm";
     }
   };
 
   return (
     <Card className={cn(getVariantClasses(), "overflow-hidden", className)}>
       <CardContent className="p-4">
-        <div className="flex items-center justify-between mb-3">
-          <h3 className="text-sm font-medium text-neutral-600 dark:text-neutral-400">
+        <div className="flex items-center justify-between mb-3 relative z-10">
+          <h3 className="text-xs font-black uppercase tracking-wider text-sauti-dark/60">
             {title}
           </h3>
           {icon && (
             <div className={cn(
-              "p-1 rounded-lg",
+              "p-2 rounded-xl transition-all duration-300",
               {
-                "bg-success-100 text-success-600": variant === "success",
-                "bg-warning-100 text-warning-600": variant === "warning", 
-                "bg-error-100 text-error-600": variant === "error",
-                "bg-neutral-100 text-neutral-600 dark:bg-neutral-700 dark:text-neutral-400": variant === "default",
+                "bg-sauti-teal text-white": variant === "success",
+                "bg-sauti-yellow text-sauti-dark": variant === "warning", 
+                "bg-sauti-red text-white": variant === "error",
+                "bg-neutral-100 text-neutral-600": variant === "default",
               }
             )}>
               {icon}
@@ -222,8 +233,8 @@ export function StatsCard({
           )}
         </div>
 
-        <div className="flex items-baseline gap-2 mb-2">
-          <span className="text-2xl font-bold text-neutral-900 dark:text-neutral-100">
+        <div className="flex items-baseline gap-2 mb-2 relative z-10">
+          <span className="text-3xl font-black text-sauti-dark">
             {value}
           </span>
           
@@ -243,10 +254,21 @@ export function StatsCard({
         </div>
 
         {description && (
-          <p className="text-xs text-neutral-500 dark:text-neutral-400">
+          <p className="text-xs text-sauti-dark/60 font-medium relative z-10">
             {description}
           </p>
         )}
+        
+        {/* Decorative background circle based on variant */}
+        <div className={cn(
+          "absolute -bottom-4 -right-4 w-24 h-24 rounded-full opacity-10 blur-xl",
+          {
+            "bg-sauti-teal": variant === "success",
+            "bg-sauti-yellow": variant === "warning",
+            "bg-sauti-red": variant === "error",
+            "bg-neutral-200": variant === "default",
+          }
+        )} />
       </CardContent>
     </Card>
   );
@@ -300,7 +322,7 @@ export function ProgressRing({
           fill="none"
           strokeDasharray={strokeDasharray}
           strokeDashoffset={strokeDashoffset}
-          className="text-sauti-orange transition-all duration-500"
+          className="text-sauti-teal transition-all duration-700"
           strokeLinecap="round"
         />
       </svg>
@@ -337,15 +359,15 @@ export function ActivityItem({
   const getStatusColor = () => {
     switch (status) {
       case "success":
-        return "text-success-600";
+        return "text-sauti-teal";
       case "warning": 
-        return "text-warning-600";
+        return "text-sauti-yellow";
       case "error":
-        return "text-error-600";
+        return "text-sauti-red";
       case "pending":
         return "text-neutral-500";
       default:
-        return "text-sauti-orange";
+        return "text-sauti-teal";
     }
   };
 
@@ -395,13 +417,13 @@ interface SectionHeaderProps {
 
 export function SectionHeader({ title, description, action, className }: SectionHeaderProps) {
   return (
-    <div className={cn("flex items-center justify-between mb-4", className)}>
+    <div className={cn("flex items-center justify-between mb-6", className)}>
       <div>
-        <h2 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100">
+        <h2 className="text-xl font-black text-sauti-dark tracking-tight">
           {title}
         </h2>
         {description && (
-          <p className="text-sm text-neutral-600 dark:text-neutral-400 mt-1">
+          <p className="text-sm font-bold text-neutral-400 mt-1">
             {description}
           </p>
         )}

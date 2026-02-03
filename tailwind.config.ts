@@ -31,15 +31,17 @@ const config = {
     			'sauti-footer': '#2C2C2C',
     			landing: '#EEF7F2',
 
-          // New Rebranding Palette
-          'sauti-yellow': '#F4B400', // Gold/Primary
-          'sauti-red': '#E53E3E', // Alert/Secondary
-          'sauti-teal': '#008080', // Linkages/Accent
-          'sauti-dark': '#0B2228', // Rich Dark Background (Softened)
+          // Reference Image Palette
+          'sauti-yellow': '#F5B017', // Solid
+          'sauti-yellow-light': '#FEF9E1', // Pastel background
           
-          'sauti-light-yellow': '#FEF3C7',
-          'sauti-light-teal': '#E6FFFA',
-          'sauti-light-red': '#FED7D7',
+          'sauti-teal': '#068297', // Solid
+          'sauti-teal-light': '#D7EBE9', // Pastel background
+          
+          'sauti-red': '#E85C4A', // Solid
+          'sauti-red-light': '#FCE1DD', // Pastel background
+          
+          'sauti-dark': '#0B2228', // Rich Dark (Softened)
     			
     			// Premium design system colors
 'primary': {
@@ -171,10 +173,12 @@ const config = {
     			lg: 'var(--radius)',
     			md: 'calc(var(--radius) - 2px)',
     			sm: 'calc(var(--radius) - 4px)',
-    			// Premium rounded corners for mobile-first design
+    			// Extra premium rounded corners
     			'xl': '1rem',
-    			'2xl': '1.5rem',
+    			'2xl': '1.5rem', // Default for cards
     			'3xl': '2rem',
+          '4xl': '2.5rem',
+          '5xl': '3rem',
     		},
     		// Premium spacing scale for consistent layouts
     		spacing: {

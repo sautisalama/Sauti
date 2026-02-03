@@ -16,8 +16,8 @@ export function SectionHeader({
   return (
     <div className={cn("flex items-center justify-between gap-2", className)}>
       <div>
-        <h3 className="text-lg sm:text-xl font-semibold text-[#1A3434]">{title}</h3>
-        {subtitle && <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">{subtitle}</p>}
+        <h3 className="text-lg sm:text-xl font-black text-sauti-dark tracking-tight">{title}</h3>
+        {subtitle && <p className="text-xs sm:text-sm font-bold text-neutral-400 mt-0.5">{subtitle}</p>}
       </div>
       {right}
     </div>

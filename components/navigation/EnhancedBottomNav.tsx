@@ -136,14 +136,14 @@ export function EnhancedBottomNav({ forceShow = false, className }: EnhancedBott
     const content = (
       <div 
         className={cn(
-          "flex flex-col items-center gap-1 py-2 px-3 rounded-xl transition-all duration-200",
-          disabled ? "opacity-50" : "hover:bg-white/10 active:scale-95",
-          active ? "text-sauti-orange" : "text-neutral-400 dark:text-neutral-500"
+          "flex flex-col items-center gap-1 py-2 px-3 rounded-xl transition-all duration-300",
+          disabled ? "opacity-50" : "hover:bg-neutral-50 active:scale-95",
+          active ? "text-sauti-teal bg-sauti-teal-light" : "text-neutral-400 dark:text-neutral-500"
         )}
         aria-disabled={disabled}
       >
         <div className="relative">
-          <Icon className={cn("h-5 w-5", active && "text-sauti-orange")} />
+          <Icon className={cn("h-5 w-5 transition-transform", active && "text-sauti-teal scale-110")} />
           {item.badge && item.badge > 0 && (
             <Badge 
               className={cn(
@@ -156,8 +156,8 @@ export function EnhancedBottomNav({ forceShow = false, className }: EnhancedBott
           )}
         </div>
         <span className={cn(
-          "text-[10px] font-medium leading-none",
-          active ? "text-sauti-orange" : "text-neutral-500 dark:text-neutral-400"
+          "text-[10px] font-bold leading-none tracking-tight transition-colors",
+          active ? "text-sauti-teal" : "text-neutral-500 dark:text-neutral-400"
         )}>
           {item.label}
         </span>

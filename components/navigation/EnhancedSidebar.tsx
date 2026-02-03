@@ -439,11 +439,11 @@ export function EnhancedSidebar({
 		const content = (
 			<div
 				className={cn(
-					"flex items-center gap-3 px-3 py-3 rounded-xl transition-all duration-200",
-					"hover:bg-white/10 dark:hover:bg-white/5",
+					"flex items-center gap-3 px-4 py-3.5 rounded-2xl transition-all duration-300",
+					"hover:bg-neutral-50 dark:hover:bg-white/5",
 					"group cursor-pointer",
 					active &&
-						"bg-sauti-orange/10 text-sauti-orange border-r-2 border-sauti-orange"
+						"bg-sauti-teal-light text-sauti-teal font-black shadow-sm"
 				)}
 			>
 				<div className="relative flex items-center justify-center">
@@ -451,8 +451,8 @@ export function EnhancedSidebar({
 						className={cn(
 							"h-5 w-5 transition-colors",
 							active
-								? "text-sauti-orange"
-								: "text-neutral-600 dark:text-neutral-400 group-hover:text-sauti-orange"
+								? "text-sauti-teal scale-110"
+								: "text-neutral-500 dark:text-neutral-400 group-hover:text-sauti-teal group-hover:scale-110"
 						)}
 					/>
 					{item.badge && item.badge > 0 && (
@@ -472,8 +472,8 @@ export function EnhancedSidebar({
 						className={cn(
 							"flex-1 text-sm font-medium transition-colors",
 							active
-								? "text-sauti-orange"
-								: "text-neutral-700 dark:text-neutral-300 group-hover:text-sauti-orange"
+								? "text-sauti-teal font-black"
+								: "text-neutral-700 dark:text-neutral-300 group-hover:text-sauti-teal"
 						)}
 					>
 						{item.label}
@@ -579,9 +579,9 @@ export function EnhancedSidebar({
 							variant="ghost"
 							size="icon"
 							onClick={() => setIsCollapsed(false)}
-							className="w-full h-8 text-neutral-500 hover:text-sauti-orange"
+							className="w-full h-10 text-neutral-500 hover:text-sauti-teal hover:bg-neutral-50"
 						>
-							<ChevronRight className="h-4 w-4" />
+							<ChevronRight className="h-5 w-5" />
 						</Button>
 					</div>
 				)}
@@ -600,7 +600,7 @@ export function EnhancedSidebar({
 										: dash?.data?.profile?.avatar_url || user?.profile?.avatar_url || ""
 								}
 							/>
-							<AvatarFallback className="bg-sauti-orange text-white">
+							<AvatarFallback className="bg-sauti-teal text-white font-bold">
 								{dash?.data?.profile?.first_name?.[0]?.toUpperCase() ||
 									user?.profile?.first_name?.[0]?.toUpperCase() ||
 									user?.email?.[0]?.toUpperCase() ||

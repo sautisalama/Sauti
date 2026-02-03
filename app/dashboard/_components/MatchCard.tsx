@@ -1,4 +1,5 @@
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import {
 	acceptMatch,
 	createMatchAppointment,
@@ -74,10 +75,22 @@ export function MatchCard({ match, onAccept }: MatchCardProps) {
 
 	return (
 		<>
-			<div className="p-4 border rounded-lg">
+			<div className={cn(
+        "p-6 rounded-2xl border-0 shadow-sm hover:shadow-md transition-all duration-300 relative overflow-hidden group",
+        match.match_status_type === "accepted" ? "bg-sauti-teal-light" : 
+        match.match_status_type === "pending" ? "bg-sauti-yellow-light" : 
+        "bg-white"
+      )}>
+        {/* Bottom Accent Line */}
+        <div className={cn(
+          "absolute bottom-0 left-0 right-0 h-1.5",
+          match.match_status_type === "accepted" ? "bg-sauti-teal" : 
+          match.match_status_type === "pending" ? "bg-sauti-yellow" : 
+          "bg-sauti-dark/10"
+        )} />
 				<div className="flex justify-between items-start mb-4">
 					<div>
-						<h3 className="font-semibold">{match.support_service.name}</h3>
+						<h3 className="font-black text-lg text-sauti-dark tracking-tight">{match.support_service.name}</h3>
 						{match.support_service.service_types && (
 							<p className="text-sm text-gray-500">
 								Service Type: {match.support_service.service_types}
@@ -89,7 +102,7 @@ export function MatchCard({ match, onAccept }: MatchCardProps) {
 							<>
 								<Button
 									onClick={handleAccept}
-									className="bg-teal-600 hover:bg-teal-700"
+									className="bg-sauti-teal hover:bg-sauti-dark text-white font-bold rounded-full px-6 transition-all duration-300"
 								>
 									Accept
 								</Button>
@@ -105,7 +118,7 @@ export function MatchCard({ match, onAccept }: MatchCardProps) {
 						{match.match_status_type === "accepted" && (
 							<Button
 								onClick={() => handleStatusUpdate("completed")}
-								className="bg-green-600 hover:bg-green-700"
+								className="bg-sauti-teal hover:bg-sauti-dark text-white font-bold rounded-full px-6 transition-all duration-300"
 							>
 								Complete
 							</Button>
@@ -117,14 +130,12 @@ export function MatchCard({ match, onAccept }: MatchCardProps) {
 				</p>
 				<div className="mt-2 flex items-center justify-between">
 					<span
-						className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium
-						${
-							match.match_status_type === "accepted"
-								? "bg-green-100 text-green-800"
-								: match.match_status_type === "pending"
-								? "bg-yellow-100 text-yellow-800"
-								: "bg-gray-100 text-gray-800"
-						}`}
+						className={cn(
+              "inline-flex items-center px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider shadow-sm",
+              match.match_status_type === "accepted" ? "bg-sauti-teal text-white" : 
+              match.match_status_type === "pending" ? "bg-sauti-yellow text-sauti-dark" : 
+              "bg-neutral-100 text-neutral-600"
+            )}
 					>
 						{match.match_status_type}
 					</span>

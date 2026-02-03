@@ -14,7 +14,7 @@ interface SamplePlaceholderProps {
 // - Add a small inline label to communicate "Sample" state
 // - Disable interactions to avoid confusion
 // - Ensure assistive tech can still read content but conveys it's illustrative
-export function SamplePlaceholder({ label = "Sample", className = "", children }: SamplePlaceholderProps) {
+export function SamplePlaceholder({ label = "Coming soon", className = "", children }: SamplePlaceholderProps) {
   return (
     <div className={`relative pointer-events-none opacity-60 grayscale select-none ${className}`} aria-live="polite">
       <div className="absolute top-2 right-2 z-10">

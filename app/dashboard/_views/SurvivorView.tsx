@@ -41,6 +41,7 @@ import {
 	CheckCircle,
 	Clock,
 	Star,
+	ArrowRight,
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
@@ -252,7 +253,7 @@ export default function SurvivorView({
 
 	return (
 		<>
-			<div className="min-h-screen bg-neutral-50 dark:bg-neutral-900">
+			<div className="min-h-screen bg-white">
 				<div className="max-w-7xl mx-auto p-4 lg:p-6">
 					{/* Welcome Header */}
 					<WelcomeHeader
@@ -264,27 +265,27 @@ export default function SurvivorView({
 					{/* Quick Actions Grid */}
 					<div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4 mb-6">
 						<QuickActionCard
-							icon={<Megaphone className="h-5 w-5 text-sauti-orange" />}
+							icon={<Megaphone className="h-5 w-5 text-current" />}
 							title="Report Now"
 							description="Quick & secure incident reporting"
 							onClick={() => setOpen(true)}
 							variant="primary"
 						/>
 						<QuickActionCard
-							icon={<MessageCircle className="h-5 w-5 text-sauti-orange" />}
+							icon={<MessageCircle className="h-5 w-5 text-sauti-teal" />}
 							title="Messages"
 							description="Chat with professionals"
 							href="/dashboard/chat"
 							badge={3}
 						/>
 						<QuickActionCard
-							icon={<CalendarDays className="h-5 w-5 text-sauti-orange" />}
+							icon={<CalendarDays className="h-5 w-5 text-sauti-teal" />}
 							title="Appointments"
 							description="Your upcoming sessions"
 							href="/dashboard/reports"
 						/>
 						<QuickActionCard
-							icon={<BookOpen className="h-5 w-5 text-sauti-orange" />}
+							icon={<BookOpen className="h-5 w-5 text-sauti-teal" />}
 							title="Resources"
 							description="Educational content"
 							href="/dashboard/resources"
@@ -352,7 +353,7 @@ export default function SurvivorView({
 									<div className="flex flex-col items-center">
 										<ProgressRing progress={safetyProgress} size={120}>
 											<div className="text-center">
-												<div className="text-2xl font-bold text-sauti-orange">
+												<div className="text-2xl font-black text-sauti-teal tracking-tighter">
 													{safetyProgress}%
 												</div>
 												<div className="text-xs text-neutral-500">Safety</div>
@@ -378,7 +379,7 @@ export default function SurvivorView({
 												<div className="text-xs text-neutral-500">Reports Filed</div>
 											</div>
 											<div>
-												<div className="text-lg font-bold text-sauti-orange">
+												<div className="text-lg font-bold text-sauti-yellow-dark">
 													{Math.max(1, Math.round(safetyProgress / 20) + matchedCount)}
 												</div>
 												<div className="text-xs text-neutral-500">Resources Used</div>
@@ -398,7 +399,7 @@ export default function SurvivorView({
 										<div className="flex flex-col items-center">
 											<ProgressRing progress={87} size={120}>
 												<div className="text-center">
-													<div className="text-2xl font-bold text-sauti-orange">87%</div>
+													<div className="text-2xl font-black text-sauti-teal tracking-tighter">87%</div>
 													<div className="text-xs text-neutral-500">Safety</div>
 												</div>
 											</ProgressRing>
@@ -406,10 +407,10 @@ export default function SurvivorView({
 												Your safety progress
 											</p>
 										</div>
-										<div className="flex-1 w-full">
-											<h3 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100 mb-3">
-												Your Journey to Safety
-											</h3>
+									<div className="flex-1 w-full">
+										<h3 className="text-xl font-black text-sauti-dark tracking-tight mb-2">
+											Your Journey to Safety
+										</h3>
 											<p className="text-neutral-600 dark:text-neutral-400 text-sm mb-4">
 												You've made significant progress on your path to safety and healing.
 												Keep taking small steps forward - you're doing great.
@@ -420,7 +421,7 @@ export default function SurvivorView({
 													<div className="text-xs text-neutral-500">Reports Filed</div>
 												</div>
 												<div>
-													<div className="text-lg font-bold text-sauti-orange">5</div>
+													<div className="text-lg font-bold text-sauti-yellow-dark">5</div>
 													<div className="text-xs text-neutral-500">Resources Used</div>
 												</div>
 												<div>
@@ -439,25 +440,28 @@ export default function SurvivorView({
 					<Card className="mb-6">
 						<CardContent className="p-4">
 							<div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-								<div className="rounded-xl bg-[#F0F9FF] p-4">
-									<p className="text-sm text-neutral-600 mb-1">Next Step</p>
-									<p className="font-medium">Review your last report match</p>
-									<Link href="/dashboard/reports" className="text-sauti-orange text-sm">
-										Open reports →
+								<div className="rounded-2xl bg-sauti-teal-light p-5 shadow-sm relative overflow-hidden group">
+									<div className="absolute bottom-0 left-0 right-0 h-1.5 bg-sauti-teal/40" />
+									<p className="text-xs font-black uppercase tracking-wider text-sauti-teal/60 mb-1">Next Step</p>
+									<p className="font-bold text-sauti-dark mb-2">Review your last report match</p>
+									<Link href="/dashboard/reports" className="text-sauti-teal font-black text-sm hover:underline flex items-center gap-1 group-hover:gap-2 transition-all">
+										Open reports <ArrowRight className="h-3 w-3" />
 									</Link>
 								</div>
-								<div className="rounded-xl bg-[#FFF8F0] p-4">
-									<p className="text-sm text-neutral-600 mb-1">Connect</p>
-									<p className="font-medium">Message a professional</p>
-									<Link href="/dashboard/chat" className="text-sauti-orange text-sm">
-										Open chat →
+								<div className="rounded-2xl bg-sauti-yellow-light p-5 shadow-sm relative overflow-hidden group">
+									<div className="absolute bottom-0 left-0 right-0 h-1.5 bg-sauti-yellow/40" />
+									<p className="text-xs font-black uppercase tracking-wider text-sauti-yellow-dark/60 mb-1">Connect</p>
+									<p className="font-bold text-sauti-dark mb-2">Message a professional</p>
+									<Link href="/dashboard/chat" className="text-sauti-teal font-black text-sm hover:underline flex items-center gap-1 group-hover:gap-2 transition-all">
+										Open chat <ArrowRight className="h-3 w-3" />
 									</Link>
 								</div>
-								<div className="rounded-xl bg-[#F5F7FF] p-4">
-									<p className="text-sm text-neutral-600 mb-1">Next-of-Kin</p>
-									<p className="font-medium">Keep details up to date</p>
-									<Link href="/dashboard/settings" className="text-sauti-orange text-sm">
-										Manage →
+								<div className="rounded-2xl bg-sauti-red-light p-5 shadow-sm relative overflow-hidden group">
+									<div className="absolute bottom-0 left-0 right-0 h-1.5 bg-sauti-red/40" />
+									<p className="text-xs font-black uppercase tracking-wider text-sauti-red/60 mb-1">Next-of-Kin</p>
+									<p className="font-bold text-sauti-dark mb-2">Keep details up to date</p>
+									<Link href="/dashboard/settings" className="text-sauti-teal font-black text-sm hover:underline flex items-center gap-1 group-hover:gap-2 transition-all">
+										Manage <ArrowRight className="h-3 w-3" />
 									</Link>
 								</div>
 							</div>
@@ -584,14 +588,19 @@ export default function SurvivorView({
 															return (
 																<div
 																	key={report.report_id}
-																	className={`flex flex-col md:flex-row md:items-center justify-between rounded-lg p-3 md:p-4 space-y-3 md:space-y-0 ${
+																	className={`flex flex-col md:flex-row md:items-center justify-between rounded-2xl p-4 md:p-6 shadow-sm border-0 relative overflow-hidden ${
 																		report.urgency === "high"
-																			? "bg-[#FFF5F5]"
+																			? "bg-sauti-red-light"
 																			: report.urgency === "medium"
-																			? "bg-[#FFF8F0]"
-																			: "bg-[#F0F9FF]"
+																			? "bg-sauti-yellow-light"
+																			: "bg-sauti-teal-light"
 																	}`}
 																>
+                                  {/* Bottom Accent Line */}
+                                  <div className={cn(
+                                    "absolute bottom-0 left-0 right-0 h-1.5",
+                                    report.urgency === "high" ? "bg-sauti-red" : report.urgency === "medium" ? "bg-sauti-yellow" : "bg-sauti-teal"
+                                  )} />
 																	<div className="flex md:hidden flex-col space-y-3">
 																		<div className="flex items-start justify-between">
 																			<div className="flex items-start gap-2 flex-1">
@@ -617,17 +626,17 @@ export default function SurvivorView({
 																						</span>
 																						<span
 																							className={`
-																						px-2 py-0.5 rounded-full text-xs
+																						px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider
 																						${
 																							report.urgency === "high"
-																								? "bg-red-100 text-red-700"
+																								? "bg-sauti-red text-white"
 																								: report.urgency === "medium"
-																								? "bg-yellow-100 text-yellow-700"
-																								: "bg-blue-100 text-blue-700"
+																								? "bg-sauti-yellow text-sauti-dark"
+																								: "bg-sauti-teal text-white"
 																						}
 																					`}
 																						>
-																							{formatServiceName(report.urgency || "low")}
+																							{formatServiceName(report.urgency || "low")} Priority
 																						</span>
 																					</div>
 																				</div>
@@ -691,13 +700,13 @@ export default function SurvivorView({
 																				<span className="w-1.5 h-1.5 rounded-full bg-gray-300" />
 																				<span
 																					className={`
-																				px-2 py-0.5 rounded-full text-xs
+																				px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider
 																				${
 																					report.urgency === "high"
-																						? "bg-red-100 text-red-700"
+																						? "bg-sauti-red text-white"
 																						: report.urgency === "medium"
-																						? "bg-yellow-100 text-yellow-700"
-																						: "bg-blue-100 text-blue-700"
+																						? "bg-sauti-yellow text-sauti-dark"
+																						: "bg-sauti-teal text-white"
 																				}
 																			`}
 																				>
@@ -786,14 +795,19 @@ export default function SurvivorView({
 													return (
 														<div
 															key={report.report_id}
-															className={`flex flex-col md:flex-row md:items-center justify-between rounded-lg p-3 md:p-4 space-y-3 md:space-y-0 ${
+															className={`flex flex-col md:flex-row md:items-center justify-between rounded-2xl p-5 shadow-sm border-0 relative overflow-hidden ${
 																report.urgency === "high"
-																	? "bg-[#FFF5F5]"
+																	? "bg-sauti-red-light"
 																	: report.urgency === "medium"
-																	? "bg-[#FFF8F0]"
-																	: "bg-[#F0F9FF]"
+																	? "bg-sauti-yellow-light"
+																	: "bg-sauti-teal-light"
 															}`}
 														>
+                              {/* Bottom Accent Line */}
+                              <div className={cn(
+                                "absolute bottom-0 left-0 right-0 h-1.5",
+                                report.urgency === "high" ? "bg-sauti-red" : report.urgency === "medium" ? "bg-sauti-yellow" : "bg-sauti-teal"
+                              )} />
 															<div className="flex md:hidden flex-col space-y-3">
 																<div className="flex items-start justify-between">
 																	<div className="flex items-start gap-2 flex-1">

@@ -35,7 +35,7 @@ export function MatchedCasesTab({
 		<div className="space-y-6">
 			<div className="flex justify-between items-center">
 				<div>
-					<h2 className="text-xl font-semibold text-[#1A3434]">Matched Cases</h2>
+					<h2 className="text-xl font-black text-sauti-dark tracking-tight">Matched Cases</h2>
 					<p className="text-sm text-gray-500">
 						{matchedServices.length} {matchedServices.length === 1 ? "case" : "cases"}{" "}
 						matched
