@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/utils/supabase/client";
@@ -13,6 +13,17 @@ export default function ChooseUser() {
 	const [selectedType, setSelectedType] = useState<UserType | null>(null);
 	const [isSubmitting, setIsSubmitting] = useState(false);
 	const router = useRouter();
+
+	useEffect(() => {
+		const checkAnon = async () => {
+			const supabase = createClient();
+			const { data: { user } } = await supabase.auth.getUser();
+			if (user?.user_metadata?.is_anonymous || user?.email?.endsWith("@anon.sautisalama.org")) {
+				window.location.href = "/dashboard";
+			}
+		};
+		checkAnon();
+	}, []);
 
 	const handleSubmit = async () => {
 		if (!selectedType) return;

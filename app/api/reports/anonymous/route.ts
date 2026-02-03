@@ -123,6 +123,7 @@ export async function POST(request: Request) {
 						first_name: formData.first_name || "Anonymous",
 						user_type: "survivor",
 						is_anonymous: true,
+						anon_username: username,
 					},
 				});
 
@@ -194,7 +195,7 @@ export async function POST(request: Request) {
 		// 3. Post-Submission Actions (Matching & Linking)
 		try {
 			// Trigger matching (async, don't block response too long)
-			matchReportWithServices(insertedReport.report_id).catch(err => 
+			matchReportWithServices(insertedReport.report_id, supabaseAdmin).catch(err => 
 				console.error("Background matching failed:", err)
 			);
 			

@@ -297,7 +297,11 @@ export default function AuthenticatedReportAbuseForm({
 			</div>
 
 			<div className="flex-1 overflow-y-auto p-4 sm:p-8 bg-neutral-50/20">
-				<form onSubmit={handleSubmit} className="space-y-10 max-w-4xl mx-auto pb-24">
+				<form 
+					id="auth-report-form"
+					onSubmit={handleSubmit} 
+					className="space-y-10 max-w-4xl mx-auto pb-24"
+				>
 				<div className="space-y-4">
 						<div className="bg-white border md:border-2 border-neutral-200 rounded-2xl md:rounded-3xl p-4 md:p-6 shadow-sm hover:border-sauti-teal/30 transition-all mb-6">
 							<p className="text-sm font-black text-sauti-dark uppercase tracking-wider mb-4">Who are you reporting for?</p>
@@ -611,12 +615,12 @@ export default function AuthenticatedReportAbuseForm({
 				</div>
 				</form>
 			</div>
-
 			<div className="shrink-0 pt-4 pb-6 bg-white border-t z-40">
 				<div className="max-w-4xl mx-auto px-4 md:px-8">
 					<Button
+						form="auth-report-form"
 						type="submit"
-						className="w-full bg-sauti-teal hover:bg-sauti-teal/90 text-white py-4 text-base sm:text-lg font-black rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-300"
+						className="w-full bg-sauti-teal hover:bg-sauti-dark text-white py-4 text-base sm:text-lg font-black rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-300"
 						disabled={loading}
 					>
 						{loading ? "Submitting..." : "Submit Report"}

@@ -270,6 +270,7 @@ export default function ReportAbuseForm({ onClose }: { onClose?: () => void }) {
 
 			// If anonymous account was created, sign in and redirect
 			if (result.anonymous && result.email && password) {
+				console.log("Anonymous account created, signing in...", result.email);
 				const { error: signInError } = await supabase.auth.signInWithPassword({
 					email: result.email,
 					password: password,
@@ -278,45 +279,48 @@ export default function ReportAbuseForm({ onClose }: { onClose?: () => void }) {
 				if (signInError) {
 					console.error("Auto sign-in failed:", signInError);
 					toast({
-						title: "Report Submitted",
-						description: `Your username is: ${result.username}. Please sign in manually.`,
+						title: "Sign-In Required",
+						description: `Your anonymous account was created as: ${result.username}, but auto sign-in failed. Please sign in manually.`,
+						variant: "destructive",
 					});
 				} else {
+					console.log("Sign-in successful for anonymous user", result.username);
 					toast({
-						title: "Anonymous Report Submitted!",
-						description: "You are being redirected to your incident management page...",
+						title: "Report Submitted Successfully!",
+						description: "Your safe space is ready. Redirecting to your dashboard...",
 					});
 					
 					if (typeof window !== "undefined") {
 						sessionStorage.setItem("anon_username", result.username);
+						// Allow toast to be seen briefly
+						setTimeout(() => {
+							window.location.replace("/dashboard");
+						}, 100);
 					}
-
-					window.location.href = "/dashboard";
 					return;
 				}
 			} else {
+				console.log("No anonymous credentials returned or password missing:", { 
+					hasAnon: !!result.anonymous, 
+					hasEmail: !!result.email, 
+					hasPassword: !!password 
+				});
 				toast({
 					title: "Report Submitted",
-					description: "Thank you for your report. We will review it shortly.",
+					description: "Thank you for your anonymous report. We will review it shortly.",
 				});
 			}
 
-			// Reset form
-			form.reset();
+			// Clear states for safety
 			setDescription("");
 			setPassword("");
-
-			// Close dialog
-			if (onClose) {
-				setTimeout(() => {
-					onClose();
-				}, 500);
-			}
+			form.reset();
+			if (onClose) onClose();
 		} catch (error) {
 			console.error("Submission error:", error);
 			toast({
 				title: "Error",
-				description: "Failed to submit report. Please try again.",
+				description: error instanceof Error ? error.message : "Failed to submit report. Please try again.",
 				variant: "destructive",
 			});
 		} finally {

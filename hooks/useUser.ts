@@ -46,6 +46,8 @@ export function useUser() {
 							first_name: authUser.user_metadata?.first_name || "",
 							last_name: authUser.user_metadata?.last_name || "",
 							user_type: authUser.user_metadata?.user_type || "survivor",
+							is_anonymous: authUser.user_metadata?.is_anonymous || false,
+							anon_username: authUser.user_metadata?.anon_username || null,
 							verification_status: "pending",
 							accreditation_files_metadata: "[]",
 							profile_image_metadata: "{}",

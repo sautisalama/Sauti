@@ -11,6 +11,7 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { AddSupportServiceForm } from "@/components/AddSupportServiceForm";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 
 interface Step {
@@ -68,6 +69,13 @@ export default function OnboardingPage() {
 	const supabase = createClient();
 	const [stepIndex, setStepIndex] = useState(0);
 	const [saving, setSaving] = useState(false);
+	const router = useRouter();
+
+	useEffect(() => {
+		if (user?.profile?.is_anonymous || user?.profile?.anon_username) {
+			window.location.href = "/dashboard";
+		}
+	}, [user]);
 
 	const [profile, setProfile] = useState({
 		first_name: "",

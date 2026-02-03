@@ -1,5 +1,6 @@
 import { createClient } from "@/utils/supabase/server";
 import { Database } from "@/types/db-schema";
+import { SupabaseClient } from "@supabase/supabase-js";
 
 type SupportService = Database["public"]["Tables"]["support_services"]["Row"];
 type Report = Database["public"]["Tables"]["reports"]["Row"];
@@ -31,13 +32,15 @@ function calculateDistance(
 	return R * c;
 }
 
+
 /**
  * Matches a report with appropriate support services based on service types and location
  * @param reportId The ID of the report to match
+ * @param customClient Optional Supabase client (e.g. admin client) to use
  * @returns Array of matched services with their distances
  */
-export async function matchReportWithServices(reportId: string) {
-	const supabase = await createClient();
+export async function matchReportWithServices(reportId: string, customClient?: SupabaseClient<Database>) {
+	const supabase = customClient || await createClient();
 
 	try {
 		// Fetch the report with required services
