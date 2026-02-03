@@ -74,7 +74,7 @@ export function Nav() {
 	const isActive = (path: string) => pathname === path;
 
 	return (
-		<header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 h-20 md:h-24 flex items-center">
+		<header className="sticky top-0 z-50 w-full border-b-2 border-gray-100 bg-white/98 backdrop-blur h-20 md:h-24 flex items-center shadow-sm">
 			<div className="container w-full max-w-[100vw] flex items-center justify-between px-6 md:px-12 relative">
 				{/* Extreme Left: Logo */}
 				<Link href="/" className="flex items-center gap-2 shrink-0">
@@ -89,7 +89,7 @@ export function Nav() {
 						className={`px-3 py-1.5 rounded-full transition-colors ${
 							isActive("/") 
 								? "bg-sauti-teal text-white" 
-								: "text-muted-foreground hover:text-sauti-teal underline-offset-4 hover:underline"
+								: "text-gray-900 hover:text-sauti-teal underline-offset-4 hover:underline"
 						}`}
 					>
 						Home
@@ -99,7 +99,7 @@ export function Nav() {
 						className={`px-3 py-1.5 rounded-full transition-colors ${
 							isActive("/about") 
 								? "bg-sauti-teal text-white" 
-								: "text-muted-foreground hover:text-sauti-teal underline-offset-4 hover:underline"
+								: "text-gray-900 hover:text-sauti-teal underline-offset-4 hover:underline"
 						}`}
 					>
 						Our Story
@@ -111,7 +111,7 @@ export function Nav() {
 								className={`px-3 py-1.5 rounded-full transition-colors outline-none flex items-center gap-1 ${
 									pathname.startsWith("/programs") 
 										? "bg-sauti-teal text-white" 
-										: "text-muted-foreground hover:text-sauti-teal underline-offset-4 hover:underline"
+										: "text-gray-900 hover:text-sauti-teal underline-offset-4 hover:underline"
 								}`}
 							>
 								Programs <ChevronDown className="h-3 w-3" />
@@ -141,7 +141,7 @@ export function Nav() {
 						className={`px-3 py-1.5 rounded-full transition-colors ${
 							pathname.startsWith("/impact") 
 								? "bg-sauti-teal text-white" 
-								: "text-muted-foreground hover:text-sauti-teal underline-offset-4 hover:underline"
+								: "text-gray-900 hover:text-sauti-teal underline-offset-4 hover:underline"
 						}`}
 					>
 						Our Impact
@@ -153,7 +153,7 @@ export function Nav() {
 								className={`px-3 py-1.5 rounded-full transition-colors outline-none flex items-center gap-1 ${
 									pathname.startsWith("/learn") 
 										? "bg-sauti-teal text-white" 
-										: "text-muted-foreground hover:text-sauti-teal underline-offset-4 hover:underline"
+										: "text-gray-900 hover:text-sauti-teal underline-offset-4 hover:underline"
 								}`}
 							>
 								Learn <ChevronDown className="h-3 w-3" />
@@ -175,7 +175,7 @@ export function Nav() {
 								className={`px-3 py-1.5 rounded-full transition-colors outline-none flex items-center gap-1 ${
 									pathname.startsWith("/volunteer") 
 										? "bg-sauti-teal text-white" 
-										: "text-muted-foreground hover:text-sauti-teal underline-offset-4 hover:underline"
+										: "text-gray-900 hover:text-sauti-teal underline-offset-4 hover:underline"
 								}`}
 							>
 								Get Involved <ChevronDown className="h-3 w-3" />
