@@ -11,30 +11,20 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from "@/components/ui/dialog";
-import { Info, Plus, Shield, Megaphone, CalendarDays, MessageCircle, ArrowRight, Trash2, CheckCircle, Star } from "lucide-react";
+import { 
+	Plus, Shield, MessageCircle, ArrowRight, 
+	Lock, ExternalLink, Activity, Info 
+} from "lucide-react";
 import { useState, useEffect, useMemo, useCallback } from "react";
-import { useSearchParams } from "next/navigation";
 import AuthenticatedReportAbuseForm from "@/components/AuthenticatedReportAbuseForm";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { WelcomeHeader, QuickActionCard, StatsCard, ActivityItem, SectionHeader } from "@/components/dashboard/DashboardComponents";
-import { AnonymousCredentialsBanner } from "@/components/dashboard/AnonymousCredentialsBanner";
 import { useDashboardData } from "@/components/providers/DashboardDataProvider";
 import Link from "next/link";
 
 interface ReportWithRelations extends Tables<"reports"> {
-	matched_services?: Array<{
-		id: string;
-		match_status_type: Database["public"]["Enums"]["match_status_type"];
-		match_date: string | null;
-		match_score: number | null;
-		support_services: {
-			id: string;
-			name: string;
-			service_types: Database["public"]["Enums"]["support_service_type"];
-		};
-	}>;
+	matched_services?: any[];
 }
 
 interface AnonymousSurvivorViewProps {
@@ -47,10 +37,7 @@ export default function AnonymousSurvivorView({
 	profileDetails,
 }: AnonymousSurvivorViewProps) {
 	const dash = useDashboardData();
-	const [reports, setReports] = useState<ReportWithRelations[]>(() => {
-		const seeded = (dash?.data?.reports as any) || [];
-		return seeded;
-	});
+	const [reports, setReports] = useState<ReportWithRelations[]>([]);
 	const [open, setOpen] = useState(false);
 	const { toast } = useToast();
 	const supabase = useMemo(() => createClient(), []);
@@ -71,181 +58,183 @@ export default function AnonymousSurvivorView({
 		fetchReports();
 	}, [fetchReports]);
 
+	const getStatusColor = (status: string | null) => {
+		switch (status?.toLowerCase()) {
+			case 'matched': return 'bg-emerald-100 text-emerald-700 border-emerald-200';
+			case 'pending': return 'bg-amber-100 text-amber-700 border-amber-200';
+			case 'investigating': return 'bg-blue-100 text-blue-700 border-blue-200';
+			default: return 'bg-neutral-100 text-neutral-600 border-neutral-200';
+		}
+	};
+
 	return (
-		<div className="min-h-screen bg-neutral-50/50">
-			<div className="max-w-7xl mx-auto p-4 lg:p-8">
-				{/* Management Header */}
-				<div className="mb-8">
-					<h1 className="text-3xl font-black text-sauti-dark tracking-tight mb-2">
-						Incident Management
-					</h1>
-					<p className="text-neutral-500 font-medium">
-						Manage your reports and track support matches securely and anonymously.
-					</p>
+		<div className="min-h-screen bg-white">
+			<div className="max-w-6xl mx-auto px-6 py-12">
+				{/* Header Section */}
+				<div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-12">
+					<div className="space-y-2">
+						<div className="flex items-center gap-2 text-neutral-400 font-bold uppercase tracking-widest text-[10px]">
+							<Shield className="h-3 w-3" />
+							Secure Anonymous Session
+						</div>
+						<h1 className="text-4xl font-black text-sauti-dark tracking-tight">
+							My Cases
+						</h1>
+						<p className="text-neutral-500 font-medium max-w-xl">
+							Track the status of your reported incidents and view matched professional support services.
+						</p>
+					</div>
+					<Button 
+						onClick={() => setOpen(true)}
+						className="bg-sauti-dark hover:bg-black text-white font-black rounded-2xl px-8 h-12 shadow-lg transition-all"
+					>
+						<Plus className="h-5 w-5 mr-2" />
+						Report New Incident
+					</Button>
 				</div>
 
-				<AnonymousCredentialsBanner 
-					username={profileDetails.anon_username ?? "Anonymous Survivor"} 
-				/>
+				<div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
+					{/* Main Column: Incidents */}
+					<div className="lg:col-span-8 space-y-8">
+						<div className="space-y-4">
+							<div className="flex items-center justify-between px-2">
+								<h2 className="text-lg font-black text-sauti-dark">Active Reports</h2>
+								<span className="text-xs font-bold text-neutral-400 bg-neutral-100 px-3 py-1 rounded-full">
+									{reports.length} Reports
+								</span>
+							</div>
 
-				<div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mt-8">
-					{/* Left Column: Report List */}
-					<div className="lg:col-span-2 space-y-6">
-						<Card className="border-0 shadow-premium overflow-hidden rounded-3xl">
-							<CardHeader className="bg-white border-b border-neutral-100 p-6">
-								<div className="flex items-center justify-between">
-									<div>
-										<CardTitle className="text-xl font-black text-sauti-dark">My Reports</CardTitle>
-										<p className="text-sm text-neutral-500 font-medium mt-1">{reports.length} active incidents</p>
-									</div>
-									<Button 
-										onClick={() => setOpen(true)}
-										className="bg-sauti-teal hover:bg-sauti-dark text-white font-black rounded-2xl px-6"
-									>
-										<Plus className="h-4 w-4 mr-2" />
-										New Report
-									</Button>
-								</div>
-							</CardHeader>
-							<CardContent className="p-6 bg-white/50">
-								{reports.length > 0 ? (
-									<div className="space-y-4">
-										{reports.map((report) => (
-											<div 
-												key={report.report_id}
-												className="bg-white rounded-2xl p-5 shadow-sm border border-neutral-100 hover:border-sauti-teal/30 transition-all group relative overflow-hidden"
-											>
-												<div className={cn(
-													"absolute left-0 top-0 bottom-0 w-1.5",
-													report.urgency === 'high' ? 'bg-sauti-red' : report.urgency === 'medium' ? 'bg-sauti-yellow' : 'bg-sauti-teal'
-												)} />
-												
-												<div className="flex items-start justify-between gap-4">
-													<div className="flex-1">
-														<div className="flex items-center gap-2 mb-2">
-															<span className={cn(
-																"px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider",
-																report.urgency === 'high' ? 'bg-sauti-red/10 text-sauti-red' : 'bg-neutral-100 text-neutral-500'
+							{reports.length > 0 ? (
+								<div className="grid grid-cols-1 gap-4">
+									{reports.map((report) => (
+										<Link 
+											href={`/dashboard/reports/${report.report_id}`} 
+											key={report.report_id}
+											className="block"
+										>
+											<Card className="border border-neutral-100 shadow-sm hover:shadow-md hover:border-neutral-200 transition-all duration-300 rounded-[2rem] overflow-hidden group">
+												<CardContent className="p-0">
+													<div className="p-6 md:p-8">
+														<div className="flex items-start justify-between mb-4">
+															<div className="flex items-center gap-3">
+																<div className={cn(
+																	"w-3 h-3 rounded-full mt-1",
+																	report.urgency === 'high' ? 'bg-sauti-red animate-pulse' : 
+																	report.urgency === 'medium' ? 'bg-amber-400' : 'bg-emerald-400'
+																)} />
+																<h3 className="text-xl font-black text-sauti-dark capitalize">
+																	{report.type_of_incident?.replace(/_/g, " ")}
+																</h3>
+															</div>
+															<div className={cn(
+																"px-4 py-1.5 rounded-full text-xs font-black border uppercase tracking-wider",
+																getStatusColor(report.match_status)
 															)}>
-																{report.urgency} Priority
-															</span>
-															<span className="text-[10px] font-bold text-neutral-400">
-																{new Date(report.submission_timestamp!).toLocaleDateString()}
-															</span>
+																{report.match_status || 'Pending'}
+															</div>
 														</div>
-														<h3 className="font-black text-sauti-dark text-lg capitalize">
-															{report.type_of_incident?.replace(/_/g, " ")}
-														</h3>
-														<p className="text-sm text-neutral-600 line-clamp-2 mt-1 font-medium">
-															{report.incident_description}
+														
+														<p className="text-neutral-500 font-medium line-clamp-2 mb-6 text-sm leading-relaxed">
+															{report.incident_description || "No description provided."}
 														</p>
-													</div>
-													<div className="text-right">
-														<div className="bg-sauti-teal/5 rounded-xl p-3 border border-sauti-teal/10">
-															<p className="text-[10px] font-black text-sauti-teal uppercase mb-1">Status</p>
-															<p className="text-sm font-black text-sauti-dark capitalize">
-																{report.match_status?.replace(/_/g, " ")}
-															</p>
-														</div>
-													</div>
-												</div>
 
-												{report.matched_services && report.matched_services.length > 0 && (
-													<div className="mt-4 pt-4 border-t border-neutral-50">
-														<p className="text-xs font-black text-neutral-400 uppercase mb-3 px-1">Top Matches</p>
-														<div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-															{report.matched_services.slice(0, 2).map((match) => (
-																<div key={match.id} className="flex items-center justify-between p-3 rounded-xl bg-neutral-50 border border-neutral-100">
-																	<div className="flex items-center gap-2">
-																		<div className="w-8 h-8 rounded-full bg-white flex items-center justify-center shadow-sm">
-																			<Shield className="h-4 w-4 text-sauti-teal" />
-																		</div>
-																		<p className="text-xs font-bold text-sauti-dark truncate max-w-[120px]">
-																			{match.support_services.name}
-																		</p>
-																	</div>
-																	<ArrowRight className="h-3 w-3 text-neutral-300" />
+														<div className="flex items-center justify-between pt-6 border-t border-neutral-50">
+															<div className="flex items-center gap-6">
+																<div className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest flex items-center gap-1.5">
+																	<Activity className="h-3 w-3" />
+																	ID: SS-{report.report_id.slice(0, 4)}
 																</div>
-															))}
+																{report.matched_services && report.matched_services.length > 0 && (
+																	<div className="flex items-center -space-x-2">
+																		{report.matched_services.slice(0, 3).map((_, i) => (
+																			<div key={i} className="w-6 h-6 rounded-full bg-sauti-teal/10 border-2 border-white flex items-center justify-center">
+																				<Shield className="h-3 w-3 text-sauti-teal" />
+																			</div>
+																		))}
+																		<span className="ml-4 text-[10px] font-black text-sauti-teal uppercase tracking-widest">
+																			{report.matched_services.length} Matches Found
+																		</span>
+																	</div>
+																)}
+															</div>
+															<div className="flex items-center gap-2 text-sauti-teal font-black text-xs group-hover:gap-3 transition-all">
+																Manage Case
+																<ArrowRight className="h-4 w-4" />
+															</div>
 														</div>
 													</div>
-												)}
-											</div>
-										))}
-									</div>
-								) : (
-									<div className="text-center py-20 px-6">
-										<div className="w-16 h-16 bg-neutral-100 rounded-3xl flex items-center justify-center mx-auto mb-4">
-											<Megaphone className="h-8 w-8 text-neutral-300" />
-										</div>
-										<h3 className="text-lg font-black text-sauti-dark">No reports yet</h3>
-										<p className="text-sm text-neutral-500 font-medium mt-2 max-w-xs mx-auto">
-											Submit your first report to start receiving support matches from professionals.
-										</p>
-									</div>
-								)}
-							</CardContent>
-						</Card>
+												</CardContent>
+											</Card>
+										</Link>
+									))}
+								</div>
+							) : (
+								<Card className="border-2 border-dashed border-neutral-100 rounded-[3rem] p-12 text-center bg-neutral-50/30">
+									<Activity className="h-12 w-12 text-neutral-200 mx-auto mb-4" />
+									<h3 className="text-xl font-black text-neutral-400">No Incidents Reported</h3>
+									<p className="text-neutral-400 font-medium max-w-xs mx-auto mt-2">
+										Your report history is empty. Use the "Report New Incident" button to start receiving support.
+									</p>
+								</Card>
+							)}
+						</div>
 					</div>
 
-					{/* Right Column: Actions & Help */}
-					<div className="space-y-6">
-						{/* Security Alert */}
-						<Alert className="bg-sauti-dark text-white border-0 shadow-premium rounded-3xl p-6">
-							<Shield className="h-6 w-6 text-sauti-teal mb-4" />
-							<AlertTitle className="text-xl font-black mb-2">Secure Haven</AlertTitle>
-							<AlertDescription className="text-sauti-teal-light/80 font-medium leading-relaxed">
-								Your data is encrypted and your identity is masked. Only qualified service providers can view your reports, and only with your explicit consent.
+					{/* Sidebar */}
+					<div className="lg:col-span-4 space-y-6">
+						{/* Anonymity Notice */}
+						<Card className="bg-neutral-900 border-0 rounded-[2.5rem] shadow-xl overflow-hidden relative">
+							<div className="absolute top-0 right-0 p-8 opacity-10">
+								<Lock className="h-24 w-24 text-white" />
+							</div>
+							<CardContent className="p-8 relative z-10">
+								<div className="w-12 h-12 bg-white/10 rounded-2xl flex items-center justify-center mb-6">
+									<Shield className="h-6 w-6 text-white" />
+								</div>
+								<h3 className="text-xl font-black text-white mb-2">Anonymous Account</h3>
+								<p className="text-neutral-400 font-medium text-sm leading-relaxed mb-6">
+									You are currently using a temporary, anonymous account. Your identity is fully protected.
+								</p>
+								<div className="space-y-4">
+									<div className="bg-white/5 rounded-2xl p-4 border border-white/10">
+										<p className="text-[10px] font-black text-neutral-400 uppercase tracking-widest mb-1">Assigned Username</p>
+										<p className="text-white font-mono text-sm uppercase">@{profileDetails.anon_username || "anonymous"}</p>
+									</div>
+									<Button asChild variant="link" className="text-sauti-teal p-0 h-auto font-black text-sm">
+										<Link href="/dashboard/settings" className="flex items-center gap-2">
+											Link to permanent account
+											<ExternalLink className="h-3 w-3" />
+										</Link>
+									</Button>
+								</div>
+							</CardContent>
+						</Card>
+
+						{/* Quick Link Real Account */}
+						<Alert className="border-neutral-100 rounded-[2rem] p-6 bg-white shadow-sm">
+							<Info className="h-5 w-5 text-sauti-teal" />
+							<AlertTitle className="text-sm font-black text-sauti-dark ml-2">Secure Link</AlertTitle>
+							<AlertDescription className="text-xs text-neutral-500 font-medium leading-relaxed mt-2 ml-2">
+								Want to keep this case history forever? Update your email address in settings to convert this to a permanent account.
 							</AlertDescription>
 						</Alert>
 
-						{/* Quick Actions */}
-						<div className="space-y-3">
-							<Link href="/dashboard/chat" className="block p-5 bg-white rounded-3xl shadow-sm border border-neutral-100 hover:border-sauti-teal/30 hover:shadow-md transition-all group">
-								<div className="flex items-center gap-4">
-									<div className="w-12 h-12 rounded-2xl bg-sauti-teal-light flex items-center justify-center group-hover:bg-sauti-teal transition-colors">
-										<MessageCircle className="h-6 w-6 text-sauti-teal group-hover:text-white transition-colors" />
-									</div>
-									<div className="flex-1">
-										<h4 className="font-black text-sauti-dark">Support Chat</h4>
-										<p className="text-xs text-neutral-500 font-medium">Connect with providers</p>
-									</div>
-									<ArrowRight className="h-4 w-4 text-neutral-300" />
+						{/* Need Help? */}
+						<div className="p-2 space-y-3">
+							<Link href="/dashboard/chat" className="flex items-center justify-between p-4 bg-neutral-50 hover:bg-neutral-100 transition-colors rounded-2xl group">
+								<div className="flex items-center gap-3">
+									<MessageCircle className="h-5 w-5 text-neutral-400 group-hover:text-sauti-teal transition-colors" />
+									<span className="text-sm font-black text-neutral-600">Secure Chat</span>
 								</div>
-							</Link>
-
-							<Link href="/dashboard/settings" className="block p-5 bg-white rounded-3xl shadow-sm border border-neutral-100 hover:border-sauti-teal/30 hover:shadow-md transition-all group">
-								<div className="flex items-center gap-4">
-									<div className="w-12 h-12 rounded-2xl bg-sauti-yellow-light flex items-center justify-center group-hover:bg-sauti-yellow transition-colors">
-										<Shield className="h-6 w-6 text-sauti-yellow-dark group-hover:text-white transition-colors" />
-									</div>
-									<div className="flex-1">
-										<h4 className="font-black text-sauti-dark">Privacy Settings</h4>
-										<p className="text-xs text-neutral-500 font-medium">Manage your security</p>
-									</div>
-									<ArrowRight className="h-4 w-4 text-neutral-300" />
-								</div>
+								<ArrowRight className="h-4 w-4 text-neutral-300" />
 							</Link>
 						</div>
-
-						{/* Emergency Card */}
-						<Card className="bg-sauti-red-light border-0 shadow-sm rounded-3xl">
-							<CardContent className="p-6">
-								<h3 className="text-lg font-black text-sauti-red mb-2">Immediate Danger?</h3>
-								<p className="text-sm text-sauti-red/80 font-bold mb-4">
-									If you are in immediate physical danger, please contact local emergency services or use the SOS button.
-								</p>
-								<Button className="w-full bg-sauti-red hover:bg-sauti-red/90 text-white font-black rounded-xl">
-									Emergency Contacts
-								</Button>
-							</CardContent>
-						</Card>
 					</div>
 				</div>
 			</div>
 
 			<Dialog open={open} onOpenChange={setOpen}>
-				<DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto p-0 border-0 rounded-3xl shadow-2xl">
+				<DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto p-0 border-0 rounded-[2rem] shadow-2xl">
 					<div className="p-8">
 						<DialogHeader className="mb-8">
 							<DialogTitle className="text-3xl font-black text-sauti-dark tracking-tight">Create Secure Report</DialogTitle>

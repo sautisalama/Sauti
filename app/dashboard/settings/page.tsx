@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Shield, Mail, User, Lock, Calendar, CheckCircle, XCircle, ArrowRight, ShieldCheck, ShieldX, ShieldAlert, ShieldQuestion, ShieldOff } from "lucide-react";
 
 import { useEffect, useState } from "react";
 import { useAccessibility } from "@/components/a11y/AccessibilityProvider";
@@ -78,6 +80,41 @@ export default function SettingsPage() {
 		noPreference: true,
 	});
 
+	// Account linking state
+	const [email, setEmail] = useState("");
+	const [updatingEmail, setUpdatingEmail] = useState(false);
+
+	useEffect(() => {
+		if (user?.email && !user.email.endsWith("@anon.sautisalama.org")) {
+			setEmail(user.email);
+		}
+	}, [user?.email]);
+
+	const handleUpdateAccount = async () => {
+		if (!email || !email.includes("@")) {
+			toast({ title: "Invalid Email", description: "Please enter a valid email address.", variant: "destructive" });
+			return;
+		}
+		setUpdatingEmail(true);
+		const { createClient } = await import("@/utils/supabase/client");
+		const supabase = createClient();
+		
+		const { error } = await supabase.auth.updateUser({ 
+			email,
+			data: { is_anonymous: false } // Explicitly mark as no longer anonymous in metadata
+		});
+
+		if (error) {
+			toast({ title: "Update Failed", description: error.message, variant: "destructive" });
+		} else {
+			toast({ 
+				title: "Email Updated", 
+				description: "A confirmation link has been sent to your new email. Please verify to complete account linking." 
+			});
+		}
+		setUpdatingEmail(false);
+	};
+
 	const onSave = (section: string) =>
 		toast({ title: "Saved", description: `${section} updated (UI only)` });
 
@@ -118,27 +155,78 @@ export default function SettingsPage() {
 
 				<TabsContent value="account">
 					<div className="space-y-6">
+						{/* Account Linking Banner for Anonymous Users */}
+						{(user?.profile?.is_anonymous || user?.profile?.anon_username) && (
+							<Alert className="bg-sauti-dark border-0 rounded-[2rem] p-8 text-white shadow-xl relative overflow-hidden">
+								<div className="absolute top-0 right-0 p-8 opacity-10">
+									<Shield className="h-24 w-24 text-white" />
+								</div>
+								<div className="relative z-10">
+									<AlertTitle className="text-xl font-black mb-2 flex items-center gap-2">
+										<Lock className="h-5 w-5 text-sauti-teal" />
+										Limited Session
+									</AlertTitle>
+									<AlertDescription className="text-neutral-400 font-medium leading-relaxed mb-6">
+										You are using a temporary anonymous account. To save your case history permanently and access it from any device, please link a valid email address below.
+									</AlertDescription>
+									<div className="flex items-center gap-3">
+										<div className="px-4 py-2 bg-white/5 rounded-xl border border-white/10 text-[10px] font-mono uppercase tracking-widest">
+											SESSION: {user?.profile?.anon_username || "guest"}
+										</div>
+									</div>
+								</div>
+							</Alert>
+						)}
+
 						{/* Account Settings */}
-						<Card>
-							<CardHeader>
-								<CardTitle>Account</CardTitle>
+						<Card className="rounded-[2.5rem] border-neutral-100 shadow-sm overflow-hidden">
+							<CardHeader className="p-8 pb-4">
+								<CardTitle className="text-xl font-black">Account Security</CardTitle>
 							</CardHeader>
-							<CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
-								<Input placeholder="Email" defaultValue={user?.email || ""} disabled />
-								<Input placeholder="Phone" />
-								<Input placeholder="City" />
-								<div className="md:col-span-2 flex justify-end">
-									<Button onClick={() => onSave("Account")}>Save</Button>
+							<CardContent className="p-8 pt-0 space-y-6">
+								<div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+									<div className="space-y-2">
+										<Label className="text-xs font-black uppercase tracking-widest text-neutral-400 ml-1">Email Address</Label>
+										<Input 
+											placeholder="Enter your email to link account" 
+											value={email}
+											onChange={(e) => setEmail(e.target.value)}
+											className="h-12 rounded-xl border-neutral-200 focus:border-sauti-teal focus:ring-4 focus:ring-sauti-teal/5"
+											disabled={updatingEmail}
+										/>
+									</div>
+									<div className="space-y-2">
+										<Label className="text-xs font-black uppercase tracking-widest text-neutral-400 ml-1">Phone Number</Label>
+										<Input 
+											placeholder="Primary contact number" 
+											className="h-12 rounded-xl border-neutral-200"
+										/>
+									</div>
+								</div>
+								
+								<div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t border-neutral-50">
+									<p className="text-xs text-neutral-400 font-medium">
+										Changing your email will trigger a confirmation link for security.
+									</p>
+									<Button 
+										onClick={handleUpdateAccount} 
+										disabled={updatingEmail}
+										className="w-full sm:w-auto bg-sauti-teal hover:bg-sauti-dark text-white font-black px-8 h-12 rounded-xl shadow-lg transition-all"
+									>
+										{updatingEmail ? "Processing..." : "Update Account"}
+									</Button>
 								</div>
 							</CardContent>
 						</Card>
 
 						{/* Calendar Integration */}
-						<CalendarConnectionStatus
-							userId={user?.id || ""}
-							variant="card"
-							showSettings={false}
-						/>
+						<div className="opacity-60 grayscale pointer-events-none">
+							<CalendarConnectionStatus
+								userId={user?.id || ""}
+								variant="card"
+								showSettings={false}
+							/>
+						</div>
 
 						{/* Next of Kin Settings - Only for survivors */}
 						{!isProfessional && (
