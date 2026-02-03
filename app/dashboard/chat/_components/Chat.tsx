@@ -172,7 +172,7 @@ export function ChatComponent({
 						).client.channel("messaging", channelId, {
 							members: [userId, otherUserId],
 							appointment_id: appointmentId,
-						});
+						} as any);
 
 						await newChannel.create();
 						setChannel(newChannel);

@@ -6,7 +6,7 @@ import { preloadChat, getPreloadedChat } from "@/utils/chat/preload";
 export function ChatPreloader({ userId, username }: { userId: string; username: string }) {
   const [isPreloading, setIsPreloading] = useState(false);
   const [isPreloaded, setIsPreloaded] = useState(false);
-  const retryTimeoutRef = useRef<NodeJS.Timeout>();
+  const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const retryCountRef = useRef(0);
   const maxRetries = 3;
 

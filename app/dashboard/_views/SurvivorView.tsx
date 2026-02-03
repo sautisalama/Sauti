@@ -3,6 +3,7 @@
 import { createClient } from "@/utils/supabase/client";
 import { Database, Tables } from "@/types/db-schema";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import {
 	Dialog,
 	DialogContent,

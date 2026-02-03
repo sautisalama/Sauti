@@ -77,7 +77,7 @@ export function LandingPage() {
 							<div className="flex flex-col gap-6">
 								<div className="bg-sauti-dark rounded-[32px] md:rounded-[40px] px-6 py-10 md:px-8 md:py-16 flex flex-col justify-center flex-1 min-h-[400px] md:min-h-[500px] relative overflow-hidden">
                                     <div className="absolute top-0 right-0 w-64 h-64 bg-sauti-teal/20 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
-									<span className="relative z-10 inline-flex w-fit px-4 py-2 rounded-full bg-sauti-teal/20 text-sauti-light-teal text-sm font-bold mb-8 uppercase tracking-wider mx-auto lg:mx-0 border border-sauti-teal/30">
+									<span className="relative z-10 inline-flex w-fit px-4 py-2 rounded-full bg-sauti-teal/20 text-white text-sm font-bold mb-8 uppercase tracking-wider mx-auto lg:mx-0 border border-sauti-teal/30">
 										Safety, Care, and Justice.
 									</span>
 									<h1 className="relative z-10 font-sans text-3xl md:text-5xl lg:text-6xl font-black text-white leading-tight mb-6 md:mb-8 tracking-tight">

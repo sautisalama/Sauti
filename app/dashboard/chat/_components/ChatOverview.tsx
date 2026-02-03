@@ -102,14 +102,14 @@ export function ChatOverview({
 				try {
 					const community = streamClient.channel("livestream", "community-global", {
 						name: "Sauti Community",
-					});
+					} as any);
 					await community.create();
 					await community.watch();
 					communityChannelRef.current = community;
 				} catch (err) {
 					const community = streamClient.channel("livestream", "community-global", {
 						name: "Sauti Community",
-					});
+					} as any);
 					await community.watch();
 					communityChannelRef.current = community;
 				}
@@ -121,7 +121,7 @@ export function ChatOverview({
 				let hasMore = true;
 				while (hasMore) {
 					const { users: page } = await streamClient.queryUsers(
-						{ id: { $ne: userId } },
+						{ id: { $ne: userId } } as any,
 						{ last_active: -1 },
 						{ limit: pageSize, offset, presence: true } as any
 					);
