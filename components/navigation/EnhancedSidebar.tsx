@@ -74,7 +74,7 @@ export function EnhancedSidebar({
 	const pathname = usePathname();
 	const user = useUser();
 	const dash = useDashboardData();
-	const [isCollapsed, setIsCollapsed] = useState(defaultCollapsed);
+	const { isSidebarCollapsed: isCollapsed, setIsSidebarCollapsed: setIsCollapsed } = dash || { isSidebarCollapsed: defaultCollapsed, setIsSidebarCollapsed: () => {} };
 	const [reportDialogOpen, setReportDialogOpen] = useState(false);
 	const [notifications, setNotifications] = useState(0);
 	const [casesCount, setCasesCount] = useState<number>(0);
@@ -86,13 +86,17 @@ export function EnhancedSidebar({
 		const handleResize = () => {
 			if (window.innerWidth < 1024) {
 				setIsCollapsed(true);
+			} else {
+				// Don't force expand unless it was previously expanded? 
+				// Actually, auto-collapse on move to mobile is good, but let's keep it simple.
+				setIsCollapsed(false);
 			}
 		};
 
 		handleResize();
 		window.addEventListener("resize", handleResize);
 		return () => window.removeEventListener("resize", handleResize);
-	}, []);
+	}, [setIsCollapsed]);
 
 	useEffect(() => {
 		// Prefer provider data when available to avoid extra fetches

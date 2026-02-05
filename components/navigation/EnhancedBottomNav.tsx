@@ -181,7 +181,7 @@ export function EnhancedBottomNav({ forceShow = false, className }: EnhancedBott
     <>
       <div
         className={cn(
-          "md:hidden fixed bottom-0 left-0 right-0 z-50",
+          "lg:hidden fixed bottom-0 left-0 right-0 z-50",
           "bg-white/95 dark:bg-neutral-900/95 backdrop-blur-xl",
           "border-t border-neutral-200 dark:border-neutral-800",
           "pb-safe-bottom",
