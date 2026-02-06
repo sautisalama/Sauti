@@ -322,11 +322,19 @@ export function LandingPage() {
                                             Join Movement
                                         </Button>
                                     </Link>
-                                    <Link href="/signup">
-                                        <Button variant="outline" className="text-white border-2 border-white/20 hover:bg-white/10 rounded-full px-8 md:px-12 py-6 md:py-10 text-lg md:text-2xl font-black shadow-2xl">
-                                            Explore App
-                                        </Button>
-                                    </Link>
+                                    {isAuthenticated ? (
+                                        <Link href="/dashboard">
+                                            <Button className="bg-sauti-teal text-white hover:bg-sauti-teal/90 rounded-full px-8 md:px-12 py-6 md:py-10 text-lg md:text-2xl font-black shadow-2xl">
+                                                Dashboard
+                                            </Button>
+                                        </Link>
+                                    ) : (
+                                        <Link href="/signup">
+                                            <Button variant="outline" className="text-white border-2 border-white/20 hover:bg-white/10 rounded-full px-8 md:px-12 py-6 md:py-10 text-lg md:text-2xl font-black shadow-2xl">
+                                                Explore App
+                                            </Button>
+                                        </Link>
+                                    )}
                                 </div>
 							</div>
 							<div className="lg:w-1/2 w-full hidden md:flex items-center justify-center relative h-[400px] lg:h-[500px]">

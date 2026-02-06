@@ -12,6 +12,7 @@ import { SupportServicesManager } from "./support-services-manager";
 import { signOut } from "@/app/(auth)/actions/auth";
 import { createClient } from "@/utils/supabase/client";
 import { useDashboardData } from "@/components/providers/DashboardDataProvider";
+import { useAccessibility } from "@/components/a11y/AccessibilityProvider";
 import {
 	User,
 	Shield,
@@ -19,7 +20,13 @@ import {
 	Camera,
 	Save,
 	LogOut,
-	ChevronRight
+	ChevronRight,
+	Contrast,
+	MousePointer2,
+	Type as FontIcon,
+	Underline,
+	RefreshCw,
+	Type
 } from "lucide-react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { SereneBreadcrumb, SereneSectionHeader } from "../_components/SurvivorDashboardComponents";
@@ -45,6 +52,7 @@ export default function ProfilePage() {
 	const isProfessional = profile?.user_type === "professional" || profile?.user_type === "ngo";
 	const supabase = createClient();
 	const router = useRouter();
+	const a11y = useAccessibility();
 
 	const [profileData, setProfileData] = useState<ProfileData>({});
 	const [formData, setFormData] = useState<Record<string, any>>({});
@@ -142,6 +150,7 @@ export default function ProfilePage() {
 	const navItems = [
 		{ id: 'account', label: 'Account Information', icon: User },
 		{ id: 'privacy', label: 'Privacy & Security', icon: Shield },
+		{ id: 'accessibility', label: 'Accessibility', icon: Contrast },
 		{ id: 'settings', label: 'App Settings', icon: Settings },
 	];
 
@@ -288,6 +297,98 @@ export default function ProfilePage() {
 									<p className="mt-4 text-sm text-serene-neutral-500 leading-relaxed">
 										Enabling anonymous mode will hide your real name from other users in community spaces and chats.
 									</p>
+								</CardContent>
+							</Card>
+						</div>
+					)}
+
+					{/* Section: Accessibility */}
+					{activeSection === 'accessibility' && (
+						<div className="space-y-6">
+							<Card className="rounded-[2rem] border-serene-neutral-200 shadow-sm bg-white overflow-hidden">
+								<CardHeader className="border-b border-serene-neutral-100 pb-6">
+									<CardTitle className="flex items-center gap-2 text-xl text-serene-neutral-900">
+										<Contrast className="h-6 w-6 text-serene-blue-500" />
+										Accessibility Settings
+									</CardTitle>
+								</CardHeader>
+								<CardContent className="space-y-6 pt-8">
+									<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+										{[
+											{ label: "High Contrast", prop: "highContrast", icon: Contrast },
+											{ label: "Reduce Motion", prop: "reduceMotion", icon: MousePointer2 },
+											{ label: "Readable Font", prop: "readableFont", icon: FontIcon },
+											{ label: "Dyslexic Font", prop: "dyslexic", icon: Type },
+											{ label: "Underline Links", prop: "underlineLinks", icon: Underline },
+										].map((item: any) => {
+											const isOn = !!(a11y as any)[item.prop];
+											return (
+												<button
+													key={item.prop}
+													onClick={() => a11y.set({ [item.prop]: !isOn })}
+													className={`
+														flex items-center justify-between px-5 py-4 rounded-2xl border-2 transition-all duration-200 group
+														${isOn 
+															? "bg-serene-blue-50 border-serene-blue-500 text-serene-blue-700 shadow-sm" 
+															: "bg-white border-serene-neutral-100 text-serene-neutral-600 hover:border-serene-neutral-200 hover:bg-serene-neutral-50"
+														}
+													`}
+												>
+													<div className="flex items-center gap-4">
+														<div className={`
+															p-2 rounded-xl transition-colors
+															${isOn ? "bg-serene-blue-500 text-white" : "bg-serene-neutral-100 text-serene-neutral-400 group-hover:text-serene-neutral-500"}
+														`}>
+															<item.icon className="h-5 w-5" />
+														</div>
+														<span className="font-bold text-sm">{item.label}</span>
+													</div>
+													<div className={`
+														relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out
+														${isOn ? "bg-serene-blue-500" : "bg-serene-neutral-200"}
+													`}>
+														<span className={`
+															pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out
+															${isOn ? "translate-x-5" : "translate-x-0"}
+														`} />
+													</div>
+												</button>
+											);
+										})}
+									</div>
+
+									<div className="pt-6 border-t border-serene-neutral-100">
+										<div className="mb-4 flex items-center gap-2 text-serene-neutral-500 font-bold uppercase tracking-widest text-xs">
+											<Type className="h-4 w-4" /> Text Scale
+										</div>
+										<div className="flex flex-wrap gap-3">
+											{[100, 112.5, 125, 137.5, 150].map((s) => (
+												<button
+													key={s}
+													onClick={() => a11y.set({ textScale: s })}
+													className={`
+														flex-1 px-4 py-3 rounded-xl border-2 text-sm font-bold transition-all
+														${a11y.textScale === s
+															? "bg-serene-blue-500 border-serene-blue-500 text-white shadow-md transform scale-105"
+															: "bg-white border-serene-neutral-100 text-serene-neutral-500 hover:border-serene-neutral-200"
+														}
+													`}
+												>
+													{s}%
+												</button>
+											))}
+										</div>
+									</div>
+
+									<div className="pt-4">
+										<Button 
+											onClick={() => a11y.reset()}
+											variant="ghost" 
+											className="w-full h-12 rounded-xl text-serene-neutral-400 hover:text-red-500 hover:bg-red-50"
+										>
+											<RefreshCw className="h-4 w-4 mr-2" /> Reset All Settings
+										</Button>
+									</div>
 								</CardContent>
 							</Card>
 						</div>

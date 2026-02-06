@@ -3,6 +3,7 @@ import withPWA from "next-pwa";
 const isWindows = process.platform === "win32";
 
 /** @type {import('next').NextConfig} */
+
 const nextConfig = {
 	images: {
 		remotePatterns: [

@@ -2,13 +2,13 @@ import type { Metadata, Viewport } from "next";
 import { Inter, Atkinson_Hyperlegible } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
-import "stream-chat-react/dist/css/v2/index.css";
+
 import { PWAInstallPrompt } from "@/components/PWAInstallPrompt";
 // import { SafetyBar } from "@/components/SafetyBar";
 import { AccessibilityProvider } from "@/components/a11y/AccessibilityProvider";
 import { KeyboardFocusScript } from "@/components/a11y/KeyboardFocusScript";
 import AccessibilityFAB from "@/components/a11y/AccessibilityFAB";
-import { ChatWarmupProvider } from "@/components/providers/ChatWarmupProvider";
+
 import { OrientationGuard } from "@/components/OrientationGuard";
 import { Suspense } from "react";
 
@@ -93,7 +93,7 @@ export default function RootLayout({
 }>) {
 	return (
 		<html lang="en">
-			<body className={`${inter.className} ${hyper.variable}`}>
+			<body className={`${inter.className} ${hyper.variable}`} suppressHydrationWarning>
 				{/* <SafetyBar /> */}
 				<a
 					href="#main-content"
@@ -102,13 +102,13 @@ export default function RootLayout({
 					Skip to content
 				</a>
 				<AccessibilityProvider>
-					<ChatWarmupProvider>
+
 						<KeyboardFocusScript />
 						<Suspense fallback={null}>
 							{children}
 						</Suspense>
 						<AccessibilityFAB />
-					</ChatWarmupProvider>
+
 				</AccessibilityProvider>
 				<OrientationGuard />
 				<PWAInstallPrompt />

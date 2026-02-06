@@ -1,0 +1,108 @@
+'use client';
+
+import { Message } from '@/types/chat';
+import { format } from 'date-fns';
+import { CheckCheck, Reply, Trash2, Copy } from 'lucide-react';
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuTrigger,
+} from '@/components/ui/context-menu';
+
+interface MessageBubbleProps {
+  message: Message;
+  isOwn: boolean;
+  showTail?: boolean;
+}
+
+export function MessageBubble({ message, isOwn, showTail = true }: MessageBubbleProps) {
+  const time = format(new Date(message.created_at), 'HH:mm');
+  const status = 'read'; 
+
+  // Link Preview Card
+  const LinkCard = ({ preview }: { preview: any }) => (
+    <a 
+      href={preview.url} 
+      target="_blank" 
+      rel="noreferrer" 
+      className={`block mt-1 mb-1 rounded-lg overflow-hidden border transition-transform hover:scale-[1.01] active:scale-[0.99] max-w-sm ${isOwn ? 'bg-white/10 border-white/20' : 'bg-serene-neutral-50 border-serene-neutral-100'}`}
+    >
+      {preview.image && (
+        <div className="h-32 w-full bg-cover bg-center" style={{ backgroundImage: `url(${preview.image})` }} />
+      )}
+      <div className="p-2">
+        <div className={`font-bold text-sm truncate ${isOwn ? 'text-white' : 'text-serene-neutral-900'}`}>{preview.title}</div>
+        <div className={`text-xs line-clamp-2 ${isOwn ? 'text-blue-100' : 'text-serene-neutral-500'}`}>{preview.description}</div>
+        <div className={`text-xs mt-1 truncate ${isOwn ? 'text-blue-200' : 'text-serene-blue-600'}`}>{preview.url}</div>
+      </div>
+    </a>
+  );
+
+  return (
+    <ContextMenu>
+      <ContextMenuTrigger>
+        <div className={`flex mb-1 ${isOwn ? 'justify-end' : 'justify-start'}`}>
+          <div 
+            className={`
+              relative max-w-[75%] px-3 py-2 rounded-2xl text-[15px] leading-relaxed shadow-sm
+              ${isOwn 
+                ? 'bg-serene-blue-600 text-white rounded-br-none' 
+                : 'bg-white text-serene-neutral-900 border border-serene-neutral-100 rounded-bl-none'
+              }
+            `}
+          >
+            {/* Tail removed for cleaner modern look */}
+
+            <div className="px-1.5 pt-0.5">
+               {/* Media Attachment */}
+               {message.metadata?.attachment_urls?.map((url, i) => (
+                   <div key={i} className="mb-2 rounded-lg overflow-hidden max-w-sm">
+                       {message.type === 'image' && <img src={url} alt="Shared" className="w-full h-auto" />}
+                       {message.type === 'video' && <video src={url} controls className="w-full h-auto" />}
+                       {message.type === 'file' && (
+                           <a href={url} target="_blank" rel="noreferrer" className="flex items-center gap-2 p-3 bg-gray-100 rounded">
+                               <span className="font-medium text-sm">Download File</span>
+                           </a>
+                       )}
+                   </div>
+               ))}
+
+                {/* Text Content */}
+                {message.type !== 'image' && (
+                  <span className={`break-words whitespace-pre-wrap ${isOwn ? 'text-white' : 'text-serene-neutral-900'}`}>{message.content}</span>
+                )}
+
+               {/* Link Preview */}
+               {message.metadata?.link_preview && (
+                 <LinkCard preview={message.metadata.link_preview} />
+               )}
+            </div>
+
+            {/* Metadata (Time + Ticks) */}
+            <div className={`flex justify-end gap-1 items-end mt-1 min-h-[15px] select-none text-[10px] opacity-80 ${isOwn ? 'text-blue-100' : 'text-serene-neutral-400'}`}>
+               <span className="mr-0.5 font-medium">{time}</span>
+               {isOwn && (
+                 <span>
+                   <CheckCheck className="h-3 w-3" />
+                 </span>
+               )}
+            </div>
+          </div>
+        </div>
+      </ContextMenuTrigger>
+      
+      <ContextMenuContent>
+        <ContextMenuItem>
+           <Reply className="mr-2 h-4 w-4" /> Reply
+        </ContextMenuItem>
+        <ContextMenuItem>
+           <Copy className="mr-2 h-4 w-4" /> Copy
+        </ContextMenuItem>
+        <ContextMenuItem className="text-red-500 focus:text-red-500">
+           <Trash2 className="mr-2 h-4 w-4" /> Delete
+        </ContextMenuItem>
+      </ContextMenuContent>
+    </ContextMenu>
+  );
+}

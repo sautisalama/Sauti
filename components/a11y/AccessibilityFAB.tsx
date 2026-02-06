@@ -62,7 +62,7 @@ export default function AccessibilityFAB() {
 	};
 
 	return (
-		<div className="fixed bottom-6 left-6 z-[100]">
+		<div className="fixed bottom-6 left-6 z-[100] hidden md:block">
 			{open && (
 				<div className="mb-4 w-80 rounded-[32px] border-2 border-gray-100 bg-white/95 backdrop-blur-xl shadow-2xl p-6 space-y-4 animate-in slide-in-from-bottom-4 duration-300">
 					<div className="flex items-center justify-between mb-2">

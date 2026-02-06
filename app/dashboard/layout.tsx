@@ -3,11 +3,12 @@ import { redirect } from "next/navigation";
 import { EnhancedSidebar } from "@/components/navigation/EnhancedSidebar";
 import { EnhancedBottomNav } from "@/components/navigation/EnhancedBottomNav";
 import { DashboardContent } from "@/components/dashboard/DashboardContent";
-import { MobileProfileButton } from "@/components/navigation/MobileProfileButton";
-import { ChatPreloader } from "./_components/ChatPreloader";
+import { MobileTopBar } from "@/components/navigation/MobileTopBar";
+import { MobileReportFAB } from "@/components/reports/MobileReportFAB";
+
 import { DashboardDataProvider } from "@/components/providers/DashboardDataProvider";
 import { fetchDashboardData } from "./_data/aggregate";
-import { UnreadSync } from "./_components/UnreadSync";
+
 
 export default async function DashboardLayout({
 	children,
@@ -42,24 +43,23 @@ export default async function DashboardLayout({
 				{/* Desktop Sidebar */}
 				<EnhancedSidebar />
 
+				{/* Mobile Top Bar */}
+				<MobileTopBar />
+
 				{/* Main Content Area - Handles dynamic margins for sidebar */}
 				<DashboardContent>
-					{/* Keep Stream client warm across all dashboard pages */}
-					<ChatPreloader userId={user.id} username={user.first_name || user.id} />
-					
-					{/* Sync unread count into provider if authenticated */}
-					<UnreadSync userId={user.id} username={user.first_name || user.id} />
 
-					<div id="main-content" className="pb-20 lg:pb-0 min-h-screen">
+					<div id="main-content" className="lg:pt-0 lg:pb-0 min-h-screen">
 						{children}
 					</div>
 
-					{/* Mobile Profile Button - Floating on mobile only */}
-					<MobileProfileButton />
 				</DashboardContent>
 
 				{/* Mobile Bottom Navigation */}
 				<EnhancedBottomNav />
+                
+                {/* Mobile Report FAB */}
+                <MobileReportFAB />
 			</DashboardDataProvider>
 		</div>
 	);

@@ -20,7 +20,6 @@ import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { getMockMatches, MockProvider } from "@/lib/mock-matches";
-import { MobileTabbar } from "@/components/MobileTabbar";
 import Link from "next/link";
 
 export default function ReportDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -449,7 +448,6 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
 					</div>
 				</div>
 			</main>
-			<MobileTabbar active="reports" base="/dashboard" userType="survivor" />
 		</div>
 	);
 }

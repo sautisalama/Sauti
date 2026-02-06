@@ -1,15 +1,10 @@
-"use client";
-
 import { useEffect, useState } from "react";
 import { createClient } from "@/utils/supabase/client";
 import { useUser } from "@/hooks/useUser";
 import { SereneActivityItem, SereneSectionHeader } from "../_components/SurvivorDashboardComponents";
 import { Bell, Calendar, CheckCircle, MessageCircle, Shield } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
-import dayjs from "dayjs";
-import relativeTime from "dayjs/plugin/relativeTime";
-
-dayjs.extend(relativeTime);
+import { formatDistanceToNow, isSameDay, subDays, parseISO } from "date-fns";
 
 export default function ActivityPage() {
   const user = useUser();
@@ -48,9 +43,9 @@ export default function ActivityPage() {
   };
 
   const groupedActivities = activities.reduce((acc, curr) => {
-     const date = dayjs(curr.created_at).isSame(dayjs(), 'day') 
+     const date = isSameDay(parseISO(curr.created_at), new Date()) 
         ? 'Today' 
-        : dayjs(curr.created_at).isSame(dayjs().subtract(1, 'day'), 'day')
+        : isSameDay(parseISO(curr.created_at), subDays(new Date(), 1))
            ? 'Yesterday'
            : 'Earlier';
      if (!acc[date]) acc[date] = [];
@@ -85,7 +80,7 @@ export default function ActivityPage() {
                             key={item.id}
                             title={item.title}
                             description={item.body}
-                            time={dayjs(item.created_at).fromNow()}
+                            time={formatDistanceToNow(parseISO(item.created_at), { addSuffix: true })}
                             icon={getIconForType(item.type)}
                             isUnread={!item.read}
                          />
