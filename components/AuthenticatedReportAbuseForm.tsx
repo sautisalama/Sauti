@@ -272,155 +272,135 @@ export default function AuthenticatedReportAbuseForm({
 		}
 	};
 
+	// Validation check
+	const formIsValid = useMemo(() => {
+		const hasIncidentType = incidentTypes.length > 0;
+		const hasUrgency = urgency !== "";
+		const hasConsent = consent !== "";
+		const hasContactPref = contactPreference !== "";
+		// Phone is optional unless contact pref is call/sms
+		const phoneRequired = contactPreference === "phone_call" || contactPreference === "sms";
+		// We can't easily check phone value here without state, so we rely on HTML5 validation for phone
+		// but checking other state-based requirements is good.
+		return hasIncidentType && hasUrgency && hasConsent && hasContactPref;
+	}, [incidentTypes, urgency, consent, contactPreference]);
+
 	return (
-		<div className="flex flex-col h-[90vh] bg-white overflow-hidden shadow-2xl rounded-[32px]">
-			{/* Modal Header */}
-			<div className="px-6 py-5 border-b bg-neutral-50 flex items-center justify-between shrink-0">
+		<div className="flex flex-col h-full bg-white">
+			{/* Header - Compact */}
+			<div className="px-6 py-4 border-b border-neutral-100 flex items-center justify-between shrink-0">
 				<div>
-					<h2 className="text-xl md:text-2xl font-black text-sauti-dark flex items-center gap-2">
-						Report Abuse
+					<h2 className="text-lg font-bold text-neutral-900 tracking-tight">
+						New Report
 					</h2>
-					<p className="text-xs text-neutral-500 font-medium tracking-wide">
-						Professional & Secure Reporting Ecosystem
+					<p className="text-xs text-neutral-500 font-medium">
+						Secure submission
 					</p>
 				</div>
-				{onClose && (
-					<Button
-						variant="ghost"
-						size="sm"
-						onClick={onClose}
-						className="rounded-full h-10 w-10 p-0 hover:bg-neutral-200 transition-colors"
-					>
-						✕
-					</Button>
-				)}
 			</div>
 
-			<div className="flex-1 overflow-y-auto p-4 sm:p-8 bg-neutral-50/20">
+			<div className="flex-1 overflow-y-auto px-4 md:px-6 py-6">
 				<form 
 					id="auth-report-form"
 					onSubmit={handleSubmit} 
-					className="space-y-10 max-w-4xl mx-auto pb-24"
+					className="space-y-6 max-w-3xl mx-auto pb-20"
 				>
-				<div className="space-y-4">
-						<div className="bg-white border md:border-2 border-neutral-200 rounded-2xl md:rounded-3xl p-4 md:p-6 shadow-sm hover:border-sauti-teal/30 transition-all mb-6">
-							<p className="text-sm font-black text-sauti-dark uppercase tracking-wider mb-4">Who are you reporting for?</p>
-							<div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-								<button
-									type="button"
-									onClick={() => setReportingFor('self')}
-									className={`flex items-center justify-center gap-2 px-4 py-3 rounded-xl md:rounded-2xl border-2 transition-all font-bold ${
-										reportingFor === 'self' 
-											? "border-sauti-teal bg-sauti-teal/5 text-sauti-teal shadow-inner" 
-											: "border-neutral-100 bg-neutral-50 text-neutral-500 hover:border-neutral-200"
-									}`}
-								>
-									<div className={`h-4 w-4 rounded-full border-2 flex items-center justify-center ${reportingFor === 'self' ? "border-sauti-teal" : "border-neutral-300"}`}>
-										{reportingFor === 'self' && <div className="h-2 w-2 rounded-full bg-sauti-teal" />}
-									</div>
-									Myself
-								</button>
-								<button
-									type="button"
-									onClick={() => setReportingFor('someone_else')}
-									className={`flex items-center justify-center gap-2 px-4 py-3 rounded-xl md:rounded-2xl border-2 transition-all font-bold ${
-										reportingFor === 'someone_else' 
-											? "border-sauti-teal bg-sauti-teal/5 text-sauti-teal shadow-inner" 
-											: "border-neutral-100 bg-neutral-50 text-neutral-500 hover:border-neutral-200"
-									}`}
-								>
-									<div className={`h-4 w-4 rounded-full border-2 flex items-center justify-center ${reportingFor === 'someone_else' ? "border-sauti-teal" : "border-neutral-300"}`}>
-										{reportingFor === 'someone_else' && <div className="h-2 w-2 rounded-full bg-sauti-teal" />}
-									</div>
-									Someone Else
-								</button>
-								<button
-									type="button"
-									onClick={() => setReportingFor('child')}
-									className={`flex items-center justify-center gap-2 px-4 py-3 rounded-xl md:rounded-2xl border-2 transition-all font-bold ${
-										reportingFor === 'child' 
-											? "border-sauti-teal bg-sauti-teal/5 text-sauti-teal shadow-inner" 
-											: "border-neutral-100 bg-neutral-50 text-neutral-500 hover:border-neutral-200"
-									}`}
-								>
-									<div className={`h-4 w-4 rounded-full border-2 flex items-center justify-center ${reportingFor === 'child' ? "border-sauti-teal" : "border-neutral-300"}`}>
-										{reportingFor === 'child' && <div className="h-2 w-2 rounded-full bg-sauti-teal" />}
-									</div>
-									A Child
-								</button>
-							</div>
-						</div>
-					<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-						<div>
-							<label className="block text-sm font-medium text-gray-700 mb-2">
-								Incident Type *
-							</label>
-							<MultiSelect
-								selected={incidentTypes}
-								onChange={setIncidentTypes}
-								options={[
-									{ value: "physical", label: "Physical abuse" },
-									{ value: "emotional", label: "Emotional abuse" },
-									{ value: "sexual", label: "Sexual abuse" },
-									{ value: "financial", label: "Financial abuse" },
-									{ value: "child_abuse", label: "Child abuse" },
-									{ value: "other", label: "Other" },
-								]}
-								placeholder="Select incident types"
-							/>
-						</div>
-						<div>
-							<label className="block text-sm font-medium text-gray-700 mb-2">
-								Urgency Level *
-							</label>
-							<EnhancedSelect
-								options={[
-									{ value: "high", label: "High urgency" },
-									{ value: "medium", label: "Medium urgency" },
-									{ value: "low", label: "Low urgency" },
-								]}
-								value={urgency}
-								onChange={(value) => {
-									setUrgency(value);
-									const form = document.querySelector("form") as HTMLFormElement;
-									const select = form.querySelector(
-										'select[name="urgency"]'
-									) as HTMLSelectElement;
-									if (select) select.value = value;
-								}}
-								placeholder="Select urgency level"
-								required
-								name="urgency"
-							/>
-							<select name="urgency" className="hidden">
-								<option value="">select urgency</option>
-								<option value="high">high urgency</option>
-								<option value="medium">medium urgency</option>
-								<option value="low">low urgency</option>
-							</select>
-						</div>
+				
+				{/* Reporting For */}
+				<div className="space-y-2">
+					<label className="text-xs font-bold text-neutral-500 uppercase tracking-wider">Who is this report for?</label>
+					<div className="grid grid-cols-3 gap-2">
+						{[
+							{ id: 'self', label: 'Myself' },
+							{ id: 'someone_else', label: 'Someone Else' },
+							{ id: 'child', label: 'A Child' }
+						].map((opt) => (
+							<button
+								key={opt.id}
+								type="button"
+								onClick={() => setReportingFor(opt.id as any)}
+								className={`flex items-center justify-center px-2 py-2.5 rounded-lg border transition-all font-medium text-xs sm:text-sm ${
+									reportingFor === opt.id 
+										? "border-sauti-teal bg-sauti-teal/5 text-sauti-teal ring-1 ring-sauti-teal" 
+										: "border-neutral-200 bg-white text-neutral-600 hover:border-neutral-300 hover:bg-neutral-50"
+								}`}
+							>
+								{opt.label}
+							</button>
+						))}
 					</div>
 				</div>
 
-				<div className="w-full space-y-3">
-					<div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
-						<span className="text-sm text-gray-600">
-							Share your story in writing or by voice (you can start with either)
+				<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+					<div>
+						<label className="block text-sm font-medium text-neutral-700 mb-1.5">
+							Incident Type <span className="text-red-500">*</span>
+						</label>
+						<MultiSelect
+							selected={incidentTypes}
+							onChange={setIncidentTypes}
+							options={[
+								{ value: "physical", label: "Physical abuse" },
+								{ value: "emotional", label: "Emotional abuse" },
+								{ value: "sexual", label: "Sexual abuse" },
+								{ value: "financial", label: "Financial abuse" },
+								{ value: "child_abuse", label: "Child abuse" },
+								{ value: "other", label: "Other" },
+							]}
+							placeholder="Select types..."
+						/>
+					</div>
+					<div>
+						<label className="block text-sm font-medium text-neutral-700 mb-1.5">
+							Urgency Level <span className="text-red-500">*</span>
+						</label>
+						<EnhancedSelect
+							options={[
+								{ value: "high", label: "High urgency" },
+								{ value: "medium", label: "Medium urgency" },
+								{ value: "low", label: "Low urgency" },
+							]}
+							value={urgency}
+							onChange={(value) => {
+								setUrgency(value);
+								const form = document.querySelector("form") as HTMLFormElement;
+								const select = form.querySelector(
+									'select[name="urgency"]'
+								) as HTMLSelectElement;
+								if (select) select.value = value;
+							}}
+							placeholder="Select urgency"
+							required
+							name="urgency"
+						/>
+						<select name="urgency" className="hidden">
+							<option value="">select urgency</option>
+							<option value="high">high urgency</option>
+							<option value="medium">medium urgency</option>
+							<option value="low">low urgency</option>
+						</select>
+					</div>
+				</div>
+
+				<div className="w-full space-y-2">
+					<div className="flex items-center justify-between">
+						<span className="text-sm font-medium text-neutral-700">
+							What happened? <span className="text-neutral-400 font-normal ml-1">(Optional)</span>
 						</span>
 						<Button
 							type="button"
 							variant="outline"
 							size="sm"
 							onClick={() => setRecorderOpen((v) => !v)}
-							className="w-full md:w-auto"
+							className="h-7 text-xs border-neutral-200 px-3"
 						>
-							{recorderOpen ? "Hide voice recorder" : "Record voice note"}
+							{recorderOpen ? "Hide recorder" : "Add Voice Note"}
 						</Button>
 					</div>
 
 					{recorderOpen && (
 						<div className="mt-2 fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-3 sm:p-4">
-							<div className="bg-white rounded-2xl p-4 sm:p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
+							<div className="bg-white rounded-2xl p-4 sm:p-6 w-full max-w-md max-h-[90vh] overflow-y-auto shadow-2xl">
 								<InlineRecorder
 									onRecorded={(blob) => {
 										setAudioBlob(blob);
@@ -437,12 +417,10 @@ export default function AuthenticatedReportAbuseForm({
 									onClose={() => setRecorderOpen(false)}
 								/>
 								{audioUploading && (
-									<p className="text-xs text-gray-500 mt-2">
-										Uploading voice note in background…
-									</p>
+									<p className="text-xs text-gray-500 mt-2">Uploading...</p>
 								)}
 								{audioUploadedUrl && !audioUploading && (
-									<p className="text-xs text-green-600 mt-2">Voice note uploaded ✓</p>
+									<p className="text-xs text-green-600 mt-2">Ready to submit ✓</p>
 								)}
 								{audioUploadError && (
 									<p className="text-xs text-red-600 mt-2">{audioUploadError}</p>
@@ -452,180 +430,165 @@ export default function AuthenticatedReportAbuseForm({
 					)}
 
 					{audioUrl && (
-						<div className="p-3 bg-green-50 border border-green-200 rounded-lg">
-							<div className="flex items-center justify-between mb-2">
-								<span className="text-sm font-medium text-green-700">
-									Voice note attached
-								</span>
-								<Button
-									type="button"
-									variant="ghost"
-									size="sm"
-									onClick={() => {
-										setAudioUrl(null);
-										setAudioBlob(null);
-										setAudioUploadedUrl(null);
-										setAudioUploadError(null);
-										audioUploadPromiseRef.current = null;
-										audioFilenameRef.current = null;
-										setAudioUploading(false);
-									}}
-								>
-									Remove
-								</Button>
+						<div className="p-3 bg-green-50/50 border border-green-100 rounded-lg flex items-center gap-3">
+							<div className="flex-1 min-w-0">
+								<div className="flex items-center justify-between mb-1">
+									<span className="text-xs font-semibold text-green-700 uppercase tracking-wide">
+										Voice Note Attached
+									</span>
+									<button
+										type="button"
+										onClick={() => {
+											setAudioUrl(null);
+											setAudioBlob(null);
+											setAudioUploadedUrl(null);
+											setAudioUploadError(null);
+											audioUploadPromiseRef.current = null;
+											audioFilenameRef.current = null;
+											setAudioUploading(false);
+										}}
+										className="text-xs text-red-500 hover:text-red-700 font-medium px-2 py-0.5 rounded hover:bg-red-50 transition-colors"
+									>
+										Remove
+									</button>
+								</div>
+								<AudioMiniPlayer src={audioUrl || ""} />
 							</div>
-							<AudioMiniPlayer src={audioUrl || ""} />
 						</div>
 					)}
 
 					<Textarea
-						placeholder="Please share what happened... (optional)"
+						placeholder="Describe the incident here..."
 						name="incident_description"
-						className="min-h-[120px] w-full text-base"
+						className="min-h-[100px] w-full text-sm border-neutral-200 focus:border-sauti-teal focus:ring-sauti-teal/20 rounded-xl resize-none py-3"
 						value={description}
 						onChange={(e) => setDescription(e.target.value)}
 					/>
-					{audioUrl && (
-						<p className="text-xs text-gray-500">
-							✓ Voice note attached - you can add additional text details if needed
-						</p>
-					)}
-					{!audioUrl && !description && (
-						<p className="text-xs text-gray-500">
-							💡 You can optionally describe what happened in writing, by voice, or
-							both
-						</p>
-					)}
 				</div>
 
 				<div className="w-full space-y-2">
-					<p className="text-lg text-gray-700">What support services do you need?</p>
-					<p className="text-sm text-gray-500">
-						Select all that apply in order of priority
-					</p>
+					<p className="text-sm font-medium text-neutral-700">Required Services</p>
 					<MultiSelect
 						selected={selectedServices}
 						onChange={setSelectedServices}
 						options={SUPPORT_SERVICE_OPTIONS}
-						placeholder="Select required services..."
+						placeholder="Select services..."
 					/>
 				</div>
 
-				<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-					<div className="col-span-full flex items-center gap-4">
-						<label className="inline-flex items-center gap-2 text-sm">
+				<div className="space-y-4 pt-2">
+					<div className="flex flex-col sm:flex-row gap-4 sm:gap-6">
+						<label className="inline-flex items-center gap-2 text-sm text-neutral-600 cursor-pointer hover:text-neutral-900">
 							<input
 								type="checkbox"
 								checked={needsDisabled}
 								onChange={(e) => setNeedsDisabled(e.target.checked)}
-							/>{" "}
-							I am disabled
+								className="rounded border-neutral-300 text-sauti-teal focus:ring-sauti-teal h-4 w-4"
+							/>
+							<span>I have a disability</span>
 						</label>
-						<label className="inline-flex items-center gap-2 text-sm">
+						<label className="inline-flex items-center gap-2 text-sm text-neutral-600 cursor-pointer hover:text-neutral-900">
 							<input
 								type="checkbox"
 								checked={needsQueer}
 								onChange={(e) => setNeedsQueer(e.target.checked)}
-							/>{" "}
-							I need queer support
+								className="rounded border-neutral-300 text-sauti-teal focus:ring-sauti-teal h-4 w-4"
+							/>
+							<span>I need queer-friendly support</span>
 						</label>
 					</div>
-					<div className="col-span-full">
-						<p className="text-lg text-gray-700">Contact Preference:</p>
+					
+					<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+						<div className="space-y-1">
+							<label className="block text-sm font-medium text-neutral-700 mb-1">Phone Number</label>
+							<Input
+								placeholder="+254..."
+								name="phone"
+								type="tel"
+								className="w-full rounded-lg border-neutral-200 h-10"
+								defaultValue={autofilledPhone || ""}
+							/>
+						</div>
+						<div className="space-y-1">
+							<label className="block text-sm font-medium text-neutral-700 mb-1">
+								Contact Method <span className="text-red-500">*</span>
+							</label>
+							<EnhancedSelect
+								options={[
+									{ value: "phone_call", label: "Phone Call" },
+									{ value: "sms", label: "SMS / Text" },
+									{ value: "email", label: "Email" },
+									{ value: "do_not_contact", label: "Do Not Contact" },
+								]}
+								value={contactPreference}
+								onChange={(value) => {
+									setContactPreference(value);
+									const form = document.querySelector("form") as HTMLFormElement;
+									const select = form.querySelector('select[name="contact_preference"]') as HTMLSelectElement;
+									if (select) select.value = value;
+									const phoneInput = document.querySelector('input[name="phone"]') as HTMLInputElement;
+									if (value === "phone_call" || value === "sms") phoneInput.required = true;
+									else phoneInput.required = false;
+								}}
+								placeholder="Select preference"
+								required
+								name="contact_preference"
+							/>
+							<select name="contact_preference" className="hidden">
+								<option value="">select contact preference</option>
+								<option value="phone_call">Call me</option>
+								<option value="sms">Text me</option>
+								<option value="email">Email me</option>
+								<option value="do_not_contact">Don't contact me</option>
+							</select>
+						</div>
 					</div>
+
 					<div className="space-y-1">
-						<Input
-							placeholder="Your phone number"
-							name="phone"
-							type="tel"
-							className="w-full"
-							defaultValue={autofilledPhone || ""}
+						<label className="block text-sm font-medium text-neutral-700 mb-1">
+							Consent to share <span className="text-red-500">*</span>
+						</label>
+						<EnhancedSelect
+							options={[
+								{ value: "yes", label: "Yes, I consent" },
+								{ value: "no", label: "No, I do not consent" },
+							]}
+							value={consent}
+							onChange={(value) => {
+								setConsent(value);
+								const form = document.querySelector("form") as HTMLFormElement;
+								const select = form.querySelector('select[name="consent"]') as HTMLSelectElement;
+								if (select) select.value = value;
+							}}
+							placeholder="Select option"
+							required
+							name="consent"
 						/>
-						{autofilledPhone && (
-							<p className="text-xs text-green-600">
-								✓ Phone number filled from your profile
-							</p>
-						)}
+						<select name="consent" className="hidden">
+							<option value="">select consent</option>
+							<option value="yes">Yes, I consent</option>
+							<option value="no">No, I don't consent</option>
+						</select>
 					</div>
-					<EnhancedSelect
-						options={[
-							{ value: "phone_call", label: "Call me" },
-							{ value: "sms", label: "Text me" },
-							{ value: "email", label: "Email me" },
-							{ value: "do_not_contact", label: "Don't contact me" },
-						]}
-						value={contactPreference}
-						onChange={(value) => {
-							setContactPreference(value);
-							const form = document.querySelector("form") as HTMLFormElement;
-							const select = form.querySelector(
-								'select[name="contact_preference"]'
-							) as HTMLSelectElement;
-							if (select) select.value = value;
-
-							const phoneInput = document.querySelector(
-								'input[name="phone"]'
-							) as HTMLInputElement;
-							if (value === "phone_call" || value === "sms") {
-								phoneInput.required = true;
-							} else {
-								phoneInput.required = false;
-							}
-						}}
-						placeholder="Select contact preference"
-						required
-						name="contact_preference"
-					/>
-					<select name="contact_preference" className="hidden">
-						<option value="">select contact preference</option>
-						<option value="phone_call">Call me</option>
-						<option value="sms">Text me</option>
-						<option value="email">Email me</option>
-						<option value="do_not_contact">Don't contact me</option>
-					</select>
 				</div>
 
-				<div className="space-y-3">
-					<label className="block text-sm font-medium text-gray-700">
-						Consent to share information with authorities *
-					</label>
-					<EnhancedSelect
-						options={[
-							{ value: "yes", label: "Yes, I consent" },
-							{ value: "no", label: "No, I don't consent" },
-						]}
-						value={consent}
-						onChange={(value) => {
-							setConsent(value);
-							const form = document.querySelector("form") as HTMLFormElement;
-							const select = form.querySelector(
-								'select[name="consent"]'
-							) as HTMLSelectElement;
-							if (select) select.value = value;
-						}}
-						placeholder="Select consent option"
-						required
-						name="consent"
-					/>
-					<select name="consent" className="hidden">
-						<option value="">select consent</option>
-						<option value="yes">Yes, I consent</option>
-						<option value="no">No, I don't consent</option>
-					</select>
-				</div>
 				</form>
 			</div>
-			<div className="shrink-0 pt-4 pb-6 bg-white border-t z-40">
-				<div className="max-w-4xl mx-auto px-4 md:px-8">
-					<Button
-						form="auth-report-form"
-						type="submit"
-						className="w-full bg-sauti-teal hover:bg-sauti-dark text-white py-4 text-base sm:text-lg font-black rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-300"
-						disabled={loading}
-					>
-						{loading ? "Submitting..." : "Submit Report"}
-					</Button>
-				</div>
+			
+			{/* Sticky Footer - Compact */}
+			<div className="shrink-0 py-4 px-6 bg-white border-t border-neutral-100 z-40">
+				<Button
+					form="auth-report-form"
+					type="submit"
+					className={`w-full h-12 text-base font-bold rounded-xl shadow-md transition-all duration-300 ${
+						loading || !formIsValid 
+						? "bg-neutral-200 text-neutral-400 cursor-not-allowed shadow-none" 
+						: "bg-sauti-teal hover:bg-sauti-dark text-white shadow-sauti-teal/20"
+					}`}
+					disabled={loading || !formIsValid}
+				>
+					{loading ? "Submitting..." : "Submit Report"}
+				</Button>
 			</div>
 		</div>
 	);

@@ -1,4 +1,5 @@
 "use client";
+import { cn } from "@/lib/utils";
 
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
@@ -14,17 +15,21 @@ import { generateCalendarUrls, generateICSFile, CalendarEvent } from '@/lib/goog
 import { AppointmentWithDetails } from '../_types';
 import { useToast } from '@/hooks/use-toast';
 
+
 interface AddToCalendarButtonProps {
   appointment: AppointmentWithDetails;
   size?: 'sm' | 'default' | 'lg';
   variant?: 'default' | 'outline' | 'ghost';
+  className?: string;
 }
 
 export function AddToCalendarButton({ 
   appointment, 
   size = 'sm', 
-  variant = 'outline' 
+  variant = 'outline',
+  className
 }: AddToCalendarButtonProps) {
+
   const [isCreatingEvent, setIsCreatingEvent] = useState(false);
   const { toast } = useToast();
 
@@ -130,7 +135,7 @@ Platform: Sauti - Supporting survivors with professional care
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant={variant} size={size} className="gap-2">
+        <Button variant={variant} size={size} className={cn("gap-2", className)}>
           <CalendarPlus className="h-4 w-4" />
           Add to Calendar
         </Button>

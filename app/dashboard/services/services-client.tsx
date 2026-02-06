@@ -1,4 +1,5 @@
 "use client";
+import { cn } from "@/lib/utils";
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Tables } from "@/types/db-schema";
@@ -334,42 +335,45 @@ useEffect(() => {
 						{services.map((service) => (
 							<Card
 								key={service.id}
-								className="hover:shadow-md transition-shadow cursor-pointer group"
+								className="rounded-2xl border-gray-100 hover:border-blue-200 hover:shadow-md transition-all duration-300 cursor-pointer group bg-white"
 								onClick={() => setSelectedService(service)}
 							>
 								<CardContent className="p-6">
 									<div className="flex items-start justify-between mb-4">
-										<div className="flex items-center gap-2">
-											<Building className="h-5 w-5 text-sauti-orange" />
-											<h3 className="font-semibold text-gray-900 truncate">
+										<div className="flex items-center gap-3">
+											<div className="h-10 w-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+												<Building className="h-5 w-5" />
+											</div>
+											<h3 className="font-bold text-gray-900 truncate max-w-[120px] sm:max-w-[160px]">
 												{service.name}
 											</h3>
 										</div>
-										<Badge className={getStatusColor(service.verification_status)}>
-											{service.verification_status || "pending"}
+										<Badge className={cn("capitalize px-2 py-0.5 rounded-lg border shadow-none", getStatusColor(service.verification_status))}>
+											{service.verification_status?.replace("_", " ") || "pending"}
 										</Badge>
 									</div>
 
-									<div className="space-y-2 mb-4">
+									<div className="space-y-3 mb-6">
 										<div className="flex items-center gap-2 text-sm text-gray-600">
-											<span className="capitalize">
+											<span className="capitalize px-2 py-0.5 bg-gray-50 rounded-md text-xs font-medium text-gray-500 border border-gray-100">
 												{service.service_types.replace("_", " ")}
 											</span>
 										</div>
 										{service.email && (
-											<div className="text-sm text-gray-600 truncate">{service.email}</div>
+											<div className="flex items-center gap-2 text-sm text-gray-500 truncate">
+												<span className="w-1.5 h-1.5 rounded-full bg-gray-300" />
+												{service.email}
+											</div>
 										)}
-										{service.phone_number && (
-											<div className="text-sm text-gray-600">{service.phone_number}</div>
-										)}
-										<div className="text-xs text-gray-500">
+										<div className="flex items-center gap-2 text-xs text-gray-400">
+											<Clock className="h-3 w-3" />
 											Created {formatDate(service.created_at)}
 										</div>
 									</div>
 
-									<div className="flex items-center justify-between">
-										<div className="flex items-center gap-2 text-sm text-gray-600">
-											<Shield className="h-4 w-4" />
+									<div className="flex items-center justify-between pt-4 border-t border-gray-50">
+										<div className="flex items-center gap-2 text-xs font-medium text-gray-500">
+											<Shield className="h-3.5 w-3.5 text-blue-400" />
 											<span>{getDocumentCount(service)} documents</span>
 										</div>
 										<div className="flex items-center gap-1">
@@ -380,7 +384,7 @@ useEffect(() => {
 													e.stopPropagation();
 													setSelectedService(service);
 												}}
-												className="opacity-0 group-hover:opacity-100 transition-opacity"
+												className="h-8 w-8 p-0 rounded-lg hover:bg-blue-50 hover:text-blue-600 transition-colors"
 											>
 												<Eye className="h-4 w-4" />
 											</Button>
@@ -392,7 +396,7 @@ useEffect(() => {
 													deleteService(service.id);
 												}}
 												disabled={isDeleting === service.id}
-												className="opacity-0 group-hover:opacity-100 transition-opacity text-red-600 hover:text-red-700"
+												className="h-8 w-8 p-0 rounded-lg hover:bg-red-50 hover:text-red-600 transition-colors text-gray-400"
 											>
 												{isDeleting === service.id ? (
 													<div className="animate-spin rounded-full h-4 w-4 border-b-2 border-red-600" />

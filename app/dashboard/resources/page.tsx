@@ -87,10 +87,10 @@ export default function BlogPage() {
 							onClick={() => setSelectedCategory(category)}
 							className={`
                                 ${
-																																	selectedCategory === category
-																																		? "bg-teal-600 hover:bg-teal-700"
-																																		: "text-teal-600 border-teal-600 hover:bg-teal-50"
-																																}
+                                    selectedCategory === category
+                                        ? "bg-serene-blue-600 hover:bg-serene-blue-700 text-white"
+                                        : "text-serene-blue-600 border-serene-blue-200 hover:bg-serene-blue-50"
+                                }
                             `}
 						>
 							{category}
@@ -104,7 +104,7 @@ export default function BlogPage() {
 				{filteredPosts.map((post, index) => (
 					<Card
 						key={index}
-						className="overflow-hidden hover:shadow-lg transition-shadow rounded-2xl border border-neutral-200"
+						className="overflow-hidden hover:shadow-lg transition-shadow rounded-3xl border border-serene-neutral-200"
 					>
 						<div className="relative h-48 w-full overflow-hidden">
 							<Image
@@ -116,20 +116,20 @@ export default function BlogPage() {
 						</div>
 						<CardHeader>
 							<div className="flex justify-between items-center mb-2">
-								<Badge variant="secondary" className="bg-teal-50 text-teal-700">
+								<Badge variant="secondary" className="bg-serene-green-50 text-serene-green-700">
 									{post.category}
 								</Badge>
-								<span className="text-sm text-gray-500">{post.date}</span>
+								<span className="text-sm text-serene-neutral-500">{post.date}</span>
 							</div>
-						<CardTitle className="text-xl font-bold text-[#1A3434] line-clamp-2 leading-snug">
+						<CardTitle className="text-xl font-bold text-serene-neutral-900 line-clamp-2 leading-snug">
 								{post.title}
 							</CardTitle>
 						</CardHeader>
 						<CardContent>
-							<p className="text-gray-600 line-clamp-3">{post.excerpt}</p>
+							<p className="text-serene-neutral-600 line-clamp-3 leading-relaxed">{post.excerpt}</p>
 							<Button
 								variant="link"
-								className="text-teal-600 hover:text-teal-700 p-0 mt-4"
+								className="text-serene-blue-600 hover:text-serene-blue-700 p-0 mt-4 font-semibold"
 							>
 								Read More →
 							</Button>
@@ -141,7 +141,7 @@ export default function BlogPage() {
 			{/* Empty State */}
 			{filteredPosts.length === 0 && (
 				<div className="text-center py-12">
-					<p className="text-gray-500">No posts found in this category.</p>
+					<p className="text-serene-neutral-500">No posts found in this category.</p>
 				</div>
 			)}
 		</div>

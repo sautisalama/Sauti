@@ -12,7 +12,7 @@ import {
 	DialogTitle,
 } from "@/components/ui/dialog";
 import { Calendar as UIDateCalendar } from "@/components/ui/calendar";
-import { ReportCard } from "@/components/reports/ReportCard";
+import { SereneReportCard } from "@/app/dashboard/_components/SurvivorDashboardComponents";
 import { ReportCardSkeleton } from "@/components/reports/ReportCardSkeleton";
 import {
 	CalendarDays,
@@ -37,6 +37,7 @@ import RichTextNotesEditor from "./rich-text-notes-editor";
 import { useToast } from "@/hooks/use-toast";
 import { useDashboardData } from "@/components/providers/DashboardDataProvider";
 import { CalendarConnectionStatus } from "../_components/CalendarConnectionStatus";
+import { SereneBreadcrumb } from "@/components/ui/SereneBreadcrumb";
 
 interface AppointmentLite {
 	id: string;
@@ -477,7 +478,15 @@ export default function ReportsMasterDetail({ userId }: { userId: string }) {
 						mobileView !== "list" ? "hidden lg:block" : ""
 					}`}
 				>
-					{/* Compact Search and Filter Bar */}
+					<div className="mb-6">
+						<SereneBreadcrumb items={[{ label: "Reports", active: true }]} className="mb-4" />
+						<div className="flex items-center justify-between">
+							<div>
+								<h1 className="text-2xl font-bold text-gray-900">My Reports</h1>
+								<p className="text-gray-500 mt-1">View your reports and check their status.</p>
+							</div>
+						</div>
+					</div>
 					<div className="mb-4 lg:sticky lg:top-[100px] lg:z-20 lg:bg-white/95 lg:backdrop-blur-sm lg:border-b lg:border-gray-200 lg:pb-4">
 						<div className="flex items-center gap-3">
 							{/* Search Bar */}
@@ -615,12 +624,18 @@ export default function ReportsMasterDetail({ userId }: { userId: string }) {
 								)}
 							</div>
 						) : (
+
 							filtered.map((r) => {
 								const isActive = selected?.report_id === r.report_id;
 								return (
 									<div key={r.report_id} className="transition-all duration-200">
-										<ReportCard
-											data={r as any}
+										<SereneReportCard
+											type={r.type_of_incident?.replace(/_/g, " ") || "Incident Report"}
+											date={formatDate(r.submission_timestamp)}
+											description={r.incident_description || ""}
+											status={r.matched_services && r.matched_services.length > 0 ? "matched" : "pending"}
+											urgency={(r.urgency as any) || "low"}
+											matchesCount={r.matched_services?.length || 0}
 											active={isActive}
 											onClick={() => setSelectedId(r.report_id)}
 										/>
@@ -724,8 +739,8 @@ export default function ReportsMasterDetail({ userId }: { userId: string }) {
 				</div>
 
 				{/* Overlay Detail Panel with animation */}
-				<div
-					className={`fixed inset-0 sm:inset-y-0 sm:right-0 sm:left-auto w-full sm:w-[540px] lg:w-[720px] bg-white shadow-2xl border-l z-40 transform transition-transform duration-300 ease-out ${
+			<div
+					className={`fixed inset-0 sm:inset-y-0 sm:right-0 sm:left-auto w-full sm:w-[600px] lg:w-[800px] bg-white shadow-2xl border-l border-serene-neutral-200 z-50 transform transition-transform duration-300 ease-out ${
 						selected
 							? "translate-y-0 sm:translate-x-0"
 							: "translate-y-full sm:translate-x-full"
@@ -743,45 +758,50 @@ export default function ReportsMasterDetail({ userId }: { userId: string }) {
 					onTouchEnd={onTouchEnd}
 				>
 					{selected && (
-						<div className="h-full flex flex-col bg-gray-50">
+						<div className="h-full flex flex-col bg-gray-50/50">
 							{/* Header */}
-							<div className="p-4 border-b border-gray-200 bg-white flex items-start justify-between gap-3 sticky top-0 z-10">
+							<div className="p-6 border-b border-serene-neutral-200 bg-white flex items-start justify-between gap-4 shadow-sm sticky top-0 z-20">
 								<div className="absolute left-1/2 -translate-x-1/2 -top-2 sm:hidden w-12 h-1.5 rounded-full bg-gray-300" />
-								<div className="flex items-start gap-3 min-w-0 flex-1">
-									<button
-										onClick={() => setSelectedId(null)}
-										className="sm:hidden -ml-1 p-1.5 rounded-md hover:bg-gray-100 transition-colors"
-									>
-										<ChevronLeft className="h-4 w-4 text-gray-600" />
-									</button>
-									<div className="min-w-0 flex-1">
-										<div className="flex items-center gap-2 mb-1">
-											<h2 className="text-lg font-semibold text-gray-900 truncate">
-												{selected.type_of_incident || "Unknown Incident"}
-											</h2>
-											<span
-												className={`px-2 py-0.5 rounded-md text-xs font-medium ${urgencyColor(
-													selected.urgency
-												)}`}
-											>
-												{selected.urgency || "low"}
-											</span>
+								
+								<button
+									onClick={() => setSelectedId(null)}
+									className="sm:hidden -ml-2 p-2 rounded-full hover:bg-gray-100 transition-colors"
+								>
+									<ChevronLeft className="h-5 w-5 text-gray-600" />
+								</button>
+								
+								<div className="min-w-0 flex-1">
+									<div className="flex items-center gap-3 mb-2">
+										<h2 className="text-xl font-bold text-gray-900 truncate">
+											{selected.type_of_incident?.replace(/_/g, " ") || "Unknown Incident"}
+										</h2>
+										<span
+											className={`px-2.5 py-1 rounded-lg text-xs font-bold uppercase tracking-wider ${urgencyColor(
+												selected.urgency
+											)}`}
+										>
+											{selected.urgency || "low"}
+										</span>
+									</div>
+									<div className="flex items-center gap-4 text-xs font-medium text-gray-500">
+										<div className="flex items-center gap-1.5">
+											<Clock className="h-3.5 w-3.5" />
+											<span>Submitted {formatDate(selected.submission_timestamp)}</span>
 										</div>
-										<div className="flex items-center gap-3 text-xs text-gray-500">
-											<div className="flex items-center gap-1">
-												<Clock className="h-3 w-3" />
-												<span>{formatDate(selected.submission_timestamp)}</span>
-											</div>
+										<div className="flex items-center gap-1.5">
+											<div className={`w-2 h-2 rounded-full ${selected.matched_services?.length ? "bg-green-500" : "bg-amber-500"}`} />
+											<span>{selected.matched_services?.length ? "Matched" : "Pending Match"}</span>
 										</div>
 									</div>
 								</div>
+
 								<Button
 									variant="ghost"
 									size="icon"
-									className="rounded-lg hover:bg-gray-100 transition-colors h-8 w-8"
+									className="hidden sm:flex rounded-full hover:bg-red-50 hover:text-red-600 transition-colors h-10 w-10"
 									onClick={() => setSelectedId(null)}
 								>
-									<X className="h-4 w-4 text-gray-600" />
+									<X className="h-5 w-5" />
 								</Button>
 							</div>
 

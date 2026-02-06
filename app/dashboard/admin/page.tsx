@@ -36,6 +36,7 @@ import { AdminUsersTable } from "./_components/AdminUsersTable";
 import { AdminServicesTable } from "./_components/AdminServicesTable";
 import { useToast } from "@/hooks/use-toast";
 import { AdminStats } from "@/types/admin-types";
+import { SereneBreadcrumb } from "@/components/ui/SereneBreadcrumb";
 
 export default function AdminDashboard() {
 	const [stats, setStats] = useState<AdminStats | null>(null);
@@ -126,17 +127,20 @@ export default function AdminDashboard() {
 		<div className="max-w-7xl mx-auto p-4 md:p-6">
 			<div className="space-y-6">
 				{/* Header */}
-				<div className="flex items-center justify-between">
-					<div>
-						<h1 className="text-3xl font-bold text-gray-900">Admin Dashboard</h1>
-						<p className="text-gray-600 mt-1">
-							Manage user verifications, services, and platform statistics
-						</p>
+				<div>
+					<SereneBreadcrumb items={[{ label: "Admin", active: true }]} className="mb-4" />
+					<div className="flex items-center justify-between">
+						<div>
+							<h1 className="text-3xl font-bold text-gray-900">Admin Dashboard</h1>
+							<p className="text-gray-600 mt-1">
+								Manage user verifications, services, and platform statistics
+							</p>
+						</div>
+						<Badge variant="secondary" className="bg-blue-100 text-blue-800">
+							<Shield className="h-4 w-4 mr-1" />
+							Admin Mode
+						</Badge>
 					</div>
-					<Badge variant="secondary" className="bg-blue-100 text-blue-800">
-						<Shield className="h-4 w-4 mr-1" />
-						Admin Mode
-					</Badge>
 				</div>
 
 				{/* Stats Cards */}

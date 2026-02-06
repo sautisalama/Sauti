@@ -322,10 +322,9 @@ export default function ProfessionalView({
 	};
 
 	return (
-		<div className="flex min-h-screen bg-white">
-			<main className="flex-1 w-full">
-				<div className="p-4 md:p-6 mt-14 md:mt-0 mb-20 md:mb-0">
-					<WelcomeHeader 
+		<>
+			<div className="max-w-7xl mx-auto p-4 lg:p-6">
+			<WelcomeHeader 
 						name={profileDetails.first_name || "Partner"} 
 						userType={profileDetails.user_type === "ngo" ? "ngo" : "professional"} 
 						timeOfDay={(() => {
@@ -685,8 +684,6 @@ export default function ProfessionalView({
 							<SafetyPlanCard userId={userId} />
 						</div>
 					</div>
-				</div>
-			</main>
 
 			{/* Delete Report Dialog */}
 			<AlertDialog
@@ -737,7 +734,6 @@ export default function ProfessionalView({
 				</AlertDialogContent>
 			</AlertDialog>
 
-			{/* Global Create Report Dialog */}
 			<Dialog open={reportDialogOpen} onOpenChange={setReportDialogOpen}>
 				<DialogContent className="max-w-4xl p-0 overflow-hidden rounded-[32px] h-[90vh] min-h-[600px] z-[1000]">
 					<DialogTitle className="sr-only">Report Abuse</DialogTitle>
@@ -752,5 +748,6 @@ export default function ProfessionalView({
 				</DialogContent>
 			</Dialog>
 		</div>
+		</>
 	);
 }

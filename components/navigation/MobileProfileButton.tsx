@@ -19,7 +19,7 @@ export function MobileProfileButton() {
     <Link
       href="/dashboard/profile"
       aria-label="Open profile"
-      className="md:hidden fixed top-3 right-3 z-50 rounded-full border border-neutral-200/60 dark:border-neutral-800/60 bg-white/70 dark:bg-neutral-900/60 backdrop-blur px-1.5 py-1.5 shadow-sm hover:shadow transition-shadow"
+      className="lg:hidden fixed top-3 right-3 z-50 rounded-full border border-neutral-200/60 dark:border-neutral-800/60 bg-white/70 dark:bg-neutral-900/60 backdrop-blur px-1.5 py-1.5 shadow-sm hover:shadow transition-shadow"
     >
       <div className="relative">
         <Avatar className="h-8 w-8">

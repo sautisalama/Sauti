@@ -69,8 +69,8 @@ export default function AnonymousSurvivorView({
 	};
 
 	return (
-		<div className="min-h-screen bg-slate-50/50">
-			<div className="max-w-6xl mx-auto px-6 py-12">
+		<>
+			<div className="max-w-7xl mx-auto p-4 lg:p-6 lg:py-12">
 				{/* Header Section */}
 				<div className="flex flex-col md:flex-row md:items-center justify-between gap-8 mb-16">
 					<div className="space-y-4">
@@ -280,6 +280,6 @@ export default function AnonymousSurvivorView({
 					</div>
 				</DialogContent>
 			</Dialog>
-		</div>
+		</>
 	);
 }

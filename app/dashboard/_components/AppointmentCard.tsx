@@ -239,197 +239,181 @@ export function AppointmentCard({
 	return (
 		<>
 			<div className={cn(
-        "rounded-2xl border-0 shadow-sm hover:shadow-md transition-all duration-300 group overflow-hidden relative mb-4",
-        appointment.status === "cancelled" ? "bg-sauti-red-light" : "bg-sauti-teal-light"
-      )}>
-        {/* Bottom Accent Line */}
-        <div className={cn(
-          "absolute bottom-0 left-0 right-0 h-1.5",
-          appointment.status === "cancelled" ? "bg-sauti-red" : "bg-sauti-teal"
-        )} />
-				<div className="p-4">
+				"group relative w-full bg-white rounded-2xl border transition-all duration-300 overflow-hidden",
+				"hover:shadow-lg hover:-translate-y-0.5 hover:border-blue-200",
+				appointment.status === "cancelled" ? "border-red-100 bg-red-50/10" : "border-gray-200"
+			)}>
+				{/* Status Strip */}
+				<div className={cn(
+					"absolute left-0 top-0 bottom-0 w-1.5 transition-colors duration-300",
+					appointment.status === "cancelled" ? "bg-red-400" : 
+					appointment.status === "completed" ? "bg-green-500" :
+					isUpcoming ? "bg-blue-500" : "bg-gray-300"
+				)} />
+
+				<div className="p-5 pl-7"> {/* Added padding-left for strip */}
 					{/* Header */}
-					<div className="flex items-start justify-between mb-3">
-						<div className="flex items-center gap-3 flex-1 min-w-0">
-							<div className="h-10 w-10 rounded-xl bg-sauti-dark text-white flex items-center justify-center font-black text-sm flex-shrink-0">
-								{appointment.matched_service?.support_service.name?.[0]?.toUpperCase() ||
-									"A"}
+					<div className="flex items-start justify-between mb-4">
+						<div className="flex items-center gap-4 min-w-0">
+							{/* Date Block */}
+							<div className={cn(
+								"flex flex-col items-center justify-center h-14 w-14 rounded-xl border shrink-0",
+								isUpcoming ? "bg-blue-50 border-blue-100 text-blue-700" : "bg-gray-50 border-gray-200 text-gray-500"
+							)}>
+								<span className="text-[10px] font-bold uppercase tracking-wider leading-none mb-1">
+									{format(appointmentDate, "MMM")}
+								</span>
+								<span className="text-xl font-bold leading-none">
+									{format(appointmentDate, "d")}
+								</span>
 							</div>
-							<div className="min-w-0 flex-1">
-								<h3 className="font-black text-sauti-dark truncate">
+
+							<div className="min-w-0">
+								<h3 className="font-bold text-gray-900 truncate text-base mb-1">
 									{appointment.matched_service?.support_service.name ||
 										"Direct Appointment"}
 								</h3>
-								<div className="flex items-center gap-2 text-sm text-gray-500">
-									<Calendar className="h-3 w-3 flex-shrink-0" />
-									<span>{format(appointmentDate, "MMM d, yyyy")}</span>
-									<span>•</span>
-									<Clock className="h-3 w-3 flex-shrink-0" />
+								<div className="flex items-center gap-2 text-xs text-gray-500 font-medium">
+									<Clock className="h-3.5 w-3.5 text-gray-400" />
 									<span>{format(appointmentDate, "h:mm a")}</span>
+									<span className="text-gray-300">•</span>
+									<span className={isUpcoming ? "text-blue-600" : ""}>
+										{format(appointmentDate, "EEEE")}
+									</span>
 									{isUpcoming && timeUntilAppointment > 0 && (
-										<>
-											<span>•</span>
-											<span className="text-blue-600 font-medium">
-												{timeUntilAppointment === 1
-													? "Tomorrow"
-													: `In ${timeUntilAppointment} days`}
-											</span>
-										</>
+										<Badge variant="secondary" className="ml-1 h-5 px-1.5 text-[10px] font-bold bg-blue-50 text-blue-700 hover:bg-blue-100 border-0">
+											{timeUntilAppointment === 1 ? "Tomorrow" : `${timeUntilAppointment}d left`}
+										</Badge>
 									)}
 								</div>
 							</div>
 						</div>
-						<div className="flex items-center gap-2 flex-shrink-0">
-							<Badge className={cn("rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-wider border-0", statusConfig.color)}>
-								{statusConfig.icon}
-								<span className="ml-1">{statusConfig.label}</span>
-							</Badge>
-							<DropdownMenu>
-								<DropdownMenuTrigger asChild>
-									<Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-										<MoreVertical className="h-4 w-4" />
-									</Button>
-								</DropdownMenuTrigger>
-								<DropdownMenuContent align="end">
-									<DropdownMenuItem onClick={handleOpenChat}>
-										<MessageCircle className="h-4 w-4 mr-2" />
-										Chat
+
+						<DropdownMenu>
+							<DropdownMenuTrigger asChild>
+								<Button variant="ghost" size="icon" className="h-8 w-8 -mr-2 text-gray-400 hover:text-gray-600">
+									<MoreVertical className="h-4 w-4" />
+								</Button>
+							</DropdownMenuTrigger>
+							<DropdownMenuContent align="end" className="w-48">
+								<DropdownMenuItem onClick={handleOpenChat}>
+									<MessageCircle className="h-4 w-4 mr-2" />
+									Chat
+								</DropdownMenuItem>
+								{appointment.matched_service?.support_service.phone_number && (
+									<DropdownMenuItem
+										onClick={() =>
+											(window.location.href = `tel:${appointment.matched_service.support_service.phone_number}`)
+										}
+									>
+										<Phone className="h-4 w-4 mr-2" />
+										Call
 									</DropdownMenuItem>
-									{appointment.matched_service?.support_service.phone_number && (
-										<DropdownMenuItem
-											onClick={() =>
-												(window.location.href = `tel:${appointment.matched_service.support_service.phone_number}`)
-											}
-										>
-											<Phone className="h-4 w-4 mr-2" />
-											Call
-										</DropdownMenuItem>
-									)}
-									<DropdownMenuItem asChild>
-										<AddToCalendarButton
-											appointment={appointment}
-											size="sm"
-											variant="ghost"
-										/>
-									</DropdownMenuItem>
-								</DropdownMenuContent>
-							</DropdownMenu>
-						</div>
+								)}
+								<DropdownMenuItem asChild>
+									<AddToCalendarButton
+										appointment={appointment}
+										size="sm"
+										variant="ghost"
+										className="w-full justify-start px-2 font-normal"
+									/>
+								</DropdownMenuItem>
+							</DropdownMenuContent>
+						</DropdownMenu>
 					</div>
 
-					{/* Service Details */}
-					<div className="mb-4">
-						{appointment.matched_service?.report?.incident_description && (
-							<div className="bg-gray-50 rounded-lg p-3 mb-3">
-								<p className="text-sm text-gray-700 line-clamp-2">
-									{appointment.matched_service.report.incident_description}
-								</p>
-							</div>
-						)}
-
-						{/* Participants */}
-						<div className="flex items-center gap-4 text-sm text-gray-600">
-							{appointment.professional && (
-								<div className="flex items-center gap-2">
-									<UserCircle className="h-4 w-4" />
-									<span className="truncate">
-										{appointment.professional.first_name}{" "}
-										{appointment.professional.last_name}
-									</span>
-								</div>
-							)}
-							{/* {appointment.survivor && (
-								<div className="flex items-center gap-2">
-									<UserCircle className="h-4 w-4" />
-									<span className="truncate">
-										{appointment.survivor.first_name} {appointment.survivor.last_name}
-									</span>
-								</div>
-							)} */}
-						</div>
-					</div>
-
-					{/* Professional Notes (if editing) */}
-					{appointment.professional_id === userId && isEditingNotes && (
-						<div className="bg-blue-50 rounded-lg p-3 mb-4">
-							<Textarea
-								value={notes}
-								onChange={(e) => setNotes(e.target.value)}
-								placeholder="Add your notes here..."
-								className="min-h-[80px] mb-2 text-sm"
-							/>
-							<div className="flex gap-2">
-								<Button
-									size="sm"
-									variant="outline"
-									onClick={() => setIsEditingNotes(false)}
-									className="flex-1 h-7 text-xs"
-								>
-									Cancel
-								</Button>
-								<Button
-									size="sm"
-									onClick={async () => {
-										await handleNotesUpdate();
-										setIsEditingNotes(false);
-									}}
-									disabled={isSavingNotes}
-									className="flex-1 h-7 text-xs"
-								>
-									{isSavingNotes ? "Saving..." : "Save"}
-								</Button>
-							</div>
+					{/* Service Details / Context */}
+					{appointment.matched_service?.report?.incident_description && (
+						<div className="mb-5 pl-1">
+							<p className="text-sm text-gray-600 line-clamp-2 leading-relaxed">
+								{appointment.matched_service.report.incident_description}
+							</p>
 						</div>
 					)}
 
-					{/* Action Buttons */}
-					<div className="flex items-center gap-2">
-						{appointment.status === "confirmed" && (
-							<>
+					{/* Participants & Primary Actions */}
+					<div className="flex items-center justify-between gap-4 mt-auto">
+						{/* Professional Info */}
+						<div className="flex items-center gap-3 min-w-0">
+							{appointment.professional && (
+								<div className="flex items-center gap-2 bg-gray-50 rounded-full pl-1 pr-3 py-1 border border-gray-100">
+									<div className="h-6 w-6 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-xs font-bold">
+										{appointment.professional.first_name?.[0]}
+									</div>
+									<span className="text-xs font-medium text-gray-700 truncate max-w-[120px]">
+										{appointment.professional.first_name} {appointment.professional.last_name}
+									</span>
+								</div>
+							)}
+						</div>
+
+						{/* Quick Actions Row */}
+						<div className="flex items-center gap-2">
+							<Button
+								variant="outline"
+								size="sm"
+								onClick={handleOpenChat}
+								className="h-9 px-3 text-xs bg-white hover:bg-gray-50 border-gray-200 text-gray-700"
+							>
+								<MessageCircle className="h-3.5 w-3.5 mr-1.5" />
+								Chat
+							</Button>
+							
+							{appointment.status === "confirmed" && isUpcoming ? (
 								<Button
-									variant="outline"
-									size="sm"
-									onClick={() => setIsRescheduleOpen(true)}
-									className="flex-1 h-8 text-xs"
+									onClick={() => window.open(appointment.meeting_link || "#", "_blank")} // Assuming meeting link exists or add placeholder
+									className="h-9 px-4 text-xs bg-blue-600 hover:bg-blue-700 text-white shadow-sm shadow-blue-200"
 								>
-									<RotateCcw className="h-3 w-3 mr-1" />
-									Reschedule
+									<Video className="h-3.5 w-3.5 mr-1.5" />
+									Join
 								</Button>
+							) : appointment.status === "confirmed" && appointment.professional_id === userId ? (
 								<Button
-									variant="outline"
-									size="sm"
-									onClick={() => handleStatusUpdate("cancelled")}
-									disabled={isUpdating}
-									className="flex-1 h-8 text-xs text-red-600 hover:text-red-700 hover:bg-red-50"
-								>
-									<XCircle className="h-3 w-3 mr-1" />
-									Cancel
-								</Button>
-							</>
-						)}
-						{appointment.professional_id === userId &&
-							appointment.status === "confirmed" && (
-								<Button
-									size="sm"
 									onClick={() => handleStatusUpdate("completed")}
 									disabled={isUpdating}
-									className="flex-1 h-8 text-xs bg-sauti-teal hover:bg-sauti-dark font-black rounded-full transition-all duration-300 shadow-md"
+									className="h-9 px-4 text-xs bg-green-600 hover:bg-green-700 text-white shadow-sm shadow-green-200"
 								>
-									<CheckCircle2 className="h-3 w-3 mr-1" />
+									<CheckCircle2 className="h-3.5 w-3.5 mr-1.5" />
 									Complete
 								</Button>
-							)}
-						{appointment.professional_id === userId && !isEditingNotes && (
-							<Button
-								variant="ghost"
-								size="sm"
-								onClick={() => setIsEditingNotes(true)}
-								className="h-8 w-8 p-0"
-							>
-								<Pencil className="h-3 w-3" />
-							</Button>
-						)}
+							) : null}
+						</div>
 					</div>
+
+					{/* Editor Area (Conditional) */}
+					{appointment.professional_id === userId && isEditingNotes && (
+						<div className="mt-4 pt-4 border-t border-dashed border-gray-200">
+							<div className="bg-yellow-50/50 rounded-lg p-3 border border-yellow-100">
+								<Textarea
+									value={notes}
+									onChange={(e) => setNotes(e.target.value)}
+									placeholder="Add private session notes..."
+									className="min-h-[80px] mb-2 text-sm bg-white border-yellow-200 focus-visible:ring-yellow-400"
+								/>
+								<div className="flex justify-end gap-2">
+									<Button
+										size="sm"
+										variant="ghost"
+										onClick={() => setIsEditingNotes(false)}
+										className="h-7 text-xs hover:bg-yellow-100 text-yellow-800"
+									>
+										Cancel
+									</Button>
+									<Button
+										size="sm"
+										onClick={async () => {
+											await handleNotesUpdate();
+											setIsEditingNotes(false);
+										}}
+										disabled={isSavingNotes}
+										className="h-7 text-xs bg-yellow-600 hover:bg-yellow-700 text-white"
+									>
+										{isSavingNotes ? "Saving..." : "Save Notes"}
+									</Button>
+								</div>
+							</div>
+						</div>
+					)}
 				</div>
 			</div>
 

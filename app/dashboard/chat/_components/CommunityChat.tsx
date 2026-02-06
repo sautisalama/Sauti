@@ -77,7 +77,7 @@ export function CommunityChat({ userId, username }: { userId: string; username: 
   }
 
   return (
-    <div className="flex h-[calc(100vh-0px)] w-full">
+    <div className="flex h-full w-full">
       <StreamChat client={client}>
         <div className={`flex h-full w-full ${styles.chatBackground}`}>
           <div className="flex-1 flex flex-col min-w-0">

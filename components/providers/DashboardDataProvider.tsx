@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useMemo, useState, useCallback } from "react";
+import React, { createContext, useContext, useMemo, useState, useCallback, useEffect } from "react";
 import { Tables } from "@/types/db-schema";
 import { AppointmentWithDetails, MatchedServiceWithRelations, ReportWithRelations } from "@/app/dashboard/_types";
 
@@ -26,6 +26,8 @@ export type DashboardDataContextType = {
   data: DashboardData | null;
   setUnreadChatCount: (n: number) => void;
   updatePartial: (patch: Partial<DashboardData>) => void;
+  isSidebarCollapsed: boolean;
+  setIsSidebarCollapsed: (v: boolean) => void;
 };
 
 const DashboardDataContext = createContext<DashboardDataContextType | null>(null);
@@ -38,6 +40,18 @@ export function DashboardDataProvider({
   children: React.ReactNode;
 }) {
   const [data, setData] = useState<DashboardData | null>(initialData ?? null);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("ss_sidebar_collapsed") === "1";
+    }
+    return false;
+  });
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("ss_sidebar_collapsed", isSidebarCollapsed ? "1" : "0");
+    }
+  }, [isSidebarCollapsed]);
 
   const setUnreadChatCount = useCallback((n: number) => {
     setData((prev) => {
@@ -51,7 +65,13 @@ export function DashboardDataProvider({
     setData((prev) => (prev ? { ...prev, ...patch } : prev));
   }, []);
 
-  const value = useMemo<DashboardDataContextType>(() => ({ data, setUnreadChatCount, updatePartial }), [data, setUnreadChatCount, updatePartial]);
+  const value = useMemo<DashboardDataContextType>(() => ({ 
+    data, 
+    setUnreadChatCount, 
+    updatePartial,
+    isSidebarCollapsed,
+    setIsSidebarCollapsed
+  }), [data, setUnreadChatCount, updatePartial, isSidebarCollapsed]);
 
   return <DashboardDataContext.Provider value={value}>{children}</DashboardDataContext.Provider>;
 }

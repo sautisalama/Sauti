@@ -1,10 +1,14 @@
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import Image from "next/image";
+import { SereneBreadcrumb } from "@/components/ui/SereneBreadcrumb";
 
 export default function AboutPage() {
   return (
     <div className="min-h-screen bg-white">
+      <div className="container mx-auto px-6 py-4">
+        <SereneBreadcrumb items={[{ label: "About Sauti Salama", active: true }]} />
+      </div>
       {/* Hero Section */}
       <section className="relative bg-gradient-to-br from-orange-400/90 via-orange-300/80 to-orange-100/70 py-20">
         <div className="container mx-auto px-6">
