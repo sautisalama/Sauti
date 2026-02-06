@@ -42,6 +42,34 @@ const config = {
           'sauti-red-light': '#FCE1DD', // Pastel background
           
           'sauti-dark': '#0B2228', // Rich Dark (Softened)
+
+          // Serene Palette (Survivor Dashboard)
+          'serene-blue': {
+              50: '#F0F7FF', // Backgrounds
+              100: '#E0F0FE',
+              200: '#BAE0FD',
+              300: '#7CCBFD',
+              400: '#36B2FA',
+              500: '#0C96EB', // Primary Brand/Action
+              600: '#0078C8',
+              700: '#0060A2',
+              800: '#005285', // Text
+              900: '#06436B',
+          },
+          'serene-green': {
+              50: '#F2FBF7',
+              100: '#DEF7EA', // Success backgrounds
+              500: '#26A668', // Success icons
+              700: '#1B764A', // Text
+          },
+          'serene-neutral': {
+             50: '#FAFAFA', // Main BG
+             100: '#F4F4F5', // Card BG
+             200: '#E4E4E7', // Borders
+             400: '#A1A1AA', // Icons
+             600: '#52525B', // Secondary Text
+             900: '#18181B', // Primary Text
+          },
     			
     			// Premium design system colors
 'primary': {

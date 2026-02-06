@@ -387,59 +387,88 @@ export function ChatComponent({
 												const unread = (ch as any).countUnread
 													? (ch as any).countUnread()
 													: 0;
-												return (
-													<button
-														key={ch.id || (isCommunity ? "community-global" : Math.random())}
-														className="w-full text-left px-3 py-2 hover:bg-gray-50 border-b"
-														onClick={() => {
-															setChannel(ch);
-															setShowUserList(false);
-															setShowNewChat(false);
-														}}
-													>
-														<div className="flex items-start gap-2">
-															<div className="relative mt-1">
-																<div className="w-9 h-9 rounded-full bg-gray-200 flex items-center justify-center text-gray-600 text-sm">
-																	{isCommunity ? "C" : label.toString().charAt(0).toUpperCase()}
-																</div>
-																{!isCommunity && (
-																	<span
-																		className={`absolute -right-0 -bottom-0 w-2.5 h-2.5 rounded-full ${
-																			other?.online ? "bg-green-500" : "bg-gray-300"
-																		}`}
-																	></span>
-																)}
+											return (
+												<button
+													key={ch.id || (isCommunity ? "community-global" : Math.random())}
+													className={`w-full text-left px-3 py-3 mx-2 mb-1 rounded-2xl transition-all duration-200 border border-transparent ${
+														channel?.id === ch.id
+															? "bg-sky-50 border-sky-100 shadow-sm"
+															: "hover:bg-gray-50 hover:shadow-sm"
+													}`}
+													onClick={() => {
+														setChannel(ch);
+														setShowUserList(false);
+														setShowNewChat(false);
+													}}
+												>
+													<div className="flex items-start gap-3">
+														<div className="relative">
+															<div
+																className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold shadow-sm ${
+																	channel?.id === ch.id
+																		? "bg-sky-100 text-sky-700"
+																		: "bg-gray-100 text-gray-500"
+																}`}
+															>
+																{isCommunity
+																	? "C"
+																	: label.toString().charAt(0).toUpperCase()}
 															</div>
-															<div className="flex-1 min-w-0">
-																<div className="flex items-center justify-between">
-																	<div className="font-medium truncate">{label}</div>
-																	<div className="text-[11px] text-muted-foreground">
-																		{last?.created_at
-																			? new Date(last.created_at).toLocaleTimeString([], {
-																					hour: "2-digit",
-																					minute: "2-digit",
-																			  })
-																			: ""}
-																	</div>
-																</div>
-																<div className="text-xs text-muted-foreground truncate">
-																	{last?.text ||
-																		(last?.attachments?.length
-																			? `${last.attachments.length} attachment(s)`
-																			: "No messages yet")}
-																</div>
-															</div>
-															{unread > 0 && (
-																<div className="ml-2 mt-1">
-																	<span className="inline-flex items-center justify-center min-w-5 h-5 text-[10px] rounded-full bg-green-600 text-white px-1">
-																		{unread}
-																	</span>
-																</div>
+															{!isCommunity && (
+																<span
+																	className={`absolute -right-0.5 -bottom-0.5 w-3 h-3 rounded-full border-2 border-white ${
+																		other?.online ? "bg-emerald-500" : "bg-gray-300"
+																	}`}
+																></span>
 															)}
 														</div>
-													</button>
-												);
-											})}
+														<div className="flex-1 min-w-0">
+															<div className="flex items-center justify-between mb-0.5">
+																<div
+																	className={`font-bold truncate ${
+																		channel?.id === ch.id
+																			? "text-gray-900"
+																			: "text-gray-700"
+																	}`}
+																>
+																	{label}
+																</div>
+																<div className="text-[10px] text-gray-400 font-medium">
+																	{last?.created_at
+																		? new Date(last.created_at).toLocaleTimeString(
+																				[],
+																				{
+																					hour: "2-digit",
+																					minute: "2-digit",
+																				}
+																		  )
+																		: ""}
+																</div>
+															</div>
+															<div
+																className={`text-xs truncate ${
+																	unread > 0
+																		? "font-bold text-gray-900"
+																		: "text-gray-500"
+																}`}
+															>
+																{last?.text ||
+																	(last?.attachments?.length
+																		? `${last.attachments.length} attachment(s)`
+																		: "No messages yet")}
+															</div>
+														</div>
+														{unread > 0 && (
+															<div className="ml-2 flex flex-col justify-center h-full">
+																<span className="inline-flex items-center justify-center min-w-[20px] h-5 text-[10px] font-bold rounded-full bg-sky-500 text-white px-1.5 shadow-sm">
+																	{unread}
+																</span>
+															</div>
+														)}
+													</div>
+												</button>
+											);
+										})}
 									</div>
 								)}
 							</div>

@@ -33,4 +33,5 @@ export interface AppointmentWithDetails {
 		support_service: Tables<"support_services">;
 		report: Tables<"reports">;
 	};
+	meeting_link?: string;
 }

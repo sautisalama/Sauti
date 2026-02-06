@@ -4,37 +4,25 @@ import { useState, useEffect, useCallback } from "react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { AnonymousModeToggle } from "@/components/chat/AnonymousModeToggle";
-import { ProfessionalDocumentsForm } from "./professional-documents";
-import { EnhancedProfessionalDocumentsForm } from "./enhanced-professional-documents";
-import { VerificationWrapper } from "./verification-wrapper";
 import { MobileVerificationSection } from "./mobile-verification-section";
 import { SupportServicesManager } from "./support-services-manager";
 import { signOut } from "@/app/(auth)/actions/auth";
 import { createClient } from "@/utils/supabase/client";
 import { useDashboardData } from "@/components/providers/DashboardDataProvider";
 import {
-	CheckCircle,
-	AlertCircle,
 	User,
 	Shield,
-	Building,
 	Settings,
-	Accessibility,
-	FileCheck,
+	Camera,
+	Save,
+	LogOut,
+	ChevronRight
 } from "lucide-react";
-import {
-	Accordion,
-	AccordionContent,
-	AccordionItem,
-	AccordionTrigger,
-} from "@/components/ui/accordion";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
+import { SereneBreadcrumb, SereneSectionHeader } from "../_components/SurvivorDashboardComponents";
 
 interface ProfileData {
 	bio?: string;
@@ -54,25 +42,16 @@ export default function ProfilePage() {
 	const profile = dash?.data?.profile;
 	const userId = dash?.data?.userId;
 	const { toast } = useToast();
-	const isProfessional =
-		profile?.user_type === "professional" || profile?.user_type === "ngo";
+	const isProfessional = profile?.user_type === "professional" || profile?.user_type === "ngo";
 	const supabase = createClient();
+	const router = useRouter();
 
 	const [profileData, setProfileData] = useState<ProfileData>({});
 	const [formData, setFormData] = useState<Record<string, any>>({});
-	const [activeTab, setActiveTab] = useState("profile");
 	const searchParams = useSearchParams();
-	// Remove local state - use dashboard data provider instead
+	const activeSection = searchParams?.get("section") || "account";
 
-	// Respect ?tab=verification to open the verification tab directly
-	useEffect(() => {
-		const tab = searchParams?.get("tab");
-		if (tab === "verification") {
-			setActiveTab("verification");
-		}
-	}, [searchParams]);
-
-	// Load profile data
+	// Data Sync
 	useEffect(() => {
 		if (profile) {
 			setProfileData({
@@ -91,12 +70,6 @@ export default function ProfilePage() {
 		}
 	}, [profile]);
 
-	// Get data from dashboard provider
-	const userServices = dash?.data?.supportServices || [];
-	const hasMatches = (dash?.data?.matchedServices?.length || 0) > 0;
-
-	// Data is already loaded by dashboard provider - no need for additional loading
-
 	const updateFormData = (section: string, field: string, value: any) => {
 		setFormData((prev) => ({
 			...prev,
@@ -105,47 +78,6 @@ export default function ProfilePage() {
 				[field]: value,
 			},
 		}));
-	};
-
-	const saveVerificationDocuments = async (documents: any[]) => {
-		try {
-			if (!userId) return;
-
-			const { error } = await supabase
-				.from("profiles")
-				.update({
-					accreditation_files: documents,
-					updated_at: new Date().toISOString(),
-				})
-				.eq("id", userId);
-
-			if (error) throw error;
-
-			// Update local state and provider cache
-			setProfileData((prev) => ({
-				...prev,
-				accreditation_files: documents,
-			}));
-			dash?.updatePartial({
-				profile: {
-					...(profile as any),
-					accreditation_files: documents,
-					updated_at: new Date().toISOString(),
-				} as any,
-			});
-
-			toast({
-				title: "Success",
-				description: "Verification documents saved successfully",
-			});
-		} catch (error) {
-			console.error("Error saving verification documents:", error);
-			toast({
-				title: "Error",
-				description: "Failed to save verification documents",
-				variant: "destructive",
-			});
-		}
 	};
 
 	const saveSection = async (section: string) => {
@@ -170,11 +102,9 @@ export default function ProfilePage() {
 						phone: sectionData.phone || profileData.phone,
 					};
 					break;
-				case "verification":
-					// This will be handled by the ProfessionalDocumentsForm component
-					// The form will call onSave after uploading files
-					return;
 			}
+
+			if (Object.keys(updateData).length === 0) return;
 
 			const { error } = await supabase
 				.from("profiles")
@@ -183,7 +113,6 @@ export default function ProfilePage() {
 
 			if (error) throw error;
 
-			// Update local state and provider cache
 			setProfileData((prev) => ({ ...prev, ...updateData }));
 			dash?.updatePartial({
 				profile: {
@@ -193,457 +122,202 @@ export default function ProfilePage() {
 				} as any,
 			});
 			toast({
-				title: "Saved",
-				description: `${section} information updated successfully`,
+				title: "Success",
+				description: "Profile updated successfully",
 			});
 		} catch (error) {
 			toast({
 				title: "Error",
-				description: `Failed to save ${section} information`,
+				description: "Failed to update profile",
 				variant: "destructive",
 			});
 		}
 	};
 
-	const getVerificationStatus = (section: string) => {
-		switch (section) {
-			case "professional":
-				return !!(
-					profileData.bio &&
-					profileData.professional_title &&
-					profileData.phone
-				);
-			case "verification":
-				return !!(
-					profileData.accreditation_files && profileData.accreditation_member_number
-				);
-			default:
-				return false;
-		}
-	};
-
-	// Check if user has uploaded documents in both verify and services tabs
-	const hasDocumentsInBothTabs = useCallback(async () => {
-		if (!userId) return false;
-
-		try {
-			// Check for professional credentials (verify tab)
-			const { data: profileData } = await supabase
-				.from("profiles")
-				.select("accreditation_files_metadata")
-				.eq("id", userId)
-				.single();
-
-			const hasProfessionalDocs = profileData?.accreditation_files_metadata
-				? Array.isArray(profileData.accreditation_files_metadata)
-					? profileData.accreditation_files_metadata.length > 0
-					: JSON.parse(profileData.accreditation_files_metadata).length > 0
-				: false;
-
-			// Check for service accreditation documents (services tab)
-			const { data: services } = await supabase
-				.from("support_services")
-				.select("accreditation_files_metadata")
-				.eq("user_id", userId);
-
-			const hasServiceDocs =
-				services?.some((service) => {
-					const docs = service.accreditation_files_metadata
-						? Array.isArray(service.accreditation_files_metadata)
-							? service.accreditation_files_metadata
-							: JSON.parse(service.accreditation_files_metadata)
-						: [];
-					return docs.length > 0;
-				}) || false;
-
-			return hasProfessionalDocs && hasServiceDocs;
-		} catch (error) {
-			console.error("Error checking documents in both tabs:", error);
-			return false;
-		}
-	}, [userId, supabase]);
-
-	// Refresh data using dashboard provider
 	const refreshAllData = useCallback(async () => {
 		if (!userId) return;
-		try {
-			// Refresh verification data in provider
-			const { data } = await supabase
-				.from("profiles")
-				.select(
-					"verification_status, last_verification_check, accreditation_files_metadata"
-				)
-				.eq("id", userId)
-				.single();
-			const docs = data?.accreditation_files_metadata
-				? Array.isArray(data.accreditation_files_metadata)
-					? data.accreditation_files_metadata
-					: JSON.parse(data.accreditation_files_metadata)
-				: [];
-			dash?.updatePartial({
-				verification: {
-					overallStatus: data?.verification_status || "pending",
-					lastChecked: data?.last_verification_check || null,
-					documentsCount: (docs || []).length,
-				},
-			});
-		} catch (error) {
-			console.error("Error refreshing data:", error);
-		}
-	}, [userId, supabase, dash]);
+		// Trigger dashboard refresh logic if needed
+	}, [userId]);
 
-	// Update verification status when user has documents in both tabs
-	useEffect(() => {
-		const checkAndUpdateStatus = async () => {
-			const hasBoth = await hasDocumentsInBothTabs();
-			if (hasBoth && profile?.verification_status === "pending") {
-				// Update verification status to "under_review" when user has documents in both tabs
-				try {
-					await supabase
-						.from("profiles")
-						.update({
-							verification_status: "under_review",
-							last_verification_check: new Date().toISOString(),
-						})
-						.eq("id", userId);
+	const navItems = [
+		{ id: 'account', label: 'Account Information', icon: User },
+		{ id: 'privacy', label: 'Privacy & Security', icon: Shield },
+		{ id: 'settings', label: 'App Settings', icon: Settings },
+	];
 
-					// Update local state
-					dash?.updatePartial({
-						profile: {
-							...(profile as any),
-							verification_status: "under_review",
-							last_verification_check: new Date().toISOString(),
-						} as any,
-					});
-				} catch (error) {
-					console.error("Error updating verification status:", error);
-				}
-			}
-		};
-
-		checkAndUpdateStatus();
-	}, [
-		hasDocumentsInBothTabs,
-		profile?.verification_status,
-		userId,
-		supabase,
-		dash,
-		profile,
-	]);
-
-	const getCompletionPercentage = () => {
-		const sections = ["professional", "verification"];
-		const completedSections = sections.filter((section) =>
-			getVerificationStatus(section)
-		);
-		return Math.round((completedSections.length / sections.length) * 100);
-	};
+	if (isProfessional) {
+		navItems.splice(1, 0, { id: 'verification', label: 'Verification & Docs', icon: Shield });
+		navItems.splice(2, 0, { id: 'services', label: 'My Services', icon: Shield });
+	}
 
 	return (
-		<div className="min-h-screen bg-gray-50 overflow-x-hidden">
-			{/* Header - Mobile Only */}
-			<div className="sm:hidden fixed top-0 left-0 right-0 z-50 bg-white border-b border-gray-200 px-4 py-3">
-				<div className="flex items-center justify-between">
-					<div className="flex items-center gap-3">
-						<Avatar className="h-10 w-10">
-							<AvatarImage src={profile?.avatar_url || ""} />
-							<AvatarFallback className="bg-sauti-orange text-white">
-								{profile?.first_name?.[0] || "U"}
-							</AvatarFallback>
-						</Avatar>
-						<div>
-							<h1 className="font-semibold text-gray-900">{profile?.first_name}</h1>
-						</div>
-					</div>
-					<Button
-						variant="outline"
-						size="sm"
-						onClick={() => signOut()}
-						className="text-red-600 border-red-200 hover:bg-red-50"
-					>
-						Sign Out
-					</Button>
-				</div>
+		<div className="min-h-screen bg-serene-neutral-50/50 pb-20 pt-2"> {/* Reduced top padding, softer bg */}
+			{/* Breadcrumb Header */}
+			<div className="px-4 md:px-8 py-4"> {/* Compact header padding */}
+				<SereneBreadcrumb items={[
+					{ label: 'Profile', href: '/dashboard/profile' },
+					{ label: activeSection.charAt(0).toUpperCase() + activeSection.slice(1) }
+				]} />
+				<SereneSectionHeader 
+					title="Profile & Settings" 
+					description="Manage your account, privacy, and preferences"
+					className="mt-2 text-2xl" // Smaller margin
+				/>
 			</div>
 
-			{/* Main Content */}
-			<div className="max-w-7xl mx-auto px-3 sm:px-4 pt-16 sm:pt-4 pb-4 sm:py-6 overflow-x-hidden">
-				<Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-					<TabsList
-						className={`grid w-full mb-4 sm:mb-6 ${
-							isProfessional ? "grid-cols-4" : "grid-cols-2"
-						}`}
-					>
-						<TabsTrigger
-							value="profile"
-							className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-3"
+			<div className="max-w-7xl mx-auto px-4 md:px-8 grid grid-cols-1 lg:grid-cols-12 gap-8">
+				{/* Sidebar Menu (Desktop) */}
+				<div className="lg:col-span-3 space-y-2 sticky top-6 h-fit"> {/* Sticky sidebar for better UX */}
+					<div className="bg-white/80 backdrop-blur-xl rounded-2xl p-2 border border-serene-neutral-200/60 shadow-sm">
+					{navItems.map(item => (
+						<button
+							key={item.id}
+							onClick={() => router.push(`/dashboard/profile?section=${item.id}`)}
+							className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 ${
+								activeSection === item.id 
+									? "bg-serene-blue-50 text-serene-blue-700 font-bold shadow-sm" 
+									: "text-serene-neutral-600 hover:bg-serene-neutral-50 hover:text-serene-blue-600"
+							}`}
 						>
-							<User className="h-3 w-3 sm:h-4 sm:w-4" />
-							<span className="hidden xs:inline">Profile</span>
-							<span className="xs:hidden">Profile</span>
-						</TabsTrigger>
-						{isProfessional && (
-							<TabsTrigger
-								value="verification"
-								className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-3"
-							>
-								<FileCheck className="h-3 w-3 sm:h-4 sm:w-4" />
-								<span className="hidden xs:inline">Verification</span>
-								<span className="xs:hidden">Verify</span>
-							</TabsTrigger>
-						)}
-						{isProfessional && (
-							<TabsTrigger
-								value="services"
-								className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-3"
-							>
-								<Building className="h-3 w-3 sm:h-4 sm:w-4" />
-								<span className="hidden xs:inline">Services</span>
-								<span className="xs:hidden">Services</span>
-							</TabsTrigger>
-						)}
-						<TabsTrigger
-							value="settings"
-							className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-3"
+							<item.icon className={`h-4.5 w-4.5 ${activeSection === item.id ? "text-serene-blue-600" : "text-serene-neutral-400"}`} />
+							<span className="text-sm tracking-wide">{item.label}</span>
+							{activeSection === item.id && (
+								<div className="ml-auto w-1 h-1 rounded-full bg-serene-blue-500" />
+							)}
+						</button>
+					))}
+					</div>
+					
+					<div className="pt-2">
+						<button 
+							onClick={() => signOut()}
+							className="w-full flex items-center gap-3 px-6 py-3.5 rounded-2xl text-red-600 hover:bg-red-50/80 border border-transparent hover:border-red-100 transition-all font-medium text-sm"
 						>
-							<Settings className="h-3 w-3 sm:h-4 sm:w-4" />
-							<span className="hidden xs:inline">Settings</span>
-							<span className="xs:hidden">Settings</span>
-						</TabsTrigger>
-					</TabsList>
+							<LogOut className="h-4.5 w-4.5" />
+							<span>Sign Out</span>
+						</button>
+					</div>
+				</div>
 
-					<TabsContent value="profile" className="space-y-3 sm:space-y-4">
-						{/* Basic Information Display */}
-						<Card>
-							<CardHeader className="pb-3 sm:pb-6">
-								<CardTitle className="flex items-center gap-2 text-base sm:text-lg">
-									<User className="h-4 w-4 sm:h-5 sm:w-5 text-sauti-orange" />
-									Basic Information
-								</CardTitle>
-							</CardHeader>
-							<CardContent className="space-y-3 sm:space-y-4">
-								<div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-									<div>
-										<label className="text-xs sm:text-sm font-medium text-gray-600">
-											First Name
-										</label>
-										<Input
-											placeholder="First Name"
-											value={formData.basic?.first_name ?? profileData.first_name ?? ""}
-											onChange={(e) =>
-												updateFormData("basic", "first_name", e.target.value)
-											}
-											className="mt-1 text-sm sm:text-base"
-										/>
-									</div>
-									<div>
-										<label className="text-xs sm:text-sm font-medium text-gray-600">
-											Last Name
-										</label>
-										<Input
-											placeholder="Last Name"
-											value={formData.basic?.last_name ?? profileData.last_name ?? ""}
-											onChange={(e) =>
-												updateFormData("basic", "last_name", e.target.value)
-											}
-											className="mt-1 text-sm sm:text-base"
-										/>
+				{/* Content Area */}
+				<div className="lg:col-span-9 space-y-6">
+					
+					{/* Header Card */}
+					<Card className="rounded-[2rem] border-serene-neutral-200/60 shadow-sm overflow-hidden bg-white group hover:shadow-md transition-all duration-500">
+						<div className="h-40 bg-gradient-to-r from-serene-blue-50 via-serene-purple-50 to-serene-pink-50 relative overflow-hidden">
+							<div className="absolute inset-0 bg-white/40 backdrop-blur-[2px]" />
+						</div>
+						<div className="px-8 pb-8 relative">
+							<div className="absolute -top-16 left-8">
+								<div className="relative group/avatar">
+									<Avatar className="h-32 w-32 border-[6px] border-white shadow-lg cursor-pointer transition-transform duration-300 group-hover/avatar:scale-[1.02]">
+										<AvatarImage src={profile?.avatar_url || ""} className="object-cover" />
+										<AvatarFallback className="bg-gradient-to-br from-serene-blue-600 to-serene-blue-700 text-white text-3xl font-bold">
+											{profile?.first_name?.[0] || "U"}
+										</AvatarFallback>
+									</Avatar>
+									<div className="absolute inset-0 bg-black/10 rounded-full opacity-0 group-hover/avatar:opacity-100 transition-opacity flex items-center justify-center cursor-pointer backdrop-blur-[1px]">
+										<Camera className="h-8 w-8 text-white drop-shadow-md" />
 									</div>
 								</div>
+							</div>
+							<div className="pl-40 pt-4 flex flex-col sm:flex-row justify-between items-start gap-4">
 								<div>
-									<label className="text-xs sm:text-sm font-medium text-gray-600">
-										Email
-									</label>
-									<p className="text-sm sm:text-lg font-medium text-gray-900 mt-1 break-all">
-										{profileData.email || "Not provided"}
-									</p>
-									<p className="text-xs text-gray-500">Email cannot be changed</p>
+									<h2 className="text-3xl font-bold text-serene-neutral-900 tracking-tight">{profile?.first_name} {profile?.last_name}</h2>
+									<p className="text-serene-neutral-500 font-medium">{profile?.email}</p>
 								</div>
+								{isProfessional && (
+									<div className="flex items-center gap-2 px-4 py-2 bg-serene-blue-50 text-serene-blue-700 rounded-full text-xs font-bold uppercase tracking-wider shadow-sm border border-serene-blue-100">
+										<Shield className="h-3 w-3" />
+										Professional Support
+									</div>
+								)}
+							</div>
+						</div>
+					</Card>
+
+					{/* Section: Account */}
+					{activeSection === 'account' && (
+						<Card className="rounded-[2rem] border-serene-neutral-200/60 shadow-sm bg-white overflow-hidden">
+							<CardHeader className="border-b border-serene-neutral-100 pb-6">
+								<CardTitle className="text-xl text-serene-neutral-900">Basic Information</CardTitle>
+							</CardHeader>
+							<CardContent className="space-y-8 pt-8">
+								<div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+									<div className="space-y-2">
+										<label className="text-sm font-semibold text-serene-neutral-700">First Name</label>
+										<Input 
+											value={formData.basic?.first_name ?? profileData.first_name ?? ""} 
+											onChange={(e) => updateFormData("basic", "first_name", e.target.value)}
+											className="rounded-xl border-serene-neutral-300 focus-visible:ring-serene-blue-200 bg-serene-neutral-50/50 h-11"
+										/>
+									</div>
+									<div className="space-y-2">
+										<label className="text-sm font-semibold text-serene-neutral-700">Last Name</label>
+										<Input 
+											value={formData.basic?.last_name ?? profileData.last_name ?? ""} 
+											onChange={(e) => updateFormData("basic", "last_name", e.target.value)}
+											className="rounded-xl border-serene-neutral-300 focus-visible:ring-serene-blue-200 bg-serene-neutral-50/50 h-11"
+										/>
+									</div>
+								</div>
+								
 								<div className="flex justify-end">
-									<Button
-										onClick={() => saveSection("basic")}
-										size="sm"
-										className="text-xs sm:text-sm"
-									>
-										Save Basic Information
+									<Button onClick={() => saveSection("basic")} className="bg-serene-blue-600 hover:bg-serene-blue-700 text-white rounded-xl">
+										<Save className="h-4 w-4 mr-2" /> Save Changes
 									</Button>
 								</div>
 							</CardContent>
 						</Card>
+					)}
 
-						{/* Anonymous Mode & Privacy */}
-						<Card>
-							<CardHeader className="pb-3 sm:pb-6">
-								<CardTitle className="flex items-center gap-2 text-base sm:text-lg">
-									<Shield className="h-4 w-4 sm:h-5 sm:w-5 text-sauti-orange" />
-									Privacy & Identity
-								</CardTitle>
-							</CardHeader>
-							<CardContent>
-								{userId && profile?.first_name && (
-									<AnonymousModeToggle userId={userId} username={profile.first_name} />
-								)}
-							</CardContent>
-						</Card>
+					{/* Section: Privacy */}
+					{activeSection === 'privacy' && (
+						<div className="space-y-6">
+							<Card className="rounded-3xl border-serene-neutral-200 shadow-sm bg-white">
+								<CardHeader>
+									<CardTitle className="flex items-center gap-2">
+										<Shield className="h-5 w-5 text-serene-blue-500" />
+										Anonymous Mode
+									</CardTitle>
+								</CardHeader>
+								<CardContent>
+									{userId && profile?.first_name && (
+										<AnonymousModeToggle userId={userId} username={profile.first_name} />
+									)}
+									<p className="mt-4 text-sm text-serene-neutral-500 leading-relaxed">
+										Enabling anonymous mode will hide your real name from other users in community spaces and chats.
+									</p>
+								</CardContent>
+							</Card>
+						</div>
+					)}
 
-						{/* Profile Completion Status */}
-						<Card className="border-amber-200 bg-amber-50">
-							<CardContent className="pt-4 sm:pt-6">
-								<div className="flex items-start gap-2 sm:gap-3">
-									<AlertCircle className="h-4 w-4 sm:h-5 sm:w-5 text-amber-600 mt-0.5 flex-shrink-0" />
-									<div className="flex-1 min-w-0">
-										<h3 className="font-semibold text-amber-800 text-sm sm:text-base">
-											Profile Completion Status
-										</h3>
-										<p className="text-xs sm:text-sm text-amber-700 mt-1">
-											Complete your profile to access all features and improve your
-											verification status.
-										</p>
-										<div className="mt-3">
-											<div className="flex items-center gap-2 text-xs sm:text-sm text-amber-700">
-												<span className="flex-shrink-0">Progress:</span>
-												<div className="flex-1 bg-amber-200 rounded-full h-2 min-w-0">
-													<div
-														className="bg-amber-600 h-2 rounded-full transition-all duration-300"
-														style={{ width: `${getCompletionPercentage()}%` }}
-													></div>
-												</div>
-												<span className="flex-shrink-0 text-xs">
-													{getCompletionPercentage()}%
-												</span>
-											</div>
-										</div>
-									</div>
-								</div>
-							</CardContent>
-						</Card>
-					</TabsContent>
-
-					{/* Verification Tab - Only for Professionals and NGOs */}
-					{isProfessional && (
-						<TabsContent value="verification" className="space-y-3 sm:space-y-4">
+					{/* Section: Professional Verification */}
+					{activeSection === 'verification' && isProfessional && (
+						<div className="space-y-6">
 							<MobileVerificationSection
 								userId={userId || ""}
-								userType={
-									(profile?.user_type as "professional" | "ngo" | "survivor") ||
-									"professional"
-								}
+								userType={(profile?.user_type as any) || "professional"}
 								onUploadSuccess={refreshAllData}
 							/>
-						</TabsContent>
+						</div>
 					)}
 
-					{/* Services Tab - Only for Professionals and NGOs */}
-					{isProfessional && (
-						<TabsContent value="services" className="space-y-3 sm:space-y-4">
-							<SupportServicesManager
-								userId={userId || ""}
-								userType={profile?.user_type || "professional"}
-								verificationStatus={
-									dash?.data?.verification?.overallStatus || "pending"
-								}
-								hasAccreditation={!!dash?.data?.verification?.documentsCount}
-								hasMatches={hasMatches}
-								verificationNotes={profile?.verification_notes || undefined}
-								documentsCount={dash?.data?.verification?.documentsCount || 0}
-								onDataUpdate={refreshAllData}
-							/>
-						</TabsContent>
+					{/* Section: Services */}
+					{activeSection === 'services' && isProfessional && (
+						<SupportServicesManager
+							userId={userId || ""}
+							userType={profile?.user_type || "professional"}
+							verificationStatus={dash?.data?.verification?.overallStatus || "pending"}
+							hasAccreditation={!!dash?.data?.verification?.documentsCount}
+							hasMatches={false}
+							documentsCount={dash?.data?.verification?.documentsCount || 0}
+							onDataUpdate={refreshAllData}
+						/>
 					)}
 
-					<TabsContent value="settings" className="space-y-3 sm:space-y-4">
-						<Card>
-							<CardHeader className="pb-3 sm:pb-6">
-								<CardTitle className="flex items-center gap-2 text-base sm:text-lg">
-									<Accessibility className="h-4 w-4 sm:h-5 sm:w-5 text-sauti-orange" />
-									Accessibility Settings
-								</CardTitle>
-							</CardHeader>
-							<CardContent className="space-y-4 sm:space-y-6">
-								<div className="space-y-3 sm:space-y-4">
-									<h4 className="font-medium text-sm sm:text-base">
-										Display Preferences
-									</h4>
-									<div className="space-y-3">
-										<div className="flex items-start justify-between gap-2 sm:gap-3">
-											<div className="flex-1 min-w-0">
-												<p className="font-medium text-sm sm:text-base">
-													High Contrast Mode
-												</p>
-												<p className="text-xs sm:text-sm text-gray-600">
-													Increase contrast for better visibility
-												</p>
-											</div>
-											<input type="checkbox" className="rounded flex-shrink-0 mt-1" />
-										</div>
-										<div className="flex items-start justify-between gap-2 sm:gap-3">
-											<div className="flex-1 min-w-0">
-												<p className="font-medium text-sm sm:text-base">Large Text</p>
-												<p className="text-xs sm:text-sm text-gray-600">
-													Increase text size for better readability
-												</p>
-											</div>
-											<input type="checkbox" className="rounded flex-shrink-0 mt-1" />
-										</div>
-										<div className="flex items-start justify-between gap-2 sm:gap-3">
-											<div className="flex-1 min-w-0">
-												<p className="font-medium text-sm sm:text-base">Reduced Motion</p>
-												<p className="text-xs sm:text-sm text-gray-600">
-													Minimize animations and transitions
-												</p>
-											</div>
-											<input type="checkbox" className="rounded flex-shrink-0 mt-1" />
-										</div>
-									</div>
-								</div>
-
-								<div className="space-y-3 sm:space-y-4">
-									<h4 className="font-medium text-sm sm:text-base">
-										Notification Preferences
-									</h4>
-									<div className="space-y-3">
-										<div className="flex items-start justify-between gap-2 sm:gap-3">
-											<div className="flex-1 min-w-0">
-												<p className="font-medium text-sm sm:text-base">
-													Email Notifications
-												</p>
-												<p className="text-xs sm:text-sm text-gray-600">
-													Receive updates via email
-												</p>
-											</div>
-											<input
-												type="checkbox"
-												className="rounded flex-shrink-0 mt-1"
-												defaultChecked
-											/>
-										</div>
-										<div className="flex items-start justify-between gap-2 sm:gap-3">
-											<div className="flex-1 min-w-0">
-												<p className="font-medium text-sm sm:text-base">
-													SMS Notifications
-												</p>
-												<p className="text-xs sm:text-sm text-gray-600">
-													Receive updates via SMS
-												</p>
-											</div>
-											<input type="checkbox" className="rounded flex-shrink-0 mt-1" />
-										</div>
-									</div>
-								</div>
-
-								<div className="flex justify-end">
-									<Button
-										onClick={() => saveSection("settings")}
-										size="sm"
-										className="text-xs sm:text-sm"
-									>
-										Save Settings
-									</Button>
-								</div>
-							</CardContent>
-						</Card>
-					</TabsContent>
-				</Tabs>
+				</div>
 			</div>
 		</div>
 	);

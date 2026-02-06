@@ -8,7 +8,10 @@ import {
   FileText, 
   LayoutDashboard,
   ClipboardList,
-  Calendar
+  Calendar,
+  Heart,
+  TrendingUp,
+  Users
 } from "lucide-react";
 import { useUser } from "@/hooks/useUser";
 import { cn } from "@/lib/utils";
@@ -107,12 +110,13 @@ export function EnhancedBottomNav({ forceShow = false, className }: EnhancedBott
       ];
     }
 
-    // Survivors: include Reports for quick access
+    // Survivors: Premium layout with 5 keys
     return [
-      { id: "overview", label: "Overview", icon: LayoutDashboard, href: "/dashboard" },
-      { id: "reports", label: "Reports", icon: ClipboardList, href: "/dashboard/reports" },
-      { id: "chat", label: "Chat", icon: MessageCircle, href: "/dashboard/chat", badge: (unreadMessages > 0 ? unreadMessages : undefined) },
-      { id: "resources", label: "Resources", icon: FileText, href: "/dashboard/resources" },
+      { id: "home", label: "Home", icon: LayoutDashboard, href: "/dashboard" },
+      { id: "cases", label: "My Cases", icon: ClipboardList, href: "/dashboard/reports" },
+      { id: "matches", label: "Matches", icon: Heart, href: "/dashboard/matches" }, // Assuming matches route exists or will be created/mapped
+      { id: "activity", label: "Activity", icon: TrendingUp, href: "/dashboard/activity", badge: (unreadMessages > 0 ? unreadMessages : undefined) }, // Mapping chat/badge here for now or separate
+      { id: "profile", label: "Profile", icon: Users, href: "/dashboard/profile" },
     ];
   };
 
@@ -136,19 +140,19 @@ export function EnhancedBottomNav({ forceShow = false, className }: EnhancedBott
     const content = (
       <div 
         className={cn(
-          "flex flex-col items-center gap-1 py-2 px-3 rounded-xl transition-all duration-300",
-          disabled ? "opacity-50" : "hover:bg-neutral-50 active:scale-95",
-          active ? "text-sauti-teal bg-sauti-teal-light" : "text-neutral-400 dark:text-neutral-500"
+          "flex flex-col items-center gap-1.5 py-2 px-3 rounded-2xl transition-all duration-300", // Increased gap, rounded-2xl
+          disabled ? "opacity-50" : "hover:bg-serene-neutral-50 active:scale-95",
+          active ? "text-serene-blue-700 bg-serene-blue-50" : "text-serene-neutral-400 bg-transparent" // Updated colors
         )}
         aria-disabled={disabled}
       >
         <div className="relative">
-          <Icon className={cn("h-5 w-5 transition-transform", active && "text-sauti-teal scale-110")} />
+          <Icon className={cn("h-6 w-6 transition-all duration-300", active && "text-serene-blue-600 scale-100 stroke-[2.5px]")} /> 
           {item.badge && item.badge > 0 && (
             <Badge 
               className={cn(
-                "absolute -top-2 -right-2 h-5 w-5 flex items-center justify-center p-0 text-[10px]",
-                "bg-error-500 text-white border-2 border-white dark:border-neutral-900"
+                "absolute -top-1.5 -right-1.5 h-4 w-4 flex items-center justify-center p-0 text-[9px] font-bold shadow-sm",
+                "bg-serene-red-500 text-white border border-white min-w-[16px]"
               )}
             >
               {item.badge > 99 ? "99+" : item.badge}
@@ -156,8 +160,8 @@ export function EnhancedBottomNav({ forceShow = false, className }: EnhancedBott
           )}
         </div>
         <span className={cn(
-          "text-[10px] font-bold leading-none tracking-tight transition-colors",
-          active ? "text-sauti-teal" : "text-neutral-500 dark:text-neutral-400"
+          "text-[10px] font-bold leading-none tracking-wide transition-colors",
+          active ? "text-serene-blue-700" : "text-serene-neutral-500"
         )}>
           {item.label}
         </span>
@@ -181,10 +185,9 @@ export function EnhancedBottomNav({ forceShow = false, className }: EnhancedBott
     <>
       <div
         className={cn(
-          "lg:hidden fixed bottom-0 left-0 right-0 z-50",
-          "bg-white/95 dark:bg-neutral-900/95 backdrop-blur-xl",
-          "border-t border-neutral-200 dark:border-neutral-800",
-          "pb-safe-bottom",
+          "lg:hidden fixed bottom-6 left-4 right-4 z-50 rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.12)]", // Floating island style
+          "bg-white/90 backdrop-blur-2xl ring-1 ring-white/20",
+          "pb-0", // Remove safe-bottom padding as it's floating
           className
         )}
       >

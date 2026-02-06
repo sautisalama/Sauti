@@ -36,6 +36,9 @@ import {
 } from "@/utils/chat/unread-tracker";
 import { useDashboardData } from "@/components/providers/DashboardDataProvider";
 import { CalendarConnectionStatus } from "../_components/CalendarConnectionStatus";
+import { SereneBreadcrumb } from "@/components/ui/SereneBreadcrumb";
+import { useRouter } from "next/navigation";
+
 
 interface MatchedServiceItem {
 	id: string;
@@ -56,6 +59,7 @@ interface MatchedServiceItem {
 }
 
 export default function CasesMasterDetail({ userId }: { userId: string }) {
+	const router = useRouter();
 	const supabase = useMemo(() => createClient(), []);
 	const dash = useDashboardData();
 	const seededFromProviderRef = useRef(false);
@@ -519,6 +523,15 @@ export default function CasesMasterDetail({ userId }: { userId: string }) {
 						mobileView !== "list" ? "hidden lg:block" : ""
 					}`}
 				>
+					<div className="mb-6">
+						<SereneBreadcrumb items={[{ label: "Cases", active: true }]} className="mb-4" />
+						<div className="flex items-center justify-between">
+							<div>
+								<h1 className="text-2xl font-bold text-gray-900">Case Management</h1>
+								<p className="text-gray-500 mt-1">Review your matched cases and leave feedback.</p>
+							</div>
+						</div>
+					</div>
 					{/* Compact Search and Filter Bar */}
 					<div className="mb-4 lg:sticky lg:top-[100px] lg:z-20 lg:bg-white/95 lg:backdrop-blur-sm lg:border-b lg:border-gray-200 lg:pb-4">
 						<div className="flex items-center gap-3">
@@ -664,7 +677,7 @@ export default function CasesMasterDetail({ userId }: { userId: string }) {
 										<CaseCard
 											data={c as any}
 											active={isActive}
-											onClick={() => setSelectedId(c.id)}
+											onClick={() => router.push(`/dashboard/reports/${c.report.report_id}`)}
 											isLoadingMessages={isLoadingMessages}
 										/>
 									</div>
@@ -766,7 +779,7 @@ export default function CasesMasterDetail({ userId }: { userId: string }) {
 
 				{/* Overlay Detail Panel with animation */}
 				<div
-					className={`fixed inset-0 sm:inset-y-0 sm:right-0 sm:left-auto w-full sm:w-[540px] lg:w-[720px] bg-white shadow-2xl border-l z-40 transform transition-transform duration-300 ease-out ${
+					className={`fixed inset-0 sm:inset-y-0 sm:right-0 sm:left-auto w-full sm:w-[600px] lg:w-[800px] bg-white shadow-2xl border-l border-serene-neutral-200 z-50 transform transition-transform duration-300 ease-out ${
 						selected
 							? "translate-y-0 sm:translate-x-0"
 							: "translate-y-full sm:translate-x-full"
@@ -774,54 +787,68 @@ export default function CasesMasterDetail({ userId }: { userId: string }) {
 					aria-hidden={!selected}
 				>
 					{selected && (
-						<div className="h-full flex flex-col bg-gray-50">
+						<div className="h-full flex flex-col bg-gray-50/50">
 							{/* Header */}
-							<div className="p-4 border-b border-gray-200 bg-white sticky top-0 z-10">
+							<div className="p-6 border-b border-serene-neutral-200 bg-white flex items-center justify-between gap-4 shadow-sm sticky top-0 z-20">
 								<div className="absolute left-1/2 -translate-x-1/2 -top-2 sm:hidden w-12 h-1.5 rounded-full bg-gray-300" />
 
-								{/* Top row with close button */}
-								<div className="flex items-start justify-between gap-3 mb-4">
-									<div className="flex items-start gap-3 min-w-0 flex-1">
-										<button
-											onClick={() => setSelectedId(null)}
-											className="sm:hidden -ml-1 p-1.5 rounded-md hover:bg-gray-100 transition-colors"
-										>
-											<ChevronLeft className="h-4 w-4 text-gray-600" />
-										</button>
-										<div className="min-w-0 flex-1">
-											<div className="flex items-center gap-2 mb-1">
-												<h2 className="text-lg font-semibold text-gray-900 truncate">
-													{selected.report?.type_of_incident || "Unknown Incident"}
-												</h2>
-												<span
-													className={`px-2 py-0.5 rounded-md text-xs font-medium ${urgencyColor(
-														selected.report?.urgency
-													)}`}
-												>
-													{selected.report?.urgency || "low"}
-												</span>
-											</div>
-											<div className="flex items-center gap-3 text-xs text-gray-500">
-												<div className="flex items-center gap-1">
-													<Clock className="h-3 w-3" />
-													<span>{formatDate(selected.match_date)}</span>
-												</div>
-												<div className="flex items-center gap-1">
-													<Shield className="h-3 w-3" />
-													<span>Case ID: {selected.id}</span>
-												</div>
-											</div>
+								<div className="flex items-center gap-3 min-w-0 flex-1">
+									<button
+										onClick={() => setSelectedId(null)}
+										className="sm:hidden -ml-2 p-2 rounded-full hover:bg-gray-100 transition-colors"
+									>
+										<ChevronLeft className="h-5 w-5 text-gray-600" />
+									</button>
+									
+									<div className="flex-1 min-w-0">
+										<div className="flex items-center gap-3 mb-1">
+											<h2 className="text-xl font-bold text-gray-900 truncate">
+												{selected.report?.type_of_incident || "Unknown Incident"}
+											</h2>
+											<span
+												className={`px-2.5 py-1 rounded-lg text-xs font-bold uppercase tracking-wider ${urgencyColor(
+													selected.report?.urgency
+												)}`}
+											>
+												{selected.report?.urgency || "low"}
+											</span>
 										</div>
+										<p className="text-xs font-medium text-gray-500 flex items-center gap-2">
+											<Clock className="h-3.5 w-3.5" />
+											Submitted {formatDate(selected.report?.submission_timestamp)}
+										</p>
 									</div>
+								</div>
+
+								<div className="flex items-center gap-2">
+									{/* Complete Case Button (if not completed) */}
+									{!selected.completed_at && (
+										<Button 
+											size="sm"
+											className="bg-serene-green-600 hover:bg-serene-green-700 text-white shadow-sm border border-serene-green-700 font-semibold"
+											onClick={() => handleCompleteCase(selected.id)}
+											disabled={isUpdatingStatus}
+										>
+											{isUpdatingStatus ? (
+												<div className="h-4 w-4 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2" />
+											) : (
+												<CheckCircle2 className="h-4 w-4 mr-1.5" />
+											)}
+											Complete Case
+										</Button>
+									)}
+									
 									<Button
 										variant="ghost"
 										size="icon"
-										className="rounded-lg hover:bg-gray-100 transition-colors h-8 w-8"
+										className="rounded-full hover:bg-red-50 hover:text-red-600 transition-colors h-10 w-10"
 										onClick={() => setSelectedId(null)}
 									>
-										<X className="h-4 w-4 text-gray-600" />
+										<X className="h-5 w-5" />
 									</Button>
 								</div>
+							</div>
+
 
 								{/* Progress Status Field */}
 								<div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
@@ -873,7 +900,6 @@ export default function CasesMasterDetail({ userId }: { userId: string }) {
 										</div>
 									</div>
 								</div>
-							</div>
 
 							{/* Body */}
 							<div className="flex-1 overflow-y-auto">
@@ -888,18 +914,18 @@ export default function CasesMasterDetail({ userId }: { userId: string }) {
 											{/* Service Info */}
 											<div>
 												<p className="text-sm font-medium text-gray-900">
-													{selected.support_service?.name || "Pending Match"}
+													{selected?.support_service?.name || "Pending Match"}
 												</p>
 												<p className="text-xs text-gray-600 mt-1">
 													Status:{" "}
 													<span className="font-medium capitalize">
-														{String(selected.match_status_type || "pending")}
+														{String(selected?.match_status_type || "pending")}
 													</span>
 												</p>
 											</div>
 
 											{/* Appointment Info */}
-											{selected.appointments?.[0] ? (
+											{selected?.appointments?.[0] ? (
 												<div className="bg-white rounded-lg border border-blue-200 p-3">
 													<div className="flex items-center gap-2 mb-2">
 														<CalendarDays className="h-4 w-4 text-green-600" />
@@ -997,7 +1023,7 @@ export default function CasesMasterDetail({ userId }: { userId: string }) {
 												onSaved={(html) => {
 													setCases((prev) =>
 														prev.map((c) =>
-															c.id === selected.id ? { ...c, notes: html } : c
+															c.id === selected?.id ? { ...c, notes: html } : c
 														)
 													);
 												}}

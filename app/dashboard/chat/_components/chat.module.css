@@ -8,11 +8,13 @@
 	height: 100%;
 }
 
-/* WhatsApp-like bubble styling overrides for stream-chat-react v2 */
+/* Serene Theme Overrides */
 .chatBackground {
-	--bubble-outgoing: #dcf8c6; /* WhatsApp light green */
+	--bubble-outgoing: #0ea5e9; /* Sky 500 / Serene Blue approx */
 	--bubble-incoming: #ffffff;
-	--bubble-meta: #667085;
+	--bubble-meta: #94a3b8;
+	background-color: #f8fafc; /* Slate 50 / Serene Neutral 50 */
+	background-image: none;
 }
 
 /* Message container spacing */

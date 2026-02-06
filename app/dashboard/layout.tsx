@@ -37,7 +37,7 @@ export default async function DashboardLayout({
 	};
 
 	return (
-		<div className="flex min-h-screen bg-white dark:bg-neutral-950 overflow-x-hidden">
+		<div className="flex min-h-screen bg-serene-neutral-50 dark:bg-neutral-950 overflow-x-hidden">
 			<DashboardDataProvider initialData={initialData || fallbackData}>
 				{/* Desktop Sidebar */}
 				<EnhancedSidebar />

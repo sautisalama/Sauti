@@ -41,6 +41,14 @@ import {
 	TooltipProvider,
 	TooltipTrigger,
 } from "@/components/ui/tooltip";
+import {
+	DropdownMenu,
+	DropdownMenuContent,
+	DropdownMenuItem,
+	DropdownMenuLabel,
+	DropdownMenuSeparator,
+	DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { useUser } from "@/hooks/useUser";
 import { createClient } from "@/utils/supabase/client";
 import { signOut } from "@/app/(auth)/actions/auth";
@@ -78,8 +86,10 @@ export function EnhancedSidebar({
 	const [reportDialogOpen, setReportDialogOpen] = useState(false);
 	const [notifications, setNotifications] = useState(0);
 	const [casesCount, setCasesCount] = useState<number>(0);
+	const [isAdminMode, setIsAdminMode] = useState(false);
 	const supabase = useMemo(() => createClient(), []);
 	const role = (dash?.data?.userType as any) ?? user?.profile?.user_type;
+
 
 	// Auto-collapse on mobile screen sizes
 	useEffect(() => {
@@ -97,6 +107,28 @@ export function EnhancedSidebar({
 		window.addEventListener("resize", handleResize);
 		return () => window.removeEventListener("resize", handleResize);
 	}, [setIsCollapsed]);
+
+	// Listen for Admin Mode changes
+	useEffect(() => {
+		const checkAdminMode = () => {
+			const mode = localStorage.getItem("adminMode") === "true";
+			setIsAdminMode(mode);
+		};
+
+		// Initial check
+		checkAdminMode();
+
+		// Listen for custom event from RoleSwitcher
+		window.addEventListener("adminModeChanged", checkAdminMode);
+		
+		// Also listen for storage events (if changed in another tab)
+		window.addEventListener("storage", checkAdminMode);
+
+		return () => {
+			window.removeEventListener("adminModeChanged", checkAdminMode);
+			window.removeEventListener("storage", checkAdminMode);
+		};
+	}, []);
 
 	useEffect(() => {
 		// Prefer provider data when available to avoid extra fetches
@@ -139,6 +171,7 @@ export function EnhancedSidebar({
 
 	const getSidebarItems = useCallback((): SidebarItem[] => {
 		const isDashboard = pathname?.startsWith("/dashboard");
+		const isAdminRoute = pathname?.startsWith("/dashboard/admin");
 
 		if (!isDashboard) {
 			return [
@@ -158,19 +191,67 @@ export function EnhancedSidebar({
 					section: "main",
 				},
 				{
-					id: "report",
-					label: "Report Incident",
-					icon: Megaphone,
-					onClick: () => setReportDialogOpen(true),
-					section: "main",
-				},
-				{
 					id: "dashboard",
 					label: "Dashboard",
 					icon: LayoutDashboard,
 					href: "/dashboard",
 					section: "secondary",
 					separator: true,
+				},
+			];
+		}
+
+		// Admin Dashboard Navigation
+		if (isAdminRoute || isAdminMode) {
+			return [
+				{
+					id: "overview",
+					label: "Overview",
+					icon: LayoutDashboard,
+					href: "/dashboard/admin",
+					section: "main",
+				},
+				{
+					id: "verifications",
+					label: "Verifications",
+					icon: Shield,
+					href: "/dashboard/admin/verifications",
+					section: "main",
+					badge: dash?.data?.verification?.pendingCount || undefined
+				},
+				{
+					id: "content",
+					label: "Content Management",
+					icon: FileText,
+					href: "/dashboard/admin/content",
+					section: "main",
+				},
+				{
+					id: "chat",
+					label: "Messages",
+					icon: MessageCircle,
+					href: "/dashboard/chat",
+					badge:
+						typeof dash?.data?.unreadChatCount === "number" &&
+						dash.data.unreadChatCount > 0
+							? dash.data.unreadChatCount
+							: undefined,
+					section: "main",
+				},
+				{
+					id: "users",
+					label: "User Management",
+					icon: Users,
+					href: "/dashboard/admin/users",
+					section: "secondary",
+					separator: true
+				},
+				{
+					id: "settings",
+					label: "Settings",
+					icon: Settings,
+					href: "/dashboard/profile?tab=settings",
+					section: "footer",
 				},
 			];
 		}
@@ -184,17 +265,6 @@ export function EnhancedSidebar({
 				section: "main",
 			},
 		];
-
-		// Add admin navigation if user is admin
-		if (dash?.data?.profile?.is_admin) {
-			baseItems.push({
-				id: "admin",
-				label: "Admin Dashboard",
-				icon: Shield,
-				href: "/dashboard/admin",
-				section: "main",
-			});
-		}
 
 		if (role === "survivor") {
 			const survivorMain: SidebarItem[] = [
@@ -235,60 +305,6 @@ export function EnhancedSidebar({
 			];
 			return [
 				...survivorMain,
-				{
-					id: "report",
-					label: "Report Incident",
-					icon: Megaphone,
-					onClick: () => setReportDialogOpen(true),
-					section: "secondary",
-					separator: true,
-				},
-				{
-					id: "profile",
-					label: "Profile",
-					icon: User,
-					href: "/dashboard/profile",
-					section: "secondary",
-				},
-				{
-					id: "settings",
-					label: "Settings",
-					icon: Settings,
-					href: "/dashboard/profile?tab=settings",
-					section: "footer",
-				},
-			];
-			return [
-				...baseItems,
-				{
-					id: "appointments",
-					label: "Appointments",
-					icon: Calendar,
-					href: "/dashboard/appointments",
-					section: "main",
-				},
-				{
-					id: "community",
-					label: "Community",
-					icon: Users,
-					href: "/dashboard/community",
-					section: "main",
-				},
-				{
-					id: "report",
-					label: "Report Incident",
-					icon: Megaphone,
-					onClick: () => setReportDialogOpen(true),
-					section: "secondary",
-					separator: true,
-				},
-				{
-					id: "profile",
-					label: "Profile",
-					icon: User,
-					href: "/dashboard/profile",
-					section: "secondary",
-				},
 				{
 					id: "settings",
 					label: "Settings",
@@ -348,53 +364,6 @@ export function EnhancedSidebar({
 					separator: true,
 				},
 				{
-					id: "profile",
-					label: "Professional Profile",
-					icon: User,
-					href: "/dashboard/profile",
-					section: "secondary",
-				},
-				{
-					id: "settings",
-					label: "Settings",
-					icon: Settings,
-					href: "/dashboard/profile?tab=settings",
-					section: "footer",
-				},
-			];
-			return [
-				...baseItems,
-				{
-					id: "cases",
-					label: "Case Management",
-					icon: ClipboardList,
-					href: "/dashboard/cases",
-					badge: 7,
-					section: "main",
-				},
-				{
-					id: "reports",
-					label: "My reports",
-					icon: ClipboardList,
-					href: "/dashboard/reports",
-					section: "main",
-				},
-				{
-					id: "services",
-					label: "My Services",
-					icon: Plus,
-					href: "/dashboard/services",
-					section: "secondary",
-					separator: true,
-				},
-				{
-					id: "profile",
-					label: "Professional Profile",
-					icon: User,
-					href: "/dashboard/profile",
-					section: "secondary",
-				},
-				{
 					id: "settings",
 					label: "Settings",
 					icon: Settings,
@@ -407,14 +376,6 @@ export function EnhancedSidebar({
 		return [
 			...baseItems,
 			{
-				id: "profile",
-				label: "Profile",
-				icon: User,
-				href: "/dashboard/profile",
-				section: "secondary",
-				separator: true,
-			},
-			{
 				id: "settings",
 				label: "Settings",
 				icon: Settings,
@@ -422,7 +383,7 @@ export function EnhancedSidebar({
 				section: "footer",
 			},
 		];
-	}, [pathname, role, casesCount, dash?.data?.unreadChatCount]);
+	}, [pathname, role, casesCount, dash?.data?.unreadChatCount, dash?.data?.verification?.pendingCount]);
 
 	// Compute items once per relevant inputs to avoid recomputing on each render
 	const sidebarItems = useMemo(
@@ -443,27 +404,27 @@ export function EnhancedSidebar({
 		const content = (
 			<div
 				className={cn(
-					"flex items-center gap-3 px-4 py-3.5 rounded-2xl transition-all duration-300",
-					"hover:bg-neutral-50 dark:hover:bg-white/5",
-					"group cursor-pointer",
-					active &&
-						"bg-sauti-teal-light text-sauti-teal font-black shadow-sm"
+					"flex items-center gap-3 px-4 py-3.5 rounded-2xl transition-all duration-300 mx-3 my-1", // Increased margin x, added margin y
+					"group cursor-pointer select-none ring-offset-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-serene-blue-400 focus-visible:ring-offset-2",
+					active
+						? "bg-serene-blue-50 text-serene-blue-700 font-bold shadow-none" // Softer active state
+						: "text-serene-neutral-500 hover:bg-serene-neutral-50 hover:text-serene-blue-600 dark:text-neutral-400 dark:hover:bg-neutral-800"
 				)}
 			>
 				<div className="relative flex items-center justify-center">
 					<Icon
 						className={cn(
-							"h-5 w-5 transition-colors",
+							"h-5 w-5 transition-all duration-300",
 							active
-								? "text-sauti-teal scale-110"
-								: "text-neutral-500 dark:text-neutral-400 group-hover:text-sauti-teal group-hover:scale-110"
+								? "text-serene-blue-600 scale-100" // Simple scale
+								: "text-serene-neutral-400 group-hover:text-serene-blue-500 group-hover:scale-105"
 						)}
 					/>
 					{item.badge && item.badge > 0 && (
 						<Badge
 							className={cn(
-								"absolute -top-1 -right-1 h-4 w-4 flex items-center justify-center p-0 text-[9px]",
-								"bg-error-500 text-white border-0 min-w-[16px]"
+								"absolute -top-1.5 -right-1.5 h-4 w-4 flex items-center justify-center p-0 text-[9px] font-bold shadow-sm",
+								"bg-serene-red-500 text-white border border-white dark:border-neutral-950 min-w-[16px]" // Red for urgency/notification typically more standard, but using brand red if available or error red
 							)}
 						>
 							{item.badge > 99 ? "99" : item.badge}
@@ -474,10 +435,10 @@ export function EnhancedSidebar({
 				{!isCollapsed && (
 					<span
 						className={cn(
-							"flex-1 text-sm font-medium transition-colors",
+							"flex-1 text-sm tracking-wide transition-colors",
 							active
-								? "text-sauti-teal font-black"
-								: "text-neutral-700 dark:text-neutral-300 group-hover:text-sauti-teal"
+								? "text-serene-blue-900 font-bold"
+								: "text-serene-neutral-600 font-medium group-hover:text-serene-blue-800"
 						)}
 					>
 						{item.label}
@@ -529,8 +490,9 @@ export function EnhancedSidebar({
 		<>
 			<div
 				className={cn(
-					"hidden lg:flex lg:fixed lg:inset-y-0 lg:left-0 lg:z-40 lg:overflow-y-auto flex-col h-screen bg-white dark:bg-neutral-900 border-r border-neutral-200 dark:border-neutral-800 transition-all duration-300",
-					isCollapsed ? "w-20" : "w-72",
+					"hidden lg:flex lg:fixed lg:inset-y-0 lg:left-0 lg:z-40 lg:overflow-y-auto flex-col h-screen transition-all duration-500 ease-spring",
+					"bg-white/90 backdrop-blur-2xl border-r border-serene-neutral-200/40 shadow-[1px_0_20px_rgba(0,0,0,0.02)]", // Softer border, glass effect
+					isCollapsed ? "w-20 items-center" : "w-72", // Collapsed centers items
 					className
 				)}
 			>
@@ -590,52 +552,93 @@ export function EnhancedSidebar({
 					</div>
 				)}
 
-				{/* User Info */}
-				<div className="px-4 py-3 border-b border-neutral-200 dark:border-neutral-800">
-					<div
-						className={cn("flex items-center gap-3", isCollapsed && "justify-center")}
-					>
-						<Avatar className="h-10 w-10">
-							<AvatarImage
-								src={
-									typeof window !== "undefined" &&
-									window.localStorage.getItem("ss_anon_mode") === "1"
-										? "/anon.svg"
-										: dash?.data?.profile?.avatar_url || user?.profile?.avatar_url || ""
-								}
-							/>
-							<AvatarFallback className="bg-sauti-teal text-white font-bold">
-								{dash?.data?.profile?.first_name?.[0]?.toUpperCase() ||
-									user?.profile?.first_name?.[0]?.toUpperCase() ||
-									user?.email?.[0]?.toUpperCase() ||
-									"U"}
-							</AvatarFallback>
-						</Avatar>
+				{/* User Info - Wrapped with Dropdown */}
+				<div className="border-b border-neutral-200 dark:border-neutral-800">
+					<DropdownMenu>
+						<DropdownMenuTrigger asChild>
+							<div
+								className={cn(
+									"flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-neutral-50 dark:hover:bg-neutral-800 transition-colors",
+									isCollapsed && "justify-center px-0"
+								)}
+							>
+								<Avatar className="h-10 w-10 border border-neutral-200 dark:border-neutral-700">
+									<AvatarImage
+										src={
+											typeof window !== "undefined" &&
+											window.localStorage.getItem("ss_anon_mode") === "1"
+												? "/anon.svg"
+												: dash?.data?.profile?.avatar_url ||
+												  user?.profile?.avatar_url ||
+												  ""
+										}
+										className="object-cover"
+									/>
+									<AvatarFallback className="bg-sauti-teal text-white font-bold">
+										{dash?.data?.profile?.first_name?.[0]?.toUpperCase() ||
+											user?.profile?.first_name?.[0]?.toUpperCase() ||
+											user?.email?.[0]?.toUpperCase() ||
+											"U"}
+									</AvatarFallback>
+								</Avatar>
 
-						{!isCollapsed && (
-							<div className="flex-1 min-w-0">
-								<p className="text-sm font-medium text-neutral-900 dark:text-neutral-100 truncate">
-									{dash?.data?.profile?.first_name || user?.email || "User"}
-								</p>
-								{role !== "survivor" && (
-									<p className="text-xs text-neutral-500 truncate capitalize">
-										{role || "Member"}
-									</p>
+								{!isCollapsed && (
+									<div className="flex-1 min-w-0 text-left">
+										<p className="text-sm font-bold text-neutral-900 dark:text-neutral-100 truncate">
+											{dash?.data?.profile?.first_name || user?.email || "User"}
+										</p>
+										{role !== "survivor" && (
+											<p className="text-xs text-neutral-500 truncate capitalize">
+												{role || "Member"}
+											</p>
+										)}
+									</div>
+								)}
+
+								{!isCollapsed && (
+									<div className="text-neutral-400">
+										<ChevronRight className="h-4 w-4 rotate-90" />
+									</div>
 								)}
 							</div>
-						)}
-
-						{!isCollapsed && notifications > 0 && (
-							<Button variant="ghost" size="icon" className="h-8 w-8">
-								<div className="relative">
-									<Bell className="h-4 w-4" />
-									<Badge className="absolute -top-1 -right-1 h-3 w-3 p-0 bg-error-500">
-										<span className="sr-only">{notifications} notifications</span>
-									</Badge>
-								</div>
-							</Button>
-						)}
-					</div>
+						</DropdownMenuTrigger>
+						<DropdownMenuContent
+							align={isCollapsed ? "center" : "end"}
+							side={isCollapsed ? "right" : "bottom"}
+							className="w-56 bg-white border-neutral-200"
+							sideOffset={isCollapsed ? 10 : 8}
+						>
+							<DropdownMenuLabel>My Account</DropdownMenuLabel>
+							<DropdownMenuSeparator />
+							<DropdownMenuItem asChild>
+								<Link href="/dashboard/profile" className="cursor-pointer">
+									<User className="mr-2 h-4 w-4" />
+									<span>Profile</span>
+								</Link>
+							</DropdownMenuItem>
+							<DropdownMenuItem asChild>
+								<Link
+									href="/dashboard/profile?tab=settings"
+									className="cursor-pointer"
+								>
+									<Settings className="mr-2 h-4 w-4" />
+									<span>Settings</span>
+								</Link>
+							</DropdownMenuItem>
+							<DropdownMenuSeparator />
+							<DropdownMenuItem
+								className="text-error-600 focus:text-error-600 focus:bg-error-50 cursor-pointer"
+								asChild
+							>
+								<form action={signOut} className="w-full flex">
+									<button className="flex w-full items-center">
+										<LogOut className="mr-2 h-4 w-4" />
+										<span>Sign Out</span>
+									</button>
+								</form>
+							</DropdownMenuItem>
+						</DropdownMenuContent>
+					</DropdownMenu>
 				</div>
 
 				{/* Role Switcher */}
@@ -676,7 +679,10 @@ export function EnhancedSidebar({
 							<SidebarItemComponent key={item.id} item={item} />
 						))}
 
-						{/* Sign Out */}
+						{/* Sign Out - Moved to Dropdown, kept generically here if needed or removed to avoid duplicate */}
+						{/* Keeping it here too for visibility if Sidebar is open? 
+                            User didn't explicitly say remove it from footer, but it IS in the dropdown now.
+                            Let's keep it here for now as a quick exit. */}
 						<form action={signOut}>
 							<Button
 								variant="ghost"

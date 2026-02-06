@@ -65,6 +65,7 @@ export function RoleSwitcher() {
 
 		localStorage.setItem("adminMode", "true");
 		setIsAdminMode(true);
+		window.dispatchEvent(new Event("adminModeChanged")); // Notify listeners
 		router.push("/dashboard/admin");
 
 		toast({
@@ -76,6 +77,7 @@ export function RoleSwitcher() {
 	const switchToUser = () => {
 		localStorage.setItem("adminMode", "false");
 		setIsAdminMode(false);
+		window.dispatchEvent(new Event("adminModeChanged")); // Notify listeners
 		router.push("/dashboard");
 
 		toast({
@@ -137,7 +139,7 @@ export function RoleSwitcher() {
 					<ChevronDown className="h-4 w-4" />
 				</Button>
 			</DropdownMenuTrigger>
-			<DropdownMenuContent align="end" className="w-56">
+			<DropdownMenuContent align="end" className="w-56 bg-white">
 				<DropdownMenuLabel>Switch Role</DropdownMenuLabel>
 				<DropdownMenuSeparator />
 

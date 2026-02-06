@@ -13,6 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { AddSupportServiceForm } from "@/components/AddSupportServiceForm";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { SereneBreadcrumb } from "@/components/ui/SereneBreadcrumb";
 
 interface Step {
 	id: string;
@@ -136,6 +137,7 @@ export default function OnboardingPage() {
 
 	const Header = (
 		<div className="mb-6">
+			<SereneBreadcrumb items={[{ label: "Onboarding", active: true }]} className="mb-4" />
 			<h1 className="text-2xl font-bold">Onboarding</h1>
 			<p className="text-sm text-neutral-500">
 				A few quick steps to get you set up.

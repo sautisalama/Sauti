@@ -21,6 +21,7 @@ import type { AppointmentWithDetails } from "@/app/dashboard/_types";
 import ReportNotesEditor from "@/app/dashboard/reports/rich-text-notes-editor";
 import { Tables } from "@/types/db-schema";
 import { CalendarConnectionStatus } from "../_components/CalendarConnectionStatus";
+import { SereneBreadcrumb } from "@/components/ui/SereneBreadcrumb";
 
 export default function AppointmentsMasterDetail({
 	userId,
@@ -124,29 +125,38 @@ export default function AppointmentsMasterDetail({
 
 	return (
 		<div className="relative">
-			{/* Mobile toggle */}
-			<div className="lg:hidden -mt-2 mb-4">
-				<div className="inline-flex rounded-xl border border-gray-200 bg-white p-1 shadow-sm">
-					<button
-						onClick={() => setMobileView("list")}
-						className={`px-4 py-2 text-sm font-medium rounded-lg transition-all duration-200 ${
-							mobileView === "list"
-								? "bg-[#1A3434] text-white shadow-sm"
-								: "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
-						}`}
-					>
-						Appointments
-					</button>
-					<button
-						onClick={() => setMobileView("calendar")}
-						className={`px-4 py-2 text-sm font-medium rounded-lg transition-all duration-200 ${
-							mobileView === "calendar"
-								? "bg-[#1A3434] text-white shadow-sm"
-								: "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
-						}`}
-					>
-						Calendar
-					</button>
+			<div className="mb-6">
+				<SereneBreadcrumb items={[{ label: "Appointments", active: true }]} className="mb-4" />
+				<div className="flex items-center justify-between">
+					<div>
+						<h1 className="text-2xl font-bold text-gray-900">Your Appointments</h1>
+						<p className="text-gray-500">Manage your scheduled sessions and direct appointments.</p>
+					</div>
+					{/* Mobile toggle */}
+					<div className="lg:hidden">
+						<div className="inline-flex rounded-xl border border-gray-200 bg-white p-1 shadow-sm">
+							<button
+								onClick={() => setMobileView("list")}
+								className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-all duration-200 ${
+									mobileView === "list"
+										? "bg-sky-500 text-white shadow-sm"
+										: "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
+								}`}
+							>
+								List
+							</button>
+							<button
+								onClick={() => setMobileView("calendar")}
+								className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-all duration-200 ${
+									mobileView === "calendar"
+										? "bg-sky-500 text-white shadow-sm"
+										: "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
+								}`}
+							>
+								Calendar
+							</button>
+						</div>
+					</div>
 				</div>
 			</div>
 

@@ -4,70 +4,43 @@ import { createClient } from "@/utils/supabase/client";
 import { Database, Tables } from "@/types/db-schema";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import {
-	Dialog,
-	DialogContent,
-	DialogDescription,
-	DialogHeader,
-	DialogTitle,
-	DialogTrigger,
-} from "@/components/ui/dialog";
-import { Info, Plus, Trash2 } from "lucide-react";
+import { Input } from "@/components/ui/input";
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
-import AuthenticatedReportAbuseForm from "@/components/AuthenticatedReportAbuseForm";
-import {
-	AlertDialog,
-	AlertDialogAction,
-	AlertDialogCancel,
-	AlertDialogContent,
-	AlertDialogDescription,
-	AlertDialogFooter,
-	AlertDialogHeader,
-	AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import {
-	Bell,
 	Search,
-	Users,
-	Megaphone,
-	CalendarDays,
 	MessageCircle,
+	CalendarDays,
 	BookOpen,
 	Shield,
 	Heart,
 	TrendingUp,
-	AlertCircle,
 	CheckCircle,
-	Clock,
-	Star,
-	ArrowRight,
+	Plus,
+	Trash2,
+	ChevronRight,
+	SlidersHorizontal
 } from "lucide-react";
-import Image from "next/image";
 import Link from "next/link";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import {
-	WelcomeHeader,
-	QuickActionCard,
-	StatsCard,
-	ProgressRing,
-	ActivityItem,
-	SectionHeader,
-} from "@/components/dashboard/DashboardComponents";
-import { AppointmentsTab } from "../_components/tabs/AppointmentsTab";
-import { SafetyPlanCard } from "@/components/SafetyPlanCard";
-import { CommunityCard } from "@/app/components/CommunityCard";
-import { DailyProgress } from "@/app/components/DailyProgress";
-import { JoinCommunity } from "@/app/components/JoinCommunity";
-import { SamplePlaceholder } from "@/components/dashboard/SamplePlaceholder";
+import { Card, CardContent } from "@/components/ui/card";
 import { useDashboardData } from "@/components/providers/DashboardDataProvider";
-import { AnonymousCredentialsBanner } from "@/components/dashboard/AnonymousCredentialsBanner";
+import {
+	SereneWelcomeHeader,
+	SereneQuickActionCard,
+	SereneStatsCard,
+	SereneSectionHeader
+} from "../_components/SurvivorDashboardComponents";
+import { Badge } from "@/components/ui/badge";
+import {
+	Sheet,
+	SheetContent,
+	SheetHeader,
+	SheetTitle,
+	SheetTrigger,
+} from "@/components/ui/sheet";
+import AuthenticatedReportAbuseForm from "@/components/AuthenticatedReportAbuseForm";
 
-// Add this interface to type the joined data
 interface ReportWithRelations extends Tables<"reports"> {
 	matched_services?: Array<{
 		id: string;
@@ -100,993 +73,251 @@ export default function SurvivorView({
 }: SurvivorViewProps) {
 	const dash = useDashboardData();
 	const [reports, setReports] = useState<ReportWithRelations[]>(() => {
-		// Seed from provider if available, else from localStorage cache
 		const seeded = (dash?.data?.reports as any) || [];
 		if (seeded && Array.isArray(seeded) && seeded.length) return seeded as any;
-		try {
-			const cached = localStorage.getItem(`reports-cache-${userId}`);
-			return cached ? (JSON.parse(cached) as any) : [];
-		} catch {
-			return [];
-		}
+		return [];
 	});
-	const [open, setOpen] = useState(false);
-	const searchParams = useSearchParams();
-	const initialTab =
-		(searchParams?.get("tab") as "overview" | "reports" | null) || "overview";
-	const [activeTab, setActiveTab] = useState<"overview" | "reports">(initialTab);
-	const supabase = useMemo(() => createClient(), []);
+	const [searchQuery, setSearchQuery] = useState("");
 	const { toast } = useToast();
-	const [deleteReport, setDeleteReport] = useState<string | null>(null);
-	const [showAlert, setShowAlert] = useState(true);
 
-	// Single fetch function used when explicitly refreshing
-	const fetchReports = useCallback(async () => {
-		console.log("Fetching reports for user:", userId);
-
-		const { data, error } = await supabase
-			.from("reports")
-			.select(
-				`
-				*,
-				matched_services (
-					id,
-					match_status_type,
-					match_date,
-					match_score,
-					support_services (
-						id,
-						name,
-						service_types
-					)
-				)
-			`
-			)
-			.eq("user_id", userId)
-			.order("submission_timestamp", { ascending: false });
-
-		if (error) {
-			console.error("Error fetching reports:", error);
-			toast({
-				title: "Error",
-				description: "Failed to fetch reports. Please try again.",
-				variant: "destructive",
-			});
-			return;
-		}
-
-		setReports(data || []);
-		try {
-			localStorage.setItem(`reports-cache-${userId}`, JSON.stringify(data || []));
-		} catch {}
-	}, [userId, supabase, toast]);
-
-	const handleDelete = async (reportId: string) => {
-		try {
-			const response = await fetch(`/api/reports/${reportId}`, {
-				method: "DELETE",
-			});
-
-			if (!response.ok) {
-				throw new Error("Failed to delete report");
-			}
-
-			toast({
-				title: "Report deleted",
-				description: "The report has been successfully deleted.",
-				variant: "default",
-			});
-
-			// Refresh data after successful deletion
-			fetchReports();
-		} catch (error) {
-			toast({
-				title: "Error",
-				description: "Failed to delete the report. Please try again.",
-				variant: "destructive",
-			});
-			console.error("Error deleting report:", error);
-		}
-		setDeleteReport(null);
-	};
-
-	useEffect(() => {
-		// If provider has reports and user matches, prefer that;
-		// otherwise keep whatever seed we had and only fetch when explicitly asked.
-		if (dash?.data && dash.data.userId === userId && dash.data.reports) {
-			setReports(dash.data.reports as any);
-			try {
-				localStorage.setItem(
-					`reports-cache-${userId}`,
-					JSON.stringify(dash.data.reports || [])
-				);
-			} catch {}
-		}
-	}, [userId, dash?.data]);
-
-	// Add formatServiceName inside component
-	const formatServiceName = (service: string) => {
-		return service
-			.split("_")
-			.map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-			.join(" ");
-	};
-
+	// Computed stats
+	const activeCasesCount = useMemo(() => reports.length, [reports]);
 	const matchedCount = useMemo(
 		() => reports.filter((r) => (r.matched_services?.length || 0) > 0).length,
 		[reports]
 	);
-	const latestReportDate = useMemo(() => {
-		const ts = reports
-			.map((r) => r.submission_timestamp)
-			.filter(Boolean) as string[];
-		if (ts.length === 0) return null;
-		return new Date(
-			ts.sort((a, b) => new Date(b).getTime() - new Date(a).getTime())[0]
-		);
+	const upcomingAppointments = useMemo(() => {
+		// Flatten appointments from matches
+		const apps: any[] = [];
+		reports.forEach(r => {
+			r.matched_services?.forEach(m => {
+				if (m.appointments) apps.push(...m.appointments);
+			});
+		});
+		return apps.filter(a => new Date(a.date) > new Date()).length;
 	}, [reports]);
-	const daysActive = useMemo(() => {
-		const ts = reports
-			.map((r) => r.submission_timestamp)
-			.filter(Boolean) as string[];
-		if (ts.length === 0) return null;
-		const minDate = new Date(
-			ts.reduce((min, cur) => (new Date(cur) < new Date(min) ? cur : min), ts[0])
-		);
-		const diff = Math.max(
-			1,
-			Math.ceil((Date.now() - minDate.getTime()) / (1000 * 60 * 60 * 24))
-		);
-		return diff;
-	}, [reports]);
-	const safetyProgress = useMemo(() => {
-		if (reports.length === 0 && matchedCount === 0) return null;
-		const base = reports.length * 10 + matchedCount * 15;
-		return Math.max(15, Math.min(95, base));
-	}, [reports, matchedCount]);
 
-	// Helper function to get time of day
 	const getTimeOfDay = (): "morning" | "afternoon" | "evening" => {
 		const hour = new Date().getHours();
 		if (hour < 12) return "morning";
 		if (hour < 18) return "afternoon";
 		return "evening";
 	};
+	
+	const [isReportSheetOpen, setIsReportSheetOpen] = useState(false);
+
+	const [isWelcomeCompact, setIsWelcomeCompact] = useState(false);
+
+	useEffect(() => {
+		const timer = setTimeout(() => {
+			setIsWelcomeCompact(true);
+		}, 30000);
+		return () => clearTimeout(timer);
+	}, []);
+
+	const filteredReports = useMemo(() => {
+		if (!searchQuery) return reports;
+		const q = searchQuery.toLowerCase();
+		return reports.filter(r => 
+			(r.incident_description || "").toLowerCase().includes(q) ||
+			(r.type_of_incident || "").toLowerCase().includes(q) ||
+			(r.city || "").toLowerCase().includes(q) ||
+			(r.match_status || "").toLowerCase().includes(q)
+		);
+	}, [reports, searchQuery]);
 
 	return (
-		<>
-			<div className="min-h-screen bg-white">
-				<div className="max-w-7xl mx-auto p-4 lg:p-6">
-					{/* Welcome Header */}
-					<WelcomeHeader
-						name={profileDetails.first_name || "Friend"}
-						userType="survivor"
-						timeOfDay={getTimeOfDay()}
+		<div className="min-h-screen bg-serene-neutral-50 pb-24">
+			{/* Floating Search Bar (Mobile/Desktop) */}
+			<div className="sticky top-0 z-40 bg-serene-neutral-50/90 backdrop-blur-md px-4 py-3 lg:px-8 border-b border-serene-neutral-200/50">
+				<div className="max-w-xl mx-auto relative">
+					<Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-serene-neutral-400" />
+					<Input 
+						placeholder="Search your cases, resources..." 
+						className="pl-10 pr-10 bg-white border-serene-neutral-200 rounded-full h-11 shadow-sm focus-visible:ring-serene-blue-200"
+						value={searchQuery}
+						onChange={(e) => setSearchQuery(e.target.value)}
 					/>
-
-					{/* Anonymous Credentials Banner */}
-					{profileDetails.is_anonymous && (
-						<div className="space-y-6 mb-6">
-							<AnonymousCredentialsBanner 
-								username={profileDetails.anon_username ?? profileDetails.email?.split('@')[0]} 
-							/>
-							
-							{(!profileDetails.phone) && (
-								<Alert className="bg-sauti-teal/5 border-sauti-teal/20 rounded-2xl p-5 shadow-sm">
-									<Info className="h-5 w-5 text-sauti-teal mt-0.5" />
-									<div className="ml-3">
-										<AlertTitle className="text-sauti-dark font-black text-lg mb-1">
-											Complete Your Secure Profile
-										</AlertTitle>
-										<AlertDescription className="text-neutral-600 font-medium">
-											Add your contact details to receive real-time updates from support services. 
-											Your information remains encrypted and is only shared with your consent.
-											<div className="mt-4 flex gap-3">
-												<Link href="/dashboard/settings">
-													<Button variant="default" size="sm" className="bg-sauti-teal hover:bg-sauti-teal/90 rounded-xl px-6">
-														Add Contact Info
-													</Button>
-												</Link>
-											</div>
-										</AlertDescription>
-									</div>
-								</Alert>
-							)}
-						</div>
-					)}
-
-					{/* Quick Actions Grid */}
-					<div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4 mb-6">
-						<QuickActionCard
-							icon={<Megaphone className="h-5 w-5 text-current" />}
-							title="Report Now"
-							description="Quick & secure incident reporting"
-							onClick={() => setOpen(true)}
-							variant="primary"
-						/>
-						<QuickActionCard
-							icon={<MessageCircle className="h-5 w-5 text-sauti-teal" />}
-							title="Messages"
-							description="Chat with professionals"
-							href="/dashboard/chat"
-							badge={3}
-						/>
-						<QuickActionCard
-							icon={<CalendarDays className="h-5 w-5 text-sauti-teal" />}
-							title="Appointments"
-							description="Your upcoming sessions"
-							href="/dashboard/reports"
-						/>
-						<QuickActionCard
-							icon={<BookOpen className="h-5 w-5 text-sauti-teal" />}
-							title="Resources"
-							description="Educational content"
-							href="/dashboard/resources"
-						/>
-					</div>
-
-					{/* Stats Overview */}
-					<div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4 mb-6">
-						<Link href="/dashboard/reports">
-							<StatsCard
-								title="My Reports"
-								value={reports.length}
-								icon={<Shield className="h-4 w-4" />}
-								description="Total incidents reported"
-								className="cursor-pointer hover:shadow-md"
-							/>
-						</Link>
-						<StatsCard
-							title="Support Matches"
-							value={matchedCount}
-							icon={<Heart className="h-4 w-4" />}
-							variant="success"
-							description="Connected to help"
-						/>
-						{typeof safetyProgress === "number" ? (
-							<StatsCard
-								title="Safety Score"
-								value={`${safetyProgress}%`}
-								icon={<TrendingUp className="h-4 w-4" />}
-								change={{
-									value: Math.max(1, Math.round(safetyProgress / 10)),
-									type: "increase",
-								}}
-								variant="success"
-								description="Your progress this month"
-							/>
-						) : (
-							<SamplePlaceholder label="Sample">
-								<StatsCard
-									title="Safety Score"
-									value="87%"
-									icon={<TrendingUp className="h-4 w-4" />}
-									change={{ value: 12, type: "increase" }}
-									variant="success"
-									description="Your progress this month"
-								/>
-							</SamplePlaceholder>
-						)}
-						<SamplePlaceholder label="Sample">
-							<StatsCard
-								title="Next Steps"
-								value={"2"}
-								icon={<CheckCircle className="h-4 w-4" />}
-								description="Recommended actions"
-								variant="warning"
-							/>
-						</SamplePlaceholder>
-					</div>
-
-					{/* Safety Progress Ring */}
-					<Card className="mb-6">
-						<CardContent className="p-6">
-							{typeof safetyProgress === "number" ? (
-								<div className="flex flex-col lg:flex-row items-center gap-6">
-									<div className="flex flex-col items-center">
-										<ProgressRing progress={safetyProgress} size={120}>
-											<div className="text-center">
-												<div className="text-2xl font-black text-sauti-teal tracking-tighter">
-													{safetyProgress}%
-												</div>
-												<div className="text-xs text-neutral-500">Safety</div>
-											</div>
-										</ProgressRing>
-										<p className="text-sm text-neutral-600 mt-2 text-center">
-											Your safety progress
-										</p>
-									</div>
-									<div className="flex-1 w-full">
-										<h3 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100 mb-3">
-											Your Journey to Safety
-										</h3>
-										<p className="text-neutral-600 dark:text-neutral-400 text-sm mb-4">
-											You've made significant progress on your path to safety and healing.
-											Keep taking small steps forward - you're doing great.
-										</p>
-										<div className="grid grid-cols-3 gap-3 text-center">
-											<div>
-												<div className="text-lg font-bold text-success-600">
-													{reports.length}
-												</div>
-												<div className="text-xs text-neutral-500">Reports Filed</div>
-											</div>
-											<div>
-												<div className="text-lg font-bold text-sauti-yellow-dark">
-													{Math.max(1, Math.round(safetyProgress / 20) + matchedCount)}
-												</div>
-												<div className="text-xs text-neutral-500">Resources Used</div>
-											</div>
-											<div>
-												<div className="text-lg font-bold text-primary-600">
-													{daysActive ?? 1}
-												</div>
-												<div className="text-xs text-neutral-500">Days Active</div>
-											</div>
-										</div>
-									</div>
-								</div>
-							) : (
-								<SamplePlaceholder label="Sample">
-									<div className="flex flex-col lg:flex-row items-center gap-6">
-										<div className="flex flex-col items-center">
-											<ProgressRing progress={87} size={120}>
-												<div className="text-center">
-													<div className="text-2xl font-black text-sauti-teal tracking-tighter">87%</div>
-													<div className="text-xs text-neutral-500">Safety</div>
-												</div>
-											</ProgressRing>
-											<p className="text-sm text-neutral-600 mt-2 text-center">
-												Your safety progress
-											</p>
-										</div>
-									<div className="flex-1 w-full">
-										<h3 className="text-xl font-black text-sauti-dark tracking-tight mb-2">
-											Your Journey to Safety
-										</h3>
-											<p className="text-neutral-600 dark:text-neutral-400 text-sm mb-4">
-												You've made significant progress on your path to safety and healing.
-												Keep taking small steps forward - you're doing great.
-											</p>
-											<div className="grid grid-cols-3 gap-3 text-center">
-												<div>
-													<div className="text-lg font-bold text-success-600">0</div>
-													<div className="text-xs text-neutral-500">Reports Filed</div>
-												</div>
-												<div>
-													<div className="text-lg font-bold text-sauti-yellow-dark">5</div>
-													<div className="text-xs text-neutral-500">Resources Used</div>
-												</div>
-												<div>
-													<div className="text-lg font-bold text-primary-600">12</div>
-													<div className="text-xs text-neutral-500">Days Active</div>
-												</div>
-											</div>
-										</div>
-									</div>
-								</SamplePlaceholder>
-							)}
-						</CardContent>
-					</Card>
-
-					{/* Next Steps & Quick Links */}
-					<Card className="mb-6">
-						<CardContent className="p-4">
-							<div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-								<div className="rounded-2xl bg-sauti-teal-light p-5 shadow-sm relative overflow-hidden group">
-									<div className="absolute bottom-0 left-0 right-0 h-1.5 bg-sauti-teal/40" />
-									<p className="text-xs font-black uppercase tracking-wider text-sauti-teal/60 mb-1">Next Step</p>
-									<p className="font-bold text-sauti-dark mb-2">Review your last report match</p>
-									<Link href="/dashboard/reports" className="text-sauti-teal font-black text-sm hover:underline flex items-center gap-1 group-hover:gap-2 transition-all">
-										Open reports <ArrowRight className="h-3 w-3" />
-									</Link>
-								</div>
-								<div className="rounded-2xl bg-sauti-yellow-light p-5 shadow-sm relative overflow-hidden group">
-									<div className="absolute bottom-0 left-0 right-0 h-1.5 bg-sauti-yellow/40" />
-									<p className="text-xs font-black uppercase tracking-wider text-sauti-yellow-dark/60 mb-1">Connect</p>
-									<p className="font-bold text-sauti-dark mb-2">Message a professional</p>
-									<Link href="/dashboard/chat" className="text-sauti-teal font-black text-sm hover:underline flex items-center gap-1 group-hover:gap-2 transition-all">
-										Open chat <ArrowRight className="h-3 w-3" />
-									</Link>
-								</div>
-								<div className="rounded-2xl bg-sauti-red-light p-5 shadow-sm relative overflow-hidden group">
-									<div className="absolute bottom-0 left-0 right-0 h-1.5 bg-sauti-red/40" />
-									<p className="text-xs font-black uppercase tracking-wider text-sauti-red/60 mb-1">Next-of-Kin</p>
-									<p className="font-bold text-sauti-dark mb-2">Keep details up to date</p>
-									<Link href="/dashboard/settings" className="text-sauti-teal font-black text-sm hover:underline flex items-center gap-1 group-hover:gap-2 transition-all">
-										Manage <ArrowRight className="h-3 w-3" />
-									</Link>
-								</div>
-							</div>
-						</CardContent>
-					</Card>
-
-					{/* Main Content Tabs */}
-					<div className="flex flex-col lg:flex-row gap-6">
-						<div className="flex-1">
-							<Tabs
-								value={activeTab}
-								onValueChange={(v) => setActiveTab(v as any)}
-								className="mb-8"
-							>
-								<TabsList className="grid w-full grid-cols-2 lg:w-auto lg:inline-flex mb-6">
-									<TabsTrigger value="overview" className="text-sm">
-										Overview
-									</TabsTrigger>
-									<TabsTrigger value="reports" className="text-sm">
-										My Reports
-									</TabsTrigger>
-								</TabsList>
-
-								<TabsContent value="overview">
-									<div className="space-y-6">
-										{/* Recent Activity */}
-										<Card>
-											<CardHeader>
-												<SectionHeader
-													title="Recent Activity"
-													description="Your latest interactions and updates"
-												/>
-											</CardHeader>
-											<CardContent className="p-0">
-												<div className="divide-y divide-neutral-100 dark:divide-neutral-800">
-													{reports.length > 0 ? (
-														<>
-															<ActivityItem
-																icon={<CheckCircle className="h-4 w-4" />}
-																title="Report submitted"
-																description="Your incident report was recorded successfully."
-																timestamp={
-																	latestReportDate
-																		? latestReportDate.toLocaleString()
-																		: "Recently"
-																}
-																status="success"
-															/>
-															{matchedCount > 0 && (
-																<ActivityItem
-																	icon={<Star className="h-4 w-4" />}
-																	title="Service match found"
-																	description="You've been matched with a support service."
-																	timestamp="Recently"
-																	status="success"
-																/>
-															)}
-														</>
-													) : (
-														<SamplePlaceholder label="Sample">
-															<ActivityItem
-																icon={<CheckCircle className="h-4 w-4" />}
-																title="Report submitted successfully"
-																description="Your incident report has been securely recorded and is being reviewed by our team."
-																timestamp="2 hours ago"
-																status="success"
-															/>
-															<ActivityItem
-																icon={<MessageCircle className="h-4 w-4" />}
-																title="New message from Dr. Sarah M."
-																description="Response to your recent consultation request with recommended next steps."
-																timestamp="5 hours ago"
-																onClick={() => (window.location.href = "/dashboard/chat")}
-															/>
-															<ActivityItem
-																icon={<CalendarDays className="h-4 w-4" />}
-																title="Appointment scheduled"
-																description="Counseling session with Jane Smith on March 15th at 2:00 PM."
-																timestamp="1 day ago"
-																status="pending"
-															/>
-															<ActivityItem
-																icon={<Star className="h-4 w-4" />}
-																title="Safety milestone achieved"
-																description="Congratulations! You've completed your safety plan and accessed 3 new resources."
-																timestamp="2 days ago"
-																status="success"
-															/>
-														</SamplePlaceholder>
-													)}
-												</div>
-											</CardContent>
-										</Card>
-
-										{/* Recent Reports Summary */}
-										<Card>
-											<CardHeader>
-												<SectionHeader
-													title="My Reports"
-													description={`${reports.length} ${
-														reports.length === 1 ? "report" : "reports"
-													} on file`}
-													action={{
-														label: "View All",
-														onClick: () => {
-															window.location.href = "/dashboard/reports";
-														},
-													}}
-												/>
-											</CardHeader>
-											<CardContent>
-												<Button onClick={() => setOpen(true)}>
-													<Plus className="h-4 w-4 mr-2" />
-													New Report
-												</Button>
-
-												{reports.length > 0 ? (
-													<div className="space-y-3">
-														{reports.map((report) => {
-															// Get the most recent matched service if any
-															const matchedService = report.matched_services?.[0];
-															const appointment = matchedService?.appointments?.[0];
-
-															return (
-																<div
-																	key={report.report_id}
-																	className={`flex flex-col md:flex-row md:items-center justify-between rounded-2xl p-4 md:p-6 shadow-sm border-0 relative overflow-hidden ${
-																		report.urgency === "high"
-																			? "bg-sauti-red-light"
-																			: report.urgency === "medium"
-																			? "bg-sauti-yellow-light"
-																			: "bg-sauti-teal-light"
-																	}`}
-																>
-                                  {/* Bottom Accent Line */}
-                                  <div className={cn(
-                                    "absolute bottom-0 left-0 right-0 h-1.5",
-                                    report.urgency === "high" ? "bg-sauti-red" : report.urgency === "medium" ? "bg-sauti-yellow" : "bg-sauti-teal"
-                                  )} />
-																	<div className="flex md:hidden flex-col space-y-3">
-																		<div className="flex items-start justify-between">
-																			<div className="flex items-start gap-2 flex-1">
-																				<div className="h-8 w-8 shrink-0 rounded-full bg-[#1A3434] text-white flex items-center justify-center text-sm">
-																					{report.type_of_incident?.[0]?.toUpperCase() || "?"}
-																				</div>
-																				<div className="min-w-0">
-																					<h4 className="font-medium text-sm">
-																						{formatServiceName(
-																							report.type_of_incident || "Unknown Incident"
-																						)}
-																					</h4>
-																					{report.incident_description && (
-																						<p className="text-sm text-gray-600 mt-1 line-clamp-2">
-																							{report.incident_description}
-																						</p>
-																					)}
-																					<div className="flex flex-wrap gap-2 text-xs text-gray-500 mt-1">
-																						<span>
-																							{new Date(
-																								report.submission_timestamp || ""
-																							).toLocaleDateString()}
-																						</span>
-																						<span
-																							className={`
-																						px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider
-																						${
-																							report.urgency === "high"
-																								? "bg-sauti-red text-white"
-																								: report.urgency === "medium"
-																								? "bg-sauti-yellow text-sauti-dark"
-																								: "bg-sauti-teal text-white"
-																						}
-																					`}
-																						>
-																							{formatServiceName(report.urgency || "low")} Priority
-																						</span>
-																					</div>
-																				</div>
-																			</div>
-																			<Button
-																				variant="ghost"
-																				size="icon"
-																				className="text-destructive hover:text-destructive hover:bg-destructive/10 -mt-1"
-																				onClick={() => setDeleteReport(report.report_id)}
-																			>
-																				<Trash2 className="h-4 w-4" />
-																			</Button>
-																		</div>
-
-																		<div className="bg-white/50 p-2 rounded-md">
-																			<p className="font-medium text-sm">
-																				{matchedService?.support_services?.name || "Pending Match"}
-																			</p>
-																			<p className="text-xs text-gray-500">
-																				{matchedService?.match_status_type
-																					? formatServiceName(matchedService.match_status_type)
-																					: "Awaiting Response"}
-																			</p>
-																		</div>
-
-																		{appointment && (
-																			<Button
-																				className="w-full bg-[#00A5A5] hover:bg-[#008585] text-sm"
-																				onClick={() => {
-																					console.log("View appointment:", appointment);
-																				}}
-																			>
-																				{appointment.status === "confirmed"
-																					? "Join Meeting"
-																					: "View Appointment"}
-																			</Button>
-																		)}
-																	</div>
-
-																	<div className="hidden md:flex items-start gap-3">
-																		<div className="h-10 w-10 shrink-0 rounded-full bg-[#1A3434] text-white flex items-center justify-center">
-																			{report.type_of_incident?.[0]?.toUpperCase() || "?"}
-																		</div>
-																		<div className="min-w-0">
-																			<h4 className="font-medium">
-																				{formatServiceName(
-																					report.type_of_incident || "Unknown Incident"
-																				)}
-																			</h4>
-																			{report.incident_description && (
-																				<p className="text-sm text-gray-600 mt-1 line-clamp-2">
-																					{report.incident_description}
-																				</p>
-																			)}
-																			<div className="flex flex-wrap items-center gap-2 text-sm text-gray-500 mt-1">
-																				<span>
-																					{new Date(
-																						report.submission_timestamp || ""
-																					).toLocaleDateString()}
-																				</span>
-																				<span className="w-1.5 h-1.5 rounded-full bg-gray-300" />
-																				<span
-																					className={`
-																				px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider
-																				${
-																					report.urgency === "high"
-																						? "bg-sauti-red text-white"
-																						: report.urgency === "medium"
-																						? "bg-sauti-yellow text-sauti-dark"
-																						: "bg-sauti-teal text-white"
-																				}
-																			`}
-																				>
-																					{formatServiceName(report.urgency || "low")} Priority
-																				</span>
-																			</div>
-																		</div>
-																	</div>
-
-																	<div className="hidden md:flex flex-col md:flex-row items-start md:items-center gap-4 md:gap-6">
-																		<div className="w-full md:w-auto">
-																			<p className="font-medium">
-																				{matchedService?.support_services?.name || "Pending Match"}
-																			</p>
-																			<p className="text-sm text-gray-500">
-																				{matchedService?.match_status_type
-																					? formatServiceName(matchedService.match_status_type)
-																					: "Awaiting Response"}
-																			</p>
-																		</div>
-																		<div className="flex w-full md:w-auto gap-2">
-																			{appointment && (
-																				<Button
-																					className="flex-1 md:flex-none bg-[#00A5A5] hover:bg-[#008585]"
-																					onClick={() => {
-																						console.log("View appointment:", appointment);
-																					}}
-																				>
-																					{appointment.status === "confirmed"
-																						? "Join Meeting"
-																						: "View Appointment"}
-																				</Button>
-																			)}
-																			<Button
-																				variant="ghost"
-																				size="icon"
-																				className="text-destructive hover:text-destructive hover:bg-destructive/10"
-																				onClick={() => setDeleteReport(report.report_id)}
-																			>
-																				<Trash2 className="h-4 w-4" />
-																			</Button>
-																		</div>
-																	</div>
-																</div>
-															);
-														})}
-													</div>
-												) : (
-													<div className="text-center py-12 bg-gray-50 rounded-lg">
-														<div className="space-y-3">
-															<p className="text-gray-500">No reports found</p>
-															<p className="text-sm text-gray-400">
-																Click "New Report" to create your first report
-															</p>
-														</div>
-													</div>
-												)}
-											</CardContent>
-										</Card>
-									</div>
-								</TabsContent>
-
-								<TabsContent value="reports">
-									<div className="space-y-6">
-										<div className="flex justify-between items-center mb-6">
-											<div>
-												<h2 className="text-xl font-semibold text-[#1A3434]">My Reports</h2>
-												<p className="text-sm text-gray-500">
-													{reports.length} {reports.length === 1 ? "report" : "reports"}{" "}
-													found
-												</p>
-											</div>
-											<Button onClick={() => setOpen(true)}>
-												<Plus className="h-4 w-4 mr-2" />
-												New Report
-											</Button>
-										</div>
-
-										{reports.length > 0 ? (
-											<div className="space-y-3">
-												{reports.map((report) => {
-													// Get the most recent matched service if any
-													const matchedService = report.matched_services?.[0];
-													const appointment = matchedService?.appointments?.[0];
-
-													return (
-														<div
-															key={report.report_id}
-															className={`flex flex-col md:flex-row md:items-center justify-between rounded-2xl p-5 shadow-sm border-0 relative overflow-hidden ${
-																report.urgency === "high"
-																	? "bg-sauti-red-light"
-																	: report.urgency === "medium"
-																	? "bg-sauti-yellow-light"
-																	: "bg-sauti-teal-light"
-															}`}
-														>
-                              {/* Bottom Accent Line */}
-                              <div className={cn(
-                                "absolute bottom-0 left-0 right-0 h-1.5",
-                                report.urgency === "high" ? "bg-sauti-red" : report.urgency === "medium" ? "bg-sauti-yellow" : "bg-sauti-teal"
-                              )} />
-															<div className="flex md:hidden flex-col space-y-3">
-																<div className="flex items-start justify-between">
-																	<div className="flex items-start gap-2 flex-1">
-																		<div className="h-8 w-8 shrink-0 rounded-full bg-[#1A3434] text-white flex items-center justify-center text-sm">
-																			{report.type_of_incident?.[0]?.toUpperCase() || "?"}
-																		</div>
-																		<div className="min-w-0">
-																			<h4 className="font-medium text-sm">
-																				{formatServiceName(
-																					report.type_of_incident || "Unknown Incident"
-																				)}
-																			</h4>
-																			{report.incident_description && (
-																				<p className="text-sm text-gray-600 mt-1 line-clamp-2">
-																					{report.incident_description}
-																				</p>
-																			)}
-																			<div className="flex flex-wrap gap-2 text-xs text-gray-500 mt-1">
-																				<span>
-																					{new Date(
-																						report.submission_timestamp || ""
-																					).toLocaleDateString()}
-																				</span>
-																				<span
-																					className={`
-																								px-2 py-0.5 rounded-full text-xs
-																								${
-																									report.urgency === "high"
-																										? "bg-red-100 text-red-700"
-																										: report.urgency === "medium"
-																										? "bg-yellow-100 text-yellow-700"
-																										: "bg-blue-100 text-blue-700"
-																								}
-																						`}
-																				>
-																					{formatServiceName(report.urgency || "low")}
-																				</span>
-																			</div>
-																		</div>
-																	</div>
-																	<Button
-																		variant="ghost"
-																		size="icon"
-																		className="text-destructive hover:text-destructive hover:bg-destructive/10 -mt-1"
-																		onClick={() => setDeleteReport(report.report_id)}
-																	>
-																		<Trash2 className="h-4 w-4" />
-																	</Button>
-																</div>
-
-																<div className="bg-white/50 p-2 rounded-md">
-																	<p className="font-medium text-sm">
-																		{matchedService?.support_services?.name || "Pending Match"}
-																	</p>
-																	<p className="text-xs text-gray-500">
-																		{matchedService?.match_status_type
-																			? formatServiceName(matchedService.match_status_type)
-																			: "Awaiting Response"}
-																	</p>
-																</div>
-
-																{appointment && (
-																	<Button
-																		className="w-full bg-[#00A5A5] hover:bg-[#008585] text-sm"
-																		onClick={() => {
-																			console.log("View appointment:", appointment);
-																		}}
-																	>
-																		{appointment.status === "confirmed"
-																			? "Join Meeting"
-																			: "View Appointment"}
-																	</Button>
-																)}
-															</div>
-
-															<div className="hidden md:flex items-start gap-3">
-																<div className="h-10 w-10 shrink-0 rounded-full bg-[#1A3434] text-white flex items-center justify-center">
-																	{report.type_of_incident?.[0]?.toUpperCase() || "?"}
-																</div>
-																<div className="min-w-0">
-																	<h4 className="font-medium">
-																		{formatServiceName(
-																			report.type_of_incident || "Unknown Incident"
-																		)}
-																	</h4>
-																	{report.incident_description && (
-																		<p className="text-sm text-gray-600 mt-1 line-clamp-2">
-																			{report.incident_description}
-																		</p>
-																	)}
-																	<div className="flex flex-wrap items-center gap-2 text-sm text-gray-500 mt-1">
-																		<span>
-																			{new Date(
-																				report.submission_timestamp || ""
-																			).toLocaleDateString()}
-																		</span>
-																		<span className="w-1.5 h-1.5 rounded-full bg-gray-300" />
-																		<span
-																			className={`
-																								px-2 py-0.5 rounded-full text-xs
-																								${
-																									report.urgency === "high"
-																										? "bg-red-100 text-red-700"
-																										: report.urgency === "medium"
-																										? "bg-yellow-100 text-yellow-700"
-																										: "bg-blue-100 text-blue-700"
-																								}
-																						`}
-																		>
-																			{formatServiceName(report.urgency || "low")} Priority
-																		</span>
-																	</div>
-																</div>
-															</div>
-
-															<div className="hidden md:flex flex-col md:flex-row items-start md:items-center gap-4 md:gap-6">
-																<div className="w-full md:w-auto">
-																	<p className="font-medium">
-																		{matchedService?.support_services?.name || "Pending Match"}
-																	</p>
-																	<p className="text-sm text-gray-500">
-																		{matchedService?.match_status_type
-																			? formatServiceName(matchedService.match_status_type)
-																			: "Awaiting Response"}
-																	</p>
-																</div>
-																<div className="flex w-full md:w-auto gap-2">
-																	{appointment && (
-																		<Button
-																			className="flex-1 md:flex-none bg-[#00A5A5] hover:bg-[#008585]"
-																			onClick={() => {
-																				console.log("View appointment:", appointment);
-																			}}
-																		>
-																			{appointment.status === "confirmed"
-																				? "Join Meeting"
-																				: "View Appointment"}
-																		</Button>
-																	)}
-																	<Button
-																		variant="ghost"
-																		size="icon"
-																		className="text-destructive hover:text-destructive hover:bg-destructive/10"
-																		onClick={() => setDeleteReport(report.report_id)}
-																	>
-																		<Trash2 className="h-4 w-4" />
-																	</Button>
-																</div>
-															</div>
-														</div>
-													);
-												})}
-											</div>
-										) : (
-											<div className="text-center py-12 bg-gray-50 rounded-lg">
-												<div className="space-y-3">
-													<p className="text-gray-500">No reports found</p>
-													<p className="text-sm text-gray-400">
-														Click "New Report" to create your first report
-													</p>
-												</div>
-											</div>
-										)}
-									</div>
-								</TabsContent>
-							</Tabs>
-
-							<div className="space-y-8">
-								<div className="grid grid-cols-1 gap-6">
-									<CommunityCard />
-									<div className="md:hidden">
-										<DailyProgress />
-									</div>
-								</div>
-							</div>
-						</div>
-
-						{/* Desktop Sidebar */}
-						<div className="hidden md:block w-[350px] space-y-6 sticky top-6 self-start">
-							<Card className="mb-6 bg-[#466D6D] text-white">
-								<CardContent className="p-6">
-									<h3 className="mb-2 text-lg font-bold">Explore Support Resources</h3>
-									<p className="mb-4">
-										Did you know? Having access to the right resources can increase your
-										chances of recovery by 70%. Discover personalized support options
-										tailored for you.
-									</p>
-
-									<div className="mt-4 flex justify-between items-center">
-										<Button asChild className="bg-teal-600 hover:bg-teal-700">
-											<Link href="/dashboard/resources">Browse Resources</Link>
-										</Button>
-										<Image
-											src="/dashboard/watering-can.png"
-											alt="Growth and Support Illustration"
-											width={100}
-											height={100}
-											className="opacity-90"
-										/>
-									</div>
-								</CardContent>
-							</Card>
-							<JoinCommunity />
-						</div>
+					<div className="absolute right-1 top-1/2 -translate-y-1/2 flex items-center gap-1">
+						{/* Desktop "New" shortcut in search bar */}
+						<Button size="sm" variant="ghost" className="hidden sm:flex h-8 w-8 rounded-full text-serene-blue-600 hover:bg-serene-blue-50" onClick={() => setIsReportSheetOpen(true)}>
+							<Plus className="h-4 w-4" />
+						</Button>
+						<Button size="icon" variant="ghost" className="h-9 w-9 text-serene-neutral-400 hover:text-serene-blue-600 rounded-full">
+							<SlidersHorizontal className="h-4 w-4" />
+						</Button>
 					</div>
 				</div>
 			</div>
 
-			{/* Global Create Report Dialog - single source of truth */}
-			<Dialog open={open} onOpenChange={setOpen}>
-				<DialogContent className="max-w-4xl p-0 overflow-hidden h-[90vh]">
-					<DialogTitle className="sr-only">Report Abuse</DialogTitle>
-					<DialogDescription className="sr-only">
-						Please fill out this form to report an incident. All information will be
-						kept confidential.
-					</DialogDescription>
-					<AuthenticatedReportAbuseForm
-						onClose={() => setOpen(false)}
-						userId={userId}
-					/>
-				</DialogContent>
-			</Dialog>
+			<div className="max-w-4xl mx-auto px-4 lg:px-6 pt-4 lg:pt-8 space-y-8 min-h-[calc(100vh-80px)] relative">
+				
+                {/* Search Overlay Mode */}
+                {searchQuery.length > 0 ? (
+                    <div className="space-y-6 animate-in fade-in zoom-in-95 duration-200">
+                        <div className="flex items-center justify-between pb-2 border-b border-serene-neutral-200">
+                            <h3 className="text-lg font-bold text-serene-neutral-900">
+                                Search Results
+                            </h3>
+                            <button 
+                                onClick={() => setSearchQuery("")}
+                                className="text-sm font-medium text-serene-neutral-500 hover:text-serene-red-500 transition-colors"
+                            >
+                                Clear Search
+                            </button>
+                        </div>
+                        
+                        <div className="space-y-3">
+                            {filteredReports.length > 0 ? (
+                                filteredReports.map((report) => (
+                                    <Link href={`/dashboard/reports/${report.report_id}`} key={report.report_id} className="block group">
+                                        <Card className="overflow-hidden border-serene-neutral-100 hover:border-serene-blue-200 transition-all duration-300 hover:shadow-md cursor-pointer">
+                                            <CardContent className="p-4 flex items-center gap-4">
+                                                <div className={cn(
+                                                    "h-12 w-12 rounded-full flex items-center justify-center text-lg font-bold shrink-0",
+                                                    "bg-serene-blue-50 text-serene-blue-600"
+                                                )}>
+                                                    {report.type_of_incident?.charAt(0).toUpperCase() || "R"}
+                                                </div>
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="flex items-center justify-between mb-1">
+                                                        <h4 className="font-semibold text-serene-neutral-900 truncate">
+                                                            {report.type_of_incident?.replace(/_/g, " ") || "Incident Report"}
+                                                        </h4>
+                                                        <span className="text-xs text-serene-neutral-400 font-medium">
+                                                            {report.submission_timestamp ? new Date(report.submission_timestamp).toLocaleDateString() : ""}
+                                                        </span>
+                                                    </div>
+                                                    <p className="text-sm text-serene-neutral-500 truncate">
+                                                        {report.incident_description || "No description provided."}
+                                                    </p>
+                                                </div>
+                                                <ChevronRight className="h-4 w-4 text-serene-neutral-300 group-hover:text-serene-blue-400 transition-colors" />
+                                            </CardContent>
+                                        </Card>
+                                    </Link>
+                                ))
+                            ) : (
+                                <div className="text-center py-24">
+                                    <div className="h-16 w-16 bg-serene-neutral-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                                        <Search className="h-8 w-8 text-serene-neutral-400" />
+                                    </div>
+                                    <h3 className="text-lg font-semibold text-serene-neutral-900 mb-1">No results found</h3>
+                                    <p className="text-serene-neutral-500">
+                                        We couldn't find any reports matching "{searchQuery}"
+                                    </p>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                ) : (
+                    <>
+                        {/* Hero & Greeting */}
+                        <SereneWelcomeHeader 
+                            name={profileDetails.first_name || "Friend"} 
+                            timeOfDay={getTimeOfDay()}
+                            compact={isWelcomeCompact}
+                        />
 
-			{/* Alert Dialog */}
-			<AlertDialog
-				open={!!deleteReport}
-				onOpenChange={(open) => !open && setDeleteReport(null)}
-			>
-				<AlertDialogContent>
-					<AlertDialogHeader>
-						<AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-						<AlertDialogDescription>
-							This action cannot be undone. This will permanently delete the report.
-						</AlertDialogDescription>
-					</AlertDialogHeader>
-					<AlertDialogFooter>
-						<AlertDialogCancel>Cancel</AlertDialogCancel>
-						<AlertDialogAction
-							className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-							onClick={() => deleteReport && handleDelete(deleteReport)}
-						>
-							Delete
-						</AlertDialogAction>
-					</AlertDialogFooter>
-				</AlertDialogContent>
-			</AlertDialog>
-		</>
+                        {/* Quick Stats Overview */}
+                        {/* Quick Actions Grid with Embedded Stats */}
+                        <div className="space-y-4">
+                            <h3 className="text-sm font-bold text-serene-neutral-400 uppercase tracking-wider px-1">Dashboard</h3>
+                            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 md:gap-4">
+                                <SereneQuickActionCard
+                                    title="Cases"
+                                    description={`${activeCasesCount} Active`}
+                                    icon={<Shield className="h-5 w-5" />}
+                                    href="/dashboard/reports"
+                                    variant="blue"
+                                    badge={activeCasesCount || undefined}
+                                />
+                                <SereneQuickActionCard
+                                    title="Matches"
+                                    description={`${matchedCount} Found`}
+                                    icon={<Heart className="h-5 w-5" />}
+                                    href="/dashboard/reports"
+                                    variant="blue"
+                                    badge={matchedCount || undefined}
+                                />
+                                <SereneQuickActionCard
+                                    title="Appointments"
+                                    description={`${upcomingAppointments} Upcoming`}
+                                    icon={<CalendarDays className="h-5 w-5" />}
+                                    href="/dashboard/reports"
+                                    variant="blue"
+                                    badge={upcomingAppointments || undefined}
+                                />
+                                <SereneQuickActionCard
+                                    title="Messages"
+                                    description="Support Chat"
+                                    icon={<MessageCircle className="h-5 w-5" />}
+                                    href="/dashboard/chat"
+                                    variant="green"
+                                    badge={dash?.data?.unreadChatCount || undefined}
+                                />
+                                <SereneQuickActionCard
+                                    title="Resources"
+                                    description="Help & Guides"
+                                    icon={<BookOpen className="h-5 w-5" />}
+                                    href="/dashboard/resources"
+                                    variant="neutral"
+                                />
+                            </div>
+                        </div>
+
+
+                        {/* Recent Activity / Active Cases Preview */}
+                        <div>
+                            <SereneSectionHeader 
+                                title="Recent Activity" 
+                                description="Latest updates on your cases"
+                                action={{ label: "View All", href: "/dashboard/reports" }}
+                            />
+                            
+                            <div className="space-y-3">
+                                {reports.length > 0 ? (
+                                    reports.slice(0, 3).map((report) => (
+                                        <Link href={`/dashboard/reports/${report.report_id}`} key={report.report_id} className="block group">
+                                            <Card className="overflow-hidden border-serene-neutral-100 hover:border-serene-blue-200 transition-all duration-300 hover:shadow-md cursor-pointer">
+                                                <CardContent className="p-4 flex items-center gap-4">
+                                                    <div className={cn(
+                                                        "h-12 w-12 rounded-full flex items-center justify-center text-lg font-bold shrink-0",
+                                                        "bg-serene-blue-50 text-serene-blue-600"
+                                                    )}>
+                                                        {report.type_of_incident?.charAt(0).toUpperCase() || "R"}
+                                                    </div>
+                                                    <div className="flex-1 min-w-0">
+                                                        <div className="flex items-center justify-between mb-1">
+                                                            <h4 className="font-semibold text-serene-neutral-900 truncate">
+                                                                {report.type_of_incident?.replace(/_/g, " ") || "Incident Report"}
+                                                            </h4>
+                                                            <span className="text-xs text-serene-neutral-400 font-medium">
+                                                                {report.submission_timestamp ? new Date(report.submission_timestamp).toLocaleDateString() : ""}
+                                                            </span>
+                                                        </div>
+                                                        <p className="text-sm text-serene-neutral-500 truncate">
+                                                            {report.incident_description || "No description provided."}
+                                                        </p>
+                                                    </div>
+                                                    <ChevronRight className="h-4 w-4 text-serene-neutral-300 group-hover:text-serene-blue-400 transition-colors" />
+                                                </CardContent>
+                                            </Card>
+                                        </Link>
+                                    ))
+                                ) : (
+                                    <div className="text-center py-12 bg-white rounded-3xl border border-dashed border-serene-neutral-200">
+                                        <p className="text-serene-neutral-400 mb-2">No active cases found</p>
+                                        <Button className="text-serene-blue-600 font-semibold" variant="link" asChild>
+                                            <Link href="/report-abuse">Start a new report</Link>
+                                        </Button>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </>
+                )}
+			</div>
+		</div>
 	);
 }
