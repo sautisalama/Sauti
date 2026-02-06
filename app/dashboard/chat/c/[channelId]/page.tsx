@@ -1,6 +1,6 @@
 import { getUser } from "@/utils/supabase/server";
 import { redirect } from "next/navigation";
-import { DMChat } from "@/app/dashboard/chat/_components/DMChat";
+import DMChat from "@/app/dashboard/chat/_components/DMChat";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";

@@ -1,7 +1,5 @@
-import { StreamChat } from "stream-chat";
-import { NextResponse } from "next/server";
-import { createClient } from "@/utils/supabase/server";
-
-export async function GET(request: Request) {
-	return NextResponse.json({ error: "Chat is currently deactivated" }, { status: 503 });
+// Deprecated: Stream Chat has been removed.
+import { NextResponse } from 'next/server';
+export async function POST() {
+  return NextResponse.json({ error: 'Stream Chat removed' }, { status: 410 });
 }

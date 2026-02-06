@@ -1,5 +1,5 @@
 import { Dialog, DialogContent } from "@/components/ui/dialog";
-import { AppointmentChat } from "@/app/dashboard/chat/_components/AppointmentChat";
+import AppointmentChat from "@/app/dashboard/chat/_components/AppointmentChat";
 
 interface ChatModalProps {
 	isOpen: boolean;

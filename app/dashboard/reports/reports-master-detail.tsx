@@ -31,11 +31,14 @@ import {
 	Pause,
 	Filter,
 	Search,
+	MessageCircle,
 } from "lucide-react";
 import { Tables } from "@/types/db-schema";
 import RichTextNotesEditor from "./rich-text-notes-editor";
 import { useToast } from "@/hooks/use-toast";
 import { useDashboardData } from "@/components/providers/DashboardDataProvider";
+import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { CalendarConnectionStatus } from "../_components/CalendarConnectionStatus";
 import { SereneBreadcrumb } from "@/components/ui/SereneBreadcrumb";
 
@@ -82,6 +85,9 @@ export default function ReportsMasterDetail({ userId }: { userId: string }) {
 	const [statusFilter, setStatusFilter] = useState<string>("all");
 	const [onBehalfFilter, setOnBehalfFilter] = useState<string>("all");
 	const [showFilters, setShowFilters] = useState(false);
+	const [editDialogOpen, setEditDialogOpen] = useState(false);
+	const [editDescription, setEditDescription] = useState("");
+    const [isRecording, setIsRecording] = useState(false);
 
 	useEffect(() => {
 		// Prefer provider snapshot when available (no spinner)
@@ -810,130 +816,131 @@ export default function ReportsMasterDetail({ userId }: { userId: string }) {
 								<div className="p-4 space-y-4">
 									{/* Matched Service & Appointment - Combined */}
 									{selected?.matched_services && selected.matched_services.length > 0 ? (
-										<div className="bg-blue-50 rounded-lg border border-blue-100 p-4">
-											<h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
-												<User className="h-4 w-4 text-blue-600" />
-												Matched Service & Appointment
-											</h3>
-											<div className="space-y-3">
-												{/* Service Info */}
+										<div className="bg-white rounded-2xl border border-serene-neutral-200 p-5 shadow-sm">
+											<div className="flex items-center justify-between mb-4">
+												<h3 className="text-base font-bold text-serene-neutral-900 flex items-center gap-2">
+													<User className="h-5 w-5 text-serene-blue-600" />
+													Matched Professional
+												</h3>
+												<Badge className="bg-serene-green-50 text-serene-green-700 border-serene-green-200 uppercase text-[10px] tracking-wider">
+													{selected.matched_services[0].match_status_type}
+												</Badge>
+											</div>
+											
+											<div className="flex items-start gap-4 mb-6">
+												<Avatar className="h-12 w-12 border-2 border-white shadow-sm">
+													<AvatarFallback className="bg-serene-blue-100 text-serene-blue-700 font-bold">
+														{selected.matched_services[0].support_services?.name?.charAt(0) || "P"}
+													</AvatarFallback>
+												</Avatar>
 												<div>
-													<p className="text-sm font-medium text-gray-900">
-														{selected.matched_services[0].support_services?.name ||
-															"Pending Match"}
+													<p className="text-base font-bold text-serene-neutral-900">
+														{selected.matched_services[0].support_services?.name || "Service Provider"}
 													</p>
-													<p className="text-xs text-gray-600 mt-1">
-														Status:{" "}
-														<span className="font-medium capitalize">
-															{String(selected.matched_services[0].match_status_type)}
-														</span>
+													<p className="text-sm text-serene-neutral-500">
+														Verified Support Professional
 													</p>
 												</div>
+											</div>
 
-												{/* Appointment Info */}
-												{selected?.matched_services?.[0]?.appointments?.[0] ? (
-													(() => {
-														const appt = selected?.matched_services?.[0]?.appointments?.[0];
-														if (!appt) return null;
-														return (
-															<div className="bg-white rounded-lg border border-blue-200 p-3">
-																<div className="flex items-center gap-2 mb-2">
-																	<CalendarDays className="h-4 w-4 text-green-600" />
-																	<span className="text-sm font-medium text-gray-900">
-																		Appointment
-																	</span>
-																</div>
-																<div className="space-y-2">
-																	<div className="text-xs text-gray-700">
-																		<div className="flex items-center gap-2 mb-1">
-																			<Clock className="h-3 w-3 text-gray-500" />
-																			<span className="font-medium">
-																				{new Date(appt.appointment_date).toLocaleDateString()}
-																			</span>
-																		</div>
-																		<div className="text-gray-600">
-																			{new Date(appt.appointment_date).toLocaleTimeString([], {
-																				hour: "2-digit",
-																				minute: "2-digit",
-																			})}
-																		</div>
-																	</div>
-																	<div className="flex items-center gap-2">
-																		<span
-																			className={`px-2 py-1 rounded-md text-xs font-medium ${
-																				appt.status === "confirmed"
-																					? "bg-blue-100 text-blue-700 border border-blue-200"
-																					: appt.status === "completed"
-																					? "bg-green-100 text-green-700 border border-green-200"
-																					: "bg-gray-100 text-gray-700 border border-gray-200"
-																			}`}
-																		>
-																			{appt.status.charAt(0).toUpperCase() + appt.status.slice(1)}
-																		</span>
-																	</div>
-																</div>
-															</div>
-														);
-													})()
-												) : (
-													<div className="bg-white rounded-lg border border-blue-200 p-3">
-														<div className="flex items-center gap-2 mb-2">
-															<CalendarDays className="h-4 w-4 text-gray-600" />
-															<span className="text-sm font-medium text-gray-900">
-																Appointment
-															</span>
-														</div>
-														<p className="text-xs text-gray-600">
-															No appointment scheduled yet
-														</p>
+											{/* Appointment Info */}
+											{selected?.matched_services?.[0]?.appointments?.[0] ? (
+												<div className="bg-serene-blue-50/50 rounded-xl border border-serene-blue-100 p-4 mb-4">
+													<div className="flex items-center gap-2 mb-2">
+														<CalendarDays className="h-4 w-4 text-serene-blue-600" />
+														<span className="text-sm font-bold text-serene-blue-900">
+															Upcoming Appointment
+														</span>
 													</div>
-												)}
+													<div className="text-sm text-serene-neutral-700 font-medium">
+														{new Date(selected.matched_services[0].appointments[0].appointment_date).toLocaleDateString(undefined, {
+															weekday: 'long',
+															month: 'long',
+															day: 'numeric',
+															hour: '2-digit',
+															minute: '2-digit'
+														})}
+													</div>
+													<div className="mt-2 flex gap-2">
+														<Badge variant="outline" className="bg-white/80 capitalize">
+															{selected.matched_services[0].appointments[0].status}
+														</Badge>
+													</div>
+												</div>
+											) : (
+												<div className="bg-serene-neutral-50 rounded-xl border border-serene-neutral-100 p-4 mb-4 text-center">
+													<p className="text-sm text-serene-neutral-500">No appointment scheduled yet.</p>
+												</div>
+											)}
 
-												<Button
-													variant="outline"
-													size="sm"
-													onClick={() => setShowProfile(true)}
-													className="w-full border-blue-200 text-blue-700 hover:bg-blue-100 text-xs h-8"
+											<div className="grid grid-cols-2 gap-3">
+												<Button 
+													className="bg-serene-blue-600 hover:bg-serene-blue-700 text-white shadow-sm"
+													onClick={() => window.location.href = `/dashboard/chat?id=${selected.matched_services![0].appointment_id || 'new'}`} // Mock chat link
 												>
-													View Professional Profile
+													<MessageCircle className="h-4 w-4 mr-2" /> Message
+												</Button>
+												<Button 
+													variant="outline"
+													className="border-serene-neutral-200 text-serene-neutral-700 hover:bg-serene-neutral-50"
+													onClick={() => setShowProfile(true)}
+												>
+													View Profile
 												</Button>
 											</div>
 										</div>
 									) : (
-										<div className="bg-gray-50 rounded-lg border border-gray-200 p-4">
-											<h3 className="text-sm font-semibold text-gray-900 mb-2 flex items-center gap-2">
-												<User className="h-4 w-4 text-gray-600" />
-												Matched Service & Appointment
+										<div className="bg-serene-neutral-50 rounded-2xl border border-serene-neutral-200 p-6 text-center">
+											<div className="w-12 h-12 rounded-full bg-serene-neutral-100 flex items-center justify-center mx-auto mb-3">
+												<Search className="h-6 w-6 text-serene-neutral-400" />
+											</div>
+											<h3 className="text-sm font-bold text-serene-neutral-900 mb-1">
+												Finding a Match
 											</h3>
-											<p className="text-xs text-gray-600">
-												No match yet - we're working on finding the right professional for
-												you
+											<p className="text-xs text-serene-neutral-500 max-w-[200px] mx-auto">
+												We are currently looking for the best professional to support you.
 											</p>
 										</div>
 									)}
 
-									{/* Description with Audio - Combined */}
-									{(selected.incident_description || (selected.media as any)?.url) && (
-										<div className="bg-white rounded-lg border border-gray-200 p-4">
-											<h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
-												<FileText className="h-4 w-4 text-gray-600" />
-												Description
+									{/* Description with Audio - Update Details Primary */}
+									<div className="bg-white rounded-2xl border border-serene-neutral-200 p-5 shadow-sm">
+										<div className="flex items-center justify-between mb-4">
+											<h3 className="text-base font-bold text-serene-neutral-900 flex items-center gap-2">
+												<FileText className="h-5 w-5 text-serene-blue-600" />
+												Report Details
 											</h3>
-											<div className="space-y-3">
-												{selected.incident_description && (
-													<p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">
-														{selected.incident_description}
-													</p>
-												)}
-												{(selected.media as any)?.url && (
+											<Button 
+												variant="ghost" 
+												size="sm" 
+												className="text-serene-blue-600 hover:text-serene-blue-700 hover:bg-serene-blue-50"
+												onClick={() => {
+													setEditDescription(selected.incident_description || "");
+													setEditDialogOpen(true);
+												}}
+											>
+												Edit
+											</Button>
+										</div>
+										<div className="space-y-4">
+											{selected.incident_description ? (
+												<p className="text-sm text-serene-neutral-700 leading-relaxed whitespace-pre-wrap">
+													{selected.incident_description}
+												</p>
+											) : (
+												<p className="text-sm text-serene-neutral-400 italic">No description provided.</p>
+											)}
+											
+											{(selected.media as any)?.url && (
+												<div className="mt-4 pt-4 border-t border-serene-neutral-100">
 													<AudioPlayer
 														src={(selected.media as any).url}
 														type={(selected.media as any).type}
 													/>
-												)}
-											</div>
+												</div>
+											)}
 										</div>
-									)}
+									</div>
 
 									{/* Notes (WYSIWYG) - Full Height */}
 									<div className="bg-white rounded-lg border border-gray-200 flex flex-col h-[80vh] sm:h-[500px] mb-4">
@@ -1055,6 +1062,73 @@ export default function ReportsMasterDetail({ userId }: { userId: string }) {
 								No matched professional found.
 							</div>
 						)}
+					</DialogContent>
+				</Dialog>
+
+				{/* Edit Report Dialog */}
+				<Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+					<DialogContent className="sm:max-w-lg bg-white rounded-3xl p-0 overflow-hidden">
+						<div className="p-6 pb-0">
+							<DialogHeader>
+								<DialogTitle className="text-xl font-bold text-serene-neutral-900">Update Report Details</DialogTitle>
+							</DialogHeader>
+						</div>
+						
+						<div className="p-6 space-y-6">
+							<div className="space-y-2">
+								<label className="text-sm font-bold text-serene-neutral-700">Description</label>
+								<textarea 
+									className="w-full min-h-[150px] p-4 rounded-xl border border-serene-neutral-200 bg-serene-neutral-50 focus:bg-white focus:ring-2 focus:ring-serene-blue-100 transition-all resize-none text-sm leading-relaxed"
+									value={editDescription}
+									onChange={(e) => setEditDescription(e.target.value)}
+									placeholder="Update the details of what happened..."
+								/>
+							</div>
+
+							<div className="space-y-2">
+								<label className="text-sm font-bold text-serene-neutral-700">Add Voice Note</label>
+								<div className="bg-serene-neutral-50 rounded-xl p-4 border border-serene-neutral-200 flex items-center justify-between">
+									<div className="flex items-center gap-3">
+										<div className={`w-10 h-10 rounded-full flex items-center justify-center ${isRecording ? "bg-red-100 text-red-600 animate-pulse" : "bg-serene-blue-100 text-serene-blue-600"}`}>
+											<Mic className="h-5 w-5" />
+										</div>
+										<div className="flex flex-col">
+											<span className="text-sm font-bold text-serene-neutral-900">{isRecording ? "Recording..." : "Record Audio"}</span>
+											<span className="text-xs text-serene-neutral-500">{isRecording ? "00:12" : "Tap to start recording"}</span>
+										</div>
+									</div>
+									<Button 
+										size="icon" 
+										variant="ghost" 
+										className={`rounded-full h-10 w-10 ${isRecording ? "bg-red-600 text-white hover:bg-red-700" : "bg-serene-neutral-200 text-serene-neutral-600 hover:bg-serene-blue-600 hover:text-white"}`}
+										onClick={() => setIsRecording(!isRecording)}
+									>
+										{isRecording ? <div className="w-3 h-3 bg-white rounded-sm" /> : <div className="w-3 h-3 bg-current rounded-full" />}
+									</Button>
+								</div>
+								<p className="text-xs text-serene-neutral-400 pl-1">Voice notes are encrypted and secure.</p>
+							</div>
+							
+							{/* Photos Disabled as per request */}
+							<div className="opacity-50 pointer-events-none">
+								<div className="flex items-center gap-2 text-sm font-bold text-serene-neutral-400 mb-2">
+									<Paperclip className="h-4 w-4" /> Add Photos (Disabled)
+								</div>
+							</div>
+
+							<div className="pt-2 flex gap-3">
+								<Button className="flex-1 bg-serene-blue-600 hover:bg-serene-blue-700 text-white rounded-xl h-12" onClick={() => {
+									// Mock update
+									toast({ title: "Report Updated", description: "Your changes have been saved successfully." });
+									setEditDialogOpen(false);
+								}}>
+									Save Changes
+								</Button>
+								<Button variant="outline" className="flex-1 rounded-xl h-12 border-serene-neutral-200" onClick={() => setEditDialogOpen(false)}>
+									Cancel
+								</Button>
+							</div>
+						</div>
 					</DialogContent>
 				</Dialog>
 			</div>

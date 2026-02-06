@@ -82,7 +82,14 @@ export function EnhancedSidebar({
 	const pathname = usePathname();
 	const user = useUser();
 	const dash = useDashboardData();
-	const { isSidebarCollapsed: isCollapsed, setIsSidebarCollapsed: setIsCollapsed } = dash || { isSidebarCollapsed: defaultCollapsed, setIsSidebarCollapsed: () => {} };
+    
+    // Hydration fix:
+    const [mounted, setMounted] = useState(false);
+    useEffect(() => setMounted(true), []);
+
+	const rawIsCollapsed = dash?.isSidebarCollapsed ?? defaultCollapsed;
+    const isCollapsed = mounted ? rawIsCollapsed : false; // Default expanded on server to match desktop usually
+    const setIsCollapsed = dash?.setSidebarCollapsed ?? (() => {});
 	const [reportDialogOpen, setReportDialogOpen] = useState(false);
 	const [notifications, setNotifications] = useState(0);
 	const [casesCount, setCasesCount] = useState<number>(0);

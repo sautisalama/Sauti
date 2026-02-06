@@ -1,6 +1,6 @@
 import { getUser } from "@/utils/supabase/server";
 import { redirect } from "next/navigation";
-import { CommunityChat } from "@/app/dashboard/chat/_components/CommunityChat";
+import CommunityChat from "@/app/dashboard/chat/_components/CommunityChat";
 import { SereneBreadcrumb } from "@/components/ui/SereneBreadcrumb";
 
 export default async function CommunityChatPage() {

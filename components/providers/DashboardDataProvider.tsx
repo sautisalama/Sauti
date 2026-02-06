@@ -19,6 +19,7 @@ export type DashboardData = {
     overallStatus: string;
     lastChecked?: string | null;
     documentsCount?: number;
+    pendingCount?: number;
   };
 };
 

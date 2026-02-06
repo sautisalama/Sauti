@@ -146,6 +146,77 @@ export type Database = {
           },
         ]
       }
+      chat_participants: {
+        Row: {
+          chat_id: string
+          joined_at: string | null
+          status: Json | null
+          user_id: string
+        }
+        Insert: {
+          chat_id: string
+          joined_at?: string | null
+          status?: Json | null
+          user_id: string
+        }
+        Update: {
+          chat_id?: string
+          joined_at?: string | null
+          status?: Json | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chat_participants_chat_id_fkey"
+            columns: ["chat_id"]
+            isOneToOne: false
+            referencedRelation: "chats"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "chat_participants_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      chats: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          id: string
+          last_message_at: string | null
+          metadata: Json | null
+          type: Database["public"]["Enums"]["chat_type"]
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          last_message_at?: string | null
+          metadata?: Json | null
+          type?: Database["public"]["Enums"]["chat_type"]
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          last_message_at?: string | null
+          metadata?: Json | null
+          type?: Database["public"]["Enums"]["chat_type"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chats_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       matched_services: {
         Row: {
           description: string | null
@@ -219,6 +290,54 @@ export type Database = {
           {
             foreignKeyName: "matched_services_survivor_id_fkey"
             columns: ["survivor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      messages: {
+        Row: {
+          chat_id: string | null
+          content: string | null
+          created_at: string | null
+          id: string
+          metadata: Json | null
+          sender_id: string | null
+          type: Database["public"]["Enums"]["message_type"]
+          updated_at: string | null
+        }
+        Insert: {
+          chat_id?: string | null
+          content?: string | null
+          created_at?: string | null
+          id?: string
+          metadata?: Json | null
+          sender_id?: string | null
+          type?: Database["public"]["Enums"]["message_type"]
+          updated_at?: string | null
+        }
+        Update: {
+          chat_id?: string | null
+          content?: string | null
+          created_at?: string | null
+          id?: string
+          metadata?: Json | null
+          sender_id?: string | null
+          type?: Database["public"]["Enums"]["message_type"]
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "messages_chat_id_fkey"
+            columns: ["chat_id"]
+            isOneToOne: false
+            referencedRelation: "chats"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "messages_sender_id_fkey"
+            columns: ["sender_id"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
@@ -680,6 +799,8 @@ export type Database = {
         | "reject_user"
         | "reject_service"
       appointment_status_type: "pending" | "confirmed" | "requested"
+      chat_role: "admin" | "member"
+      chat_type: "dm" | "group" | "support_match"
       consent_type: "yes" | "no"
       contact_preference_type: "phone_call" | "sms" | "email" | "do_not_contact"
       gender_type: "female" | "male" | "non_binary" | "prefer_not_to_say"
@@ -697,6 +818,15 @@ export type Database = {
         | "declined"
         | "completed"
         | "cancelled"
+      message_type:
+        | "text"
+        | "image"
+        | "video"
+        | "file"
+        | "audio"
+        | "location"
+        | "system"
+        | "mixed"
       stat_type:
         | "user_counts"
         | "service_counts"
@@ -856,6 +986,8 @@ export const Constants = {
         "reject_service",
       ],
       appointment_status_type: ["pending", "confirmed", "requested"],
+      chat_role: ["admin", "member"],
+      chat_type: ["dm", "group", "support_match"],
       consent_type: ["yes", "no"],
       contact_preference_type: ["phone_call", "sms", "email", "do_not_contact"],
       gender_type: ["female", "male", "non_binary", "prefer_not_to_say"],
@@ -874,6 +1006,16 @@ export const Constants = {
         "declined",
         "completed",
         "cancelled",
+      ],
+      message_type: [
+        "text",
+        "image",
+        "video",
+        "file",
+        "audio",
+        "location",
+        "system",
+        "mixed",
       ],
       stat_type: [
         "user_counts",
