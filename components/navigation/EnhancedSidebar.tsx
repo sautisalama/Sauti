@@ -505,10 +505,10 @@ export function EnhancedSidebar({
 			>
 				{/* Header */}
 				<div className="flex items-center justify-between p-4 border-b border-neutral-200 dark:border-neutral-800">
-					{!isCollapsed && (
+						{!isCollapsed && (
 						<Link href="/dashboard" className="flex items-center gap-3">
 							<Image
-								src="/small-logo.png"
+								src="/logo-small.png"
 								alt="Sauti Salama"
 								width={32}
 								height={32}
@@ -521,10 +521,10 @@ export function EnhancedSidebar({
 						</Link>
 					)}
 
-					{isCollapsed && (
+						{isCollapsed && (
 						<Link href="/dashboard" className="flex justify-center w-full">
 							<Image
-								src="/logo.webp"
+								src="/logo-small.png"
 								alt="Sauti Salama"
 								width={32}
 								height={32}
