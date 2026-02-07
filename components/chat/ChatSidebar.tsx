@@ -143,8 +143,8 @@ export function ChatSidebar({ chats, selectedChatId, onSelectChat, isLoading, cu
                >
                  <div className="relative">
                    <Avatar className="h-12 w-12 border-2 border-[#25d366]">
-                      <AvatarImage src="/icons/salama-ai.png" />
-                      <AvatarFallback className="bg-purple-100 text-purple-700">AI</AvatarFallback>
+                      <AvatarImage src="/logo-small.png" />
+                      <AvatarFallback className="bg-gradient-to-br from-sauti-teal to-sauti-orange text-white">AI</AvatarFallback>
                    </Avatar>
                    <span className="absolute bottom-0 right-0 h-3 w-3 bg-[#25d366] border-2 border-white rounded-full"></span>
                  </div>

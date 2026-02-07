@@ -778,6 +778,13 @@ export default function CasesMasterDetail({ userId }: { userId: string }) {
 				</div>
 
 				{/* Overlay Detail Panel with animation */}
+			{/* Backdrop for mobile */}
+			{selected && (
+				<div 
+					className="fixed inset-0 bg-black/20 z-40 sm:hidden"
+					onClick={() => setSelectedId(null)}
+				/>
+			)}
 				<div
 					className={`fixed inset-0 sm:inset-y-0 sm:right-0 sm:left-auto w-full sm:w-[600px] lg:w-[800px] bg-white shadow-2xl border-l border-serene-neutral-200 z-50 transform transition-transform duration-300 ease-out ${
 						selected

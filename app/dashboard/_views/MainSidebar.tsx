@@ -108,8 +108,8 @@ export function MainSidebar() {
 				<div className="flex flex-col items-center gap-12 mx-6">
 					<Link href="/dashboard">
 						<Image
-							src="/small-logo.png"
-							alt="Logo"
+							src="/logo-small.png"
+							alt="Sauti Salama"
 							width={30}
 							height={30}
 							className="w-7 h-10"
@@ -196,14 +196,15 @@ export function MainSidebar() {
 				}`}
 			>
 				<div className="flex items-center justify-between px-4 py-3">
-					<Link href="/dashboard">
+					<Link href="/dashboard" className="flex items-center gap-2">
 						<Image
-							src="/small-logo.png"
-							alt="Logo"
-							width={24}
-							height={24}
-							className="w-6 h-8"
+							src="/logo-small.png"
+							alt="Sauti Salama"
+							width={28}
+							height={28}
+							className="w-7 h-7"
 						/>
+						<span className="font-bold text-white text-sm">Sauti Salama</span>
 					</Link>
 					<div className="flex items-center gap-3">
 						<TooltipProvider>

@@ -233,7 +233,8 @@ export default function ProfilePage() {
 				{/* Content Area */}
 				<div className="lg:col-span-9 space-y-6">
 					
-					{/* Header Card */}
+					{/* Header Card - Hidden on Accessibility and Settings tabs */}
+				{!['accessibility', 'settings'].includes(activeSection) && (
 					<Card className="rounded-[2rem] border-serene-neutral-200/60 shadow-sm overflow-hidden bg-white group hover:shadow-md transition-all duration-500">
 						<div className="h-24 sm:h-40 bg-gradient-to-r from-sauti-teal/10 via-sauti-teal/5 to-sauti-teal/10 relative overflow-hidden">
 							<div className="absolute inset-0 bg-white/40 backdrop-blur-[2px]" />
@@ -268,6 +269,7 @@ export default function ProfilePage() {
 							</div>
 						</div>
 					</Card>
+				)}
 
 					{/* Section: Account */}
 					{activeSection === 'account' && (

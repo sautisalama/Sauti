@@ -7,7 +7,8 @@ import { MessageBubble } from './MessageBubble';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Phone, Video, Search, MoreVertical, Smile, Paperclip, Mic, Send, X, Lock } from 'lucide-react';
-import { ChatMediaDrawer } from './ChatMediaDrawer'; // Import Drawer
+import { ChatMediaDrawer } from './ChatMediaDrawer';
+import { EmojiPicker } from './EmojiPicker';
 
 interface ChatWindowProps {
   chat: Chat;
@@ -20,8 +21,11 @@ export function ChatWindow({ chat, onBack }: ChatWindowProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const emojiPickerRef = useRef<HTMLDivElement>(null);
   const [linkPreview, setLinkPreview] = useState<any>(null);
   
   const supabase = createClient();
@@ -371,8 +375,28 @@ export function ChatWindow({ chat, onBack }: ChatWindowProps) {
        )}
 
        {/* Input Area */}
-       <div className="bg-white px-4 py-3 flex items-center gap-3 z-10 border-t border-serene-neutral-100">
-         <Button variant="ghost" size="icon" className="text-serene-neutral-400 hover:text-serene-blue-500 hover:bg-serene-blue-50 rounded-full transition-colors">
+       <div className="bg-white px-4 py-3 flex items-center gap-3 z-10 border-t border-serene-neutral-100 relative">
+         {/* Emoji Picker Popover */}
+         {showEmojiPicker && (
+           <div 
+             ref={emojiPickerRef}
+             className="absolute bottom-full left-0 mb-2 z-50"
+           >
+             <EmojiPicker 
+               onEmojiSelect={(emoji) => {
+                 setInputText(prev => prev + emoji);
+                 textareaRef.current?.focus();
+               }}
+               onClose={() => setShowEmojiPicker(false)}
+             />
+           </div>
+         )}
+         <Button 
+           variant="ghost" 
+           size="icon" 
+           className={`text-serene-neutral-400 hover:text-serene-blue-500 hover:bg-serene-blue-50 rounded-full transition-colors ${showEmojiPicker ? 'bg-serene-blue-50 text-serene-blue-500' : ''}`}
+           onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+         >
            <Smile className="h-6 w-6" />
          </Button>
          <Button variant="ghost" size="icon" className="text-serene-neutral-400 hover:text-serene-blue-500 hover:bg-serene-blue-50 rounded-full transition-colors" onClick={() => fileInputRef.current?.click()}>
@@ -384,12 +408,14 @@ export function ChatWindow({ chat, onBack }: ChatWindowProps) {
            <textarea
              ref={(el) => {
                 // @ts-ignore
+                textareaRef.current = el;
                 if (el) {
                     el.style.height = 'auto';
                     el.style.height = el.scrollHeight + 'px';
                 }
              }}
-             className="flex-1 bg-transparent border-none outline-none text-serene-neutral-900 placeholder-serene-neutral-400 text-[15px] resize-none max-h-[120px] py-1" 
+             className="flex-1 bg-transparent border-none outline-none text-serene-neutral-900 placeholder-serene-neutral-400 text-[15px] resize-none max-h-[120px] py-1"
+             onFocus={() => setShowEmojiPicker(false)} 
              placeholder="Type a message..."
              rows={1}
              value={inputText}

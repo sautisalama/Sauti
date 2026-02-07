@@ -20,24 +20,44 @@ export function MessageBubble({ message, isOwn, showTail = true }: MessageBubble
   const time = format(new Date(message.created_at), 'HH:mm');
   const status = 'read'; 
 
-  // Link Preview Card
-  const LinkCard = ({ preview }: { preview: any }) => (
-    <a 
-      href={preview.url} 
-      target="_blank" 
-      rel="noreferrer" 
-      className={`block mt-1 mb-1 rounded-lg overflow-hidden border transition-transform hover:scale-[1.01] active:scale-[0.99] max-w-sm ${isOwn ? 'bg-white/10 border-white/20' : 'bg-serene-neutral-50 border-serene-neutral-100'}`}
-    >
-      {preview.image && (
-        <div className="h-32 w-full bg-cover bg-center" style={{ backgroundImage: `url(${preview.image})` }} />
-      )}
-      <div className="p-2">
-        <div className={`font-bold text-sm truncate ${isOwn ? 'text-white' : 'text-serene-neutral-900'}`}>{preview.title}</div>
-        <div className={`text-xs line-clamp-2 ${isOwn ? 'text-blue-100' : 'text-serene-neutral-500'}`}>{preview.description}</div>
-        <div className={`text-xs mt-1 truncate ${isOwn ? 'text-blue-200' : 'text-serene-blue-600'}`}>{preview.url}</div>
-      </div>
-    </a>
-  );
+  // Link Preview Card with favicon
+  const LinkCard = ({ preview }: { preview: any }) => {
+    const domain = (() => {
+      try {
+        return new URL(preview.url).hostname.replace('www.', '');
+      } catch {
+        return preview.url;
+      }
+    })();
+    const faviconUrl = `https://www.google.com/s2/favicons?domain=${domain}&sz=32`;
+    
+    return (
+      <a 
+        href={preview.url} 
+        target="_blank" 
+        rel="noreferrer" 
+        className={`block mt-2 mb-1 rounded-xl overflow-hidden border transition-all hover:scale-[1.01] active:scale-[0.99] max-w-sm ${isOwn ? 'bg-white/10 border-white/20' : 'bg-serene-neutral-50 border-serene-neutral-100'}`}
+      >
+        {preview.image && (
+          <div className="h-32 w-full bg-cover bg-center" style={{ backgroundImage: `url(${preview.image})` }} />
+        )}
+        <div className="p-3">
+          <div className={`font-bold text-sm mb-1 line-clamp-2 ${isOwn ? 'text-white' : 'text-serene-neutral-900'}`}>
+            {preview.title || domain}
+          </div>
+          {preview.description && (
+            <div className={`text-xs line-clamp-2 mb-2 ${isOwn ? 'text-blue-100' : 'text-serene-neutral-500'}`}>
+              {preview.description}
+            </div>
+          )}
+          <div className={`flex items-center gap-2 text-xs ${isOwn ? 'text-blue-200' : 'text-serene-neutral-400'}`}>
+            <img src={faviconUrl} alt="" className="w-4 h-4 rounded" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+            <span className="truncate">{domain}</span>
+          </div>
+        </div>
+      </a>
+    );
+  };
 
   return (
     <ContextMenu>
