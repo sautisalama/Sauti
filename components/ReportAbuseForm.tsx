@@ -329,11 +329,11 @@ export default function ReportAbuseForm({ onClose }: { onClose?: () => void }) {
 	};
 
 	return (
-		<div className="flex flex-col h-[90vh] bg-white overflow-hidden">
+		<div className="flex flex-col h-[90vh] sm:h-[85vh] bg-white overflow-hidden rounded-none sm:rounded-2xl">
 			{/* Modal Header */}
-			<div className="px-6 py-4 border-b bg-neutral-50 flex items-center justify-between shrink-0">
+			<div className="px-4 sm:px-6 py-3 sm:py-4 border-b bg-neutral-50 flex items-center justify-between shrink-0">
 				<div>
-					<h2 className="text-xl font-bold text-sauti-dark">Report Abuse</h2>
+					<h2 className="text-lg sm:text-xl font-bold text-sauti-dark">Report Abuse</h2>
 					<p className="text-xs text-neutral-500">Your safety is our priority. All reports are encrypted.</p>
 				</div>
 				{onClose && (
@@ -343,10 +343,10 @@ export default function ReportAbuseForm({ onClose }: { onClose?: () => void }) {
 				)}
 			</div>
 
-			<div className="flex-1 overflow-y-auto p-4 sm:p-8 bg-neutral-50/30">
-				<form onSubmit={handleSubmit} className="space-y-10 max-w-2xl mx-auto pb-12">
-					<div className="space-y-6">
-						<div className="bg-white border-2 border-neutral-200 rounded-3xl p-6 shadow-sm hover:border-sauti-teal/30 transition-all">
+			<div className="flex-1 overflow-y-auto p-3 sm:p-8 bg-neutral-50/30">
+				<form onSubmit={handleSubmit} className="space-y-8 sm:space-y-10 max-w-2xl mx-auto pb-12">
+					<div className="space-y-4 sm:space-y-6">
+						<div className="bg-white border-2 border-neutral-200 rounded-xl sm:rounded-3xl p-4 sm:p-6 shadow-sm hover:border-sauti-teal/30 transition-all">
 							<p className="text-sm font-black text-sauti-dark uppercase tracking-wider mb-4">Who are you reporting for?</p>
 							<div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
 								<button
