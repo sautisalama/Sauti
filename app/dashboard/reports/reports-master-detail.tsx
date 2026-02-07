@@ -329,8 +329,8 @@ export default function ReportsMasterDetail({ userId }: { userId: string }) {
 				<div className="space-y-3">
 					<div className="flex items-center justify-between">
 						<div className="flex items-center gap-2">
-							<div className="w-3 h-3 rounded-full bg-purple-500" />
-							<span className="text-sm font-medium text-gray-700">
+							<div className="w-3 h-3 rounded-full bg-sauti-teal" />
+							<span className="text-sm font-medium text-sauti-dark">
 								Voice Recording
 							</span>
 						</div>
@@ -353,7 +353,7 @@ export default function ReportsMasterDetail({ userId }: { userId: string }) {
 							onTouchEnd={handleSeekEnd}
 							className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
 							style={{
-								background: `linear-gradient(to right, #8b5cf6 0%, #8b5cf6 ${
+								background: `linear-gradient(to right, #1A3434 0%, #1A3434 ${
 									(currentTime / duration) * 100
 								}%, #e5e7eb ${(currentTime / duration) * 100}%, #e5e7eb 100%)`,
 							}}
@@ -778,8 +778,8 @@ export default function ReportsMasterDetail({ userId }: { userId: string }) {
 								
 								<div className="min-w-0 flex-1">
 									<div className="flex items-center gap-3 mb-2">
-										<h2 className="text-xl font-bold text-gray-900 truncate">
-											{selected.type_of_incident?.replace(/_/g, " ") || "Unknown Incident"}
+										<h2 className="text-xl font-bold text-sauti-dark truncate">
+											Your Support Journey
 										</h2>
 										<span
 											className={`px-2.5 py-1 rounded-lg text-xs font-bold uppercase tracking-wider ${urgencyColor(
@@ -875,14 +875,14 @@ export default function ReportsMasterDetail({ userId }: { userId: string }) {
 
 											<div className="grid grid-cols-2 gap-3">
 												<Button 
-													className="bg-serene-blue-600 hover:bg-serene-blue-700 text-white shadow-sm"
-													onClick={() => window.location.href = `/dashboard/chat?id=${selected.matched_services![0].appointment_id || 'new'}`} // Mock chat link
+													className="bg-sauti-teal hover:bg-sauti-dark text-white shadow-sm"
+													onClick={() => window.location.href = `/dashboard/chat?id=${selected.matched_services![0].appointments?.[0]?.appointment_id || 'new'}`} // Mock chat link
 												>
 													<MessageCircle className="h-4 w-4 mr-2" /> Message
 												</Button>
 												<Button 
 													variant="outline"
-													className="border-serene-neutral-200 text-serene-neutral-700 hover:bg-serene-neutral-50"
+													className="border-sauti-teal/30 text-sauti-dark hover:bg-sauti-teal/5"
 													onClick={() => setShowProfile(true)}
 												>
 													View Profile

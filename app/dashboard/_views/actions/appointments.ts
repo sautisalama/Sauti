@@ -68,7 +68,7 @@ export async function updateAppointmentStatus(
 	const { error } = await supabase
 		.from("appointments")
 		.update({ status })
-		.eq("id", appointmentId);
+		.eq("appointment_id", appointmentId);
 
 	if (error) {
 		console.error("Error updating appointment status:", error);

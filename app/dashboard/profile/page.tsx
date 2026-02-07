@@ -175,8 +175,8 @@ export default function ProfilePage() {
 			</div>
 
 			<div className="max-w-7xl mx-auto px-4 md:px-8 grid grid-cols-1 lg:grid-cols-12 gap-8">
-				{/* Sidebar Menu (Desktop) */}
-				<div className="lg:col-span-3 space-y-2 sticky top-6 h-fit"> {/* Sticky sidebar for better UX */}
+				{/* Sidebar Menu - Hidden on mobile, shows as horizontal tabs */}
+				<div className="hidden lg:block lg:col-span-3 space-y-2 sticky top-6 h-fit">
 					<div className="bg-white/80 backdrop-blur-xl rounded-2xl p-2 border border-serene-neutral-200/60 shadow-sm">
 					{navItems.map(item => (
 						<button
@@ -208,39 +208,63 @@ export default function ProfilePage() {
 					</div>
 				</div>
 
+	
+
+				{/* Mobile Navigation Tabs */}
+				<div className="lg:hidden col-span-1 -mt-2 mb-4">
+					<div className="flex overflow-x-auto gap-2 pb-2 scrollbar-hide">
+						{navItems.map(item => (
+							<button
+								key={item.id}
+								onClick={() => router.push(`/dashboard/profile?section=${item.id}`)}
+								className={`flex-shrink-0 flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all whitespace-nowrap ${
+									activeSection === item.id 
+										? "bg-sauti-teal text-white shadow-md" 
+										: "bg-white text-serene-neutral-600 border border-serene-neutral-200"
+								}`}
+							>
+								<item.icon className="h-4 w-4" />
+								{item.label}
+							</button>
+						))}
+					</div>
+				</div>
+
 				{/* Content Area */}
 				<div className="lg:col-span-9 space-y-6">
 					
 					{/* Header Card */}
 					<Card className="rounded-[2rem] border-serene-neutral-200/60 shadow-sm overflow-hidden bg-white group hover:shadow-md transition-all duration-500">
-						<div className="h-40 bg-gradient-to-r from-serene-blue-50 via-serene-purple-50 to-serene-pink-50 relative overflow-hidden">
+						<div className="h-24 sm:h-40 bg-gradient-to-r from-sauti-teal/10 via-sauti-teal/5 to-sauti-teal/10 relative overflow-hidden">
 							<div className="absolute inset-0 bg-white/40 backdrop-blur-[2px]" />
 						</div>
-						<div className="px-8 pb-8 relative">
-							<div className="absolute -top-16 left-8">
-								<div className="relative group/avatar">
-									<Avatar className="h-32 w-32 border-[6px] border-white shadow-lg cursor-pointer transition-transform duration-300 group-hover/avatar:scale-[1.02]">
-										<AvatarImage src={profile?.avatar_url || ""} className="object-cover" />
-										<AvatarFallback className="bg-gradient-to-br from-serene-blue-600 to-serene-blue-700 text-white text-3xl font-bold">
-											{profile?.first_name?.[0] || "U"}
-										</AvatarFallback>
-									</Avatar>
-									<div className="absolute inset-0 bg-black/10 rounded-full opacity-0 group-hover/avatar:opacity-100 transition-opacity flex items-center justify-center cursor-pointer backdrop-blur-[1px]">
-										<Camera className="h-8 w-8 text-white drop-shadow-md" />
+						<div className="px-4 sm:px-8 pb-6 sm:pb-8 relative">
+							{/* Avatar - stacked on mobile, positioned on desktop */}
+							<div className="flex flex-col sm:flex-row sm:items-end gap-4">
+								<div className="relative -mt-12 sm:-mt-16 mx-auto sm:mx-0">
+									<div className="relative group/avatar">
+										<Avatar className="h-24 w-24 sm:h-32 sm:w-32 border-4 sm:border-[6px] border-white shadow-lg cursor-pointer transition-transform duration-300 group-hover/avatar:scale-[1.02]">
+											<AvatarImage src={profile?.avatar_url || ""} className="object-cover" />
+											<AvatarFallback className="bg-gradient-to-br from-sauti-teal to-sauti-dark text-white text-2xl sm:text-3xl font-bold">
+												{profile?.first_name?.[0] || "U"}
+											</AvatarFallback>
+										</Avatar>
+										<div className="absolute inset-0 bg-black/10 rounded-full opacity-0 group-hover/avatar:opacity-100 transition-opacity flex items-center justify-center cursor-pointer backdrop-blur-[1px]">
+											<Camera className="h-6 w-6 sm:h-8 sm:w-8 text-white drop-shadow-md" />
+										</div>
 									</div>
 								</div>
-							</div>
-							<div className="pl-40 pt-4 flex flex-col sm:flex-row justify-between items-start gap-4">
-								<div>
-									<h2 className="text-3xl font-bold text-serene-neutral-900 tracking-tight">{profile?.first_name} {profile?.last_name}</h2>
-									<p className="text-serene-neutral-500 font-medium">{profile?.email}</p>
+								{/* User info - centered on mobile, beside avatar on desktop */}
+								<div className="flex-1 text-center sm:text-left pb-0 sm:pb-2">
+									<h2 className="text-xl sm:text-3xl font-bold text-sauti-dark tracking-tight">{profile?.first_name} {profile?.last_name}</h2>
+									<p className="text-serene-neutral-500 text-sm sm:text-base font-medium mt-1">{profile?.email}</p>
+									{isProfessional && (
+										<div className="inline-flex items-center gap-2 px-3 py-1.5 bg-sauti-teal/10 text-sauti-teal rounded-full text-xs font-bold uppercase tracking-wider mt-3">
+											<Shield className="h-3 w-3" />
+											Professional Support
+										</div>
+									)}
 								</div>
-								{isProfessional && (
-									<div className="flex items-center gap-2 px-4 py-2 bg-serene-blue-50 text-serene-blue-700 rounded-full text-xs font-bold uppercase tracking-wider shadow-sm border border-serene-blue-100">
-										<Shield className="h-3 w-3" />
-										Professional Support
-									</div>
-								)}
 							</div>
 						</div>
 					</Card>
@@ -272,7 +296,7 @@ export default function ProfilePage() {
 								</div>
 								
 								<div className="flex justify-end">
-									<Button onClick={() => saveSection("basic")} className="bg-serene-blue-600 hover:bg-serene-blue-700 text-white rounded-xl">
+									<Button onClick={() => saveSection("basic")} className="bg-sauti-teal hover:bg-sauti-dark text-white rounded-xl h-11 px-6">
 										<Save className="h-4 w-4 mr-2" /> Save Changes
 									</Button>
 								</div>
