@@ -89,7 +89,7 @@ export function EnhancedSidebar({
 
 	const rawIsCollapsed = dash?.isSidebarCollapsed ?? defaultCollapsed;
     const isCollapsed = mounted ? rawIsCollapsed : false; // Default expanded on server to match desktop usually
-    const setIsCollapsed = dash?.setSidebarCollapsed ?? (() => {});
+    const setIsCollapsed = dash?.setIsSidebarCollapsed ?? (() => {});
 	const [reportDialogOpen, setReportDialogOpen] = useState(false);
 	const [notifications, setNotifications] = useState(0);
 	const [casesCount, setCasesCount] = useState<number>(0);

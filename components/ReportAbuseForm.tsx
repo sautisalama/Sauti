@@ -644,7 +644,7 @@ export default function ReportAbuseForm({ onClose }: { onClose?: () => void }) {
 				<div className="pt-2">
 					<Button
 						type="submit"
-						className="w-full bg-blue-600 hover:bg-blue-700 text-white py-4 text-base sm:text-lg font-bold rounded-2xl shadow-lg hover:shadow-xl transition-all duration-200"
+						className="w-full bg-sauti-teal hover:bg-sauti-dark text-white py-4 text-base sm:text-lg font-bold rounded-2xl shadow-lg hover:shadow-xl transition-all duration-200"
 						disabled={loading || (password.length > 0 && password.length < 6)}
 					>
 						{loading ? "Submitting..." : "Submit Report"}

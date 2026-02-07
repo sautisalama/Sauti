@@ -1,3 +1,4 @@
+"use client";
 import { useEffect, useState } from "react";
 import { createClient } from "@/utils/supabase/client";
 import { useUser } from "@/hooks/useUser";
@@ -43,6 +44,7 @@ export default function ActivityPage() {
   };
 
   const groupedActivities = activities.reduce((acc, curr) => {
+     if (!curr.created_at) return acc;
      const date = isSameDay(parseISO(curr.created_at), new Date()) 
         ? 'Today' 
         : isSameDay(parseISO(curr.created_at), subDays(new Date(), 1))
@@ -78,11 +80,11 @@ export default function ActivityPage() {
                       {groupedActivities[group].map((item: any) => (
                          <SereneActivityItem
                             key={item.id}
-                            title={item.title}
-                            description={item.body}
-                            time={formatDistanceToNow(parseISO(item.created_at), { addSuffix: true })}
-                            icon={getIconForType(item.type)}
-                            isUnread={!item.read}
+                            title={item.title || "Update"}
+                            description={item.body || ""}
+                            time={item.created_at ? formatDistanceToNow(parseISO(item.created_at), { addSuffix: true }) : "Just now"}
+                            icon={getIconForType(item.type || "")}
+                            isUnread={!!item.read === false}
                          />
                       ))}
                    </div>
