@@ -58,6 +58,7 @@ export default function AuthenticatedReportAbuseForm({
 	const [urgency, setUrgency] = useState<string>("");
 	const [contactPreference, setContactPreference] = useState<string>("");
 	const [consent, setConsent] = useState<string>("");
+	const [recordOnly, setRecordOnly] = useState(false);
 	const supabase = useMemo(() => createClient(), []);
 	const user = useUser();
 
@@ -229,6 +230,7 @@ export default function AuthenticatedReportAbuseForm({
 			email: user?.profile?.email || null,
 			media,
 			is_onBehalf: reportingFor !== 'self',
+			record_only: recordOnly,
 			additional_info: {
 				incident_types: incidentTypes,
 				special_needs: { disabled: needsDisabled, queer_support: needsQueer },
@@ -286,7 +288,7 @@ export default function AuthenticatedReportAbuseForm({
 	}, [incidentTypes, urgency, consent, contactPreference]);
 
 	return (
-		<div className="flex flex-col h-full bg-white">
+		<div className="flex flex-col h-full bg-white rounded-lg sm:rounded-none">
 			{/* Header - Compact */}
 			<div className="px-6 py-4 border-b border-neutral-100 flex items-center justify-between shrink-0">
 				<div>
@@ -569,6 +571,39 @@ export default function AuthenticatedReportAbuseForm({
 							<option value="yes">Yes, I consent</option>
 							<option value="no">No, I don't consent</option>
 						</select>
+					</div>
+
+					{/* Record Only Option */}
+					<div className={`p-4 rounded-xl border-2 transition-all cursor-pointer ${
+						recordOnly 
+							? 'border-amber-400 bg-amber-50' 
+							: 'border-neutral-200 bg-white hover:border-neutral-300'
+					}`}
+						onClick={() => setRecordOnly(!recordOnly)}
+					>
+						<label className="flex items-start gap-3 cursor-pointer">
+							<input
+								type="checkbox"
+								checked={recordOnly}
+								onChange={(e) => setRecordOnly(e.target.checked)}
+								className="mt-0.5 rounded border-neutral-300 text-amber-500 focus:ring-amber-500 h-5 w-5"
+							/>
+							<div className="flex-1">
+								<span className="text-sm font-semibold text-neutral-800 block">
+									I don't need immediate help right now
+								</span>
+								<span className="text-xs text-neutral-500 block mt-1">
+									Your report will be safely documented for your records. You can request support later at any time.
+								</span>
+							</div>
+						</label>
+						{recordOnly && (
+							<div className="mt-3 p-3 bg-amber-100/50 rounded-lg">
+								<p className="text-xs text-amber-800">
+									<strong>Note:</strong> Your report will be stored securely but won't be shared with service providers unless you request help later. You can always access your report from your dashboard.
+								</p>
+							</div>
+						)}
 					</div>
 				</div>
 

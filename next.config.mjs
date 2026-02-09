@@ -27,6 +27,14 @@ const nextConfig = {
 				protocol: "https",
 				hostname: "i.pravatar.cc",
 			},
+			{
+				protocol: "https",
+				hostname: "*.supabase.co",
+			},
+			{
+				protocol: "https",
+				hostname: "*.supabase.in",
+			},
 		],
 	},
 	reactStrictMode: true, // Enable React strict mode for improved error handling

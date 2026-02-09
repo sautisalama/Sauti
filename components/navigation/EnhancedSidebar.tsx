@@ -24,6 +24,7 @@ import {
 	HelpCircle,
 	Megaphone,
 	Shield,
+	BookOpen,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -56,6 +57,7 @@ import ReportAbuseForm from "@/components/ReportAbuseForm";
 import { cn } from "@/lib/utils";
 import { useDashboardData } from "@/components/providers/DashboardDataProvider";
 import { RoleSwitcher } from "@/components/RoleSwitcher";
+import AuthenticatedReportAbuseForm from "@/components/AuthenticatedReportAbuseForm";
 
 interface SidebarItem {
 	id: string;
@@ -253,13 +255,7 @@ export function EnhancedSidebar({
 					section: "secondary",
 					separator: true
 				},
-				{
-					id: "settings",
-					label: "Settings",
-					icon: Settings,
-					href: "/dashboard/profile?tab=settings",
-					section: "footer",
-				},
+
 			];
 		}
 
@@ -312,13 +308,7 @@ export function EnhancedSidebar({
 			];
 			return [
 				...survivorMain,
-				{
-					id: "settings",
-					label: "Settings",
-					icon: Settings,
-					href: "/dashboard/profile?tab=settings",
-					section: "footer",
-				},
+
 			];
 		}
 
@@ -327,17 +317,10 @@ export function EnhancedSidebar({
 				...baseItems,
 				{
 					id: "cases",
-					label: "Case Management",
+					label: "Cases",
 					icon: ClipboardList,
 					href: "/dashboard/cases",
 					badge: casesCount > 0 ? casesCount : undefined,
-					section: "main",
-				},
-				{
-					id: "reports",
-					label: "My reports",
-					icon: ClipboardList,
-					href: "/dashboard/reports",
 					section: "main",
 				},
 				{
@@ -359,36 +342,31 @@ export function EnhancedSidebar({
 					href: "/dashboard/resources",
 					section: "main",
 				},
+				{
+					id: "services",
+					label: "Services",
+					icon: Shield,
+					href: "/dashboard/profile?section=services",
+					section: "main",
+				},
 			];
 			return [
 				...proMain,
 				{
-					id: "services",
-					label: "My Services",
-					icon: Plus,
-					href: "/dashboard/services",
+					id: "report",
+					label: "Report Abuse",
+					icon: Megaphone,
+					onClick: () => setReportDialogOpen(true),
 					section: "secondary",
 					separator: true,
 				},
-				{
-					id: "settings",
-					label: "Settings",
-					icon: Settings,
-					href: "/dashboard/profile?tab=settings",
-					section: "footer",
-				},
+
 			];
 		}
 
 		return [
 			...baseItems,
-			{
-				id: "settings",
-				label: "Settings",
-				icon: Settings,
-				href: "/dashboard/settings",
-				section: "footer",
-			},
+
 		];
 	}, [pathname, role, casesCount, dash?.data?.unreadChatCount, dash?.data?.verification?.pendingCount]);
 
@@ -612,29 +590,28 @@ export function EnhancedSidebar({
 						<DropdownMenuContent
 							align={isCollapsed ? "center" : "end"}
 							side={isCollapsed ? "right" : "bottom"}
-							className="w-56 bg-white border-neutral-200"
+							className="w-60 mb-2 ml-2 rounded-2xl border-serene-neutral-200 shadow-xl bg-white/95 backdrop-blur-xl animate-in fade-in zoom-in-95 duration-200"
 							sideOffset={isCollapsed ? 10 : 8}
 						>
-							<DropdownMenuLabel>My Account</DropdownMenuLabel>
-							<DropdownMenuSeparator />
+							<DropdownMenuLabel className="font-normal p-3">
+								<div className="flex flex-col space-y-1">
+									<p className="text-sm font-medium leading-none text-serene-neutral-900">
+										{dash?.data?.profile?.first_name || user?.email || "User"}
+									</p>
+									<p className="text-xs leading-none text-serene-neutral-500 truncate">{user?.email}</p>
+								</div>
+							</DropdownMenuLabel>
+							<DropdownMenuSeparator className="bg-serene-neutral-100" />
 							<DropdownMenuItem asChild>
-								<Link href="/dashboard/profile" className="cursor-pointer">
-									<User className="mr-2 h-4 w-4" />
+								<Link href="/dashboard/profile" className="cursor-pointer rounded-xl focus:bg-serene-neutral-50 focus:text-serene-blue-600 m-1">
+									<User className="mr-2 h-4 w-4 text-serene-neutral-500" />
 									<span>Profile</span>
 								</Link>
 							</DropdownMenuItem>
-							<DropdownMenuItem asChild>
-								<Link
-									href="/dashboard/profile?tab=settings"
-									className="cursor-pointer"
-								>
-									<Settings className="mr-2 h-4 w-4" />
-									<span>Settings</span>
-								</Link>
-							</DropdownMenuItem>
-							<DropdownMenuSeparator />
+
+							<DropdownMenuSeparator className="bg-serene-neutral-100" />
 							<DropdownMenuItem
-								className="text-error-600 focus:text-error-600 focus:bg-error-50 cursor-pointer"
+								className="text-red-600 focus:text-red-700 focus:bg-red-50 cursor-pointer rounded-xl m-1"
 								asChild
 							>
 								<form action={signOut} className="w-full flex">
@@ -686,37 +663,28 @@ export function EnhancedSidebar({
 							<SidebarItemComponent key={item.id} item={item} />
 						))}
 
-						{/* Sign Out - Moved to Dropdown, kept generically here if needed or removed to avoid duplicate */}
-						{/* Keeping it here too for visibility if Sidebar is open? 
-                            User didn't explicitly say remove it from footer, but it IS in the dropdown now.
-                            Let's keep it here for now as a quick exit. */}
-						<form action={signOut}>
-							<Button
-								variant="ghost"
-								className={cn(
-									"w-full justify-start text-neutral-600 hover:text-error-600 hover:bg-error-50",
-									isCollapsed && "justify-center"
-								)}
-							>
-								<LogOut className="h-4 w-4" />
-								{!isCollapsed && <span className="ml-3">Sign Out</span>}
-							</Button>
-						</form>
 					</div>
 				</div>
 			</div>
 
-			{/* Report Dialog */}
+		{/* Report Dialog */}
 			<Dialog open={reportDialogOpen} onOpenChange={setReportDialogOpen}>
-				<DialogContent className="sm:max-w-4xl">
-					<DialogHeader>
+				<DialogContent className="p-0 sm:max-w-4xl h-[90vh] max-sm:h-[95vh] overflow-hidden border-none text-left bg-transparent shadow-2xl max-sm:rounded-xl">
+					<DialogHeader className="sr-only">
 						<DialogTitle>Report Incident</DialogTitle>
-						<DialogDescription>
-							Your safety and privacy are our priority. All information will be kept
-							confidential.
-						</DialogDescription>
+						<DialogDescription>Submit an incident report</DialogDescription>
 					</DialogHeader>
-					<ReportAbuseForm onClose={() => setReportDialogOpen(false)} />
+					<div className="h-full w-full bg-white rounded-xl sm:rounded-2xl overflow-hidden flex flex-col">
+					    {/* Header removed from here as forms have their own headers */}
+						{dash?.data?.userId ? (
+							<AuthenticatedReportAbuseForm 
+								userId={dash.data.userId} 
+								onClose={() => setReportDialogOpen(false)} 
+							/>
+						) : (
+							<ReportAbuseForm onClose={() => setReportDialogOpen(false)} />
+						)}
+					</div>
 				</DialogContent>
 			</Dialog>
 		</>

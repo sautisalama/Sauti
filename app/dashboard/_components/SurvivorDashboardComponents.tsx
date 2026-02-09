@@ -28,9 +28,10 @@ interface SereneWelcomeHeaderProps {
   timeOfDay?: "morning" | "afternoon" | "evening";
   className?: string;
   compact?: boolean;
+  welcomeMessage?: string;
 }
 
-export function SereneWelcomeHeader({ name, timeOfDay = "morning", className, compact }: SereneWelcomeHeaderProps) {
+export function SereneWelcomeHeader({ name, timeOfDay = "morning", className, compact, welcomeMessage = "Welcome back, you're safe here." }: SereneWelcomeHeaderProps) {
   const greetings = {
     morning: "Good morning",
     afternoon: "Good afternoon", 
@@ -47,7 +48,7 @@ export function SereneWelcomeHeader({ name, timeOfDay = "morning", className, co
           {greetings[timeOfDay]}, <span className="text-serene-blue-600">{name}</span>
         </h1>
         <p className="text-serene-neutral-600 font-medium leading-relaxed">
-          Welcome back, you're safe here.
+          {welcomeMessage}
         </p>
       </div>
     );
@@ -66,7 +67,7 @@ export function SereneWelcomeHeader({ name, timeOfDay = "morning", className, co
           {greetings[timeOfDay]}, <span className="text-serene-blue-600">{name}</span>
         </h1>
         <p className="text-serene-neutral-600 text-lg font-medium leading-relaxed">
-          Welcome back, you're safe here.
+          {welcomeMessage}
         </p>
       </div>
     </div>

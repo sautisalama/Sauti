@@ -5,6 +5,9 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import Image from "next/image";
+import Link from "next/link";
+import { PenLine } from "lucide-react";
+import { useDashboardData } from "@/components/providers/DashboardDataProvider";
 
 type BlogPost = {
 	title: string;
@@ -60,6 +63,8 @@ const categories = [
 
 export default function BlogPage() {
 	const [selectedCategory, setSelectedCategory] = useState("All");
+	const dash = useDashboardData();
+	const isProfessional = dash?.data?.userType === "professional" || dash?.data?.userType === "ngo";
 
 	const filteredPosts =
 		selectedCategory === "All"
@@ -70,12 +75,22 @@ export default function BlogPage() {
 		<div className="container mx-auto py-8 px-4">
 			{/* Header */}
 			<div className="mb-12 text-center">
-				<h1 className="text-4xl font-bold text-[#1A3434] mb-4">Our Resources</h1>
-				<p className="text-gray-600 max-w-2xl mx-auto">
+				<h1 className="text-4xl font-bold text-serene-neutral-900 mb-4">Resources</h1>
+				<p className="text-serene-neutral-600 max-w-2xl mx-auto mb-6">
 					Stay informed about our latest news, success stories, and initiatives in
 					supporting survivors.
 				</p>
+				{isProfessional && (
+					<Button asChild className="bg-sauti-teal hover:bg-sauti-dark text-white rounded-xl h-11 px-6 relative">
+						<Link href="/dashboard/blogs">
+							<PenLine className="h-4 w-4 mr-2" />
+							Write Blog Post
+							<span className="ml-2 px-2 py-0.5 text-[10px] font-bold bg-amber-400 text-amber-900 rounded-full uppercase">Soon</span>
+						</Link>
+					</Button>
+				)}
 			</div>
+
 
 			{/* Categories */}
 			<div className="mb-8 sticky top-0 z-10 bg-white/80 backdrop-blur supports-[backdrop-filter]:bg-white/60 py-3 border-b">

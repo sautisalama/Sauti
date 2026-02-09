@@ -20,6 +20,7 @@ interface SupportServicesTabProps {
 	setOpen: (open: boolean) => void;
 	userId: string;
 	onRefresh: () => Promise<void>;
+	userType?: 'professional' | 'ngo' | 'survivor';
 }
 
 export function SupportServicesTab({
@@ -30,21 +31,37 @@ export function SupportServicesTab({
 	setOpen,
 	userId,
 	onRefresh,
+	userType = 'professional',
 }: SupportServicesTabProps) {
+	// Service limits: 2 for professionals, unlimited for NGOs
+	const serviceLimit = userType === 'ngo' ? Infinity : 2;
+	const isAtLimit = supportServices.length >= serviceLimit;
+	const canAddMore = !isAtLimit;
 	return (
 		<div className="space-y-6">
 			<div className="flex justify-between items-center">
 				<div>
 					<h2 className="text-xl font-black text-sauti-dark tracking-tight">Support Services</h2>
 					<p className="text-sm text-gray-500">
-						{supportServices.length}{" "}
+						{supportServices.length}{userType !== 'ngo' ? `/${serviceLimit}` : ''}{" "}
 						{supportServices.length === 1 ? "service" : "services"} registered
 					</p>
 				</div>
-				<Button onClick={() => setOpen(true)} className="bg-sauti-teal hover:bg-sauti-dark text-white font-bold rounded-full px-6 transition-all duration-300 shadow-md">
-					<Plus className="h-4 w-4 mr-2" />
-					Add Service
-				</Button>
+				<div className="flex items-center gap-3">
+					{isAtLimit && userType !== 'ngo' && (
+						<span className="text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded-lg">
+							Limit reached
+						</span>
+					)}
+					<Button 
+						onClick={() => setOpen(true)} 
+						className="bg-sauti-teal hover:bg-sauti-dark text-white font-bold rounded-full px-6 transition-all duration-300 shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+						disabled={isAtLimit}
+					>
+						<Plus className="h-4 w-4 mr-2" />
+						Add Service
+					</Button>
+				</div>
 			</div>
 
 			{supportServices.length > 0 ? (

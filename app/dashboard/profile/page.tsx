@@ -160,58 +160,43 @@ export default function ProfilePage() {
 	}
 
 	return (
-		<div className="min-h-screen bg-serene-neutral-50/50 pb-20 pt-2"> {/* Reduced top padding, softer bg */}
-			{/* Breadcrumb Header */}
-			<div className="px-4 md:px-8 py-4"> {/* Compact header padding */}
+		<div className="min-h-screen bg-serene-neutral-50/30 pb-24">
+			{/* Compact Breadcrumb Header */}
+			<div className="relative px-4 md:px-8 py-3 md:py-4">
 				<SereneBreadcrumb items={[
 					{ label: 'Profile', href: '/dashboard/profile' },
 					{ label: activeSection.charAt(0).toUpperCase() + activeSection.slice(1) }
 				]} />
-				<SereneSectionHeader 
-					title="Profile & Settings" 
-					description="Manage your account, privacy, and preferences"
-					className="mt-2 text-2xl" // Smaller margin
-				/>
+				<h1 className="text-xl font-bold text-serene-neutral-900 mt-1">Profile & Settings</h1>
 			</div>
 
-			<div className="max-w-7xl mx-auto px-4 md:px-8 grid grid-cols-1 lg:grid-cols-12 gap-8">
-				{/* Sidebar Menu - Hidden on mobile, shows as horizontal tabs */}
-				<div className="hidden lg:block lg:col-span-3 space-y-2 sticky top-6 h-fit">
-					<div className="bg-white/80 backdrop-blur-xl rounded-2xl p-2 border border-serene-neutral-200/60 shadow-sm">
+			<div className="relative max-w-6xl mx-auto px-4 md:px-8 grid grid-cols-1 lg:grid-cols-12 gap-6">
+				{/* Sidebar Menu - Hidden on mobile */}
+				<div className="hidden lg:block lg:col-span-3 space-y-3 sticky top-4 h-fit">
+					<div className="bg-white/95 backdrop-blur-xl rounded-2xl p-3 border border-serene-neutral-100 shadow-sm">
 					{navItems.map(item => (
 						<button
 							key={item.id}
 							onClick={() => router.push(`/dashboard/profile?section=${item.id}`)}
-							className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 ${
+							className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 ${
 								activeSection === item.id 
-									? "bg-serene-blue-50 text-serene-blue-700 font-bold shadow-sm" 
-									: "text-serene-neutral-600 hover:bg-serene-neutral-50 hover:text-serene-blue-600"
+									? "bg-serene-blue-50/80 text-serene-blue-700 font-semibold" 
+									: "text-serene-neutral-600 hover:bg-serene-neutral-50/80 hover:text-serene-neutral-900"
 							}`}
 						>
-							<item.icon className={`h-4.5 w-4.5 ${activeSection === item.id ? "text-serene-blue-600" : "text-serene-neutral-400"}`} />
-							<span className="text-sm tracking-wide">{item.label}</span>
+							<item.icon className={`h-4 w-4 ${activeSection === item.id ? "text-serene-blue-600" : "text-serene-neutral-400"}`} />
+							<span className="text-sm">{item.label}</span>
 							{activeSection === item.id && (
-								<div className="ml-auto w-1 h-1 rounded-full bg-serene-blue-500" />
+								<div className="ml-auto w-1.5 h-1.5 rounded-full bg-serene-blue-500" />
 							)}
 						</button>
 					))}
 					</div>
-					
-					<div className="pt-2">
-						<button 
-							onClick={() => signOut()}
-							className="w-full flex items-center gap-3 px-6 py-3.5 rounded-2xl text-red-600 hover:bg-red-50/80 border border-transparent hover:border-red-100 transition-all font-medium text-sm"
-						>
-							<LogOut className="h-4.5 w-4.5" />
-							<span>Sign Out</span>
-						</button>
-					</div>
 				</div>
 
-	
 
 				{/* Mobile Navigation Tabs */}
-				<div className="lg:hidden col-span-1 -mt-2 mb-4">
+				<div className="lg:hidden col-span-1 mb-4">
 					<div className="flex overflow-x-auto gap-2 pb-2 scrollbar-hide">
 						{navItems.map(item => (
 							<button
@@ -219,8 +204,8 @@ export default function ProfilePage() {
 								onClick={() => router.push(`/dashboard/profile?section=${item.id}`)}
 								className={`flex-shrink-0 flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all whitespace-nowrap ${
 									activeSection === item.id 
-										? "bg-sauti-teal text-white shadow-md" 
-										: "bg-white text-serene-neutral-600 border border-serene-neutral-200"
+										? "bg-serene-blue-600 text-white" 
+										: "bg-white/80 text-serene-neutral-600 border border-serene-neutral-100"
 								}`}
 							>
 								<item.icon className="h-4 w-4" />
@@ -233,36 +218,36 @@ export default function ProfilePage() {
 				{/* Content Area */}
 				<div className="lg:col-span-9 space-y-6">
 					
-					{/* Header Card - Hidden on Accessibility and Settings tabs */}
-				{!['accessibility', 'settings'].includes(activeSection) && (
-					<Card className="rounded-[2rem] border-serene-neutral-200/60 shadow-sm overflow-hidden bg-white group hover:shadow-md transition-all duration-500">
-						<div className="h-24 sm:h-40 bg-gradient-to-r from-sauti-teal/10 via-sauti-teal/5 to-sauti-teal/10 relative overflow-hidden">
-							<div className="absolute inset-0 bg-white/40 backdrop-blur-[2px]" />
+					{/* Header Card - Only shown on Account tab */}
+				{activeSection === 'account' && (
+					<Card className="rounded-[1.75rem] border-serene-neutral-100 shadow-sm overflow-hidden bg-white">
+						<div className="h-28 sm:h-36 bg-gradient-to-br from-serene-blue-50 via-serene-neutral-50 to-serene-blue-50/30 relative overflow-hidden">
+							<div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(100,140,180,0.08),transparent_70%)]" />
 						</div>
-						<div className="px-4 sm:px-8 pb-6 sm:pb-8 relative">
-							{/* Avatar - stacked on mobile, positioned on desktop */}
+						<div className="px-5 sm:px-8 pb-6 sm:pb-8 relative">
+							{/* Avatar */}
 							<div className="flex flex-col sm:flex-row sm:items-end gap-4">
-								<div className="relative -mt-12 sm:-mt-16 mx-auto sm:mx-0">
+								<div className="relative -mt-14 sm:-mt-16 mx-auto sm:mx-0">
 									<div className="relative group/avatar">
-										<Avatar className="h-24 w-24 sm:h-32 sm:w-32 border-4 sm:border-[6px] border-white shadow-lg cursor-pointer transition-transform duration-300 group-hover/avatar:scale-[1.02]">
+										<Avatar className="h-24 w-24 sm:h-28 sm:w-28 border-4 border-white shadow-lg cursor-pointer transition-transform duration-300 group-hover/avatar:scale-[1.02]">
 											<AvatarImage src={profile?.avatar_url || ""} className="object-cover" />
-											<AvatarFallback className="bg-gradient-to-br from-sauti-teal to-sauti-dark text-white text-2xl sm:text-3xl font-bold">
+											<AvatarFallback className="bg-gradient-to-br from-serene-blue-500 to-serene-blue-700 text-white text-2xl sm:text-3xl font-bold">
 												{profile?.first_name?.[0] || "U"}
 											</AvatarFallback>
 										</Avatar>
-										<div className="absolute inset-0 bg-black/10 rounded-full opacity-0 group-hover/avatar:opacity-100 transition-opacity flex items-center justify-center cursor-pointer backdrop-blur-[1px]">
-											<Camera className="h-6 w-6 sm:h-8 sm:w-8 text-white drop-shadow-md" />
+										<div className="absolute inset-0 bg-black/10 rounded-full opacity-0 group-hover/avatar:opacity-100 transition-opacity flex items-center justify-center cursor-pointer">
+											<Camera className="h-6 w-6 sm:h-7 sm:w-7 text-white drop-shadow-md" />
 										</div>
 									</div>
 								</div>
-								{/* User info - centered on mobile, beside avatar on desktop */}
-								<div className="flex-1 text-center sm:text-left pb-0 sm:pb-2">
-									<h2 className="text-xl sm:text-3xl font-bold text-sauti-dark tracking-tight">{profile?.first_name} {profile?.last_name}</h2>
-									<p className="text-serene-neutral-500 text-sm sm:text-base font-medium mt-1">{profile?.email}</p>
+								{/* User info */}
+								<div className="flex-1 text-center sm:text-left pb-0 sm:pb-1">
+									<h2 className="text-xl sm:text-2xl font-bold text-serene-neutral-900 tracking-tight">{profile?.first_name} {profile?.last_name}</h2>
+									<p className="text-serene-neutral-500 text-sm font-medium mt-0.5">{profile?.email}</p>
 									{isProfessional && (
-										<div className="inline-flex items-center gap-2 px-3 py-1.5 bg-sauti-teal/10 text-sauti-teal rounded-full text-xs font-bold uppercase tracking-wider mt-3">
+										<div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-serene-blue-50 text-serene-blue-700 rounded-full text-xs font-semibold mt-3">
 											<Shield className="h-3 w-3" />
-											Professional Support
+											Professional
 										</div>
 									)}
 								</div>

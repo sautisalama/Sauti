@@ -13,7 +13,11 @@ export default async function CommunityChatPage() {
          <SereneBreadcrumb items={[{ label: "Community", active: true }]} className="mb-0" />
       </div>
       <div className="flex-1">
-         <CommunityChat userId={user.id} username={user.first_name || user.id} />
+         <CommunityChat 
+            communityId="general"
+            communityName="General Community"
+            currentUserId={user.id} 
+          />
       </div>
     </div>
   );

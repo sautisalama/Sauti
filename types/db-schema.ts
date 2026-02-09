@@ -146,6 +146,199 @@ export type Database = {
           },
         ]
       }
+      blogs: {
+        Row: {
+          admin_notes: string | null
+          author_id: string | null
+          category: string | null
+          content: string
+          cover_image_url: string | null
+          created_at: string | null
+          id: string
+          published_at: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          slug: string | null
+          status: Database["public"]["Enums"]["blog_status_type"] | null
+          tags: Json | null
+          title: string
+          updated_at: string | null
+          view_count: number | null
+        }
+        Insert: {
+          admin_notes?: string | null
+          author_id?: string | null
+          category?: string | null
+          content: string
+          cover_image_url?: string | null
+          created_at?: string | null
+          id?: string
+          published_at?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          slug?: string | null
+          status?: Database["public"]["Enums"]["blog_status_type"] | null
+          tags?: Json | null
+          title: string
+          updated_at?: string | null
+          view_count?: number | null
+        }
+        Update: {
+          admin_notes?: string | null
+          author_id?: string | null
+          category?: string | null
+          content?: string
+          cover_image_url?: string | null
+          created_at?: string | null
+          id?: string
+          published_at?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          slug?: string | null
+          status?: Database["public"]["Enums"]["blog_status_type"] | null
+          tags?: Json | null
+          title?: string
+          updated_at?: string | null
+          view_count?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "blogs_author_id_fkey"
+            columns: ["author_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "blogs_reviewed_by_fkey"
+            columns: ["reviewed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      case_recommendations: {
+        Row: {
+          content: string
+          created_at: string | null
+          id: string
+          is_shared_with_survivor: boolean | null
+          match_id: string | null
+          professional_id: string | null
+          shared_at: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          content: string
+          created_at?: string | null
+          id?: string
+          is_shared_with_survivor?: boolean | null
+          match_id?: string | null
+          professional_id?: string | null
+          shared_at?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          content?: string
+          created_at?: string | null
+          id?: string
+          is_shared_with_survivor?: boolean | null
+          match_id?: string | null
+          professional_id?: string | null
+          shared_at?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "case_recommendations_match_id_fkey"
+            columns: ["match_id"]
+            isOneToOne: false
+            referencedRelation: "matched_services"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "case_recommendations_professional_id_fkey"
+            columns: ["professional_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      case_shares: {
+        Row: {
+          created_at: string | null
+          from_professional_id: string | null
+          id: string
+          include_notes: boolean | null
+          include_recommendations: boolean | null
+          match_id: string | null
+          original_match_date: string | null
+          reason: string | null
+          required_services: Json | null
+          responded_at: string | null
+          status: Database["public"]["Enums"]["case_share_status_type"] | null
+          support_history: Json | null
+          to_professional_id: string | null
+          to_service_pool: boolean | null
+        }
+        Insert: {
+          created_at?: string | null
+          from_professional_id?: string | null
+          id?: string
+          include_notes?: boolean | null
+          include_recommendations?: boolean | null
+          match_id?: string | null
+          original_match_date?: string | null
+          reason?: string | null
+          required_services?: Json | null
+          responded_at?: string | null
+          status?: Database["public"]["Enums"]["case_share_status_type"] | null
+          support_history?: Json | null
+          to_professional_id?: string | null
+          to_service_pool?: boolean | null
+        }
+        Update: {
+          created_at?: string | null
+          from_professional_id?: string | null
+          id?: string
+          include_notes?: boolean | null
+          include_recommendations?: boolean | null
+          match_id?: string | null
+          original_match_date?: string | null
+          reason?: string | null
+          required_services?: Json | null
+          responded_at?: string | null
+          status?: Database["public"]["Enums"]["case_share_status_type"] | null
+          support_history?: Json | null
+          to_professional_id?: string | null
+          to_service_pool?: boolean | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "case_shares_from_professional_id_fkey"
+            columns: ["from_professional_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "case_shares_match_id_fkey"
+            columns: ["match_id"]
+            isOneToOne: false
+            referencedRelation: "matched_services"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "case_shares_to_professional_id_fkey"
+            columns: ["to_professional_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       chat_participants: {
         Row: {
           chat_id: string
@@ -217,6 +410,144 @@ export type Database = {
           },
         ]
       }
+      communities: {
+        Row: {
+          avatar_url: string | null
+          created_at: string | null
+          creator_id: string | null
+          description: string | null
+          id: string
+          is_public: boolean | null
+          member_count: number | null
+          name: string
+          updated_at: string | null
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string | null
+          creator_id?: string | null
+          description?: string | null
+          id?: string
+          is_public?: boolean | null
+          member_count?: number | null
+          name: string
+          updated_at?: string | null
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string | null
+          creator_id?: string | null
+          description?: string | null
+          id?: string
+          is_public?: boolean | null
+          member_count?: number | null
+          name?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "communities_creator_id_fkey"
+            columns: ["creator_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      community_invitations: {
+        Row: {
+          community_id: string | null
+          created_at: string | null
+          id: string
+          invitee_id: string | null
+          inviter_id: string | null
+          message: string | null
+          responded_at: string | null
+          status: Database["public"]["Enums"]["invitation_status_type"] | null
+        }
+        Insert: {
+          community_id?: string | null
+          created_at?: string | null
+          id?: string
+          invitee_id?: string | null
+          inviter_id?: string | null
+          message?: string | null
+          responded_at?: string | null
+          status?: Database["public"]["Enums"]["invitation_status_type"] | null
+        }
+        Update: {
+          community_id?: string | null
+          created_at?: string | null
+          id?: string
+          invitee_id?: string | null
+          inviter_id?: string | null
+          message?: string | null
+          responded_at?: string | null
+          status?: Database["public"]["Enums"]["invitation_status_type"] | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "community_invitations_community_id_fkey"
+            columns: ["community_id"]
+            isOneToOne: false
+            referencedRelation: "communities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "community_invitations_invitee_id_fkey"
+            columns: ["invitee_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "community_invitations_inviter_id_fkey"
+            columns: ["inviter_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      community_members: {
+        Row: {
+          community_id: string | null
+          id: string
+          joined_at: string | null
+          role: Database["public"]["Enums"]["community_role_type"] | null
+          user_id: string | null
+        }
+        Insert: {
+          community_id?: string | null
+          id?: string
+          joined_at?: string | null
+          role?: Database["public"]["Enums"]["community_role_type"] | null
+          user_id?: string | null
+        }
+        Update: {
+          community_id?: string | null
+          id?: string
+          joined_at?: string | null
+          role?: Database["public"]["Enums"]["community_role_type"] | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "community_members_community_id_fkey"
+            columns: ["community_id"]
+            isOneToOne: false
+            referencedRelation: "communities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "community_members_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       matched_services: {
         Row: {
           description: string | null
@@ -228,8 +559,10 @@ export type Database = {
             | Database["public"]["Enums"]["match_status_type"]
             | null
           notes: string | null
+          recommendations: Json | null
           report_id: string | null
           service_id: string | null
+          shared_from_match_id: string | null
           support_service:
             | Database["public"]["Enums"]["support_service_type"]
             | null
@@ -246,8 +579,10 @@ export type Database = {
             | Database["public"]["Enums"]["match_status_type"]
             | null
           notes?: string | null
+          recommendations?: Json | null
           report_id?: string | null
           service_id?: string | null
+          shared_from_match_id?: string | null
           support_service?:
             | Database["public"]["Enums"]["support_service_type"]
             | null
@@ -264,8 +599,10 @@ export type Database = {
             | Database["public"]["Enums"]["match_status_type"]
             | null
           notes?: string | null
+          recommendations?: Json | null
           report_id?: string | null
           service_id?: string | null
+          shared_from_match_id?: string | null
           support_service?:
             | Database["public"]["Enums"]["support_service_type"]
             | null
@@ -285,6 +622,13 @@ export type Database = {
             columns: ["service_id"]
             isOneToOne: false
             referencedRelation: "support_services"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "matched_services_shared_from_match_id_fkey"
+            columns: ["shared_from_match_id"]
+            isOneToOne: false
+            referencedRelation: "matched_services"
             referencedColumns: ["id"]
           },
           {
@@ -518,6 +862,7 @@ export type Database = {
             | null
           principal_subdivision: string | null
           principal_subdivision_code: string | null
+          record_only: boolean | null
           report_id: string
           required_services: Json | null
           state: string | null
@@ -564,6 +909,7 @@ export type Database = {
             | null
           principal_subdivision?: string | null
           principal_subdivision_code?: string | null
+          record_only?: boolean | null
           report_id?: string
           required_services?: Json | null
           state?: string | null
@@ -610,6 +956,7 @@ export type Database = {
             | null
           principal_subdivision?: string | null
           principal_subdivision_code?: string | null
+          record_only?: boolean | null
           report_id?: string
           required_services?: Json | null
           state?: string | null
@@ -799,8 +1146,16 @@ export type Database = {
         | "reject_user"
         | "reject_service"
       appointment_status_type: "pending" | "confirmed" | "requested"
+      blog_status_type:
+        | "draft"
+        | "pending_review"
+        | "approved"
+        | "rejected"
+        | "published"
+      case_share_status_type: "pending" | "accepted" | "declined"
       chat_role: "admin" | "member"
-      chat_type: "dm" | "group" | "support_match"
+      chat_type: "dm" | "group" | "support_match" | "community"
+      community_role_type: "admin" | "moderator" | "member"
       consent_type: "yes" | "no"
       contact_preference_type: "phone_call" | "sms" | "email" | "do_not_contact"
       gender_type: "female" | "male" | "non_binary" | "prefer_not_to_say"
@@ -811,6 +1166,7 @@ export type Database = {
         | "financial"
         | "child_abuse"
         | "other"
+      invitation_status_type: "pending" | "accepted" | "declined" | "expired"
       language_type: "english" | "swahili" | "other"
       match_status_type:
         | "pending"
@@ -986,8 +1342,17 @@ export const Constants = {
         "reject_service",
       ],
       appointment_status_type: ["pending", "confirmed", "requested"],
+      blog_status_type: [
+        "draft",
+        "pending_review",
+        "approved",
+        "rejected",
+        "published",
+      ],
+      case_share_status_type: ["pending", "accepted", "declined"],
       chat_role: ["admin", "member"],
-      chat_type: ["dm", "group", "support_match"],
+      chat_type: ["dm", "group", "support_match", "community"],
+      community_role_type: ["admin", "moderator", "member"],
       consent_type: ["yes", "no"],
       contact_preference_type: ["phone_call", "sms", "email", "do_not_contact"],
       gender_type: ["female", "male", "non_binary", "prefer_not_to_say"],
@@ -999,6 +1364,7 @@ export const Constants = {
         "child_abuse",
         "other",
       ],
+      invitation_status_type: ["pending", "accepted", "declined", "expired"],
       language_type: ["english", "swahili", "other"],
       match_status_type: [
         "pending",

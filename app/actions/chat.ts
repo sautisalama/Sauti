@@ -149,3 +149,83 @@ export async function searchUsers(query: string) {
   if (error) throw error;
   return data;
 }
+
+export async function getCaseChat(caseId: string, survivorId: string) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Unauthorized');
+
+  // 1. Try to find existing chat for this case
+  const { data: existingChats, error: searchError } = await supabase
+    .from('chats')
+    .select(`
+      *,
+      participants:chat_participants(
+        *,
+        user:profiles(*)
+      )
+    `)
+    // We use granular metadata query if possible, or filter in code if contains is tricky with partial JSON
+    // .contains('metadata', { case_id: caseId }) // This works if metadata is JSONB and indexed
+    .textSearch('metadata', `${caseId}`) // Alternative or just fetch and filter
+    .limit(5); // Fetch a few and filter in JS to be safe
+
+  if (searchError) throw searchError;
+
+  // Filter precisely for case_id in metadata
+  const foundChat = existingChats?.find((c: any) => c.metadata?.case_id === caseId);
+
+  if (foundChat) {
+    return foundChat as Chat;
+  }
+
+  // 2. Create new chat if not found
+  const { data: chat, error: createError } = await supabase
+    .from('chats')
+    .insert({
+      type: 'support_match',
+      created_by: user.id,
+      metadata: { case_id: caseId }
+    })
+    .select()
+    .single();
+
+  if (createError) throw createError;
+
+  // 3. Add Participants (Professional and Survivor)
+  const participants = [
+    {
+      chat_id: chat.id,
+      user_id: user.id,
+      status: { role: 'admin' }
+    },
+    {
+      chat_id: chat.id,
+      user_id: survivorId,
+      status: { role: 'member' }
+    }
+  ];
+
+  const { error: partError } = await supabase
+    .from('chat_participants')
+    .insert(participants);
+
+  if (partError) throw partError;
+
+  // 4. Return full chat object
+  const { data: fullChat, error: fetchError } = await supabase
+    .from('chats')
+    .select(`
+      *,
+      participants:chat_participants(
+        *,
+        user:profiles(*)
+      )
+    `)
+    .eq('id', chat.id)
+    .single();
+
+  if (fetchError) throw fetchError;
+
+  return fullChat as Chat;
+}
