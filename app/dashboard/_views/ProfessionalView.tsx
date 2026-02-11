@@ -1,7 +1,21 @@
 "use client";
 
+import { useState, useEffect, useMemo } from "react";
+import Link from "next/link";
+import { Tables } from "@/types/db-schema";
+import { createClient } from "@/utils/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Input } from "@/components/ui/input";
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import {
+	Dialog,
+	DialogContent,
+	DialogHeader,
+	DialogTitle,
+	DialogDescription,
+} from "@/components/ui/dialog";
 import {
 	AlertDialog,
 	AlertDialogAction,
@@ -13,60 +27,40 @@ import {
 	AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { useToast } from "@/hooks/use-toast";
-import { CommunityCard } from "@/app/components/CommunityCard";
-import { JoinCommunity } from "@/app/components/JoinCommunity";
-import { ConditionCheckCard } from "@/app/components/ConditionCheckCard";
-import { Tables } from "@/types/db-schema";
-import { createClient } from "@/utils/supabase/client";
-import { deleteReport, fetchUserReports } from "./actions/reports";
 import {
-	fetchUserSupportServices,
-	deleteSupportService,
-} from "./actions/support-services";
-import { DailyProgress } from "@/app/components/DailyProgress";
-import { fetchMatchedServices } from "./actions/matched-services";
-import { useState, useEffect, useMemo } from "react";
-import SurvivorView from "./SurvivorView";
-import { OverviewTab } from "../_components/tabs/OverviewTab";
-import { ReportsTab } from "../_components/tabs/ReportsTab";
-import { SupportServicesTab } from "../_components/tabs/SupportServicesTab";
-import { ReportWithRelations, MatchedServiceWithRelations } from "../_types";
-import { MatchCard } from "../_components/MatchCard";
-import { MatchedCasesTab } from "../_components/tabs/MatchedCasesTab";
-import { AppointmentsTab } from "../_components/tabs/AppointmentsTab";
-import { CalScheduler } from "../_components/CalScheduler";
-import { Calendar as UIDateCalendar } from "@/components/ui/calendar";
-import { EnhancedAppointmentScheduler } from "../_components/EnhancedAppointmentScheduler";
-import { SafetyPlanCard } from "@/components/SafetyPlanCard";
-import {
-	WelcomeHeader,
-	StatsCard,
-	SectionHeader,
-} from "@/components/dashboard/DashboardComponents";
-import { QuickActions } from "@/components/dashboard/QuickActions";
-import {
+	Search,
 	ClipboardList,
 	Users,
 	CalendarDays,
 	MessageCircle,
-	PlusCircle,
+	BookOpen,
+	Briefcase,
+	ChevronRight,
+	ChevronUp,
+	ChevronDown,
+	SlidersHorizontal,
 	Lock,
 	Clock,
+	Plus,
+	AlertTriangle,
+	FileText,
+	TrendingUp,
+	Shield,
+	Calendar
 } from "lucide-react";
-import Link from "next/link";
-import { fetchUserAppointments } from "./actions/appointments";
-import { SamplePlaceholder } from "@/components/dashboard/SamplePlaceholder";
-import {
-	Dialog,
-	DialogContent,
-	DialogHeader,
-	DialogTitle,
-	DialogDescription,
-} from "@/components/ui/dialog";
-import AuthenticatedReportAbuseForm from "@/components/AuthenticatedReportAbuseForm";
-import { getPreloadedChat, preloadChat } from "@/utils/chat/preload";
+import { cn } from "@/lib/utils";
 import { useDashboardData } from "@/components/providers/DashboardDataProvider";
+import {
+	SereneWelcomeHeader,
+	SereneQuickActionCard,
+	SereneSectionHeader
+} from "../_components/SurvivorDashboardComponents";
+import { ReportWithRelations, MatchedServiceWithRelations } from "../_types";
+import { fetchUserReports, deleteReport } from "./actions/reports";
+import { fetchUserSupportServices, deleteSupportService } from "./actions/support-services";
+import { fetchMatchedServices } from "./actions/matched-services";
+import { fetchUserAppointments } from "./actions/appointments";
+import AuthenticatedReportAbuseForm from "@/components/AuthenticatedReportAbuseForm";
 
 interface ProfessionalViewProps {
 	userId: string;
@@ -78,87 +72,49 @@ export default function ProfessionalView({
 	profileDetails,
 }: ProfessionalViewProps) {
 	const dash = useDashboardData();
-	const [open, setOpen] = useState(false);
-	const [deleteReportId, setDeleteReportId] = useState<string | null>(null);
-	const [deleteServiceId, setDeleteServiceId] = useState<string | null>(null);
-	const [reportDialogOpen, setReportDialogOpen] = useState(false);
 	const { toast } = useToast();
+	const [searchQuery, setSearchQuery] = useState("");
+	const [reportDialogOpen, setReportDialogOpen] = useState(false);
+	const [isWelcomeCompact, setIsWelcomeCompact] = useState(false);
+	const [isCalendarExpanded, setIsCalendarExpanded] = useState(false);
+	const [selectedDate, setSelectedDate] = useState(new Date());
+	const [calendarViewMode, setCalendarViewMode] = useState<'week' | 'month'>('week');
+	const [dashboardTab, setDashboardTab] = useState<'cases' | 'reports'>('cases');
 
-	// State with proper typing
+	// State
 	const [reports, setReports] = useState<ReportWithRelations[]>([]);
-	const [supportServices, setSupportServices] = useState<
-		Tables<"support_services">[]
-	>([]);
-	const [matchedServices, setMatchedServices] = useState<
-		MatchedServiceWithRelations[]
-	>([]);
+	const [supportServices, setSupportServices] = useState<Tables<"support_services">[]>([]);
+	const [matchedServices, setMatchedServices] = useState<MatchedServiceWithRelations[]>([]);
 	const [appointments, setAppointments] = useState<any[]>([]);
-	const [unreadCount, setUnreadCount] = useState<number>(0);
 
-	const handleDelete = async (reportId: string) => {
-		try {
-			await deleteReport(reportId);
-			const updatedReports = await fetchUserReports(userId);
-			setReports(updatedReports as ReportWithRelations[]);
-			toast({
-				title: "Report deleted",
-				description: "The report has been successfully deleted.",
-			});
-		} catch (error) {
-			toast({
-				title: "Error",
-				description: "Failed to delete the report. Please try again.",
-				variant: "destructive",
-			});
-		}
-		setDeleteReportId(null);
+	const getTimeOfDay = (): "morning" | "afternoon" | "evening" => {
+		const hour = new Date().getHours();
+		if (hour < 12) return "morning";
+		if (hour < 18) return "afternoon";
+		return "evening";
 	};
 
-	const handleDeleteService = async (serviceId: string) => {
-		try {
-			await deleteSupportService(serviceId);
-			const updatedServices = await fetchUserSupportServices(userId);
-			setSupportServices(updatedServices);
-			// Also refresh matched services as they might be affected
-			const updatedMatches = await fetchMatchedServices(userId);
-			setMatchedServices(updatedMatches);
-			toast({
-				title: "Service deleted",
-				description: "The support service has been successfully deleted.",
-			});
-		} catch (error) {
-			toast({
-				title: "Error",
-				description: "Failed to delete the support service. Please try again.",
-				variant: "destructive",
-			});
-		}
-		setDeleteServiceId(null);
-	};
+	// Auto-compact welcome after 30s
+	useEffect(() => {
+		const timer = setTimeout(() => setIsWelcomeCompact(true), 30000);
+		return () => clearTimeout(timer);
+	}, []);
 
-	const formatServiceName = (service: string) => {
-		return service
-			.split("_")
-			.map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-			.join(" ");
-	};
-
+	// Load data from provider or fetch
 	useEffect(() => {
 		const loadData = async () => {
 			try {
-				const [userReports, userServices, userMatches, userAppointments] =
-					await Promise.all([
-						fetchUserReports(userId),
-						fetchUserSupportServices(userId),
-						fetchMatchedServices(userId),
-						fetchUserAppointments(userId, "professional", true),
-					]);
-
+				const [userReports, userServices, userMatches, userAppointments] = await Promise.all([
+					fetchUserReports(userId),
+					fetchUserSupportServices(userId),
+					fetchMatchedServices(userId),
+					fetchUserAppointments(userId, "professional", true),
+				]);
 				setReports(userReports as ReportWithRelations[]);
 				setSupportServices(userServices);
 				setMatchedServices(userMatches);
 				setAppointments(userAppointments || []);
-			} catch (error) {
+			} catch {
 				toast({
 					title: "Error",
 					description: "Failed to load data. Please try again.",
@@ -167,7 +123,6 @@ export default function ProfessionalView({
 			}
 		};
 
-		// If provider data is available, use it and skip initial fetch
 		if (dash?.data && dash.data.userId === userId) {
 			setReports((dash.data.reports as ReportWithRelations[]) || []);
 			setSupportServices(dash.data.supportServices || []);
@@ -178,576 +133,658 @@ export default function ProfessionalView({
 		loadData();
 	}, [userId, toast, dash?.data]);
 
-	// Live unread messages count (Stream Chat)
-	useEffect(() => {
-		let cleanup: (() => void) | undefined;
-		const init = async () => {
-			try {
-				const username = profileDetails.first_name || userId;
-				let pre = getPreloadedChat(userId);
-				if (!pre) {
-					pre = await preloadChat(userId, username);
-				}
-				const computeUnread = () => {
-					try {
-						const total = (pre?.dmChannels || []).reduce((sum: number, ch: any) => {
-							const n = typeof ch.countUnread === "function" ? ch.countUnread() : 0;
-							return sum + (Number.isFinite(n) ? n : 0);
-						}, 0);
-						setUnreadCount(total);
-					} catch {
-						setUnreadCount(0);
-					}
-				};
-				computeUnread();
-				const client = pre?.client as any;
-				if (client && typeof client.on === "function") {
-					const handler = () => computeUnread();
-					client.on("notification.message_new", handler);
-					client.on("message.new", handler);
-					client.on("notification.mark_read", handler);
-					client.on("notification.channel_marked_read", handler);
-					client.on("notification.added_to_channel", handler);
-					cleanup = () => {
-						try {
-							client.off("notification.message_new", handler);
-							client.off("message.new", handler);
-							client.off("notification.mark_read", handler);
-							client.off("notification.channel_marked_read", handler);
-							client.off("notification.added_to_channel", handler);
-						} catch {
-							console.log("");
-						}
-					};
-				}
-			} catch {
-				setUnreadCount(0);
-			}
-		};
-		init();
-		return () => {
-			if (cleanup) cleanup();
-		};
-	}, [userId, profileDetails.first_name]);
-
-	// Determine verification and gating conditions
-	const hasServices = supportServices.length > 0;
-	const hasMatches = matchedServices.length > 0;
-	const hasPendingMatches = useMemo(
-		() =>
-			matchedServices.some(
-				(ms) => (ms.match_status_type || "").toLowerCase() === "pending"
-			),
+	// Computed stats
+	const activeCasesCount = matchedServices.length;
+	const pendingCasesCount = useMemo(
+		() => matchedServices.filter(m => m.match_status_type?.toLowerCase() === 'pending').length,
 		[matchedServices]
 	);
-	const profileIncomplete = useMemo(() => {
-		const required = [
-			profileDetails?.first_name,
-			profileDetails?.phone,
-			profileDetails?.professional_title,
-		];
-		return required.some((v) => !v || (typeof v === "string" && v.trim() === ""));
-	}, [profileDetails]);
-	// Prefer backend verification status from provider when available, fallback to profile completeness heuristic
-	const isVerified =
-		(dash?.data as any)?.verification?.overallStatus === "verified"
-			? true
-			: !profileIncomplete;
+	const upcomingAppointments = useMemo(
+		() => appointments.filter(a => a.appointment_date && new Date(a.appointment_date) > new Date()).length,
+		[appointments]
+	);
 
-	// Persist verification state for mobile nav to adapt
-	useEffect(() => {
-		try {
-			window.localStorage.setItem("ss_pro_verified", isVerified ? "1" : "0");
-			// Keep legacy key for compatibility
-			window.localStorage.setItem("ss_pro_restricted", !isVerified ? "1" : "0");
-		} catch {
-			// Ignore localStorage errors
-		}
-	}, [isVerified]);
 
-	// Tailored banner content
-	const renderGateBanner = () => {
-		const verificationStatus =
-			(dash?.data as any)?.verification?.overallStatus ||
-			profileDetails?.verification_status ||
-			"pending";
+	// Verification status
+	const isVerified = useMemo(() => {
+		const verStatus = (dash?.data as any)?.verification?.overallStatus;
+		if (verStatus === "verified") return true;
+		const required = [profileDetails?.first_name, profileDetails?.phone, profileDetails?.professional_title];
+		return required.every(v => v && v.trim() !== "");
+	}, [dash?.data, profileDetails]);
 
-		// If user has uploaded documents in both tabs, show awaiting verification message
-		if (verificationStatus === "under_review") {
-			return (
-				<Alert className="mb-4 border-blue-300 bg-blue-50 text-blue-900">
-					<AlertTitle className="font-semibold flex items-center gap-2">
-						<Clock className="h-4 w-4" /> Awaiting Verification
-					</AlertTitle>
-					<AlertDescription>
-						Your documents have been submitted and are under review. You can still
-						report incidents while waiting for verification.
-						<div className="mt-3 flex flex-wrap gap-2">
-							<Button
-								size="sm"
-								variant="default"
-								onClick={() => setReportDialogOpen(true)}
-							>
-								Report Incident
-							</Button>
-						</div>
-					</AlertDescription>
-				</Alert>
-			);
-		}
-
-		// Default verification required message
-		const title = "Complete your professional profile";
-		const description =
-			hasServices && !hasMatches
-				? "You have services listed but no matches yet. Verify and complete your profile to be discoverable."
-				: "Update your profile details for verification so you can be matched with cases.";
-		return (
-			<Alert className="mb-4 border-amber-300 bg-amber-50 text-amber-900">
-				<AlertTitle className="font-semibold flex items-center gap-2">
-					<Lock className="h-4 w-4" /> Verification required
-				</AlertTitle>
-				<AlertDescription>
-					{description}
-					<div className="mt-3 flex flex-wrap gap-2">
-						<Link href="/dashboard/profile?tab=verification">
-							<Button size="sm" variant="default">
-								Update profile
-							</Button>
-						</Link>
-					</div>
-				</AlertDescription>
-			</Alert>
+	// Filter cases by search
+	const filteredCases = useMemo(() => {
+		if (!searchQuery) return matchedServices.slice(0, 5);
+		const q = searchQuery.toLowerCase();
+		return matchedServices.filter(m =>
+			(m.report?.type_of_incident || "").toLowerCase().includes(q) ||
+			(m.report?.incident_description || "").toLowerCase().includes(q) ||
+			(m.support_service?.name || "").toLowerCase().includes(q)
 		);
+	}, [matchedServices, searchQuery]);
+
+	// Get week days for calendar
+	const getWeekDays = (baseDate: Date) => {
+		const start = new Date(baseDate);
+		start.setDate(start.getDate() - start.getDay());
+		return Array.from({ length: 7 }, (_, i) => {
+			const day = new Date(start);
+			day.setDate(start.getDate() + i);
+			return day;
+		});
 	};
 
+	const weekDays = useMemo(() => getWeekDays(selectedDate), [selectedDate]);
+
+	// Get month days for calendar (full grid including prev/next month days)
+	const getMonthDays = (baseDate: Date) => {
+		const year = baseDate.getFullYear();
+		const month = baseDate.getMonth();
+		const firstDay = new Date(year, month, 1);
+		const lastDay = new Date(year, month + 1, 0);
+		const startPadding = firstDay.getDay();
+		const totalDays = lastDay.getDate();
+		const weeks = Math.ceil((startPadding + totalDays) / 7);
+		const days: { date: Date; isCurrentMonth: boolean }[] = [];
+		
+		for (let i = 0; i < weeks * 7; i++) {
+			const day = new Date(year, month, 1 - startPadding + i);
+			days.push({
+				date: day,
+				isCurrentMonth: day.getMonth() === month
+			});
+		}
+		return days;
+	};
+
+	const monthDays = useMemo(() => getMonthDays(selectedDate), [selectedDate]);
+
+	// Get appointments for a specific day
+	const getAppointmentsForDay = (date: Date) => {
+		return appointments.filter(a => {
+			if (!a.appointment_date) return false;
+			const apptDate = new Date(a.appointment_date);
+			return apptDate.toDateString() === date.toDateString();
+		});
+	};
+
+	const selectedDayAppointments = useMemo(
+		() => getAppointmentsForDay(selectedDate),
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+		[selectedDate, appointments]
+	);
+
 	return (
-		<>
-			<div className="max-w-7xl mx-auto p-4 lg:p-6">
-			<WelcomeHeader 
-						name={profileDetails.first_name || "Partner"} 
-						userType={profileDetails.user_type === "ngo" ? "ngo" : "professional"} 
-						timeOfDay={(() => {
-							const hour = new Date().getHours();
-							if (hour < 12) return "morning";
-							if (hour < 18) return "afternoon";
-							return "evening";
-						})()}
+		<div className="min-h-screen bg-serene-neutral-50 pb-24">
+			{/* Sticky Search Bar */}
+			<div className="sticky top-0 z-40 bg-serene-neutral-50/90 backdrop-blur-md px-4 py-3 lg:px-8 border-b border-serene-neutral-200/50">
+				<div className="max-w-xl mx-auto relative">
+					<Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-serene-neutral-400" />
+					<Input
+						placeholder="Search cases, services..."
+						className="pl-10 pr-10 bg-white border-serene-neutral-200 rounded-full h-11 shadow-sm focus-visible:ring-serene-blue-200"
+						value={searchQuery}
+						onChange={(e) => setSearchQuery(e.target.value)}
 					/>
-
-					{/* Persistent verification banner for unverified */}
-					{!isVerified && renderGateBanner()}
-
-					{/* KPI Row */}
-					<div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-8">
-						{/* 1) Cases matched */}
-						<Link href="/dashboard/cases">
-							<StatsCard
-								title="Cases matched"
-								value={matchedServices.length}
-								icon={<Users className="h-5 w-5" />}
-								variant="success"
-								description="Direct impact cases"
-							/>
-						</Link>
-						{/* 2) Appointments */}
-						<Link href="/dashboard/appointments">
-							<StatsCard
-								title="Appointments"
-								value={appointments.length}
-								icon={<CalendarDays className="h-5 w-5" />}
-								variant="warning"
-								description="Scheduled sessions"
-							/>
-						</Link>
-						{/* 3) Services */}
-						<Link href="/dashboard/services">
-							<StatsCard
-								title="Services"
-								value={supportServices.length}
-								icon={<Users className="h-5 w-5" />}
-								variant="default"
-								description="Active service listings"
-							/>
-						</Link>
-						{/* 4) Reports */}
-						<Link href="/dashboard/reports">
-							<StatsCard
-								title="Reports"
-								value={reports.length}
-								icon={<ClipboardList className="h-5 w-5" />}
-								variant="error"
-								description="Total filed reports"
-							/>
-						</Link>
+					<div className="absolute right-1 top-1/2 -translate-y-1/2 flex items-center gap-1">
+						<Button
+							size="sm"
+							variant="ghost"
+							className="hidden sm:flex h-8 w-8 rounded-full text-serene-blue-600 hover:bg-serene-blue-50"
+							onClick={() => setReportDialogOpen(true)}
+						>
+							<Plus className="h-4 w-4" />
+						</Button>
+						<Button size="icon" variant="ghost" className="h-9 w-9 text-serene-neutral-400 hover:text-serene-blue-600 rounded-full">
+							<SlidersHorizontal className="h-4 w-4" />
+						</Button>
 					</div>
+				</div>
+			</div>
 
-					{/* Quick Actions */}
-					<div className="my-4">
-						<QuickActions
-							actions={[
-								{
-									label: "Report Now",
-									description: "Quick incident reporting",
-									onClick: () => setReportDialogOpen(true),
-									icon: ClipboardList,
-								},
-								{
-									label: "Messages",
-									description: "Open chat",
-									href: "/dashboard/chat",
-									icon: MessageCircle,
-								},
-								{
-									label: "Schedule",
-									description: "Manage appointments",
-									href: "/dashboard/appointments",
-									icon: CalendarDays,
-									disabled: !isVerified,
-								},
-								{
-									label: "My Reports",
-									description: "View or submit reports",
-									href: "/dashboard/reports",
-									icon: ClipboardList,
-								},
-							]}
+			<div className="max-w-4xl mx-auto px-4 lg:px-6 pt-4 lg:pt-8 space-y-8 min-h-[calc(100vh-80px)]">
+				{/* Search Results Mode */}
+				{searchQuery.length > 0 ? (
+					<div className="space-y-6 animate-in fade-in zoom-in-95 duration-200">
+						<div className="flex items-center justify-between pb-2 border-b border-serene-neutral-200">
+							<h3 className="text-lg font-bold text-serene-neutral-900">Search Results</h3>
+							<button
+								onClick={() => setSearchQuery("")}
+								className="text-sm font-medium text-serene-neutral-500 hover:text-serene-red-500 transition-colors"
+							>
+								Clear Search
+							</button>
+						</div>
+						<div className="space-y-3">
+							{filteredCases.length > 0 ? (
+								filteredCases.map((match) => (
+									<Link href={`/dashboard/cases/${match.id}`} key={match.id} className="block group">
+										<Card className="overflow-hidden border-serene-neutral-100 hover:border-serene-blue-200 transition-all duration-300 hover:shadow-md cursor-pointer">
+											<CardContent className="p-4 flex items-center gap-4">
+												<div className={cn(
+													"h-12 w-12 rounded-full flex items-center justify-center text-lg font-bold shrink-0",
+													"bg-serene-blue-50 text-serene-blue-600"
+												)}>
+													{match.report?.type_of_incident?.charAt(0).toUpperCase() || "C"}
+												</div>
+												<div className="flex-1 min-w-0">
+													<h4 className="font-semibold text-serene-neutral-900 truncate">
+														{match.report?.type_of_incident?.replace(/_/g, " ") || "Case"}
+													</h4>
+													<p className="text-sm text-serene-neutral-500 truncate">
+														{match.support_service?.name || "Support case"}
+													</p>
+												</div>
+												<ChevronRight className="h-4 w-4 text-serene-neutral-300 group-hover:text-serene-blue-400 transition-colors" />
+											</CardContent>
+										</Card>
+									</Link>
+								))
+							) : (
+								<div className="text-center py-24">
+									<div className="h-16 w-16 bg-serene-neutral-100 rounded-full flex items-center justify-center mx-auto mb-4">
+										<Search className="h-8 w-8 text-serene-neutral-400" />
+									</div>
+									<h3 className="text-lg font-semibold text-serene-neutral-900 mb-1">No results found</h3>
+									<p className="text-serene-neutral-500">
+										We couldn't find any cases matching "{searchQuery}"
+									</p>
+								</div>
+							)}
+						</div>
+					</div>
+				) : (
+					<>
+						{/* Welcome Header */}
+						<SereneWelcomeHeader
+							name={profileDetails.first_name || "Partner"}
+							timeOfDay={getTimeOfDay()}
+							compact={isWelcomeCompact}
+							welcomeMessage="Welcome back, ready to make a difference?"
 						/>
-					</div>
 
-					{/* Quick Agenda + Queues */}
-					<div className="grid grid-cols-1 md:grid-cols-3 gap-4 my-4">
-						<div className="rounded-2xl border-0 p-5 bg-sauti-teal-light shadow-sm relative overflow-hidden group">
-              <div className="absolute bottom-0 left-0 right-0 h-1.5 bg-sauti-teal/40" />
-							<p className="text-xs font-black uppercase tracking-wider text-sauti-teal/60 mb-2">My Agenda</p>
-							{appointments.length > 0 ? (
-								<div className="space-y-3 text-sm relative z-10">
-									{[...appointments]
-										.filter((a) => a.appointment_date)
-										.sort(
-											(a, b) =>
-												new Date(a.appointment_date).getTime() -
-												new Date(b.appointment_date).getTime()
-										)
-										.slice(0, 2)
-										.map((a, idx) => (
-											<div key={idx} className="flex items-center justify-between bg-white/50 p-2 rounded-xl">
-												<span className="font-bold text-sauti-dark">
-													{new Date(a.appointment_date).toLocaleTimeString([], {
-														hour: "2-digit",
-														minute: "2-digit",
-													})}{" "}
-													• {a.matched_service?.support_service?.name || "Session"}
-												</span>
-												<Link href="/dashboard/appointments" className="text-sauti-teal font-black hover:underline px-2 py-1 bg-white rounded-lg text-xs">
-													Open
-												</Link>
-											</div>
-										))}
+						{/* Verification Banner */}
+						{!isVerified && (
+							<Alert className="border-amber-200 bg-amber-50 text-amber-900 rounded-2xl">
+								<AlertTriangle className="h-4 w-4" />
+								<AlertTitle className="font-semibold">Complete your verification</AlertTitle>
+								<AlertDescription className="mt-1">
+									Verify your profile to be matched with survivors seeking support.
+									<Link href="/dashboard/profile?tab=verification" className="ml-2 font-semibold text-amber-700 hover:underline">
+										Complete now →
+									</Link>
+								</AlertDescription>
+							</Alert>
+						)}
+
+						{/* Quick Actions Grid */}
+						<div className="space-y-4">
+							<h3 className="text-sm font-bold text-serene-neutral-400 uppercase tracking-wider px-1">Dashboard</h3>
+							<div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 md:gap-4">
+								<SereneQuickActionCard
+									title="Cases"
+									description={`${activeCasesCount} Active`}
+									icon={<Users className="h-5 w-5" />}
+									href="/dashboard/cases"
+									variant="blue"
+									badge={pendingCasesCount > 0 ? pendingCasesCount : undefined}
+								/>
+								<SereneQuickActionCard
+									title="Messages"
+									description="Support Chat"
+									icon={<MessageCircle className="h-5 w-5" />}
+									href="/dashboard/chat"
+									variant="green"
+									badge={dash?.data?.unreadChatCount || undefined}
+								/>
+								<SereneQuickActionCard
+									title="Services"
+									description={`${supportServices.length} Active`}
+									icon={<Briefcase className="h-5 w-5" />}
+									href="/dashboard/profile?tab=services"
+									variant="neutral"
+								/>
+								<SereneQuickActionCard
+									title="Blog Posts"
+									description="Write & Share"
+									icon={<BookOpen className="h-5 w-5" />}
+									href="/dashboard/blogs"
+									variant="neutral"
+								/>
 								</div>
-							) : (
-								<SamplePlaceholder label="Sample">
-									<div className="space-y-3 text-sm relative z-10">
-										<div className="flex items-center justify-between bg-white/50 p-2 rounded-xl">
-											<span className="font-bold text-sauti-dark">10:00 • Intake call</span>
-											<Link href="/dashboard/appointments" className="text-sauti-teal font-black hover:underline px-2 py-1 bg-white rounded-lg text-xs">
-												Open
-											</Link>
+							</div>
+
+							{/* Weekly Schedule Calendar */}
+							<div className="bg-white rounded-2xl border border-serene-neutral-100 overflow-hidden shadow-sm">
+								<button 
+									onClick={() => setIsCalendarExpanded(!isCalendarExpanded)}
+									className="w-full flex items-center justify-between px-5 py-4 hover:bg-serene-neutral-50/50 transition-colors"
+								>
+									<div className="flex items-center gap-3">
+										<div className="h-10 w-10 bg-serene-blue-50 rounded-xl flex items-center justify-center">
+											<Calendar className="h-5 w-5 text-serene-blue-600" />
 										</div>
-										<div className="flex items-center justify-between bg-white/50 p-2 rounded-xl">
-											<span className="font-bold text-sauti-dark">14:00 • Follow-up</span>
-											<Link
-												href="/dashboard?tab=appointments"
-												className="text-sauti-teal font-black hover:underline px-2 py-1 bg-white rounded-lg text-xs"
-											>
-												Open
-											</Link>
-										</div>
-									</div>
-								</SamplePlaceholder>
-							)}
-						</div>
-						<div className="rounded-2xl border-0 p-5 bg-sauti-red-light shadow-sm relative overflow-hidden group">
-              <div className="absolute bottom-0 left-0 right-0 h-1.5 bg-sauti-red/40" />
-							<p className="text-xs font-black uppercase tracking-wider text-sauti-red/60 mb-2">Queues</p>
-							{reports.length > 0 ? (
-								<div className="grid grid-cols-3 gap-3 text-sm relative z-10">
-									{(() => {
-										const counts = reports.reduce((acc, r) => {
-											const k = (r.urgency || "low").toLowerCase();
-											acc[k] = ((acc[k] || 0) as number) + 1;
-											return acc;
-										}, {} as Record<string, number>);
-										return (
-											<>
-												<div className="rounded-xl bg-white/60 p-3 text-center shadow-sm">
-													<p className="text-[10px] text-sauti-red font-black uppercase tracking-wider">High</p>
-													<p className="text-xl font-black text-sauti-red">{counts["high"] || 0}</p>
-												</div>
-												<div className="rounded-xl bg-white/60 p-3 text-center shadow-sm">
-													<p className="text-[10px] text-sauti-yellow-dark font-black uppercase tracking-wider">Med</p>
-													<p className="text-xl font-black text-sauti-yellow-dark">{counts["medium"] || 0}</p>
-												</div>
-												<div className="rounded-xl bg-white/60 p-3 text-center shadow-sm">
-													<p className="text-[10px] text-sauti-teal font-black uppercase tracking-wider">Low</p>
-													<p className="text-xl font-black text-sauti-teal">{counts["low"] || 0}</p>
-												</div>
-											</>
-										);
-									})()}
-								</div>
-							) : (
-								<SamplePlaceholder label="Sample">
-									<div className="grid grid-cols-3 gap-3 text-sm relative z-10">
-										<div className="rounded-xl bg-white/60 p-3 text-center shadow-sm">
-											<p className="text-[10px] text-sauti-red font-black uppercase tracking-wider">High</p>
-											<p className="text-xl font-black text-sauti-red">2</p>
-										</div>
-										<div className="rounded-xl bg-white/60 p-3 text-center shadow-sm">
-											<p className="text-[10px] text-sauti-yellow-dark font-black uppercase tracking-wider">Med</p>
-											<p className="text-xl font-black text-sauti-yellow-dark">5</p>
-										</div>
-										<div className="rounded-xl bg-white/60 p-3 text-center shadow-sm">
-											<p className="text-[10px] text-sauti-teal font-black uppercase tracking-wider">Low</p>
-											<p className="text-xl font-black text-sauti-teal">9</p>
-										</div>
-									</div>
-								</SamplePlaceholder>
-							)}
-						</div>
-						<div className="rounded-2xl border-0 p-5 bg-sauti-yellow-light shadow-sm relative overflow-hidden group">
-              <div className="absolute bottom-0 left-0 right-0 h-1.5 bg-sauti-yellow/40" />
-							<p className="text-xs font-black uppercase tracking-wider text-sauti-yellow-dark/60 mb-2">Quick Chat</p>
-							<p className="text-sm font-bold text-sauti-dark mb-3 relative z-10">Open your messages to coordinate care.</p>
-							<Link href="/dashboard/chat" className="text-sauti-teal font-black hover:underline bg-white px-3 py-1.5 rounded-lg text-xs shadow-sm relative z-10 inline-block">
-								Open chat →
-							</Link>
-						</div>
-					</div>
-
-					<div className="flex flex-col md:flex-row gap-6">
-						<div className="flex-1">
-							<Tabs defaultValue="overview" className="mb-8">
-								<TabsList className="w-full overflow-x-auto flex whitespace-nowrap gap-1 px-1">
-									<TabsTrigger value="overview" className="text-xs px-2 py-1">
-										Overview
-									</TabsTrigger>
-									<TabsTrigger value="reports" className="text-xs px-2 py-1">
-										Reports
-									</TabsTrigger>
-									<TabsTrigger value="matched-cases" className="text-xs px-2 py-1">
-										Cases
-									</TabsTrigger>
-									<TabsTrigger
-										value="support-services"
-										className="text-xs px-2 py-1 hidden sm:inline-flex"
-									>
-										Services
-									</TabsTrigger>
-									<TabsTrigger value="appointments" className="text-xs px-2 py-1">
-										Appointments
-									</TabsTrigger>
-									<TabsTrigger
-										value="scheduling"
-										className="text-xs px-2 py-1 hidden sm:inline-flex"
-									>
-										Scheduling
-									</TabsTrigger>
-								</TabsList>
-
-								<TabsContent value="overview">
-									<OverviewTab
-										reports={reports}
-										matchedServices={matchedServices}
-										supportServices={supportServices}
-										onDeleteReport={setDeleteReportId}
-										formatServiceName={formatServiceName}
-									/>
-								</TabsContent>
-
-								<TabsContent value="reports">
-									<ReportsTab
-										reports={reports}
-										onDeleteReport={setDeleteReportId}
-										formatServiceName={formatServiceName}
-										userId={userId}
-										reportDialogOpen={reportDialogOpen}
-										setReportDialogOpen={setReportDialogOpen}
-										onRefresh={async () => {
-											const updatedReports = await fetchUserReports(userId);
-											setReports(updatedReports as ReportWithRelations[]);
-										}}
-									/>
-								</TabsContent>
-
-								<TabsContent value="matched-cases">
-									<div
-										className={
-											"relative " + (!isVerified ? "opacity-50 pointer-events-none" : "")
-										}
-									>
-										<MatchedCasesTab
-											userId={userId}
-											matchedServices={matchedServices}
-											onRefresh={async () => {
-												const [updatedMatches, updatedServices] = await Promise.all([
-													fetchMatchedServices(userId),
-													fetchUserSupportServices(userId),
-												]);
-												setMatchedServices(updatedMatches);
-												setSupportServices(updatedServices);
-											}}
-										/>
-										{!isVerified && (
-											<div className="absolute inset-0 flex items-center justify-center">
-												<p className="text-sm bg-white/90 px-3 py-1 rounded border">
-													Verification required to manage cases
-												</p>
-											</div>
-										)}
-									</div>
-								</TabsContent>
-
-								<TabsContent value="support-services">
-									<SupportServicesTab
-										supportServices={supportServices}
-										formatServiceName={formatServiceName}
-										onDeleteService={setDeleteServiceId}
-										open={open}
-										setOpen={setOpen}
-										userId={userId}
-										onRefresh={async () => {
-											const updatedServices = await fetchUserSupportServices(userId);
-											setSupportServices(updatedServices);
-										}}
-									/>
-								</TabsContent>
-
-								<TabsContent value="appointments">
-									<div
-										className={
-											"relative " + (!isVerified ? "opacity-50 pointer-events-none" : "")
-										}
-									>
-										<AppointmentsTab
-											userId={userId}
-											userType="professional"
-											username={profileDetails.first_name || userId}
-											onAppointmentsChange={async () => {
-												const updatedMatches = await fetchMatchedServices(userId);
-												setMatchedServices(updatedMatches);
-											}}
-										/>
-										{!isVerified && (
-											<div className="absolute inset-0 flex items-center justify-center">
-												<p className="text-sm bg-white/90 px-3 py-1 rounded border">
-													Verification required to manage appointments
-												</p>
-											</div>
-										)}
-									</div>
-								</TabsContent>
-
-								<TabsContent value="scheduling">
-									<div className="space-y-6">
-										<div>
-											<h2 className="text-xl font-black text-sauti-dark tracking-tight mb-1">
-												Professional Scheduling
-											</h2>
-											<p className="text-sm font-bold text-neutral-400 mb-4">
-												Manage your availability and let clients schedule appointments with
-												you.
+										<div className="text-left">
+											<h3 className="font-semibold text-serene-neutral-900">Schedule</h3>
+											<p className="text-sm text-serene-neutral-500">
+												{upcomingAppointments} upcoming appointment{upcomingAppointments !== 1 ? 's' : ''}
 											</p>
 										</div>
-
-										<CalScheduler
-											professionalId={userId}
-											calLink={profileDetails.cal_link || undefined}
-										/>
 									</div>
-								</TabsContent>
-							</Tabs>
+									{isCalendarExpanded ? (
+										<ChevronUp className="h-5 w-5 text-serene-neutral-400" />
+									) : (
+										<ChevronDown className="h-5 w-5 text-serene-neutral-400" />
+									)}
+								</button>
 
-							<div className="space-y-8">
-								<div className="grid grid-cols-1 gap-6">
-									<CommunityCard />
-									<div className="md:hidden">
-										<DailyProgress />
-									</div>
+								{isCalendarExpanded && (
+									<div className="border-t border-serene-neutral-100 p-4 space-y-4">
+										{/* View Mode Toggle + Navigation */}
+										<div className="flex items-center justify-between">
+											{/* Week/Month Toggle */}
+											<div className="flex bg-serene-neutral-100 rounded-lg p-0.5">
+												<button
+													onClick={() => setCalendarViewMode('week')}
+													className={cn(
+														"px-3 py-1.5 text-xs font-medium rounded-md transition-all",
+														calendarViewMode === 'week' 
+															? "bg-white text-serene-blue-700 shadow-sm"
+															: "text-serene-neutral-600 hover:text-serene-neutral-900"
+													)}
+												>
+													Week
+												</button>
+												<button
+													onClick={() => setCalendarViewMode('month')}
+													className={cn(
+														"px-3 py-1.5 text-xs font-medium rounded-md transition-all",
+														calendarViewMode === 'month' 
+															? "bg-white text-serene-blue-700 shadow-sm"
+															: "text-serene-neutral-600 hover:text-serene-neutral-900"
+													)}
+												>
+													Month
+												</button>
+											</div>
+											
+											{/* Date range label */}
+											<p className="text-sm font-medium text-serene-neutral-700">
+												{calendarViewMode === 'week' 
+													? `${weekDays[0].toLocaleDateString('default', { month: 'short', day: 'numeric' })} - ${weekDays[6].toLocaleDateString('default', { month: 'short', day: 'numeric' })}`
+													: selectedDate.toLocaleDateString('default', { month: 'long', year: 'numeric' })
+												}
+											</p>
+											
+											{/* Navigation */}
+											<div className="flex gap-1">
+												<Button
+													variant="ghost"
+													size="sm"
+													className="h-8 w-8 p-0"
+													onClick={() => {
+														const prev = new Date(selectedDate);
+														prev.setDate(prev.getDate() - (calendarViewMode === 'week' ? 7 : 30));
+														setSelectedDate(prev);
+													}}
+												>
+													←
+												</Button>
+												<Button
+													variant="ghost"
+													size="sm"
+													className="h-8 w-8 p-0"
+													onClick={() => {
+														const next = new Date(selectedDate);
+														next.setDate(next.getDate() + (calendarViewMode === 'week' ? 7 : 30));
+														setSelectedDate(next);
+													}}
+												>
+													→
+												</Button>
+											</div>
+										</div>
+
+								{/* Days Grid - Week or Month */}
+								<div className="grid grid-cols-7 gap-1">
+									{['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
+										<div key={day} className="text-center text-xs font-medium text-serene-neutral-400 py-1">
+											{day}
+										</div>
+									))}
+									{calendarViewMode === 'week' ? (
+										// Week View
+										weekDays.map((day, idx) => {
+											const dayAppointments = getAppointmentsForDay(day);
+											const isToday = day.toDateString() === new Date().toDateString();
+											const isSelected = day.toDateString() === selectedDate.toDateString();
+											
+											return (
+												<button
+													key={idx}
+													onClick={() => setSelectedDate(day)}
+													className={cn(
+														"relative aspect-square rounded-xl flex flex-col items-center justify-center transition-all",
+														isSelected 
+															? "bg-serene-blue-600 text-white" 
+															: isToday 
+																? "bg-serene-blue-50 text-serene-blue-700" 
+																: "hover:bg-serene-neutral-50 text-serene-neutral-700"
+													)}
+												>
+													<span className="text-sm font-semibold">{day.getDate()}</span>
+													{dayAppointments.length > 0 && (
+														<div className="flex gap-0.5 mt-0.5">
+															{Array.from({ length: Math.min(dayAppointments.length, 3) }).map((_, i) => (
+																<div 
+																	key={i} 
+																	className={cn(
+																		"h-1 w-1 rounded-full",
+																		isSelected ? "bg-white/80" : "bg-serene-blue-500"
+																	)} 
+																/>
+															))}
+														</div>
+													)}
+												</button>
+											);
+										})
+									) : (
+										// Month View
+										monthDays.map((dayInfo, idx) => {
+											const { date: day, isCurrentMonth } = dayInfo;
+											const dayAppointments = getAppointmentsForDay(day);
+											const isToday = day.toDateString() === new Date().toDateString();
+											const isSelected = day.toDateString() === selectedDate.toDateString();
+											
+											return (
+												<button
+													key={idx}
+													onClick={() => setSelectedDate(day)}
+													className={cn(
+														"relative h-10 rounded-lg flex flex-col items-center justify-center transition-all text-xs",
+														!isCurrentMonth && "opacity-40",
+														isSelected 
+															? "bg-serene-blue-600 text-white" 
+															: isToday 
+																? "bg-serene-blue-50 text-serene-blue-700 font-bold" 
+																: "hover:bg-serene-neutral-50 text-serene-neutral-700"
+													)}
+												>
+													<span className="font-medium">{day.getDate()}</span>
+													{dayAppointments.length > 0 && isCurrentMonth && (
+														<div className={cn(
+															"h-1 w-1 rounded-full mt-0.5",
+															isSelected ? "bg-white/80" : "bg-serene-blue-500"
+														)} />
+													)}
+												</button>
+											);
+										})
+									)}
 								</div>
+
+										{/* Selected Day Appointments */}
+										<div className="pt-2 border-t border-serene-neutral-100">
+											<p className="text-sm font-semibold text-serene-neutral-700 mb-3">
+												{selectedDate.toLocaleDateString('default', { weekday: 'long', month: 'long', day: 'numeric' })}
+											</p>
+											{selectedDayAppointments.length > 0 ? (
+												<div className="space-y-2">
+													{selectedDayAppointments.map((appt, idx) => (
+														<div key={idx} className="flex items-center gap-3 p-3 bg-serene-neutral-50/80 rounded-xl">
+															<div className="h-10 w-10 bg-serene-blue-100 rounded-lg flex items-center justify-center text-serene-blue-700">
+																<Clock className="h-4 w-4" />
+															</div>
+															<div className="flex-1 min-w-0">
+																<p className="font-medium text-serene-neutral-900 text-sm truncate">
+																	{appt.matched_service?.support_service?.name || 'Appointment'}
+																</p>
+																<p className="text-xs text-serene-neutral-500">
+																	{new Date(appt.appointment_date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+																</p>
+															</div>
+															<Badge className="bg-serene-blue-50 text-serene-blue-700 border-0 text-xs">
+																{appt.status || 'Scheduled'}
+															</Badge>
+														</div>
+													))}
+												</div>
+											) : (
+												<p className="text-sm text-serene-neutral-400 text-center py-4">
+													No appointments scheduled for this day
+												</p>
+											)}
+										</div>
+									</div>
+								)}
+							</div>
+
+						{/* Cases/Reports Tab Toggle - Only show if user has reports */}
+						{reports.length > 0 && (
+							<div className="bg-white rounded-2xl border border-serene-neutral-100 p-1.5 shadow-sm">
+								<div className="flex gap-1">
+									<button
+										onClick={() => setDashboardTab('cases')}
+										className={cn(
+											"flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all",
+											dashboardTab === 'cases'
+												? "bg-serene-blue-600 text-white shadow-sm"
+												: "text-serene-neutral-600 hover:bg-serene-neutral-50"
+										)}
+									>
+										<Users className="h-4 w-4" />
+										Cases
+										{matchedServices.length > 0 && (
+											<span className={cn(
+												"text-xs px-1.5 py-0.5 rounded-full font-bold",
+												dashboardTab === 'cases' ? "bg-white/20" : "bg-serene-blue-100 text-serene-blue-700"
+											)}>
+												{matchedServices.length}
+											</span>
+										)}
+									</button>
+									<button
+										onClick={() => setDashboardTab('reports')}
+										className={cn(
+											"flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all",
+											dashboardTab === 'reports'
+												? "bg-serene-blue-600 text-white shadow-sm"
+												: "text-serene-neutral-600 hover:bg-serene-neutral-50"
+										)}
+									>
+										<FileText className="h-4 w-4" />
+										My Reports
+										{reports.length > 0 && (
+											<span className={cn(
+												"text-xs px-1.5 py-0.5 rounded-full font-bold",
+												dashboardTab === 'reports' ? "bg-white/20" : "bg-amber-100 text-amber-700"
+											)}>
+												{reports.length}
+											</span>
+										)}
+									</button>
+								</div>
+							</div>
+						)}
+
+						{/* Content based on selected tab */}
+						{dashboardTab === 'cases' ? (
+							<>
+								{/* Recent Cases */}
+								<div>
+							<SereneSectionHeader
+								title="Recent Cases"
+								description="Your assigned support cases"
+								action={{ label: "View All", href: "/dashboard/cases" }}
+							/>
+
+							<div className="space-y-3">
+								{matchedServices.length > 0 ? (
+									matchedServices.slice(0, 3).map((match) => (
+										<Link href={`/dashboard/cases/${match.id}`} key={match.id} className="block group">
+											<Card className="overflow-hidden border-serene-neutral-100 hover:border-serene-blue-200 transition-all duration-300 hover:shadow-md cursor-pointer">
+												<CardContent className="p-4 flex items-center gap-4">
+													<div className={cn(
+														"h-12 w-12 rounded-2xl flex items-center justify-center shrink-0",
+														match.report?.urgency === 'high' ? "bg-red-50 text-red-600" :
+														match.report?.urgency === 'medium' ? "bg-amber-50 text-amber-600" :
+														"bg-serene-blue-50 text-serene-blue-600"
+													)}>
+														<Shield className="h-5 w-5" />
+													</div>
+													<div className="flex-1 min-w-0">
+														<div className="flex items-center gap-2 mb-1">
+															<h4 className="font-semibold text-serene-neutral-900 truncate">
+																{match.report?.type_of_incident?.replace(/_/g, " ") || "Support Case"}
+															</h4>
+															<Badge variant="outline" className={cn(
+																"text-[10px] font-bold uppercase border-0 px-1.5 py-0.5",
+																match.match_status_type === 'active' ? "bg-serene-green-50 text-serene-green-700" :
+																match.match_status_type === 'pending' ? "bg-amber-50 text-amber-700" :
+																"bg-serene-neutral-50 text-serene-neutral-600"
+															)}>
+																{match.match_status_type || 'pending'}
+															</Badge>
+														</div>
+														<p className="text-sm text-serene-neutral-500 truncate">
+															{match.report?.incident_description || "No description available"}
+														</p>
+													</div>
+													<ChevronRight className="h-4 w-4 text-serene-neutral-300 group-hover:text-serene-blue-400 transition-colors" />
+												</CardContent>
+											</Card>
+										</Link>
+									))
+								) : (
+									<div className="text-center py-12 bg-white rounded-3xl border border-dashed border-serene-neutral-200">
+										<div className="h-12 w-12 bg-serene-neutral-100 rounded-full flex items-center justify-center mx-auto mb-3">
+											<Users className="h-6 w-6 text-serene-neutral-400" />
+										</div>
+										<p className="text-serene-neutral-500 mb-1">No cases assigned yet</p>
+										<p className="text-sm text-serene-neutral-400">
+											Complete your verification to start receiving cases
+										</p>
+									</div>
+								)}
 							</div>
 						</div>
 
-						<div className="hidden md:block w-[350px] space-y-6 sticky top-6 self-start">
-							<ConditionCheckCard />
-							<JoinCommunity />
-							<SafetyPlanCard userId={userId} />
+						{/* Upcoming Appointments */}
+						{appointments.length > 0 && (
+							<div>
+								<SereneSectionHeader
+									title="Upcoming Appointments"
+									description="Your scheduled sessions"
+								/>
+
+								<div className="space-y-3">
+									{appointments
+										.filter(a => a.appointment_date && new Date(a.appointment_date) > new Date())
+										.slice(0, 2)
+										.map((appt, idx) => (
+											<Card key={idx} className="overflow-hidden border-serene-neutral-100 hover:border-serene-blue-200 transition-all duration-300 hover:shadow-md">
+												<CardContent className="p-4 flex items-center gap-4">
+													<div className="h-12 w-12 bg-serene-blue-50 rounded-2xl flex flex-col items-center justify-center text-serene-blue-600">
+														<span className="text-xs font-medium uppercase">
+															{new Date(appt.appointment_date).toLocaleString('default', { month: 'short' })}
+														</span>
+														<span className="text-lg font-bold leading-none">
+															{new Date(appt.appointment_date).getDate()}
+														</span>
+													</div>
+													<div className="flex-1 min-w-0">
+														<h4 className="font-semibold text-serene-neutral-900">
+															{appt.matched_service?.support_service?.name || "Appointment"}
+														</h4>
+														<p className="text-sm text-serene-neutral-500">
+															{new Date(appt.appointment_date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+														</p>
+													</div>
+													<Badge className="bg-serene-blue-600 text-white border-0 text-xs">
+														Upcoming
+													</Badge>
+												</CardContent>
+											</Card>
+										))}
+								</div>
+							</div>
+						)}
+					</>
+				) : (
+					/* My Reports Tab Content */
+					<div>
+						<SereneSectionHeader
+							title="My Reports"
+							description="Reports you've submitted personally"
+							action={{ label: "View All", href: "/dashboard/reports" }}
+						/>
+
+						<div className="space-y-3">
+							{reports.length > 0 ? (
+								reports.slice(0, 5).map((report) => (
+									<Link href={`/dashboard/reports/${report.report_id}`} key={report.report_id} className="block group">
+										<Card className="overflow-hidden border-serene-neutral-100 hover:border-amber-200 transition-all duration-300 hover:shadow-md cursor-pointer">
+											<CardContent className="p-4 flex items-center gap-4">
+												<div className={cn(
+													"h-12 w-12 rounded-2xl flex items-center justify-center shrink-0",
+													report.urgency === 'high' ? "bg-red-50 text-red-600" :
+													report.urgency === 'medium' ? "bg-amber-50 text-amber-600" :
+													"bg-serene-blue-50 text-serene-blue-600"
+												)}>
+													<FileText className="h-5 w-5" />
+												</div>
+												<div className="flex-1 min-w-0">
+													<div className="flex items-center gap-2 mb-1">
+														<h4 className="font-semibold text-serene-neutral-900 truncate">
+															{report.type_of_incident?.replace(/_/g, " ") || "Report"}
+														</h4>
+														<Badge variant="outline" className={cn(
+															"text-[10px] font-bold uppercase border-0 px-1.5 py-0.5",
+															report.match_status === 'accepted' ? "bg-serene-green-50 text-serene-green-700" :
+															report.match_status === 'pending' ? "bg-amber-50 text-amber-700" :
+															"bg-serene-neutral-50 text-serene-neutral-600"
+														)}>
+															{report.match_status || 'pending'}
+														</Badge>
+													</div>
+													<p className="text-sm text-serene-neutral-500 truncate">
+														{report.incident_description || "No description available"}
+													</p>
+												</div>
+												<ChevronRight className="h-5 w-5 text-serene-neutral-300 group-hover:text-serene-neutral-500 transition-colors" />
+											</CardContent>
+										</Card>
+									</Link>
+								))
+							) : (
+								<Card className="border-dashed border-2 border-serene-neutral-200">
+									<CardContent className="p-8 text-center">
+										<FileText className="h-10 w-10 text-serene-neutral-300 mx-auto mb-3" />
+										<p className="text-serene-neutral-500">You haven't submitted any personal reports</p>
+									</CardContent>
+								</Card>
+							)}
 						</div>
 					</div>
+				)}
+					</>
+				)}
+			</div>
 
-			{/* Delete Report Dialog */}
-			<AlertDialog
-				open={!!deleteReportId}
-				onOpenChange={(open) => !open && setDeleteReportId(null)}
-			>
-				<AlertDialogContent>
-					<AlertDialogHeader>
-						<AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-						<AlertDialogDescription>
-							This action cannot be undone. This will permanently delete the report.
-						</AlertDialogDescription>
-					</AlertDialogHeader>
-					<AlertDialogFooter>
-						<AlertDialogCancel>Cancel</AlertDialogCancel>
-						<AlertDialogAction
-							className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-							onClick={() => deleteReportId && handleDelete(deleteReportId)}
-						>
-							Delete
-						</AlertDialogAction>
-					</AlertDialogFooter>
-				</AlertDialogContent>
-			</AlertDialog>
-
-			{/* Delete Service Dialog */}
-			<AlertDialog
-				open={!!deleteServiceId}
-				onOpenChange={(open) => !open && setDeleteServiceId(null)}
-			>
-				<AlertDialogContent>
-					<AlertDialogHeader>
-						<AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-						<AlertDialogDescription>
-							This action cannot be undone. This will permanently delete the support
-							service.
-						</AlertDialogDescription>
-					</AlertDialogHeader>
-					<AlertDialogFooter>
-						<AlertDialogCancel>Cancel</AlertDialogCancel>
-						<AlertDialogAction
-							className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-							onClick={() => deleteServiceId && handleDeleteService(deleteServiceId)}
-						>
-							Delete
-						</AlertDialogAction>
-					</AlertDialogFooter>
-				</AlertDialogContent>
-			</AlertDialog>
-
+			{/* Report Dialog */}
 			<Dialog open={reportDialogOpen} onOpenChange={setReportDialogOpen}>
-				<DialogContent className="max-w-4xl p-0 overflow-hidden rounded-[32px] h-[90vh] min-h-[600px] z-[1000]">
-					<DialogTitle className="sr-only">Report Abuse</DialogTitle>
-					<DialogDescription className="sr-only">
-						Please fill out this form to report an incident. All information will be
-						kept confidential.
-					</DialogDescription>
-					<AuthenticatedReportAbuseForm
-						onClose={() => setReportDialogOpen(false)}
-						userId={userId}
-					/>
+				<DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-y-auto rounded-3xl">
+					<DialogHeader>
+						<DialogTitle className="text-xl font-bold">Report Incident</DialogTitle>
+						<DialogDescription>
+							Your safety is our priority. All information is kept confidential.
+						</DialogDescription>
+					</DialogHeader>
+					<AuthenticatedReportAbuseForm userId={userId} onClose={() => setReportDialogOpen(false)} />
 				</DialogContent>
 			</Dialog>
 		</div>
-		</>
 	);
 }

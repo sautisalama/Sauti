@@ -5,6 +5,8 @@ import { createClient } from "@/utils/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Separator } from "@/components/ui/separator";
 import { Calendar as UIDateCalendar } from "@/components/ui/calendar";
 import {
 	CalendarDays,
@@ -17,7 +19,7 @@ import {
 	Phone,
 	Mail,
 	X,
-	Mic,
+	Briefcase,
 	Play,
 	Pause,
 	Filter,
@@ -38,6 +40,12 @@ import { useDashboardData } from "@/components/providers/DashboardDataProvider";
 import { CalendarConnectionStatus } from "../_components/CalendarConnectionStatus";
 import { SereneBreadcrumb } from "@/components/ui/SereneBreadcrumb";
 import { useRouter } from "next/navigation";
+import { ChatWindow } from "@/components/chat/ChatWindow";
+import { getCaseChat } from "@/app/actions/chat";
+import { Chat } from "@/types/chat";
+import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
+import { Calendar } from "lucide-react";
 
 
 interface MatchedServiceItem {
@@ -75,6 +83,84 @@ export default function CasesMasterDetail({ userId }: { userId: string }) {
 	const [showFilters, setShowFilters] = useState(false);
 	const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
 	const [isLoadingMessages, setIsLoadingMessages] = useState(false);
+
+	// Chat State
+	const [activeTab, setActiveTab] = useState<'details' | 'chat'>('details');
+	const [activeChat, setActiveChat] = useState<Chat | null>(null);
+	const [isChatLoading, setIsChatLoading] = useState(false);
+
+	// Calendar State
+	const [calendarViewMode, setCalendarViewMode] = useState<'week' | 'month'>('week');
+	const [calendarSelectedDate, setCalendarSelectedDate] = useState(new Date());
+
+	// Calendar Helpers
+	const getWeekDays = (baseDate: Date) => {
+		const start = new Date(baseDate);
+		start.setDate(start.getDate() - start.getDay());
+		return Array.from({ length: 7 }, (_, i) => {
+			const day = new Date(start);
+			day.setDate(start.getDate() + i);
+			return day;
+		});
+	};
+
+	const getMonthDays = (baseDate: Date) => {
+		const year = baseDate.getFullYear();
+		const month = baseDate.getMonth();
+		const firstDay = new Date(year, month, 1);
+		const lastDay = new Date(year, month + 1, 0);
+		const startPadding = firstDay.getDay();
+		const totalDays = lastDay.getDate();
+		const weeks = Math.ceil((startPadding + totalDays) / 7);
+		const days: { date: Date; isCurrentMonth: boolean }[] = [];
+		
+		for (let i = 0; i < weeks * 7; i++) {
+			const day = new Date(year, month, 1 - startPadding + i);
+			days.push({
+				date: day,
+				isCurrentMonth: day.getMonth() === month
+			});
+		}
+		return days;
+	};
+
+	const weekDays = useMemo(() => getWeekDays(calendarSelectedDate), [calendarSelectedDate]);
+	const monthDays = useMemo(() => getMonthDays(calendarSelectedDate), [calendarSelectedDate]);
+
+	const getAllAppointments = (casesData: MatchedServiceItem[]) => {
+		const all: any[] = [];
+		casesData.forEach(c => {
+			 c.appointments?.forEach(a => {
+				 all.push({ ...a, case: c });
+			 });
+		});
+		return all;
+	};
+
+	const getAppointmentsForDay = (date: Date, items: MatchedServiceItem[]) => {
+		const all = getAllAppointments(items);
+		return all.filter(a =>
+			a.appointment_date && new Date(a.appointment_date).toDateString() === date.toDateString()
+		);
+	};
+
+	// Fetch chat when case is selected
+	useEffect(() => {
+		if (selectedId) {
+			const selectedCase = cases.find(c => c.id === selectedId);
+			if (selectedCase && selectedCase.report?.survivor_id) {
+				setIsChatLoading(true);
+				const survId = selectedCase.report.survivor_id;
+				getCaseChat(selectedId, survId)
+					.then(chat => setActiveChat(chat))
+					.catch(err => console.error("Failed to load chat", err))
+					.finally(() => setIsChatLoading(false));
+			}
+		} else {
+			setActiveChat(null);
+			setActiveTab('details');
+		}
+	}, [selectedId, cases]);
 
 	// Seed from provider if available (instant render)
 	useEffect(() => {
@@ -485,33 +571,30 @@ export default function CasesMasterDetail({ userId }: { userId: string }) {
 	};
 
 	return (
-		<div className="relative">
-			<div
-				className={`grid grid-cols-1 lg:grid-cols-12 gap-6 ${
-					selected ? "overflow-x-hidden" : ""
-				}`}
-			>
+		<div className="relative min-h-screen bg-serene-neutral-50">
+				<div className=" overflow-hidden flex flex-col lg:flex-row gap-4 lg:gap-8">
 				{/* Mobile toggle */}
-				<div className="lg:hidden -mt-2 mb-4">
-					<div className="inline-flex rounded-xl border border-gray-200 bg-white p-1 shadow-sm">
+				<div className="lg:hidden px-1 shrink-0">
+					<div className="inline-flex rounded-2xl border border-serene-neutral-200 bg-white/80 backdrop-blur-sm p-1 shadow-sm">
 						<button
 							onClick={() => setMobileView("list")}
-							className={`px-4 py-2 text-sm font-medium rounded-lg transition-all duration-200 ${
+							className={`px-5 py-2.5 text-sm font-semibold rounded-xl transition-all duration-300 ${
 								mobileView === "list"
-									? "bg-[#1A3434] text-white shadow-sm"
-									: "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
+									? "bg-sauti-teal text-white shadow-md"
+									: "text-serene-neutral-600 hover:text-sauti-dark hover:bg-serene-neutral-50"
 							}`}
 						>
 							Cases
 						</button>
 						<button
 							onClick={() => setMobileView("calendar")}
-							className={`px-4 py-2 text-sm font-medium rounded-lg transition-all duration-200 ${
+							className={`px-5 py-2.5 text-sm font-semibold rounded-xl transition-all duration-300 ${
 								mobileView === "calendar"
-									? "bg-[#1A3434] text-white shadow-sm"
-									: "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
+									? "bg-sauti-teal text-white shadow-md"
+									: "text-serene-neutral-600 hover:text-sauti-dark hover:bg-serene-neutral-50"
 							}`}
 						>
+							<Calendar className="h-4 w-4 mr-1.5 inline" />
 							Calendar
 						</button>
 					</div>
@@ -519,21 +602,21 @@ export default function CasesMasterDetail({ userId }: { userId: string }) {
 
 				{/* Master list */}
 				<div
-					className={`lg:col-span-7 xl:col-span-7 ${
+					className={`flex-1 h-full overflow-y-auto pr-2 pb-8 scroll-smooth ${
 						mobileView !== "list" ? "hidden lg:block" : ""
 					}`}
 				>
-					<div className="mb-6">
+					<div className="mb-8">
 						<SereneBreadcrumb items={[{ label: "Cases", active: true }]} className="mb-4" />
 						<div className="flex items-center justify-between">
 							<div>
-								<h1 className="text-2xl font-bold text-gray-900">Case Management</h1>
-								<p className="text-gray-500 mt-1">Review your matched cases and leave feedback.</p>
+								<h1 className="text-2xl lg:text-3xl font-bold text-sauti-dark tracking-tight">Case Management</h1>
+								<p className="text-serene-neutral-500 mt-1 text-sm lg:text-base font-medium">Review your matched cases and track progress.</p>
 							</div>
 						</div>
 					</div>
-					{/* Compact Search and Filter Bar */}
-					<div className="mb-4 lg:sticky lg:top-[100px] lg:z-20 lg:bg-white/95 lg:backdrop-blur-sm lg:border-b lg:border-gray-200 lg:pb-4">
+					{/* Premium Search and Filter Bar */}
+					<div className="mb-6 sticky top-0 z-30 bg-serene-neutral-50/95 backdrop-blur-lg border-b border-serene-neutral-100 pb-4 pt-3 -mx-1 px-1">
 						<div className="flex items-center gap-3">
 							{/* Search Bar */}
 							<div className="relative flex-1">
@@ -541,9 +624,9 @@ export default function CasesMasterDetail({ userId }: { userId: string }) {
 									placeholder="Search cases..."
 									value={q}
 									onChange={(e) => setQ(e.target.value)}
-									className="pl-10 pr-4 py-2 text-sm border-gray-200 rounded-lg focus:ring-2 focus:ring-[#1A3434]/20 focus:border-[#1A3434]"
+									className="pl-11 pr-4 py-2.5 text-sm border-serene-neutral-200 rounded-2xl bg-white shadow-sm focus:ring-2 focus:ring-sauti-teal/20 focus:border-sauti-teal transition-all placeholder:text-serene-neutral-400"
 								/>
-								<Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+								<Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-4 w-4 text-serene-neutral-400" />
 							</div>
 
 							{/* Filter Toggle Button */}
@@ -551,20 +634,20 @@ export default function CasesMasterDetail({ userId }: { userId: string }) {
 								variant="outline"
 								size="sm"
 								onClick={() => setShowFilters(!showFilters)}
-								className={`h-9 px-3 border-gray-200 hover:bg-gray-50 ${
+								className={`h-10 px-4 rounded-2xl border-serene-neutral-200 hover:bg-white hover:border-sauti-teal/30 shadow-sm transition-all font-semibold ${
 									urgencyFilter !== "all" ||
 									statusFilter !== "all" ||
 									onBehalfFilter !== "all"
-										? "bg-blue-50 text-blue-700 border-blue-200"
-										: ""
+										? "bg-sauti-teal/10 text-sauti-teal border-sauti-teal/30"
+										: "bg-white text-serene-neutral-600"
 								}`}
 							>
-								<Filter className="h-4 w-4 mr-1" />
+								<Filter className="h-4 w-4 mr-1.5" />
 								Filters
 								{(urgencyFilter !== "all" ||
 									statusFilter !== "all" ||
 									onBehalfFilter !== "all") && (
-									<span className="ml-1 h-2 w-2 bg-blue-500 rounded-full"></span>
+									<span className="ml-1.5 h-2 w-2 bg-sauti-teal rounded-full animate-pulse"></span>
 								)}
 							</Button>
 						</div>
@@ -651,20 +734,20 @@ export default function CasesMasterDetail({ userId }: { userId: string }) {
 								))}
 							</>
 						) : filtered.length === 0 ? (
-							<div className="text-center py-20">
-								<div className="w-20 h-20 mx-auto mb-6 rounded-full bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
-									<Shield className="h-10 w-10 text-blue-500" />
+							<div className="text-center py-24 px-6">
+								<div className="w-20 h-20 mx-auto mb-6 rounded-3xl bg-gradient-to-br from-sauti-teal/10 to-serene-blue-100 flex items-center justify-center shadow-sm">
+									<Shield className="h-10 w-10 text-sauti-teal" />
 								</div>
-								<h3 className="text-xl font-semibold text-gray-900 mb-3">
+								<h3 className="text-xl font-bold text-sauti-dark mb-3">
 									{q ? "No cases found" : "No cases yet"}
 								</h3>
-								<p className="text-gray-500 max-w-md mx-auto leading-relaxed">
+								<p className="text-serene-neutral-500 max-w-sm mx-auto leading-relaxed text-sm">
 									{q
 										? "Try adjusting your search terms or filters to find what you're looking for."
 										: "When survivors report incidents and you're matched as their support professional, your cases will appear here."}
 								</p>
 								{q && (
-									<Button variant="outline" onClick={() => setQ("")} className="mt-4">
+									<Button variant="outline" onClick={() => setQ("")} className="mt-6 rounded-2xl border-serene-neutral-200 text-sauti-dark font-semibold hover:bg-serene-neutral-50">
 										Clear search
 									</Button>
 								)}
@@ -689,12 +772,12 @@ export default function CasesMasterDetail({ userId }: { userId: string }) {
 
 				{/* Right column: Calendar by default */}
 				<div
-					className={`lg:col-span-5 xl:col-span-5 ${
+					className={`flex-1 lg:flex-[5] xl:flex-[5] h-full overflow-y-auto ${
 						mobileView !== "calendar" ? "hidden lg:block" : ""
-					} lg:sticky lg:top-[100px] lg:self-start lg:max-h-[calc(100vh-120px)] lg:overflow-y-auto`}
+					}`}
 				>
-					<Card className="p-4 shadow-sm border-gray-200 rounded-lg">
-						<div className="flex items-center justify-between mb-4">
+					<Card className="p-5 shadow-sm border-serene-neutral-200 rounded-2xl bg-white">
+						<div className="flex items-center justify-between mb-5">
 							<div>
 								<div className="flex items-center gap-2 mb-1">
 									<h3 className="text-base font-semibold text-gray-900">
@@ -729,49 +812,246 @@ export default function CasesMasterDetail({ userId }: { userId: string }) {
 							className="mb-3"
 						/>
 
-						<UIDateCalendar
-							mode="single"
-							showOutsideDays
-							className="p-0"
-							classNames={{
-								caption: "flex items-center justify-between px-2 py-2 mb-3",
-								nav: "flex items-center gap-1",
-								nav_button_previous:
-									"relative left-0 h-7 w-7 rounded-md hover:bg-gray-100",
-								nav_button_next:
-									"relative right-0 h-7 w-7 rounded-md hover:bg-gray-100",
-								head_cell: "text-gray-500 font-medium text-xs uppercase tracking-wide",
-								cell: "h-8 w-8 text-center text-sm relative",
-								day: "h-7 w-7 rounded-md hover:bg-gray-100 transition-colors",
-								day_selected: "bg-[#1A3434] text-white hover:bg-[#1A3434]",
-								day_today: "bg-gray-100 text-gray-900 font-semibold",
-							}}
-							selected={undefined}
-							modifiers={{ booked: (date) => isDateBooked(date) }}
-							modifiersStyles={{
-								booked: {
-									backgroundColor: "#E0F2FE",
-									color: "#0369A1",
-									borderRadius: 8,
-									fontWeight: 600,
-								},
-							}}
-							onSelect={(date) => {
-								if (!date) return;
-								// Filter master list by selected date (appointments on that date)
-								const dayKey = date.toDateString();
-								const firstWithAppt = filtered.find((c) =>
-									(c.appointments || []).some(
-										(a) => new Date(a.appointment_date).toDateString() === dayKey
-									)
-								);
-								if (firstWithAppt) setSelectedId(firstWithAppt.id);
-							}}
-						/>
-						<div className="mt-4 flex items-center gap-3 text-xs text-gray-500">
-							<div className="flex items-center gap-2">
-								<span className="inline-block w-2 h-2 rounded bg-sky-100 border border-sky-200" />
-								<span>Appointment scheduled</span>
+						{/* Custom Calendar UI */}
+						<div className="bg-white rounded-lg overflow-hidden">
+							{/* View Mode Toggle + Navigation */}
+							<div className="flex items-center justify-between mb-4">
+								<div className="flex bg-gray-100 rounded-lg p-0.5">
+									<button
+										onClick={() => setCalendarViewMode('week')}
+										className={cn(
+											"px-3 py-1.5 text-xs font-medium rounded-md transition-all",
+											calendarViewMode === 'week' 
+												? "bg-white text-blue-700 shadow-sm"
+												: "text-gray-600 hover:text-gray-900"
+										)}
+									>
+										Week
+									</button>
+									<button
+										onClick={() => setCalendarViewMode('month')}
+										className={cn(
+											"px-3 py-1.5 text-xs font-medium rounded-md transition-all",
+											calendarViewMode === 'month' 
+												? "bg-white text-blue-700 shadow-sm"
+												: "text-gray-600 hover:text-gray-900"
+										)}
+									>
+										Month
+									</button>
+								</div>
+								
+								<p className="text-sm font-medium text-gray-700">
+									{calendarViewMode === 'week' 
+										? `${weekDays[0].toLocaleDateString('default', { month: 'short', day: 'numeric' })} - ${weekDays[6].toLocaleDateString('default', { month: 'short', day: 'numeric' })}`
+										: calendarSelectedDate.toLocaleDateString('default', { month: 'long', year: 'numeric' })
+									}
+								</p>
+								
+								<div className="flex gap-1">
+									<Button
+										variant="ghost"
+										size="sm"
+										className="h-8 w-8 p-0"
+										onClick={() => {
+											const prev = new Date(calendarSelectedDate);
+											prev.setDate(prev.getDate() - (calendarViewMode === 'week' ? 7 : 30));
+											setCalendarSelectedDate(prev);
+										}}
+									>
+										←
+									</Button>
+									<Button
+										variant="ghost"
+										size="sm"
+										className="h-8 w-8 p-0"
+										onClick={() => {
+											const next = new Date(calendarSelectedDate);
+											next.setDate(next.getDate() + (calendarViewMode === 'week' ? 7 : 30));
+											setCalendarSelectedDate(next);
+										}}
+									>
+										→
+									</Button>
+								</div>
+							</div>
+
+							{/* Days Grid */}
+							<div className="grid grid-cols-7 gap-1 mb-4">
+								{['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map(day => (
+									<div key={day} className="text-center text-xs font-medium text-gray-400 py-1">
+										{day}
+									</div>
+								))}
+								{calendarViewMode === 'week' ? (
+									weekDays.map((day, idx) => {
+										const dayAppointments = getAppointmentsForDay(day, filtered);
+										const isToday = day.toDateString() === new Date().toDateString();
+										const isSelected = day.toDateString() === calendarSelectedDate.toDateString();
+										
+										return (
+											<button
+												key={idx}
+												onClick={() => {
+													setCalendarSelectedDate(day);
+													// If has appointments, allow selection logic if needed
+													if (dayAppointments.length > 0) {
+														// Example: select first case? Or list below?
+														// The list below shows appointments. Clicking here just updates `calendarSelectedDate`.
+														// The user can then click the appointment list item below to open the case.
+													}
+												}}
+												className={cn(
+													"relative aspect-square rounded-xl flex flex-col items-center justify-center transition-all",
+													isSelected 
+														? "bg-blue-600 text-white" 
+														: isToday 
+															? "bg-blue-50 text-blue-700" 
+															: "hover:bg-gray-50 text-gray-700"
+												)}
+											>
+												<span className="text-sm font-semibold">{day.getDate()}</span>
+												{dayAppointments.length > 0 && (
+													<div className="flex gap-0.5 mt-0.5">
+														{Array.from({ length: Math.min(dayAppointments.length, 3) }).map((_, i) => (
+															<div 
+																key={i} 
+																className={cn(
+																	"h-1 w-1 rounded-full",
+																	isSelected ? "bg-white/80" : "bg-blue-500"
+																)} 
+															/>
+														))}
+													</div>
+												)}
+											</button>
+										);
+									})
+								) : (
+									monthDays.map((dayInfo, idx) => {
+										const { date: day, isCurrentMonth } = dayInfo;
+										const dayAppointments = getAppointmentsForDay(day, filtered);
+										const isToday = day.toDateString() === new Date().toDateString();
+										const isSelected = day.toDateString() === calendarSelectedDate.toDateString();
+										
+										return (
+											<button
+												key={idx}
+												onClick={() => setCalendarSelectedDate(day)}
+												className={cn(
+													"relative h-9 rounded-lg flex flex-col items-center justify-center transition-all text-xs",
+													!isCurrentMonth && "opacity-40",
+													isSelected 
+														? "bg-blue-600 text-white" 
+														: isToday 
+															? "bg-blue-50 text-blue-700 font-bold" 
+															: "hover:bg-gray-50 text-gray-700"
+												)}
+											>
+												<span className="font-medium">{day.getDate()}</span>
+												{dayAppointments.length > 0 && isCurrentMonth && (
+													<div className={cn(
+														"h-1 w-1 rounded-full mt-0.5",
+														isSelected ? "bg-white/80" : "bg-blue-500"
+													)} />
+												)}
+											</button>
+										);
+									})
+								)}
+							</div>
+
+							{/* Selected Date Details */}
+							<div className="pt-4 border-t border-gray-100">
+								<h4 className="text-sm font-semibold text-gray-900 mb-3 block">
+									{calendarSelectedDate.toDateString() === new Date().toDateString() ? "Today" : calendarSelectedDate.toLocaleDateString('default', { weekday: 'long', month: 'long', day: 'numeric' })}
+								</h4>
+								
+								{(() => {
+									const appointments = getAppointmentsForDay(calendarSelectedDate, filtered);
+									const isToday = calendarSelectedDate.toDateString() === new Date().toDateString();
+									
+									if (appointments.length > 0) {
+										return (
+											<div className="space-y-2">
+												{appointments.map((appt, i) => (
+													<div 
+														key={i} 
+														className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl cursor-pointer hover:bg-gray-100 transition-colors"
+														onClick={() => setSelectedId(appt.case.id)}
+													>
+														<div className="h-10 w-10 bg-blue-100 rounded-lg flex items-center justify-center text-blue-700 shrink-0">
+															<Clock className="h-4 w-4" />
+														</div>
+														<div className="flex-1 min-w-0">
+															<p className="font-medium text-gray-900 text-sm truncate">
+																{appt.case?.support_service?.name || "Appointment"}
+															</p>
+															<p className="text-xs text-gray-500">
+																{new Date(appt.appointment_date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+															</p>
+														</div>
+														<Badge className="bg-blue-50 text-blue-700 border-0 text-xs shrink-0">
+															{appt.status || 'Scheduled'}
+														</Badge>
+													</div>
+												))}
+											</div>
+										);
+									} else if (isToday) {
+										// Show upcoming for week logic
+										const allAppts = getAllAppointments(filtered);
+										const today = new Date();
+										const nextWeek = new Date(today);
+										nextWeek.setDate(today.getDate() + 7);
+										
+										const upcoming = allAppts
+											.filter(a => {
+												if (!a.appointment_date) return false;
+												const d = new Date(a.appointment_date);
+												return d > today && d <= nextWeek;
+											})
+											.sort((a, b) => new Date(a.appointment_date).getTime() - new Date(b.appointment_date).getTime())
+											.slice(0, 3); // Top 3
+
+										if (upcoming.length > 0) {
+											return (
+												<div>
+													<p className="text-xs font-medium text-gray-500 mb-2 uppercase tracking-wide">Upcoming This Week</p>
+													<div className="space-y-2">
+														{upcoming.map((appt, i) => (
+															<div 
+																key={i} 
+																className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl cursor-pointer hover:bg-gray-100 transition-colors"
+																onClick={() => setSelectedId(appt.case.id)}
+															>
+																<div className="h-10 w-10 bg-green-100 rounded-lg flex items-center justify-center text-green-700 shrink-0">
+																	<Calendar className="h-4 w-4" />
+																</div>
+																<div className="flex-1 min-w-0">
+																	<p className="font-medium text-gray-900 text-sm truncate">
+																		{appt.case?.support_service?.name || "Appointment"}
+																	</p>
+																	<div className="flex items-center gap-2 text-xs text-gray-500">
+																		<span>{new Date(appt.appointment_date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</span>
+																		<span>•</span>
+																		<span>{new Date(appt.appointment_date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+																	</div>
+																</div>
+															</div>
+														))}
+													</div>
+												</div>
+											);
+										}
+									}
+									
+									return (
+										<div className="text-center py-6 bg-gray-50 rounded-xl border border-dashed border-gray-200">
+											<p className="text-sm text-gray-500">No appointments scheduled</p>
+										</div>
+									);
+								})()}
 							</div>
 						</div>
 					</Card>
@@ -856,189 +1136,277 @@ export default function CasesMasterDetail({ userId }: { userId: string }) {
 								</div>
 							</div>
 
+							{/* Tabs */}
+							<div className="flex border-b border-gray-200 px-4 gap-6 bg-white shrink-0">
+								<button
+									onClick={() => setActiveTab('details')}
+									className={`py-3 text-sm font-medium border-b-2 transition-colors ${
+										activeTab === 'details'
+											? 'border-blue-600 text-blue-600'
+											: 'border-transparent text-gray-500 hover:text-gray-700'
+									}`}
+								>
+									Case Details
+								</button>
+								<button
+									onClick={() => setActiveTab('chat')}
+									className={`py-3 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 ${
+										activeTab === 'chat'
+											? 'border-blue-600 text-blue-600'
+											: 'border-transparent text-gray-500 hover:text-gray-700'
+									}`}
+								>
+									<MessageSquare className="h-4 w-4" />
+									Chat
+								</button>
+							</div>
 
-								{/* Progress Status Field */}
-								<div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
-									<div className="flex items-center justify-between">
-										<div className="flex items-center gap-2">
-											<TrendingUp className="h-4 w-4 text-blue-600" />
-											<span className="text-sm font-medium text-gray-900">
-												Progress Status
-											</span>
+							{activeTab === 'chat' ? (
+								<div className="flex-1 overflow-hidden flex flex-col relative h-full">
+									{isChatLoading ? (
+										<div className="flex items-center justify-center h-full text-gray-500">
+											<div className="animate-spin h-6 w-6 border-2 border-blue-600 border-t-transparent rounded-full mr-2"></div>
+											Loading chat...
 										</div>
-										<div className="flex items-center gap-2">
-											{isLoadingMessages ? (
-												<div className="h-7 w-16 bg-gray-200 rounded-md animate-pulse" />
-											) : selected.unread_messages && selected.unread_messages > 0 ? (
-												<Button
-													variant="outline"
-													size="sm"
-													onClick={() => {
-														// Navigate to chats page with specific chat
-														window.open(`/dashboard/chats?caseId=${selected.id}`, "_blank");
-													}}
-													className="h-7 px-2 text-xs border-blue-200 text-blue-700 hover:bg-blue-50"
-												>
-													<MessageSquare className="h-3 w-3 mr-1" />
-													{selected.unread_messages} unread
-												</Button>
-											) : null}
-											{selected.match_status_type === "completed" ? (
-												<div className="flex items-center gap-2 text-xs text-green-700 bg-green-50 px-2 py-1 rounded-md border border-green-200">
-													<CheckCircle2 className="h-3 w-3" />
-													<span className="font-medium">Completed</span>
-												</div>
-											) : (
-												<Button
-													variant="outline"
-													size="sm"
-													onClick={() => handleCompleteCase(selected.id)}
-													disabled={isUpdatingStatus}
-													className="h-7 px-2 text-xs border-green-200 text-green-700 hover:bg-green-50"
-												>
-													{isUpdatingStatus ? (
-														<Clock className="h-3 w-3 mr-1" />
-													) : (
-														<CheckCircle2 className="h-3 w-3 mr-1" />
-													)}
-													{isUpdatingStatus ? "Completing..." : "Mark as Completed"}
-												</Button>
-											)}
-										</div>
-									</div>
-								</div>
-
-							{/* Body */}
-							<div className="flex-1 overflow-y-auto">
-								<div className="p-4 space-y-4">
-									{/* Matched Service & Appointment - Combined */}
-									<div className="bg-blue-50 rounded-lg border border-blue-100 p-4">
-										<h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
-											<User className="h-4 w-4 text-blue-600" />
-											Matched Service & Appointment
-										</h3>
-										<div className="space-y-3">
-											{/* Service Info */}
-											<div>
-												<p className="text-sm font-medium text-gray-900">
-													{selected?.support_service?.name || "Pending Match"}
-												</p>
-												<p className="text-xs text-gray-600 mt-1">
-													Status:{" "}
-													<span className="font-medium capitalize">
-														{String(selected?.match_status_type || "pending")}
-													</span>
-												</p>
-											</div>
-
-											{/* Appointment Info */}
-											{selected?.appointments?.[0] ? (
-												<div className="bg-white rounded-lg border border-blue-200 p-3">
-													<div className="flex items-center gap-2 mb-2">
-														<CalendarDays className="h-4 w-4 text-green-600" />
-														<span className="text-sm font-medium text-gray-900">
-															Appointment
-														</span>
-													</div>
-													<div className="space-y-2">
-														<div className="text-xs text-gray-700">
-															<div className="flex items-center gap-2 mb-1">
-																<Clock className="h-3 w-3 text-gray-500" />
-																<span className="font-medium">
-																	{new Date(
-																		selected.appointments[0].appointment_date
-																	).toLocaleDateString()}
-																</span>
-															</div>
-															<div className="text-gray-600">
-																{new Date(
-																	selected.appointments[0].appointment_date
-																).toLocaleTimeString([], {
-																	hour: "2-digit",
-																	minute: "2-digit",
-																})}
-															</div>
-														</div>
-														<div className="flex items-center gap-2">
-															<span
-																className={`px-2 py-1 rounded-md text-xs font-medium ${
-																	selected.appointments[0].status === "confirmed"
-																		? "bg-blue-100 text-blue-700 border border-blue-200"
-																		: selected.appointments[0].status === "completed"
-																		? "bg-green-100 text-green-700 border border-green-200"
-																		: "bg-gray-100 text-gray-700 border border-gray-200"
-																}`}
-															>
-																{selected.appointments[0].status.charAt(0).toUpperCase() +
-																	selected.appointments[0].status.slice(1)}
-															</span>
-														</div>
-													</div>
-												</div>
-											) : (
-												<div className="bg-white rounded-lg border border-blue-200 p-3">
-													<div className="flex items-center gap-2 mb-2">
-														<CalendarDays className="h-4 w-4 text-gray-600" />
-														<span className="text-sm font-medium text-gray-900">
-															Appointment
-														</span>
-													</div>
-													<p className="text-xs text-gray-600">
-														No appointment scheduled yet
-													</p>
-												</div>
-											)}
-										</div>
-									</div>
-
-									{/* Description with Audio - Combined */}
-									{(selected.report?.incident_description ||
-										selected.report?.media?.url) && (
-										<div className="bg-white rounded-lg border border-gray-200 p-4">
-											<h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
-												<FileText className="h-4 w-4 text-gray-600" />
-												Description
-											</h3>
-											<div className="space-y-3">
-												{selected.report?.incident_description && (
-													<p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">
-														{selected.report.incident_description}
-													</p>
-												)}
-												{selected.report?.media?.url && (
-													<AudioPlayer
-														src={selected.report.media.url}
-														type={selected.report.media.type}
-													/>
-												)}
-											</div>
+									) : activeChat ? (
+										<ChatWindow 
+											chat={activeChat} 
+											onBack={() => setActiveTab('details')} 
+										/>
+									) : (
+										<div className="flex items-center justify-center h-full text-gray-500 p-8 text-center">
+											<p>Unable to load chat or no survivor associated.</p>
 										</div>
 									)}
+								</div>
+							) : (
+								/* Premium Case Details Body */
+								<div className="flex-1 overflow-y-auto bg-gray-50/50">
+									<div className="p-6 space-y-6">
 
-									{/* Notes (WYSIWYG) - Full Height */}
-									<div className="bg-white rounded-lg border border-gray-200 flex flex-col h-[80vh] sm:h-[500px] mb-4">
-										<div className="p-4 border-b border-gray-200">
-											<h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-												<FileText className="h-5 w-5 text-gray-600" />
-												Case Notes & Updates
-											</h3>
-										</div>
-										<div className="flex-1 overflow-hidden">
-											<CaseNotesEditor
-												matchId={selected.id}
-												initialHtml={selected.notes || ""}
-												onSaved={(html) => {
-													setCases((prev) =>
-														prev.map((c) =>
-															c.id === selected?.id ? { ...c, notes: html } : c
-														)
-													);
-												}}
-											/>
-										</div>
+										{/* Status Card */}
+										<Card className="p-5 border-serene-neutral-200 shadow-sm bg-white">
+											<div className="flex items-center justify-between mb-4">
+												<div className="flex items-center gap-2">
+													<div className="h-8 w-8 rounded-full bg-blue-50 flex items-center justify-center">
+														<TrendingUp className="h-4 w-4 text-blue-600" />
+													</div>
+													<span className="text-sm font-semibold text-gray-900">Case Status</span>
+												</div>
+												{selected.match_status_type === "completed" ? (
+													<Badge className="bg-green-50 text-green-700 border-green-200 hover:bg-green-100">
+														<CheckCircle2 className="h-3 w-3 mr-1" />
+														Completed
+													</Badge>
+												) : (
+													<Button
+														variant="outline"
+														size="sm"
+														onClick={() => handleCompleteCase(selected.id)}
+														disabled={isUpdatingStatus}
+														className="h-8 text-xs border-green-200 text-green-700 hover:bg-green-50 hover:text-green-800"
+													>
+														{isUpdatingStatus ? (
+															<Clock className="h-3 w-3 mr-1 animate-spin" />
+														) : (
+															<CheckCircle2 className="h-3 w-3 mr-1" />
+														)}
+														Mark Complete
+													</Button>
+												)}
+											</div>
+											
+											{selected.unread_messages && selected.unread_messages > 0 && (
+												<div className="flex items-center gap-3 p-3 bg-blue-50/50 rounded-lg border border-blue-100">
+													<div className="relative">
+														<MessageCircle className="h-5 w-5 text-blue-600" />
+														<span className="absolute -top-1 -right-1 h-2.5 w-2.5 bg-red-500 rounded-full border-2 border-white" />
+													</div>
+													<div className="flex-1">
+														<p className="text-sm font-medium text-blue-900">New Messages</p>
+														<p className="text-xs text-blue-600">You have {selected.unread_messages} unread message(s)</p>
+													</div>
+													<Button
+														size="sm"
+														className="h-8 bg-blue-600 text-white hover:bg-blue-700 shadow-sm"
+														onClick={() => window.open(`/dashboard/chats?caseId=${selected.id}`, "_blank")}
+													>
+														View Chat
+													</Button>
+												</div>
+											)}
+										</Card>
+
+										{/* Survivor & Incident Card */}
+										<Card className="overflow-hidden border-serene-neutral-200 shadow-sm bg-white">
+											<div className="p-5 border-b border-gray-100 bg-gray-50/30">
+												<h3 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
+													<User className="h-4 w-4 text-gray-500" />
+													Survivor & Incident Details
+												</h3>
+											</div>
+											<div className="p-5 grid grid-cols-1 sm:grid-cols-2 gap-6">
+												{/* Incident Type */}
+												<div>
+													<p className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1.5">Incident Type</p>
+													<div className="flex items-center gap-2">
+														<Shield className="h-4 w-4 text-gray-400" />
+														<span className="text-sm font-medium text-gray-900">
+															{selected.report?.type_of_incident || "Not specified"}
+														</span>
+													</div>
+												</div>
+
+												{/* Urgency */}
+												<div>
+													<p className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1.5">Urgency Level</p>
+													<Badge variant="outline" className={cn("capitalize font-medium", urgencyColor(selected.report?.urgency))}>
+														{selected.report?.urgency || "Low"} Priority
+													</Badge>
+												</div>
+
+												{/* Date */}
+												<div>
+													<p className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1.5">Reported On</p>
+													<div className="flex items-center gap-2">
+														<Calendar className="h-4 w-4 text-gray-400" />
+														<span className="text-sm text-gray-900">
+															{formatDate(selected.report?.submission_timestamp)}
+														</span>
+													</div>
+												</div>
+
+												{/* Connection */}
+												<div>
+													<p className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1.5">Connection Type</p>
+													<div className="flex items-center gap-2">
+														<User className="h-4 w-4 text-gray-400" />
+														<span className="text-sm text-gray-900 capitalize">
+															{selected.report?.reporting_on_behalf ? "On Behalf" : "Direct Report"}
+														</span>
+													</div>
+												</div>
+											</div>
+										</Card>
+
+										{/* Matched Service Card */}Welcome back, you're safe here.
+										<Card className="overflow-hidden border-serene-neutral-200 shadow-sm bg-white">
+											<div className="p-5 border-b border-gray-100 bg-gray-50/30 flex justify-between items-center">
+												<h3 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
+													<Briefcase className="h-4 w-4 text-gray-500" />
+													Matched Service
+												</h3>
+												<Badge variant="secondary" className="bg-gray-100 text-gray-600 font-normal">
+													{selected.match_status_type === 'matched' ? 'Active Match' : 'Pending'}
+												</Badge>
+											</div>
+											<div className="p-5">
+												<div className="flex items-start gap-4 mb-6">
+													<div className="h-12 w-12 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center shrink-0">
+														<span className="text-lg font-bold text-blue-600">
+															{selected.support_service?.name?.charAt(0) || "S"}
+														</span>
+													</div>
+													<div>
+														<h4 className="text-base font-bold text-gray-900">
+															{selected.support_service?.name || "Pending Service Allocation"}
+														</h4>
+														<p className="text-sm text-gray-500 mt-0.5">
+															{selected.support_service?.category || "Support Service"} • {selected.support_service?.organization_name || "Sauti Salama Network"}
+														</p>
+													</div>
+												</div>
+
+												{selected.appointments?.[0] ? (
+													<div className="bg-green-50/50 rounded-xl border border-green-100 p-4">
+														<div className="flex items-center gap-2 mb-3">
+															<CalendarDays className="h-4 w-4 text-green-600" />
+															<span className="text-sm font-bold text-green-900">Upcoming Appointment</span>
+														</div>
+														<div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+															<div>
+																<p className="text-sm font-medium text-gray-900">
+																	{new Date(selected.appointments[0].appointment_date).toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}
+																</p>
+																<p className="text-sm text-gray-500">
+																	{new Date(selected.appointments[0].appointment_date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+																</p>
+															</div>
+															<Badge className={cn(
+																"self-start sm:self-center capitalize",
+																selected.appointments[0].status === 'confirmed' ? "bg-green-100 text-green-700 hover:bg-green-200" : "bg-gray-100 text-gray-700"
+															)}>
+																{selected.appointments[0].status}
+															</Badge>
+														</div>
+													</div>
+												) : (
+													<div className="text-center py-6 bg-gray-50 rounded-xl border border-dashed border-gray-200">
+														<CalendarDays className="h-8 w-8 text-gray-300 mx-auto mb-2" />
+														<p className="text-sm text-gray-500">No appointments scheduled yet</p>
+													</div>
+												)}
+											</div>
+										</Card>
+
+										{/* Description & Media */}
+										{(selected.report?.incident_description || selected.report?.media?.url) && (
+											<Card className="border-serene-neutral-200 shadow-sm bg-white overflow-hidden">
+												<div className="p-5 border-b border-gray-100 bg-gray-50/30">
+													<h3 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
+														<FileText className="h-4 w-4 text-gray-500" />
+														Incident Description
+													</h3>
+												</div>
+												<div className="p-5 space-y-4">
+													{selected.report?.incident_description && (
+														<div className="prose prose-sm max-w-none text-gray-600">
+															<p className="whitespace-pre-wrap leading-relaxed">
+																{selected.report.incident_description}
+															</p>
+														</div>
+													)}
+													
+													{selected.report?.media?.url && (
+														<div className="bg-gray-50 rounded-xl p-3 border border-gray-100">
+															<p className="text-xs font-medium text-gray-500 mb-2 uppercase tracking-wide">Attached Media</p>
+															<AudioPlayer
+																src={selected.report.media.url}
+																type={selected.report.media.type}
+															/>
+														</div>
+													)}
+												</div>
+											</Card>
+										)}
+
+										{/* Notes Editor */}
+										<Card className="overflow-hidden flex flex-col h-[500px]">
+											<div className="p-4 flex items-center justify-between">
+												<h3 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
+													<FileText className="h-4 w-4 text-gray-500" />
+													Case Notes
+												</h3>
+												<span className="text-xs text-gray-400">Private & Secure</span>
+											</div>
+											<div className="flex-1 overflow-hidden bg-gray-50/20">
+												<CaseNotesEditor
+													matchId={selected.id}
+													initialHtml={selected.notes || ""}
+													onSaved={(html) => {
+														setCases((prev) =>
+															prev.map((c) =>
+																c.id === selected?.id ? { ...c, notes: html } : c
+															)
+														);
+													}}
+												/>
+											</div>
+										</Card>
+
 									</div>
 								</div>
-							</div>
+							)}
 						</div>
 					)}
 				</div>

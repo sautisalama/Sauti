@@ -258,11 +258,14 @@ const editor = useEditor({
 	if (!editor || !editor.chain) return null;
 
 	return (
-		<div className="flex flex-col h-full">
+		<div className="flex flex-col h-full bg-white rounded-2xl border border-serene-neutral-200 shadow-sm overflow-hidden">
 			<style jsx>{`
-				/* Tiptap basic styles */
+				/* Tiptap premium styles */
 				.tiptap :global(.ProseMirror) {
 					outline: none;
+					color: #1f2937;
+					font-size: 0.9375rem;
+					line-height: 1.7;
 				}
 				.tiptap :global(.ProseMirror p.is-editor-empty:first-child::before) {
 					content: attr(data-placeholder);
@@ -270,24 +273,31 @@ const editor = useEditor({
 					float: left;
 					height: 0;
 					pointer-events: none;
+					font-style: italic;
 				}
 				.tiptap :global(img) {
 					max-width: 100%;
 					height: auto;
 				}
 				.tiptap :global(blockquote) {
-					border-left: 3px solid #e5e7eb;
-					margin: 0.75rem 0;
-					padding-left: 0.75rem;
-					color: #374151;
+					border-left: 3px solid #1A3434;
+					margin: 1rem 0;
+					padding-left: 1rem;
+					color: #4b5563;
+					background: linear-gradient(90deg, rgba(26, 52, 52, 0.05) 0%, transparent 100%);
+					border-radius: 0 0.5rem 0.5rem 0;
+					padding: 0.75rem 1rem;
 				}
 				.tiptap :global(pre) {
-					background: #f3f4f6;
-					border-radius: 6px;
-					padding: 0.5rem 0.75rem;
+					background: #f8fafc;
+					border-radius: 0.75rem;
+					border: 1px solid #e2e8f0;
+					padding: 0.875rem 1rem;
 					font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
 						"Liberation Mono", "Courier New", monospace;
-					font-size: 0.85rem;
+					font-size: 0.8125rem;
+					line-height: 1.6;
+					overflow-x: auto;
 				}
 				/* Ensure lists render with styles even without typography plugin */
 				.tiptap :global(ul) {
@@ -311,10 +321,10 @@ const editor = useEditor({
 				}
 			`}</style>
 
-			{/* Toolbar */}
-			<div className="flex flex-col gap-2 p-3 bg-gray-50 border-b border-gray-200">
-				<div className="flex items-center gap-1 flex-wrap" onMouseDown={prevent}>
-					<span className="text-sm font-medium text-gray-700 mr-2">Formatting:</span>
+			{/* Premium Toolbar */}
+			<div className="flex flex-col gap-3 p-4 bg-gradient-to-b from-serene-neutral-50 to-white border-b border-serene-neutral-100">
+				<div className="flex items-center gap-1.5 flex-wrap" onMouseDown={prevent}>
+					<span className="text-xs font-bold text-serene-neutral-500 uppercase tracking-wider mr-2">Format</span>
 					<Button
 						type="button"
 						variant="ghost"
@@ -342,8 +352,8 @@ const editor = useEditor({
 						size="icon"
 						className={`h-8 w-8 ${
 							editor.isActive("bold")
-								? "bg-blue-100 text-blue-700 border border-blue-200 shadow-sm"
-								: "hover:bg-gray-100"
+								? "bg-sauti-teal/10 text-sauti-teal border border-sauti-teal/20 shadow-sm"
+								: "hover:bg-serene-neutral-50"
 						}`}
 						onClick={() => editor.chain().focus().toggleBold().run()}
 						title="Bold"
@@ -358,8 +368,8 @@ const editor = useEditor({
 						size="icon"
 						className={`h-8 w-8 ${
 							editor.isActive("italic")
-								? "bg-blue-100 text-blue-700 border border-blue-200 shadow-sm"
-								: "hover:bg-gray-100"
+								? "bg-sauti-teal/10 text-sauti-teal border border-sauti-teal/20 shadow-sm"
+								: "hover:bg-serene-neutral-50"
 						}`}
 						onClick={() => editor.chain().focus().toggleItalic().run()}
 						title="Italic"
@@ -374,8 +384,8 @@ const editor = useEditor({
 						size="icon"
 						className={`h-8 w-8 ${
 							editor.isActive("underline")
-								? "bg-blue-100 text-blue-700 border border-blue-200 shadow-sm"
-								: "hover:bg-gray-100"
+								? "bg-sauti-teal/10 text-sauti-teal border border-sauti-teal/20 shadow-sm"
+								: "hover:bg-serene-neutral-50"
 						}`}
 						onClick={() => editor.chain().focus().toggleUnderline().run()}
 						title="Underline"
@@ -390,8 +400,8 @@ const editor = useEditor({
 						size="icon"
 						className={`h-8 w-8 ${
 							editor.isActive("strike")
-								? "bg-blue-100 text-blue-700 border border-blue-200 shadow-sm"
-								: "hover:bg-gray-100"
+								? "bg-sauti-teal/10 text-sauti-teal border border-sauti-teal/20 shadow-sm"
+								: "hover:bg-serene-neutral-50"
 						}`}
 						onClick={() => editor.chain().focus().toggleStrike().run()}
 						title="Strikethrough"
@@ -407,8 +417,8 @@ const editor = useEditor({
 						size="icon"
 						className={`h-8 w-8 ${
 							editor.isActive("bulletList")
-								? "bg-blue-100 text-blue-700 border border-blue-200 shadow-sm"
-								: "hover:bg-gray-100"
+								? "bg-sauti-teal/10 text-sauti-teal border border-sauti-teal/20 shadow-sm"
+								: "hover:bg-serene-neutral-50"
 						}`}
 						onClick={() => editor.chain().focus().toggleBulletList().run()}
 						title="Bullet List"
@@ -421,8 +431,8 @@ const editor = useEditor({
 						size="icon"
 						className={`h-8 w-8 ${
 							editor.isActive("orderedList")
-								? "bg-blue-100 text-blue-700 border border-blue-200 shadow-sm"
-								: "hover:bg-gray-100"
+								? "bg-sauti-teal/10 text-sauti-teal border border-sauti-teal/20 shadow-sm"
+								: "hover:bg-serene-neutral-50"
 						}`}
 						onClick={() => editor.chain().focus().toggleOrderedList().run()}
 						title="Numbered List"
@@ -435,8 +445,8 @@ const editor = useEditor({
 						size="icon"
 						className={`h-8 w-8 ${
 							editor.isActive("blockquote")
-								? "bg-blue-100 text-blue-700 border border-blue-200 shadow-sm"
-								: "hover:bg-gray-100"
+								? "bg-sauti-teal/10 text-sauti-teal border border-sauti-teal/20 shadow-sm"
+								: "hover:bg-serene-neutral-50"
 						}`}
 						onClick={() => editor.chain().focus().toggleBlockquote().run()}
 						title="Blockquote"
@@ -449,8 +459,8 @@ const editor = useEditor({
 						size="icon"
 						className={`h-8 w-8 ${
 							editor.isActive("codeBlock")
-								? "bg-blue-100 text-blue-700 border border-blue-200 shadow-sm"
-								: "hover:bg-gray-100"
+								? "bg-sauti-teal/10 text-sauti-teal border border-sauti-teal/20 shadow-sm"
+								: "hover:bg-serene-neutral-50"
 						}`}
 						onClick={() => editor.chain().focus().toggleCodeBlock().run()}
 						title="Code Block"
@@ -458,16 +468,16 @@ const editor = useEditor({
 						<Code className="h-4 w-4" />
 					</Button>
 				</div>
-				<div className="flex items-center gap-1 flex-wrap" onMouseDown={prevent}>
-					<span className="text-sm font-medium text-gray-700 mr-2">Align:</span>
+				<div className="flex items-center gap-1.5 flex-wrap" onMouseDown={prevent}>
+					<span className="text-xs font-bold text-serene-neutral-500 uppercase tracking-wider mr-2">Align</span>
 					<Button
 						type="button"
 						variant={editor.isActive({ textAlign: "left" }) ? "secondary" : "ghost"}
 						size="icon"
 						className={`h-8 w-8 ${
 							editor.isActive({ textAlign: "left" })
-								? "bg-blue-100 text-blue-700 border border-blue-200 shadow-sm"
-								: "hover:bg-gray-100"
+								? "bg-sauti-teal/10 text-sauti-teal border border-sauti-teal/20 shadow-sm"
+								: "hover:bg-serene-neutral-50"
 						}`}
 						onClick={() => editor.chain().focus().setTextAlign("left").run()}
 						title="Align Left"
@@ -480,8 +490,8 @@ const editor = useEditor({
 						size="icon"
 						className={`h-8 w-8 ${
 							editor.isActive({ textAlign: "center" })
-								? "bg-blue-100 text-blue-700 border border-blue-200 shadow-sm"
-								: "hover:bg-gray-100"
+								? "bg-sauti-teal/10 text-sauti-teal border border-sauti-teal/20 shadow-sm"
+								: "hover:bg-serene-neutral-50"
 						}`}
 						onClick={() => editor.chain().focus().setTextAlign("center").run()}
 						title="Align Center"
@@ -494,8 +504,8 @@ const editor = useEditor({
 						size="icon"
 						className={`h-8 w-8 ${
 							editor.isActive({ textAlign: "right" })
-								? "bg-blue-100 text-blue-700 border border-blue-200 shadow-sm"
-								: "hover:bg-gray-100"
+								? "bg-sauti-teal/10 text-sauti-teal border border-sauti-teal/20 shadow-sm"
+								: "hover:bg-serene-neutral-50"
 						}`}
 						onClick={() => editor.chain().focus().setTextAlign("right").run()}
 						title="Align Right"
@@ -510,8 +520,8 @@ const editor = useEditor({
 						size="icon"
 						className={`h-8 w-8 ${
 							editor.isActive({ textAlign: "justify" })
-								? "bg-blue-100 text-blue-700 border border-blue-200 shadow-sm"
-								: "hover:bg-gray-100"
+								? "bg-sauti-teal/10 text-sauti-teal border border-sauti-teal/20 shadow-sm"
+								: "hover:bg-serene-neutral-50"
 						}`}
 						onClick={() => editor.chain().focus().setTextAlign("justify").run()}
 						title="Justify"
@@ -525,8 +535,8 @@ const editor = useEditor({
 						size="icon"
 						className={`h-8 w-8 ${
 							editor.isActive("link")
-								? "bg-blue-100 text-blue-700 border border-blue-200 shadow-sm"
-								: "hover:bg-gray-100"
+								? "bg-sauti-teal/10 text-sauti-teal border border-sauti-teal/20 shadow-sm"
+								: "hover:bg-serene-neutral-50"
 						}`}
 						onClick={insertOrEditLink}
 						title="Insert/Edit Link"
@@ -549,36 +559,41 @@ const editor = useEditor({
 						type="button"
 						variant="ghost"
 						size="icon"
-						className="h-8 w-8 hover:bg-gray-100"
+						className="h-8 w-8 hover:bg-serene-neutral-50"
 						onClick={onPickImage}
 						title="Insert Image"
 					>
 						<ImageIcon className="h-4 w-4" />
 					</Button>
-					<div className="ml-auto flex items-center gap-3 text-xs text-gray-500">
-						{saving ? (
-							<span>Saving…</span>
-						) : dirty ? (
-							<span>Unsaved changes</span>
-						) : lastSavedAt ? (
-							<span>Saved {lastSavedAt}</span>
-						) : null}
+					<div className="ml-auto flex items-center gap-4">
+						<span className="text-xs font-medium text-serene-neutral-400">
+							{saving ? (
+								<span className="flex items-center gap-1.5">
+									<span className="h-2 w-2 bg-sauti-teal rounded-full animate-pulse" />
+									Saving…
+								</span>
+							) : dirty ? (
+								<span className="text-amber-600">Unsaved changes</span>
+							) : lastSavedAt ? (
+								<span className="text-serene-green-600">Saved {lastSavedAt}</span>
+							) : null}
+						</span>
 						<Button
 							type="button"
 							size="sm"
 							onClick={() => save()}
 							disabled={saving}
-							className="h-8"
+							className="h-9 px-4 bg-sauti-teal hover:bg-sauti-dark text-white font-semibold rounded-xl shadow-sm transition-all duration-200"
 						>
-							<Save className="h-4 w-4 mr-1" /> Save
+							<Save className="h-4 w-4 mr-1.5" /> Save Notes
 						</Button>
 					</div>
 				</div>
 			</div>
 
-			{/* Editor */}
-			<div className="flex-1 overflow-hidden">
-				<EditorContent editor={editor} className="h-full overflow-y-auto" />
+			{/* Premium Editor Area */}
+			<div className="flex-1 overflow-hidden bg-white">
+				<EditorContent editor={editor} className="h-full overflow-y-auto p-6" />
 			</div>
 		</div>
 	);

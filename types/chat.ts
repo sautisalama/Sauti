@@ -11,6 +11,10 @@ export interface ChatMetadata {
   case_id?: string;
   support_service_id?: string;
   pinned_message_ids?: string[];
+  // Community-related fields
+  is_community?: boolean;
+  community_id?: string;
+  member_count?: number;
   last_message_preview?: {
     content: string;
     sender_id: string;

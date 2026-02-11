@@ -329,7 +329,7 @@ export default function ReportAbuseForm({ onClose }: { onClose?: () => void }) {
 	};
 
 	return (
-		<div className="flex flex-col h-[90vh] sm:h-[85vh] bg-white overflow-hidden rounded-none sm:rounded-2xl">
+		<div className="flex flex-col h-[90vh] sm:h-[85vh] bg-white overflow-hidden rounded-lg sm:rounded-2xl">
 			{/* Modal Header */}
 			<div className="px-4 sm:px-6 py-3 sm:py-4 border-b bg-neutral-50 flex items-center justify-between shrink-0">
 				<div>

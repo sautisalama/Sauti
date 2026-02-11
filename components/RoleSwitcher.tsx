@@ -139,47 +139,54 @@ export function RoleSwitcher() {
 					<ChevronDown className="h-4 w-4" />
 				</Button>
 			</DropdownMenuTrigger>
-			<DropdownMenuContent align="end" className="w-56 bg-white">
-				<DropdownMenuLabel>Switch Role</DropdownMenuLabel>
-				<DropdownMenuSeparator />
+			<DropdownMenuContent 
+				align="end" 
+				side="bottom"
+				className="w-60 mb-2 ml-2 rounded-2xl border-serene-neutral-200 shadow-xl bg-white/95 backdrop-blur-xl animate-in fade-in zoom-in-95 duration-200"
+			>
+				<DropdownMenuLabel className="font-normal p-3 text-xs text-serene-neutral-500 uppercase tracking-wider">
+					Switch Role
+				</DropdownMenuLabel>
+				<DropdownMenuSeparator className="bg-serene-neutral-100" />
 
 				{!isAdminMode && (
-					<DropdownMenuItem onClick={switchToAdmin} className="gap-2">
-						<Shield className="h-4 w-4 text-blue-600" />
+					<DropdownMenuItem 
+						onClick={switchToAdmin} 
+						className="gap-3 cursor-pointer rounded-xl focus:bg-serene-neutral-50 focus:text-serene-blue-600 m-1 p-2"
+					>
+						<div className="h-8 w-8 rounded-lg bg-blue-50 flex items-center justify-center text-blue-600">
+							<Shield className="h-4 w-4" />
+						</div>
 						<div className="flex flex-col">
-							<span>Admin Mode</span>
-							<span className="text-xs text-gray-500">
-								Manage verifications & platform
+							<span className="font-semibold text-sm">Admin Mode</span>
+							<span className="text-[10px] text-gray-500">
+								Platform management
 							</span>
 						</div>
-						<Badge variant="secondary" className="ml-auto text-xs">
+						<Badge variant="secondary" className="ml-auto text-[10px] bg-blue-50 text-blue-700 border-blue-100">
 							Admin
 						</Badge>
 					</DropdownMenuItem>
 				)}
 
 				{isAdminMode && (
-					<DropdownMenuItem onClick={switchToUser} className="gap-2">
-						{getRoleIcon(roleContext.primary_role)}
-						<div className="flex flex-col">
-							<span>{getRoleLabel(roleContext.primary_role)} Mode</span>
-							<span className="text-xs text-gray-500">Your regular dashboard</span>
+					<DropdownMenuItem 
+						onClick={switchToUser} 
+						className="gap-3 cursor-pointer rounded-xl focus:bg-serene-neutral-50 focus:text-serene-blue-600 m-1 p-2"
+					>
+						<div className="h-8 w-8 rounded-lg bg-gray-50 flex items-center justify-center text-gray-600">
+							{getRoleIcon(roleContext.primary_role)}
 						</div>
-						<Badge variant="outline" className="ml-auto text-xs">
+						<div className="flex flex-col">
+							<span className="font-semibold text-sm">{getRoleLabel(roleContext.primary_role)} Mode</span>
+							<span className="text-[10px] text-gray-500">Regular dashboard</span>
+						</div>
+						<Badge variant="outline" className="ml-auto text-[10px]">
 							User
 						</Badge>
 					</DropdownMenuItem>
 				)}
 
-				<DropdownMenuSeparator />
-
-				<DropdownMenuItem
-					onClick={() => router.push("/dashboard/settings")}
-					className="gap-2"
-				>
-					<Settings className="h-4 w-4" />
-					Settings
-				</DropdownMenuItem>
 			</DropdownMenuContent>
 		</DropdownMenu>
 	);

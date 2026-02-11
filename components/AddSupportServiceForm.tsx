@@ -1,45 +1,28 @@
 "use client";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { Textarea } from "./ui/textarea";
-import {
-	Card,
-	CardContent,
-	CardDescription,
-	CardHeader,
-	CardTitle,
-} from "./ui/card";
-import { Switch } from "./ui/switch";
-import { Badge } from "./ui/badge";
 import { Database } from "@/types/db-schema";
-import { serviceValidationService } from "@/lib/service-validation";
 import { useDashboardData } from "@/components/providers/DashboardDataProvider";
-import { fileUploadService } from "@/lib/file-upload";
-import { createClient } from "@/utils/supabase/client";
 import {
 	MapPin,
-	Globe,
 	Phone,
 	Clock,
 	Building2,
 	Mail,
 	Globe2,
-	Video,
-	MessageCircle,
 	Plus,
-	Loader2,
-	AlertCircle,
 	CheckCircle,
-	FileText,
-	Upload,
-	Trash2,
-	X,
-	Link,
+	Briefcase,
+	Globe,
+	ArrowRight,
+	Loader2
 } from "lucide-react";
-import { Alert, AlertDescription } from "./ui/alert";
+import { EnhancedSelect } from "@/components/ui/enhanced-select";
+import { cn } from "@/lib/utils";
 
 type ServiceType = Database["public"]["Enums"]["support_service_type"];
 
@@ -50,7 +33,7 @@ const SERVICE_OPTIONS = [
 	{ value: "shelter", label: "Shelter Services" },
 	{ value: "financial_assistance", label: "Financial Assistance" },
 	{ value: "other", label: "Other Support Services" },
-] as const;
+];
 
 const AVAILABILITY_OPTIONS = [
 	{ value: "24/7", label: "24/7 Emergency Support" },
@@ -59,7 +42,7 @@ const AVAILABILITY_OPTIONS = [
 	{ value: "weekends", label: "Weekends Only" },
 	{ value: "by_appointment", label: "By Appointment" },
 	{ value: "flexible", label: "Flexible Hours" },
-] as const;
+];
 
 const COVERAGE_OPTIONS = [
 	{ value: "5", label: "5 kilometers" },
@@ -67,41 +50,19 @@ const COVERAGE_OPTIONS = [
 	{ value: "25", label: "25 kilometers" },
 	{ value: "50", label: "50 kilometers" },
 	{ value: "100", label: "100 kilometers" },
-] as const;
+];
 
 export function AddSupportServiceForm({
 	onSuccess,
 }: {
-	onSuccess?: () => void;
+	onSuccess?: (newServiceId?: string) => void;
 }) {
 	const { toast } = useToast();
 	const dash = useDashboardData();
 	const profile = dash?.data?.profile;
 	const [loading, setLoading] = useState(false);
-	const [location, setLocation] = useState<{ lat: number; lng: number } | null>(
-		null
-	);
-	const [existingServices, setExistingServices] = useState<ServiceType[]>([]);
-	const [validationResult, setValidationResult] = useState<{
-		valid: boolean;
-		reason?: string;
-		suggestions?: string[];
-	} | null>(null);
-	const [previousDocuments, setPreviousDocuments] = useState<any[]>([]);
-	const [documents, setDocuments] = useState<
-		{
-			id: string;
-			title: string;
-			file: File | null;
-			note?: string;
-			uploaded: boolean;
-			url?: string;
-			isLinked?: boolean;
-			originalDocId?: string;
-		}[]
-	>([]);
-	const [isUploading, setIsUploading] = useState(false);
-	const [dragOverDocId, setDragOverDocId] = useState<string | null>(null);
+	const [location, setLocation] = useState<{ lat: number; lng: number } | null>(null);
+	
 	const [formData, setFormData] = useState({
 		name: "",
 		service_types: "" as ServiceType,
@@ -113,6 +74,7 @@ export function AddSupportServiceForm({
 		is_remote: false,
 	});
 
+	// Get location on mount
 	useEffect(() => {
 		if ("geolocation" in navigator) {
 			navigator.geolocation.getCurrentPosition(
@@ -122,242 +84,47 @@ export function AddSupportServiceForm({
 						lng: position.coords.longitude,
 					});
 				},
-				(error) => {
-					console.error("Error getting location:", error);
-					toast({
-						title: "Location Error",
-						description: "Unable to get your location. Some features may be limited.",
-						variant: "destructive",
-					});
-				}
+				(error) => console.error("Error getting location:", error)
 			);
 		}
-	}, [toast]);
+	}, []);
 
-	const loadExistingServices = async () => {
-		try {
-			const response = await fetch("/api/support-services");
-			if (response.ok) {
-				const services = await response.json();
-				const serviceTypes = services.map((service: any) => service.service_types);
-				setExistingServices(serviceTypes);
-			}
-		} catch (error) {
-			console.error("Error loading existing services:", error);
-		}
-	};
-
-	const loadPreviousDocuments = useCallback(async () => {
-		if (!profile?.id) return;
-
-		try {
-			const supabase = createClient();
-			const { data } = await supabase
-				.from("profiles")
-				.select("accreditation_files_metadata")
-				.eq("id", profile.id)
-				.single();
-
-			if (data?.accreditation_files_metadata) {
-				const docs = Array.isArray(data.accreditation_files_metadata)
-					? data.accreditation_files_metadata
-					: JSON.parse(data.accreditation_files_metadata);
-				setPreviousDocuments(docs || []);
-			}
-		} catch (error) {
-			console.error("Error loading previous documents:", error);
-		}
-	}, [profile?.id]);
-
-	const addDocument = () => {
-		const newDoc = {
-			id: `doc-${Date.now()}`,
-			title: "",
-			file: null,
-			note: "",
-			uploaded: false,
-		};
-		setDocuments([...documents, newDoc]);
-	};
-
-	const removeDocument = (id: string) => {
-		setDocuments(documents.filter((doc) => doc.id !== id));
-	};
-
-	const updateDocument = (id: string, field: string, value: any) => {
-		setDocuments(
-			documents.map((doc) => (doc.id === id ? { ...doc, [field]: value } : doc))
+	const isFormFilled = useMemo(() => {
+		const basicFilled = !!(
+			formData.name && 
+			formData.service_types && 
+			formData.phone_number && 
+			formData.availability
 		);
-	};
-
-	const linkPreviousDocument = (docId: string, originalDoc: any) => {
-		const linkedDoc = {
-			id: `linked-${Date.now()}`,
-			title: originalDoc.title,
-			file: null,
-			note: originalDoc.note || "",
-			uploaded: true,
-			url: originalDoc.url,
-			isLinked: true,
-			originalDocId: docId,
-		};
-		setDocuments([...documents, linkedDoc]);
-	};
-
-	const uploadDocument = async (doc: any) => {
-		if (!doc.file || !profile?.id) return null;
-
-		try {
-			const result = await fileUploadService.uploadFile({
-				userId: profile.id,
-				userType: profile.user_type || "professional",
-				serviceId: undefined, // Will be set after service creation
-				serviceType: formData.service_types,
-				fileType: "accreditation",
-				fileName: doc.file.name,
-				file: doc.file,
-			});
-			return result.url;
-		} catch (error) {
-			console.error("Error uploading document:", error);
-			throw error;
-		}
-	};
-
-	// Drag and drop handlers
-	const handleDragOver = (e: React.DragEvent, docId: string) => {
-		e.preventDefault();
-		setDragOverDocId(docId);
-	};
-
-	const handleDragLeave = (e: React.DragEvent) => {
-		e.preventDefault();
-		setDragOverDocId(null);
-	};
-
-	const handleDrop = (e: React.DragEvent, docId: string) => {
-		e.preventDefault();
-		setDragOverDocId(null);
-
-		const droppedFiles = Array.from(e.dataTransfer.files);
-		if (droppedFiles.length > 0) {
-			const droppedFile = droppedFiles[0];
-			// Validate file type
-			const allowedTypes = [
-				"application/pdf",
-				"image/jpeg",
-				"image/jpg",
-				"image/png",
-				"image/webp",
-				"application/msword",
-				"application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-			];
-
-			if (allowedTypes.includes(droppedFile.type)) {
-				updateDocument(docId, "file", droppedFile);
-				// Auto-fill title if empty
-				const doc = documents.find((d) => d.id === docId);
-				if (doc && !doc.title) {
-					updateDocument(docId, "title", droppedFile.name.replace(/\.[^/.]+$/, ""));
-				}
-			} else {
-				toast({
-					title: "Invalid File Type",
-					description: "Please select a valid file type (PDF, JPG, PNG, DOC, DOCX)",
-					variant: "destructive",
-				});
-			}
-		}
-	};
-
-	const validateService = useCallback(() => {
-		if (!formData.service_types || !profile?.user_type) return;
-
-		const validation = serviceValidationService.validateServiceCreation(
-			existingServices,
-			formData.service_types,
-			profile.user_type
-		);
-
-		setValidationResult(validation);
-	}, [formData.service_types, profile?.user_type, existingServices]);
-
-	// Load existing services for validation
-	useEffect(() => {
-		if (profile?.user_type === "ngo") {
-			loadExistingServices();
-		}
-	}, [profile?.user_type]);
-
-	// Load previous documents when service type changes
-	useEffect(() => {
-		if (formData.service_types && profile?.id) {
-			loadPreviousDocuments();
-		}
-	}, [formData.service_types, profile?.id, loadPreviousDocuments]);
-
-	// Validate service when service type changes
-	useEffect(() => {
-		if (formData.service_types && profile?.user_type) {
-			validateService();
-		}
-	}, [
-		formData.service_types,
-		profile?.user_type,
-		existingServices,
-		validateService,
-	]);
+		const coverageFilled = !!(formData.coverage_area_radius || formData.is_remote);
+		return basicFilled && coverageFilled;
+	}, [formData]);
 
 	const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
 		e.preventDefault();
-
-		// Check validation before submitting
-		if (validationResult && !validationResult.valid) {
-			toast({
-				title: "Service Validation Failed",
-				description: validationResult.reason,
-				variant: "destructive",
-			});
-			return;
-		}
-
+		if (!isFormFilled) return;
+		
 		setLoading(true);
 
-		// Validate that at least one service type is selected
-		const hasLocalServices =
-			formData.coverage_area_radius && formData.coverage_area_radius !== "";
-		const hasRemoteServices = formData.is_remote;
-
-		if (!hasLocalServices && !hasRemoteServices) {
-			toast({
-				title: "Service type required",
-				description: "Please select at least one service type (Local or Remote).",
-				variant: "destructive",
-			});
-			setLoading(false);
-			return;
-		}
-
-		// Validate location for local services
-		if (hasLocalServices && !location) {
-			toast({
-				title: "Location required",
-				description: "Please allow location access for local services.",
-				variant: "destructive",
-			});
-			setLoading(false);
-			return;
-		}
-
 		try {
-			// First create the service
+			// Prepare data
+			const hasLocalServices = formData.coverage_area_radius && formData.coverage_area_radius !== "";
+			
+			if (hasLocalServices && !location) {
+				toast({
+					title: "Location needed",
+					description: "Please enable location services for local coverage.",
+					variant: "destructive",
+				});
+				setLoading(false);
+				return;
+			}
+
 			const serviceData = {
 				...formData,
 				latitude: hasLocalServices ? location?.lat : null,
 				longitude: hasLocalServices ? location?.lng : null,
-				coverage_area_radius: hasLocalServices
-					? Number(formData.coverage_area_radius)
-					: null,
+				coverage_area_radius: hasLocalServices ? Number(formData.coverage_area_radius) : null,
 			};
 
 			const response = await fetch("/api/support-services", {
@@ -366,739 +133,256 @@ export function AddSupportServiceForm({
 				body: JSON.stringify(serviceData),
 			});
 
-			if (!response.ok) throw new Error("Failed to add service");
+			if (!response.ok) throw new Error("Failed to create service");
 
 			const newService = await response.json();
 
-			// Upload documents if any
-			if (documents.length > 0) {
-				setIsUploading(true);
-				const uploadedDocs = [];
-
-				for (const doc of documents) {
-					if (doc.isLinked) {
-						// Link existing document
-						uploadedDocs.push({
-							title: doc.title,
-							note: doc.note,
-							url: doc.url,
-							uploaded: true,
-							serviceId: newService.id,
-							serviceType: formData.service_types,
-						});
-					} else if (doc.file) {
-						// Upload new document
-						const url = await uploadDocument(doc);
-						if (url) {
-							uploadedDocs.push({
-								title: doc.title,
-								note: doc.note,
-								url: url,
-								uploaded: true,
-								serviceId: newService.id,
-								serviceType: formData.service_types,
-							});
-						}
-					}
-				}
-
-				// Update service with documents
-				if (uploadedDocs.length > 0) {
-					const updateResponse = await fetch(
-						`/api/support-services/${newService.id}`,
-						{
-							method: "PATCH",
-							headers: { "Content-Type": "application/json" },
-							body: JSON.stringify({
-								accreditation_files_metadata: uploadedDocs,
-							}),
-						}
-					);
-
-					if (!updateResponse.ok) {
-						console.error("Failed to update service with documents");
-					}
-				}
-			}
-
 			toast({
-				title: "Success",
-				description:
-					"Support service has been successfully added with accreditation documents.",
+				title: "Service Created",
+				description: "Now, please upload your verification documents.",
 			});
 
-			onSuccess?.();
+			// Pass the new ID so parent can open the upload modal
+			onSuccess?.(newService.id);
+
 		} catch (error) {
+			console.error("Error creating service:", error);
 			toast({
 				title: "Error",
-				description: "Failed to add support service. Please try again.",
+				description: "Failed to create service. Please try again.",
 				variant: "destructive",
 			});
 		} finally {
 			setLoading(false);
-			setIsUploading(false);
 		}
 	};
 
 	return (
-		<>
-			<style jsx>{`
-				.slider::-webkit-slider-thumb {
-					appearance: none;
-					height: 20px;
-					width: 20px;
-					border-radius: 50%;
-					background: #3b82f6;
-					cursor: pointer;
-					border: 2px solid #ffffff;
-					box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-				}
-				.slider::-moz-range-thumb {
-					height: 20px;
-					width: 20px;
-					border-radius: 50%;
-					background: #3b82f6;
-					cursor: pointer;
-					border: 2px solid #ffffff;
-					box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-				}
-			`}</style>
-			<div className="flex flex-col h-[90vh] bg-white overflow-hidden shadow-2xl rounded-[32px] border border-neutral-100">
-				{/* Modal Header */}
-				<div className="px-6 py-5 border-b bg-neutral-50 flex items-center justify-between shrink-0">
-					<div>
-						<h2 className="text-xl md:text-2xl font-black text-sauti-dark flex items-center gap-2">
-							Register Support Service
-						</h2>
-						<p className="text-xs text-neutral-500 font-medium tracking-wide">
-							Professional Verification & Accreditation
-						</p>
-					</div>
-					{onSuccess && (
-						<Button
-							variant="ghost"
-							size="sm"
-							onClick={() => onSuccess()}
-							className="rounded-full h-10 w-10 p-0 hover:bg-neutral-200 transition-colors"
-						>
-							✕
-						</Button>
-					)}
+		<div className="flex flex-col h-full bg-white sm:rounded-3xl overflow-hidden">
+			{/* Header */}
+			<div className="px-6 py-5 border-b border-neutral-100 flex items-center justify-between bg-white sticky top-0 z-10">
+				<div>
+					<h2 className="text-xl font-bold text-neutral-900 tracking-tight">
+						Add Support Service
+					</h2>
+					<p className="text-sm text-neutral-500 font-medium">
+						Step 1 of 2: Service Details
+					</p>
 				</div>
+			</div>
 
-				<div className="flex-1 overflow-y-auto p-4 sm:p-8 bg-neutral-50/20">
-					<form onSubmit={handleSubmit} className="space-y-10 max-w-4xl mx-auto pb-24">
-						{/* Basic Information */}
-						<div className="space-y-4">
-							<div className="flex items-center gap-2 mb-3">
-								<Building2 className="h-4 w-4 text-blue-600" />
-								<h3 className="text-base font-semibold text-gray-900">
-									Basic Information
-								</h3>
-							</div>
-
-							<div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-								<div className="space-y-2">
-									<Label htmlFor="name" className="text-sm font-medium text-gray-700">
-										Organization / Service Name *
-									</Label>
-									<Input
-										id="name"
-										type="text"
-										placeholder="e.g., SafeCare Counseling Center"
-										value={formData.name}
-										onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-										required
-										className="h-10"
-									/>
-								</div>
-
-								<div className="space-y-2">
-									<Label
-										htmlFor="service_types"
-										className="text-sm font-medium text-gray-700"
-									>
-										Service Type *
-									</Label>
-									<select
-										id="service_types"
-										value={formData.service_types}
-										onChange={(e) =>
-											setFormData({
-												...formData,
-												service_types: e.target.value as ServiceType,
-											})
-										}
-										required
-										className="w-full h-10 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent relative z-10"
-									>
-										<option value="">Select a service type</option>
-										{SERVICE_OPTIONS.map(({ value, label }) => (
-											<option key={value} value={value}>
-												{label}
-											</option>
-										))}
-									</select>
-								</div>
-							</div>
+			<div className="flex-1 overflow-y-auto">
+				<form id="add-service-form" onSubmit={handleSubmit} className="max-w-2xl mx-auto p-6 space-y-8">
+					
+					{/* Organization Info */}
+					<div className="space-y-4">
+						<div className="flex items-center gap-2 mb-2">
+							<Building2 className="h-5 w-5 text-sauti-teal" />
+							<h3 className="text-lg font-bold text-neutral-900">Organization Details</h3>
 						</div>
-
-						{/* Contact Information */}
+						
 						<div className="space-y-4">
-							<div className="flex items-center gap-2 mb-3">
-								<Phone className="h-4 w-4 text-blue-600" />
-								<h3 className="text-base font-semibold text-gray-900">
-									Contact Information
-								</h3>
-							</div>
-
-							<div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-								<div className="space-y-2">
-									<Label
-										htmlFor="phone_number"
-										className="text-sm font-medium text-gray-700"
-									>
-										Phone Number *
-									</Label>
-									<Input
-										id="phone_number"
-										type="tel"
-										placeholder="+254 700 000 000"
-										value={formData.phone_number}
-										onChange={(e) =>
-											setFormData({ ...formData, phone_number: e.target.value })
-										}
-										required
-										className="h-10"
-									/>
-								</div>
-
-								<div className="space-y-2">
-									<Label htmlFor="email" className="text-sm font-medium text-gray-700">
-										Email Address
-									</Label>
-									<Input
-										id="email"
-										type="email"
-										placeholder="contact@yourorganization.org"
-										value={formData.email}
-										onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-										className="h-10"
-									/>
-								</div>
-
-								<div className="space-y-2 md:col-span-2">
-									<Label htmlFor="website" className="text-sm font-medium text-gray-700">
-										Website (Optional)
-									</Label>
-									<Input
-										id="website"
-										type="url"
-										placeholder="https://www.yourorganization.org"
-										value={formData.website}
-										onChange={(e) =>
-											setFormData({ ...formData, website: e.target.value })
-										}
-										className="h-10"
-									/>
-								</div>
-							</div>
-						</div>
-
-						{/* Service Availability */}
-						<div className="space-y-4">
-							<div className="flex items-center gap-2 mb-3">
-								<Clock className="h-4 w-4 text-blue-600" />
-								<h3 className="text-base font-semibold text-gray-900">
-									Service Availability
-								</h3>
-							</div>
-
-							<div className="space-y-2">
-								<Label
-									htmlFor="availability"
-									className="text-sm font-medium text-gray-700"
-								>
-									When are you typically available? *
+							<div className="space-y-1.5">
+								<Label htmlFor="name" className="text-sm font-semibold text-neutral-700">
+									Organization Name <span className="text-red-500">*</span>
 								</Label>
-								<select
-									id="availability"
-									value={formData.availability}
-									onChange={(e) =>
-										setFormData({ ...formData, availability: e.target.value })
-									}
-									required
-									className="w-full h-10 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent relative z-10"
-								>
-									<option value="">Select your availability</option>
-									{AVAILABILITY_OPTIONS.map(({ value, label }) => (
-										<option key={value} value={value}>
-											{label}
-										</option>
-									))}
-								</select>
+								<Input
+									id="name"
+									placeholder="e.g. Hope Counseling Center"
+									value={formData.name}
+									onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+									className="h-11 rounded-xl border-neutral-200 focus:border-sauti-teal focus:ring-sauti-teal/20"
+								/>
+							</div>
+
+							<div className="space-y-1.5">
+								<Label className="text-sm font-semibold text-neutral-700">
+									Service Type <span className="text-red-500">*</span>
+								</Label>
+								<EnhancedSelect
+									options={SERVICE_OPTIONS}
+									value={formData.service_types}
+									onChange={(val) => setFormData({ ...formData, service_types: val as ServiceType })}
+									placeholder="Select service type..."
+								/>
 							</div>
 						</div>
+					</div>
 
-						{/* Service Coverage */}
-						<div className="space-y-4">
-							<div className="flex items-center gap-2 mb-3">
-								<MapPin className="h-4 w-4 text-blue-600" />
-								<h3 className="text-base font-semibold text-gray-900">
-									Service Coverage
-								</h3>
+					{/* Contact Info */}
+					<div className="space-y-4">
+						<div className="flex items-center gap-2 mb-2">
+							<Phone className="h-5 w-5 text-sauti-teal" />
+							<h3 className="text-lg font-bold text-neutral-900">Contact Information</h3>
+						</div>
+
+						<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+							<div className="space-y-1.5">
+								<Label htmlFor="phone" className="text-sm font-semibold text-neutral-700">Phone Number <span className="text-red-500">*</span></Label>
+								<Input
+									id="phone"
+									type="tel"
+									placeholder="+254..."
+									value={formData.phone_number}
+									onChange={(e) => setFormData({ ...formData, phone_number: e.target.value })}
+									className="h-11 rounded-xl border-neutral-200 focus:border-sauti-teal focus:ring-sauti-teal/20"
+								/>
 							</div>
+							<div className="space-y-1.5">
+								<Label htmlFor="email" className="text-sm font-semibold text-neutral-700">Email Address</Label>
+								<Input
+									id="email"
+									type="email"
+									placeholder="contact@org.com"
+									value={formData.email}
+									onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+									className="h-11 rounded-xl border-neutral-200 focus:border-sauti-teal focus:ring-sauti-teal/20"
+								/>
+							</div>
+						</div>
+						<div className="space-y-1.5">
+							<Label htmlFor="website" className="text-sm font-semibold text-neutral-700">Website</Label>
+							<Input
+								id="website"
+								placeholder="https://..."
+								value={formData.website}
+								onChange={(e) => setFormData({ ...formData, website: e.target.value })}
+								className="h-11 rounded-xl border-neutral-200 focus:border-sauti-teal focus:ring-sauti-teal/20"
+							/>
+						</div>
+					</div>
 
-							{/* Service Coverage Options */}
-							<div className="space-y-3">
-								<Label className="text-sm font-medium text-gray-700">
-									How do you provide your services? (Select all that apply)
-								</Label>
+					{/* Availability & Coverage */}
+					<div className="space-y-4">
+						<div className="flex items-center gap-2 mb-2">
+							<Globe className="h-5 w-5 text-sauti-teal" />
+							<h3 className="text-lg font-bold text-neutral-900">Availability & Coverage</h3>
+						</div>
 
-								{/* Coverage Options */}
-								<div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-									{/* Local Services Option */}
-									<div
-										className={`relative p-4 border-2 rounded-lg cursor-pointer transition-all duration-200 ${
-											formData.coverage_area_radius && formData.coverage_area_radius !== ""
-												? "border-blue-500 bg-blue-50"
-												: "border-gray-200 hover:border-gray-300"
-										}`}
-										onClick={() => {
-											if (
-												formData.coverage_area_radius &&
-												formData.coverage_area_radius !== ""
-											) {
-												// If local services are enabled, disable them
-												setFormData({ ...formData, coverage_area_radius: "" });
-											} else {
-												// If local services are disabled, enable them with default radius
-												setFormData({ ...formData, coverage_area_radius: "5" });
-											}
-										}}
-									>
-										<div className="flex items-start gap-3">
-											<div
-												className={`w-4 h-4 rounded-full border-2 mt-0.5 ${
-													formData.coverage_area_radius &&
-													formData.coverage_area_radius !== ""
-														? "border-blue-500 bg-blue-500"
-														: "border-gray-300"
-												}`}
-											>
-												{formData.coverage_area_radius &&
-													formData.coverage_area_radius !== "" && (
-														<div className="w-2 h-2 bg-white rounded-full m-0.5" />
-													)}
-											</div>
-											<div className="flex-1">
-												<div className="flex items-center gap-2 mb-1">
-													<MapPin className="h-4 w-4 text-gray-600" />
-													<span className="text-sm font-medium text-gray-900">
-														Local Services
-													</span>
-												</div>
-												<p className="text-xs text-gray-600">
-													I provide in-person services within a specific area
-												</p>
-											</div>
-										</div>
+						<div className="space-y-1.5">
+							<Label className="text-sm font-semibold text-neutral-700">
+								Typical Availability <span className="text-red-500">*</span>
+							</Label>
+							<EnhancedSelect
+								options={AVAILABILITY_OPTIONS}
+								value={formData.availability}
+								onChange={(val) => setFormData({ ...formData, availability: val })}
+								placeholder="Select availability..."
+							/>
+						</div>
+
+						<div className="space-y-3 pt-2">
+							<Label className="text-sm font-semibold text-neutral-700">Service Reach <span className="text-red-500">*</span></Label>
+							<div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+								{/* Remote Option */}
+								<div 
+									onClick={() => setFormData({ ...formData, is_remote: !formData.is_remote })}
+									className={cn(
+										"cursor-pointer p-4 rounded-xl border-2 transition-all flex items-start gap-3",
+										formData.is_remote 
+											? "border-sauti-teal bg-sauti-teal/5 ring-1 ring-sauti-teal" 
+											: "border-neutral-100 bg-neutral-50 hover:border-neutral-200"
+									)}
+								>
+									<div className={cn("mt-0.5 h-5 w-5 rounded-full border flex items-center justify-center shrink-0", 
+										formData.is_remote ? "border-sauti-teal bg-sauti-teal" : "border-neutral-300 bg-white"
+									)}>
+										{formData.is_remote && <CheckCircle className="h-3.5 w-3.5 text-white" />}
 									</div>
-
-									{/* Remote Services Option */}
-									<div
-										className={`relative p-4 border-2 rounded-lg cursor-pointer transition-all duration-200 ${
-											formData.is_remote
-												? "border-green-500 bg-green-50"
-												: "border-gray-200 hover:border-gray-300"
-										}`}
-										onClick={() =>
-											setFormData({ ...formData, is_remote: !formData.is_remote })
-										}
-									>
-										<div className="flex items-start gap-3">
-											<div
-												className={`w-4 h-4 rounded-full border-2 mt-0.5 ${
-													formData.is_remote
-														? "border-green-500 bg-green-500"
-														: "border-gray-300"
-												}`}
-											>
-												{formData.is_remote && (
-													<div className="w-2 h-2 bg-white rounded-full m-0.5" />
-												)}
-											</div>
-											<div className="flex-1">
-												<div className="flex items-center gap-2 mb-1">
-													<Globe2 className="h-4 w-4 text-gray-600" />
-													<span className="text-sm font-medium text-gray-900">
-														Remote Services
-													</span>
-												</div>
-												<p className="text-xs text-gray-600">
-													I provide services online, by phone, or video calls
-												</p>
-											</div>
-										</div>
+									<div>
+										<span className="block font-semibold text-neutral-900">Remote Services</span>
+										<span className="text-xs text-neutral-500">Phone, video, or online support available anywhere.</span>
 									</div>
 								</div>
 
-								{/* Local Services Configuration */}
-								{formData.coverage_area_radius &&
-									formData.coverage_area_radius !== "" && (
-										<div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
-											<div className="space-y-3">
-												<div className="flex items-center gap-2 mb-2">
-													<MapPin className="h-4 w-4 text-blue-600" />
-													<span className="text-sm font-medium text-blue-900">
-														Service Coverage Area
-													</span>
-												</div>
-
-												{/* Distance Slider */}
-												<div className="space-y-2">
-													<Label className="text-sm font-medium text-gray-700">
-														Maximum Travel Distance: {formData.coverage_area_radius || 5} km
-													</Label>
-													<input
-														type="range"
-														min="1"
-														max="100"
-														value={formData.coverage_area_radius || 5}
-														onChange={(e) =>
-															setFormData({
-																...formData,
-																coverage_area_radius: e.target.value,
-															})
-														}
-														className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
-														style={{
-															background: `linear-gradient(to right, #3b82f6 0%, #3b82f6 ${
-																((Number(formData.coverage_area_radius) || 5) / 100) * 100
-															}%, #e5e7eb ${
-																((Number(formData.coverage_area_radius) || 5) / 100) * 100
-															}%, #e5e7eb 100%)`,
-														}}
-													/>
-													<div className="flex justify-between text-xs text-gray-500">
-														<span>1 km</span>
-														<span>100 km</span>
-													</div>
-												</div>
-
-												{/* Quick Distance Buttons */}
-												<div className="flex flex-wrap gap-2">
-													{[5, 10, 25, 50].map((distance) => (
-														<button
-															key={distance}
-															type="button"
-															onClick={() =>
-																setFormData({
-																	...formData,
-																	coverage_area_radius: distance.toString(),
-																})
-															}
-															className={`px-3 py-1 text-xs rounded-full border transition-colors ${
-																Number(formData.coverage_area_radius) === distance
-																	? "bg-blue-500 text-white border-blue-500"
-																	: "bg-white text-gray-600 border-gray-300 hover:border-blue-300"
-															}`}
-														>
-															{distance} km
-														</button>
-													))}
-												</div>
-
-												<p className="text-xs text-blue-700">
-													Survivors within this distance will be able to find your service
-												</p>
-											</div>
-										</div>
+								{/* In-Person Option */}
+								<div 
+									onClick={() => setFormData({ ...formData, coverage_area_radius: formData.coverage_area_radius ? "" : "5" })}
+									className={cn(
+										"cursor-pointer p-4 rounded-xl border-2 transition-all flex items-start gap-3",
+										formData.coverage_area_radius 
+											? "border-sauti-teal bg-sauti-teal/5 ring-1 ring-sauti-teal" 
+											: "border-neutral-100 bg-neutral-50 hover:border-neutral-200"
 									)}
-
-								{/* Combined Services Info */}
-								{formData.is_remote &&
-									formData.coverage_area_radius &&
-									formData.coverage_area_radius !== "" && (
-										<div className="bg-gradient-to-r from-blue-50 to-green-50 rounded-lg p-4 border border-blue-200">
-											<div className="flex items-center gap-2 mb-2">
-												<div className="flex items-center gap-1">
-													<MapPin className="h-4 w-4 text-blue-600" />
-													<Globe2 className="h-4 w-4 text-green-600" />
-												</div>
-												<span className="text-sm font-medium text-gray-900">
-													Hybrid Service Provider
-												</span>
-											</div>
-											<p className="text-xs text-gray-600">
-												You offer both local services within {formData.coverage_area_radius}{" "}
-												km and remote services worldwide.
-											</p>
-										</div>
-									)}
-
-								{/* Remote Services Configuration */}
-								{formData.is_remote && (
-									<div className="bg-green-50 rounded-lg p-4 border border-green-200">
-										<div className="space-y-3">
-											<div className="flex items-center gap-2 mb-2">
-												<Globe2 className="h-4 w-4 text-green-600" />
-												<span className="text-sm font-medium text-green-900">
-													Remote Service Options
-												</span>
-											</div>
-
-											<div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-												{[
-													{ icon: Phone, label: "Phone Calls", desc: "Voice consultations" },
-													{ icon: Video, label: "Video Calls", desc: "Face-to-face online" },
-													{
-														icon: MessageCircle,
-														label: "Chat Support",
-														desc: "Text-based help",
-													},
-													{
-														icon: Mail,
-														label: "Email Support",
-														desc: "Written communication",
-													},
-												].map(({ icon: Icon, label, desc }) => (
-													<div
-														key={label}
-														className="flex items-center gap-2 p-2 bg-white rounded border border-green-200"
-													>
-														<Icon className="h-4 w-4 text-green-600" />
-														<div>
-															<span className="text-sm font-medium text-gray-900">
-																{label}
-															</span>
-															<p className="text-xs text-gray-600">{desc}</p>
-														</div>
-													</div>
-												))}
-											</div>
-
-											<p className="text-xs text-green-700">
-												Your service will be available to survivors worldwide through remote
-												channels
-											</p>
-										</div>
+								>
+									<div className={cn("mt-0.5 h-5 w-5 rounded-full border flex items-center justify-center shrink-0", 
+										formData.coverage_area_radius ? "border-sauti-teal bg-sauti-teal" : "border-neutral-300 bg-white"
+									)}>
+										{formData.coverage_area_radius && <CheckCircle className="h-3.5 w-3.5 text-white" />}
 									</div>
-								)}
-							</div>
-						</div>
-
-						{/* Accreditation Documents */}
-						<div className="space-y-4">
-							<div className="flex items-center gap-2 mb-3">
-								<FileText className="h-4 w-4 text-blue-600" />
-								<h3 className="text-base font-semibold text-gray-900">
-									Accreditation Documents
-								</h3>
+									<div>
+										<span className="block font-semibold text-neutral-900">In-Person Services</span>
+										<span className="text-xs text-neutral-500">Physical support within a specific radius.</span>
+									</div>
+								</div>
 							</div>
 
-							{/* Previous Documents Section */}
-							{previousDocuments.length > 0 && (
-								<div className="space-y-3">
-									<Label className="text-sm font-medium text-gray-700">
-										Link Previous Documents
-									</Label>
-									<p className="text-xs text-gray-600">
-										You can link previously uploaded documents that are relevant to this
-										service type.
-									</p>
-									<div className="grid gap-2 max-h-32 overflow-y-auto">
-										{previousDocuments.map((doc, index) => (
-											<div
-												key={index}
-												className="flex items-center justify-between p-2 bg-gray-50 rounded border"
-											>
-												<div className="flex items-center gap-2">
-													<FileText className="h-4 w-4 text-gray-600" />
-													<div>
-														<p className="text-sm font-medium">{doc.title}</p>
-														<p className="text-xs text-gray-500">
-															{doc.serviceType ? doc.serviceType.replace("_", " ") : "General"}
-														</p>
-													</div>
-												</div>
-												<Button
+							{/* Radius Slider if In-Person */}
+							{formData.coverage_area_radius && (
+								<div className="pt-2 animate-in fade-in slide-in-from-top-2">
+									<div className="bg-neutral-50 rounded-xl p-4 border border-neutral-100 space-y-3">
+										<div className="flex justify-between items-center">
+											<Label className="text-xs font-semibold uppercase text-neutral-500">Coverage Radius</Label>
+											<span className="text-sm font-bold text-sauti-teal">{formData.coverage_area_radius} km</span>
+										</div>
+										<input
+											type="range"
+											min="1"
+											max="100"
+											value={Number(formData.coverage_area_radius) || 5}
+											onChange={(e) => setFormData({ ...formData, coverage_area_radius: e.target.value })}
+											className="w-full h-2 bg-neutral-200 rounded-lg appearance-none cursor-pointer accent-sauti-teal"
+										/>
+										<div className="flex gap-2 flex-wrap">
+											{[5, 10, 25, 50, 100].map(val => (
+												<button
+													key={val}
 													type="button"
-													variant="outline"
-													size="sm"
-													onClick={() => linkPreviousDocument(`prev-${index}`, doc)}
-													className="gap-1"
+													onClick={() => setFormData({ ...formData, coverage_area_radius: val.toString() })}
+													className={cn(
+														"px-2.5 py-1 text-xs rounded-lg font-medium transition-colors border",
+														Number(formData.coverage_area_radius) === val
+															? "bg-sauti-teal text-white border-sauti-teal"
+															: "bg-white text-neutral-600 border-neutral-200 hover:border-neutral-300"
+													)}
 												>
-													<Link className="h-3 w-3" />
-													Link
-												</Button>
-											</div>
-										))}
+													{val}km
+												</button>
+											))}
+										</div>
 									</div>
 								</div>
 							)}
-
-							{/* Document Upload Section */}
-							<div className="space-y-3">
-								<div className="flex items-center justify-between">
-									<Label className="text-sm font-medium text-gray-700">
-										Upload New Documents
-									</Label>
-									<Button
-										type="button"
-										variant="outline"
-										size="sm"
-										onClick={addDocument}
-										className="gap-1"
-									>
-										<Plus className="h-3 w-3" />
-										Add Document
-									</Button>
-								</div>
-
-								{documents.length === 0 ? (
-									<div className="text-center py-6 bg-gray-50 rounded-lg border border-dashed">
-										<FileText className="h-8 w-8 text-gray-400 mx-auto mb-2" />
-										<p className="text-sm text-gray-500">
-											No documents added yet. Click "Add Document" to upload accreditation
-											files.
-										</p>
-									</div>
-								) : (
-									<div className="space-y-3">
-										{documents.map((doc) => (
-											<div key={doc.id} className="p-3 bg-white rounded-lg border">
-												<div className="space-y-3">
-													<div className="flex items-center justify-between">
-														<div className="flex items-center gap-2">
-															<FileText className="h-4 w-4 text-gray-600" />
-															{doc.isLinked && (
-																<Badge variant="outline" className="text-xs">
-																	<Link className="h-3 w-3 mr-1" />
-																	Linked
-																</Badge>
-															)}
-														</div>
-														<Button
-															type="button"
-															variant="ghost"
-															size="sm"
-															onClick={() => removeDocument(doc.id)}
-															className="text-red-600 hover:text-red-700"
-														>
-															<X className="h-4 w-4" />
-														</Button>
-													</div>
-
-													<div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-														<Input
-															placeholder="Document title (e.g., License, Certificate)"
-															value={doc.title}
-															onChange={(e) => updateDocument(doc.id, "title", e.target.value)}
-															className="h-9"
-														/>
-														<div className="flex items-center gap-2">
-															{/* Drag and Drop File Input */}
-															<div
-																className={`flex-1 border-2 border-dashed rounded-md p-3 text-center transition-colors cursor-pointer ${
-																	dragOverDocId === doc.id
-																		? "border-sauti-orange bg-orange-50"
-																		: doc.file
-																		? "border-green-300 bg-green-50"
-																		: "border-gray-300 hover:border-gray-400"
-																}`}
-																onDragOver={(e) => handleDragOver(e, doc.id)}
-																onDragLeave={handleDragLeave}
-																onDrop={(e) => handleDrop(e, doc.id)}
-																onClick={(e) => {
-																	e.preventDefault();
-																	document.getElementById(`file-upload-${doc.id}`)?.click();
-																}}
-																onTouchEnd={(e) => {
-																	e.preventDefault();
-																	document.getElementById(`file-upload-${doc.id}`)?.click();
-																}}
-															>
-																{doc.file ? (
-																	<div className="space-y-1">
-																		<FileText className="h-5 w-5 text-green-600 mx-auto" />
-																		<p className="text-xs font-medium text-green-800 truncate">
-																			{doc.file.name}
-																		</p>
-																		<p className="text-xs text-green-600">
-																			{(doc.file.size / 1024 / 1024).toFixed(2)} MB
-																		</p>
-																	</div>
-																) : (
-																	<div className="space-y-1">
-																		<Upload className="h-5 w-5 text-gray-400 mx-auto" />
-																		<p className="text-xs text-gray-600">
-																			<span className="font-medium text-sauti-orange">Click</span>{" "}
-																			or drag file
-																		</p>
-																		<p className="text-xs text-gray-500">
-																			PDF, JPG, PNG, DOC, DOCX
-																		</p>
-																	</div>
-																)}
-																<input
-																	type="file"
-																	onChange={(e) =>
-																		updateDocument(doc.id, "file", e.target.files?.[0] || null)
-																	}
-																	accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx"
-																	className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-																	disabled={doc.isLinked}
-																/>
-															</div>
-															{doc.uploaded && (
-																<Badge
-																	variant="outline"
-																	className="text-green-600 border-green-200"
-																>
-																	<CheckCircle className="h-3 w-3 mr-1" />
-																	Uploaded
-																</Badge>
-															)}
-														</div>
-													</div>
-
-													<Textarea
-														placeholder="Notes (optional)"
-														value={doc.note || ""}
-														onChange={(e) => updateDocument(doc.id, "note", e.target.value)}
-														className="min-h-[60px] resize-none"
-													/>
-												</div>
-											</div>
-										))}
-									</div>
-								)}
-							</div>
 						</div>
+					</div>
+				</form>
+			</div>
 
-						{/* Submit Button */}
-						<div className="shrink-0 pt-4 pb-6 bg-white border-t z-40">
-				<div className="max-w-4xl mx-auto px-4 md:px-8">
-					<Button
-						type="submit"
-						className="w-full bg-sauti-teal hover:bg-sauti-teal/90 text-white py-4 text-base sm:text-lg font-black rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-300"
-						disabled={loading || isUploading}
-					>
-						{loading || isUploading ? (
-							<>
-								<Loader2 className="mr-2 h-5 w-5 animate-spin" />
-								{isUploading ? "Uploading Documents..." : "Registering Service..."}
-							</>
-						) : (
-							"Register Support Service"
-						)}
-					</Button>
-				</div>
+			{/* Sticky Footer */}
+			<div className="p-6 border-t border-neutral-100 bg-white shrink-0">
+				<Button
+					form="add-service-form"
+					type="submit"
+					disabled={!isFormFilled || loading}
+					className={cn(
+						"w-full h-12 text-base font-bold rounded-xl shadow-md transition-all",
+						!isFormFilled || loading
+							? "bg-neutral-200 text-neutral-400 cursor-not-allowed shadow-none"
+							: "bg-sauti-teal hover:bg-sauti-dark text-white shadow-sauti-teal/20"
+					)}
+				>
+					{loading ? (
+						<>
+							<Loader2 className="mr-2 h-5 w-5 animate-spin" />
+							Creating Service...
+						</>
+					) : (
+						<>
+							Create & Continue <ArrowRight className="ml-2 h-5 w-5" />
+						</>
+					)}
+				</Button>
 			</div>
-					</form>
-				</div>
-			</div>
-		</>
+		</div>
 	);
 }

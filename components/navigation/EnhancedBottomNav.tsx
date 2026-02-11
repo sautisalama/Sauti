@@ -104,23 +104,17 @@ export function EnhancedBottomNav({ forceShow = false, className }: EnhancedBott
   const getNavItems = (): NavItem[] => {
     if (!isDashboard) return [];
 
-    // All users get the same structure as requested
-    // "learn, reports, home and chats"
-    
-    // Note: User requested order: Learn, Reports, Home, Chats.
-    // Usually Home is first or center. 
-    // Let's follow: Home, Reports, Chats, Learn (Resources) to be more standard, 
-    // OR exactly as requested: Learn, Reports, Home, Chats.
-    
-    // Let's try to balance it.
-    // 1. Home (Overview)
-    // 2. Reports (Cases)
-    // 3. Chats
-    // 4. Learn (Resources)
+    const userRole = dash?.data?.userType || user?.profile?.user_type;
+    const isProfessional = userRole === 'professional' || userRole === 'ngo';
+
+    // Professional: Home, Cases, Chats, Resources
+    // Survivor: Home, Reports, Chats, Resources
     
     return [
       { id: "home", label: "Home", icon: LayoutDashboard, href: "/dashboard" },
-      { id: "reports", label: "Reports", icon: ClipboardList, href: "/dashboard/reports", badge: casesCount > 0 ? casesCount : undefined },
+      isProfessional 
+        ? { id: "cases", label: "Cases", icon: ClipboardList, href: "/dashboard/cases", badge: casesCount > 0 ? casesCount : undefined }
+        : { id: "reports", label: "Reports", icon: ClipboardList, href: "/dashboard/reports" },
       { id: "chat", label: "Chats", icon: MessageCircle, href: "/dashboard/chat", badge: unreadMessages > 0 ? unreadMessages : undefined },
       { id: "learn", label: "Learn", icon: FileText, href: "/dashboard/resources" },
     ];

@@ -9,6 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import { AnonymousModeToggle } from "@/components/chat/AnonymousModeToggle";
 import { MobileVerificationSection } from "./mobile-verification-section";
 import { SupportServicesManager } from "./support-services-manager";
+import { PrivacySecuritySettings } from "./privacy-security-settings";
 import { signOut } from "@/app/(auth)/actions/auth";
 import { createClient } from "@/utils/supabase/client";
 import { useDashboardData } from "@/components/providers/DashboardDataProvider";
@@ -160,290 +161,267 @@ export default function ProfilePage() {
 	}
 
 	return (
-		<div className="min-h-screen bg-serene-neutral-50/50 pb-20 pt-2"> {/* Reduced top padding, softer bg */}
-			{/* Breadcrumb Header */}
-			<div className="px-4 md:px-8 py-4"> {/* Compact header padding */}
-				<SereneBreadcrumb items={[
-					{ label: 'Profile', href: '/dashboard/profile' },
-					{ label: activeSection.charAt(0).toUpperCase() + activeSection.slice(1) }
-				]} />
-				<SereneSectionHeader 
-					title="Profile & Settings" 
-					description="Manage your account, privacy, and preferences"
-					className="mt-2 text-2xl" // Smaller margin
-				/>
+		<div className="h-screen flex flex-col bg-serene-neutral-50/30 overflow-hidden">
+			{/* Fixed Header section */}
+			<div className="flex-none px-4 md:px-8 py-3 md:py-4 bg-serene-neutral-50/80 backdrop-blur-md border-b border-serene-neutral-200/50 z-20">
+				<div className="max-w-6xl mx-auto w-full">
+					<SereneBreadcrumb items={[
+						{ label: 'Profile', href: '/dashboard/profile' },
+						{ label: activeSection.charAt(0).toUpperCase() + activeSection.slice(1) }
+					]} />
+					<h1 className="text-xl font-bold text-serene-neutral-900 mt-1">Profile & Settings</h1>
+				</div>
 			</div>
 
-			<div className="max-w-7xl mx-auto px-4 md:px-8 grid grid-cols-1 lg:grid-cols-12 gap-8">
-				{/* Sidebar Menu - Hidden on mobile, shows as horizontal tabs */}
-				<div className="hidden lg:block lg:col-span-3 space-y-2 sticky top-6 h-fit">
-					<div className="bg-white/80 backdrop-blur-xl rounded-2xl p-2 border border-serene-neutral-200/60 shadow-sm">
-					{navItems.map(item => (
-						<button
-							key={item.id}
-							onClick={() => router.push(`/dashboard/profile?section=${item.id}`)}
-							className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 ${
-								activeSection === item.id 
-									? "bg-serene-blue-50 text-serene-blue-700 font-bold shadow-sm" 
-									: "text-serene-neutral-600 hover:bg-serene-neutral-50 hover:text-serene-blue-600"
-							}`}
-						>
-							<item.icon className={`h-4.5 w-4.5 ${activeSection === item.id ? "text-serene-blue-600" : "text-serene-neutral-400"}`} />
-							<span className="text-sm tracking-wide">{item.label}</span>
-							{activeSection === item.id && (
-								<div className="ml-auto w-1 h-1 rounded-full bg-serene-blue-500" />
-							)}
-						</button>
-					))}
-					</div>
+			{/* Main Layout - Fixed height container with scrollable content area */}
+			<div className="flex-1 min-h-0 w-full">
+				<div className="h-full max-w-6xl mx-auto px-4 md:px-8 grid grid-cols-1 lg:grid-cols-12 gap-6">
 					
-					<div className="pt-2">
-						<button 
-							onClick={() => signOut()}
-							className="w-full flex items-center gap-3 px-6 py-3.5 rounded-2xl text-red-600 hover:bg-red-50/80 border border-transparent hover:border-red-100 transition-all font-medium text-sm"
-						>
-							<LogOut className="h-4.5 w-4.5" />
-							<span>Sign Out</span>
-						</button>
-					</div>
-				</div>
-
-	
-
-				{/* Mobile Navigation Tabs */}
-				<div className="lg:hidden col-span-1 -mt-2 mb-4">
-					<div className="flex overflow-x-auto gap-2 pb-2 scrollbar-hide">
-						{navItems.map(item => (
-							<button
-								key={item.id}
-								onClick={() => router.push(`/dashboard/profile?section=${item.id}`)}
-								className={`flex-shrink-0 flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all whitespace-nowrap ${
-									activeSection === item.id 
-										? "bg-sauti-teal text-white shadow-md" 
-										: "bg-white text-serene-neutral-600 border border-serene-neutral-200"
-								}`}
-							>
-								<item.icon className="h-4 w-4" />
-								{item.label}
-							</button>
-						))}
-					</div>
-				</div>
-
-				{/* Content Area */}
-				<div className="lg:col-span-9 space-y-6">
-					
-					{/* Header Card - Hidden on Accessibility and Settings tabs */}
-				{!['accessibility', 'settings'].includes(activeSection) && (
-					<Card className="rounded-[2rem] border-serene-neutral-200/60 shadow-sm overflow-hidden bg-white group hover:shadow-md transition-all duration-500">
-						<div className="h-24 sm:h-40 bg-gradient-to-r from-sauti-teal/10 via-sauti-teal/5 to-sauti-teal/10 relative overflow-hidden">
-							<div className="absolute inset-0 bg-white/40 backdrop-blur-[2px]" />
-						</div>
-						<div className="px-4 sm:px-8 pb-6 sm:pb-8 relative">
-							{/* Avatar - stacked on mobile, positioned on desktop */}
-							<div className="flex flex-col sm:flex-row sm:items-end gap-4">
-								<div className="relative -mt-12 sm:-mt-16 mx-auto sm:mx-0">
-									<div className="relative group/avatar">
-										<Avatar className="h-24 w-24 sm:h-32 sm:w-32 border-4 sm:border-[6px] border-white shadow-lg cursor-pointer transition-transform duration-300 group-hover/avatar:scale-[1.02]">
-											<AvatarImage src={profile?.avatar_url || ""} className="object-cover" />
-											<AvatarFallback className="bg-gradient-to-br from-sauti-teal to-sauti-dark text-white text-2xl sm:text-3xl font-bold">
-												{profile?.first_name?.[0] || "U"}
-											</AvatarFallback>
-										</Avatar>
-										<div className="absolute inset-0 bg-black/10 rounded-full opacity-0 group-hover/avatar:opacity-100 transition-opacity flex items-center justify-center cursor-pointer backdrop-blur-[1px]">
-											<Camera className="h-6 w-6 sm:h-8 sm:w-8 text-white drop-shadow-md" />
-										</div>
-									</div>
-								</div>
-								{/* User info - centered on mobile, beside avatar on desktop */}
-								<div className="flex-1 text-center sm:text-left pb-0 sm:pb-2">
-									<h2 className="text-xl sm:text-3xl font-bold text-sauti-dark tracking-tight">{profile?.first_name} {profile?.last_name}</h2>
-									<p className="text-serene-neutral-500 text-sm sm:text-base font-medium mt-1">{profile?.email}</p>
-									{isProfessional && (
-										<div className="inline-flex items-center gap-2 px-3 py-1.5 bg-sauti-teal/10 text-sauti-teal rounded-full text-xs font-bold uppercase tracking-wider mt-3">
-											<Shield className="h-3 w-3" />
-											Professional Support
-										</div>
+					{/* Sidebar Menu - Fixed on desktop */}
+					<div className="hidden lg:block lg:col-span-3 h-full py-6">
+						<div className="bg-white/95 backdrop-blur-xl rounded-2xl p-3 border border-serene-neutral-100 shadow-sm sticky top-0">
+							{navItems.map(item => (
+								<button
+									key={item.id}
+									onClick={() => router.push(`/dashboard/profile?section=${item.id}`)}
+									className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 ${
+										activeSection === item.id 
+											? "bg-serene-blue-50/80 text-serene-blue-700 font-semibold shadow-sm" 
+											: "text-serene-neutral-600 hover:bg-serene-neutral-50/80 hover:text-serene-neutral-900"
+									}`}
+								>
+									<item.icon className={`h-4 w-4 ${activeSection === item.id ? "text-serene-blue-600" : "text-serene-neutral-400"}`} />
+									<span className="text-sm">{item.label}</span>
+									{activeSection === item.id && (
+										<div className="ml-auto w-1.5 h-1.5 rounded-full bg-serene-blue-500" />
 									)}
-								</div>
+								</button>
+							))}
+						</div>
+					</div>
+
+					{/* Content Area - Scrollable */}
+					<div className="lg:col-span-9 h-full overflow-y-auto py-6 pb-32 scrollbar-hide">
+						
+						{/* Mobile Navigation Tabs - Sticky within content on mobile */}
+						<div className="lg:hidden mb-6 sticky top-0 z-10 bg-serene-neutral-50/95 backdrop-blur-sm py-2 -mx-4 px-4 border-b border-serene-neutral-200/50">
+							<div className="flex overflow-x-auto gap-2 pb-1 scrollbar-hide">
+								{navItems.map(item => (
+									<button
+										key={item.id}
+										onClick={() => router.push(`/dashboard/profile?section=${item.id}`)}
+										className={`flex-shrink-0 flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all whitespace-nowrap ${
+											activeSection === item.id 
+												? "bg-serene-blue-600 text-white shadow-md shadow-serene-blue-500/20" 
+												: "bg-white text-serene-neutral-600 border border-serene-neutral-200"
+										}`}
+									>
+										<item.icon className="h-4 w-4" />
+										{item.label}
+									</button>
+								))}
 							</div>
 						</div>
-					</Card>
-				)}
 
-					{/* Section: Account */}
-					{activeSection === 'account' && (
-						<Card className="rounded-[2rem] border-serene-neutral-200/60 shadow-sm bg-white overflow-hidden">
-							<CardHeader className="border-b border-serene-neutral-100 pb-6">
-								<CardTitle className="text-xl text-serene-neutral-900">Basic Information</CardTitle>
-							</CardHeader>
-							<CardContent className="space-y-8 pt-8">
-								<div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-									<div className="space-y-2">
-										<label className="text-sm font-semibold text-serene-neutral-700">First Name</label>
-										<Input 
-											value={formData.basic?.first_name ?? profileData.first_name ?? ""} 
-											onChange={(e) => updateFormData("basic", "first_name", e.target.value)}
-											className="rounded-xl border-serene-neutral-300 focus-visible:ring-serene-blue-200 bg-serene-neutral-50/50 h-11"
-										/>
+						<div className="space-y-4">
+							{/* Header Card - Only shown on Account tab */}
+							{activeSection === 'account' && (
+								<Card className="rounded-[1.75rem] border-serene-neutral-100 shadow-sm overflow-hidden bg-white">
+									<div className="h-28 sm:h-32 bg-gradient-to-br from-serene-blue-50 via-serene-neutral-50 to-serene-blue-50/30 relative overflow-hidden">
+										<div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(100,140,180,0.08),transparent_70%)]" />
 									</div>
-									<div className="space-y-2">
-										<label className="text-sm font-semibold text-serene-neutral-700">Last Name</label>
-										<Input 
-											value={formData.basic?.last_name ?? profileData.last_name ?? ""} 
-											onChange={(e) => updateFormData("basic", "last_name", e.target.value)}
-											className="rounded-xl border-serene-neutral-300 focus-visible:ring-serene-blue-200 bg-serene-neutral-50/50 h-11"
-										/>
-									</div>
-								</div>
-								
-								<div className="flex justify-end">
-									<Button onClick={() => saveSection("basic")} className="bg-sauti-teal hover:bg-sauti-dark text-white rounded-xl h-11 px-6">
-										<Save className="h-4 w-4 mr-2" /> Save Changes
-									</Button>
-								</div>
-							</CardContent>
-						</Card>
-					)}
-
-					{/* Section: Privacy */}
-					{activeSection === 'privacy' && (
-						<div className="space-y-6">
-							<Card className="rounded-3xl border-serene-neutral-200 shadow-sm bg-white">
-								<CardHeader>
-									<CardTitle className="flex items-center gap-2">
-										<Shield className="h-5 w-5 text-serene-blue-500" />
-										Anonymous Mode
-									</CardTitle>
-								</CardHeader>
-								<CardContent>
-									{userId && profile?.first_name && (
-										<AnonymousModeToggle userId={userId} username={profile.first_name} />
-									)}
-									<p className="mt-4 text-sm text-serene-neutral-500 leading-relaxed">
-										Enabling anonymous mode will hide your real name from other users in community spaces and chats.
-									</p>
-								</CardContent>
-							</Card>
-						</div>
-					)}
-
-					{/* Section: Accessibility */}
-					{activeSection === 'accessibility' && (
-						<div className="space-y-6">
-							<Card className="rounded-[2rem] border-serene-neutral-200 shadow-sm bg-white overflow-hidden">
-								<CardHeader className="border-b border-serene-neutral-100 pb-6">
-									<CardTitle className="flex items-center gap-2 text-xl text-serene-neutral-900">
-										<Contrast className="h-6 w-6 text-serene-blue-500" />
-										Accessibility Settings
-									</CardTitle>
-								</CardHeader>
-								<CardContent className="space-y-6 pt-8">
-									<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-										{[
-											{ label: "High Contrast", prop: "highContrast", icon: Contrast },
-											{ label: "Reduce Motion", prop: "reduceMotion", icon: MousePointer2 },
-											{ label: "Readable Font", prop: "readableFont", icon: FontIcon },
-											{ label: "Dyslexic Font", prop: "dyslexic", icon: Type },
-											{ label: "Underline Links", prop: "underlineLinks", icon: Underline },
-										].map((item: any) => {
-											const isOn = !!(a11y as any)[item.prop];
-											return (
-												<button
-													key={item.prop}
-													onClick={() => a11y.set({ [item.prop]: !isOn })}
-													className={`
-														flex items-center justify-between px-5 py-4 rounded-2xl border-2 transition-all duration-200 group
-														${isOn 
-															? "bg-serene-blue-50 border-serene-blue-500 text-serene-blue-700 shadow-sm" 
-															: "bg-white border-serene-neutral-100 text-serene-neutral-600 hover:border-serene-neutral-200 hover:bg-serene-neutral-50"
-														}
-													`}
-												>
-													<div className="flex items-center gap-4">
-														<div className={`
-															p-2 rounded-xl transition-colors
-															${isOn ? "bg-serene-blue-500 text-white" : "bg-serene-neutral-100 text-serene-neutral-400 group-hover:text-serene-neutral-500"}
-														`}>
-															<item.icon className="h-5 w-5" />
-														</div>
-														<span className="font-bold text-sm">{item.label}</span>
+									<div className="px-5 sm:px-8 pb-5 sm:pb-6 relative">
+										{/* Avatar */}
+										<div className="flex flex-col sm:flex-row sm:items-end gap-4">
+											<div className="relative -mt-12 sm:-mt-14 mx-auto sm:mx-0">
+												<div className="relative group/avatar">
+													<Avatar className="h-20 w-20 sm:h-24 sm:w-24 border-4 border-white shadow-lg cursor-pointer transition-transform duration-300 group-hover/avatar:scale-[1.02]">
+														<AvatarImage src={profile?.avatar_url || ""} className="object-cover" />
+														<AvatarFallback className="bg-gradient-to-br from-serene-blue-500 to-serene-blue-700 text-white text-xl sm:text-2xl font-bold">
+															{profile?.first_name?.[0] || "U"}
+														</AvatarFallback>
+													</Avatar>
+													<div className="absolute inset-0 bg-black/10 rounded-full opacity-0 group-hover/avatar:opacity-100 transition-opacity flex items-center justify-center cursor-pointer">
+														<Camera className="h-6 w-6 sm:h-7 sm:w-7 text-white drop-shadow-md" />
 													</div>
-													<div className={`
-														relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out
-														${isOn ? "bg-serene-blue-500" : "bg-serene-neutral-200"}
-													`}>
-														<span className={`
-															pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out
-															${isOn ? "translate-x-5" : "translate-x-0"}
-														`} />
+												</div>
+											</div>
+											{/* User info */}
+											<div className="flex-1 text-center sm:text-left pb-0">
+												<h2 className="text-xl sm:text-2xl font-bold text-serene-neutral-900 tracking-tight">{profile?.first_name} {profile?.last_name}</h2>
+												<p className="text-serene-neutral-500 text-sm font-medium mt-0.5">{profile?.email}</p>
+												{isProfessional && (
+													<div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-serene-blue-50 text-serene-blue-700 rounded-full text-xs font-semibold mt-2">
+														<Shield className="h-3 w-3" />
+														Professional
 													</div>
-												</button>
-											);
-										})}
-									</div>
-
-									<div className="pt-6 border-t border-serene-neutral-100">
-										<div className="mb-4 flex items-center gap-2 text-serene-neutral-500 font-bold uppercase tracking-widest text-xs">
-											<Type className="h-4 w-4" /> Text Scale
-										</div>
-										<div className="flex flex-wrap gap-3">
-											{[100, 112.5, 125, 137.5, 150].map((s) => (
-												<button
-													key={s}
-													onClick={() => a11y.set({ textScale: s })}
-													className={`
-														flex-1 px-4 py-3 rounded-xl border-2 text-sm font-bold transition-all
-														${a11y.textScale === s
-															? "bg-serene-blue-500 border-serene-blue-500 text-white shadow-md transform scale-105"
-															: "bg-white border-serene-neutral-100 text-serene-neutral-500 hover:border-serene-neutral-200"
-														}
-													`}
-												>
-													{s}%
-												</button>
-											))}
+												)}
+											</div>
 										</div>
 									</div>
+								</Card>
+							)}
 
-									<div className="pt-4">
-										<Button 
-											onClick={() => a11y.reset()}
-											variant="ghost" 
-											className="w-full h-12 rounded-xl text-serene-neutral-400 hover:text-red-500 hover:bg-red-50"
-										>
-											<RefreshCw className="h-4 w-4 mr-2" /> Reset All Settings
-										</Button>
-									</div>
-								</CardContent>
-							</Card>
+							{/* Section: Account */}
+							{activeSection === 'account' && (
+								<Card className="rounded-[2rem] border-serene-neutral-200/60 shadow-sm bg-white overflow-hidden">
+									<CardHeader className="border-b border-serene-neutral-100 pb-4 pt-6 px-6 sm:px-8">
+										<CardTitle className="text-lg text-serene-neutral-900">Basic Information</CardTitle>
+									</CardHeader>
+									<CardContent className="space-y-8 pt-8">
+										<div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+											<div className="space-y-2">
+												<label className="text-sm font-semibold text-serene-neutral-700">First Name</label>
+												<Input 
+													value={formData.basic?.first_name ?? profileData.first_name ?? ""} 
+													onChange={(e) => updateFormData("basic", "first_name", e.target.value)}
+													className="rounded-xl border-serene-neutral-300 focus-visible:ring-serene-blue-200 bg-serene-neutral-50/50 h-11"
+												/>
+											</div>
+											<div className="space-y-2">
+												<label className="text-sm font-semibold text-serene-neutral-700">Last Name</label>
+												<Input 
+													value={formData.basic?.last_name ?? profileData.last_name ?? ""} 
+													onChange={(e) => updateFormData("basic", "last_name", e.target.value)}
+													className="rounded-xl border-serene-neutral-300 focus-visible:ring-serene-blue-200 bg-serene-neutral-50/50 h-11"
+												/>
+											</div>
+										</div>
+										
+										<div className="flex justify-end">
+											<Button onClick={() => saveSection("basic")} className="bg-sauti-teal hover:bg-sauti-dark text-white rounded-xl h-11 px-6">
+												<Save className="h-4 w-4 mr-2" /> Save Changes
+											</Button>
+										</div>
+									</CardContent>
+								</Card>
+							)}
+
+							{/* Section: Privacy */}
+							{activeSection === 'privacy' && (
+								<PrivacySecuritySettings />
+							)}
+
+							{/* Section: Accessibility */}
+							{activeSection === 'accessibility' && (
+								<div className="space-y-6">
+									<Card className="rounded-[2rem] border-serene-neutral-200 shadow-sm bg-white overflow-hidden">
+										<CardHeader className="border-b border-serene-neutral-100 pb-6">
+											<CardTitle className="flex items-center gap-2 text-xl text-serene-neutral-900">
+												<Contrast className="h-6 w-6 text-serene-blue-500" />
+												Accessibility Settings
+											</CardTitle>
+										</CardHeader>
+										<CardContent className="space-y-6 pt-8">
+											<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+												{[
+													{ label: "High Contrast", prop: "highContrast", icon: Contrast },
+													{ label: "Reduce Motion", prop: "reduceMotion", icon: MousePointer2 },
+													{ label: "Readable Font", prop: "readableFont", icon: FontIcon },
+													{ label: "Dyslexic Font", prop: "dyslexic", icon: Type },
+													{ label: "Underline Links", prop: "underlineLinks", icon: Underline },
+												].map((item: any) => {
+													const isOn = !!(a11y as any)[item.prop];
+													return (
+														<button
+															key={item.prop}
+															onClick={() => a11y.set({ [item.prop]: !isOn })}
+															className={`
+																flex items-center justify-between px-5 py-4 rounded-2xl border-2 transition-all duration-200 group
+																${isOn 
+																	? "bg-serene-blue-50 border-serene-blue-500 text-serene-blue-700 shadow-sm" 
+																	: "bg-white border-serene-neutral-100 text-serene-neutral-600 hover:border-serene-neutral-200 hover:bg-serene-neutral-50"
+																}
+															`}
+														>
+															<div className="flex items-center gap-4">
+																<div className={`
+																	p-2 rounded-xl transition-colors
+																	${isOn ? "bg-serene-blue-500 text-white" : "bg-serene-neutral-100 text-serene-neutral-400 group-hover:text-serene-neutral-500"}
+																`}>
+																	<item.icon className="h-5 w-5" />
+																</div>
+																<span className="font-bold text-sm">{item.label}</span>
+															</div>
+															<div className={`
+																relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out
+																${isOn ? "bg-serene-blue-500" : "bg-serene-neutral-200"}
+															`}>
+																<span className={`
+																	pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out
+																	${isOn ? "translate-x-5" : "translate-x-0"}
+																`} />
+															</div>
+														</button>
+													);
+												})}
+											</div>
+
+											<div className="pt-6 border-t border-serene-neutral-100">
+												<div className="mb-4 flex items-center gap-2 text-serene-neutral-500 font-bold uppercase tracking-widest text-xs">
+													<Type className="h-4 w-4" /> Text Scale
+												</div>
+												<div className="flex flex-wrap gap-3">
+													{[100, 112.5, 125, 137.5, 150].map((s) => (
+														<button
+															key={s}
+															onClick={() => a11y.set({ textScale: s })}
+															className={`
+																flex-1 px-4 py-3 rounded-xl border-2 text-sm font-bold transition-all
+																${a11y.textScale === s
+																	? "bg-serene-blue-500 border-serene-blue-500 text-white shadow-md transform scale-105"
+																	: "bg-white border-serene-neutral-100 text-serene-neutral-500 hover:border-serene-neutral-200"
+																}
+															`}
+														>
+															{s}%
+														</button>
+													))}
+												</div>
+											</div>
+
+											<div className="pt-4">
+												<Button 
+													onClick={() => a11y.reset()}
+													variant="ghost" 
+													className="w-full h-12 rounded-xl text-serene-neutral-400 hover:text-red-500 hover:bg-red-50"
+												>
+													<RefreshCw className="h-4 w-4 mr-2" /> Reset All Settings
+												</Button>
+											</div>
+										</CardContent>
+									</Card>
+								</div>
+							)}
+
+							{/* Section: Professional Verification */}
+							{activeSection === 'verification' && isProfessional && (
+								<div className="space-y-6">
+									<MobileVerificationSection
+										userId={userId || ""}
+										userType={(profile?.user_type as any) || "professional"}
+										profile={profile}
+										onUpdate={refreshAllData}
+										onNavigateToServices={() => router.push('/dashboard/profile?section=services')}
+										onUploadSuccess={refreshAllData}
+									/>
+								</div>
+							)}
+
+							{/* Section: Services */}
+							{activeSection === 'services' && isProfessional && (
+								<SupportServicesManager
+									userId={userId || ""}
+									userType={profile?.user_type || "professional"}
+									verificationStatus={dash?.data?.verification?.overallStatus || "pending"}
+									hasAccreditation={!!dash?.data?.verification?.documentsCount}
+									hasMatches={false}
+									documentsCount={dash?.data?.verification?.documentsCount || 0}
+									onDataUpdate={refreshAllData}
+								/>
+							)}
 						</div>
-					)}
-
-					{/* Section: Professional Verification */}
-					{activeSection === 'verification' && isProfessional && (
-						<div className="space-y-6">
-							<MobileVerificationSection
-								userId={userId || ""}
-								userType={(profile?.user_type as any) || "professional"}
-								onUploadSuccess={refreshAllData}
-							/>
-						</div>
-					)}
-
-					{/* Section: Services */}
-					{activeSection === 'services' && isProfessional && (
-						<SupportServicesManager
-							userId={userId || ""}
-							userType={profile?.user_type || "professional"}
-							verificationStatus={dash?.data?.verification?.overallStatus || "pending"}
-							hasAccreditation={!!dash?.data?.verification?.documentsCount}
-							hasMatches={false}
-							documentsCount={dash?.data?.verification?.documentsCount || 0}
-							onDataUpdate={refreshAllData}
-						/>
-					)}
-
+					</div>
 				</div>
 			</div>
 		</div>
