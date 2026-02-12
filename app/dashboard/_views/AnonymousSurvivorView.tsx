@@ -101,7 +101,7 @@ export default function AnonymousSurvivorView({
 
 
 				{/* Upgrade Banner */}
-				<UpgradeAccountBanner userEmail={profileDetails.email || ""} userId={userId} />
+				<UpgradeAccountBanner userEmail={profileDetails.email || ""} />
 
 				<div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
 					{/* Main Column: Reports */}

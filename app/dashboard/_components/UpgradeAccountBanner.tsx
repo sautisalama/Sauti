@@ -7,10 +7,9 @@ import { UpgradeAccountDialog } from "./UpgradeAccountDialog";
 
 interface UpgradeAccountBannerProps {
 	userEmail: string;
-	userId: string;
 }
 
-export function UpgradeAccountBanner({ userEmail, userId }: UpgradeAccountBannerProps) {
+export function UpgradeAccountBanner({ userEmail }: UpgradeAccountBannerProps) {
 	const [open, setOpen] = useState(false);
 	const [copied, setCopied] = useState(false);
 
