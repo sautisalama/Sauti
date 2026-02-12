@@ -227,19 +227,6 @@ export default function ProfessionalView({
 						value={searchQuery}
 						onChange={(e) => setSearchQuery(e.target.value)}
 					/>
-					<div className="absolute right-1 top-1/2 -translate-y-1/2 flex items-center gap-1">
-						<Button
-							size="sm"
-							variant="ghost"
-							className="hidden sm:flex h-8 w-8 rounded-full text-serene-blue-600 hover:bg-serene-blue-50"
-							onClick={() => setReportDialogOpen(true)}
-						>
-							<Plus className="h-4 w-4" />
-						</Button>
-						<Button size="icon" variant="ghost" className="h-9 w-9 text-serene-neutral-400 hover:text-serene-blue-600 rounded-full">
-							<SlidersHorizontal className="h-4 w-4" />
-						</Button>
-					</div>
 				</div>
 			</div>
 

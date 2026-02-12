@@ -23,6 +23,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useDashboardData } from "@/components/providers/DashboardDataProvider";
 import Link from "next/link";
+import { UpgradeAccountBanner } from "../_components/UpgradeAccountBanner";
 
 interface ReportWithRelations extends Tables<"reports"> {
 	matched_services?: any[];
@@ -82,7 +83,10 @@ export default function AnonymousSurvivorView({
 							Your Support Space
 						</h1>
 						<p className="text-slate-500 font-medium max-w-xl text-lg leading-relaxed">
-							Welcome back. Here you can track your journey, manage your reports, and connect with caring professionals.
+							{reports.length === 1 
+								? "Your incident has been securely recorded. We are here to support you as you take your next steps."
+								: "Welcome back. Here you can track your journey, manage your reports, and connect with caring professionals."
+							}
 						</p>
 					</div>
 					<Button 
@@ -93,6 +97,11 @@ export default function AnonymousSurvivorView({
 						Share New Incident
 					</Button>
 				</div>
+
+
+
+				{/* Upgrade Banner */}
+				<UpgradeAccountBanner userEmail={profileDetails.email || ""} userId={userId} />
 
 				<div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
 					{/* Main Column: Reports */}
@@ -198,39 +207,7 @@ export default function AnonymousSurvivorView({
 					{/* Sidebar */}
 					<div className="lg:col-span-4 space-y-8">
 						{/* Anonymity Notice */}
-						<Card className="bg-slate-900 border-0 rounded-[2.5rem] shadow-xl overflow-hidden relative group/anon">
-							<div className="absolute top-0 right-0 p-10 opacity-5 rotate-12 group-hover/anon:rotate-0 transition-transform duration-1000">
-								<Lock className="h-32 w-32 text-white" />
-							</div>
-							<CardContent className="p-10 relative z-10 space-y-8">
-								<div className="w-14 h-14 bg-white/10 rounded-2xl flex items-center justify-center shadow-inner">
-									<ShieldCheck className="h-7 w-7 text-teal-400" />
-								</div>
-								
-								<div className="space-y-4">
-									<h3 className="text-2xl font-bold text-white tracking-tight">Stay Anonymous</h3>
-									<p className="text-slate-400 font-medium text-base leading-relaxed">
-										You are using a temporary session. We've assigned you a unique identity to protect your privacy.
-									</p>
-								</div>
 
-								<div className="space-y-4">
-									<div className="bg-white/5 rounded-2xl p-5 border border-white/10 backdrop-blur-sm">
-										<p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Assigned Alias</p>
-										<div className="flex items-center gap-3">
-											<User className="h-4 w-4 text-teal-400" />
-											<p className="text-white font-mono text-base uppercase tracking-wider">@{profileDetails.anon_username || "guest_survivor"}</p>
-										</div>
-									</div>
-									<Button asChild variant="link" className="text-teal-400 p-0 h-auto font-bold text-sm hover:text-white transition-colors">
-										<Link href="/dashboard/settings" className="flex items-center gap-2">
-											Permanent Account Options
-											<ExternalLink className="h-3.5 w-3.5" />
-										</Link>
-									</Button>
-								</div>
-							</CardContent>
-						</Card>
 
 						{/* Supportive Tips / Help */}
 						<div className="space-y-4">

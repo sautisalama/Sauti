@@ -28,7 +28,7 @@ interface SereneWelcomeHeaderProps {
   timeOfDay?: "morning" | "afternoon" | "evening";
   className?: string;
   compact?: boolean;
-  welcomeMessage?: string;
+  welcomeMessage?: ReactNode;
 }
 
 export function SereneWelcomeHeader({ name, timeOfDay = "morning", className, compact, welcomeMessage = "Welcome back, you're safe here." }: SereneWelcomeHeaderProps) {
