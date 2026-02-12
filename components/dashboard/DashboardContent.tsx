@@ -57,7 +57,9 @@ export function DashboardContent({ children }: DashboardContentProps) {
         </main>
         {user && (
             <div className="hidden lg:block">
-                <GlobalReportFab userId={user} />
+                {(pathname === "/dashboard" || pathname === "/dashboard/reports") && (
+                    <GlobalReportFab userId={user} />
+                )}
             </div>
         )}
     </>

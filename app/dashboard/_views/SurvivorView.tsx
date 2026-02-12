@@ -15,10 +15,8 @@ import {
 	BookOpen,
 	Shield,
 	Heart,
-	TrendingUp,
-	CheckCircle,
-	Plus,
-	Trash2,
+    User,
+    ArrowRight,
 	ChevronRight,
 	SlidersHorizontal
 } from "lucide-react";
@@ -138,15 +136,6 @@ export default function SurvivorView({
 						value={searchQuery}
 						onChange={(e) => setSearchQuery(e.target.value)}
 					/>
-					<div className="absolute right-1 top-1/2 -translate-y-1/2 flex items-center gap-1">
-						{/* Desktop "New" shortcut in search bar */}
-						<Button size="sm" variant="ghost" className="hidden sm:flex h-8 w-8 rounded-full text-serene-blue-600 hover:bg-serene-blue-50" onClick={() => setIsReportSheetOpen(true)}>
-							<Plus className="h-4 w-4" />
-						</Button>
-						<Button size="icon" variant="ghost" className="h-9 w-9 text-serene-neutral-400 hover:text-serene-blue-600 rounded-full">
-							<SlidersHorizontal className="h-4 w-4" />
-						</Button>
-					</div>
 				</div>
 			</div>
 
@@ -217,6 +206,16 @@ export default function SurvivorView({
                             name={profileDetails.first_name || "Friend"} 
                             timeOfDay={getTimeOfDay()}
                             compact={isWelcomeCompact}
+                            welcomeMessage={
+                                (!profileDetails.first_name || profileDetails.first_name === "Anonymous") ? (
+                                    <span className="flex flex-col sm:flex-row sm:items-center gap-2">
+                                        <span>Please update your personal details to help us personalize your support.</span>
+                                        <Link href="/dashboard/profile" className="inline-flex items-center font-bold text-serene-blue-600 hover:text-serene-blue-700 hover:underline text-sm">
+                                            Complete Profile <ArrowRight className="ml-1 h-2 w-2" />
+                                        </Link>
+                                    </span>
+                                ) : "Welcome back, you're safe here."
+                            }
                         />
 
                         {/* Quick Stats Overview */}
@@ -225,7 +224,7 @@ export default function SurvivorView({
                             <h3 className="text-sm font-bold text-serene-neutral-400 uppercase tracking-wider px-1">Dashboard</h3>
                             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 md:gap-4">
                                 <SereneQuickActionCard
-                                    title="Cases"
+                                    title="Reports"
                                     description={`${activeCasesCount} Active`}
                                     icon={<Shield className="h-5 w-5" />}
                                     href="/dashboard/reports"
@@ -240,14 +239,7 @@ export default function SurvivorView({
                                     variant="blue"
                                     badge={matchedCount || undefined}
                                 />
-                                <SereneQuickActionCard
-                                    title="Appointments"
-                                    description={`${upcomingAppointments} Upcoming`}
-                                    icon={<CalendarDays className="h-5 w-5" />}
-                                    href="/dashboard/reports"
-                                    variant="blue"
-                                    badge={upcomingAppointments || undefined}
-                                />
+                                {/* removed appointments card */}
                                 <SereneQuickActionCard
                                     title="Messages"
                                     description="Support Chat"
@@ -265,7 +257,6 @@ export default function SurvivorView({
                                 />
                             </div>
                         </div>
-
 
                         {/* Recent Activity / Active Cases Preview */}
                         <div>

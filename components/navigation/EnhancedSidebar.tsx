@@ -298,13 +298,6 @@ export function EnhancedSidebar({
 					href: "/dashboard/resources",
 					section: "main",
 				},
-				{
-					id: "appointments",
-					label: "Appointments",
-					icon: Calendar,
-					href: "/dashboard/appointments",
-					section: "main",
-				},
 			];
 			return [
 				...survivorMain,
