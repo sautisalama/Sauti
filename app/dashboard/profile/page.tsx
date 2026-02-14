@@ -169,7 +169,7 @@ export default function ProfilePage() {
 	}
 
 	return (
-		<div className="h-screen flex flex-col bg-serene-neutral-50/30 overflow-hidden">
+		<div className="h-screen flex flex-col bg-serene-neutral-50/30 overflow-y-auto">
 			{/* Fixed Header section */}
 			<div className="flex-none px-4 md:px-8 py-3 md:py-4 bg-serene-neutral-50/80 backdrop-blur-md border-b border-serene-neutral-200/50 z-20">
 				<div className="max-w-6xl mx-auto w-full">
@@ -182,11 +182,11 @@ export default function ProfilePage() {
 			</div>
 
 			{/* Main Layout - Fixed height container with scrollable content area */}
-			<div className="flex-1 min-h-0 w-full">
-				<div className="h-full max-w-6xl mx-auto px-4 md:px-8 grid grid-cols-1 lg:grid-cols-12 gap-6">
+			<div className="flex-1 w-full">
+				<div className="max-w-6xl mx-auto px-4 md:px-8 grid grid-cols-1 lg:grid-cols-12 gap-6">
 					
 					{/* Sidebar Menu - Fixed on desktop */}
-					<div className="hidden lg:block lg:col-span-3 h-full py-6">
+					<div className="hidden lg:block lg:col-span-3 py-6">
 						<div className="bg-white/95 backdrop-blur-xl rounded-2xl p-3 border border-serene-neutral-100 shadow-sm sticky top-0">
 							{navItems.map(item => (
 								<button
@@ -208,8 +208,8 @@ export default function ProfilePage() {
 						</div>
 					</div>
 
-					{/* Content Area - Scrollable */}
-					<div className="lg:col-span-9 h-full overflow-y-auto py-6 pb-32 scrollbar-hide">
+					{/* Content Area - Scrolls with page */}
+					<div className="lg:col-span-9 py-6 pb-32">
 						
 						{/* Mobile Navigation Tabs - Sticky within content on mobile */}
 						<div className="lg:hidden mb-6 sticky top-0 z-10 bg-serene-neutral-50/95 backdrop-blur-sm py-2 -mx-4 px-4 border-b border-serene-neutral-200/50">

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -47,6 +47,10 @@ import { Calendar } from "@/components/ui/calendar";
 import { format } from "date-fns";
 import { cn, safelyParseJsonArray } from "@/lib/utils";
 import { EnhancedSelect } from "@/components/ui/enhanced-select";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { LocationPicker } from "@/components/ui/location-picker";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
 
 type SupportServiceType = Database["public"]["Enums"]["support_service_type"];
 type UserType = Database["public"]["Enums"]["user_type"];
@@ -173,8 +177,12 @@ export function SupportServiceSidepanel({
 		phone_number: "",
 		website: "",
 		availability: "",
-		coverage_area_radius: "",
+		coverage_area_radius: "5000",
+		latitude: null as number | null,
+		longitude: null as number | null,
+		address: "",
 		is_remote: false,
+		is_in_person: false,
 	});
 	const [isSaving, setIsSaving] = useState(false);
 	const [isModalOpen, setIsModalOpen] = useState(false); // Document Upload modal
@@ -202,7 +210,35 @@ export function SupportServiceSidepanel({
 	
 	// Tab State
 	const [activeTab, setActiveTab] = useState("new");
-	
+	const tabOrder = ["new", "documents", "sharing"] as const;
+	const touchStartRef = useRef<{ x: number; y: number } | null>(null);
+	const swipeScrollRef = useRef<HTMLDivElement>(null);
+
+	const handleTouchStart = useCallback((e: React.TouchEvent) => {
+		touchStartRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+	}, []);
+
+	const handleTouchEnd = useCallback((e: React.TouchEvent) => {
+		if (!touchStartRef.current) return;
+		const deltaX = e.changedTouches[0].clientX - touchStartRef.current.x;
+		const deltaY = e.changedTouches[0].clientY - touchStartRef.current.y;
+		touchStartRef.current = null;
+
+		// Only trigger if horizontal swipe is dominant and > 50px
+		if (Math.abs(deltaX) < 50 || Math.abs(deltaX) < Math.abs(deltaY)) return;
+
+		const currentIndex = tabOrder.indexOf(activeTab as typeof tabOrder[number]);
+		if (deltaX < 0 && currentIndex < tabOrder.length - 1) {
+			// Swipe left → next tab
+			setActiveTab(tabOrder[currentIndex + 1]);
+			swipeScrollRef.current?.scrollTo(0, 0);
+		} else if (deltaX > 0 && currentIndex > 0) {
+			// Swipe right → previous tab
+			setActiveTab(tabOrder[currentIndex - 1]);
+			swipeScrollRef.current?.scrollTo(0, 0);
+		}
+	}, [activeTab]);
+
 	// Location State
 	const [currentLocation, setCurrentLocation] = useState<{ lat: number; lng: number } | null>(null);
 	const [shouldUpdateLocation, setShouldUpdateLocation] = useState(false);
@@ -237,8 +273,12 @@ export function SupportServiceSidepanel({
 				phone_number: service.phone_number || "",
 				website: service.website || "",
 				availability: service.availability || "",
-				coverage_area_radius: service.coverage_area_radius ? String(service.coverage_area_radius) : "",
-				is_remote: !service.coverage_area_radius,
+				coverage_area_radius: service.coverage_area_radius ? String(service.coverage_area_radius) : "5000",
+				latitude: service.latitude ?? null,
+				longitude: service.longitude ?? null,
+				address: "", // Address not stored in DB yet, but used for UI
+				is_remote: !service.coverage_area_radius, // heuristic
+				is_in_person: !!service.coverage_area_radius,
 			});
 		}
 	}, [service]);
@@ -432,8 +472,12 @@ export function SupportServiceSidepanel({
 				phone_number: service?.phone_number || "",
 				website: service?.website || "",
 				availability: service?.availability || "",
-				coverage_area_radius: service?.coverage_area_radius ? String(service.coverage_area_radius) : "",
+				coverage_area_radius: service?.coverage_area_radius ? String(service.coverage_area_radius) : "5000",
+				latitude: service?.latitude ?? null,
+				longitude: service?.longitude ?? null,
+				address: "",
 				is_remote: !service?.coverage_area_radius,
+				is_in_person: !!service?.coverage_area_radius,
 			});
 		} else {
 			setIsEditing(true);
@@ -456,11 +500,9 @@ export function SupportServiceSidepanel({
 					phone_number: editData.phone_number || null,
 					website: editData.website || null,
 					availability: editData.availability || null,
-					coverage_area_radius: (!editData.is_remote && editData.coverage_area_radius) ? Number(editData.coverage_area_radius) : null,
-					...(shouldUpdateLocation && currentLocation ? {
-						latitude: currentLocation.lat,
-						longitude: currentLocation.lng
-					} : {}),
+					coverage_area_radius: (editData.is_in_person && editData.coverage_area_radius) ? Number(editData.coverage_area_radius) : null,
+					latitude: (editData.is_in_person && editData.latitude) ? editData.latitude : null,
+					longitude: (editData.is_in_person && editData.longitude) ? editData.longitude : null,
 					accreditation_files_metadata: [], // Clear documents
 				})
 				.eq("id", service.id);
@@ -777,10 +819,13 @@ export function SupportServiceSidepanel({
 
 	return (
 		<>
-			<div className="fixed inset-0 sm:inset-y-0 sm:right-0 sm:left-auto w-full sm:w-[540px] lg:w-[600px] xl:w-[700px] bg-white shadow-2xl border-l z-[40] transform transition-transform duration-300 ease-out translate-y-0 sm:translate-x-0 flex flex-col h-full active-sidepanel">
+			{/* Mobile Backdrop Overlay */}
+			<div className="fixed inset-0 bg-black/50 z-[59] sm:hidden" onClick={onClose} />
+
+			<div className="fixed inset-0 sm:inset-y-0 sm:right-0 sm:left-auto w-full sm:w-[540px] lg:w-[600px] xl:w-[700px] bg-white shadow-2xl border-l z-[60] isolate transform transition-transform duration-300 ease-out translate-y-0 sm:translate-x-0 flex flex-col h-full active-sidepanel">
 				
 				{/* Header */}
-				<div className="flex-none p-5 border-b border-serene-neutral-200 bg-white/80 backdrop-blur-md sticky top-0 z-10">
+				<div className="flex-none p-5 border-b border-serene-neutral-200 bg-white backdrop-blur-md z-20">
 					<div className="flex items-start justify-between gap-4">
 						<div className="flex items-start gap-4 flex-1 overflow-hidden">
 							<div className="p-2.5 rounded-xl bg-sauti-teal/10 flex-shrink-0">
@@ -873,7 +918,7 @@ export function SupportServiceSidepanel({
 					</div>
 				</div>
 
-				<Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col">
+				<Tabs value={activeTab} onValueChange={(val) => { setActiveTab(val); swipeScrollRef.current?.scrollTo(0, 0); }} className="flex-1 min-h-0 flex flex-col">
 					<div className="px-5 border-b border-serene-neutral-200">
 						<TabsList className="bg-transparent p-0 w-full flex justify-start gap-8 h-auto">
 							<TabsTrigger 
@@ -907,8 +952,14 @@ export function SupportServiceSidepanel({
 						</TabsList>
 					</div>
 
-					<ScrollArea className="flex-1">
-						<div className="p-5 pb-10">
+					<div
+						ref={swipeScrollRef}
+						className="flex-1 overflow-y-auto overscroll-contain"
+						style={{ WebkitOverflowScrolling: 'touch' }}
+						onTouchStart={handleTouchStart}
+						onTouchEnd={handleTouchEnd}
+					>
+						<div className="p-5 pb-32 sm:pb-8">
 							<TabsContent value="new" className="space-y-8 mt-0 focus-visible:outline-none">
 								{/* Status Alert */}
 								{service.verification_notes && (
@@ -936,197 +987,227 @@ export function SupportServiceSidepanel({
 									</Alert>
 								)}
 
-								{/* Details Section */}
-								<section className="space-y-4">
-									<h3 className="text-sm font-bold text-serene-neutral-900 uppercase tracking-wider flex items-center gap-2">
-										<Shield className="h-4 w-4 text-sauti-teal" />
-										Service Details
-									</h3>
-									
-									<Card className="shadow-none border border-serene-neutral-200 rounded-xl">
-										<CardContent className="p-0 divide-y divide-serene-neutral-100">
-											{/* Email */}
-											<div className="p-3 grid grid-cols-1 md:grid-cols-3 gap-2 hover:bg-serene-neutral-50/50 transition-colors">
-												<span className="text-sm font-medium text-serene-neutral-500 self-center">Email</span>
-												<div className="md:col-span-2">
-													{isEditing ? (
-														<Input value={editData.email} onChange={e => setEditData({...editData, email: e.target.value})} className="h-8 text-sm" placeholder="email@example.com" />
-													) : (
-														<span className="text-sm text-serene-neutral-900 break-all font-medium block py-1">{service.email || "Not provided"}</span>
-													)}
-												</div>
-											</div>
-											{/* Phone */}
-											<div className="p-3 grid grid-cols-1 md:grid-cols-3 gap-2 hover:bg-serene-neutral-50/50 transition-colors">
-												<span className="text-sm font-medium text-serene-neutral-500 self-center">Phone</span>
-												<div className="md:col-span-2">
-													{isEditing ? (
-														<Input value={editData.phone_number} onChange={e => setEditData({...editData, phone_number: e.target.value})} className="h-8 text-sm" placeholder="+254..." />
-													) : (
-														<span className="text-sm text-serene-neutral-900 font-medium block py-1">{service.phone_number || "Not provided"}</span>
-													)}
-												</div>
-											</div>
-											{/* Website */}
-											<div className="p-3 grid grid-cols-1 md:grid-cols-3 gap-2 hover:bg-serene-neutral-50/50 transition-colors">
-												<span className="text-sm font-medium text-serene-neutral-500 self-center">Website</span>
-												<div className="md:col-span-2">
-													{isEditing ? (
-														<Input value={editData.website} onChange={e => setEditData({...editData, website: e.target.value})} className="h-8 text-sm" placeholder="https://..." />
-													) : (
-														service.website ? (
-															<a href={service.website} target="_blank" rel="noopener noreferrer" className="text-sm text-sauti-teal hover:underline break-all truncate block font-medium py-1">
-																{service.website}
-															</a>
-														) : (
-															<span className="text-sm text-serene-neutral-400 italic block py-1">Not provided</span>
-														)
-													)}
-												</div>
-											</div>
-											{/* Availability */}
-											<div className="p-3 grid grid-cols-1 md:grid-cols-3 gap-2 hover:bg-serene-neutral-50/50 transition-colors">
-												<span className="text-sm font-medium text-serene-neutral-500 pt-2">Availability</span>
-												<div className="md:col-span-2 relative z-20">
-													{isEditing ? (
-														<div className="w-full">
-															<EnhancedSelect
-																options={AVAILABILITY_OPTIONS}
-																value={editData.availability || ""}
-																onChange={(val) => setEditData({...editData, availability: val})}
-																placeholder="Select availability..."
-																className="relative z-50"
-															/>
+									<div className="mt-6">
+										{isEditing ? (
+											<Accordion type="single" collapsible className="w-full space-y-4" defaultValue="details">
+												{/* Service Details Accordion Item (Edit Mode) */}
+												<AccordionItem value="details" className="border-none">
+													<AccordionTrigger className="group py-3 hover:no-underline px-1">
+														<div className="flex items-center gap-2">
+															<Shield className="h-4 w-4 text-sauti-teal" />
+															<span className="text-sm font-bold text-serene-neutral-900 uppercase tracking-wider">
+																Service Details
+															</span>
 														</div>
-													) : (
-														<p className="text-sm text-serene-neutral-900 whitespace-pre-wrap leading-relaxed py-2">
-															{AVAILABILITY_OPTIONS.find(opt => opt.value === service.availability)?.label || service.availability || "Not provided"}
-														</p>
-													)}
-												</div>
-											</div>
-										</CardContent>
-									</Card>
-
-									<Card className="shadow-none border border-serene-neutral-200 rounded-xl mt-4 relative z-0">
-										<CardContent className="p-0 divide-y divide-serene-neutral-100">
-											{/* Service Region / Coverage */}
-											<div className="p-3 grid grid-cols-1 md:grid-cols-3 gap-2 hover:bg-serene-neutral-50/50 transition-colors">
-												<span className="text-sm font-medium text-serene-neutral-500 flex items-center gap-1.5 pt-2">
-													<MapPin className="h-3.5 w-3.5" />
-													Service Region
-												</span>
-												<div className="md:col-span-2">
-													{isEditing ? (
-
-														<div className="space-y-3">
-															<div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-																{/* Remote Option */}
-																<div 
-																	onClick={() => setEditData({ ...editData, is_remote: !editData.is_remote })}
-																	className={cn(
-																		"cursor-pointer p-3 rounded-xl border-2 transition-all flex items-start gap-3",
-																		editData.is_remote 
-																			? "border-sauti-teal bg-sauti-teal/5 ring-1 ring-sauti-teal" 
-																			: "border-serene-neutral-100 bg-serene-neutral-50 hover:border-serene-neutral-200"
-																	)}
-																>
-																	<div className={cn("mt-0.5 h-3.5 w-3.5 rounded-full border flex items-center justify-center shrink-0", 
-																		editData.is_remote ? "border-sauti-teal bg-sauti-teal" : "border-serene-neutral-300 bg-white"
-																	)}>
-																		{editData.is_remote && <CheckCircle className="h-2.5 w-2.5 text-white" />}
+													</AccordionTrigger>
+													<AccordionContent className="pb-3 pt-1 px-1">
+														<Card className="shadow-none border border-serene-neutral-200 rounded-xl">
+															<CardContent className="p-4 space-y-4">
+																<div className="flex flex-col gap-4">
+																	{/* Email */}
+																	<div className="space-y-1.5 w-full">
+																		<span className="text-xs font-semibold text-serene-neutral-500 uppercase tracking-wide">Email</span>
+																		<Input value={editData.email} onChange={e => setEditData({...editData, email: e.target.value})} className="h-9 text-sm rounded-xl border-serene-neutral-200 bg-serene-neutral-50/30 focus:bg-white transition-all shadow-sm w-full" placeholder="email@example.com" />
 																	</div>
-																	<div>
-																		<span className="block text-sm font-semibold text-serene-neutral-900">Remote</span>
+																	{/* Phone */}
+																	<div className="space-y-1.5 w-full">
+																		<span className="text-xs font-semibold text-serene-neutral-500 uppercase tracking-wide">Phone</span>
+																		<Input value={editData.phone_number} onChange={e => setEditData({...editData, phone_number: e.target.value})} className="h-9 text-sm rounded-xl border-serene-neutral-200 bg-serene-neutral-50/30 focus:bg-white transition-all shadow-sm w-full" placeholder="+254..." />
+																	</div>
+																	{/* Website */}
+																	<div className="space-y-1.5 w-full">
+																		<span className="text-xs font-semibold text-serene-neutral-500 uppercase tracking-wide">Website</span>
+																		<Input value={editData.website} onChange={e => setEditData({...editData, website: e.target.value})} className="h-9 text-sm rounded-xl border-serene-neutral-200 bg-serene-neutral-50/30 focus:bg-white transition-all shadow-sm w-full" placeholder="https://..." />
+																	</div>
+																	{/* Availability */}
+																	<div className="space-y-1.5 w-full">
+																		<span className="text-xs font-semibold text-serene-neutral-500 uppercase tracking-wide">Availability</span>
+																		<Select
+																			value={editData.availability || ""}
+																			onValueChange={(val) => setEditData({...editData, availability: val})}
+																		>
+																			<SelectTrigger className="w-full h-9 text-sm rounded-xl border-serene-neutral-200 bg-serene-neutral-50/30 focus:bg-white transition-all shadow-sm">
+																				<SelectValue placeholder="Select availability..." />
+																			</SelectTrigger>
+																			<SelectContent>
+																				{AVAILABILITY_OPTIONS.map((option) => (
+																					<SelectItem key={option.value} value={option.value}>
+																						{option.label}
+																					</SelectItem>
+																				))}
+																			</SelectContent>
+																		</Select>
 																	</div>
 																</div>
+															</CardContent>
+														</Card>
+													</AccordionContent>
+												</AccordionItem>
 
-																{/* In-Person Option */}
+												{/* Location & Coverage Accordion Item (Edit Mode) */}
+												<AccordionItem value="location" className="border-none">
+													<AccordionTrigger className="group py-3 hover:no-underline px-1">
+														<div className="flex items-center justify-between w-full pr-4">
+															<span className="text-sm font-bold text-serene-neutral-900 uppercase tracking-wider flex items-center gap-2">
+																<MapPin className="h-4 w-4 text-sauti-teal" />
+																Location & Coverage
+															</span>
+														</div>
+													</AccordionTrigger>
+													<AccordionContent className="pb-3 pt-1 px-1">
+														<div className="space-y-6 animate-in fade-in slide-in-from-top-2 duration-300">
+															{/* Service Mode Selection */}
+															<div className="grid grid-cols-2 gap-3">
 																<div 
-																	onClick={() => setEditData({ 
-																		...editData, 
-																		is_remote: !editData.is_remote,
-																		coverage_area_radius: editData.coverage_area_radius || "5" 
-																	})}
+																	onClick={() => setEditData(prev => ({ ...prev, is_remote: true, is_in_person: false }))}
 																	className={cn(
-																		"cursor-pointer p-3 rounded-xl border-2 transition-all flex items-start gap-3",
-																		!editData.is_remote 
-																			? "border-sauti-teal bg-sauti-teal/5 ring-1 ring-sauti-teal" 
-																			: "border-serene-neutral-100 bg-serene-neutral-50 hover:border-serene-neutral-200"
+																		"cursor-pointer rounded-xl border p-3 flex items-center justify-center gap-2 transition-all duration-200",
+																		editData.is_remote 
+																			? "border-sauti-teal bg-sauti-teal/5 text-sauti-teal shadow-inner" 
+																			: "border-serene-neutral-200 bg-white text-serene-neutral-500 hover:border-serene-neutral-300 hover:bg-serene-neutral-50 shadow-sm"
 																	)}
 																>
-																	<div className={cn("mt-0.5 h-3.5 w-3.5 rounded-full border flex items-center justify-center shrink-0", 
-																		!editData.is_remote ? "border-sauti-teal bg-sauti-teal" : "border-serene-neutral-300 bg-white"
-																	)}>
-																		{!editData.is_remote && <CheckCircle className="h-2.5 w-2.5 text-white" />}
-																	</div>
-																	<div>
-																		<span className="block text-sm font-semibold text-serene-neutral-900">In-Person</span>
-																	</div>
+																	<Globe className="h-4 w-4" />
+																	<span className="text-sm font-semibold">Remote</span>
+																</div>
+																<div 
+																	onClick={() => setEditData(prev => ({ ...prev, is_in_person: true, is_remote: false }))}
+																	className={cn(
+																		"cursor-pointer rounded-xl border p-3 flex items-center justify-center gap-2 transition-all duration-200",
+																		editData.is_in_person 
+																			? "border-sauti-teal bg-sauti-teal/5 text-sauti-teal shadow-inner" 
+																			: "border-serene-neutral-200 bg-white text-serene-neutral-500 hover:border-serene-neutral-300 hover:bg-serene-neutral-50 shadow-sm"
+																	)}
+																>
+																	<MapPin className="h-4 w-4" />
+																	<span className="text-sm font-semibold">In-Person</span>
 																</div>
 															</div>
 
-															{/* Radius Slider if In-Person */}
-															{!editData.is_remote && (
-																<div className="pt-2 animate-in fade-in slide-in-from-top-2">
-																	<div className="bg-serene-neutral-50 rounded-xl p-4 border border-serene-neutral-100 space-y-3">
-																		<div className="flex justify-between items-center">
-																			<label className="text-xs font-semibold uppercase text-serene-neutral-500">Coverage Radius</label>
-																			<span className="text-sm font-bold text-sauti-teal">{editData.coverage_area_radius} km</span>
-																		</div>
-																		<input
-																			type="range"
-																			min="1"
-																			max="100"
-																			value={Number(editData.coverage_area_radius) || 5}
-																			onChange={(e) => setEditData({ ...editData, coverage_area_radius: e.target.value })}
-																			className="w-full h-2 bg-serene-neutral-200 rounded-lg appearance-none cursor-pointer accent-sauti-teal"
+															{editData.is_in_person && (
+																<div className="space-y-2">
+																	<div className="flex items-center justify-between">
+																		{editData.address && (
+																			<span className="text-xs text-sauti-teal font-medium truncate max-w-[200px]">
+																				{editData.address}
+																			</span>
+																		)}
+																	</div>
+																	<div className="rounded-xl overflow-hidden shadow-none border border-serene-neutral-200">
+																		<LocationPicker
+																			initialLat={editData.latitude || -1.2921}
+																			initialLng={editData.longitude || 36.8219}
+																			initialRadius={Number(editData.coverage_area_radius) || 5000}
+																			initialAddress={editData.address}
+																			onLocationChange={(lat, lng, address) => {
+																				setEditData(prev => ({ ...prev, latitude: lat, longitude: lng, address }));
+																			}}
+																			onRadiusChange={(radius) => {
+																				setEditData(prev => ({ ...prev, coverage_area_radius: String(radius) }));
+																			}}
+																			className="w-full"
 																		/>
-																		<div className="flex gap-2 flex-wrap">
-																			{[5, 10, 25, 50, 100].map(val => (
-																				<button
-																					key={val}
-																					type="button"
-																					onClick={() => setEditData({ ...editData, coverage_area_radius: val.toString() })}
-																					className={cn(
-																						"px-2.5 py-1 text-xs rounded-lg font-medium transition-colors border",
-																						Number(editData.coverage_area_radius) === val
-																							? "bg-sauti-teal text-white border-sauti-teal"
-																							: "bg-white text-serene-neutral-600 border-serene-neutral-200 hover:border-serene-neutral-300"
-																					)}
-																				>
-																					{val}km
-																				</button>
-																			))}
-																		</div>
 																	</div>
 																</div>
 															)}
+														</div>
+													</AccordionContent>
+												</AccordionItem>
+											</Accordion>
+										) : (
+											/* View Mode: Vertical Stack (No Accordion) */
+											<div className="space-y-8">
+												{/* Service Details (View Mode) */}
+												<section className="space-y-4">
+													<h3 className="text-sm font-bold text-serene-neutral-900 uppercase tracking-wider flex items-center gap-2">
+														<Shield className="h-4 w-4 text-sauti-teal" />
+														Service Details
+													</h3>
+													<Card className="shadow-none border border-serene-neutral-200 rounded-xl">
+														<CardContent className="p-4 space-y-4">
+															<div className="grid grid-cols-2 gap-4">
+																<div className="space-y-1.5 overflow-hidden">
+																	<span className="text-xs font-semibold text-serene-neutral-500 uppercase tracking-wide">Email</span>
+																	<span className="text-sm text-serene-neutral-900 break-all font-medium block truncate" title={service.email || ""}>{service.email || "Not provided"}</span>
+																</div>
+																<div className="space-y-1.5 overflow-hidden">
+																	<span className="text-xs font-semibold text-serene-neutral-500 uppercase tracking-wide">Phone</span>
+																	<span className="text-sm text-serene-neutral-900 font-medium block truncate" title={service.phone_number || ""}>{service.phone_number || "Not provided"}</span>
+																</div>
+																<div className="space-y-1.5 overflow-hidden">
+																	<span className="text-xs font-semibold text-serene-neutral-500 uppercase tracking-wide">Website</span>
+																	{service.website ? (
+																		<a href={service.website} target="_blank" rel="noopener noreferrer" className="text-sm text-sauti-teal hover:underline break-all truncate block font-medium" title={service.website}>
+																			{service.website}
+																		</a>
+																	) : (
+																		<span className="text-sm text-serene-neutral-400 italic block">Not provided</span>
+																	)}
+																</div>
+																<div className="space-y-1.5 overflow-hidden">
+																	<span className="text-xs font-semibold text-serene-neutral-500 uppercase tracking-wide">Availability</span>
+																	<p className="text-sm text-serene-neutral-900 leading-relaxed truncate" title={AVAILABILITY_OPTIONS.find(opt => opt.value === service.availability)?.label || service.availability || ""}>
+																		{AVAILABILITY_OPTIONS.find(opt => opt.value === service.availability)?.label || service.availability || "Not provided"}
+																	</p>
+																</div>
+															</div>
+														</CardContent>
+													</Card>
+												</section>
 
-															{currentLocation && !editData.is_remote && (
-																<label className="flex items-center gap-2 cursor-pointer p-2 rounded-lg hover:bg-serene-neutral-50 transition-colors border border-transparent hover:border-serene-neutral-200">
-																	<input 
-																		type="checkbox" 
-																		checked={shouldUpdateLocation}
-																		onChange={(e) => setShouldUpdateLocation(e.target.checked)}
-																		className="rounded border-serene-neutral-300 text-sauti-teal focus:ring-sauti-teal h-4 w-4"
-																	/>
-																	<span className="text-xs font-medium text-serene-neutral-600 select-none">
-																		Update location to current GPS
-																	</span>
-																</label>
+												{/* Location & Coverage (View Mode) */}
+												<section className="space-y-4">
+													<div className="flex items-center justify-between pr-4">
+														<h3 className="text-sm font-bold text-serene-neutral-900 uppercase tracking-wider flex items-center gap-2">
+															<MapPin className="h-4 w-4 text-sauti-teal" />
+															Location & Coverage
+														</h3>
+													</div>
+													
+													<div className="space-y-4">
+														<div className="flex gap-2 flex-wrap">
+															{(!service.coverage_area_radius || service.coverage_area_radius === 0) && (
+																<div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-serene-neutral-100 text-serene-neutral-700 border border-serene-neutral-200">
+																	<Globe className="h-3.5 w-3.5" />
+																	Remote Service
+																</div>
+															)}
+															{service.coverage_area_radius && service.coverage_area_radius > 0 && (
+																<div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-sauti-teal/5 text-sauti-teal border border-sauti-teal/10">
+																	<MapPin className="h-3.5 w-3.5" />
+																	In-Person Service
+																</div>
 															)}
 														</div>
-													) : (
-														<span className="text-sm text-serene-neutral-900 font-medium">
-															{service.coverage_area_radius ? `${service.coverage_area_radius} km radius` : "Remote / Not specified"}
-														</span>
-													)}
-												</div>
+
+														{service.coverage_area_radius && service.coverage_area_radius > 0 && service.latitude && service.longitude && (
+															<div className="relative h-[400px] w-full rounded-xl overflow-hidden shadow-sm border border-serene-neutral-200 mt-4 group">
+																<LocationPicker
+																	initialLat={service.latitude}
+																	initialLng={service.longitude}
+																	initialRadius={Number(service.coverage_area_radius)}
+																	disabled={true}
+																	onLocationChange={() => {}}
+																	onRadiusChange={() => {}}
+																	className="w-full h-full"
+																/>
+																{/* Map Overlay for Coverage Info */}
+																<div className="absolute bottom-4 left-4 z-10 bg-white/90 backdrop-blur-md px-4 py-2 rounded-lg shadow-sm border border-serene-neutral-200/50">
+																	<div className="flex items-center gap-2">
+																		<div className="h-2 w-2 rounded-full bg-sauti-teal animate-pulse" />
+																		<span className="text-xs font-semibold text-serene-neutral-900">
+																			Coverage Area: {(service.coverage_area_radius / 1000).toFixed(1)} km radius
+																		</span>
+																	</div>
+																</div>
+															</div>
+														)}
+													</div>
+												</section>
 											</div>
-										</CardContent>
-									</Card>
-								</section>
+										)}
+									</div>
+
 							</TabsContent>
 
 							<TabsContent value="documents" className="space-y-6 mt-0 focus-visible:outline-none">
@@ -1251,11 +1332,11 @@ export function SupportServiceSidepanel({
 								)}
 							</TabsContent>
 						</div>
-					</ScrollArea>
+					</div>
 				</Tabs>
 
 				{/* Footer Actions */}
-				<div className="flex-none p-5 border-t border-serene-neutral-200 bg-white/80 backdrop-blur-md z-10 sticky bottom-0">
+				<div className="flex-none p-4 sm:p-5 pt-3 sm:pt-3 border-t border-serene-neutral-200 bg-white z-20">
 					<div className="flex items-center justify-between gap-4">
 						{/* Back Button */}
 						{activeTab !== 'new' ? (
