@@ -24,41 +24,53 @@ import {
 	Loader2,
 	Eye,
 	Power,
-	Play
+	Play,
+	Share2,
+	Users,
+	MoreVertical,
+	Calendar as CalendarIcon,
+	ChevronLeft,
+	MapPin,
+	Globe
 } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { Database } from "@/types/db-schema";
+import { Database, Tables } from "@/types/db-schema";
 import { fileUploadService } from "@/lib/file-upload";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger, ContextMenuSeparator } from "@/components/ui/context-menu";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { format } from "date-fns";
+import { cn, safelyParseJsonArray } from "@/lib/utils";
+import { EnhancedSelect } from "@/components/ui/enhanced-select";
 
 type SupportServiceType = Database["public"]["Enums"]["support_service_type"];
 type UserType = Database["public"]["Enums"]["user_type"];
+type VerificationStatusType = Database["public"]["Enums"]["verification_status_type"];
 
-interface SupportService {
-	id: string;
-	name: string;
-	service_types: SupportServiceType;
-	email?: string | null;
-	phone_number?: string | null;
-	website?: string | null;
-	availability?: string | null;
-	verification_status?: string | null;
-	verification_notes?: string | null;
-	last_verification_check?: string | null;
-	accreditation_files_metadata?: any;
-	created_at?: string | null;
-}
+type SupportService = Tables<"support_services">;
 
 interface SupportServiceSidepanelProps {
 	service: SupportService | null;
 	userId: string;
 	userType: UserType;
+	profileVerificationStatus?: string;
 	onClose: () => void;
 	onUpdate: () => void;
 }
+
+const AVAILABILITY_OPTIONS = [
+	{ value: "24/7", label: "24/7 Emergency Support" },
+	{ value: "weekdays_9_5", label: "Weekdays (9 AM - 5 PM)" },
+	{ value: "weekdays_extended", label: "Weekdays (8 AM - 8 PM)" },
+	{ value: "weekends", label: "Weekends Only" },
+	{ value: "by_appointment", label: "By Appointment" },
+	{ value: "flexible", label: "Flexible Hours" },
+];
 
 // --- Helper Components ---
 
@@ -146,10 +158,12 @@ export function SupportServiceSidepanel({
 	service,
 	userId,
 	userType,
+	profileVerificationStatus,
 	onClose,
 	onUpdate,
 }: SupportServiceSidepanelProps) {
 	const [documents, setDocuments] = useState<any[]>([]);
+	const [sharedUsers, setSharedUsers] = useState<any[]>([]);
 	const [isLoading, setIsLoading] = useState(false);
 	const [isUploading, setIsUploading] = useState(false);
 	const [isEditing, setIsEditing] = useState(false);
@@ -159,11 +173,16 @@ export function SupportServiceSidepanel({
 		phone_number: "",
 		website: "",
 		availability: "",
+		coverage_area_radius: "",
+		is_remote: false,
 	});
 	const [isSaving, setIsSaving] = useState(false);
-	const [isModalOpen, setIsModalOpen] = useState(false); // Unified modal
+	const [isModalOpen, setIsModalOpen] = useState(false); // Document Upload modal
+	const [isSuspendModalOpen, setIsSuspendModalOpen] = useState(false);
+	const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+	const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+
 	const [availableDocuments, setAvailableDocuments] = useState<any[]>([]);
-	const [activeTab, setActiveTab] = useState("new");
 	const [isSubmitting, setIsSubmitting] = useState(false); // For "Submit for Review"
 
 	// Upload form state
@@ -173,14 +192,44 @@ export function SupportServiceSidepanel({
 	const [uploadFile, setUploadFile] = useState<File | null>(null);
 	const [isDragOver, setIsDragOver] = useState(false);
 
+	// Suspend form state
+	const [suspendType, setSuspendType] = useState<"temporary" | "permanent">("temporary");
+	const [suspensionDate, setSuspensionDate] = useState<Date | undefined>(undefined);
+	const [suspensionReason, setSuspensionReason] = useState("");
+
+	// Share form state
+	const [shareEmail, setShareEmail] = useState("");
+	
+	// Tab State
+	const [activeTab, setActiveTab] = useState("new");
+	
+	// Location State
+	const [currentLocation, setCurrentLocation] = useState<{ lat: number; lng: number } | null>(null);
+	const [shouldUpdateLocation, setShouldUpdateLocation] = useState(false);
+
 	const supabase = createClient();
 	const { toast } = useToast();
 
 	// --- Effects ---
 
 	useEffect(() => {
+		if (isEditing && "geolocation" in navigator) {
+			navigator.geolocation.getCurrentPosition(
+				(position) => {
+					setCurrentLocation({
+						lat: position.coords.latitude,
+						lng: position.coords.longitude,
+					});
+				},
+				(error) => console.error("Error getting location:", error)
+			);
+		}
+	}, [isEditing]);
+
+	useEffect(() => {
 		if (service) {
 			loadServiceDocuments();
+			loadSharedUsers();
 			loadAvailableDocuments();
 			setEditData({
 				name: service.name || "",
@@ -188,11 +237,35 @@ export function SupportServiceSidepanel({
 				phone_number: service.phone_number || "",
 				website: service.website || "",
 				availability: service.availability || "",
+				coverage_area_radius: service.coverage_area_radius ? String(service.coverage_area_radius) : "",
+				is_remote: !service.coverage_area_radius,
 			});
 		}
 	}, [service]);
 
 	// --- Data Loading ---
+
+	const loadSharedUsers = useCallback(async () => {
+		if (!service) return;
+		try {
+			const { data, error } = await supabase
+				.from("service_shares")
+				.select(`
+					id,
+					status,
+					created_at,
+					to_user:profiles!service_shares_to_user_id_fkey (
+						id, first_name, last_name, email, avatar_url
+					)
+				`)
+				.eq("service_id", service.id);
+
+			if (error) throw error;
+			setSharedUsers(data || []);
+		} catch (error) {
+			console.error("Error loading shared users:", error);
+		}
+	}, [service, supabase]);
 
 	const loadServiceDocuments = useCallback(async () => {
 		if (!service) return;
@@ -207,11 +280,10 @@ export function SupportServiceSidepanel({
 
 			if (error) throw error;
 
-			const docs = data?.accreditation_files_metadata
-				? Array.isArray(data.accreditation_files_metadata)
-					? data.accreditation_files_metadata
-					: JSON.parse(data.accreditation_files_metadata)
-				: [];
+			let docs: any[] = [];
+			if (data?.accreditation_files_metadata) {
+				docs = safelyParseJsonArray(data.accreditation_files_metadata);
+			}
 
 			setDocuments(docs);
 		} catch (error) {
@@ -240,16 +312,14 @@ export function SupportServiceSidepanel({
 			const availableDocs: any[] = [];
 
 			if (profile?.accreditation_files_metadata) {
-				const profileDocs = Array.isArray(profile.accreditation_files_metadata)
-					? profile.accreditation_files_metadata
-					: JSON.parse(profile.accreditation_files_metadata);
+				const profileDocs = safelyParseJsonArray(profile.accreditation_files_metadata);
 
 				profileDocs.forEach((doc: any, index: number) => {
 					availableDocs.push({
 						id: `profile-${index}`,
 						title: doc.title || doc.fileName || "Profile Document",
 						url: doc.url,
-						source: "Profile Profile",
+						source: "Profile",
 						sourceId: "profile",
 						uploadedAt: doc.uploadedAt,
 						fileSize: doc.fileSize,
@@ -261,15 +331,13 @@ export function SupportServiceSidepanel({
 			const { data: otherServices } = await supabase
 				.from("support_services")
 				.select("id, name, accreditation_files_metadata")
-				.eq("professional_id", userId) // Assuming professional_id is correct field
+				.eq("user_id", userId) 
 				.neq("id", service.id);
 
 			if (otherServices) {
 				for (const otherSvc of otherServices) {
 					if (otherSvc.accreditation_files_metadata) {
-						const svcDocs = Array.isArray(otherSvc.accreditation_files_metadata)
-							? otherSvc.accreditation_files_metadata
-							: JSON.parse(otherSvc.accreditation_files_metadata);
+						const svcDocs = safelyParseJsonArray(otherSvc.accreditation_files_metadata);
 
 						svcDocs.forEach((doc: any, index: number) => {
 							availableDocs.push({
@@ -294,8 +362,36 @@ export function SupportServiceSidepanel({
 
 	// --- Actions ---
 
+	/**
+	 * Helper to update verification_status on support_services.
+	 * Updates ONLY the verification_status column in an isolated call so
+	 * PostgREST sends it as the sole column value, allowing PostgreSQL to
+	 * resolve the text → verification_status_type enum cast correctly.
+	 */
+	const updateVerificationStatus = async (
+		serviceId: string,
+		status: VerificationStatusType
+	) => {
+		const { error } = await supabase
+			.from("support_services")
+			.update({ verification_status: status } as any)
+			.eq("id", serviceId);
+		if (error) throw error;
+	};
+
 	const handleSubmitForReview = async () => {
 		if (!service) return;
+
+		// Check if profile is verified first
+		if (profileVerificationStatus !== "verified" && profileVerificationStatus !== "under_review") {
+			toast({
+				title: "Identity Verification Required",
+				description: "Please complete your Identity Verification (ID Front & Back) in the Profile section before submitting your service.",
+				variant: "destructive",
+			});
+			return;
+		}
+
 		if (documents.length === 0) {
 			toast({
 				title: "Action Required",
@@ -307,22 +403,14 @@ export function SupportServiceSidepanel({
 
 		setIsSubmitting(true);
 		try {
-			const { error } = await supabase
-				.from("support_services")
-				.update({ 
-					verification_status: "under_review",
-					// potentially update a submitted_at timestamp if column exists
-				})
-				.eq("id", service.id);
-
-			if (error) throw error;
+			await updateVerificationStatus(service.id, "under_review");
 
 			toast({
 				title: "Submitted for Review",
 				description: "Your service is now being reviewed by our team.",
 			});
 			onUpdate();
-			onClose(); // Optional: close panel after submit
+			onClose(); 
 		} catch (error) {
 			console.error("Error submitting for review:", error);
 			toast({
@@ -337,7 +425,6 @@ export function SupportServiceSidepanel({
 
 	const handleEdit = () => {
 		if (isEditing) {
-			// Cancelling edit
 			setIsEditing(false);
 			setEditData({
 				name: service?.name || "",
@@ -345,9 +432,12 @@ export function SupportServiceSidepanel({
 				phone_number: service?.phone_number || "",
 				website: service?.website || "",
 				availability: service?.availability || "",
+				coverage_area_radius: service?.coverage_area_radius ? String(service.coverage_area_radius) : "",
+				is_remote: !service?.coverage_area_radius,
 			});
 		} else {
 			setIsEditing(true);
+			setShouldUpdateLocation(false);
 		}
 	};
 
@@ -355,7 +445,10 @@ export function SupportServiceSidepanel({
 		if (!service) return;
 		setIsSaving(true);
 		try {
-			const { error } = await supabase
+			// When details are edited:
+			// 1. Update the non-enum fields + clear documents
+			// 2. Separately reset verification_status to 'pending' (enum-safe)
+			const { error: fieldsError } = await supabase
 				.from("support_services")
 				.update({
 					name: editData.name,
@@ -363,14 +456,30 @@ export function SupportServiceSidepanel({
 					phone_number: editData.phone_number || null,
 					website: editData.website || null,
 					availability: editData.availability || null,
+					coverage_area_radius: (!editData.is_remote && editData.coverage_area_radius) ? Number(editData.coverage_area_radius) : null,
+					...(shouldUpdateLocation && currentLocation ? {
+						latitude: currentLocation.lat,
+						longitude: currentLocation.lng
+					} : {}),
+					accreditation_files_metadata: [], // Clear documents
 				})
 				.eq("id", service.id);
 
-			if (error) throw error;
+			if (fieldsError) throw fieldsError;
 
-			toast({ title: "Success", description: "Service details updated successfully" });
+			// Reset verification status separately (enum-safe update)
+			await updateVerificationStatus(service.id, "pending");
+
+			setDocuments([]); // Clear local state
+			toast({ 
+				title: "Details Updated", 
+				description: "Verification reset. Please re-upload documents to verify." 
+			});
 			setIsEditing(false);
+			
+			// Trigger parent update immediately
 			onUpdate();
+			
 		} catch (error) {
 			console.error("Error updating service:", error);
 			toast({ title: "Error", description: "Failed to update service details", variant: "destructive" });
@@ -379,31 +488,134 @@ export function SupportServiceSidepanel({
 		}
 	};
 
-	const handleToggleSuspend = async () => {
+	const handleConfirmSuspend = async () => {
 		if (!service) return;
 		setIsSaving(true);
 		try {
-			const newStatus = service.verification_status === "suspended" ? "verified" : "suspended";
-			const { error } = await supabase
+			// Update suspension fields (non-enum)
+			const suspensionFields: Record<string, any> = {
+				suspension_reason: suspensionReason,
+			};
+
+			if (suspendType === 'permanent') {
+				suspensionFields.is_permanently_suspended = true;
+				suspensionFields.suspension_end_date = null;
+			} else {
+				if (!suspensionDate) {
+					toast({ title: "Date Required", description: "Please select an end date for temporary suspension.", variant: "destructive" });
+					setIsSaving(false);
+					return;
+				}
+				suspensionFields.is_permanently_suspended = false;
+				suspensionFields.suspension_end_date = suspensionDate.toISOString();
+			}
+
+			const { error: fieldsError } = await supabase
 				.from("support_services")
-				.update({ verification_status: newStatus })
+				.update(suspensionFields)
 				.eq("id", service.id);
 
-			if (error) throw error;
+			if (fieldsError) throw fieldsError;
+
+			// Update verification_status separately (enum-safe)
+			await updateVerificationStatus(service.id, "suspended");
 
 			toast({ 
-				title: newStatus === "suspended" ? "Service Suspended" : "Service Activated", 
-				description: newStatus === "suspended" 
-					? "This service is now hidden from matching." 
-					: "This service is now active and can be matched." 
+				title: "Service Suspended", 
+				description: "Service has been suspended successfully." 
 			});
+			setIsSuspendModalOpen(false);
 			onUpdate();
 		} catch (error) {
-			console.error("Error updating service status:", error);
-			toast({ title: "Error", description: "Failed to update service status", variant: "destructive" });
+			console.error("Error suspending service:", error);
+			toast({ title: "Error", description: "Failed to suspend service", variant: "destructive" });
 		} finally {
 			setIsSaving(false);
 		}
+	};
+
+	const handleActivate = async () => {
+		if (!service) return;
+		setIsSaving(true);
+		try {
+			// Clear suspension fields (non-enum)
+			const { error: fieldsError } = await supabase
+				.from("support_services")
+				.update({ 
+					suspension_reason: null,
+					suspension_end_date: null,
+					is_permanently_suspended: false
+				})
+				.eq("id", service.id);
+
+			if (fieldsError) throw fieldsError;
+
+			// Set verification_status separately (enum-safe)
+			await updateVerificationStatus(service.id, "verified");
+
+			toast({ title: "Service Activated", description: "Service is now active." });
+			onUpdate();
+		} catch (error) {
+			console.error("Error activating service:", error);
+			toast({ title: "Error", description: "Failed to activate service", variant: "destructive" });
+		} finally {
+			setIsSaving(false);
+		}
+	};
+
+	const handleConfirmShare = async () => {
+		if (!service || !shareEmail) return;
+		setIsSaving(true);
+		
+		try {
+			// 1. Find user by email
+			const { data: user, error: userError } = await supabase
+				.from("profiles")
+				.select("id")
+				.eq("email", shareEmail)
+				.single();
+
+			if (userError || !user) {
+				toast({ title: "User Not Found", description: "No professional found with this email.", variant: "destructive" });
+				return;
+			}
+
+			if (user.id === userId) {
+				toast({ title: "Invalid Action", description: "You cannot share a service with yourself.", variant: "destructive" });
+				return;
+			}
+
+			// 2. Create Share Request logic (via API or direct insert if policy allows)
+			// Using API route better for notification logic trigger
+			const response = await fetch('/api/services/share', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ 
+					serviceId: service.id, 
+					toUserId: user.id 
+				})
+			});
+
+			if (!response.ok) throw new Error("Failed to share service");
+
+			toast({ title: "Share Request Sent", description: `Invitation sent to ${shareEmail}` });
+			setIsShareModalOpen(false);
+			setShareEmail("");
+			// loadSharedUsers(); // Reload list (pending)
+		} catch (error) {
+			console.error("Error sharing service:", error);
+			toast({ title: "Error", description: "Failed to share service", variant: "destructive" });
+		} finally {
+			setIsSaving(false);
+		}
+	};
+
+	const handleDelete = async () => {
+		if (!service) return;
+		// Implement delete logic
+		// Check for active matches first?
+		toast({ title: "Coming Soon", description: "Delete functionality will be implemented with safety checks." });
+		setIsDeleteModalOpen(false);
 	};
 
 	const handleUploadNew = async () => {
@@ -458,35 +670,37 @@ export function SupportServiceSidepanel({
 			return;
 		}
 
+		// Ensure no undefined values are passed
 		const linkedDoc = {
-			title: doc.title,
-			url: doc.url,
+			title: doc.title || "Untitled Document",
+			url: doc.url || "",
 			uploadedAt: doc.uploadedAt || new Date().toISOString(),
-			linked: true, // Marker
-			sourceId: doc.sourceId,
-			sourceName: doc.source,
-			fileSize: doc.fileSize,
+			linked: true,
+			sourceId: doc.sourceId || null,
+			sourceName: doc.source || doc.sourceName || "Unknown Source",
+			fileSize: doc.fileSize || 0,
 		};
 
 		const updatedDocs = [...documents, linkedDoc];
 		try {
 			await saveDocuments(updatedDocs);
 			toast({ title: "Document Linked", description: "Document linked successfully." });
-			setIsModalOpen(false); // Close modal on success
+			setIsModalOpen(false);
 		} catch (error) {
+			console.error("Link existing document error:", error);
 			toast({ title: "Link Failed", description: "Failed to link document.", variant: "destructive" });
 		}
 	};
 
 	const saveDocuments = async (newDocuments: any[]) => {
 		if (!service) return;
-		// Updates the local state immediately for UI snapiness if needed, 
-		// but usually we wait for re-fetch or optimistic update.
-		// For now we do database update then re-render via onUpdate or local state.
 		
+		// Sanitize payload: JSON does not support 'undefined'
+		const payload = JSON.parse(JSON.stringify(newDocuments));
+
 		const { error } = await supabase
 			.from("support_services")
-			.update({ accreditation_files_metadata: newDocuments })
+			.update({ accreditation_files_metadata: payload })
 			.eq("id", service.id);
 
 		if (error) throw error;
@@ -496,10 +710,6 @@ export function SupportServiceSidepanel({
 
 	const handleDeleteDoc = async (docUrl: string, index: number) => {
 		try {
-			// If it's a linked doc, just remove the reference. If uploaded, delete file + ref?
-			// Ideally we shouldn't delete the file if it's potentially used elsewhere, 
-			// but for simple "uploaded here, stays here" model:
-			
 			const doc = documents[index];
 			if (!doc.linked) {
 				await fileUploadService.deleteFile(docUrl, "accreditation");
@@ -522,7 +732,6 @@ export function SupportServiceSidepanel({
 		const files = Array.from(e.dataTransfer.files);
 		if (files.length > 0) {
 			const file = files[0];
-			// Basic validation could go here
 			setUploadFile(file);
 			if (!uploadTitle) setUploadTitle(file.name.split('.')[0]);
 		}
@@ -561,13 +770,14 @@ export function SupportServiceSidepanel({
 
 	if (!service) return null;
 
-	const canSubmit = service.verification_status !== "verified" && service.verification_status !== "under_review";
+	const canSubmit = service.verification_status !== "verified" && service.verification_status !== "under_review" && service.verification_status !== "suspended";
+	const isVerified = service.verification_status === "verified";
+	const isSuspended = service.verification_status === "suspended";
 	const isSubmitted = service.verification_status === "under_review";
 
 	return (
 		<>
-			{/* Sidepanel Container */}
-			<div className="fixed inset-0 sm:inset-y-0 sm:right-0 sm:left-auto w-full sm:w-[540px] lg:w-[600px] xl:w-[700px] bg-white shadow-2xl border-l z-[60] transform transition-transform duration-300 ease-out translate-y-0 sm:translate-x-0 flex flex-col h-full active-sidepanel">
+			<div className="fixed inset-0 sm:inset-y-0 sm:right-0 sm:left-auto w-full sm:w-[540px] lg:w-[600px] xl:w-[700px] bg-white shadow-2xl border-l z-[40] transform transition-transform duration-300 ease-out translate-y-0 sm:translate-x-0 flex flex-col h-full active-sidepanel">
 				
 				{/* Header */}
 				<div className="flex-none p-5 border-b border-serene-neutral-200 bg-white/80 backdrop-blur-md sticky top-0 z-10">
@@ -609,7 +819,7 @@ export function SupportServiceSidepanel({
 										size="sm" 
 										onClick={handleEdit} 
 										disabled={isSaving}
-										className="h-8 px-3 text-serene-neutral-600 hover:text-red-600 hover:bg-red-50"
+										className="h-8 px-3 text-serene-neutral-600 hover:text-serene-neutral-900 hover:bg-serene-neutral-200/50"
 									>
 										Cancel
 									</Button>
@@ -617,33 +827,43 @@ export function SupportServiceSidepanel({
 										size="sm" 
 										onClick={handleSaveEdit} 
 										disabled={isSaving || !editData.name.trim()}
-										className="h-8 px-3 bg-serene-green-600 hover:bg-serene-green-700 text-white shadow-sm"
+										className="h-8 px-3 bg-sauti-teal hover:bg-sauti-teal/90 text-white shadow-sm"
 									>
 										{isSaving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Save Changes"}
 									</Button>
 								</div>
 							) : (
-								<Button variant="ghost" size="icon" onClick={handleEdit} className="h-9 w-9 rounded-full hover:bg-serene-neutral-100 text-serene-neutral-500">
-									<Edit className="h-4 w-4" />
-								</Button>
-							)}
-							
-							{/* Suspend / Activate Button */}
-							{/* Only show if not editing */}
-							{!isEditing && (
-								<Button 
-									variant="ghost" 
-									size="icon" 
-									onClick={handleToggleSuspend} 
-									className={`h-9 w-9 rounded-full ${
-										service.verification_status === 'suspended' 
-											? "text-serene-green-600 hover:bg-serene-green-50" 
-											: "text-amber-500 hover:bg-amber-50"
-									}`}
-									title={service.verification_status === 'suspended' ? "Activate Service" : "Suspend Service"}
-								>
-									{service.verification_status === 'suspended' ? <Play className="h-4 w-4" /> : <Power className="h-4 w-4" />}
-								</Button>
+								<>
+									<Button variant="ghost" size="icon" onClick={handleEdit} className="h-9 w-9 rounded-full hover:bg-serene-neutral-100 text-serene-neutral-500">
+										<Edit className="h-4 w-4" />
+									</Button>
+									
+									<ContextMenu>
+										<ContextMenuTrigger>
+											<Button variant="ghost" size="icon" className="h-9 w-9 rounded-full hover:bg-serene-neutral-100 text-serene-neutral-500">
+												<MoreVertical className="h-5 w-5" />
+											</Button>
+										</ContextMenuTrigger>
+										<ContextMenuContent className="w-56">
+											{isSuspended ? (
+												<ContextMenuItem onClick={handleActivate} className="text-green-600 focus:text-green-600 focus:bg-green-50 cursor-pointer">
+													<Play className="h-4 w-4 mr-2" /> Reactivate Service
+												</ContextMenuItem>
+											) : (
+												<ContextMenuItem onClick={() => setIsSuspendModalOpen(true)} className="text-amber-600 focus:text-amber-600 focus:bg-amber-50 cursor-pointer">
+													<Power className="h-4 w-4 mr-2" /> Suspend Service
+												</ContextMenuItem>
+											)}
+											<ContextMenuItem onClick={() => setIsShareModalOpen(true)} className="cursor-pointer">
+												<Share2 className="h-4 w-4 mr-2" /> Share Service
+											</ContextMenuItem>
+											<ContextMenuSeparator />
+											<ContextMenuItem onClick={() => setIsDeleteModalOpen(true)} className="text-red-600 focus:text-red-600 focus:bg-red-50 cursor-pointer">
+												<Trash2 className="h-4 w-4 mr-2" /> Delete Service
+											</ContextMenuItem>
+										</ContextMenuContent>
+									</ContextMenu>
+								</>
 							)}
 
 							<Button variant="ghost" size="icon" onClick={onClose} className="h-9 w-9 rounded-full hover:bg-red-50 hover:text-red-600">
@@ -653,334 +873,711 @@ export function SupportServiceSidepanel({
 					</div>
 				</div>
 
-				{/* Scrollable Content */}
-				<ScrollArea className="flex-1">
-					<div className="p-5 space-y-8 pb-32">
-						{/* Status Alert */}
-						{service.verification_notes && (
-							<Alert variant={service.verification_status === 'rejected' ? 'destructive' : 'default'} className="bg-amber-50 border-amber-200">
-								<AlertCircle className="h-4 w-4 text-amber-600" />
-								<AlertTitle className="text-amber-800 font-semibold mb-1">Attention Needed</AlertTitle>
-								<AlertDescription className="text-amber-700">
-									{service.verification_notes}
-								</AlertDescription>
-							</Alert>
-						)}
-
-						{/* Details Section */}
-						<section className="space-y-4">
-							<h3 className="text-sm font-bold text-serene-neutral-900 uppercase tracking-wider flex items-center gap-2">
-								<Shield className="h-4 w-4 text-sauti-teal" />
-								Service Details
-							</h3>
-							
-							<Card className="shadow-none border border-serene-neutral-200">
-								<CardContent className="p-0 divide-y divide-serene-neutral-100">
-									{/* Email */}
-									<div className="p-4 grid grid-cols-1 sm:grid-cols-3 gap-2">
-										<span className="text-sm font-medium text-serene-neutral-500">Email</span>
-										<div className="sm:col-span-2">
-											{isEditing ? (
-												<Input value={editData.email} onChange={e => setEditData({...editData, email: e.target.value})} className="h-8" placeholder="email@example.com" />
-											) : (
-												<span className="text-sm text-serene-neutral-900 break-all">{service.email || "Not provided"}</span>
-											)}
-										</div>
-									</div>
-									{/* Phone */}
-									<div className="p-4 grid grid-cols-1 sm:grid-cols-3 gap-2">
-										<span className="text-sm font-medium text-serene-neutral-500">Phone</span>
-										<div className="sm:col-span-2">
-											{isEditing ? (
-												<Input value={editData.phone_number} onChange={e => setEditData({...editData, phone_number: e.target.value})} className="h-8" placeholder="+254..." />
-											) : (
-												<span className="text-sm text-serene-neutral-900">{service.phone_number || "Not provided"}</span>
-											)}
-										</div>
-									</div>
-									{/* Website */}
-									<div className="p-4 grid grid-cols-1 sm:grid-cols-3 gap-2">
-										<span className="text-sm font-medium text-serene-neutral-500">Website</span>
-										<div className="sm:col-span-2">
-											{isEditing ? (
-												<Input value={editData.website} onChange={e => setEditData({...editData, website: e.target.value})} className="h-8" placeholder="https://..." />
-											) : (
-												<a href={service.website || "#"} target="_blank" className="text-sm text-sauti-teal hover:underline break-all truncate block">
-													{service.website || "Not provided"}
-												</a>
-											)}
-										</div>
-									</div>
-									{/* Availability */}
-									<div className="p-4 grid grid-cols-1 sm:grid-cols-3 gap-2">
-										<span className="text-sm font-medium text-serene-neutral-500">Availability</span>
-										<div className="sm:col-span-2">
-											{isEditing ? (
-												<Textarea value={editData.availability} onChange={e => setEditData({...editData, availability: e.target.value})} className="min-h-[60px]" placeholder="e.g. Mon-Fri 8am-5pm" />
-											) : (
-												<p className="text-sm text-serene-neutral-900 whitespace-pre-wrap">{service.availability || "Not provided"}</p>
-											)}
-										</div>
-									</div>
-								</CardContent>
-							</Card>
-						</section>
-
-						{/* Documents Section */}
-						<section className="space-y-4">
-							<div className="flex items-center justify-between">
-								<h3 className="text-sm font-bold text-serene-neutral-900 uppercase tracking-wider flex items-center gap-2">
-									<FileText className="h-4 w-4 text-sauti-teal" />
-									Verification Documents
-								</h3>
-								<Button size="sm" onClick={() => setIsModalOpen(true)} className="h-8 bg-sauti-teal hover:bg-sauti-teal/90 text-white shadow-sm gap-2">
-									<Plus className="h-3.5 w-3.5" />
-									Add Document
-								</Button>
-							</div>
-
-							{documents.length === 0 ? (
-								<div className="text-center py-10 border-2 border-dashed border-serene-neutral-200 rounded-2xl bg-serene-neutral-50/50">
-									<div className="mx-auto w-12 h-12 rounded-full bg-serene-neutral-100 flex items-center justify-center mb-3">
-										<FileText className="h-6 w-6 text-serene-neutral-400" />
-									</div>
-									<h4 className="text-sm font-semibold text-serene-neutral-900">No documents yet</h4>
-									<p className="text-xs text-serene-neutral-500 mt-1 mb-4">Upload credentials to verify this service</p>
-									<Button variant="outline" size="sm" onClick={() => setIsModalOpen(true)}>
-										Upload First Document
-									</Button>
-								</div>
-							) : (
-								<div className="grid grid-cols-1 gap-3">
-									{documents.map((doc, idx) => (
-										<div key={idx} className="group relative bg-white border border-serene-neutral-200 rounded-xl p-4 transition-all hover:shadow-md hover:border-sauti-teal/30">
-											<div className="flex items-start gap-3">
-												<div className="h-10 w-10 rounded-lg bg-sauti-teal/10 flex items-center justify-center flex-shrink-0">
-													<FileText className="h-5 w-5 text-sauti-teal" />
-												</div>
-												<div className="flex-1 min-w-0">
-													<div className="flex items-center justify-between mb-1">
-														<h4 className="font-semibold text-serene-neutral-900 text-sm truncate pr-2">{doc.title}</h4>
-														{doc.linked && (
-															<Badge variant="outline" className="text-[10px] items-center gap-1 bg-blue-50 text-blue-700 border-blue-200 px-1.5 py-0 h-5">
-																<LinkIcon className="h-3 w-3" /> Linked
-															</Badge>
-														)}
-													</div>
-													<div className="flex items-center gap-3 text-xs text-serene-neutral-500">
-														<span>{formatFileSize(doc.fileSize)}</span>
-														<span>•</span>
-														<span>{formatDate(doc.uploadedAt)}</span>
-													</div>
-												</div>
-												<div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-													<Button variant="ghost" size="icon" className="h-8 w-8 text-serene-neutral-500 hover:text-sauti-teal hover:bg-sauti-teal/10" onClick={() => window.open(doc.url, '_blank')}>
-														<Eye className="h-4 w-4" />
-													</Button>
-													<Button variant="ghost" size="icon" className="h-8 w-8 text-serene-neutral-500 hover:text-red-600 hover:bg-red-50" onClick={() => handleDeleteDoc(doc.url, idx)}>
-														<Trash2 className="h-4 w-4" />
-													</Button>
-												</div>
-											</div>
-										</div>
-									))}
-								</div>
-							)}
-						</section>
-					</div>
-				</ScrollArea>
-
-				{/* Footer Actions */}
-				<div className="flex-none p-5 border-t border-serene-neutral-200 bg-white z-10 sticky bottom-0">
-					{canSubmit ? (
-						<div className="flex flex-col gap-3">
-							<Button 
-								className="w-full h-12 text-base font-medium shadow-md bg-gradient-to-r from-sauti-teal to-sauti-teal-dark hover:brightness-110 text-white rounded-xl transition-all"
-								onClick={handleSubmitForReview}
-								disabled={isSubmitting || documents.length === 0}
+				<Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col">
+					<div className="px-5 border-b border-serene-neutral-200">
+						<TabsList className="bg-transparent p-0 w-full flex justify-start gap-8 h-auto">
+							<TabsTrigger 
+								value="new" 
+								className="rounded-none border-b-2 border-transparent data-[state=active]:border-sauti-teal data-[state=active]:text-sauti-teal data-[state=active]:shadow-none py-3 px-1 text-sm font-medium text-serene-neutral-500 transition-all hover:text-serene-neutral-700"
 							>
-								{isSubmitting ? (
-									<>
-										<Loader2 className="mr-2 h-5 w-5 animate-spin" /> Submitting...
-									</>
-								) : (
-									<>
-										Submit Service For Review <ArrowRight className="ml-2 h-5 w-5 opacity-80" />
-									</>
+								Overview
+							</TabsTrigger>
+							<TabsTrigger 
+								value="documents" 
+								className="rounded-none border-b-2 border-transparent data-[state=active]:border-sauti-teal data-[state=active]:text-sauti-teal data-[state=active]:shadow-none py-3 px-1 text-sm font-medium text-serene-neutral-500 transition-all hover:text-serene-neutral-700"
+							>
+								Documents
+								{documents.length > 0 && (
+									<span className="ml-2 bg-serene-neutral-100 text-serene-neutral-600 py-0.5 px-1.5 rounded-full text-[10px] font-bold">
+										{documents.length}
+									</span>
 								)}
-							</Button>
-							<p className="text-xs text-center text-serene-neutral-500">
-								By submitting, you agree that all provided documents are accurate.
-							</p>
-						</div>
-					) : isSubmitted ? (
-						<div className="bg-amber-50 rounded-xl p-4 text-center border border-amber-100">
-							<p className="text-sm font-semibold text-amber-800 flex items-center justify-center gap-2">
-								<Clock className="h-4 w-4" /> Under Review
-							</p>
-							<p className="text-xs text-amber-600 mt-1">
-								Changes to documents are restricted while under review.
-							</p>
-						</div>
-					) : (
-						<div className="bg-green-50 rounded-xl p-4 text-center border border-green-100">
-							<p className="text-sm font-semibold text-green-800 flex items-center justify-center gap-2">
-								<CheckCircle className="h-4 w-4" /> Service Verified
-							</p>
-						</div>
-					)}
-				</div>
-			</div>
+							</TabsTrigger>
+							<TabsTrigger 
+								value="sharing" 
+								className="rounded-none border-b-2 border-transparent data-[state=active]:border-sauti-teal data-[state=active]:text-sauti-teal data-[state=active]:shadow-none py-3 px-1 text-sm font-medium text-serene-neutral-500 transition-all hover:text-serene-neutral-700"
+							>
+								Sharing
+								{sharedUsers.length > 0 && (
+									<span className="ml-2 bg-serene-neutral-100 text-serene-neutral-600 py-0.5 px-1.5 rounded-full text-[10px] font-bold">
+										{sharedUsers.length}
+									</span>
+								)}
+							</TabsTrigger>
+						</TabsList>
+					</div>
 
-			{/* Unified Document Modal */}
-			<Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-				<DialogContent className="sm:max-w-[600px] p-0 overflow-hidden gap-0 rounded-2xl z-[100]">
-					<div className="p-6 pb-0 bg-white">
-						<DialogHeader className="mb-4">
-							<DialogTitle className="text-xl font-bold flex items-center gap-2 text-serene-neutral-900">
-								<FileText className="h-5 w-5 text-sauti-teal" />
-								Manage Documents
-							</DialogTitle>
-							<DialogDescription>
-								Upload a new file or link an existing document from your profile.
-							</DialogDescription>
-						</DialogHeader>
-						
-						<Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-							<TabsList className="w-full grid grid-cols-2 p-1 bg-serene-neutral-100 rounded-xl">
-								<TabsTrigger value="new" className="rounded-lg data-[state=active]:bg-white data-[state=active]:text-sauti-teal data-[state=active]:shadow-sm font-medium">
-									Upload New
-								</TabsTrigger>
-								<TabsTrigger value="existing" className="rounded-lg data-[state=active]:bg-white data-[state=active]:text-sauti-teal data-[state=active]:shadow-sm font-medium">
-									Link Existing 
-									{availableDocuments.length > 0 && 
-										<Badge className="ml-2 h-5 bg-serene-neutral-200 text-serene-neutral-600 hover:bg-serene-neutral-300 border-none">
-											{availableDocuments.length}
-										</Badge>
-									}
-								</TabsTrigger>
-							</TabsList>
-							
-							<div className="mt-6 mb-6">
-								{/* Tab: Upload New */}
-								<TabsContent value="new" className="mt-0 focus-visible:outline-none">
-									<div className="space-y-4">
-										<div className="space-y-1.5">
-											<label className="text-sm font-semibold text-serene-neutral-700">Document Title</label>
-											<Input 
-												value={uploadTitle}
-												onChange={(e) => setUploadTitle(e.target.value)}
-												placeholder="e.g. Business License 2024"
-												className="h-11 rounded-xl bg-serene-neutral-50 border-serene-neutral-200 focus:bg-white transition-all"
-											/>
-										</div>
-										<div className="grid grid-cols-2 gap-4">
-											<div className="space-y-1.5">
-												<label className="text-sm font-semibold text-serene-neutral-700">Document Number</label>
-												<Input 
-													value={uploadDocNumber}
-													onChange={(e) => setUploadDocNumber(e.target.value)}
-													placeholder="e.g. LIC-12345"
-													className="h-11 rounded-xl bg-serene-neutral-50 border-serene-neutral-200 focus:bg-white transition-all"
-												/>
-											</div>
-											<div className="space-y-1.5">
-												<label className="text-sm font-semibold text-serene-neutral-700">Issuing Organization</label>
-												<Input 
-													value={uploadIssuer}
-													onChange={(e) => setUploadIssuer(e.target.value)}
-													placeholder="e.g. Nursing Council"
-													className="h-11 rounded-xl bg-serene-neutral-50 border-serene-neutral-200 focus:bg-white transition-all"
-												/>
-											</div>
-										</div>
-										<FileUploadZone 
-											onFileSelect={handleFileSelect}
-											isDragOver={isDragOver}
-											file={uploadFile}
-											onClearFile={() => { setUploadFile(null); setUploadTitle(""); }}
-											handleDragOver={handleDragOver}
-											handleDragLeave={handleDragLeave}
-											handleDrop={handleDrop}
-										/>
-									</div>
-								</TabsContent>
+					<ScrollArea className="flex-1">
+						<div className="p-5 pb-10">
+							<TabsContent value="new" className="space-y-8 mt-0 focus-visible:outline-none">
+								{/* Status Alert */}
+								{service.verification_notes && (
+									<Alert variant={service.verification_status === 'rejected' ? 'destructive' : 'default'} className="bg-amber-50 border-amber-200">
+										<AlertCircle className="h-4 w-4 text-amber-600" />
+										<AlertTitle className="text-amber-800 font-semibold mb-1">Attention Needed</AlertTitle>
+										<AlertDescription className="text-amber-700">
+											{service.verification_notes}
+										</AlertDescription>
+									</Alert>
+								)}
 
-								{/* Tab: Link Existing */}
-								<TabsContent value="existing" className="mt-0 focus-visible:outline-none h-[280px]">
-									{availableDocuments.length === 0 ? (
-										<div className="flex flex-col items-center justify-center h-full text-center p-4">
-											<FileText className="h-10 w-10 text-serene-neutral-300 mb-2" />
-											<p className="text-sm font-medium text-serene-neutral-900">No documents found</p>
-											<p className="text-xs text-serene-neutral-500 mt-1">Upload documents to your profile to see them here.</p>
-										</div>
-									) : (
-										<ScrollArea className="h-full pr-3 mx-[-4px] px-[4px]">
-											<div className="space-y-2">
-												{availableDocuments.map((doc) => {
-													const isLinked = documents.some(d => d.url === doc.url);
-													return (
-														<div 
-															key={doc.id}
-															className={`group flex items-center justify-between p-3 rounded-xl border transition-all duration-200 ${
-																isLinked 
-																? "bg-serene-neutral-50 border-serene-neutral-200 opacity-60" 
-																: "bg-white border-serene-neutral-200 hover:border-sauti-teal/50 hover:shadow-sm cursor-pointer"
-															}`}
-															onClick={() => !isLinked && linkExistingDocument(doc)}
-														>
-															<div className="flex items-center gap-3 min-w-0">
-																<div className={`h-9 w-9 rounded-lg flex items-center justify-center flex-shrink-0 ${isLinked ? "bg-serene-neutral-200" : "bg-serene-blue-50 text-serene-blue-600 group-hover:bg-sauti-teal/10 group-hover:text-sauti-teal"}`}>
-																	<FileText className="h-4 w-4" />
+								{isSuspended && (
+									<Alert className="bg-gray-100 border-gray-300">
+										<Power className="h-4 w-4 text-gray-600" />
+										<AlertTitle className="text-gray-800 font-semibold mb-1">Service Suspended</AlertTitle>
+										<AlertDescription className="text-gray-700">
+											<p>Reason: {service.suspension_reason}</p>
+											{service.is_permanently_suspended ? (
+												<p className="mt-1 font-semibold text-red-600">Permanently Suspended</p>
+											) : (
+												<p className="mt-1">Suspended until: {formatDate(service.suspension_end_date)}</p>
+											)}
+										</AlertDescription>
+									</Alert>
+								)}
+
+								{/* Details Section */}
+								<section className="space-y-4">
+									<h3 className="text-sm font-bold text-serene-neutral-900 uppercase tracking-wider flex items-center gap-2">
+										<Shield className="h-4 w-4 text-sauti-teal" />
+										Service Details
+									</h3>
+									
+									<Card className="shadow-none border border-serene-neutral-200 rounded-xl">
+										<CardContent className="p-0 divide-y divide-serene-neutral-100">
+											{/* Email */}
+											<div className="p-3 grid grid-cols-1 md:grid-cols-3 gap-2 hover:bg-serene-neutral-50/50 transition-colors">
+												<span className="text-sm font-medium text-serene-neutral-500 self-center">Email</span>
+												<div className="md:col-span-2">
+													{isEditing ? (
+														<Input value={editData.email} onChange={e => setEditData({...editData, email: e.target.value})} className="h-8 text-sm" placeholder="email@example.com" />
+													) : (
+														<span className="text-sm text-serene-neutral-900 break-all font-medium block py-1">{service.email || "Not provided"}</span>
+													)}
+												</div>
+											</div>
+											{/* Phone */}
+											<div className="p-3 grid grid-cols-1 md:grid-cols-3 gap-2 hover:bg-serene-neutral-50/50 transition-colors">
+												<span className="text-sm font-medium text-serene-neutral-500 self-center">Phone</span>
+												<div className="md:col-span-2">
+													{isEditing ? (
+														<Input value={editData.phone_number} onChange={e => setEditData({...editData, phone_number: e.target.value})} className="h-8 text-sm" placeholder="+254..." />
+													) : (
+														<span className="text-sm text-serene-neutral-900 font-medium block py-1">{service.phone_number || "Not provided"}</span>
+													)}
+												</div>
+											</div>
+											{/* Website */}
+											<div className="p-3 grid grid-cols-1 md:grid-cols-3 gap-2 hover:bg-serene-neutral-50/50 transition-colors">
+												<span className="text-sm font-medium text-serene-neutral-500 self-center">Website</span>
+												<div className="md:col-span-2">
+													{isEditing ? (
+														<Input value={editData.website} onChange={e => setEditData({...editData, website: e.target.value})} className="h-8 text-sm" placeholder="https://..." />
+													) : (
+														service.website ? (
+															<a href={service.website} target="_blank" rel="noopener noreferrer" className="text-sm text-sauti-teal hover:underline break-all truncate block font-medium py-1">
+																{service.website}
+															</a>
+														) : (
+															<span className="text-sm text-serene-neutral-400 italic block py-1">Not provided</span>
+														)
+													)}
+												</div>
+											</div>
+											{/* Availability */}
+											<div className="p-3 grid grid-cols-1 md:grid-cols-3 gap-2 hover:bg-serene-neutral-50/50 transition-colors">
+												<span className="text-sm font-medium text-serene-neutral-500 pt-2">Availability</span>
+												<div className="md:col-span-2 relative z-20">
+													{isEditing ? (
+														<div className="w-full">
+															<EnhancedSelect
+																options={AVAILABILITY_OPTIONS}
+																value={editData.availability || ""}
+																onChange={(val) => setEditData({...editData, availability: val})}
+																placeholder="Select availability..."
+																className="relative z-50"
+															/>
+														</div>
+													) : (
+														<p className="text-sm text-serene-neutral-900 whitespace-pre-wrap leading-relaxed py-2">
+															{AVAILABILITY_OPTIONS.find(opt => opt.value === service.availability)?.label || service.availability || "Not provided"}
+														</p>
+													)}
+												</div>
+											</div>
+										</CardContent>
+									</Card>
+
+									<Card className="shadow-none border border-serene-neutral-200 rounded-xl mt-4 relative z-0">
+										<CardContent className="p-0 divide-y divide-serene-neutral-100">
+											{/* Service Region / Coverage */}
+											<div className="p-3 grid grid-cols-1 md:grid-cols-3 gap-2 hover:bg-serene-neutral-50/50 transition-colors">
+												<span className="text-sm font-medium text-serene-neutral-500 flex items-center gap-1.5 pt-2">
+													<MapPin className="h-3.5 w-3.5" />
+													Service Region
+												</span>
+												<div className="md:col-span-2">
+													{isEditing ? (
+
+														<div className="space-y-3">
+															<div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+																{/* Remote Option */}
+																<div 
+																	onClick={() => setEditData({ ...editData, is_remote: !editData.is_remote })}
+																	className={cn(
+																		"cursor-pointer p-3 rounded-xl border-2 transition-all flex items-start gap-3",
+																		editData.is_remote 
+																			? "border-sauti-teal bg-sauti-teal/5 ring-1 ring-sauti-teal" 
+																			: "border-serene-neutral-100 bg-serene-neutral-50 hover:border-serene-neutral-200"
+																	)}
+																>
+																	<div className={cn("mt-0.5 h-3.5 w-3.5 rounded-full border flex items-center justify-center shrink-0", 
+																		editData.is_remote ? "border-sauti-teal bg-sauti-teal" : "border-serene-neutral-300 bg-white"
+																	)}>
+																		{editData.is_remote && <CheckCircle className="h-2.5 w-2.5 text-white" />}
+																	</div>
+																	<div>
+																		<span className="block text-sm font-semibold text-serene-neutral-900">Remote</span>
+																	</div>
 																</div>
-																<div className="min-w-0">
-																	<p className="text-sm font-semibold text-serene-neutral-900 truncate">{doc.title}</p>
-																	<div className="flex items-center gap-2 text-xs text-serene-neutral-500">
-																		<Badge variant="secondary" className="h-5 px-1.5 font-normal bg-serene-neutral-100 text-serene-neutral-600">
-																			{doc.source}
-																		</Badge>
-																		<span>{formatDate(doc.uploadedAt)}</span>
+
+																{/* In-Person Option */}
+																<div 
+																	onClick={() => setEditData({ 
+																		...editData, 
+																		is_remote: !editData.is_remote,
+																		coverage_area_radius: editData.coverage_area_radius || "5" 
+																	})}
+																	className={cn(
+																		"cursor-pointer p-3 rounded-xl border-2 transition-all flex items-start gap-3",
+																		!editData.is_remote 
+																			? "border-sauti-teal bg-sauti-teal/5 ring-1 ring-sauti-teal" 
+																			: "border-serene-neutral-100 bg-serene-neutral-50 hover:border-serene-neutral-200"
+																	)}
+																>
+																	<div className={cn("mt-0.5 h-3.5 w-3.5 rounded-full border flex items-center justify-center shrink-0", 
+																		!editData.is_remote ? "border-sauti-teal bg-sauti-teal" : "border-serene-neutral-300 bg-white"
+																	)}>
+																		{!editData.is_remote && <CheckCircle className="h-2.5 w-2.5 text-white" />}
+																	</div>
+																	<div>
+																		<span className="block text-sm font-semibold text-serene-neutral-900">In-Person</span>
 																	</div>
 																</div>
 															</div>
-															{isLinked ? (
-																<Badge variant="outline" className="bg-white">Linked</Badge>
-															) : (
-																<Button size="sm" variant="ghost" className="h-8 w-8 rounded-full p-0 text-sauti-teal hover:bg-sauti-teal/10">
-																	<Plus className="h-5 w-5" />
-																</Button>
+
+															{/* Radius Slider if In-Person */}
+															{!editData.is_remote && (
+																<div className="pt-2 animate-in fade-in slide-in-from-top-2">
+																	<div className="bg-serene-neutral-50 rounded-xl p-4 border border-serene-neutral-100 space-y-3">
+																		<div className="flex justify-between items-center">
+																			<label className="text-xs font-semibold uppercase text-serene-neutral-500">Coverage Radius</label>
+																			<span className="text-sm font-bold text-sauti-teal">{editData.coverage_area_radius} km</span>
+																		</div>
+																		<input
+																			type="range"
+																			min="1"
+																			max="100"
+																			value={Number(editData.coverage_area_radius) || 5}
+																			onChange={(e) => setEditData({ ...editData, coverage_area_radius: e.target.value })}
+																			className="w-full h-2 bg-serene-neutral-200 rounded-lg appearance-none cursor-pointer accent-sauti-teal"
+																		/>
+																		<div className="flex gap-2 flex-wrap">
+																			{[5, 10, 25, 50, 100].map(val => (
+																				<button
+																					key={val}
+																					type="button"
+																					onClick={() => setEditData({ ...editData, coverage_area_radius: val.toString() })}
+																					className={cn(
+																						"px-2.5 py-1 text-xs rounded-lg font-medium transition-colors border",
+																						Number(editData.coverage_area_radius) === val
+																							? "bg-sauti-teal text-white border-sauti-teal"
+																							: "bg-white text-serene-neutral-600 border-serene-neutral-200 hover:border-serene-neutral-300"
+																					)}
+																				>
+																					{val}km
+																				</button>
+																			))}
+																		</div>
+																	</div>
+																</div>
+															)}
+
+															{currentLocation && !editData.is_remote && (
+																<label className="flex items-center gap-2 cursor-pointer p-2 rounded-lg hover:bg-serene-neutral-50 transition-colors border border-transparent hover:border-serene-neutral-200">
+																	<input 
+																		type="checkbox" 
+																		checked={shouldUpdateLocation}
+																		onChange={(e) => setShouldUpdateLocation(e.target.checked)}
+																		className="rounded border-serene-neutral-300 text-sauti-teal focus:ring-sauti-teal h-4 w-4"
+																	/>
+																	<span className="text-xs font-medium text-serene-neutral-600 select-none">
+																		Update location to current GPS
+																	</span>
+																</label>
 															)}
 														</div>
-													);
-												})}
+													) : (
+														<span className="text-sm text-serene-neutral-900 font-medium">
+															{service.coverage_area_radius ? `${service.coverage_area_radius} km radius` : "Remote / Not specified"}
+														</span>
+													)}
+												</div>
 											</div>
-										</ScrollArea>
-									)}
-								</TabsContent>
-							</div>
-						</Tabs>
-					</div>
+										</CardContent>
+									</Card>
+								</section>
+							</TabsContent>
 
-					{/* Modal Footer */}
-					<div className="p-4 bg-serene-neutral-50 border-t border-serene-neutral-200 flex justify-end gap-2">
-						<Button variant="ghost" onClick={() => setIsModalOpen(false)}>Cancel</Button>
-						{activeTab === "new" && (
+							<TabsContent value="documents" className="space-y-6 mt-0 focus-visible:outline-none">
+								<div className="flex items-center justify-between">
+									<h3 className="text-sm font-bold text-serene-neutral-900 uppercase tracking-wider flex items-center gap-2">
+										<FileText className="h-4 w-4 text-sauti-teal" />
+										Verification Documents
+									</h3>
+									<Button size="sm" onClick={() => setIsModalOpen(true)} className="h-9 bg-serene-neutral-900 hover:bg-serene-neutral-800 text-white shadow-sm gap-2 rounded-lg">
+										<Plus className="h-3.5 w-3.5" />
+										Add Document
+									</Button>
+								</div>
+
+								{documents.length === 0 ? (
+									<div className="text-center py-12 border-2 border-dashed border-serene-neutral-200 rounded-2xl bg-serene-neutral-50/50">
+										<div className="mx-auto w-14 h-14 rounded-full bg-white shadow-sm border border-serene-neutral-100 flex items-center justify-center mb-4">
+											<FileText className="h-6 w-6 text-serene-neutral-400" />
+										</div>
+										<h4 className="text-base font-semibold text-serene-neutral-900">No documents yet</h4>
+										<p className="text-sm text-serene-neutral-500 mt-1 mb-6 max-w-xs mx-auto">Upload licenses, certificates, or other proof of operation.</p>
+										<Button variant="outline" onClick={() => setIsModalOpen(true)} className="bg-white">
+											Upload First Document
+										</Button>
+									</div>
+								) : (
+									<div className="grid grid-cols-1 gap-3">
+										{documents.map((doc, idx) => (
+											<div key={idx} className="group relative bg-white border border-serene-neutral-200 rounded-xl p-4 transition-all hover:shadow-md hover:border-sauti-teal/30">
+												<div className="flex items-start gap-4">
+													<div className="h-10 w-10 rounded-lg bg-sauti-teal/5 border border-sauti-teal/10 flex items-center justify-center flex-shrink-0 text-sauti-teal">
+														<FileText className="h-5 w-5" />
+													</div>
+													<div className="flex-1 min-w-0 pt-0.5">
+														<div className="flex items-center justify-between mb-1">
+															<h4 className="font-semibold text-serene-neutral-900 text-sm truncate pr-2" title={doc.title}>{doc.title}</h4>
+															{doc.linked && (
+																<Badge variant="secondary" className="text-[10px] items-center gap-1 bg-serene-blue-50 text-serene-blue-700 border-serene-blue-200 px-1.5 py-0 h-5 whitespace-nowrap">
+																	<LinkIcon className="h-3 w-3" /> Linked
+																</Badge>
+															)}
+														</div>
+														<div className="flex items-center gap-3 text-xs text-serene-neutral-500">
+															<span>{formatFileSize(doc.fileSize)}</span>
+															<span className="text-serene-neutral-300">•</span>
+															<span>{formatDate(doc.uploadedAt)}</span>
+															{doc.sourceName && (
+																<>
+																	<span className="text-serene-neutral-300">•</span>
+																	<span>From: {doc.sourceName}</span>
+																</>
+															)}
+														</div>
+													</div>
+													<div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+														<Button variant="ghost" size="icon" className="h-8 w-8 text-serene-neutral-500 hover:text-sauti-teal hover:bg-sauti-teal/10 rounded-lg" onClick={() => window.open(doc.url, '_blank')}>
+															<Eye className="h-4 w-4" />
+														</Button>
+														<Button variant="ghost" size="icon" className="h-8 w-8 text-serene-neutral-500 hover:text-red-600 hover:bg-red-50 rounded-lg" onClick={() => handleDeleteDoc(doc.url, idx)}>
+															<Trash2 className="h-4 w-4" />
+														</Button>
+													</div>
+												</div>
+											</div>
+										))}
+									</div>
+								)}
+							</TabsContent>
+
+							<TabsContent value="sharing" className="space-y-6 mt-0 focus-visible:outline-none">
+								<div className="bg-gradient-to-br from-serene-blue-50 to-white rounded-xl p-5 border border-serene-blue-100/50 flex gap-4 shadow-sm">
+									<div className="bg-white p-2.5 rounded-lg shadow-sm h-fit">
+										<Users className="h-5 w-5 text-serene-blue-600" />
+									</div>
+									<div className="space-y-1">
+										<h4 className="text-sm font-bold text-serene-blue-900">Collaborative Management</h4>
+										<p className="text-xs text-serene-blue-700/80 leading-relaxed max-w-sm">
+											Invite other professionals to help manage this service. They will be able to view details and use this service for client matches.
+										</p>
+									</div>
+								</div>
+
+								<div className="flex items-center justify-between">
+									<h3 className="text-sm font-bold text-serene-neutral-900 uppercase tracking-wider flex items-center gap-2">
+										<Share2 className="h-4 w-4 text-sauti-teal" />
+										Shared With
+									</h3>
+									<Button size="sm" onClick={() => setIsShareModalOpen(true)} variant="outline" className="h-9 gap-2 shadow-sm bg-white hover:bg-serene-neutral-50">
+										<Plus className="h-3.5 w-3.5" />
+										Invite Professional
+									</Button>
+								</div>
+
+								{sharedUsers.length === 0 ? (
+									<div className="text-center py-12 rounded-2xl border border-dashed border-serene-neutral-200">
+										<p className="text-serene-neutral-400 text-sm font-medium">No one has access to this service yet.</p>
+									</div>
+								) : (
+									<div className="space-y-3">
+										{sharedUsers.map((share) => (
+											<div key={share.id} className="flex items-center justify-between p-3 bg-white border border-serene-neutral-200 rounded-xl hover:shadow-sm transition-all">
+												<div className="flex items-center gap-3">
+													{/* Avatar placeholder */}
+													<div className="h-9 w-9 rounded-full bg-gradient-to-br from-serene-neutral-100 to-serene-neutral-200 border border-white shadow-sm flex items-center justify-center text-xs font-bold text-serene-neutral-600">
+														{share.to_user.first_name?.[0] || 'U'}
+													</div>
+													<div>
+														<p className="text-sm font-semibold text-serene-neutral-900">{share.to_user.first_name} {share.to_user.last_name}</p>
+														<p className="text-xs text-serene-neutral-500">{share.to_user.email}</p>
+													</div>
+												</div>
+												<Badge variant="secondary" className={`capitalize font-medium ${
+													share.status === 'accepted' ? 'bg-serene-green-50 text-serene-green-700 border-serene-green-200' : 
+													share.status === 'pending' ? 'bg-amber-50 text-amber-700 border-amber-200' :
+													'bg-serene-neutral-100 text-serene-neutral-600'
+												}`}>
+													{share.status}
+												</Badge>
+											</div>
+										))}
+									</div>
+								)}
+							</TabsContent>
+						</div>
+					</ScrollArea>
+				</Tabs>
+
+				{/* Footer Actions */}
+				<div className="flex-none p-5 border-t border-serene-neutral-200 bg-white/80 backdrop-blur-md z-10 sticky bottom-0">
+					<div className="flex items-center justify-between gap-4">
+						{/* Back Button */}
+						{activeTab !== 'new' ? (
 							<Button 
+								variant="ghost" 
+								onClick={() => setActiveTab(activeTab === 'sharing' ? 'documents' : 'new')} 
+								className="gap-2 text-serene-neutral-600 hover:text-serene-neutral-900 pl-0 hover:bg-transparent hover:underline transition-all"
+							>
+								<ChevronLeft className="h-4 w-4" /> Back
+							</Button>
+						) : (
+							<div /> 
+						)}
+
+						{/* Forward Actions */}
+						<div className="flex items-center gap-2">
+							{activeTab === 'new' && (
+								<Button onClick={() => setActiveTab('documents')} className="bg-serene-neutral-900 hover:bg-serene-neutral-800 text-white gap-2 shadow-sm rounded-xl px-5 transition-all">
+									Next: Documents <ArrowRight className="h-4 w-4" />
+								</Button>
+							)}
+							
+							{activeTab === 'documents' && (
+								<Button onClick={() => setActiveTab('sharing')} className="bg-serene-neutral-900 hover:bg-serene-neutral-800 text-white gap-2 shadow-sm rounded-xl px-5 transition-all">
+									Next: Sharing <ArrowRight className="h-4 w-4" />
+								</Button>
+							)}
+
+							{activeTab === 'sharing' && canSubmit && (
+								<Button 
+									className="bg-sauti-teal hover:bg-sauti-teal/90 text-white shadow-md gap-2 rounded-xl px-6 transition-all"
+									onClick={handleSubmitForReview}
+									disabled={isSubmitting || documents.length === 0}
+								>
+									{isSubmitting ? (
+										<>
+											<Loader2 className="animate-spin h-4 w-4" />
+											Submitting...
+										</>
+									) : (
+										<>
+											Submit for Verification 
+											<CheckCircle className="h-4 w-4" />
+										</>
+									)}
+								</Button>
+							)}
+							{activeTab === 'sharing' && !canSubmit && isSubmitted && (
+								<div className="bg-amber-50 text-amber-800 px-4 py-2 rounded-xl border border-amber-200 font-medium text-sm flex items-center gap-2">
+									<Clock className="h-4 w-4" />
+									Under Review
+								</div>
+							)}
+						</div>
+					</div>
+				</div>
+			</div>
+
+
+			{/* --- Modals --- */}
+			
+			{/* Document Upload Modal */}
+			<Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+				<DialogContent className="max-w-md rounded-2xl bg-white shadow-2xl border-none p-6">
+					<DialogHeader className="space-y-3 pb-4">
+						<DialogTitle className="text-xl font-bold text-serene-neutral-900 flex items-center gap-2">
+							<FileText className="h-5 w-5 text-sauti-teal" />
+							Add Verification Document
+						</DialogTitle>
+						<DialogDescription className="text-serene-neutral-500 text-sm leading-relaxed">
+							Attach a license, certificate, or proof of registration to verify this service. You can upload a new file or reuse one from your library.
+						</DialogDescription>
+					</DialogHeader>
+					
+					{/* Tabs for Upload vs Link */}
+					<Tabs defaultValue="upload" className="w-full">
+						<div className="bg-serene-neutral-50 p-1.5 rounded-xl border border-serene-neutral-200 mb-6">
+							<TabsList className="grid w-full grid-cols-2 bg-transparent h-auto p-0 gap-2">
+								<TabsTrigger 
+									value="upload" 
+									className="rounded-lg py-2.5 data-[state=active]:bg-white data-[state=active]:text-sauti-teal data-[state=active]:shadow-sm data-[state=active]:font-semibold text-serene-neutral-500 transition-all duration-200"
+								>
+									Upload New
+								</TabsTrigger>
+								<TabsTrigger 
+									value="existing" 
+									className="rounded-lg py-2.5 data-[state=active]:bg-white data-[state=active]:text-sauti-teal data-[state=active]:shadow-sm data-[state=active]:font-semibold text-serene-neutral-500 transition-all duration-200"
+								>
+									Select from Library
+								</TabsTrigger>
+							</TabsList>
+						</div>
+						
+						<TabsContent value="upload" className="space-y-5 focus-visible:outline-none mt-0">
+							<div className="space-y-4">
+								<div className="space-y-2">
+									<label className="text-xs font-semibold text-serene-neutral-700 uppercase tracking-wide ml-1">Document Details</label>
+									<Input 
+										placeholder="Document Title (e.g. Medical License)" 
+										value={uploadTitle} 
+										onChange={e => setUploadTitle(e.target.value)}
+										className="h-12 rounded-xl border-serene-neutral-200 focus-visible:ring-sauti-teal bg-serene-neutral-50/50 focus:bg-white transition-colors"
+									/>
+									<div className="grid grid-cols-2 gap-3">
+										<Input 
+											placeholder="License No." 
+											value={uploadDocNumber} 
+											onChange={e => setUploadDocNumber(e.target.value)}
+											className="h-12 rounded-xl border-serene-neutral-200 focus-visible:ring-sauti-teal bg-serene-neutral-50/50 focus:bg-white transition-colors"
+										/>
+										<Input 
+											placeholder="Issuing Auth. (Optional)" 
+											value={uploadIssuer} 
+											onChange={e => setUploadIssuer(e.target.value)}
+											className="h-12 rounded-xl border-serene-neutral-200 focus-visible:ring-sauti-teal bg-serene-neutral-50/50 focus:bg-white transition-colors"
+										/>
+									</div>
+								</div>
+							</div>
+
+							<div className="space-y-2">
+								<label className="text-xs font-semibold text-serene-neutral-700 uppercase tracking-wide ml-1">File Attachment</label>
+								<FileUploadZone 
+									onFileSelect={handleFileSelect}
+									isDragOver={isDragOver}
+									file={uploadFile}
+									onClearFile={() => setUploadFile(null)}
+									handleDragOver={handleDragOver}
+									handleDragLeave={handleDragLeave}
+									handleDrop={handleDrop}
+								/>
+							</div>
+
+							<Button 
+								className="w-full h-12 text-base font-medium shadow-lg shadow-sauti-teal/20 bg-sauti-teal hover:bg-sauti-teal/90 text-white rounded-xl transition-all hover:scale-[1.01] active:scale-[0.99] mt-2" 
 								onClick={handleUploadNew} 
-								disabled={!uploadFile || !uploadTitle || isUploading}
-								className="bg-sauti-teal hover:bg-sauti-teal/90 text-white shadow-sm min-w-[100px]"
+								disabled={isUploading || !uploadFile || !uploadTitle}
 							>
 								{isUploading ? (
-									<><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Uploading</>
-								) : "Upload & Save"}
+									<>
+										<Loader2 className="animate-spin h-5 w-5 mr-2" />
+										Uploading...
+									</>
+								) : (
+									<>
+										<Upload className="h-5 w-5 mr-2" />
+										Upload & Attach Document
+									</>
+								)}
 							</Button>
-						)}
-					</div>
+						</TabsContent>
+
+						<TabsContent value="existing" className="focus-visible:outline-none mt-0">
+							<ScrollArea className="h-[350px] -mr-4 pr-4">
+								<div className="space-y-3 pb-2">
+									{availableDocuments.map((doc) => {
+										const isAttached = documents.some(d => d.url === doc.url);
+										return (
+											<div 
+												key={doc.id} 
+												className={`
+													relative flex items-center justify-between p-4 rounded-xl border transition-all duration-200 group
+													${isAttached 
+														? "bg-serene-neutral-50 border-serene-neutral-200 cursor-default opacity-70" 
+														: "bg-white border-serene-neutral-200 hover:border-sauti-teal hover:shadow-md hover:shadow-sauti-teal/5 cursor-pointer"
+													}
+												`}
+												onClick={() => !isAttached && linkExistingDocument(doc)}
+											>
+												<div className="flex items-center gap-4">
+													<div className={`
+														h-12 w-12 rounded-xl flex items-center justify-center transition-colors
+														${isAttached ? "bg-serene-neutral-100 text-serene-neutral-400" : "bg-sauti-teal/5 text-sauti-teal group-hover:bg-sauti-teal/10"}
+													`}>
+														<FileText className="h-6 w-6" />
+													</div>
+													<div>
+														<p className={`text-sm font-bold ${isAttached ? "text-serene-neutral-600" : "text-serene-neutral-900 group-hover:text-sauti-teal"}`}>
+															{doc.title}
+														</p>
+														<div className="flex items-center gap-2 mt-1">
+															<Badge variant="outline" className="text-[10px] h-5 px-1.5 font-normal text-serene-neutral-500 bg-white border-serene-neutral-200">
+																{doc.sourceName}
+															</Badge>
+															<span className="text-xs text-serene-neutral-400">• {formatDate(doc.uploadedAt)}</span>
+														</div>
+													</div>
+												</div>
+												
+												{isAttached ? (
+													<Badge variant="secondary" className="bg-serene-neutral-200/50 text-serene-neutral-500 border-transparent px-2.5 py-1">
+														Attached
+													</Badge>
+												) : (
+													<Button 
+														size="sm" 
+														className="bg-white text-sauti-teal border-2 border-sauti-teal/10 hover:border-sauti-teal hover:bg-sauti-teal hover:text-white transition-all shadow-sm rounded-lg"
+													>
+														<Plus className="h-4 w-4 mr-1.5" />
+														Link
+													</Button>
+												)}
+											</div>
+										);
+									})}
+									{availableDocuments.length === 0 && (
+										<div className="flex flex-col items-center justify-center py-16 text-center border-2 border-dashed border-serene-neutral-100 rounded-2xl bg-serene-neutral-50/30">
+											<div className="h-16 w-16 rounded-full bg-white shadow-sm flex items-center justify-center mb-4">
+												<FileText className="h-8 w-8 text-serene-neutral-300" />
+											</div>
+											<p className="text-base font-semibold text-serene-neutral-900">No documents found</p>
+											<p className="text-sm text-serene-neutral-500 max-w-[200px] mt-1 leading-relaxed">
+												You haven't uploaded documents to other services yet.
+											</p>
+											<Button variant="link" onClick={() => (document.querySelector('[value="upload"]') as HTMLElement)?.click()} className="mt-2 text-sauti-teal">
+												Upload a new document
+											</Button>
+										</div>
+									)}
+								</div>
+							</ScrollArea>
+						</TabsContent>
+					</Tabs>
 				</DialogContent>
 			</Dialog>
-			
-			{/* Mobile Backdrop */}
-			<div className="fixed inset-0 bg-black/20 backdrop-blur-sm z-50 sm:hidden" onClick={onClose} />
+
+			{/* Suspend Modal */}
+			<Dialog open={isSuspendModalOpen} onOpenChange={setIsSuspendModalOpen}>
+				<DialogContent className="max-w-md rounded-2xl">
+					<DialogHeader>
+						<DialogTitle className="text-lg font-bold text-serene-neutral-900">Suspend Service</DialogTitle>
+						<DialogDescription className="text-serene-neutral-500">
+							Temporarily or permanently remove this service from active matching.
+						</DialogDescription>
+					</DialogHeader>
+					<div className="space-y-5 py-3">
+						<div className="space-y-2">
+							<label className="text-sm font-semibold text-serene-neutral-700">Suspension Type</label>
+							<Select value={suspendType} onValueChange={(val: any) => setSuspendType(val)}>
+								<SelectTrigger className="w-full h-11 rounded-xl border-serene-neutral-200">
+									<SelectValue />
+								</SelectTrigger>
+								<SelectContent className="rounded-xl">
+									<SelectItem value="temporary">Temporary (Set End Date)</SelectItem>
+									<SelectItem value="permanent">Permanent</SelectItem>
+								</SelectContent>
+							</Select>
+						</div>
+
+						{suspendType === 'temporary' && (
+							<div className="space-y-2 flex flex-col">
+								<label className="text-sm font-semibold text-serene-neutral-700">Reactivate On</label>
+								<Popover>
+									<PopoverTrigger asChild>
+										<Button variant={"outline"} className={cn("w-full h-11 justify-start text-left font-normal rounded-xl border-serene-neutral-200", !suspensionDate && "text-muted-foreground")}>
+											<CalendarIcon className="mr-2 h-4 w-4 text-serene-neutral-400" />
+											{suspensionDate ? format(suspensionDate, "PPP") : <span>Pick a date</span>}
+										</Button>
+									</PopoverTrigger>
+									<PopoverContent className="w-auto p-0 rounded-xl" align="start">
+										<Calendar
+											mode="single"
+											selected={suspensionDate}
+											onSelect={setSuspensionDate}
+											disabled={(date) => date < new Date()}
+											initialFocus
+											className="rounded-xl border border-serene-neutral-200"
+										/>
+									</PopoverContent>
+								</Popover>
+							</div>
+						)}
+
+						<div className="space-y-2">
+							<label className="text-sm font-semibold text-serene-neutral-700">Reason for Suspension</label>
+							<Textarea 
+								placeholder="E.g., Staff shortage, Renovation, Holiday..." 
+								value={suspensionReason}
+								onChange={e => setSuspensionReason(e.target.value)}
+								className="min-h-[100px] rounded-xl border-serene-neutral-200 resize-none focus-visible:ring-sauti-teal"
+							/>
+						</div>
+					</div>
+					<DialogFooter className="gap-2 sm:gap-0">
+						<Button variant="ghost" onClick={() => setIsSuspendModalOpen(false)} className="rounded-xl hover:bg-serene-neutral-100 text-serene-neutral-600">Cancel</Button>
+						<Button className="bg-amber-600 hover:bg-amber-700 text-white rounded-xl shadow-sm" onClick={handleConfirmSuspend} disabled={isSaving}>
+							{isSaving ? <Loader2 className="animate-spin h-4 w-4" /> : "Confirm Suspension"}
+						</Button>
+					</DialogFooter>
+				</DialogContent>
+			</Dialog>
+
+			{/* Share Modal */}
+			<Dialog open={isShareModalOpen} onOpenChange={setIsShareModalOpen}>
+				<DialogContent className="max-w-md rounded-2xl">
+					<DialogHeader>
+						<DialogTitle className="text-lg font-bold text-serene-neutral-900">Share Service</DialogTitle>
+						<DialogDescription className="text-serene-neutral-500">
+							Invite professionals to view and match with this service.
+						</DialogDescription>
+					</DialogHeader>
+					<div className="space-y-5 py-3">
+						<div className="space-y-2">
+							<label className="text-sm font-semibold text-serene-neutral-700">Professional's Email</label>
+							<Input 
+								placeholder="colleague@example.com" 
+								value={shareEmail}
+								onChange={e => setShareEmail(e.target.value)}
+								className="h-11 rounded-xl border-serene-neutral-200 focus-visible:ring-sauti-teal"
+							/>
+							<p className="text-xs text-serene-neutral-400">They must have a Sauti Salama professional account.</p>
+						</div>
+					</div>
+					<DialogFooter className="gap-2 sm:gap-0">
+						<Button variant="ghost" onClick={() => setIsShareModalOpen(false)} className="rounded-xl hover:bg-serene-neutral-100 text-serene-neutral-600">Cancel</Button>
+						<Button className="bg-sauti-teal hover:bg-sauti-teal/90 text-white rounded-xl shadow-sm" onClick={handleConfirmShare} disabled={isSaving || !shareEmail}>
+							{isSaving ? <Loader2 className="animate-spin h-4 w-4" /> : "Send Invitation"}
+						</Button>
+					</DialogFooter>
+				</DialogContent>
+			</Dialog>
+
 		</>
 	);
 }

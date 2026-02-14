@@ -192,24 +192,44 @@ export function VerificationProgressBar({
 			</div>
 
 			{/* Status Messages */}
+			{(verificationStatus === "pending" || !verificationStatus) && (
+				<div className="px-5 pb-4">
+					<div className="flex items-start gap-3 p-4 bg-blue-50 rounded-2xl border border-blue-100/50 shadow-sm">
+						<AlertCircle className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
+						<div>
+							<p className="text-sm font-bold text-blue-900 leading-none mb-1">Verification Pending</p>
+							<p className="text-xs font-medium text-blue-800/80 leading-relaxed">
+								Please complete your verification documents to proceed.
+							</p>
+						</div>
+					</div>
+				</div>
+			)}
+
 			{verificationStatus === "under_review" && (
 				<div className="px-5 pb-4">
-					<div className="flex items-center gap-2 p-3 bg-sauti-yellow-light/30 rounded-xl border border-sauti-yellow/20">
-						<Clock className="h-4 w-4 text-sauti-yellow flex-shrink-0" />
-						<span className="text-sm font-medium text-amber-800">
-							Verification under review — we'll notify you when approved
-						</span>
+					<div className="flex items-start gap-3 p-4 bg-amber-50 rounded-2xl border border-amber-100/50 shadow-sm">
+						<Clock className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
+						<div>
+							<p className="text-sm font-bold text-amber-900 leading-none mb-1">Your documents are under review</p>
+							<p className="text-xs font-medium text-amber-800/80 leading-relaxed">
+								We'll notify you once verified. This usually takes 24-48 hours.
+							</p>
+						</div>
 					</div>
 				</div>
 			)}
 
 			{verificationStatus === "rejected" && (
 				<div className="px-5 pb-4">
-					<div className="flex items-center gap-2 p-3 bg-red-50 rounded-xl border border-red-200">
-						<AlertCircle className="h-4 w-4 text-red-600 flex-shrink-0" />
-						<span className="text-sm font-medium text-red-800">
-							Verification needs attention — please review your documents
-						</span>
+					<div className="flex items-start gap-3 p-4 bg-red-50 rounded-2xl border border-red-100/50 shadow-sm">
+						<AlertCircle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
+						<div>
+							<p className="text-sm font-bold text-red-900 leading-none mb-1">Action Required</p>
+							<p className="text-xs font-medium text-red-800/80 leading-relaxed">
+								Verification needs attention. Please check the admin notes below and re-upload the necessary documents.
+							</p>
+						</div>
 					</div>
 				</div>
 			)}

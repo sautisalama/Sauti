@@ -8,6 +8,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
 import { AnonymousModeToggle } from "@/components/chat/AnonymousModeToggle";
 import { MobileVerificationSection } from "./mobile-verification-section";
+import { VerificationSection } from "./verification-section";
 import { SupportServicesManager } from "./support-services-manager";
 import { PrivacySecuritySettings } from "./privacy-security-settings";
 import { signOut } from "@/app/(auth)/actions/auth";
@@ -123,6 +124,13 @@ export default function ProfilePage() {
 			if (error) throw error;
 
 			setProfileData((prev) => ({ ...prev, ...updateData }));
+			
+			// Clear form data for this section so inputs reflect the new saved state
+			setFormData(prev => ({
+				...prev,
+				[section]: {} 
+			}));
+
 			dash?.updatePartial({
 				profile: {
 					...(profile as any),
@@ -248,8 +256,12 @@ export default function ProfilePage() {
 											</div>
 											{/* User info */}
 											<div className="flex-1 text-center sm:text-left pb-0">
-												<h2 className="text-xl sm:text-2xl font-bold text-serene-neutral-900 tracking-tight">{profile?.first_name} {profile?.last_name}</h2>
-												<p className="text-serene-neutral-500 text-sm font-medium mt-0.5">{profile?.email}</p>
+												<h2 className="text-xl sm:text-2xl font-bold text-serene-neutral-900 tracking-tight">
+													{profileData.first_name || profile?.first_name} {profileData.last_name || profile?.last_name}
+												</h2>
+												<p className="text-serene-neutral-500 text-sm font-medium mt-0.5">
+													{profileData.email || profile?.email}
+												</p>
 												{isProfessional && (
 													<div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-serene-blue-50 text-serene-blue-700 rounded-full text-xs font-semibold mt-2">
 														<Shield className="h-3 w-3" />
@@ -288,8 +300,8 @@ export default function ProfilePage() {
 											</div>
 										</div>
 										
-										<div className="flex justify-end">
-											<Button onClick={() => saveSection("basic")} className="bg-sauti-teal hover:bg-sauti-dark text-white rounded-xl h-11 px-6">
+										<div className="flex flex-col sm:flex-row justify-end gap-3 mt-4 sm:mt-0">
+											<Button onClick={() => saveSection("basic")} className="w-full sm:w-auto bg-sauti-teal hover:bg-sauti-dark text-white rounded-xl h-11 px-6 shadow-sm">
 												<Save className="h-4 w-4 mr-2" /> Save Changes
 											</Button>
 										</div>
@@ -397,14 +409,28 @@ export default function ProfilePage() {
 							{/* Section: Professional Verification */}
 							{activeSection === 'verification' && isProfessional && (
 								<div className="space-y-6">
-									<MobileVerificationSection
-										userId={userId || ""}
-										userType={(profile?.user_type as any) || "professional"}
-										profile={profile}
-										onUpdate={refreshAllData}
-										onNavigateToServices={() => router.push('/dashboard/profile?section=services')}
-										onUploadSuccess={refreshAllData}
-									/>
+									{/* Mobile view (< md) */}
+									<div className="md:hidden">
+										<MobileVerificationSection
+											userId={userId || ""}
+											userType={(profile?.user_type as any) || "professional"}
+											profile={profile}
+											onUpdate={refreshAllData}
+											onNavigateToServices={() => router.push('/dashboard/profile?section=services')}
+											onUploadSuccess={refreshAllData}
+										/>
+									</div>
+									
+									{/* Desktop view (>= md) */}
+									<div className="hidden md:block">
+										<VerificationSection
+											userId={userId || ""}
+											userType={(profile?.user_type as any) || "professional"}
+											profile={profile}
+											onUpdate={refreshAllData}
+											onNavigateToServices={() => router.push('/dashboard/profile?section=services')}
+										/>
+									</div>
 								</div>
 							)}
 

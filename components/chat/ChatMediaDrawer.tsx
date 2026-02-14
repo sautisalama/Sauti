@@ -65,38 +65,47 @@ export function ChatMediaDrawer({ chatId, isOpen, onClose }: ChatMediaDrawerProp
                         ) : items.length === 0 ? (
                             <div className="text-center py-8 text-gray-400">No {activeTab} shared yet</div>
                         ) : (
+                        <>
+                        {activeTab === 'media' && (
                             <div className="grid grid-cols-3 gap-2">
-                                {activeTab === 'media' && items.map(msg => (
-                                    <div key={msg.id} className="aspect-square bg-gray-100 rounded overflow-hidden relative group">
-                                         {/* Placeholder for actual image rendering */}
-                                         {msg.metadata?.attachment_urls?.[0] ? (
-                                              <img src={msg.metadata.attachment_urls[0]} alt="shared" className="w-full h-full object-cover" />
-                                         ) : (
-                                              <div className="w-full h-full flex items-center justify-center text-gray-400">
-                                                  <ImageIcon className="h-6 w-6" />
-                                              </div>
-                                         )}
-                                    </div>
-                                ))}
+                                {items.flatMap(msg => {
+                                    const atts = (msg.attachments || []).concat(
+                                       (msg.metadata?.attachment_urls || []).map(url => ({ url, type: msg.type as any, id: url }))
+                                    );
+                                    return atts.filter(a => a.type === 'image' || a.type === 'video').map((att, i) => (
+                                       <div key={`${msg.id}-${i}`} className="aspect-square bg-gray-100 rounded overflow-hidden relative group cursor-pointer">
+                                           {att.type === 'image' ? (
+                                                <img src={att.url} alt="shared" className="w-full h-full object-cover" />
+                                           ) : (
+                                                <video src={att.url} className="w-full h-full object-cover" />
+                                           )}
+                                       </div>
+                                    ));
+                                })}
                             </div>
                         )}
 
                         {activeTab === 'docs' && !loading && (
                             <div className="flex flex-col gap-2">
-                                {items.map(msg => (
-                                    <div key={msg.id} className="flex items-center gap-3 p-2 hover:bg-gray-50 rounded border">
-                                        <div className="h-10 w-10 bg-red-100 rounded flex items-center justify-center text-red-500">
-                                            <FileText className="h-5 w-5" />
-                                        </div>
-                                        <div className="flex-1 min-w-0">
-                                            <div className="font-medium text-sm truncate">{msg.content || 'Document'}</div>
-                                            <div className="text-xs text-gray-500">{format(new Date(msg.created_at), 'MMM d, yyyy')}</div>
-                                        </div>
-                                        <Button variant="ghost" size="icon" className="h-8 w-8">
-                                            <Download className="h-4 w-4" />
-                                        </Button>
-                                    </div>
-                                ))}
+                                {items.flatMap(msg => {
+                                    const atts = (msg.attachments || []).concat(
+                                       (msg.metadata?.attachment_urls || []).map(url => ({ url, type: msg.type as any, name: 'Document', id: url }))
+                                    );
+                                    return atts.filter(a => a.type === 'file').map((att, i) => (
+                                        <a href={att.url} target="_blank" rel="noreferrer" key={`${msg.id}-${i}`} className="flex items-center gap-3 p-2 hover:bg-gray-50 rounded border">
+                                            <div className="h-10 w-10 bg-red-100 rounded flex items-center justify-center text-red-500 shrink-0">
+                                                <FileText className="h-5 w-5" />
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <div className="font-medium text-sm truncate">{att.name || msg.content || 'Document'}</div>
+                                                <div className="text-xs text-gray-500">{format(new Date(msg.created_at), 'MMM d, yyyy')}</div>
+                                            </div>
+                                            <Button variant="ghost" size="icon" className="h-8 w-8">
+                                                <Download className="h-4 w-4" />
+                                            </Button>
+                                        </a>
+                                    ));
+                                })}
                             </div>
                         )}
 
@@ -125,6 +134,8 @@ export function ChatMediaDrawer({ chatId, isOpen, onClose }: ChatMediaDrawerProp
                                      </a>
                                  ))}
                              </div>
+                        )}
+                        </>
                         )}
                     </div>
                  </Tabs>

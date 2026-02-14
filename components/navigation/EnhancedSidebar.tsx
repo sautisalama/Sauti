@@ -535,6 +535,7 @@ export function EnhancedSidebar({
 					<DropdownMenu>
 						<DropdownMenuTrigger asChild>
 							<div
+								suppressHydrationWarning
 								className={cn(
 									"flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-neutral-50 dark:hover:bg-neutral-800 transition-colors",
 									isCollapsed && "justify-center px-0"

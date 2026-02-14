@@ -55,14 +55,14 @@ export function PrivacySecuritySettings() {
 	return (
 		<div className="space-y-6 max-w-4xl">
 			{/* Header */}
-			<div className="bg-gradient-to-r from-purple-50 to-white p-6 rounded-2xl border border-purple-100 flex items-start gap-4">
-				<div className="p-3 bg-white rounded-xl shadow-sm border border-purple-100">
+			<div className="bg-gradient-to-r from-purple-50 to-white p-4 sm:p-6 rounded-2xl border border-purple-100 flex items-start gap-4">
+				<div className="p-3 bg-white rounded-xl shadow-sm border border-purple-100 shrink-0">
 					<Shield className="h-6 w-6 text-purple-600" />
 				</div>
 				<div>
-					<h2 className="text-lg font-bold text-neutral-900">Privacy & Security</h2>
-					<p className="text-neutral-600 text-sm mt-1">
-						Manage your account security and control how your data is used.
+					<h2 className="text-lg font-bold text-neutral-900 leading-tight">Privacy & Security</h2>
+					<p className="text-neutral-600 text-sm mt-1 leading-relaxed">
+						Manage account security and control your data.
 					</p>
 				</div>
 			</div>

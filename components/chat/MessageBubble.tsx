@@ -2,7 +2,7 @@
 
 import { Message } from '@/types/chat';
 import { format } from 'date-fns';
-import { CheckCheck, Reply, Trash2, Copy } from 'lucide-react';
+import { CheckCheck, Reply, Trash2, Copy, FileText } from 'lucide-react';
 import {
   ContextMenu,
   ContextMenuContent,
@@ -75,14 +75,27 @@ export function MessageBubble({ message, isOwn, showTail = true }: MessageBubble
             {/* Tail removed for cleaner modern look */}
 
             <div className="px-1.5 pt-0.5">
-               {/* Media Attachment */}
-               {message.metadata?.attachment_urls?.map((url, i) => (
-                   <div key={i} className="mb-2 rounded-lg overflow-hidden max-w-sm">
-                       {message.type === 'image' && <img src={url} alt="Shared" className="w-full h-auto" />}
-                       {message.type === 'video' && <video src={url} controls className="w-full h-auto" />}
-                       {message.type === 'file' && (
-                           <a href={url} target="_blank" rel="noreferrer" className="flex items-center gap-2 p-3 bg-gray-100 rounded">
-                               <span className="font-medium text-sm">Download File</span>
+               {/* Media Attachment - Support both new attachments column and legacy metadata */}
+               {(message.attachments || []).concat(
+                  (message.metadata?.attachment_urls || []).map(url => ({ url, type: message.type as any }))
+               ).map((attachment, i) => (
+                   <div key={i} className="mb-2 rounded-lg overflow-hidden max-w-sm relative group">
+                       {attachment.type === 'image' && (
+                          <div className="relative">
+                            <img src={attachment.url} alt="Shared" className="w-full h-auto max-h-[300px] object-cover rounded-lg" />
+                             {/* Gradient overlay for text readability if we add caption later */}
+                          </div>
+                       )}
+                       {attachment.type === 'video' && <video src={attachment.url} controls className="w-full h-auto rounded-lg" />}
+                       {attachment.type === 'file' && (
+                           <a href={attachment.url} target="_blank" rel="noreferrer" className="flex items-center gap-3 p-3 bg-serene-neutral-100 rounded-lg border border-serene-neutral-200 hover:bg-serene-neutral-200 transition-colors">
+                               <div className="bg-white p-2 rounded-full text-sauti-teal">
+                                 <FileText className="h-5 w-5" />
+                               </div>
+                               <div className="flex-1 min-w-0">
+                                 <p className="font-medium text-sm text-serene-neutral-900 truncate">{attachment.name || 'Document'}</p>
+                                 {attachment.size && <p className="text-xs text-serene-neutral-500">{(attachment.size / 1024 / 1024).toFixed(2)} MB</p>}
+                               </div>
                            </a>
                        )}
                    </div>
