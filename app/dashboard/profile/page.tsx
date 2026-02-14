@@ -8,8 +8,10 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
 import { AnonymousModeToggle } from "@/components/chat/AnonymousModeToggle";
 import { MobileVerificationSection } from "./mobile-verification-section";
+import { VerificationSection } from "./verification-section";
 import { SupportServicesManager } from "./support-services-manager";
 import { PrivacySecuritySettings } from "./privacy-security-settings";
+import { CalendarIntegrationSettings } from "./calendar-integration-settings";
 import { signOut } from "@/app/(auth)/actions/auth";
 import { createClient } from "@/utils/supabase/client";
 import { useDashboardData } from "@/components/providers/DashboardDataProvider";
@@ -27,7 +29,8 @@ import {
 	Type as FontIcon,
 	Underline,
 	RefreshCw,
-	Type
+	Type,
+	Calendar,
 } from "lucide-react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { SereneBreadcrumb, SereneSectionHeader } from "../_components/SurvivorDashboardComponents";
@@ -123,6 +126,13 @@ export default function ProfilePage() {
 			if (error) throw error;
 
 			setProfileData((prev) => ({ ...prev, ...updateData }));
+			
+			// Clear form data for this section so inputs reflect the new saved state
+			setFormData(prev => ({
+				...prev,
+				[section]: {} 
+			}));
+
 			dash?.updatePartial({
 				profile: {
 					...(profile as any),
@@ -152,6 +162,7 @@ export default function ProfilePage() {
 		{ id: 'account', label: 'Account Information', icon: User },
 		{ id: 'privacy', label: 'Privacy & Security', icon: Shield },
 		{ id: 'accessibility', label: 'Accessibility', icon: Contrast },
+		{ id: 'calendar', label: 'Calendar', icon: Calendar },
 		{ id: 'settings', label: 'App Settings', icon: Settings },
 	];
 
@@ -161,7 +172,7 @@ export default function ProfilePage() {
 	}
 
 	return (
-		<div className="h-screen flex flex-col bg-serene-neutral-50/30 overflow-hidden">
+		<div className="h-screen flex flex-col bg-serene-neutral-50/30 overflow-y-auto">
 			{/* Fixed Header section */}
 			<div className="flex-none px-4 md:px-8 py-3 md:py-4 bg-serene-neutral-50/80 backdrop-blur-md border-b border-serene-neutral-200/50 z-20">
 				<div className="max-w-6xl mx-auto w-full">
@@ -174,11 +185,11 @@ export default function ProfilePage() {
 			</div>
 
 			{/* Main Layout - Fixed height container with scrollable content area */}
-			<div className="flex-1 min-h-0 w-full">
-				<div className="h-full max-w-6xl mx-auto px-4 md:px-8 grid grid-cols-1 lg:grid-cols-12 gap-6">
+			<div className="flex-1 w-full">
+				<div className="max-w-6xl mx-auto px-4 md:px-8 grid grid-cols-1 lg:grid-cols-12 gap-6">
 					
 					{/* Sidebar Menu - Fixed on desktop */}
-					<div className="hidden lg:block lg:col-span-3 h-full py-6">
+					<div className="hidden lg:block lg:col-span-3 py-6">
 						<div className="bg-white/95 backdrop-blur-xl rounded-2xl p-3 border border-serene-neutral-100 shadow-sm sticky top-0">
 							{navItems.map(item => (
 								<button
@@ -200,8 +211,8 @@ export default function ProfilePage() {
 						</div>
 					</div>
 
-					{/* Content Area - Scrollable */}
-					<div className="lg:col-span-9 h-full overflow-y-auto py-6 pb-32 scrollbar-hide">
+					{/* Content Area - Scrolls with page */}
+					<div className="lg:col-span-9 py-6 pb-32">
 						
 						{/* Mobile Navigation Tabs - Sticky within content on mobile */}
 						<div className="lg:hidden mb-6 sticky top-0 z-10 bg-serene-neutral-50/95 backdrop-blur-sm py-2 -mx-4 px-4 border-b border-serene-neutral-200/50">
@@ -248,8 +259,12 @@ export default function ProfilePage() {
 											</div>
 											{/* User info */}
 											<div className="flex-1 text-center sm:text-left pb-0">
-												<h2 className="text-xl sm:text-2xl font-bold text-serene-neutral-900 tracking-tight">{profile?.first_name} {profile?.last_name}</h2>
-												<p className="text-serene-neutral-500 text-sm font-medium mt-0.5">{profile?.email}</p>
+												<h2 className="text-xl sm:text-2xl font-bold text-serene-neutral-900 tracking-tight">
+													{profileData.first_name || profile?.first_name} {profileData.last_name || profile?.last_name}
+												</h2>
+												<p className="text-serene-neutral-500 text-sm font-medium mt-0.5">
+													{profileData.email || profile?.email}
+												</p>
 												{isProfessional && (
 													<div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-serene-blue-50 text-serene-blue-700 rounded-full text-xs font-semibold mt-2">
 														<Shield className="h-3 w-3" />
@@ -288,8 +303,8 @@ export default function ProfilePage() {
 											</div>
 										</div>
 										
-										<div className="flex justify-end">
-											<Button onClick={() => saveSection("basic")} className="bg-sauti-teal hover:bg-sauti-dark text-white rounded-xl h-11 px-6">
+										<div className="flex flex-col sm:flex-row justify-end gap-3 mt-4 sm:mt-0">
+											<Button onClick={() => saveSection("basic")} className="w-full sm:w-auto bg-sauti-teal hover:bg-sauti-dark text-white rounded-xl h-11 px-6 shadow-sm">
 												<Save className="h-4 w-4 mr-2" /> Save Changes
 											</Button>
 										</div>
@@ -397,14 +412,28 @@ export default function ProfilePage() {
 							{/* Section: Professional Verification */}
 							{activeSection === 'verification' && isProfessional && (
 								<div className="space-y-6">
-									<MobileVerificationSection
-										userId={userId || ""}
-										userType={(profile?.user_type as any) || "professional"}
-										profile={profile}
-										onUpdate={refreshAllData}
-										onNavigateToServices={() => router.push('/dashboard/profile?section=services')}
-										onUploadSuccess={refreshAllData}
-									/>
+									{/* Mobile view (< md) */}
+									<div className="md:hidden">
+										<MobileVerificationSection
+											userId={userId || ""}
+											userType={(profile?.user_type as any) || "professional"}
+											profile={profile}
+											onUpdate={refreshAllData}
+											onNavigateToServices={() => router.push('/dashboard/profile?section=services')}
+											onUploadSuccess={refreshAllData}
+										/>
+									</div>
+									
+									{/* Desktop view (>= md) */}
+									<div className="hidden md:block">
+										<VerificationSection
+											userId={userId || ""}
+											userType={(profile?.user_type as any) || "professional"}
+											profile={profile}
+											onUpdate={refreshAllData}
+											onNavigateToServices={() => router.push('/dashboard/profile?section=services')}
+										/>
+									</div>
 								</div>
 							)}
 
@@ -418,6 +447,14 @@ export default function ProfilePage() {
 									hasMatches={false}
 									documentsCount={dash?.data?.verification?.documentsCount || 0}
 									onDataUpdate={refreshAllData}
+								/>
+							)}
+
+							{/* Section: Calendar Integration */}
+							{activeSection === 'calendar' && (
+								<CalendarIntegrationSettings
+									userId={userId || ""}
+									isProfessional={isProfessional}
 								/>
 							)}
 						</div>

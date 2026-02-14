@@ -30,6 +30,7 @@ import { AppointmentWithDetails } from "../_types";
 import { ChatModal } from "./ChatModal";
 import { Textarea } from "@/components/ui/textarea";
 import { AddToCalendarButton } from "./AddToCalendarButton";
+import { AddToCalendarModal } from "./AddToCalendarModal";
 import {
 	DropdownMenu,
 	DropdownMenuContent,
@@ -56,6 +57,7 @@ export function AppointmentCard({
 	const [notes, setNotes] = useState(appointment.notes || "");
 	const [isSavingNotes, setIsSavingNotes] = useState(false);
 	const [isEditingNotes, setIsEditingNotes] = useState(false);
+	const [showCalendarModal, setShowCalendarModal] = useState(false);
 	const appointmentDate = new Date(appointment.appointment_date);
 
 	const handleOpenChat = () => {
@@ -69,6 +71,10 @@ export function AppointmentCard({
 			setIsUpdating(true);
 			await updateAppointmentStatus(appointment.appointment_id, status);
 			onStatusUpdate?.();
+			// Show calendar modal when confirming
+			if (status === "confirmed") {
+				setShowCalendarModal(true);
+			}
 		} catch (error) {
 			console.error("Error updating appointment status:", error);
 		} finally {
@@ -430,6 +436,21 @@ export function AppointmentCard({
 				onClose={() => setIsRescheduleOpen(false)}
 				appointment={appointment}
 				onReschedule={onStatusUpdate}
+			/>
+
+			<AddToCalendarModal
+				isOpen={showCalendarModal}
+				onClose={() => setShowCalendarModal(false)}
+				userId={userId}
+				appointmentDetails={{
+					appointmentId: appointment.appointment_id,
+					date: appointmentDate,
+					duration: 60,
+					serviceName: appointment.matched_service?.support_service?.name,
+					professionalName: appointment.professional
+						? `${appointment.professional.first_name} ${appointment.professional.last_name}`
+						: undefined,
+				}}
 			/>
 		</>
 	);

@@ -1359,11 +1359,46 @@ export default function ReportsMasterDetail({ userId }: { userId: string }) {
 							</div>
 
 							<div className="pt-2 flex gap-3">
-								<Button className="flex-1 bg-serene-blue-600 hover:bg-serene-blue-700 text-white rounded-xl h-12" onClick={() => {
-									// Mock update
-									toast({ title: "Report Updated", description: "Your changes have been saved successfully." });
-									setEditDialogOpen(false);
-								}}>
+								<Button 
+									className="flex-1 bg-serene-blue-600 hover:bg-serene-blue-700 text-white rounded-xl h-12" 
+									onClick={async () => {
+										if (!selected) return;
+										try {
+											const { error } = await supabase
+												.from("reports")
+												.update({ incident_description: editDescription })
+												.eq("report_id", selected.report_id);
+
+											if (error) throw error;
+
+											// Update local state
+											const updatedReports = reports.map(r => 
+												r.report_id === selected.report_id 
+													? { ...r, incident_description: editDescription } 
+													: r
+											);
+											setReports(updatedReports as any);
+											
+											// Also update cache
+											try {
+												localStorage.setItem(
+													`reports-cache-${userId}`,
+													JSON.stringify(updatedReports)
+												);
+											} catch {}
+
+											toast({ title: "Report Updated", description: "Your changes have been saved successfully." });
+											setEditDialogOpen(false);
+										} catch (err) {
+											console.error("Error updating report:", err);
+											toast({ 
+												title: "Update Failed", 
+												description: "Could not update the report details. Please try again.", 
+												variant: "destructive" 
+											});
+										}
+									}}
+								>
 									Save Changes
 								</Button>
 								<Button variant="outline" className="flex-1 rounded-xl h-12 border-serene-neutral-200" onClick={() => setEditDialogOpen(false)}>

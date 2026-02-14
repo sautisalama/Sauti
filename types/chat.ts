@@ -32,10 +32,19 @@ export interface ParticipantStatus {
   draft_message?: string;
 }
 
+export interface Attachment {
+  id?: string;
+  url: string;
+  type: 'image' | 'video' | 'file' | 'audio';
+  name?: string;
+  size?: number;
+  path?: string; // storage path
+}
+
 export interface MessageMetadata {
   is_edited?: boolean;
   reply_to_id?: string;
-  attachment_urls?: string[];
+  attachment_urls?: string[]; // Deprecated in favor of attachments column
   link_preview?: {
     title?: string;
     description?: string;
@@ -79,6 +88,7 @@ export interface Message {
   type: MessageType;
   created_at: string;
   updated_at?: string;
+  attachments?: Attachment[] | null;
   metadata: MessageMetadata;
   sender?: {
     id: string;

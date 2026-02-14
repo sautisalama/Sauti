@@ -29,14 +29,15 @@ export async function fetchUserReports(
 			.order("submission_timestamp", { ascending: false });
 
 		if (error) {
-			console.error("Error fetching reports:", error);
-			throw error;
+			console.error("Error fetching reports (Supabase):", error);
+			return [];
 		}
 
 		return reports || [];
 	} catch (error) {
-		console.error("Error in fetchUserReports:", error);
-		throw error;
+		console.error("Error in fetchUserReports:", JSON.stringify(error, null, 2));
+		// Return empty array to prevent UI crash
+		return [];
 	}
 }
 

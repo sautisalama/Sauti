@@ -1,5 +1,5 @@
 "use client";
-import { cn } from "@/lib/utils";
+import { cn, safelyParseJsonArray } from "@/lib/utils";
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Tables } from "@/types/db-schema";
@@ -37,20 +37,7 @@ import { useDashboardData } from "@/components/providers/DashboardDataProvider";
 type SupportServiceType = Database["public"]["Enums"]["support_service_type"];
 type UserType = Database["public"]["Enums"]["user_type"];
 
-interface SupportService {
-	id: string;
-	name: string;
-	service_types: SupportServiceType;
-	email?: string;
-	phone_number?: string;
-	website?: string;
-	availability?: string;
-	verification_status?: string;
-	verification_notes?: string;
-	last_verification_check?: string;
-	accreditation_files_metadata?: any;
-	created_at?: string;
-}
+type SupportService = Tables<"support_services">;
 
 export default function ServicesClient({ userId }: { userId: string }) {
 	const dash = useDashboardData();
@@ -120,15 +107,22 @@ export default function ServicesClient({ userId }: { userId: string }) {
 
 			if (profile) {
 				setUserType(profile.user_type || "professional");
-				setVerificationStatus(profile.verification_status || "pending");
-				setVerificationNotes(profile.verification_notes);
+				
+				// Check documents first
+				const docs = safelyParseJsonArray(profile.accreditation_files_metadata);
+				const hasIdFront = docs.some((d: any) => d.title === "National ID (Front)" || d.title?.includes("ID Front"));
+				const hasIdBack = docs.some((d: any) => d.title === "National ID (Back)" || d.title?.includes("ID Back"));
+				const hasBothIds = hasIdFront && hasIdBack;
 
-				// Check if user has accreditation files
-				const docs = profile.accreditation_files_metadata
-					? Array.isArray(profile.accreditation_files_metadata)
-						? profile.accreditation_files_metadata
-						: JSON.parse(profile.accreditation_files_metadata)
-					: [];
+				// Force pending if IDs are missing, even if DB says under_review
+				let status = profile.verification_status || "pending";
+				if (status === "under_review" && !hasBothIds) {
+					status = "pending";
+				}
+
+				setVerificationStatus(status);
+				setVerificationNotes(profile.verification_notes || undefined);
+
 				setHasAccreditation(docs.length > 0);
 				setDocumentsCount(docs.length);
 			}
@@ -195,7 +189,7 @@ useEffect(() => {
 		}
 	};
 
-	const getStatusIcon = (status?: string) => {
+	const getStatusIcon = (status?: string | null) => {
 		switch (status) {
 			case "verified":
 				return <CheckCircle className="h-4 w-4 text-green-600" />;
@@ -208,7 +202,7 @@ useEffect(() => {
 		}
 	};
 
-	const getStatusColor = (status?: string) => {
+	const getStatusColor = (status?: string | null) => {
 		switch (status) {
 			case "verified":
 				return "bg-green-100 text-green-800 border-green-200";
@@ -221,7 +215,7 @@ useEffect(() => {
 		}
 	};
 
-	const formatDate = (dateString?: string) => {
+	const formatDate = (dateString?: string | null) => {
 		if (!dateString) return "";
 		return new Date(dateString).toLocaleDateString("en-US", {
 			year: "numeric",
@@ -231,10 +225,7 @@ useEffect(() => {
 	};
 
 	const getDocumentCount = (service: SupportService) => {
-		if (!service.accreditation_files_metadata) return 0;
-		const docs = Array.isArray(service.accreditation_files_metadata)
-			? service.accreditation_files_metadata
-			: JSON.parse(service.accreditation_files_metadata);
+		const docs = safelyParseJsonArray(service.accreditation_files_metadata);
 		return docs.length;
 	};
 
@@ -356,7 +347,7 @@ useEffect(() => {
 									<div className="space-y-3 mb-6">
 										<div className="flex items-center gap-2 text-sm text-gray-600">
 											<span className="capitalize px-2 py-0.5 bg-gray-50 rounded-md text-xs font-medium text-gray-500 border border-gray-100">
-												{service.service_types.replace("_", " ")}
+												{service.service_types?.replace("_", " ") || ""}
 											</span>
 										</div>
 										{service.email && (
@@ -439,7 +430,27 @@ useEffect(() => {
 					userId={userId}
 					userType={userType}
 					onClose={() => setSelectedService(null)}
-					onUpdate={loadServices}
+					onUpdate={async () => {
+						try {
+							// Re-fetch services and update local + selected state (no page reload)
+							const { data, error } = await supabase
+								.from("support_services")
+								.select("*")
+								.eq("user_id", userId)
+								.order("created_at", { ascending: false });
+
+							if (!error && data) {
+								setServices(data || []);
+								// Update selectedService with fresh data so sidepanel reflects changes
+								const updated = data.find(s => s.id === selectedService.id);
+								if (updated) {
+									setSelectedService(updated);
+								}
+							}
+						} catch (err) {
+							console.error("Error refreshing services:", err);
+						}
+					}}
 				/>
 			)}
 		</div>

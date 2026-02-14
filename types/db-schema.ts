@@ -642,6 +642,7 @@ export type Database = {
       }
       messages: {
         Row: {
+          attachments: Json[] | null
           chat_id: string | null
           content: string | null
           created_at: string | null
@@ -652,6 +653,7 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          attachments?: Json[] | null
           chat_id?: string | null
           content?: string | null
           created_at?: string | null
@@ -662,6 +664,7 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          attachments?: Json[] | null
           chat_id?: string | null
           content?: string | null
           created_at?: string | null
@@ -682,6 +685,50 @@ export type Database = {
           {
             foreignKeyName: "messages_sender_id_fkey"
             columns: ["sender_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      notifications: {
+        Row: {
+          created_at: string | null
+          id: string
+          link: string | null
+          message: string | null
+          metadata: Json | null
+          read: boolean | null
+          title: string
+          type: string
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          link?: string | null
+          message?: string | null
+          metadata?: Json | null
+          read?: boolean | null
+          title: string
+          type: string
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          link?: string | null
+          message?: string | null
+          metadata?: Json | null
+          read?: boolean | null
+          title?: string
+          type?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notifications_user_id_fkey"
+            columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
@@ -726,7 +773,9 @@ export type Database = {
           updated_at: string | null
           user_type: Database["public"]["Enums"]["user_type"] | null
           verification_notes: string | null
-          verification_status: string | null
+          verification_status:
+            | Database["public"]["Enums"]["verification_status_type"]
+            | null
           verification_updated_at: string | null
         }
         Insert: {
@@ -766,7 +815,9 @@ export type Database = {
           updated_at?: string | null
           user_type?: Database["public"]["Enums"]["user_type"] | null
           verification_notes?: string | null
-          verification_status?: string | null
+          verification_status?:
+            | Database["public"]["Enums"]["verification_status_type"]
+            | null
           verification_updated_at?: string | null
         }
         Update: {
@@ -806,7 +857,9 @@ export type Database = {
           updated_at?: string | null
           user_type?: Database["public"]["Enums"]["user_type"] | null
           verification_notes?: string | null
-          verification_status?: string | null
+          verification_status?:
+            | Database["public"]["Enums"]["verification_status_type"]
+            | null
           verification_updated_at?: string | null
         }
         Relationships: [
@@ -978,6 +1031,58 @@ export type Database = {
           },
         ]
       }
+      service_shares: {
+        Row: {
+          created_at: string | null
+          from_user_id: string | null
+          id: string
+          service_id: string | null
+          status: string | null
+          to_user_id: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          from_user_id?: string | null
+          id?: string
+          service_id?: string | null
+          status?: string | null
+          to_user_id?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          from_user_id?: string | null
+          id?: string
+          service_id?: string | null
+          status?: string | null
+          to_user_id?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "service_shares_from_user_id_fkey"
+            columns: ["from_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "service_shares_service_id_fkey"
+            columns: ["service_id"]
+            isOneToOne: false
+            referencedRelation: "support_services"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "service_shares_to_user_id_fkey"
+            columns: ["to_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       support_services: {
         Row: {
           accreditation_files_metadata: Json | null
@@ -992,6 +1097,7 @@ export type Database = {
           id: string
           is_active: boolean | null
           is_banned: boolean | null
+          is_permanently_suspended: boolean | null
           last_verification_check: string | null
           latitude: number | null
           longitude: number | null
@@ -999,9 +1105,13 @@ export type Database = {
           phone_number: string | null
           priority: number | null
           service_types: Database["public"]["Enums"]["support_service_type"]
+          suspension_end_date: string | null
+          suspension_reason: string | null
           user_id: string | null
           verification_notes: string | null
-          verification_status: string | null
+          verification_status:
+            | Database["public"]["Enums"]["verification_status_type"]
+            | null
           verification_updated_at: string | null
           verified_at: string | null
           verified_by: string | null
@@ -1020,6 +1130,7 @@ export type Database = {
           id?: string
           is_active?: boolean | null
           is_banned?: boolean | null
+          is_permanently_suspended?: boolean | null
           last_verification_check?: string | null
           latitude?: number | null
           longitude?: number | null
@@ -1027,9 +1138,13 @@ export type Database = {
           phone_number?: string | null
           priority?: number | null
           service_types: Database["public"]["Enums"]["support_service_type"]
+          suspension_end_date?: string | null
+          suspension_reason?: string | null
           user_id?: string | null
           verification_notes?: string | null
-          verification_status?: string | null
+          verification_status?:
+            | Database["public"]["Enums"]["verification_status_type"]
+            | null
           verification_updated_at?: string | null
           verified_at?: string | null
           verified_by?: string | null
@@ -1048,6 +1163,7 @@ export type Database = {
           id?: string
           is_active?: boolean | null
           is_banned?: boolean | null
+          is_permanently_suspended?: boolean | null
           last_verification_check?: string | null
           latitude?: number | null
           longitude?: number | null
@@ -1055,9 +1171,13 @@ export type Database = {
           phone_number?: string | null
           priority?: number | null
           service_types?: Database["public"]["Enums"]["support_service_type"]
+          suspension_end_date?: string | null
+          suspension_reason?: string | null
           user_id?: string | null
           verification_notes?: string | null
-          verification_status?: string | null
+          verification_status?:
+            | Database["public"]["Enums"]["verification_status_type"]
+            | null
           verification_updated_at?: string | null
           verified_at?: string | null
           verified_by?: string | null
@@ -1204,6 +1324,7 @@ export type Database = {
         | "verified"
         | "rejected"
         | "under_review"
+        | "suspended"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1406,6 +1527,7 @@ export const Constants = {
         "verified",
         "rejected",
         "under_review",
+        "suspended",
       ],
     },
   },

@@ -292,18 +292,65 @@ export default function ProfessionalView({
 						/>
 
 						{/* Verification Banner */}
-						{!isVerified && (
-							<Alert className="border-amber-200 bg-amber-50 text-amber-900 rounded-2xl">
-								<AlertTriangle className="h-4 w-4" />
-								<AlertTitle className="font-semibold">Complete your verification</AlertTitle>
-								<AlertDescription className="mt-1">
-									Verify your profile to be matched with survivors seeking support.
-									<Link href="/dashboard/profile?tab=verification" className="ml-2 font-semibold text-amber-700 hover:underline">
-										Complete now →
-									</Link>
-								</AlertDescription>
-							</Alert>
-						)}
+						{(() => {
+							const verifiedCount = supportServices.filter(s => s.verification_status === 'verified').length;
+							const reviewCount = supportServices.filter(s => s.verification_status === 'under_review').length;
+							const rejectedCount = supportServices.filter(s => s.verification_status === 'rejected').length;
+							const total = supportServices.length;
+
+							if (total > 0 && verifiedCount === total) return null;
+
+							let bannerTitle = "Complete your verification";
+							let bannerDesc = "Verify your profile to be matched with survivors seeking support.";
+							let bannerVariant: "default" | "destructive" | "warning" = "warning";
+							let BannerIcon = AlertTriangle;
+
+							if (rejectedCount > 0) {
+								bannerTitle = "Action Required: Verification Rejected";
+								bannerDesc = "One or more of your services were not approved. Please review and update your documents.";
+								bannerVariant = "destructive";
+							} else if (verifiedCount > 0 && reviewCount > 0) {
+								bannerTitle = "Verification in Progress";
+								bannerDesc = `You have ${verifiedCount} verified service and ${reviewCount} under review. We'll notify you once all are approved.`;
+								BannerIcon = Clock;
+							} else if (reviewCount > 0) {
+								bannerTitle = "Documents Under Review";
+								bannerDesc = "We are currently reviewing your documents. This usually takes 24-48 hours.";
+								BannerIcon = Clock;
+							} else if (total === 0) {
+								bannerTitle = "Register your first service";
+								bannerDesc = "Add a support service to start helping survivors and complete your provider profile.";
+							}
+
+							return (
+								<Alert className={cn(
+									"border-0 shadow-sm rounded-[2rem] p-5 sm:p-6 transition-all duration-300",
+									bannerVariant === "destructive" ? "bg-red-50 text-red-900 shadow-red-100/50" : 
+									bannerVariant === "warning" ? "bg-amber-50 text-amber-900 shadow-amber-100/50" : 
+									"bg-serene-blue-50 text-serene-blue-900 shadow-serene-blue-100/50"
+								)}>
+									<div className="flex flex-col sm:flex-row gap-4 sm:items-center">
+										<div className={cn(
+											"h-12 w-12 rounded-2xl flex items-center justify-center shrink-0 shadow-sm",
+											bannerVariant === "destructive" ? "bg-red-100 text-red-600" :
+											bannerVariant === "warning" ? "bg-amber-100 text-amber-600" :
+											"bg-serene-blue-100 text-serene-blue-600"
+										)}>
+											<BannerIcon className="h-6 w-6" />
+										</div>
+										<div className="flex-1">
+											<AlertTitle className="font-bold text-base sm:text-lg tracking-tight mb-1">{bannerTitle}</AlertTitle>
+											<AlertDescription className="text-sm font-medium opacity-80 leading-relaxed">
+												{bannerDesc}
+												<Link href="/dashboard/profile?section=services" className="block sm:inline sm:ml-2 font-bold text-inherit hover:underline underline-offset-4 mt-2 sm:mt-0">
+													Manage services →
+												</Link>
+											</AlertDescription>
+										</div>
+									</div>
+								</Alert>
+							);
+						})()}
 
 						{/* Quick Actions Grid */}
 						<div className="space-y-4">

@@ -23,6 +23,8 @@ import {
 } from "lucide-react";
 import { EnhancedSelect } from "@/components/ui/enhanced-select";
 import { cn } from "@/lib/utils";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { LocationPicker } from "@/components/ui/location-picker";
 
 type ServiceType = Database["public"]["Enums"]["support_service_type"];
 
@@ -71,6 +73,9 @@ export function AddSupportServiceForm({
 		website: "",
 		availability: "",
 		coverage_area_radius: "",
+		latitude: null as number | null,
+		longitude: null as number | null,
+		address: "",
 		is_remote: false,
 	});
 
@@ -122,8 +127,8 @@ export function AddSupportServiceForm({
 
 			const serviceData = {
 				...formData,
-				latitude: hasLocalServices ? location?.lat : null,
-				longitude: hasLocalServices ? location?.lng : null,
+				latitude: hasLocalServices ? formData.latitude : null,
+				longitude: hasLocalServices ? formData.longitude : null,
 				coverage_area_radius: hasLocalServices ? Number(formData.coverage_area_radius) : null,
 			};
 
@@ -317,40 +322,22 @@ export function AddSupportServiceForm({
 								</div>
 							</div>
 
-							{/* Radius Slider if In-Person */}
+							{/* Location Picker if In-Person */}
+							{/* We use an existing location check or default to Nairobi if geolocation failed/not ready */}
 							{formData.coverage_area_radius && (
 								<div className="pt-2 animate-in fade-in slide-in-from-top-2">
-									<div className="bg-neutral-50 rounded-xl p-4 border border-neutral-100 space-y-3">
-										<div className="flex justify-between items-center">
-											<Label className="text-xs font-semibold uppercase text-neutral-500">Coverage Radius</Label>
-											<span className="text-sm font-bold text-sauti-teal">{formData.coverage_area_radius} km</span>
-										</div>
-										<input
-											type="range"
-											min="1"
-											max="100"
-											value={Number(formData.coverage_area_radius) || 5}
-											onChange={(e) => setFormData({ ...formData, coverage_area_radius: e.target.value })}
-											className="w-full h-2 bg-neutral-200 rounded-lg appearance-none cursor-pointer accent-sauti-teal"
-										/>
-										<div className="flex gap-2 flex-wrap">
-											{[5, 10, 25, 50, 100].map(val => (
-												<button
-													key={val}
-													type="button"
-													onClick={() => setFormData({ ...formData, coverage_area_radius: val.toString() })}
-													className={cn(
-														"px-2.5 py-1 text-xs rounded-lg font-medium transition-colors border",
-														Number(formData.coverage_area_radius) === val
-															? "bg-sauti-teal text-white border-sauti-teal"
-															: "bg-white text-neutral-600 border-neutral-200 hover:border-neutral-300"
-													)}
-												>
-													{val}km
-												</button>
-											))}
-										</div>
-									</div>
+									<Label className="text-sm font-semibold text-neutral-700 mb-2 block">Service Location & Coverage</Label>
+									<LocationPicker
+										initialLat={location?.lat || -1.2921}
+										initialLng={location?.lng || 36.8219}
+										initialRadius={Number(formData.coverage_area_radius) === 0 ? 5000 : Number(formData.coverage_area_radius)}
+										onLocationChange={(lat, lng, address) => {
+											setFormData(prev => ({ ...prev, latitude: lat, longitude: lng, address }));
+										}}
+										onRadiusChange={(radius) => {
+											setFormData(prev => ({ ...prev, coverage_area_radius: String(radius) }));
+										}}
+									/>
 								</div>
 							)}
 						</div>

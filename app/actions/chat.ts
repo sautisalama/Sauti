@@ -49,7 +49,7 @@ export async function getMessages(chatId: string, limit = 50, before?: string) {
   return (data as Message[]).reverse(); // Return in chronological order for UI
 }
 
-export async function sendMessage(chatId: string, content: string, type: MessageType = 'text', metadata = {}) {
+export async function sendMessage(chatId: string, content: string, type: MessageType = 'text', metadata = {}, attachments: any[] = []) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Unauthorized');
@@ -61,7 +61,8 @@ export async function sendMessage(chatId: string, content: string, type: Message
       sender_id: user.id,
       content,
       type,
-      metadata
+      metadata,
+      attachments
     })
     .select()
     .single();

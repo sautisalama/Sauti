@@ -1,7 +1,7 @@
 import { Chat, Message } from '@/types/chat';
 import { useState, useEffect, useRef } from 'react';
 import { getMessages, sendMessage } from '@/app/actions/chat';
-import { uploadChatFile, fetchLinkMetadata } from '@/app/actions/chat-media';
+import { fetchLinkMetadata } from '@/app/actions/chat-media';
 import { createClient } from '@/utils/supabase/client';
 import { MessageBubble } from './MessageBubble';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -9,6 +9,8 @@ import { Button } from '@/components/ui/button';
 import { Phone, Video, Search, MoreVertical, Smile, Paperclip, Mic, Send, X, Lock } from 'lucide-react';
 import { ChatMediaDrawer } from './ChatMediaDrawer';
 import { EmojiPicker } from './EmojiPicker';
+import { AttachmentMenu } from './AttachmentMenu';
+import { FilePreviewModal } from './FilePreviewModal';
 
 interface ChatWindowProps {
   chat: Chat;
@@ -23,16 +25,22 @@ export function ChatWindow({ chat, onBack }: ChatWindowProps) {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const emojiPickerRef = useRef<HTMLDivElement>(null);
   const [linkPreview, setLinkPreview] = useState<any>(null);
+  
+  // File Handling State
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [selectedFileType, setSelectedFileType] = useState<'image' | 'video' | 'document' | null>(null);
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
   
   const supabase = createClient();
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [currentUserName, setCurrentUserName] = useState<string>('there');
   const [isTyping, setIsTyping] = useState(false);
 
+  // ... (User Data and Effect logic remains the same) ...
   // Fetch current user ID and Profile
   useEffect(() => {
     const getUserData = async () => {
@@ -94,8 +102,7 @@ export function ChatWindow({ chat, onBack }: ChatWindowProps) {
     setIsLoading(true);
     try {
       if (chat.id === 'salama-ai-bot') {
-          // Fake AI Bot - Start fresh or load from local/memory if we implemented that.
-          // For now, we start fresh to show the interaction sequence requested.
+          // Fake AI Bot logic preserved
           setMessages([]);
       } else {
           const data = await getMessages(chat.id);
@@ -117,26 +124,14 @@ export function ChatWindow({ chat, onBack }: ChatWindowProps) {
      botSequenceStarted.current = false;
   }, [chat.id]);
 
-  // Bot Logic
+  // Bot Logic preserved...
   useEffect(() => {
-      // Only run if:
-      // 1. It is the AI bot chat
-      // 2. There are no messages
-      // 3. Not currently loading existing messages
-      // 4. Sequence hasn't started yet
       if (chat.id === 'salama-ai-bot' && messages.length === 0 && !isLoading && !botSequenceStarted.current) {
           botSequenceStarted.current = true;
-          
-          // Sequence
           const runSequence = async () => {
              setIsTyping(true);
              scrollToBottom();
-             
-             // 6 seconds typing as requested
              await new Promise(r => setTimeout(r, 6000));
-             
-             // Check if user has sent a message in the meantime? 
-             // Ideally yes, but for this simple demo let's just proceed or use a mounted ref
              
              const welcomeMsg: Message = {
                  id: 'bot-welcome',
@@ -149,17 +144,15 @@ export function ChatWindow({ chat, onBack }: ChatWindowProps) {
              };
              
              setMessages(prev => {
-                 // Double check duplicate before adding
                  if (prev.some(m => m.id === 'bot-welcome')) return prev;
                  return [...prev, welcomeMsg];
              });
              
-             setIsTyping(false); // Brief pause?
+             setIsTyping(false); 
              scrollToBottom();
 
-             // Second message
              setIsTyping(true);
-             await new Promise(r => setTimeout(r, 1500)); // Shorter for second msg
+             await new Promise(r => setTimeout(r, 1500)); 
              
              const infoMsg: Message = {
                  id: 'bot-info',
@@ -178,7 +171,6 @@ export function ChatWindow({ chat, onBack }: ChatWindowProps) {
              setIsTyping(false);
              scrollToBottom();
           };
-          
           runSequence();
       }
   }, [chat.id, isLoading, messages.length, currentUserName]);
@@ -195,7 +187,7 @@ export function ChatWindow({ chat, onBack }: ChatWindowProps) {
     
     try {
       if (chat.id === 'salama-ai-bot') {
-          // Fake Send
+          // Fake Send preserved
           const userMsg: Message = {
               id: Date.now().toString(),
               chat_id: chat.id,
@@ -209,7 +201,6 @@ export function ChatWindow({ chat, onBack }: ChatWindowProps) {
           setInputText('');
           scrollToBottom();
 
-          // Bot Reply
           setTimeout(async () => {
               setIsTyping(true);
               scrollToBottom();
@@ -234,6 +225,7 @@ export function ChatWindow({ chat, onBack }: ChatWindowProps) {
         await sendMessage(chat.id, inputText, 'text', metadata);
         setInputText('');
         setLinkPreview(null);
+        // height reset logic handled by state change usually, but explicit reset in ref if needed
       }
     } catch (error) {
       console.error('Failed to send', error);
@@ -242,25 +234,54 @@ export function ChatWindow({ chat, onBack }: ChatWindowProps) {
     }
   };
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-      const file = e.target.files?.[0];
-      if (!file) return;
+  const handleFileSelect = (file: File, type: 'image' | 'video' | 'document') => {
+      setSelectedFile(file);
+      setSelectedFileType(type);
+      setIsPreviewOpen(true);
+  };
 
-      // Optimistic logic would go here
+  const handleSendFile = async (file: File, caption: string) => {
+      setIsUploading(true);
       try {
-          const formData = new FormData();
-          formData.append('file', file);
-          formData.append('chatId', chat.id);
+          const fileExt = file.name.split('.').pop();
+          const fileName = `${chat.id}/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+
+          const { error: uploadError } = await supabase.storage
+            .from('chat-media')
+            .upload(fileName, file);
+
+          if (uploadError) throw uploadError;
+
+          const { data: signedData, error: signedError } = await supabase.storage
+            .from('chat-media')
+            .createSignedUrl(fileName, 60 * 60 * 24 * 365); // 1 year validity
+
+          if (signedError) throw signedError;
           
-          const result = await uploadChatFile(formData);
+          const attachment = {
+              url: signedData.signedUrl,
+              type: file.type.startsWith('image/') ? 'image' : file.type.startsWith('video/') ? 'video' : 'file',
+              name: file.name,
+              size: file.size,
+              path: fileName
+          };
+
+          let msgType: any = 'file';
+          if (attachment.type === 'image') msgType = 'image';
+          if (attachment.type === 'video') msgType = 'video';
+
+          await sendMessage(chat.id, caption, msgType, {}, [attachment as any]);
           
-          await sendMessage(chat.id, file.name, result.type as any, { 
-              attachment_urls: [result.url]
-          });
+          setIsPreviewOpen(false);
+          setSelectedFile(null);
       } catch (err) {
           console.error('Upload failed', err);
+          alert('Upload failed. Please try again.');
+      } finally {
+          setIsUploading(false);
       }
   };
+
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -350,6 +371,7 @@ export function ChatWindow({ chat, onBack }: ChatWindowProps) {
              />
            );
          })}
+         {/* Typing Indicator */}
          {isTyping && (
              <div className="flex justify-start mb-1 animate-in fade-in slide-in-from-left-2">
                  <div className="bg-white px-4 py-3 rounded-2xl rounded-tl-none shadow-sm flex items-center gap-1">
@@ -399,10 +421,9 @@ export function ChatWindow({ chat, onBack }: ChatWindowProps) {
          >
            <Smile className="h-6 w-6" />
          </Button>
-         <Button variant="ghost" size="icon" className="text-serene-neutral-400 hover:text-serene-blue-500 hover:bg-serene-blue-50 rounded-full transition-colors" onClick={() => fileInputRef.current?.click()}>
-           <Paperclip className="h-6 w-6" />
-         </Button>
-         <input type="file" ref={fileInputRef} className="hidden" onChange={handleFileUpload} />
+
+         {/* Attachment Menu Replaces old Paperclip */}
+         <AttachmentMenu onFileSelect={handleFileSelect} />
          
          <div className="flex-1 bg-serene-neutral-50 hover:bg-serene-neutral-100 transition-colors rounded-2xl flex items-end px-4 py-2 border border-transparent focus-within:border-serene-blue-200 focus-within:bg-white focus-within:ring-2 focus-within:ring-serene-blue-100">
            <textarea
@@ -410,7 +431,7 @@ export function ChatWindow({ chat, onBack }: ChatWindowProps) {
                 // @ts-ignore
                 textareaRef.current = el;
                 if (el) {
-                    el.style.height = 'auto';
+                    el.style.height = 'auto'; // Reset
                     el.style.height = el.scrollHeight + 'px';
                 }
              }}
@@ -428,7 +449,6 @@ export function ChatWindow({ chat, onBack }: ChatWindowProps) {
                 if(e.key === 'Enter' && !e.shiftKey) {
                     e.preventDefault();
                     handleSend();
-                    // Reset height after send? state update handles re-render, but better to be safe
                 }
              }}
            />
@@ -453,6 +473,18 @@ export function ChatWindow({ chat, onBack }: ChatWindowProps) {
          chatId={chat.id} 
          isOpen={isDrawerOpen} 
          onClose={() => setIsDrawerOpen(false)} 
+       />
+
+       {/* File Preview Modal */}
+       <FilePreviewModal 
+         isOpen={isPreviewOpen}
+         onClose={() => {
+             setIsPreviewOpen(false);
+             setSelectedFile(null);
+         }}
+         file={selectedFile}
+         onSend={handleSendFile}
+         isSending={isUploading}
        />
     </div>
   );
