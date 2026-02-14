@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { AddToCalendarModal } from "./AddToCalendarModal";
 import { Calendar } from "@/components/ui/calendar";
 import {
   Dialog,
@@ -39,6 +40,8 @@ interface EnhancedAppointmentSchedulerProps {
   }) => Promise<void>;
   professionalName?: string;
   availableSlots?: TimeSlot[];
+  userId?: string;
+  serviceName?: string;
 }
 
 export function EnhancedAppointmentScheduler({
@@ -47,6 +50,8 @@ export function EnhancedAppointmentScheduler({
   onSchedule,
   professionalName,
   availableSlots = [],
+  userId,
+  serviceName,
 }: EnhancedAppointmentSchedulerProps) {
   const [selectedDate, setSelectedDate] = useState<Date>();
   const [selectedTime, setSelectedTime] = useState<string>();
@@ -55,6 +60,13 @@ export function EnhancedAppointmentScheduler({
   const [notes, setNotes] = useState<string>("");
   const [timeSlots, setTimeSlots] = useState<TimeSlot[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [showCalendarModal, setShowCalendarModal] = useState(false);
+  const [lastScheduledAppointment, setLastScheduledAppointment] = useState<{
+    date: Date;
+    duration: number;
+    type: string;
+    notes?: string;
+  } | null>(null);
 
   // Generate time slots for selected date
   useEffect(() => {
@@ -102,13 +114,19 @@ export function EnhancedAppointmentScheduler({
 
     setIsLoading(true);
     try {
-      await onSchedule({
+      const apptData = {
         date: appointmentDate,
         duration,
         type: appointmentType,
         notes,
-      });
+      };
+      await onSchedule(apptData);
+      setLastScheduledAppointment(apptData);
       onClose();
+      // Show calendar modal after scheduling
+      if (userId) {
+        setShowCalendarModal(true);
+      }
       // Reset form
       setSelectedDate(undefined);
       setSelectedTime(undefined);
@@ -136,6 +154,7 @@ export function EnhancedAppointmentScheduler({
   };
 
   return (
+    <>
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[600px] max-h-[80vh] overflow-y-auto">
         <DialogHeader>
@@ -275,5 +294,26 @@ export function EnhancedAppointmentScheduler({
         </div>
       </DialogContent>
     </Dialog>
+
+    {/* Add to Calendar Modal — shown after appointment is created */}
+    {lastScheduledAppointment && userId && (
+      <AddToCalendarModal
+        isOpen={showCalendarModal}
+        onClose={() => {
+          setShowCalendarModal(false);
+          setLastScheduledAppointment(null);
+        }}
+        userId={userId}
+        appointmentDetails={{
+          date: lastScheduledAppointment.date,
+          duration: lastScheduledAppointment.duration,
+          type: lastScheduledAppointment.type,
+          notes: lastScheduledAppointment.notes,
+          professionalName: professionalName,
+          serviceName: serviceName,
+        }}
+      />
+    )}
+    </>
   );
 }

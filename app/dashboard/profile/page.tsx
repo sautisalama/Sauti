@@ -11,6 +11,7 @@ import { MobileVerificationSection } from "./mobile-verification-section";
 import { VerificationSection } from "./verification-section";
 import { SupportServicesManager } from "./support-services-manager";
 import { PrivacySecuritySettings } from "./privacy-security-settings";
+import { CalendarIntegrationSettings } from "./calendar-integration-settings";
 import { signOut } from "@/app/(auth)/actions/auth";
 import { createClient } from "@/utils/supabase/client";
 import { useDashboardData } from "@/components/providers/DashboardDataProvider";
@@ -28,7 +29,8 @@ import {
 	Type as FontIcon,
 	Underline,
 	RefreshCw,
-	Type
+	Type,
+	Calendar,
 } from "lucide-react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { SereneBreadcrumb, SereneSectionHeader } from "../_components/SurvivorDashboardComponents";
@@ -160,6 +162,7 @@ export default function ProfilePage() {
 		{ id: 'account', label: 'Account Information', icon: User },
 		{ id: 'privacy', label: 'Privacy & Security', icon: Shield },
 		{ id: 'accessibility', label: 'Accessibility', icon: Contrast },
+		{ id: 'calendar', label: 'Calendar', icon: Calendar },
 		{ id: 'settings', label: 'App Settings', icon: Settings },
 	];
 
@@ -444,6 +447,14 @@ export default function ProfilePage() {
 									hasMatches={false}
 									documentsCount={dash?.data?.verification?.documentsCount || 0}
 									onDataUpdate={refreshAllData}
+								/>
+							)}
+
+							{/* Section: Calendar Integration */}
+							{activeSection === 'calendar' && (
+								<CalendarIntegrationSettings
+									userId={userId || ""}
+									isProfessional={isProfessional}
 								/>
 							)}
 						</div>

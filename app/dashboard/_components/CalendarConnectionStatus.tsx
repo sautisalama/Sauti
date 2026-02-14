@@ -224,7 +224,7 @@ export function CalendarConnectionStatus({
 								<Button
 									variant="outline"
 									size="sm"
-									onClick={() => (window.location.href = "/dashboard/settings")}
+									onClick={() => (window.location.href = "/dashboard/profile?section=calendar")}
 								>
 									<Settings className="h-4 w-4 mr-1" />
 									Calendar Settings
