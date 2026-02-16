@@ -31,9 +31,11 @@ import {
 	RefreshCw,
 	Type,
 	Calendar,
+	AlertCircle
 } from "lucide-react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { SereneBreadcrumb, SereneSectionHeader } from "../_components/SurvivorDashboardComponents";
+import {Alert, AlertDescription, AlertTitle	} from "@/components/ui/alert"
 
 interface ProfileData {
 	bio?: string;
@@ -184,6 +186,25 @@ export default function ProfilePage() {
 				</div>
 			</div>
 
+            {/* Profile Verification Banner - Just below header */}
+            {(profile?.verification_status === 'rejected' || (profile as any)?.accreditation_notes) && (
+                 <div className="px-4 md:px-8 pt-4">
+                     <div className="max-w-6xl mx-auto w-full">
+                        <div className="bg-red-50 border border-red-100 rounded-2xl p-4 flex items-start gap-4 animate-in slide-in-from-top-2">
+                             <div className="bg-red-100 rounded-full p-2 text-red-600 mt-0.5">
+                                 <Shield className="h-5 w-5" />
+                             </div>
+                             <div>
+                                 <h3 className="font-bold text-red-900">Verification Rejected</h3>
+                                 <p className="text-sm text-red-800 mt-1 whitespace-pre-line">
+                                     {profile?.verification_notes || "Please check your documents and resubmit."}
+                                 </p>
+                             </div>
+                        </div>
+                     </div>
+                 </div>
+            )}
+
 			{/* Main Layout - Fixed height container with scrollable content area */}
 			<div className="flex-1 w-full">
 				<div className="max-w-6xl mx-auto px-4 md:px-8 grid grid-cols-1 lg:grid-cols-12 gap-6">
@@ -279,37 +300,49 @@ export default function ProfilePage() {
 
 							{/* Section: Account */}
 							{activeSection === 'account' && (
-								<Card className="rounded-[2rem] border-serene-neutral-200/60 shadow-sm bg-white overflow-hidden">
-									<CardHeader className="border-b border-serene-neutral-100 pb-4 pt-6 px-6 sm:px-8">
-										<CardTitle className="text-lg text-serene-neutral-900">Basic Information</CardTitle>
-									</CardHeader>
-									<CardContent className="space-y-8 pt-8">
-										<div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-											<div className="space-y-2">
-												<label className="text-sm font-semibold text-serene-neutral-700">First Name</label>
-												<Input 
-													value={formData.basic?.first_name ?? profileData.first_name ?? ""} 
-													onChange={(e) => updateFormData("basic", "first_name", e.target.value)}
-													className="rounded-xl border-serene-neutral-300 focus-visible:ring-serene-blue-200 bg-serene-neutral-50/50 h-11"
-												/>
+								<div className="space-y-6">
+									{profile?.verification_status === 'rejected' && (
+										<Alert variant="destructive" className="bg-red-50 border-red-100 rounded-2xl p-4">
+											<AlertCircle className="h-4 w-4" />
+											<AlertTitle>Profile Information Rejected</AlertTitle>
+											<AlertDescription className="mt-1">
+												Your personal details or identity documents were rejected. Please check the Admin Notes above and update your information.
+											</AlertDescription>
+										</Alert>
+									)}
+
+									<Card className="rounded-[2rem] border-serene-neutral-200/60 shadow-sm bg-white overflow-hidden">
+										<CardHeader className="border-b border-serene-neutral-100 pb-4 pt-6 px-6 sm:px-8">
+											<CardTitle className="text-lg text-serene-neutral-900">Basic Information</CardTitle>
+										</CardHeader>
+										<CardContent className="space-y-8 pt-8">
+											<div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+												<div className="space-y-2">
+													<label className="text-sm font-semibold text-serene-neutral-700">First Name</label>
+													<Input 
+														value={formData.basic?.first_name ?? profileData.first_name ?? ""} 
+														onChange={(e) => updateFormData("basic", "first_name", e.target.value)}
+														className="rounded-xl border-serene-neutral-300 focus-visible:ring-serene-blue-200 bg-serene-neutral-50/50 h-11"
+													/>
+												</div>
+												<div className="space-y-2">
+													<label className="text-sm font-semibold text-serene-neutral-700">Last Name</label>
+													<Input 
+														value={formData.basic?.last_name ?? profileData.last_name ?? ""} 
+														onChange={(e) => updateFormData("basic", "last_name", e.target.value)}
+														className="rounded-xl border-serene-neutral-300 focus-visible:ring-serene-blue-200 bg-serene-neutral-50/50 h-11"
+													/>
+												</div>
 											</div>
-											<div className="space-y-2">
-												<label className="text-sm font-semibold text-serene-neutral-700">Last Name</label>
-												<Input 
-													value={formData.basic?.last_name ?? profileData.last_name ?? ""} 
-													onChange={(e) => updateFormData("basic", "last_name", e.target.value)}
-													className="rounded-xl border-serene-neutral-300 focus-visible:ring-serene-blue-200 bg-serene-neutral-50/50 h-11"
-												/>
+											
+											<div className="flex flex-col sm:flex-row justify-end gap-3 mt-4 sm:mt-0">
+												<Button onClick={() => saveSection("basic")} className="w-full sm:w-auto bg-sauti-teal hover:bg-sauti-dark text-white rounded-xl h-11 px-6 shadow-sm">
+													<Save className="h-4 w-4 mr-2" /> Save Changes
+												</Button>
 											</div>
-										</div>
-										
-										<div className="flex flex-col sm:flex-row justify-end gap-3 mt-4 sm:mt-0">
-											<Button onClick={() => saveSection("basic")} className="w-full sm:w-auto bg-sauti-teal hover:bg-sauti-dark text-white rounded-xl h-11 px-6 shadow-sm">
-												<Save className="h-4 w-4 mr-2" /> Save Changes
-											</Button>
-										</div>
-									</CardContent>
-								</Card>
+										</CardContent>
+									</Card>
+								</div>
 							)}
 
 							{/* Section: Privacy */}
@@ -439,15 +472,27 @@ export default function ProfilePage() {
 
 							{/* Section: Services */}
 							{activeSection === 'services' && isProfessional && (
-								<SupportServicesManager
-									userId={userId || ""}
-									userType={profile?.user_type || "professional"}
-									verificationStatus={dash?.data?.verification?.overallStatus || "pending"}
-									hasAccreditation={!!dash?.data?.verification?.documentsCount}
-									hasMatches={false}
-									documentsCount={dash?.data?.verification?.documentsCount || 0}
-									onDataUpdate={refreshAllData}
-								/>
+								<div className="space-y-6">
+									{dash?.data?.supportServices?.some((s: any) => s.verification_status === 'rejected') && (
+										<Alert variant="destructive" className="bg-red-50 border-red-100 rounded-2xl p-4">
+											<AlertCircle className="h-4 w-4" />
+											<AlertTitle>Action Required on Services</AlertTitle>
+											<AlertDescription className="mt-1">
+												One or more of your services have been rejected. Please review the specific service details below to fix the issues.
+											</AlertDescription>
+										</Alert>
+									)}
+
+									<SupportServicesManager
+										userId={userId || ""}
+										userType={profile?.user_type || "professional"}
+										verificationStatus={dash?.data?.verification?.overallStatus || "pending"}
+										hasAccreditation={!!dash?.data?.verification?.documentsCount}
+										hasMatches={false}
+										documentsCount={dash?.data?.verification?.documentsCount || 0}
+										onDataUpdate={refreshAllData}
+									/>
+								</div>
 							)}
 
 							{/* Section: Calendar Integration */}

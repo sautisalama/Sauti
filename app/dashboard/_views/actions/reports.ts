@@ -16,7 +16,7 @@ export async function fetchUserReports(
 				*,
 				matched_services (
 					match_status_type,
-					support_service:support_services (
+					service_details:support_services (
 						name
 					),
 					appointments (

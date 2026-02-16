@@ -137,7 +137,7 @@ export function RescheduleModal({
 					</DialogTitle>
 					<DialogDescription>
 						Choose a new date and time for your appointment with{" "}
-						{appointment.matched_service?.support_service?.name ||
+						{appointment.matched_service?.service_details?.name ||
 							"the service provider"}
 						.
 					</DialogDescription>

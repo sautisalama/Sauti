@@ -3,208 +3,226 @@
 import { useState, useEffect } from "react";
 import { createClient } from "@/utils/supabase/client";
 import {
-	Card,
-	CardContent,
-	CardDescription,
-	CardHeader,
-	CardTitle,
-} from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-	Users,
 	Shield,
-	CheckCircle,
-	XCircle,
-	AlertTriangle,
-	MapPin,
-	BarChart3,
-	UserCheck,
-	UserX,
-	Building2,
-	FileText,
-	Eye,
-	Ban,
-	Check,
-	X,
+	ShieldAlert,
+    Building2,
+    Users,
+    BookOpen,
 } from "lucide-react";
-import { AdminStatsCards } from "./_components/AdminStatsCards";
-import { VerificationQueue } from "./_components/VerificationQueue";
-import { CoverageMap } from "./_components/CoverageMap";
-import { AdminUsersTable } from "./_components/AdminUsersTable";
-import { AdminServicesTable } from "./_components/AdminServicesTable";
-import { useToast } from "@/hooks/use-toast";
-import { AdminStats } from "@/types/admin-types";
-import { SereneBreadcrumb } from "@/components/ui/SereneBreadcrumb";
+import { 
+    SereneWelcomeHeader, 
+    SereneQuickActionCard,
+    SereneSectionHeader
+} from "../_components/SurvivorDashboardComponents";
+import { AdminActivitySection } from "./_components/AdminActivitySection";
+
+import { Database } from "@/types/db-schema";
 
 export default function AdminDashboard() {
-	const [stats, setStats] = useState<AdminStats | null>(null);
+	const [stats, setStats] = useState<{
+        pendingVerifications: number;
+        activeServices: number;
+        serviceGrowth: { value: string; trend: 'up' | 'down' | 'neutral' };
+        totalProfessionals: number;
+        professionalGrowth: { value: string; trend: 'up' | 'down' | 'neutral' };
+        blogGrowth: { value: string; trend: 'up' | 'down' | 'neutral' };
+        unreadMessages: number;
+    } | null>(null);
 	const [isLoading, setIsLoading] = useState(true);
 	const [isAdmin, setIsAdmin] = useState(false);
+    const [adminProfile, setAdminProfile] = useState<any>(null);
 	const supabase = createClient();
-	const { toast } = useToast();
-
+    
 	useEffect(() => {
 		checkAdminStatus();
-		loadStats();
+		loadQuickStats();
 	}, []);
 
 	const checkAdminStatus = async () => {
 		try {
-			const {
-				data: { user },
-			} = await supabase.auth.getUser();
+			const { data: { user } } = await supabase.auth.getUser();
 			if (!user) return;
 
 			const { data: profile } = await supabase
 				.from("profiles")
-				.select("is_admin")
+				.select("*")
 				.eq("id", user.id)
 				.single();
 
 			setIsAdmin(profile?.is_admin || false);
+            setAdminProfile(profile);
 		} catch (error) {
 			console.error("Error checking admin status:", error);
 		}
 	};
 
-	const loadStats = async () => {
-		try {
-			const { data, error } = await supabase
-				.from("admin_dashboard_stats")
-				.select("*")
-				.single();
+    const calculateGrowth = async (table: keyof Database['public']['Tables'], filter?: any): Promise<{ value: string; trend: 'up' | 'down' | 'neutral' }> => {
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+        const dateStr = thirtyDaysAgo.toISOString();
 
-			if (error) throw error;
-			setStats(data);
+        // Current Total
+        let currentQuery = supabase.from(table).select("*", { count: 'exact', head: true });
+        if (filter) {
+            Object.entries(filter).forEach(([key, value]) => {
+                if (Array.isArray(value)) { 
+                    currentQuery = currentQuery.in(key, value); 
+                } else {
+                    currentQuery = currentQuery.eq(key, value);
+                }
+            });
+        }
+        const { count: currentTotal } = await currentQuery;
+
+        // Count 30 Days Ago (Total at that time)
+        // Which is basically: Count of all items where created_at <= 30 days ago
+        let prevQuery = supabase.from(table).select("*", { count: 'exact', head: true }).lte('created_at', dateStr);
+        if (filter) {
+             Object.entries(filter).forEach(([key, value]) => {
+                if (Array.isArray(value)) { 
+                    prevQuery = prevQuery.in(key, value); 
+                } else {
+                    prevQuery = prevQuery.eq(key, value);
+                }
+            });
+        }
+        const { count: prevTotal } = await prevQuery;
+
+        const current = currentTotal || 0;
+        const prev = prevTotal || 0;
+
+        if (prev === 0) {
+            return { value: current > 0 ? "+100%" : "0%", trend: 'neutral' as const }; // If baseline is 0
+        }
+
+        const growth = ((current - prev) / prev) * 100;
+        return {
+            value: `${growth > 0 ? "+" : ""}${growth.toFixed(1)}%`,
+            trend: growth > 0 ? 'up' : growth < 0 ? 'down' : 'neutral' as const
+        };
+    };
+
+	const loadQuickStats = async () => {
+		try {
+            // Pending Verifications (Queue)
+            const { count: pendingCount } = await supabase
+                .from("support_services")
+                .select("*", { count: 'exact', head: true })
+                .eq("verification_status", "pending");
+
+            // Services
+            const { count: serviceCount } = await supabase
+                .from("support_services")
+                .select("*", { count: 'exact', head: true })
+                .eq("verification_status", "verified");
+            const serviceGrowth = await calculateGrowth("support_services", { verification_status: "verified" });
+
+            // Professionals
+            const { count: proCount } = await supabase
+                .from("profiles")
+                .select("*", { count: 'exact', head: true })
+                .in("user_type", ["professional", "ngo"]);
+            const professionalGrowth = await calculateGrowth("profiles", { user_type: ["professional", "ngo"] });
+
+            // Blogs
+            const blogGrowth = await calculateGrowth("blogs");
+
+            // Mock unread messages
+            const unreadMessages = 0; 
+
+			setStats({
+                pendingVerifications: pendingCount || 0,
+                activeServices: serviceCount || 0,
+                serviceGrowth,
+                totalProfessionals: proCount || 0,
+                professionalGrowth,
+                blogGrowth,
+                unreadMessages
+            });
 		} catch (error) {
 			console.error("Error loading admin stats:", error);
-			toast({
-				title: "Error",
-				description: "Failed to load admin statistics",
-				variant: "destructive",
-			});
 		} finally {
 			setIsLoading(false);
 		}
 	};
 
-	if (!isAdmin) {
+	if (!isAdmin && !isLoading) {
 		return (
-			<div className="max-w-4xl mx-auto p-4 md:p-6">
-				<Card className="border-red-200 bg-red-50">
-					<CardHeader>
-						<CardTitle className="flex items-center gap-2 text-red-800">
-							<Shield className="h-5 w-5" />
-							Access Denied
-						</CardTitle>
-						<CardDescription className="text-red-600">
-							You don't have admin privileges to access this dashboard.
-						</CardDescription>
-					</CardHeader>
-				</Card>
-			</div>
-		);
-	}
-
-	if (isLoading) {
-		return (
-			<div className="max-w-7xl mx-auto p-4 md:p-6">
-				<div className="space-y-6">
-					<div className="h-8 bg-gray-200 rounded animate-pulse" />
-					<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-						{[...Array(4)].map((_, i) => (
-							<div key={i} className="h-32 bg-gray-200 rounded animate-pulse" />
-						))}
-					</div>
+			<div className="max-w-4xl mx-auto p-4 md:p-8">
+				<div className="bg-red-50 border border-red-100 rounded-2xl p-8 text-center">
+                    <div className="h-16 w-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4 text-red-600">
+					    <ShieldAlert className="h-8 w-8" />
+                    </div>
+					<h2 className="text-xl font-bold text-red-900 mb-2">Access Denied</h2>
+					<p className="text-red-700">
+						You don't have admin privileges to access this dashboard.
+					</p>
 				</div>
 			</div>
 		);
 	}
+
+    const getTimeOfDay = (): "morning" | "afternoon" | "evening" => {
+		const hour = new Date().getHours();
+		if (hour < 12) return "morning";
+		if (hour < 18) return "afternoon";
+		return "evening";
+	};
 
 	return (
-		<div className="max-w-7xl mx-auto p-4 md:p-6">
-			<div className="space-y-6">
-				{/* Header */}
-				<div>
-					<SereneBreadcrumb items={[{ label: "Admin", active: true }]} className="mb-4" />
-					<div className="flex items-center justify-between">
-						<div>
-							<h1 className="text-3xl font-bold text-gray-900">Admin Dashboard</h1>
-							<p className="text-gray-600 mt-1">
-								Manage user verifications, services, and platform statistics
-							</p>
-						</div>
-						<Badge variant="secondary" className="bg-blue-100 text-blue-800">
-							<Shield className="h-4 w-4 mr-1" />
-							Admin Mode
-						</Badge>
-					</div>
-				</div>
+		<div className="max-w-7xl mx-auto p-4 md:p-6 lg:p-8 space-y-8 pb-20">
+            {/* Welcome Header */}
+            <SereneWelcomeHeader 
+                name={adminProfile?.first_name || "Admin"}
+                timeOfDay={getTimeOfDay()}
+                welcomeMessage="Here's what needs your attention today."
+            />
 
-				{/* Stats Cards */}
-				{stats && <AdminStatsCards stats={stats} />}
+            {/* Activity Feed */}
+            <AdminActivitySection />
 
-				{/* Main Content Tabs */}
-				<Tabs defaultValue="verification" className="space-y-6">
-					<TabsList className="grid w-full grid-cols-5">
-						<TabsTrigger value="verification" className="flex items-center gap-2">
-							<UserCheck className="h-4 w-4" />
-							Verification
-						</TabsTrigger>
-						<TabsTrigger value="users" className="flex items-center gap-2">
-							<Users className="h-4 w-4" />
-							Users
-						</TabsTrigger>
-						<TabsTrigger value="services" className="flex items-center gap-2">
-							<Building2 className="h-4 w-4" />
-							Services
-						</TabsTrigger>
-						<TabsTrigger value="coverage" className="flex items-center gap-2">
-							<MapPin className="h-4 w-4" />
-							Coverage
-						</TabsTrigger>
-						<TabsTrigger value="analytics" className="flex items-center gap-2">
-							<BarChart3 className="h-4 w-4" />
-							Analytics
-						</TabsTrigger>
-					</TabsList>
-
-					<TabsContent value="verification" className="space-y-6">
-						<VerificationQueue onRefresh={loadStats} />
-					</TabsContent>
-
-					<TabsContent value="users" className="space-y-6">
-						<AdminUsersTable onRefresh={loadStats} />
-					</TabsContent>
-
-					<TabsContent value="services" className="space-y-6">
-						<AdminServicesTable onRefresh={loadStats} />
-					</TabsContent>
-
-					<TabsContent value="coverage" className="space-y-6">
-						<CoverageMap />
-					</TabsContent>
-
-					<TabsContent value="analytics" className="space-y-6">
-						<Card>
-							<CardHeader>
-								<CardTitle>Platform Analytics</CardTitle>
-								<CardDescription>
-									Detailed insights into platform usage and performance
-								</CardDescription>
-							</CardHeader>
-							<CardContent>
-								<div className="text-center py-8 text-gray-500">
-									<BarChart3 className="h-12 w-12 mx-auto mb-4 text-gray-300" />
-									<p>Analytics dashboard coming soon...</p>
-								</div>
-							</CardContent>
-						</Card>
-					</TabsContent>
-				</Tabs>
-			</div>
+            {/* Quick Action Grid */}
+            <div>
+                <SereneSectionHeader title="Management Console" description="Quick access to core administrative functions" />
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                     <SereneQuickActionCard 
+                        title="Verifications"
+                        description={stats ? `${stats.pendingVerifications} Pending` : "Manage queue"}
+                        icon={<Shield className="h-6 w-6 text-sauti-red" />}
+                        href="/dashboard/admin/review"
+                        variant="custom"
+                        className="bg-sauti-red-light border-sauti-red/10 shadow-sm hover:shadow-md transition-all"
+                        badge={stats?.pendingVerifications || undefined}
+                        badgeClassName="bg-sauti-red text-white"
+                     />
+                     <SereneQuickActionCard 
+                        title="Services"
+                        description={stats ? `${stats.activeServices} Active` : "Manage Directory"}
+                        icon={<Building2 className="h-6 w-6 text-sauti-yellow" />}
+                        href="/dashboard/admin/services"
+                        variant="custom"
+                        className="bg-sauti-yellow-light border-sauti-yellow/10 shadow-sm hover:shadow-md transition-all"
+                        stats={stats?.serviceGrowth}
+                     />
+                     <SereneQuickActionCard 
+                        title="Professionals"
+                        description={stats ? `${stats.totalProfessionals} Registered` : "Userbase"}
+                        icon={<Users className="h-6 w-6 text-sauti-teal" />}
+                        href="/dashboard/admin/professionals"
+                        variant="custom"
+                        className="bg-sauti-teal-light border-sauti-teal/10 shadow-sm hover:shadow-md transition-all"
+                        stats={stats?.professionalGrowth}
+                     />
+                     <SereneQuickActionCard 
+                        title="Content"
+                        description="Blogs & Events"
+                        icon={<BookOpen className="h-5 w-5" />}
+                        href="/dashboard/admin/blogs"
+                        variant="neutral"
+                        stats={stats?.blogGrowth}
+                     />
+                </div>
+            </div>
 		</div>
 	);
 }

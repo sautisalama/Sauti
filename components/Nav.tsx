@@ -11,7 +11,7 @@ import {
 	UsersRound,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetTrigger, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
 import {
@@ -233,6 +233,8 @@ export function Nav() {
 							</Button>
 						</SheetTrigger>
 						<SheetContent side="right" className="w-full sm:w-full h-full p-0 border-none">
+							<SheetTitle className="sr-only">Mobile Navigation Menu</SheetTitle>
+							<SheetDescription className="sr-only">Navigation links and actions</SheetDescription>
 							<div className="flex flex-col h-full bg-white overflow-y-auto">
 								<div className="p-8 space-y-10">
 									{/* Mobile Header */}

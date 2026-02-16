@@ -15,7 +15,7 @@ import AuthenticatedReportAbuseForm from "@/components/AuthenticatedReportAbuseF
 interface ReportWithRelations extends Tables<"reports"> {
 	matched_services?: {
 		match_status_type: string;
-		support_service: Tables<"support_services">;
+		service_details: Tables<"support_services">;
 		appointments?: {
 			appointment_date: string;
 			status: string;
@@ -173,7 +173,7 @@ export function ReportsTab({
 											<div className="flex items-center justify-between">
 												<div className="flex-1">
 													<span className="text-sm font-black text-sauti-teal">
-														✅ Accepted by: {acceptedMatch.support_service.name}
+														✅ Accepted by: {acceptedMatch.service_details.name}
 													</span>
 													{appointment && (
 														<div className="flex items-center gap-2 mt-2">
@@ -218,7 +218,7 @@ export function ReportsTab({
 														key={index}
 														className="text-sm text-gray-600 flex items-center justify-between"
 													>
-														<span>{match.support_service.name}</span>
+														<span>{match.service_details.name}</span>
 														<span className="px-2 py-0.5 rounded-full text-xs bg-yellow-100 text-yellow-700">
 															pending
 														</span>

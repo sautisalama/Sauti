@@ -11,7 +11,8 @@ import {
   Calendar,
   Heart,
   TrendingUp,
-  Users
+  Users,
+  Shield
 } from "lucide-react";
 import { useUser } from "@/hooks/useUser";
 import { cn } from "@/lib/utils";
@@ -106,6 +107,24 @@ export function EnhancedBottomNav({ forceShow = false, className }: EnhancedBott
 
     const userRole = dash?.data?.userType || user?.profile?.user_type;
     const isProfessional = userRole === 'professional' || userRole === 'ngo';
+    const isAdmin = user?.profile?.is_admin || false; // Check admin status
+    
+    // Admin Navigation
+    if (isAdmin) {
+        return [
+            { id: "overview", label: "Overview", icon: LayoutDashboard, href: "/dashboard/admin" },
+            { 
+                id: "verification", 
+                label: "Verify", 
+                icon: Shield, 
+                href: "/dashboard/admin/review", // Assuming this is the verifications list page
+                badge: dash?.data?.verification?.pendingCount || undefined
+            },
+             // Admins manage services, so replacing Learn with Services seems appropriate for "important tasks"
+            { id: "services", label: "Services", icon: Users, href: "/dashboard/admin/services" },
+            { id: "chat", label: "Chats", icon: MessageCircle, href: "/dashboard/chat", badge: unreadMessages > 0 ? unreadMessages : undefined },
+        ];
+    }
 
     // Professional: Home, Cases, Chats, Resources
     // Survivor: Home, Reports, Chats, Resources

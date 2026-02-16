@@ -29,7 +29,7 @@ export interface ReportCardData {
 	media?: { url?: string; type?: string; size?: number } | null;
 	matched_services?: Array<{
 		match_status_type?: string;
-		support_services?: { name?: string | null } | null;
+		service_details?: { name?: string | null } | null;
 		appointments?: Array<{
 			appointment_date: string;
 			status: string;
@@ -162,7 +162,7 @@ export function ReportCard({
 }: ReportCardProps) {
 	const mostRecentMatch = data.matched_services?.[0];
 	const matchLabel =
-		mostRecentMatch?.support_services?.name || mostRecentMatch?.match_status_type;
+		mostRecentMatch?.service_details?.name || mostRecentMatch?.match_status_type;
 	const appointment = mostRecentMatch?.appointments?.[0];
 	const professional = appointment?.professional;
 	const hasMedia = !!data.media?.url;

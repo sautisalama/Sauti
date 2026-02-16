@@ -117,8 +117,14 @@ interface SereneQuickActionProps {
   href?: string;
   onClick?: () => void;
   badge?: number | string;
-  variant?: "blue" | "green" | "neutral";
+  badgeClassName?: string;
+  variant?: "blue" | "green" | "neutral" | "custom";
   className?: string;
+  stats?: {
+    value: string;
+    trend: 'up' | 'down' | 'neutral';
+    label?: string;
+  };
 }
 
 export function SereneQuickActionCard({ 
@@ -127,20 +133,24 @@ export function SereneQuickActionCard({
   description, 
   href, 
   onClick, 
-  badge, 
+  badge,
+  badgeClassName,
   variant = "blue",
-  className 
+  className,
+  stats
 }: SereneQuickActionProps) {
   const variants = {
     blue: "bg-serene-blue-50 hover:bg-serene-blue-100 text-serene-blue-900",
     green: "bg-serene-green-50 hover:bg-serene-green-100 text-serene-green-700",
-    neutral: "bg-serene-neutral-50 hover:bg-serene-neutral-100 text-serene-neutral-900"
+    neutral: "bg-serene-neutral-50 hover:bg-serene-neutral-100 text-serene-neutral-900",
+    custom: "" // Custom styling via className
   };
 
   const iconColors = {
     blue: "text-serene-blue-600 bg-white/60",
     green: "text-serene-green-500 bg-white/60",
-    neutral: "text-serene-neutral-600 bg-white/60"
+    neutral: "text-serene-neutral-600 bg-white/60",
+    custom: "bg-white/60" // Base bg for custom, text color comes from icon
   };
 
   const content = (
@@ -151,7 +161,7 @@ export function SereneQuickActionCard({
       className
     )}>
       {badge && (
-        <Badge className="absolute top-3 right-3 bg-serene-blue-600 text-white border-0 font-medium px-1.5 py-0.5 text-xs">
+        <Badge className={cn("absolute top-3 right-3 bg-serene-blue-600 text-white border-0 font-medium px-1.5 py-0.5 text-xs", badgeClassName)}>
           {badge}
         </Badge>
       )}
@@ -168,9 +178,23 @@ export function SereneQuickActionCard({
             {title}
           </h3>
           {description && (
-            <p className="text-xs leading-relaxed opacity-80 font-medium">
+            <p className="text-xs leading-relaxed opacity-80 font-medium mb-3">
               {description}
             </p>
+          )}
+          {stats && (
+            <div className="flex items-center gap-1.5 text-xs font-medium">
+               <span className={cn(
+                 "flex items-center gap-0.5 px-1.5 py-0.5 rounded-md",
+                 stats.trend === 'up' ? "bg-green-100/50 text-green-700" : 
+                 stats.trend === 'down' ? "bg-red-100/50 text-red-700" : "bg-gray-100/50 text-gray-700"
+               )}>
+                 {stats.trend === 'up' && <TrendingUp className="h-3 w-3" />}
+                 {stats.trend === 'down' && <TrendingDown className="h-3 w-3" />}
+                 {stats.value}
+               </span>
+               <span className="opacity-60">{stats.label || "from last month"}</span>
+            </div>
           )}
         </div>
       </div>

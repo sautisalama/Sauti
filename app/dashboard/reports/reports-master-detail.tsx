@@ -198,7 +198,7 @@ export default function ReportsMasterDetail({ userId }: { userId: string }) {
 							matched_services (
 								id,
 								match_status_type,
-								support_service:support_services (
+								service_details:support_services (
 									id,
 									name,
 									phone_number,
@@ -226,7 +226,7 @@ export default function ReportsMasterDetail({ userId }: { userId: string }) {
 					matched_services:
 						r.matched_services?.map((m: any) => ({
 							...m,
-							support_services: m.support_service || m.support_services || null,
+							support_services: m.service_details || m.support_services || null,
 						})) || [],
 				}));
 				setReports(normalized || []);

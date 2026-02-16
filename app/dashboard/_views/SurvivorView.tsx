@@ -45,7 +45,7 @@ interface ReportWithRelations extends Tables<"reports"> {
 		match_status_type: Database["public"]["Enums"]["match_status_type"];
 		match_date: string | null;
 		match_score: number | null;
-		support_services: {
+		service_details: {
 			id: string;
 			name: string;
 			service_types: Database["public"]["Enums"]["support_service_type"];
@@ -226,32 +226,38 @@ export default function SurvivorView({
                                 <SereneQuickActionCard
                                     title="Reports"
                                     description={`${activeCasesCount} Active`}
-                                    icon={<Shield className="h-5 w-5" />}
+                                    icon={<Shield className="h-5 w-5 text-sauti-red" />}
                                     href="/dashboard/reports"
-                                    variant="blue"
+                                    variant="custom"
+                                    className="bg-sauti-red-light border-sauti-red/10 shadow-sm hover:shadow-md transition-all"
                                     badge={activeCasesCount || undefined}
+                                    badgeClassName="bg-sauti-red text-white"
                                 />
                                 <SereneQuickActionCard
                                     title="Matches"
                                     description={`${matchedCount} Found`}
-                                    icon={<Heart className="h-5 w-5" />}
-                                    href="/dashboard/reports"
-                                    variant="blue"
+                                    icon={<Heart className="h-5 w-5 text-sauti-yellow" />}
+                                    href="/dashboard/reports" // Should this be matches? User has it as reports in prev code. Leaving as is, but styling as Matches.
+                                    variant="custom"
+                                    className="bg-sauti-yellow-light border-sauti-yellow/10 shadow-sm hover:shadow-md transition-all"
                                     badge={matchedCount || undefined}
+                                    badgeClassName="bg-sauti-yellow text-white"
                                 />
                                 {/* removed appointments card */}
                                 <SereneQuickActionCard
                                     title="Messages"
                                     description="Support Chat"
-                                    icon={<MessageCircle className="h-5 w-5" />}
+                                    icon={<MessageCircle className="h-5 w-5 text-sauti-teal" />}
                                     href="/dashboard/chat"
-                                    variant="green"
+                                    variant="custom"
+                                    className="bg-sauti-teal-light border-sauti-teal/10 shadow-sm hover:shadow-md transition-all"
                                     badge={dash?.data?.unreadChatCount || undefined}
+                                    badgeClassName="bg-sauti-teal text-white"
                                 />
                                 <SereneQuickActionCard
                                     title="Resources"
                                     description="Help & Guides"
-                                    icon={<BookOpen className="h-5 w-5" />}
+                                    icon={<BookOpen className="h-5 w-5 text-gray-500" />}
                                     href="/dashboard/resources"
                                     variant="neutral"
                                 />

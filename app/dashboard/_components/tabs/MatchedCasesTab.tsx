@@ -12,7 +12,7 @@ interface MatchedServiceWithRelations {
 	match_date: string;
 	match_status_type: string;
 	report: Tables<"reports">;
-	support_service: Tables<"support_services">;
+	service_details: Tables<"support_services">;
 }
 
 interface MatchedCasesTabProps {

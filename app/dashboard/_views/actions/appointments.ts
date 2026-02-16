@@ -27,7 +27,7 @@ export async function fetchUserAppointments(
 			*,
 			matched_service:matched_services (
 				*,
-				support_service:support_services (*),
+				service_details:support_services (*),
 				report:reports (
 					*,
 					user:profiles (*)
@@ -87,7 +87,7 @@ export async function fetchAppointmentById(appointmentId: string) {
 			*,
 			matched_service:matched_services (
 				*,
-				support_service:support_services (*),
+				service_details:support_services (*),
 				report:reports (
 					*,
 					user:profiles (*)

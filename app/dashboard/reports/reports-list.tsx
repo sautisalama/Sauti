@@ -14,7 +14,7 @@ interface ReportWithRelations extends Tables<"reports"> {
 	matched_services?: Array<{
 		id: string;
 		match_status_type: any;
-		support_services: { id: string; name: string };
+		service_details: { id: string; name: string };
 		appointments?: Array<{
 			id: string;
 			appointment_id: string;
@@ -42,7 +42,7 @@ export default function ReportsList({ userId }: { userId: string }) {
           matched_services (
             id,
             match_status_type,
-            support_services (
+            service_details:support_services (
               id,
               name
             ),

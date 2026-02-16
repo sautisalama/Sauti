@@ -10,7 +10,7 @@ export async function fetchMatchedServices(userId: string) {
 		.select(`
 			*,
 			report:reports(*),
-			support_service:support_services(*)
+			service_details:support_services(*)
 		`)
 		.in("service_id", serviceIds)
 		.order("match_date", { ascending: false });
@@ -39,7 +39,7 @@ export async function acceptMatch(matchId: string) {
 			.from("matched_services")
 			.select(`
 				*,
-				support_service:support_services(
+				service_details:support_services(
 					user_id,
 					name
 				)

@@ -179,15 +179,15 @@ export function AdminUsersTable({ onRefresh }: AdminUsersTableProps) {
 	const getStatusColor = (status: string) => {
 		switch (status) {
 			case "pending":
-				return "bg-yellow-100 text-yellow-800";
+				return "bg-amber-50 text-amber-700 border-amber-200 shadow-sm";
 			case "under_review":
-				return "bg-blue-100 text-blue-800";
+				return "bg-blue-50 text-blue-700 border-blue-200 shadow-sm";
 			case "verified":
-				return "bg-green-100 text-green-800";
+				return "bg-green-50 text-green-700 border-green-200 shadow-sm";
 			case "rejected":
-				return "bg-red-100 text-red-800";
+				return "bg-red-50 text-red-700 border-red-200 shadow-sm";
 			default:
-				return "bg-gray-100 text-gray-800";
+				return "bg-serene-neutral-100 text-serene-neutral-700 border-serene-neutral-200";
 		}
 	};
 
@@ -231,10 +231,10 @@ export function AdminUsersTable({ onRefresh }: AdminUsersTableProps) {
 	}
 
 	return (
-		<Card>
-			<CardHeader>
-				<CardTitle>Users Management</CardTitle>
-				<CardDescription>
+		<Card className="border-serene-neutral-200/60 shadow-sm rounded-2xl overflow-hidden">
+			<CardHeader className="bg-white border-b border-serene-neutral-100">
+				<CardTitle className="text-xl font-bold text-serene-neutral-900">Users Management</CardTitle>
+				<CardDescription className="text-serene-neutral-500">
 					Manage user accounts, verification status, and access permissions
 				</CardDescription>
 			</CardHeader>
@@ -242,12 +242,12 @@ export function AdminUsersTable({ onRefresh }: AdminUsersTableProps) {
 				{/* Filters */}
 				<div className="flex flex-col sm:flex-row gap-4">
 					<div className="relative flex-1">
-						<Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+						<Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-serene-neutral-400 h-4 w-4" />
 						<Input
 							placeholder="Search users..."
 							value={searchTerm}
 							onChange={(e) => setSearchTerm(e.target.value)}
-							className="pl-10"
+							className="pl-10 rounded-full bg-serene-neutral-50 border-serene-neutral-200 focus:bg-white transition-all"
 						/>
 					</div>
 
@@ -289,16 +289,16 @@ export function AdminUsersTable({ onRefresh }: AdminUsersTableProps) {
 				</div>
 
 				{/* Users Table */}
-				<div className="border rounded-lg">
+				<div className="border border-serene-neutral-200 rounded-xl overflow-hidden">
 					<Table>
-						<TableHeader>
-							<TableRow>
-								<TableHead>User</TableHead>
-								<TableHead>Role</TableHead>
-								<TableHead>Status</TableHead>
-								<TableHead>Joined</TableHead>
-								<TableHead>Last Updated</TableHead>
-								<TableHead className="text-right">Actions</TableHead>
+						<TableHeader className="bg-serene-neutral-50/80 backdrop-blur-sm">
+							<TableRow className="hover:bg-transparent border-b border-serene-neutral-200">
+								<TableHead className="font-bold text-serene-neutral-600 pl-6">User</TableHead>
+								<TableHead className="font-bold text-serene-neutral-600">Role</TableHead>
+								<TableHead className="font-bold text-serene-neutral-600">Status</TableHead>
+								<TableHead className="font-bold text-serene-neutral-600">Joined</TableHead>
+								<TableHead className="font-bold text-serene-neutral-600">Last Updated</TableHead>
+								<TableHead className="text-right font-bold text-serene-neutral-600 pr-6">Actions</TableHead>
 							</TableRow>
 						</TableHeader>
 						<TableBody>
