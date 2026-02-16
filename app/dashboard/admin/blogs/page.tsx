@@ -1,6 +1,6 @@
 "use client";
 
-import { BlogManager } from "../_components/BlogManager";
+import { BlogManager } from "@/components/admin/BlogManager";
 import { SereneBreadcrumb } from "@/components/ui/SereneBreadcrumb";
 
 export default function BlogsPage() {

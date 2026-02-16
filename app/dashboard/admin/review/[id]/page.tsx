@@ -281,6 +281,8 @@ export default function ReviewPage() {
                 ? '/dashboard/profile?section=account'
                 : '/dashboard/profile?section=services';
 
+            if (!profile) throw new Error("Profile not loaded");
+
             await supabase.from('notifications').insert({
                 user_id: profile.id, // The profile owner
                 type: `verification_${status}`,

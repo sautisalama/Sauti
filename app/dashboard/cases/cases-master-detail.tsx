@@ -58,6 +58,11 @@ interface MatchedServiceItem {
 	report: any;
 	service_details: any;
 	notes?: string | null;
+	support_service?: {
+		name?: string;
+		category?: string;
+		organization_name?: string;
+	} | null;
 	appointments?: Array<{
 		id: string;
 		appointment_id: string;
