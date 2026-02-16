@@ -37,7 +37,7 @@ export function AddToCalendarButton({
   const endDate = new Date(appointmentDate.getTime() + (60 * 60 * 1000)); // 1 hour duration
 
   const calendarEvent: CalendarEvent = {
-    title: `Appointment - ${appointment.matched_service?.support_service?.name || 'Healthcare Appointment'}`,
+    title: `Appointment - ${appointment.matched_service?.service_details?.name || 'Healthcare Appointment'}`,
     start: appointmentDate,
     end: endDate,
     description: `

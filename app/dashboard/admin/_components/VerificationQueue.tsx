@@ -185,15 +185,15 @@ export function VerificationQueue({ onRefresh }: VerificationQueueProps) {
 	const getStatusColor = (status: string) => {
 		switch (status) {
 			case "pending":
-				return "bg-yellow-100 text-yellow-800";
+				return "bg-amber-100 text-amber-800 border-amber-200 hover:bg-amber-200";
 			case "under_review":
-				return "bg-blue-100 text-blue-800";
+				return "bg-blue-100 text-blue-800 border-blue-200 hover:bg-blue-200";
 			case "verified":
-				return "bg-green-100 text-green-800";
+				return "bg-green-100 text-green-800 border-green-200 hover:bg-green-200";
 			case "rejected":
-				return "bg-red-100 text-red-800";
+				return "bg-red-100 text-red-800 border-red-200 hover:bg-red-200";
 			default:
-				return "bg-gray-100 text-gray-800";
+				return "bg-serene-neutral-100 text-serene-neutral-800 border-serene-neutral-200";
 		}
 	};
 
@@ -249,38 +249,44 @@ export function VerificationQueue({ onRefresh }: VerificationQueueProps) {
 
 				<TabsContent value="users" className="space-y-4">
 					{pendingUsers.length === 0 ? (
-						<Card>
-							<CardContent className="text-center py-8">
-								<CheckCircle className="h-12 w-12 mx-auto text-green-500 mb-4" />
-								<h3 className="text-lg font-medium text-gray-900 mb-2">
+						<Card className="border-serene-neutral-200/60 shadow-sm rounded-2xl bg-serene-neutral-50/50">
+							<CardContent className="text-center py-12">
+								<CheckCircle className="h-16 w-16 mx-auto text-green-500 mb-4 opacity-80" />
+								<h3 className="text-xl font-bold text-serene-neutral-900 mb-2">
 									All Caught Up!
 								</h3>
-								<p className="text-gray-500">
+								<p className="text-serene-neutral-500">
 									No pending user verifications at the moment.
 								</p>
 							</CardContent>
 						</Card>
 					) : (
-						<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+						<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
 							{pendingUsers.map((user) => (
-								<Card key={user.id} className="hover:shadow-md transition-shadow">
-									<CardHeader className="pb-3">
+								<Card key={user.id} className="hover:shadow-md transition-all duration-300 border-serene-neutral-200/60 rounded-2xl overflow-hidden hover:border-serene-blue-200">
+									<CardHeader className="pb-3 bg-white border-b border-serene-neutral-100">
 										<div className="flex items-center justify-between">
-											<CardTitle className="text-lg">
+											<CardTitle className="text-lg font-bold text-serene-neutral-900">
 												{user.first_name} {user.last_name}
 											</CardTitle>
 											<Badge className={getStatusColor(user.verification_status)}>
 												{user.verification_status.replace("_", " ")}
 											</Badge>
 										</div>
-										<CardDescription className="capitalize">
+										<CardDescription className="capitalize font-medium text-serene-neutral-500">
 											{user.user_type}
 										</CardDescription>
 									</CardHeader>
-									<CardContent className="space-y-3">
-										<div className="text-sm text-gray-600">
-											<p>Submitted: {formatDate(user.created_at)}</p>
-											<p>Last Updated: {formatDate(user.verification_updated_at)}</p>
+									<CardContent className="p-4 space-y-4 bg-white">
+										<div className="text-sm text-serene-neutral-600 space-y-1">
+											<p className="flex justify-between">
+                                                <span className="text-serene-neutral-400">Submitted:</span> 
+                                                <span className="font-medium">{formatDate(user.created_at)}</span>
+                                            </p>
+											<p className="flex justify-between">
+                                                <span className="text-serene-neutral-400">Updated:</span>
+                                                <span className="font-medium">{formatDate(user.verification_updated_at)}</span>
+                                            </p>
 										</div>
 
 										{user.accreditation_files_metadata && (
@@ -313,36 +319,42 @@ export function VerificationQueue({ onRefresh }: VerificationQueueProps) {
 
 				<TabsContent value="services" className="space-y-4">
 					{pendingServices.length === 0 ? (
-						<Card>
-							<CardContent className="text-center py-8">
-								<CheckCircle className="h-12 w-12 mx-auto text-green-500 mb-4" />
-								<h3 className="text-lg font-medium text-gray-900 mb-2">
+						<Card className="border-serene-neutral-200/60 shadow-sm rounded-2xl bg-serene-neutral-50/50">
+							<CardContent className="text-center py-12">
+								<CheckCircle className="h-16 w-16 mx-auto text-green-500 mb-4 opacity-80" />
+								<h3 className="text-xl font-bold text-serene-neutral-900 mb-2">
 									All Caught Up!
 								</h3>
-								<p className="text-gray-500">
+								<p className="text-serene-neutral-500">
 									No pending service verifications at the moment.
 								</p>
 							</CardContent>
 						</Card>
 					) : (
-						<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+						<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
 							{pendingServices.map((service) => (
-								<Card key={service.id} className="hover:shadow-md transition-shadow">
-									<CardHeader className="pb-3">
+								<Card key={service.id} className="hover:shadow-md transition-all duration-300 border-serene-neutral-200/60 rounded-2xl overflow-hidden hover:border-serene-blue-200">
+									<CardHeader className="pb-3 bg-white border-b border-serene-neutral-100">
 										<div className="flex items-center justify-between">
-											<CardTitle className="text-lg">{service.name}</CardTitle>
+											<CardTitle className="text-lg font-bold text-serene-neutral-900">{service.name}</CardTitle>
 											<Badge className={getStatusColor(service.verification_status)}>
 												{service.verification_status.replace("_", " ")}
 											</Badge>
 										</div>
-										<CardDescription className="capitalize">
+										<CardDescription className="capitalize font-medium text-serene-neutral-500">
 											{service.service_types}
 										</CardDescription>
 									</CardHeader>
-									<CardContent className="space-y-3">
-										<div className="text-sm text-gray-600">
-											<p>Submitted: {formatDate(service.created_at)}</p>
-											<p>Last Updated: {formatDate(service.verification_updated_at)}</p>
+									<CardContent className="p-4 space-y-4 bg-white">
+										<div className="text-sm text-serene-neutral-600 space-y-1">
+											<p className="flex justify-between">
+                                                <span className="text-serene-neutral-400">Submitted:</span> 
+                                                <span className="font-medium">{formatDate(service.created_at)}</span>
+                                            </p>
+											<p className="flex justify-between">
+                                                <span className="text-serene-neutral-400">Updated:</span>
+                                                <span className="font-medium">{formatDate(service.verification_updated_at)}</span>
+                                            </p>
 										</div>
 
 										{service.latitude && service.longitude && (

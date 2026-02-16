@@ -32,7 +32,7 @@ export function MatchCard({ match, onAccept }: MatchCardProps) {
 			await createMatchAppointment(
 				match.id,
 				appointmentDate,
-				match.support_service.user_id!,
+				match.service_details.user_id!,
 				match.report.user_id!
 			);
 
@@ -90,10 +90,10 @@ export function MatchCard({ match, onAccept }: MatchCardProps) {
         )} />
 				<div className="flex justify-between items-start mb-4">
 					<div>
-						<h3 className="font-black text-lg text-sauti-dark tracking-tight">{match.support_service.name}</h3>
-						{match.support_service.service_types && (
+						<h3 className="font-black text-lg text-sauti-dark tracking-tight">{match.service_details.name}</h3>
+						{match.service_details.service_types && (
 							<p className="text-sm text-gray-500">
-								Service Type: {match.support_service.service_types}
+								Service Type: {match.service_details.service_types}
 							</p>
 						)}
 					</div>

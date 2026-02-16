@@ -56,7 +56,7 @@ interface MatchedServiceItem {
 	completed_at?: string | null;
 	unread_messages?: number;
 	report: any;
-	support_service: any;
+	service_details: any;
 	notes?: string | null;
 	appointments?: Array<{
 		id: string;
@@ -193,7 +193,7 @@ export default function CasesMasterDetail({ userId }: { userId: string }) {
 					completed_at: (m as any).completed_at ?? null,
 					unread_messages: 0,
 					report: m.report,
-					support_service: m.support_service,
+					service_details: m.service_details,
 					notes: (m as any).notes || null,
 					appointments: apptByMatchId.get(m.id) || [],
 				})
@@ -226,7 +226,7 @@ export default function CasesMasterDetail({ userId }: { userId: string }) {
 				const [{ data: matches }, { data: appts }] = await Promise.all([
 					supabase
 						.from("matched_services")
-						.select(`*, report:reports(*), support_service:support_services(*)`)
+						.select(`*, report:reports(*), service_details:support_services(*)`)
 						.in("service_id", ids)
 						.order("match_date", { ascending: false }),
 					supabase
@@ -348,7 +348,7 @@ export default function CasesMasterDetail({ userId }: { userId: string }) {
 					(c.report?.type_of_incident || "").toLowerCase().includes(term) ||
 					(c.report?.incident_description || "").toLowerCase().includes(term) ||
 					(c.match_status_type || "").toLowerCase().includes(term) ||
-					(c.support_service?.name || "").toLowerCase().includes(term)
+					(c.service_details?.name || "").toLowerCase().includes(term)
 			);
 		}
 

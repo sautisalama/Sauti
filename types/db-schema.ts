@@ -154,7 +154,9 @@ export type Database = {
           content: string
           cover_image_url: string | null
           created_at: string | null
+          event_details: Json | null
           id: string
+          is_event: boolean | null
           published_at: string | null
           reviewed_at: string | null
           reviewed_by: string | null
@@ -172,7 +174,9 @@ export type Database = {
           content: string
           cover_image_url?: string | null
           created_at?: string | null
+          event_details?: Json | null
           id?: string
+          is_event?: boolean | null
           published_at?: string | null
           reviewed_at?: string | null
           reviewed_by?: string | null
@@ -190,7 +194,9 @@ export type Database = {
           content?: string
           cover_image_url?: string | null
           created_at?: string | null
+          event_details?: Json | null
           id?: string
+          is_event?: boolean | null
           published_at?: string | null
           reviewed_at?: string | null
           reviewed_by?: string | null
@@ -769,6 +775,7 @@ export type Database = {
           professional_title: string | null
           profile_image_metadata: Json | null
           profile_image_url: string | null
+          reviewed_by: Json | null
           settings: Json | null
           updated_at: string | null
           user_type: Database["public"]["Enums"]["user_type"] | null
@@ -811,6 +818,7 @@ export type Database = {
           professional_title?: string | null
           profile_image_metadata?: Json | null
           profile_image_url?: string | null
+          reviewed_by?: Json | null
           settings?: Json | null
           updated_at?: string | null
           user_type?: Database["public"]["Enums"]["user_type"] | null
@@ -853,6 +861,7 @@ export type Database = {
           professional_title?: string | null
           profile_image_metadata?: Json | null
           profile_image_url?: string | null
+          reviewed_by?: Json | null
           settings?: Json | null
           updated_at?: string | null
           user_type?: Database["public"]["Enums"]["user_type"] | null
@@ -1104,6 +1113,7 @@ export type Database = {
           name: string
           phone_number: string | null
           priority: number | null
+          reviewed_by: Json | null
           service_types: Database["public"]["Enums"]["support_service_type"]
           suspension_end_date: string | null
           suspension_reason: string | null
@@ -1137,6 +1147,7 @@ export type Database = {
           name: string
           phone_number?: string | null
           priority?: number | null
+          reviewed_by?: Json | null
           service_types: Database["public"]["Enums"]["support_service_type"]
           suspension_end_date?: string | null
           suspension_reason?: string | null
@@ -1170,6 +1181,7 @@ export type Database = {
           name?: string
           phone_number?: string | null
           priority?: number | null
+          reviewed_by?: Json | null
           service_types?: Database["public"]["Enums"]["support_service_type"]
           suspension_end_date?: string | null
           suspension_reason?: string | null

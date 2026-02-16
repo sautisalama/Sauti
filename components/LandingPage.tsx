@@ -186,7 +186,7 @@ export function LandingPage() {
 								Our <CircledText circleColor="#F4B400">Story</CircledText>
 							</h2>
 						</div>
-						<div className="bg-sauti-light-teal/30 rounded-[32px] md:rounded-[60px] p-6 md:p-12 lg:p-24 relative overflow-hidden">
+						<div className="bg-sauti-teal-light/30 rounded-[32px] md:rounded-[60px] p-6 md:p-12 lg:p-24 relative overflow-hidden">
 							<div className="grid lg:grid-cols-2 gap-16 lg:gap-24 items-start relative z-10">
 								<div>
 									<h2 className="text-3xl md:text-5xl lg:text-7xl font-black text-sauti-dark mb-4 md:mb-6 leading-[1.1] tracking-tight">
@@ -509,9 +509,9 @@ export function LandingPage() {
 
 function ServiceCard({ icon, title, description, slug, theme = 'teal' }: { icon: React.ReactNode, title: string, description: string, slug: string, theme?: 'teal' | 'yellow' | 'red' }) {
     const bgMap = {
-        teal: 'hover:bg-sauti-light-teal/50',
-        yellow: 'hover:bg-sauti-light-yellow/50',
-        red: 'hover:bg-sauti-light-red/50'
+        teal: 'hover:bg-sauti-teal-light/50',
+        yellow: 'hover:bg-sauti-yellow-light/50',
+        red: 'hover:bg-sauti-red-light/50'
     };
     const borderMap = {
         teal: 'hover:border-sauti-teal/30',

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
+import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { Tables } from "@/types/db-schema";
 import { createClient } from "@/utils/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -73,7 +74,10 @@ export default function ProfessionalView({
 }: ProfessionalViewProps) {
 	const dash = useDashboardData();
 	const { toast } = useToast();
-	const [searchQuery, setSearchQuery] = useState("");
+    const searchParams = useSearchParams();
+    const router = useRouter(); 
+    const pathname = usePathname();
+	const searchQuery = searchParams.get("q") || "";
 	const [reportDialogOpen, setReportDialogOpen] = useState(false);
 	const [isWelcomeCompact, setIsWelcomeCompact] = useState(false);
 	const [isCalendarExpanded, setIsCalendarExpanded] = useState(false);
@@ -160,7 +164,7 @@ export default function ProfessionalView({
 		return matchedServices.filter(m =>
 			(m.report?.type_of_incident || "").toLowerCase().includes(q) ||
 			(m.report?.incident_description || "").toLowerCase().includes(q) ||
-			(m.support_service?.name || "").toLowerCase().includes(q)
+			(m.service_details?.name || "").toLowerCase().includes(q)
 		);
 	}, [matchedServices, searchQuery]);
 
@@ -217,18 +221,7 @@ export default function ProfessionalView({
 
 	return (
 		<div className="min-h-screen bg-serene-neutral-50 pb-24">
-			{/* Sticky Search Bar */}
-			<div className="sticky top-0 z-40 bg-serene-neutral-50/90 backdrop-blur-md px-4 py-3 lg:px-8 border-b border-serene-neutral-200/50">
-				<div className="max-w-xl mx-auto relative">
-					<Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-serene-neutral-400" />
-					<Input
-						placeholder="Search cases, services..."
-						className="pl-10 pr-10 bg-white border-serene-neutral-200 rounded-full h-11 shadow-sm focus-visible:ring-serene-blue-200"
-						value={searchQuery}
-						onChange={(e) => setSearchQuery(e.target.value)}
-					/>
-				</div>
-			</div>
+
 
 			<div className="max-w-4xl mx-auto px-4 lg:px-6 pt-4 lg:pt-8 space-y-8 min-h-[calc(100vh-80px)]">
 				{/* Search Results Mode */}
@@ -237,7 +230,7 @@ export default function ProfessionalView({
 						<div className="flex items-center justify-between pb-2 border-b border-serene-neutral-200">
 							<h3 className="text-lg font-bold text-serene-neutral-900">Search Results</h3>
 							<button
-								onClick={() => setSearchQuery("")}
+								onClick={() => router.push(pathname)}
 								className="text-sm font-medium text-serene-neutral-500 hover:text-serene-red-500 transition-colors"
 							>
 								Clear Search
@@ -260,7 +253,7 @@ export default function ProfessionalView({
 														{match.report?.type_of_incident?.replace(/_/g, " ") || "Case"}
 													</h4>
 													<p className="text-sm text-serene-neutral-500 truncate">
-														{match.support_service?.name || "Support case"}
+														{match.service_details?.name || "Support case"}
 													</p>
 												</div>
 												<ChevronRight className="h-4 w-4 text-serene-neutral-300 group-hover:text-serene-blue-400 transition-colors" />
@@ -295,20 +288,35 @@ export default function ProfessionalView({
 						{(() => {
 							const verifiedCount = supportServices.filter(s => s.verification_status === 'verified').length;
 							const reviewCount = supportServices.filter(s => s.verification_status === 'under_review').length;
-							const rejectedCount = supportServices.filter(s => s.verification_status === 'rejected').length;
+							const rejectedServices = supportServices.filter(s => s.verification_status === 'rejected');
+							const rejectedCount = rejectedServices.length;
+							const isProfileRejected = profileDetails.verification_status === 'rejected';
 							const total = supportServices.length;
 
-							if (total > 0 && verifiedCount === total) return null;
+							if (total > 0 && verifiedCount === total && !isProfileRejected) return null;
 
 							let bannerTitle = "Complete your verification";
 							let bannerDesc = "Verify your profile to be matched with survivors seeking support.";
 							let bannerVariant: "default" | "destructive" | "warning" = "warning";
 							let BannerIcon = AlertTriangle;
+							let rejectionReason = "";
 
-							if (rejectedCount > 0) {
+							if (rejectedCount > 0 || isProfileRejected) {
 								bannerTitle = "Action Required: Verification Rejected";
-								bannerDesc = "One or more of your services were not approved. Please review and update your documents.";
 								bannerVariant = "destructive";
+								
+								// Find specific rejection note
+								if (isProfileRejected && profileDetails.verification_notes) {
+									rejectionReason = `Profile issues: ${profileDetails.verification_notes}`;
+								} else if (rejectedCount > 0) {
+									const rejectedNames = rejectedServices.slice(0, 2).map(s => s.name).join(', ');
+									rejectionReason = `Service(s) ${rejectedNames} rejected. Reason: ${rejectedServices[0].verification_notes || "Please check documents."}`;
+								} else {
+									rejectionReason = "Please review your documents and resubmit.";
+								}
+
+								bannerDesc = rejectionReason;
+							
 							} else if (verifiedCount > 0 && reviewCount > 0) {
 								bannerTitle = "Verification in Progress";
 								bannerDesc = `You have ${verifiedCount} verified service and ${reviewCount} under review. We'll notify you once all are approved.`;
@@ -340,11 +348,27 @@ export default function ProfessionalView({
 										</div>
 										<div className="flex-1">
 											<AlertTitle className="font-bold text-base sm:text-lg tracking-tight mb-1">{bannerTitle}</AlertTitle>
-											<AlertDescription className="text-sm font-medium opacity-80 leading-relaxed">
+											<AlertDescription className="text-sm font-medium opacity-80 leading-relaxed whitespace-pre-line">
 												{bannerDesc}
-												<Link href="/dashboard/profile?section=services" className="block sm:inline sm:ml-2 font-bold text-inherit hover:underline underline-offset-4 mt-2 sm:mt-0">
-													Manage services →
-												</Link>
+												{bannerVariant === 'destructive' && (
+													<div className="flex gap-3 mt-2">
+														{(isProfileRejected || !verifiedCount) && (
+															<Link href="/dashboard/profile?section=account" className="font-bold border-b border-red-300 hover:border-red-600 transition-colors">
+																Fix Personal Details →
+															</Link>
+														)}
+														{(rejectedCount > 0 || total === 0) && (
+															<Link href="/dashboard/profile?section=services" className="font-bold border-b border-red-300 hover:border-red-600 transition-colors">
+																{rejectedCount > 0 ? "Fix Service Documents →" : "Add Service →"}
+															</Link>
+														)}
+													</div>
+												)}
+												{bannerVariant !== 'destructive' && (
+													<Link href="/dashboard/profile?section=services" className="block sm:inline sm:ml-2 font-bold text-inherit hover:underline underline-offset-4 mt-2 sm:mt-0">
+														Manage services →
+													</Link>
+												)}
 											</AlertDescription>
 										</div>
 									</div>
@@ -359,30 +383,35 @@ export default function ProfessionalView({
 								<SereneQuickActionCard
 									title="Cases"
 									description={`${activeCasesCount} Active`}
-									icon={<Users className="h-5 w-5" />}
+									icon={<Users className="h-5 w-5 text-sauti-teal" />}
 									href="/dashboard/cases"
-									variant="blue"
+									variant="custom"
+									className="bg-sauti-teal-light border-sauti-teal/10 shadow-sm hover:shadow-md transition-all"
 									badge={pendingCasesCount > 0 ? pendingCasesCount : undefined}
+                                    badgeClassName="bg-sauti-teal text-white"
 								/>
 								<SereneQuickActionCard
 									title="Messages"
 									description="Support Chat"
-									icon={<MessageCircle className="h-5 w-5" />}
+									icon={<MessageCircle className="h-5 w-5 text-serene-blue-600" />}
 									href="/dashboard/chat"
-									variant="green"
+									variant="custom"
+                                    className="bg-serene-blue-100 border-serene-blue-200 shadow-sm hover:shadow-md transition-all"
 									badge={dash?.data?.unreadChatCount || undefined}
+                                    badgeClassName="bg-serene-blue-600 text-white"
 								/>
 								<SereneQuickActionCard
 									title="Services"
 									description={`${supportServices.length} Active`}
-									icon={<Briefcase className="h-5 w-5" />}
+									icon={<Briefcase className="h-5 w-5 text-sauti-yellow" />}
 									href="/dashboard/profile?tab=services"
-									variant="neutral"
+									variant="custom"
+                                    className="bg-sauti-yellow-light border-sauti-yellow/10 shadow-sm hover:shadow-md transition-all"
 								/>
 								<SereneQuickActionCard
 									title="Blog Posts"
 									description="Write & Share"
-									icon={<BookOpen className="h-5 w-5" />}
+									icon={<BookOpen className="h-5 w-5 text-gray-500" />}
 									href="/dashboard/blogs"
 									variant="neutral"
 								/>
@@ -573,7 +602,7 @@ export default function ProfessionalView({
 															</div>
 															<div className="flex-1 min-w-0">
 																<p className="font-medium text-serene-neutral-900 text-sm truncate">
-																	{appt.matched_service?.support_service?.name || 'Appointment'}
+																	{appt.matched_service?.service_details?.name || 'Appointment'}
 																</p>
 																<p className="text-xs text-serene-neutral-500">
 																	{new Date(appt.appointment_date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}

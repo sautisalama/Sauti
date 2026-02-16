@@ -276,7 +276,7 @@ export function AppointmentCard({
 
 							<div className="min-w-0">
 								<h3 className="font-bold text-gray-900 truncate text-base mb-1">
-									{appointment.matched_service?.support_service.name ||
+									{appointment.matched_service?.service_details.name ||
 										"Direct Appointment"}
 								</h3>
 								<div className="flex items-center gap-2 text-xs text-gray-500 font-medium">
@@ -306,10 +306,10 @@ export function AppointmentCard({
 									<MessageCircle className="h-4 w-4 mr-2" />
 									Chat
 								</DropdownMenuItem>
-								{appointment.matched_service?.support_service.phone_number && (
+								{appointment.matched_service?.service_details.phone_number && (
 									<DropdownMenuItem
 										onClick={() =>
-											(window.location.href = `tel:${appointment.matched_service.support_service.phone_number}`)
+											(window.location.href = `tel:${appointment.matched_service.service_details.phone_number}`)
 										}
 									>
 										<Phone className="h-4 w-4 mr-2" />
@@ -446,7 +446,7 @@ export function AppointmentCard({
 					appointmentId: appointment.appointment_id,
 					date: appointmentDate,
 					duration: 60,
-					serviceName: appointment.matched_service?.support_service?.name,
+					serviceName: appointment.matched_service?.service_details?.name,
 					professionalName: appointment.professional
 						? `${appointment.professional.first_name} ${appointment.professional.last_name}`
 						: undefined,

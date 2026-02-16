@@ -5,13 +5,13 @@ export interface MatchedServiceWithRelations {
 	match_date: string;
 	match_status_type: string;
 	report: Tables<"reports">;
-	support_service: Tables<"support_services">;
+	service_details: Tables<"support_services">;
 }
 
 export interface ReportWithRelations extends Tables<"reports"> {
 	matched_services?: {
 		match_status_type: string;
-		support_service: Tables<"support_services">;
+		service_details: Tables<"support_services">;
 		appointments?: {
 			appointment_date: string;
 			status: string;
@@ -30,7 +30,7 @@ export interface AppointmentWithDetails {
 	survivor?: Tables<"profiles">;
 	notes?: string;
 	matched_service: {
-		support_service: Tables<"support_services">;
+		service_details: Tables<"support_services">;
 		report: Tables<"reports">;
 	};
 	meeting_link?: string;

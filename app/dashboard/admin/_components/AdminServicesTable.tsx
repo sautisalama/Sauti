@@ -38,7 +38,8 @@ import {
 	Clock,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { Service } from "@/types/admin-types";
+import { Service, VerificationStatus } from "@/types/admin-types";
+import { SupportServiceReportView } from "@/components/admin/SupportServiceReportView";
 
 interface AdminServicesTableProps {
 	onRefresh: () => void;
@@ -60,6 +61,27 @@ export function AdminServicesTable({ onRefresh }: AdminServicesTableProps) {
 
 	useEffect(() => {
 		loadServices();
+
+        // Real-time subscription
+        const channel = supabase
+            .channel('admin-services-changes')
+            .on(
+                'postgres_changes',
+                {
+                    event: '*',
+                    schema: 'public',
+                    table: 'support_services'
+                },
+                (payload) => {
+                    console.log('Real-time update:', payload);
+                    loadServices();
+                }
+            )
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
 	}, []);
 
 	useEffect(() => {
@@ -76,19 +98,38 @@ export function AdminServicesTable({ onRefresh }: AdminServicesTableProps) {
           id, name, service_types, verification_status, is_active, is_banned,
           created_at, verification_updated_at, verification_notes,
           latitude, longitude, coverage_area_radius, profile_id,
-          profiles!inner(first_name, last_name)
+          phone_number, email, accreditation_files_metadata,
+          profiles!inner(first_name, last_name, verification_status)
         `
 				)
+                .neq('name', '') // Filter out empty names
+                .not('name', 'is', null) // Filter out null names
 				.order("created_at", { ascending: false });
 
 			if (error) throw error;
 
-			const servicesWithProfile =
+			const servicesWithProfile: Service[] =
 				data?.map((service) => ({
 					...service,
+					// Map DB fields to Admin Type
+					phone: service.phone_number,
+					email: service.email,
+					accreditation_files_metadata:
+						service.accreditation_files_metadata || [],
+					verification_status: service.verification_status as VerificationStatus,
 					profile_name: service.profiles
 						? `${service.profiles[0]?.first_name} ${service.profiles[0]?.last_name}`
 						: "Unknown",
+					// Pass the single profile object for ReportView
+					profiles:
+						service.profiles && service.profiles[0]
+							? {
+									first_name: service.profiles[0].first_name,
+									last_name: service.profiles[0].last_name,
+									verification_status: service.profiles[0]
+										.verification_status as VerificationStatus,
+							  }
+							: undefined,
 				})) || [];
 
 			setServices(servicesWithProfile);
@@ -189,18 +230,111 @@ export function AdminServicesTable({ onRefresh }: AdminServicesTableProps) {
 		}
 	};
 
+    const handleVerifyService = async (serviceId: string, notes: string) => {
+		const service = services.find(s => s.id === serviceId);
+        
+        // Validation: Provider must be verified first
+        if (service && service.profiles && (service.profiles as any).verification_status !== 'verified') {
+            toast({
+                title: "Action Blocked",
+                description: "Cannot verify service because the provider's profile is not verified.",
+                variant: "destructive"
+            });
+            return;
+        }
+
+        try {
+            setIsProcessing(true);
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) throw new Error("Not authenticated");
+
+            const { error } = await supabase
+                .from("support_services")
+                .update({
+                    verification_status: "verified",
+                    verification_notes: notes,
+                    verification_updated_at: new Date().toISOString(),
+                    admin_verified_by: user.id,
+                    admin_verified_at: new Date().toISOString(),
+                    is_active: true
+                })
+                .eq("id", serviceId);
+
+            if (error) throw error;
+
+            // Audit Log
+             await supabase.from("admin_actions").insert({
+                admin_id: user.id,
+                action_type: "verify_service",
+                target_type: "service",
+                target_id: serviceId,
+                details: { notes }
+            });
+
+            toast({ title: "Service Verified", description: "Service has been successfully verified." });
+            onRefresh();
+            loadServices();
+            setSelectedService(null);
+        } catch (error) {
+            console.error("Error verifying service:", error);
+            toast({ title: "Error", description: "Failed to verify service", variant: "destructive" });
+        } finally {
+            setIsProcessing(false);
+        }
+    };
+
+
+    const handleRejectService = async (serviceId: string, notes: string) => {
+         try {
+            setIsProcessing(true);
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) throw new Error("Not authenticated");
+
+            const { error } = await supabase
+                .from("support_services")
+                .update({
+                    verification_status: "rejected",
+                    verification_notes: notes,
+                    verification_updated_at: new Date().toISOString(),
+                    is_active: false
+                })
+                .eq("id", serviceId);
+
+            if (error) throw error;
+
+            // Audit Log
+             await supabase.from("admin_actions").insert({
+                admin_id: user.id,
+                action_type: "reject_service",
+                target_type: "service",
+                target_id: serviceId,
+                details: { notes }
+            });
+
+            toast({ title: "Service Rejected", description: "Service has been rejected." });
+            onRefresh();
+            loadServices();
+            setSelectedService(null);
+        } catch (error) {
+           console.error("Error rejecting service:", error);
+           toast({ title: "Error", description: "Failed to reject service", variant: "destructive" });
+        } finally {
+            setIsProcessing(false);
+        }
+    };
+
 	const getStatusColor = (status: string) => {
 		switch (status) {
 			case "pending":
-				return "bg-yellow-100 text-yellow-800";
+				return "bg-amber-50 text-amber-700 border-amber-200 shadow-sm";
 			case "under_review":
-				return "bg-blue-100 text-blue-800";
+				return "bg-blue-50 text-blue-700 border-blue-200 shadow-sm";
 			case "verified":
-				return "bg-green-100 text-green-800";
+				return "bg-green-50 text-green-700 border-green-200 shadow-sm";
 			case "rejected":
-				return "bg-red-100 text-red-800";
+				return "bg-red-50 text-red-700 border-red-200 shadow-sm";
 			default:
-				return "bg-gray-100 text-gray-800";
+				return "bg-serene-neutral-100 text-serene-neutral-700 border-serene-neutral-200";
 		}
 	};
 
@@ -236,28 +370,28 @@ export function AdminServicesTable({ onRefresh }: AdminServicesTableProps) {
 	}
 
 	return (
-		<Card>
-			<CardHeader>
-				<CardTitle>Services Management</CardTitle>
-				<CardDescription>
+		<Card className="border-serene-neutral-200/60 shadow-sm rounded-2xl overflow-hidden">
+			<CardHeader className="bg-white border-b border-serene-neutral-100">
+				<CardTitle className="text-xl font-bold text-serene-neutral-900">Services Management</CardTitle>
+				<CardDescription className="text-serene-neutral-500">
 					Manage support services, verification status, and availability
 				</CardDescription>
 			</CardHeader>
-			<CardContent className="space-y-4">
+			<CardContent className="p-6 space-y-6">
 				{/* Filters */}
 				<div className="flex flex-col sm:flex-row gap-4">
 					<div className="relative flex-1">
-						<Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+						<Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-serene-neutral-400 h-4 w-4" />
 						<Input
 							placeholder="Search services..."
 							value={searchTerm}
 							onChange={(e) => setSearchTerm(e.target.value)}
-							className="pl-10"
+							className="pl-10 rounded-full bg-serene-neutral-50 border-serene-neutral-200 focus:bg-white transition-all"
 						/>
 					</div>
 
 					<Select value={typeFilter} onValueChange={setTypeFilter}>
-						<SelectTrigger className="w-full sm:w-40">
+						<SelectTrigger className="w-full sm:w-40 rounded-full border-serene-neutral-200">
 							<SelectValue placeholder="Type" />
 						</SelectTrigger>
 						<SelectContent>
@@ -271,7 +405,7 @@ export function AdminServicesTable({ onRefresh }: AdminServicesTableProps) {
 					</Select>
 
 					<Select value={statusFilter} onValueChange={setStatusFilter}>
-						<SelectTrigger className="w-full sm:w-40">
+						<SelectTrigger className="w-full sm:w-40 rounded-full border-serene-neutral-200">
 							<SelectValue placeholder="Status" />
 						</SelectTrigger>
 						<SelectContent>
@@ -284,7 +418,7 @@ export function AdminServicesTable({ onRefresh }: AdminServicesTableProps) {
 					</Select>
 
 					<Select value={banFilter} onValueChange={setBanFilter}>
-						<SelectTrigger className="w-full sm:w-40">
+						<SelectTrigger className="w-full sm:w-40 rounded-full border-serene-neutral-200">
 							<SelectValue placeholder="Ban Status" />
 						</SelectTrigger>
 						<SelectContent>
@@ -296,17 +430,17 @@ export function AdminServicesTable({ onRefresh }: AdminServicesTableProps) {
 				</div>
 
 				{/* Services Table */}
-				<div className="border rounded-lg">
+				<div className="border border-serene-neutral-200 rounded-xl overflow-hidden">
 					<Table>
-						<TableHeader>
-							<TableRow>
-								<TableHead>Service</TableHead>
-								<TableHead>Provider</TableHead>
-								<TableHead>Type</TableHead>
-								<TableHead>Status</TableHead>
-								<TableHead>Location</TableHead>
-								<TableHead>Created</TableHead>
-								<TableHead className="text-right">Actions</TableHead>
+						<TableHeader className="bg-serene-neutral-50/80 backdrop-blur-sm">
+							<TableRow className="hover:bg-transparent border-b border-serene-neutral-200">
+								<TableHead className="font-bold text-serene-neutral-600 pl-6">Service</TableHead>
+								<TableHead className="font-bold text-serene-neutral-600">Provider</TableHead>
+								<TableHead className="font-bold text-serene-neutral-600">Type</TableHead>
+								<TableHead className="font-bold text-serene-neutral-600">Status</TableHead>
+								<TableHead className="font-bold text-serene-neutral-600">Location</TableHead>
+								<TableHead className="font-bold text-serene-neutral-600">Created</TableHead>
+								<TableHead className="text-right font-bold text-serene-neutral-600 pr-6">Actions</TableHead>
 							</TableRow>
 						</TableHeader>
 						<TableBody>

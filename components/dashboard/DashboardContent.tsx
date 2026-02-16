@@ -5,6 +5,7 @@ import { useDashboardData } from "@/components/providers/DashboardDataProvider";
 import { usePathname, useSearchParams } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { GlobalReportFab } from "@/components/dashboard/GlobalReportFab";
+import { DesktopHeader } from "@/components/navigation/DesktopHeader";
 
 interface DashboardContentProps {
   children: React.ReactNode;
@@ -52,6 +53,7 @@ export function DashboardContent({ children }: DashboardContentProps) {
                 showTopPadding ? "pt-16" : "", // 64px top bar
                 showBottomPadding ? "pb-24" : "" // Bottom nav spacing
             )}>
+                {!isChat && <DesktopHeader />}
                 {children}
             </div>
         </main>

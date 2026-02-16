@@ -1,7 +1,5 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { createClient } from "@/utils/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -17,74 +15,11 @@ import {
 	User,
 	Building2,
 	ChevronDown,
-	CheckCircle,
-	Settings,
 } from "lucide-react";
-import { useRouter } from "next/navigation";
-import { useToast } from "@/hooks/use-toast";
-import { UserRoleContext } from "@/types/admin-types";
+import { useRoleSwitcher } from "@/hooks/useRoleSwitcher";
 
 export function RoleSwitcher() {
-	const [roleContext, setRoleContext] = useState<UserRoleContext | null>(null);
-	const [isLoading, setIsLoading] = useState(true);
-	const [isAdminMode, setIsAdminMode] = useState(false);
-	const supabase = createClient();
-	const router = useRouter();
-	const { toast } = useToast();
-
-	useEffect(() => {
-		loadRoleContext();
-	}, []);
-
-	const loadRoleContext = async () => {
-		try {
-			const {
-				data: { user },
-			} = await supabase.auth.getUser();
-			if (!user) return;
-
-			// Check if user is in admin mode (stored in localStorage)
-			const adminMode = localStorage.getItem("adminMode") === "true";
-			setIsAdminMode(adminMode);
-
-			const { data, error } = await supabase.rpc("get_user_role_context", {
-				target_user_id: user.id,
-			});
-
-			if (error) throw error;
-			setRoleContext(data?.[0] || null);
-		} catch (error) {
-			console.error("Error loading role context:", error);
-		} finally {
-			setIsLoading(false);
-		}
-	};
-
-	const switchToAdmin = () => {
-		if (!roleContext?.can_switch_to_admin) return;
-
-		localStorage.setItem("adminMode", "true");
-		setIsAdminMode(true);
-		window.dispatchEvent(new Event("adminModeChanged")); // Notify listeners
-		router.push("/dashboard/admin");
-
-		toast({
-			title: "Switched to Admin Mode",
-			description: "You are now viewing the admin dashboard",
-		});
-	};
-
-	const switchToUser = () => {
-		localStorage.setItem("adminMode", "false");
-		setIsAdminMode(false);
-		window.dispatchEvent(new Event("adminModeChanged")); // Notify listeners
-		router.push("/dashboard");
-
-		toast({
-			title: "Switched to User Mode",
-			description: "You are now viewing your regular dashboard",
-		});
-	};
+	const { roleContext, isAdminMode, isLoading, switchToAdmin, switchToUser } = useRoleSwitcher();
 
 	const getRoleIcon = (userType: string) => {
 		switch (userType) {

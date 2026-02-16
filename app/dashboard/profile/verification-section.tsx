@@ -60,6 +60,8 @@ interface VerificationDocument {
 	uploadedAt?: string;
 	type?: 'identity' | 'qualification'; // Optional, can infer
 	metadata?: any; 
+	status?: string; // 'verified' | 'rejected' | 'pending'
+	notes?: string;
 }
 
 export function VerificationSection({
@@ -102,7 +104,17 @@ export function VerificationSection({
 
 			let profileDocs: VerificationDocument[] = [];
 			if (profile?.accreditation_files_metadata) {
-				profileDocs = safelyParseJsonArray(profile.accreditation_files_metadata) || [];
+				// Handle potentially double-stringified JSON or direct array
+				const rawMeta = profile.accreditation_files_metadata;
+				const parsedMeta = typeof rawMeta === 'string' ? safelyParseJsonArray(rawMeta) : rawMeta;
+				
+				if (Array.isArray(parsedMeta)) {
+					profileDocs = parsedMeta.map((d: any) => ({
+						...d,
+						status: d.status || 'pending',
+						notes: d.notes || ''
+					}));
+				}
 				setDocuments(profileDocs);
 			}
 
@@ -121,17 +133,20 @@ export function VerificationSection({
 				services.forEach((svc: any) => {
 					if (!svc.accreditation_files_metadata) return;
 					
-					const docs = safelyParseJsonArray(svc.accreditation_files_metadata);
+					const rawMeta = svc.accreditation_files_metadata;
+					const docs = typeof rawMeta === 'string' ? safelyParseJsonArray(rawMeta) : rawMeta;
+
 					if (docs && Array.isArray(docs)) {
 						docs.forEach((d: any) => {
 							// Avoid duplicates based on URL
-							// Also check if d is valid object
 							if (d && d.url && 
 								!serviceDocs.some(existing => existing.url === d.url) && 
 								!profileDocs.some(existing => existing.url === d.url)) {
 								serviceDocs.push({
 									...d,
-									sourceName: svc.title // Add source info
+									sourceName: svc.title, // Add source info
+									status: d.status || 'pending',
+									notes: d.notes || ''
 								});
 							}
 						});
@@ -152,7 +167,15 @@ export function VerificationSection({
 	// Helpers to find specific docs
 	const idFront = documents.find(d => d.title === "National ID (Front)" || d.title?.includes("ID Front"));
 	const idBack = documents.find(d => d.title === "National ID (Back)" || d.title?.includes("ID Back"));
-	const otherDocs = documents.filter(d => d !== idFront && d !== idBack);
+	
+    // Robustly filter out IDs from other docs list
+    const otherDocs = documents.filter(d => {
+        const title = d.title.toLowerCase();
+        return !title.includes("national id (front)") && 
+               !title.includes("national id (back)") && 
+               !title.includes("id front") && 
+               !title.includes("id back");
+    });
 
 	const handleFileUpload = async (file: File, title: string, type: 'identity' | 'qualification' = 'qualification', metadata: any = {}) => {
 		try {
@@ -174,6 +197,7 @@ export function VerificationSection({
 				url: result.url,
 				uploadedAt: new Date().toISOString(),
 				type,
+				status: 'pending', // Default to pending on upload
 				...metadata
 			};
 
@@ -282,50 +306,82 @@ export function VerificationSection({
 		setDocToDelete(doc);
 	};
 
-	const DocumentCard = ({ doc, onDelete }: { doc: VerificationDocument, onDelete: () => void }) => (
-		<div className="group relative bg-white border border-neutral-200 rounded-2xl p-4 transition-all hover:shadow-md hover:border-sauti-teal/30">
-			<div className="flex items-center gap-4">
-				<div className="h-12 w-12 rounded-xl bg-sauti-teal/5 border border-sauti-teal/10 flex items-center justify-center shrink-0 text-sauti-teal">
-					<FileText className="h-6 w-6" />
-				</div>
-				<div className="flex-1 min-w-0">
-					<div className="flex items-center justify-between mb-0.5">
-						<h4 className="font-bold text-neutral-900 text-sm truncate pr-2" title={doc.title}>{doc.title}</h4>
-						<Badge variant="outline" className="text-[10px] uppercase font-bold tracking-wider px-1.5 py-0 h-5 border-neutral-200 text-neutral-500">
-							{doc.type === 'identity' ? 'Identity' : 'Qualification'}
-						</Badge>
+	const DocumentCard = ({ doc, onDelete }: { doc: VerificationDocument, onDelete: () => void }) => {
+		const isRejected = doc.status === 'rejected';
+		return (
+			<div className={cn(
+				"group relative bg-white border rounded-2xl p-4 transition-all hover:shadow-md",
+				isRejected ? "border-red-200 bg-red-50/10 shadow-red-100/50" : "border-neutral-200 hover:border-sauti-teal/30"
+			)}>
+				<div className="flex items-center gap-4">
+					<div className={cn(
+						"h-12 w-12 rounded-xl flex items-center justify-center shrink-0",
+						isRejected ? "bg-red-100 text-red-600" : "bg-sauti-teal/5 border border-sauti-teal/10 text-sauti-teal"
+					)}>
+						{isRejected ? <AlertCircle className="h-6 w-6" /> : <FileText className="h-6 w-6" />}
 					</div>
-					<div className="flex items-center gap-2 text-xs text-neutral-500">
-						<span>{new Date(doc.uploadedAt || "").toLocaleDateString("en-US", { month: 'short', day: 'numeric', year: 'numeric' })}</span>
-						{doc.type === 'qualification' && doc.metadata?.issuer && (
-							<>
-								<span className="text-neutral-300">•</span>
-								<span className="truncate">{doc.metadata.issuer}</span>
-							</>
-						)}
+					<div className="flex-1 min-w-0">
+						<div className="flex items-center justify-between mb-0.5">
+							<h4 className={cn("font-bold text-sm truncate pr-2", isRejected ? "text-red-900" : "text-neutral-900")} title={doc.title}>
+								{doc.title}
+							</h4>
+							<Badge variant="outline" className={cn(
+								"text-[10px] uppercase font-bold tracking-wider px-1.5 py-0 h-5",
+								isRejected ? "border-red-200 text-red-600 bg-white" : "border-neutral-200 text-neutral-500"
+							)}>
+								{isRejected ? 'Rejected' : (doc.type === 'identity' ? 'Identity' : 'Qualification')}
+							</Badge>
+						</div>
+						<div className="flex items-center gap-2 text-xs text-neutral-500">
+							{isRejected ? (
+								<div className="flex items-center gap-1.5 text-red-700 font-medium">
+									<p>{doc.notes || "Please re-upload this document."}</p>
+								</div>
+							) : (
+								<>
+									<span>{formatDate(doc.uploadedAt)}</span>
+									{doc.type === 'qualification' && doc.metadata?.issuer && (
+										<>
+											<span className="text-neutral-300">•</span>
+											<span className="truncate">{doc.metadata.issuer}</span>
+										</>
+									)}
+								</>
+							)}
+						</div>
 					</div>
-				</div>
-				<div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-					<Button variant="ghost" size="icon" className="h-9 w-9 text-neutral-400 hover:text-sauti-teal hover:bg-sauti-teal/10 rounded-xl" asChild>
-						<a href={doc.url} target="_blank" rel="noopener noreferrer">
-							<Eye className="h-5 w-5" />
-						</a>
-					</Button>
-					<Button variant="ghost" size="icon" className="h-9 w-9 text-neutral-400 hover:text-red-500 hover:bg-red-50 rounded-xl" onClick={onDelete}>
-						<Trash2 className="h-5 w-5" />
-					</Button>
+					<div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+						<Button variant="ghost" size="icon" className="h-9 w-9 text-neutral-400 hover:text-sauti-teal hover:bg-sauti-teal/10 rounded-xl" asChild>
+							<a href={doc.url} target="_blank" rel="noopener noreferrer">
+								<Eye className="h-5 w-5" />
+							</a>
+						</Button>
+						<Button variant="ghost" size="icon" className="h-9 w-9 text-neutral-400 hover:text-red-500 hover:bg-red-50 rounded-xl" onClick={onDelete}>
+							<Trash2 className="h-5 w-5" />
+						</Button>
+					</div>
 				</div>
 			</div>
-		</div>
-	);
+		);
+	};
 
+	// Helper to safely format dates
+	const formatDate = (dateString?: string) => {
+		if (!dateString) return "Date not available";
+		const date = new Date(dateString);
+		return isNaN(date.getTime()) ? "Date not available" : date.toLocaleDateString("en-US", { month: 'short', day: 'numeric', year: 'numeric' });
+	};
+
+	// ID Upload Slot Component
 	const IDUploadSlot = ({ title, existingDoc, side }: { title: string, existingDoc?: VerificationDocument, side: 'front' | 'back' }) => {
-		const isVerified = profile.verification_status === 'verified';
+		const isVerified = existingDoc?.status === 'verified' || profile.verification_status === 'verified';
+		const isRejected = existingDoc?.status === 'rejected';
 		
 		return (
 			<div 
 				onClick={() => {
-					if (!existingDoc && !isVerified) {
+					// Allow re-upload if rejected or not existing
+					if ((!existingDoc || isRejected) && !isVerified) {
 						setIdSide(side);
 						setShowIdModal(true);
 					}
@@ -334,16 +390,19 @@ export function VerificationSection({
 					"group relative rounded-2xl border-2 border-dashed transition-all p-6 flex flex-col items-center justify-center text-center gap-3 h-48 overflow-hidden",
 					isVerified 
 						? "border-sauti-teal bg-sauti-teal/5 cursor-default"
-						: existingDoc 
-							? "border-sauti-teal/30 bg-sauti-teal/[0.02] cursor-pointer" 
-							: "border-neutral-200 bg-neutral-50/50 hover:border-sauti-teal/50 hover:bg-sauti-teal/[0.02] cursor-pointer"
+						: isRejected
+							? "border-red-300 bg-red-50 cursor-pointer hover:border-red-400"
+							: existingDoc 
+								? "border-sauti-teal/30 bg-sauti-teal/[0.02] cursor-pointer" 
+								: "border-neutral-200 bg-neutral-50/50 hover:border-sauti-teal/50 hover:bg-sauti-teal/[0.02] cursor-pointer"
 				)}
 			>
 				{existingDoc ? (
 					<>
 						<div className={cn(
 							"absolute top-3 right-3 flex gap-1.5 transition-opacity",
-							isVerified ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+							isVerified ? "opacity-100" : "opacity-0 group-hover:opacity-100",
+							isRejected && "opacity-100" // Always show actions if rejected
 						)}>
 							<Button 
 								variant="secondary" 
@@ -370,12 +429,27 @@ export function VerificationSection({
 								</Button>
 							)}
 						</div>
-						<div className="h-14 w-14 rounded-2xl bg-sauti-teal/10 flex items-center justify-center text-sauti-teal mb-1">
-							<Shield className="h-8 w-8" />
+
+						<div className={cn(
+							"h-14 w-14 rounded-2xl flex items-center justify-center mb-1",
+							isRejected ? "bg-red-100 text-red-600" : "bg-sauti-teal/10 text-sauti-teal"
+						)}>
+							{isRejected ? <AlertCircle className="h-8 w-8" /> : <Shield className="h-8 w-8" />}
 						</div>
-						<div>
-							<p className="font-bold text-neutral-900 text-sm tracking-tight">{title}</p>
-							<p className="text-[11px] text-sauti-teal font-semibold uppercase tracking-wider mt-0.5">Verified & Secure</p>
+						
+						<div className="w-full px-2">
+							<p className={cn("font-bold text-sm tracking-tight truncate", isRejected ? "text-red-900" : "text-neutral-900")}>
+								{title}
+							</p>
+							{isRejected ? (
+								<div className="text-xs text-red-600 font-medium mt-1 bg-red-100/50 p-1.5 rounded-lg break-words">
+									{existingDoc.notes || "Rejected. Please re-upload."}
+								</div>
+							) : (
+								<p className="text-[11px] text-sauti-teal font-semibold uppercase tracking-wider mt-0.5">
+									{isVerified ? "Verified & Secure" : "Pending Review"}
+								</p>
+							)}
 						</div>
 					</>
 				) : (

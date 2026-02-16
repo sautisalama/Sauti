@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
 	LayoutDashboard,
 	MessageCircle,
@@ -24,7 +24,8 @@ import {
 	HelpCircle,
 	Megaphone,
 	Shield,
-	BookOpen,
+	BookOpen, 
+	Building2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -82,6 +83,7 @@ export function EnhancedSidebar({
 	className,
 }: EnhancedSidebarProps) {
 	const pathname = usePathname();
+    const router = useRouter();
 	const user = useUser();
 	const dash = useDashboardData();
     
@@ -122,6 +124,13 @@ export function EnhancedSidebar({
 		const checkAdminMode = () => {
 			const mode = localStorage.getItem("adminMode") === "true";
 			setIsAdminMode(mode);
+
+            // Redirect if on main dashboard and admin mode is active
+            // We only redirect if exactly on "/dashboard" to allow navigating to other parts if needed,
+            // though usually admin mode implies using the admin layout.
+            if (mode && pathname === "/dashboard") {
+                 router.push("/dashboard/admin");
+            }
 		};
 
 		// Initial check
@@ -137,7 +146,7 @@ export function EnhancedSidebar({
 			window.removeEventListener("adminModeChanged", checkAdminMode);
 			window.removeEventListener("storage", checkAdminMode);
 		};
-	}, []);
+	}, [pathname, router]);
 
 	useEffect(() => {
 		// Prefer provider data when available to avoid extra fetches
@@ -221,18 +230,32 @@ export function EnhancedSidebar({
 					section: "main",
 				},
 				{
-					id: "verifications",
+					id: "verification",
 					label: "Verifications",
 					icon: Shield,
-					href: "/dashboard/admin/verifications",
+					href: "/dashboard/admin/review", // Updated to point to Review page directly
 					section: "main",
 					badge: dash?.data?.verification?.pendingCount || undefined
 				},
 				{
-					id: "content",
-					label: "Content Management",
-					icon: FileText,
-					href: "/dashboard/admin/content",
+					id: "services",
+					label: "Services",
+					icon: Building2,
+					href: "/dashboard/admin/services",
+					section: "main",
+				},
+				{
+					id: "professionals",
+					label: "Professionals",
+					icon: Users,
+					href: "/dashboard/admin/professionals",
+					section: "main",
+				},
+				{
+					id: "blogs",
+					label: "Blogs & Events",
+					icon: BookOpen,
+					href: "/dashboard/admin/blogs",
 					section: "main",
 				},
 				{
@@ -247,14 +270,7 @@ export function EnhancedSidebar({
 							: undefined,
 					section: "main",
 				},
-				{
-					id: "users",
-					label: "User Management",
-					icon: Users,
-					href: "/dashboard/admin/users",
-					section: "secondary",
-					separator: true
-				},
+
 
 			];
 		}
@@ -372,7 +388,13 @@ export function EnhancedSidebar({
 	const isActive = (item: SidebarItem) => {
 		if (!item.href) return false;
 		if (item.href === "/dashboard") return pathname === "/dashboard";
-		return pathname?.startsWith(item.href);
+        
+        // Fix for Admin Overview: Only active if exact match, otherwise 'Sub-pages' like 'review' take precedence
+        if (item.href === "/dashboard/admin") return pathname === "/dashboard/admin";
+
+        // Handle nested routes / sub-paths (e.g. /dashboard/admin/review should be active for /dashboard/admin/review/123)
+		if (item.href !== "/dashboard" && pathname?.startsWith(item.href)) return true;
+        return false;
 	};
 
 	const SidebarItemComponent = ({ item }: { item: SidebarItem }) => {

@@ -8,13 +8,13 @@ interface MatchedServiceWithRelations {
 	match_date: string;
 	match_status_type: string;
 	report: Tables<"reports">;
-	support_service: Tables<"support_services">;
+	service_details: Tables<"support_services">;
 }
 
 interface ReportWithRelations extends Tables<"reports"> {
 	matched_services?: {
 		match_status_type: string;
-		support_service: Tables<"support_services">;
+		service_details: Tables<"support_services">;
 		appointments?: {
 			appointment_date: string;
 			status: string;
@@ -124,7 +124,7 @@ export function OverviewTab({
 											<div className="flex items-center justify-between text-sm">
 												<div className="text-gray-600">
 													<span className="font-medium">Accepted by:</span>{" "}
-													{acceptedMatch.support_service.name}
+													{acceptedMatch.service_details.name}
 												</div>
 												{appointment?.appointment_date && (
 													<div className="text-gray-600">
@@ -198,7 +198,7 @@ export function OverviewTab({
 
 									<div className="flex items-center gap-4">
 										<div className="text-right">
-											<p className="font-medium">{matchedCase.support_service.name}</p>
+											<p className="font-medium">{matchedCase.service_details.name}</p>
 											<p className="text-sm text-gray-500">
 												{matchedCase.match_status_type
 													? formatServiceName(matchedCase.match_status_type)

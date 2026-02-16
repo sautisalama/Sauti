@@ -22,6 +22,23 @@ export type StatType =
 	| "coverage_map"
 	| "initial_setup";
 
+export interface ReviewAuditLog {
+	reviewer_id: string;
+	reviewer_name?: string;
+	date: string;
+	action: "verify" | "reject" | "suspend" | "ban" | "unban";
+	notes?: string;
+}
+
+export interface EventDetails {
+	event_date: string;
+	location: string;
+	is_virtual: boolean;
+	meeting_link?: string;
+	cta_text?: string;
+	cta_link?: string;
+}
+
 export interface AdminStats {
 	total_survivors: number;
 	total_professionals: number;
@@ -73,6 +90,8 @@ export interface User {
 	created_at: string;
 	verification_updated_at: string;
 	verification_notes?: string;
+	reviewed_by?: ReviewAuditLog;
+    email?: string;
 }
 
 export interface Service {
@@ -89,7 +108,21 @@ export interface Service {
 	longitude?: number;
 	coverage_area_radius?: number;
 	profile_id: string;
-	profile_name?: string;
+	profile_name?: string; // Often joined or from service details
+	profile_image_url?: string;
+	email?: string;
+	phone?: string; // Mapped from phone_number
+
+	// Joined Profile Data
+	profiles?: {
+		first_name: string;
+		last_name: string;
+		verification_status: VerificationStatus;
+	};
+
+	// Added via migration - standardized to metadata
+	accreditation_files_metadata?: any[]; // JSONB
+	reviewed_by?: ReviewAuditLog;
 }
 
 export interface CoverageData {
