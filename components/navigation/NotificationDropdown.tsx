@@ -1,6 +1,6 @@
 "use client";
 
-import { Bell } from "lucide-react";
+import { Bell, CheckCircle, XCircle, AlertTriangle, AlertCircle, Info, Clock, ArrowRight, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
 	DropdownMenu,
@@ -34,7 +34,7 @@ export function NotificationDropdown() {
             .select('*')
             .eq('user_id', user.id)
             .order('created_at', { ascending: false })
-            .limit(10);
+            .limit(15); // Increased limit slightly for better history view
         
         if (data) setNotifications(data);
     };
@@ -89,27 +89,59 @@ export function NotificationDropdown() {
         }
     };
 
+    // --- Format Helpers ---
+
+    const getIcon = (type: string) => {
+        if (type.includes('verified') || type.includes('approved')) return <CheckCircle className="h-5 w-5 text-green-600" />;
+        if (type.includes('rejected')) return <XCircle className="h-5 w-5 text-red-600" />;
+        if (type.includes('banned') || type.includes('suspended')) return <AlertTriangle className="h-5 w-5 text-amber-600" />;
+        if (type.includes('review') || type.includes('pending')) return <Clock className="h-5 w-5 text-blue-600" />;
+        if (type.includes('match')) return <ArrowRight className="h-5 w-5 text-sauti-teal" />;
+        return <Info className="h-5 w-5 text-serene-neutral-500" />;
+    };
+
+    const getBgColor = (type: string) => {
+        if (type.includes('verified') || type.includes('approved')) return "bg-green-50 border-green-100";
+        if (type.includes('rejected')) return "bg-red-50 border-red-100";
+        if (type.includes('banned') || type.includes('suspended')) return "bg-amber-50 border-amber-100";
+        if (type.includes('review') || type.includes('pending')) return "bg-blue-50 border-blue-100";
+        return "bg-serene-neutral-50 border-serene-neutral-100";
+    };
+
+    const formatTimeAgo = (dateString: string | null) => {
+        if (!dateString) return 'Just now';
+        const date = new Date(dateString);
+        const now = new Date();
+        const diffInSeconds = Math.max(0, Math.floor((now.getTime() - date.getTime()) / 1000));
+        
+        if (diffInSeconds < 60) return 'Just now';
+        if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}m ago`;
+        if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}h ago`;
+        if (diffInSeconds < 604800) return `${Math.floor(diffInSeconds / 86400)}d ago`;
+        return date.toLocaleDateString(); 
+    };
+
 	return (
         <DropdownMenu>
             <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="icon" className="relative rounded-full hover:bg-serene-neutral-100 text-serene-neutral-500 hover:text-serene-blue-600 transition-colors h-10 w-10">
-                    <Bell className="h-5 w-5" />
+                    <Bell className="h-5 w-5 transition-transform group-active:scale-95" />
                     {unreadCount > 0 && (
-                        <span className="absolute top-2 right-2 h-2 w-2 rounded-full bg-sauti-orange ring-2 ring-white animate-pulse" />
+                        <span className="absolute top-2 right-2 h-2.5 w-2.5 rounded-full bg-red-500 ring-2 ring-white animate-pulse" />
                     )}
                 </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-80 rounded-2xl border-serene-neutral-200 shadow-xl bg-white/95 backdrop-blur-xl mt-2">
-                <DropdownMenuLabel className="flex items-center justify-between p-4 pb-2">
+            <DropdownMenuContent align="end" className="w-[380px] rounded-2xl border-serene-neutral-200 shadow-xl bg-white/95 backdrop-blur-xl mt-2 p-0 overflow-hidden">
+                <div className="flex items-center justify-between p-4 bg-white border-b border-serene-neutral-100">
                     <div className="flex flex-col">
-                        <span className="font-bold text-serene-neutral-900">Notifications</span>
-                        <span className="text-xs text-serene-neutral-400 font-normal">Recent updates</span>
+                        <span className="font-bold text-serene-neutral-900 text-base">Notifications</span>
+                        <span className="text-xs text-serene-neutral-500 font-medium">{unreadCount} unread</span>
                     </div>
                     {unreadCount > 0 && (
                         <Button 
                             variant="ghost" 
                             size="sm" 
-                            className="h-6 text-[10px] text-sauti-blue hover:text-sauti-blue-dark hover:bg-sauti-blue/10 px-2 rounded-full"
+                            className="h-7 text-xs font-semibold text-sauti-blue hover:text-sauti-blue-dark hover:bg-sauti-blue/10 px-3 rounded-full"
                             onClick={(e) => {
                                 e.stopPropagation();
                                 handleMarkAllRead();
@@ -118,53 +150,57 @@ export function NotificationDropdown() {
                             Mark all read
                         </Button>
                     )}
-                </DropdownMenuLabel>
-                <DropdownMenuSeparator className="bg-serene-neutral-100" />
+                </div>
+                
                 {notifications.length === 0 ? (
-                    <div className="py-12 text-center text-sm text-serene-neutral-500">
-                        <div className="h-12 w-12 rounded-full bg-serene-neutral-50 flex items-center justify-center mx-auto mb-3">
-                            <Bell className="h-6 w-6 text-serene-neutral-300" />
+                    <div className="py-16 text-center">
+                        <div className="h-16 w-16 rounded-full bg-serene-neutral-50 flex items-center justify-center mx-auto mb-4 border border-serene-neutral-100">
+                            <Bell className="h-8 w-8 text-serene-neutral-300" />
                         </div>
-                        <p className="font-medium text-serene-neutral-600">All caught up!</p>
-                        <p className="text-xs mt-1">No new notifications</p>
+                        <p className="font-semibold text-serene-neutral-700">All caught up!</p>
+                        <p className="text-xs text-serene-neutral-400 mt-1 max-w-[200px] mx-auto">
+                            Check back later for updates on your account and verification.
+                        </p>
                     </div>
                 ) : (
-                    <div className="max-h-[300px] overflow-y-auto p-2 space-y-1">
+                    <div className="max-h-[420px] overflow-y-auto scrollbar-hide">
                         {notifications.map((notification) => (
                             <DropdownMenuItem 
                                 key={notification.id} 
                                 className={cn(
-                                    "cursor-pointer p-3 rounded-xl transition-colors mb-1",
-                                    !notification.read ? "bg-serene-blue-50/50 hover:bg-serene-blue-50" : "hover:bg-serene-neutral-50"
+                                    "cursor-pointer p-4 border-b border-serene-neutral-50 transition-all hover:bg-serene-neutral-50 focus:bg-serene-neutral-50 gap-4 items-start relative outline-none",
+                                    !notification.read && "bg-serene-blue-50/20"
                                 )}
                                 onClick={() => handleNotificationClick(notification)}
                             >
-                                <div className="flex flex-col gap-1 w-full relative">
-                                    {!notification.read && (
-                                        <span className="absolute -left-1 top-1.5 h-1.5 w-1.5 rounded-full bg-sauti-blue" />
-                                    )}
-                                    <span className={cn("text-sm text-serene-neutral-900 pr-4", !notification.read ? "font-semibold" : "font-medium")}>
-                                        {notification.title || (notification.type === 'verification_verified' ? 'Verification Approved' : 
-                                            notification.type === 'verification_rejected' ? 'Verification Rejected' : 
-                                            notification.type === 'account_banned' ? 'Account Suspended' : 'Update')}
-                                    </span>
-                                    <span className="text-xs text-serene-neutral-500 line-clamp-2 leading-relaxed">
+                                {/* Left Unread Indicator Strip */}
+                                {!notification.read && (
+                                    <div className="absolute left-0 top-0 bottom-0 w-1 bg-sauti-blue" />
+                                )}
+
+                                {/* Icon */}
+                                <div className={cn("mt-0.5 h-10 w-10 rounded-full flex items-center justify-center shrink-0 border shadow-sm", getBgColor(notification.type))}>
+                                    {getIcon(notification.type)}
+                                </div>
+
+                                {/* Content */}
+                                <div className="flex-1 min-w-0 space-y-1">
+                                    <div className="flex items-start justify-between gap-3">
+                                         <span className={cn("text-sm text-serene-neutral-900 leading-snug truncate pr-2", !notification.read ? "font-bold" : "font-semibold")}>
+                                             {notification.title || "Notification"}
+                                         </span>
+                                         <span className="text-[10px] text-serene-neutral-400 whitespace-nowrap shrink-0 font-medium">
+                                             {formatTimeAgo(notification.created_at)}
+                                         </span>
+                                    </div>
+                                    <p className={cn("text-xs text-serene-neutral-600 line-clamp-2 leading-relaxed font-medium")}>
                                         {notification.message}
-                                    </span>
-                                    <span className="text-[10px] text-serene-neutral-400 mt-1">
-                                        {notification.created_at 
-                                            ? new Date(notification.created_at).toLocaleDateString() 
-                                            : 'Just now'}
-                                    </span>
+                                    </p>
                                 </div>
                             </DropdownMenuItem>
                         ))}
                     </div>
                 )}
-                <DropdownMenuSeparator className="bg-serene-neutral-100" />
-                <DropdownMenuItem className="p-3 justify-center text-xs text-serene-blue-600 font-bold cursor-pointer hover:text-serene-blue-700 hover:bg-serene-blue-50/50 rounded-b-xl my-1 mx-2" onClick={() => router.push('/dashboard/notifications')}>
-                    View All Notifications
-                </DropdownMenuItem>
             </DropdownMenuContent>
         </DropdownMenu>
 	);

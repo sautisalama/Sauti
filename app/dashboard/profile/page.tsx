@@ -157,8 +157,35 @@ export default function ProfilePage() {
 
 	const refreshAllData = useCallback(async () => {
 		if (!userId) return;
-		// Trigger dashboard refresh logic if needed
-	}, [userId]);
+		
+		try {
+			const { data: updatedProfile, error } = await supabase
+				.from("profiles")
+				.select("*")
+				.eq("id", userId)
+				.single();
+				
+			if (error) throw error;
+			
+			if (updatedProfile && dash) {
+				dash.updatePartial({
+					profile: updatedProfile
+				});
+                
+                // Also update local state
+                if (updatedProfile) {
+                    setProfileData(prev => ({
+                        ...prev,
+                        isVerified: (updatedProfile as any).verification_status === 'verified',
+                        accreditation_files: (updatedProfile as any).accreditation_files_metadata,
+                        // Update other fields as needed
+                    }));
+                }
+			}
+		} catch (error) {
+			console.error("Failed to refresh profile data:", error);
+		}
+	}, [userId, supabase, dash]);
 
 	const navItems = [
 		{ id: 'account', label: 'Account Information', icon: User },

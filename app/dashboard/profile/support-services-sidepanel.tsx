@@ -51,6 +51,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { LocationPicker } from "@/components/ui/location-picker";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
+import { updateServiceStatus, VerificationDocument } from "@/lib/verification-utils";
 
 type SupportServiceType = Database["public"]["Enums"]["support_service_type"];
 type UserType = Database["public"]["Enums"]["user_type"];
@@ -322,7 +323,11 @@ export function SupportServiceSidepanel({
 
 			let docs: any[] = [];
 			if (data?.accreditation_files_metadata) {
-				docs = safelyParseJsonArray(data.accreditation_files_metadata);
+				const rawDocs = safelyParseJsonArray(data.accreditation_files_metadata);
+				docs = rawDocs.map((d: any) => ({
+					...d,
+					title: d.title || d.name || 'Untitled Document'
+				}));
 			}
 
 			setDocuments(docs);
@@ -357,7 +362,7 @@ export function SupportServiceSidepanel({
 				profileDocs.forEach((doc: any, index: number) => {
 					availableDocs.push({
 						id: `profile-${index}`,
-						title: doc.title || doc.fileName || "Profile Document",
+						title: doc.title || doc.name || doc.fileName || "Profile Document",
 						url: doc.url,
 						source: "Profile",
 						sourceId: "profile",
@@ -383,7 +388,7 @@ export function SupportServiceSidepanel({
 						svcDocs.forEach((doc: any, index: number) => {
 							availableDocs.push({
 								id: `${otherSvc.id}-${index}`,
-								title: doc.title || doc.fileName || "Service Document",
+								title: doc.title || doc.name || doc.fileName || "Service Document",
 								url: doc.url,
 								source: otherSvc.name,
 								sourceId: otherSvc.id,
@@ -662,6 +667,8 @@ export function SupportServiceSidepanel({
 		setIsDeleteModalOpen(false);
 	};
 
+
+
 	const handleUploadNew = async () => {
 		if (!uploadFile || !uploadTitle || !service) return;
 
@@ -678,21 +685,40 @@ export function SupportServiceSidepanel({
 				file: uploadFile,
 			});
 
-			const newDoc = {
+			const newDoc: VerificationDocument = {
 				title: uploadTitle,
 				url: result.url,
-				fileType: uploadFile.type,
-				fileSize: uploadFile.size,
+				// fileType: uploadFile.type, // Not in interface, but okay if extra
+				// fileSize: uploadFile.size,
 				uploadedAt: new Date().toISOString(),
-				uploaded: true,
-				docNumber: uploadDocNumber,
-				issuer: uploadIssuer,
+				// uploaded: true,
+				// docNumber: uploadDocNumber,
+				status: 'pending', // Default
+				// issuer: uploadIssuer,
                 docType: uploadDocNumber ? 'License' : 'Certificate',
+                ...{
+                    fileType: uploadFile.type,
+                    fileSize: uploadFile.size,
+                    uploaded: true,
+                    docNumber: uploadDocNumber,
+                    issuer: uploadIssuer
+                }
 			};
 
-			// 2. Save metadata
+			// 2. Save metadata & Update Status
 			const updatedDocs = [...documents, newDoc];
-			await saveDocuments(updatedDocs);
+            
+            // This handles updating the metadata column AND the verification_status column
+            // We do NOT need to call saveDocuments separately if we do it here, 
+            // BUT updateServiceStatus only updates the status column, not the docs column.
+            // So we need to update docs first, then status, OR do both.
+            // The utility `updateServiceStatus` calculates status but assumes we pass it the *future* state of docs.
+            // It currently only updates `verification_status`.
+            
+            // Let's reuse saveDocuments to save the docs, then call the utility for the status.
+			await saveDocuments(updatedDocs); // Saves docs to DB
+            // Disable auto-update. User must submit manually.
+			// const newStatus = await updateServiceStatus(supabase, service.id, updatedDocs, service.verification_status as any);
 
 			// Reset form
 			setUploadFile(null);
@@ -700,8 +726,13 @@ export function SupportServiceSidepanel({
 			setUploadDocNumber("");
 			setUploadIssuer("");
 			setIsModalOpen(false);
-			toast({ title: "Document Uploaded", description: "Document has been uploaded successfully" });
+			toast({ title: "Document Uploaded", description: `Document uploaded.` });
+            
+            // Trigger update to refresh parent view
+            onUpdate();
+
 		} catch (error) {
+            console.error(error);
 			toast({ title: "Upload Failed", description: "Failed to upload document", variant: "destructive" });
 		} finally {
 			setIsUploading(false);
@@ -715,11 +746,18 @@ export function SupportServiceSidepanel({
 			return;
 		}
 
+		if (!service) return;
+
 		// Ensure no undefined values are passed
 		const linkedDoc = {
 			title: doc.title || "Untitled Document",
 			url: doc.url || "",
 			uploadedAt: doc.uploadedAt || new Date().toISOString(),
+			status: 'pending', // Linking triggers re-review usually? Or if it's already verified? 
+            // If it's a profile doc that is verified, maybe we trust it? 
+            // Safest to set to 'pending' for this specific service context, or inherit.
+            // Let's default to pending for the service's context unless we want to propagate.
+            
 			linked: true,
 			sourceId: doc.sourceId || null,
 			sourceName: doc.source || doc.sourceName || "Unknown Source",
@@ -730,8 +768,13 @@ export function SupportServiceSidepanel({
 		const updatedDocs = [...documents, linkedDoc];
 		try {
 			await saveDocuments(updatedDocs);
+            
+            // Update status - DISABLED for manual submission
+            // await updateServiceStatus(supabase, service.id, updatedDocs, service.verification_status as any);
+            
 			toast({ title: "Document Linked", description: "Document linked successfully." });
 			setIsModalOpen(false);
+            onUpdate();
 		} catch (error) {
 			console.error("Link existing document error:", error);
 			toast({ title: "Link Failed", description: "Failed to link document.", variant: "destructive" });
@@ -746,7 +789,10 @@ export function SupportServiceSidepanel({
 
 		const { error } = await supabase
 			.from("support_services")
-			.update({ accreditation_files_metadata: payload })
+			.update({ 
+                accreditation_files_metadata: payload,
+                verification_updated_at: new Date().toISOString()
+            })
 			.eq("id", service.id);
 
 		if (error) throw error;
@@ -755,6 +801,7 @@ export function SupportServiceSidepanel({
 	};
 
 	const handleDeleteDoc = async (docUrl: string, index: number) => {
+        if (!service) return;
 		try {
 			const doc = documents[index];
 			if (!doc.linked) {
@@ -763,7 +810,12 @@ export function SupportServiceSidepanel({
 
 			const updatedDocs = documents.filter((_, i) => i !== index);
 			await saveDocuments(updatedDocs);
+            
+            // Update status - DISABLED for manual submission
+            // await updateServiceStatus(supabase, service.id, updatedDocs, service.verification_status as any);
+            
 			toast({ title: "Success", description: "Document removed." });
+            onUpdate();
 		} catch (error) {
 			toast({ title: "Error", description: "Failed to delete document.", variant: "destructive" });
 		}

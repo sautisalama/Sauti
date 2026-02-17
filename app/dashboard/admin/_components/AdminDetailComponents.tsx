@@ -20,10 +20,8 @@ export type AccreditationDocument = {
     docNumber?: string;
     issuer?: string;
     reviewed_at?: string;
-    reviewer_id?: string;
+    reviewed_by?: string;
     docType?: string;
-    issuer?: string;
-    docNumber?: string;
 };
 
 // Premium InfoBlock Component

@@ -228,11 +228,6 @@ export default function ReviewPage() {
                 verification_status: status,
                 verification_notes: notes,
                 verification_updated_at: new Date().toISOString(),
-                ...(action === 'verify' ? { 
-                    verified_by: user.id, // Only for profile/service schema support? Check schema if verify_by exists for services.
-                    // Profiles has admin_verified_by. Services table schema? 
-                    // Let's check schema assumption. Assuming standard fields or JSON metadata.
-                } : {}),
                 reviewed_by: {
                     reviewer_id: user.id,
                     reviewed_at: new Date().toISOString(),
@@ -240,13 +235,17 @@ export default function ReviewPage() {
                     notes: notes
                 }
             };
-            
-            // Schema check: profiles has `admin_verified_by`, support_services might not?
-            // Using `reviewed_by` JSONB for generic tracking is safer across both.
-            if (targetType === 'profile' && action === 'verify') {
-                updatePayload.admin_verified_by = user.id;
-                updatePayload.admin_verified_at = new Date().toISOString(); 
-                updatePayload.isVerified = true;
+
+            // Schema-specific fields for verification
+            if (action === 'verify') {
+                if (targetType === 'profile') {
+                    updatePayload.admin_verified_by = user.id;
+                    updatePayload.admin_verified_at = new Date().toISOString(); 
+                    updatePayload.isVerified = true;
+                } else if (targetType === 'service') {
+                    updatePayload.verified_by = user.id;
+                    updatePayload.verified_at = new Date().toISOString();
+                }
             }
 
             const table = targetType === 'profile' ? 'profiles' : 'support_services';
@@ -313,8 +312,7 @@ export default function ReviewPage() {
 
         // 1. Create Metadata Entry
         const reviewEntry = {
-            url: doc.url,
-            name: doc.name,
+            ...doc, // Preserve existing metadata (e.g. title, custom fields)
             status,
             notes,
             reviewed_at: new Date().toISOString(),
@@ -745,7 +743,7 @@ const parseDocuments = (filesJson: any, metadataJson: any): AccreditationDocumen
     if (metadataJson && Array.isArray(metadataJson)) {
         return metadataJson.map((meta: any) => ({
             url: meta.url || filesJson?.find((f: any) => f.url === meta.url)?.url || '#',
-            name: meta.name || 'Untitled Document',
+            name: meta.title || meta.name || 'Untitled Document',
             type: meta.type || filesJson?.find((f: any) => f.url === meta.url)?.type || 'unknown',
             status: meta.status,
             notes: meta.notes,
