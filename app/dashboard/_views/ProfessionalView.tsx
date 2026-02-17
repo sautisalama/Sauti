@@ -47,7 +47,13 @@ import {
 	FileText,
 	TrendingUp,
 	Shield,
-	Calendar
+	Calendar,
+    AlertCircle, 
+    CheckCircle, 
+    ArrowRight,
+    Loader2, 
+    User, 
+    Sparkles 
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useDashboardData } from "@/components/providers/DashboardDataProvider";
@@ -286,48 +292,78 @@ export default function ProfessionalView({
 
 						{/* Verification Banner */}
 						{(() => {
-							const verifiedCount = supportServices.filter(s => s.verification_status === 'verified').length;
-							const reviewCount = supportServices.filter(s => s.verification_status === 'under_review').length;
+                            // Aggregated Status Logic
+							const verifiedServices = supportServices.filter(s => s.verification_status === 'verified');
+							const reviewServices = supportServices.filter(s => s.verification_status === 'under_review');
 							const rejectedServices = supportServices.filter(s => s.verification_status === 'rejected');
+							
+                            const verifiedCount = verifiedServices.length;
+							const reviewCount = reviewServices.length;
 							const rejectedCount = rejectedServices.length;
-							const isProfileRejected = profileDetails.verification_status === 'rejected';
 							const total = supportServices.length;
+                            
+							const isProfileRejected = profileDetails.verification_status === 'rejected';
+                            const isProfilePending = profileDetails.verification_status === 'pending' || !profileDetails.verification_status;
+                            const isProfileUnderReview = profileDetails.verification_status === 'under_review';
 
-							if (total > 0 && verifiedCount === total && !isProfileRejected) return null;
+                            // 1. All Good
+							if (total > 0 && verifiedCount === total && !isProfileRejected && !isProfilePending && !isProfileUnderReview) return null;
 
 							let bannerTitle = "Complete your verification";
 							let bannerDesc = "Verify your profile to be matched with survivors seeking support.";
 							let bannerVariant: "default" | "destructive" | "warning" = "warning";
 							let BannerIcon = AlertTriangle;
-							let rejectionReason = "";
-
+                            
+                            // 2. Rejections (High Priority)
 							if (rejectedCount > 0 || isProfileRejected) {
-								bannerTitle = "Action Required: Verification Rejected";
+								bannerTitle = "Action Required: Documents Rejected";
 								bannerVariant = "destructive";
+                                BannerIcon = AlertCircle;
 								
-								// Find specific rejection note
-								if (isProfileRejected && profileDetails.verification_notes) {
-									rejectionReason = `Profile issues: ${profileDetails.verification_notes}`;
-								} else if (rejectedCount > 0) {
-									const rejectedNames = rejectedServices.slice(0, 2).map(s => s.name).join(', ');
-									rejectionReason = `Service(s) ${rejectedNames} rejected. Reason: ${rejectedServices[0].verification_notes || "Please check documents."}`;
-								} else {
-									rejectionReason = "Please review your documents and resubmit.";
+								// Construct detailed rejection reason
+                                const reasons: string[] = [];
+                                
+								if (isProfileRejected) {
+                                    // Try to find specific doc notes if available in metadata (requires parsing)
+                                    // For now, generic or specific if notes field used
+									reasons.push(profileDetails.verification_notes ? `Profile: ${profileDetails.verification_notes}` : "Profile documents rejected.");
 								}
-
-								bannerDesc = rejectionReason;
+                                
+                                if (rejectedCount > 0) {
+                                    rejectedServices.forEach(s => {
+                                        reasons.push(`Service "${s.name}": ${s.verification_notes || "Documents rejected"}`);
+                                    });
+								}
+                                
+                                if (reasons.length > 0) {
+                                     bannerDesc = reasons.join("\n");
+                                } else {
+                                     bannerDesc = "Please review your documents and resubmit.";
+                                }
 							
-							} else if (verifiedCount > 0 && reviewCount > 0) {
+							} 
+                            // 3. Profile Pending (Medium Priority)
+                            else if (isProfilePending) {
+                                bannerTitle = "Verification Pending";
+                                bannerDesc = "Please complete your identity verification to proceed.";
+                                bannerVariant = "warning";
+                            }
+                            // 4. Under Review (Low Priority)
+                            else if (isProfileUnderReview || reviewCount > 0) {
 								bannerTitle = "Verification in Progress";
-								bannerDesc = `You have ${verifiedCount} verified service and ${reviewCount} under review. We'll notify you once all are approved.`;
+                                const parts = [];
+                                if (isProfileUnderReview) parts.push("Profile is under review.");
+                                if (reviewCount > 0) parts.push(`${reviewCount} service(s) under review.`);
+                                
+								bannerDesc = parts.join(" ") || "We are reviewing your documents. This usually takes 24-48 hours.";
 								BannerIcon = Clock;
-							} else if (reviewCount > 0) {
-								bannerTitle = "Documents Under Review";
-								bannerDesc = "We are currently reviewing your documents. This usually takes 24-48 hours.";
-								BannerIcon = Clock;
-							} else if (total === 0) {
+                                bannerVariant = "default"; // or a specific info variant
+							} 
+                            // 5. No Services (Onboarding)
+                            else if (total === 0) {
 								bannerTitle = "Register your first service";
 								bannerDesc = "Add a support service to start helping survivors and complete your provider profile.";
+                                bannerVariant = "warning"; // Encouragement
 							}
 
 							return (
@@ -351,23 +387,37 @@ export default function ProfessionalView({
 											<AlertDescription className="text-sm font-medium opacity-80 leading-relaxed whitespace-pre-line">
 												{bannerDesc}
 												{bannerVariant === 'destructive' && (
-													<div className="flex gap-3 mt-2">
-														{(isProfileRejected || !verifiedCount) && (
-															<Link href="/dashboard/profile?section=account" className="font-bold border-b border-red-300 hover:border-red-600 transition-colors">
-																Fix Personal Details →
+													<div className="flex flex-wrap gap-3 mt-3">
+														{(isProfileRejected || isProfilePending) && (
+															<Link href="/dashboard/profile?section=account" className="inline-flex items-center text-xs font-bold uppercase tracking-wider text-red-700 hover:text-red-900 border-b border-red-300 hover:border-red-600 transition-all pb-0.5">
+																Fix Profile Docs <ArrowRight className="h-3 w-3 ml-1" />
 															</Link>
 														)}
 														{(rejectedCount > 0 || total === 0) && (
-															<Link href="/dashboard/profile?section=services" className="font-bold border-b border-red-300 hover:border-red-600 transition-colors">
-																{rejectedCount > 0 ? "Fix Service Documents →" : "Add Service →"}
+															<Link href="/dashboard/profile?section=services" className="inline-flex items-center text-xs font-bold uppercase tracking-wider text-red-700 hover:text-red-900 border-b border-red-300 hover:border-red-600 transition-all pb-0.5">
+																{rejectedCount > 0 ? "Fix Service Docs" : "Add Service"} <ArrowRight className="h-3 w-3 ml-1" />
 															</Link>
 														)}
 													</div>
 												)}
 												{bannerVariant !== 'destructive' && (
-													<Link href="/dashboard/profile?section=services" className="block sm:inline sm:ml-2 font-bold text-inherit hover:underline underline-offset-4 mt-2 sm:mt-0">
-														Manage services →
-													</Link>
+													<div className="flex flex-wrap gap-3 mt-3">
+                                                        {isProfilePending && (
+                                                            <Link href="/dashboard/profile?section=account" className="inline-flex items-center text-xs font-bold uppercase tracking-wider text-amber-800 hover:text-amber-950 border-b border-amber-300 hover:border-amber-600 transition-all pb-0.5">
+                                                                Complete Profile <ArrowRight className="h-3 w-3 ml-1" />
+                                                            </Link>
+                                                        )}
+                                                        {total === 0 && (
+                                                            <Link href="/dashboard/profile?section=services" className="inline-flex items-center text-xs font-bold uppercase tracking-wider text-amber-800 hover:text-amber-950 border-b border-amber-300 hover:border-amber-600 transition-all pb-0.5">
+                                                                Add Service <ArrowRight className="h-3 w-3 ml-1" />
+                                                            </Link>
+                                                        )}
+                                                        {!isProfilePending && total > 0 && (
+    														<Link href="/dashboard/profile?section=services" className="inline-flex items-center text-xs font-bold uppercase tracking-wider text-inherit hover:opacity-100 opacity-60 transition-all pb-0.5 border-b border-transparent hover:border-current">
+	    													    Manage Services <ArrowRight className="h-3 w-3 ml-1" />
+		    												</Link>
+                                                        )}
+													</div>
 												)}
 											</AlertDescription>
 										</div>

@@ -18,7 +18,9 @@ import {
     CheckCircle,
     ExternalLink,
     AlertTriangle,
-    XCircle
+    XCircle,
+    CreditCard,
+    Shield
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -45,6 +47,7 @@ import {
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { performAdminAction } from "@/app/actions/admin-actions";
 
 type ReviewHistoryItem = {
     id: string;
@@ -96,6 +99,9 @@ export default function ServiceDetailPage() {
     const [history, setHistory] = useState<ReviewHistoryItem[]>([]);
     const [stats, setStats] = useState<{ matches: number }>({ matches: 0 });
     const [isLoading, setIsLoading] = useState(true);
+
+    // Filter documents (Primary fix: ensure parseDocuments works, but UI might not need separate ID card unless required)
+    // However, for consistency, let's prepare the updated DocumentPreviewCard usage.
     
     const [viewingDoc, setViewingDoc] = useState<{ doc: AccreditationDocument, contextId: string, contextType: 'service' } | null>(null);
     const [actionDialog, setActionDialog] = useState<{
@@ -186,70 +192,20 @@ export default function ServiceDetailPage() {
         const status = action === 'verify' ? 'verified' : (action === 'ban' ? 'suspended' : 'rejected');
 
         try {
-            const { data: { user } } = await supabase.auth.getUser();
-            if (!user) {
-                toast({ title: "Error", description: "You must be logged in.", variant: "destructive" });
-                return;
-            }
-
-            // 1. Update Service Status
-            const updatePayload: any = {
-                verification_status: status,
-                verification_notes: notes,
-                verification_updated_at: new Date().toISOString(),
-                reviewed_by: {
-                    reviewer_id: user.id,
-                    reviewed_at: new Date().toISOString(),
-                    action: action,
-                    notes: notes
-                }
-            };
-
-            const { error: updateError } = await supabase
-                .from('support_services')
-                .update(updatePayload)
-                .eq('id', targetId);
-
-            if (updateError) throw updateError;
-
-            // 2. Log Action
-            await supabase.from('admin_actions').insert({
-                admin_id: user.id,
-                action_type: `${action}_service`,
-                target_id: targetId,
-                target_type: 'service',
-                details: { notes, previous_status: service?.verification_status }
+            await performAdminAction({
+                targetId,
+                targetType: 'service',
+                action,
+                notes
             });
-
-            // 3. Send Notification
-            if (owner) {
-                const notificationTitle = "Service Verification Update";
-                const notificationMessage = `Your service "${service?.name}" verification status has been updated to ${status}.`;
-                const notificationLink = '/dashboard/profile?section=services';
-
-                await supabase.from('notifications').insert({
-                    user_id: owner.id,
-                    type: `verification_${status}`,
-                    title: notificationTitle,
-                    message: notificationMessage,
-                    link: notificationLink,
-                    read: false,
-                    metadata: { 
-                        target_type: 'service', 
-                        target_id: targetId,
-                        notes: notes,
-                        action_by: user.id
-                    }
-                });
-            }
 
             toast({ title: "Success", description: `Service marked as ${status}.` });
             setActionDialog(prev => ({ ...prev, isOpen: false, notes: '' }));
             fetchData(); // Refresh
 
-        } catch (error) {
+        } catch (error: any) {
             console.error("Action error:", error);
-            toast({ title: "Error", description: "Failed to update status", variant: "destructive" });
+            toast({ title: "Error", description: error.message || "Failed to update status", variant: "destructive" });
         }
     };
 
@@ -608,13 +564,15 @@ const parseDocuments = (filesJson: any, metadataJson: any): AccreditationDocumen
     if (metadataJson && Array.isArray(metadataJson)) {
         return metadataJson.map((meta: any) => ({
             url: meta.url || filesJson?.find((f: any) => f.url === meta.url)?.url || '#',
-            name: meta.name || 'Untitled Document',
+            name: meta.title || meta.name || 'Untitled Document',
             type: meta.type || filesJson?.find((f: any) => f.url === meta.url)?.type || 'unknown',
             status: meta.status,
-            notes: meta.notes,
+            notes: meta.notes || meta.note,
             docNumber: meta.docNumber,
             issuer: meta.issuer,
             reviewed_at: meta.reviewed_at,
+            docType: meta.docType,
+            reviewer_id: meta.reviewer_id
         }));
     } else if (filesJson && Array.isArray(filesJson)) {
         return filesJson.map((file: any) => ({
@@ -622,6 +580,7 @@ const parseDocuments = (filesJson: any, metadataJson: any): AccreditationDocumen
             name: file.name || 'Untitled Document',
             type: file.type || 'unknown',
             status: 'pending', 
+            docType: 'Other'
         }));
     }
     return [];

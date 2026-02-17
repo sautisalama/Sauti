@@ -56,6 +56,7 @@ interface VerificationDocument {
 	url: string;
 	uploadedAt?: string;
 	type?: 'identity' | 'qualification';
+    docType?: string;
 	metadata?: any; 
 }
 
@@ -132,6 +133,7 @@ export function MobileVerificationSection({
 				url: result.url,
 				uploadedAt: new Date().toISOString(),
 				type,
+                docType: type === 'identity' ? 'Identity' : (metadata.number ? 'License' : 'Certificate'),
 				...metadata
 			};
 
@@ -228,7 +230,7 @@ export function MobileVerificationSection({
 								<FileText className="h-5 w-5" />
 							</div>
 							<Badge variant="outline" className="text-[10px] uppercase font-bold tracking-wider px-1.5 py-0 h-5 border-serene-neutral-200 text-serene-neutral-500 bg-white">
-								{doc.type === 'identity' ? 'ID' : 'PDF'}
+								{doc.docType || (doc.type === 'identity' ? 'ID' : 'PDF')}
 							</Badge>
 						</div>
 					)}

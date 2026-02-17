@@ -104,11 +104,28 @@ export default function AdminDashboard() {
 
 	const loadQuickStats = async () => {
 		try {
-            // Pending Verifications (Queue)
-            const { count: pendingCount } = await supabase
+            // Pending Verifications (Queue) - Count unique USERS who require verification
+            // 1. Get IDs of professionals/NGOs with pending status
+            const { data: pendingProfiles } = await supabase
+                .from("profiles")
+                .select("id")
+                .in("user_type", ["professional", "ngo"])
+                .in("verification_status", ["pending", "under_review"]);
+
+            // 2. Get User IDs of services with pending status
+            const { data: pendingServices } = await supabase
                 .from("support_services")
-                .select("*", { count: 'exact', head: true })
-                .eq("verification_status", "pending");
+                .select("user_id")
+                .in("verification_status", ["pending", "under_review"]);
+            
+            // 3. Combine and get unique user count
+            const uniqueUserIds = new Set([
+                ...(pendingProfiles?.map(p => p.id) || []),
+                ...(pendingServices?.map(s => s.user_id).filter(Boolean) || []) // Filter out null user_ids if any
+            ]);
+            
+            const totalPending = uniqueUserIds.size;
+
 
             // Services
             const { count: serviceCount } = await supabase
@@ -131,7 +148,7 @@ export default function AdminDashboard() {
             const unreadMessages = 0; 
 
 			setStats({
-                pendingVerifications: pendingCount || 0,
+                pendingVerifications: totalPending,
                 activeServices: serviceCount || 0,
                 serviceGrowth,
                 totalProfessionals: proCount || 0,

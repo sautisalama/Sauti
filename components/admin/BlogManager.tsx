@@ -49,6 +49,7 @@ import {
     Video
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { manageBlogPost, deleteBlogPost } from "@/app/actions/blog-actions";
 
 // Interface reflecting the DB schema
 interface BlogPost {
@@ -145,35 +146,16 @@ export function BlogManager() {
     const handleSave = async () => {
         try {
             setIsSaving(true);
-            const { data: { user } } = await supabase.auth.getUser();
-            if (!user) throw new Error("Not authenticated");
-
-            const postData = {
-                title: formData.title,
-                content: formData.content,
-                status: formData.status,
-                is_event: formData.is_event,
-                event_details: formData.is_event ? formData.event_details : null,
-                author_id: editingPost ? editingPost.author_id : user.id,
-                updated_at: new Date().toISOString(),
-                ...(formData.status === 'published' && (!editingPost?.published_at) && { published_at: new Date().toISOString() })
-            };
-
-            let error;
-            if (editingPost) {
-                const { error: updateError } = await supabase
-                    .from("blogs")
-                    .update(postData)
-                    .eq("id", editingPost.id);
-                error = updateError;
-            } else {
-                const { error: insertError } = await supabase
-                    .from("blogs")
-                    .insert([postData]);
-                error = insertError;
-            }
-
-            if (error) throw error;
+            
+            await manageBlogPost({
+                id: editingPost?.id,
+                title: formData.title || '',
+                content: formData.content || '',
+                status: formData.status as any,
+                is_event: !!formData.is_event,
+                event_details: formData.event_details,
+                author_id: editingPost?.author_id || '' // populated by server action if new
+            });
 
             toast({
                 title: "Success",
@@ -182,11 +164,11 @@ export function BlogManager() {
             setIsEditorOpen(false);
             loadPosts();
 
-        } catch (error) {
+        } catch (error: any) {
             console.error("Error saving post:", error);
             toast({
                 title: "Error",
-                description: "Failed to save content",
+                description: error.message || "Failed to save content",
                 variant: 'destructive'
             });
         } finally {
@@ -197,8 +179,7 @@ export function BlogManager() {
     const handleDelete = async (id: string) => {
         if (!confirm("Are you sure you want to delete this content?")) return;
         try {
-             const { error } = await supabase.from("blogs").delete().eq("id", id);
-             if (error) throw error;
+             await deleteBlogPost(id);
              toast({ title: "Deleted", description: "Content deleted successfully" });
              loadPosts();
         } catch(error) {

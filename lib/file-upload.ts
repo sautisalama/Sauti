@@ -63,12 +63,12 @@ export class FileUploadService {
 		],
 	};
 
-	// File size limits (in bytes)
-	private readonly FILE_SIZE_LIMITS = {
+	// File size limits (in bytes) - Client side check removed as per user request
+	/*private readonly FILE_SIZE_LIMITS = {
 		accreditation: 10 * 1024 * 1024, // 10MB
 		profile: 5 * 1024 * 1024, // 5MB
 		report: 50 * 1024 * 1024, // 50MB
-	};
+	};*/
 
 	/**
 	 * Validates file before upload
@@ -77,14 +77,14 @@ export class FileUploadService {
 		file: File,
 		fileType: FileUploadOptions["fileType"]
 	): void {
-		// Check file size
-		const maxSize = this.FILE_SIZE_LIMITS[fileType];
+		// Check file size - Disabled to let Supabase Storage buckets handle limits
+		/*const maxSize = this.FILE_SIZE_LIMITS[fileType];
 		if (file.size > maxSize) {
 			throw new FileUploadError(
 				`File size exceeds limit of ${Math.round(maxSize / 1024 / 1024)}MB`,
 				"FILE_TOO_LARGE"
 			);
-		}
+		}*/
 
 		// Check file type
 		const allowedTypes = this.ALLOWED_FILE_TYPES[fileType];

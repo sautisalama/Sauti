@@ -18,6 +18,7 @@ import { usePathname } from "next/navigation";
 import Image from "next/image";
 import { useRoleSwitcher } from "@/hooks/useRoleSwitcher";
 import { Badge } from "@/components/ui/badge";
+import { NotificationDropdown } from "./NotificationDropdown";
 
 export function MobileTopBar() {
   const user = useUser();
@@ -57,8 +58,11 @@ export function MobileTopBar() {
          <span className="font-bold text-base text-sauti-dark tracking-tight">Sauti Salama</span>
       </Link>
 
-      {/* User Profile Dropdown */}
-      <DropdownMenu>
+      <div className="flex items-center gap-2">
+        <NotificationDropdown />
+        
+        {/* User Profile Dropdown */}
+        <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button variant="ghost" className="relative h-9 w-9 rounded-full p-0 hover:bg-serene-neutral-50 focus-visible:ring-0 transition-all">
             <Avatar className="h-8 w-8 border-2 border-white shadow-sm ring-1 ring-serene-neutral-100 transition-transform active:scale-95">
@@ -130,7 +134,8 @@ export function MobileTopBar() {
             <span>Log out</span>
           </DropdownMenuItem>
         </DropdownMenuContent>
-      </DropdownMenu>
+        </DropdownMenu>
+      </div>
     </div>
   );
 }
