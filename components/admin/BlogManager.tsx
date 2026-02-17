@@ -228,18 +228,20 @@ export function BlogManager() {
     };
 
 	return (
-		<Card className="border-serene-neutral-200/60 shadow-sm rounded-2xl overflow-hidden">
-			<CardHeader className="bg-white border-b border-serene-neutral-100">
+		<Card className="bg-white border-serene-neutral-200 shadow-sm rounded-2xl overflow-hidden hover:shadow-md transition-all duration-300">
+			<CardHeader className="bg-white border-b border-serene-neutral-100 pb-4">
                 <div className="flex items-center justify-between">
-				    <CardTitle className="text-xl font-bold text-serene-neutral-900">Content Management</CardTitle>
-                    <Button onClick={handleCreateNew} className="bg-serene-blue-600 hover:bg-serene-blue-700 text-white rounded-xl shadow-md shadow-serene-blue-200 transition-all hover:shadow-lg">
+				    <div className="space-y-1">
+                        <CardTitle className="text-xl font-bold text-sauti-dark">Content Management</CardTitle>
+                        <CardDescription className="text-serene-neutral-500 text-sm">
+					        Manage blogs, articles, and upcoming events
+				        </CardDescription>
+                    </div>
+                    <Button onClick={handleCreateNew} className="bg-sauti-blue hover:bg-sauti-blue-dark text-white rounded-xl shadow-sm hover:shadow-md transition-all">
                         <Plus className="mr-2 h-4 w-4" />
                         Create New
                     </Button>
                 </div>
-				<CardDescription className="text-serene-neutral-500">
-					Manage blogs, articles, and upcoming events
-				</CardDescription>
 			</CardHeader>
 			<CardContent className="p-6 space-y-6">
                 {/* Filters */}
@@ -289,7 +291,8 @@ export function BlogManager() {
 							</TableRow>
 						</TableHeader>
                         <TableBody>
-                            {filteredPosts.map(post => (
+                            {filteredPosts.length > 0 ? (
+                                filteredPosts.map(post => (
                                 <TableRow key={post.id}>
                                     <TableCell className="font-medium pl-6">
                                         {post.title}
@@ -332,7 +335,34 @@ export function BlogManager() {
                                         </div>
                                     </TableCell>
                                 </TableRow>
-                            ))}
+                            ))
+                            ) : (
+                                <TableRow>
+                                    <TableCell colSpan={6} className="h-[400px] text-center">
+                                        <div className="flex flex-col items-center justify-center p-12 text-center">
+                                            <div className="bg-sauti-orange/10 h-20 w-20 rounded-2xl flex items-center justify-center mb-4 shadow-sm border border-sauti-orange/20">
+                                                <FileText className="h-10 w-10 text-sauti-orange" />
+                                            </div>
+                                            <h3 className="text-lg font-bold text-sauti-teal mb-1">
+                                                No content found
+                                            </h3>
+                                            <p className="text-sm text-serene-neutral-500 max-w-sm mx-auto mb-6">
+                                                No blogs or events match your current filters.
+                                            </p>
+                                            <Button 
+                                                variant="outline" 
+                                                onClick={() => {
+                                                    setSearchTerm("");
+                                                    setTypeFilter("all");
+                                                }}
+                                                className="border-serene-neutral-200 text-serene-neutral-600 hover:text-sauti-dark hover:bg-serene-neutral-50"
+                                            >
+                                                Clear Filters
+                                            </Button>
+                                        </div>
+                                    </TableCell>
+                                </TableRow>
+                            )}
                         </TableBody>
                     </Table>
                 </div>

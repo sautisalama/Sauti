@@ -149,8 +149,8 @@ export function DocumentSidepanel({ isOpen, onClose, document, contextData, cont
 
                              {/* 1. Document Metadata (From Upload Form) */}
                              <div className="space-y-4">
-                                <h4 className="text-xs font-bold text-serene-neutral-400 uppercase tracking-widest flex items-center gap-2">
-                                    <Info className="h-3.5 w-3.5" />
+                                <h4 className="text-xs font-bold text-sauti-dark/60 uppercase tracking-widest flex items-center gap-2">
+                                    <Info className="h-3.5 w-3.5 text-sauti-blue" />
                                     Submitted Details
                                 </h4>
                                 <div className="grid grid-cols-1 gap-4">
@@ -179,8 +179,8 @@ export function DocumentSidepanel({ isOpen, onClose, document, contextData, cont
 
                              {/* 2. Verify Against (Profile/Service Context) */}
                              <div className="space-y-4">
-                                <h4 className="text-xs font-bold text-serene-neutral-400 uppercase tracking-widest flex items-center gap-2">
-                                    <CheckCircle className="h-3.5 w-3.5" />
+                                <h4 className="text-xs font-bold text-sauti-dark/60 uppercase tracking-widest flex items-center gap-2">
+                                    <CheckCircle className="h-3.5 w-3.5 text-sauti-teal" />
                                     Verify Against
                                 </h4>
                                 <div className="bg-serene-blue-50/50 rounded-xl border border-serene-blue-100/50 p-4 space-y-4">
@@ -218,7 +218,7 @@ export function DocumentSidepanel({ isOpen, onClose, document, contextData, cont
 
                              {/* 3. Decision & Notes */}
                              <div className="space-y-4">
-                                <h4 className="text-xs font-bold text-serene-neutral-400 uppercase tracking-widest">Admin Decision</h4>
+                                <h4 className="text-xs font-bold text-sauti-dark/60 uppercase tracking-widest">Admin Decision</h4>
                                 <div className="space-y-3">
                                     <Label className="text-xs text-serene-neutral-600">Verification Notes</Label>
                                     <Textarea

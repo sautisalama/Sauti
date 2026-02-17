@@ -25,40 +25,40 @@ export function AdminStatsCards({ stats }: AdminStatsCardsProps) {
 			title: "Total Users",
 			value: stats.total_survivors + stats.total_professionals + stats.total_ngos,
 			icon: Users,
-			color: "text-blue-600",
-			bgColor: "bg-blue-50",
-			borderColor: "border-blue-200",
+			color: "text-sauti-blue",
+			bgColor: "bg-sauti-blue/10",
+			borderColor: "border-sauti-blue/20",
 			details: [
 				{
 					label: "Survivors",
 					value: stats.total_survivors,
-					color: "text-gray-600",
+					color: "text-serene-neutral-600",
 				},
 				{
 					label: "Professionals",
 					value: stats.total_professionals,
-					color: "text-blue-600",
+					color: "text-sauti-blue",
 				},
-				{ label: "NGOs", value: stats.total_ngos, color: "text-green-600" },
+				{ label: "NGOs", value: stats.total_ngos, color: "text-sauti-teal" },
 			],
 		},
 		{
 			title: "Verification Queue",
 			value: stats.pending_verifications + stats.pending_service_verifications,
 			icon: AlertTriangle,
-			color: "text-orange-600",
-			bgColor: "bg-orange-50",
-			borderColor: "border-orange-200",
+			color: "text-sauti-orange",
+			bgColor: "bg-sauti-orange/10",
+			borderColor: "border-sauti-orange/20",
 			details: [
 				{
 					label: "User Verifications",
 					value: stats.pending_verifications,
-					color: "text-orange-600",
+					color: "text-sauti-orange",
 				},
 				{
 					label: "Service Verifications",
 					value: stats.pending_service_verifications,
-					color: "text-orange-600",
+					color: "text-sauti-orange",
 				},
 			],
 		},
@@ -66,19 +66,19 @@ export function AdminStatsCards({ stats }: AdminStatsCardsProps) {
 			title: "Verified Content",
 			value: stats.verified_users + stats.active_services,
 			icon: CheckCircle,
-			color: "text-green-600",
-			bgColor: "bg-green-50",
-			borderColor: "border-green-200",
+			color: "text-sauti-teal",
+			bgColor: "bg-sauti-teal/10",
+			borderColor: "border-sauti-teal/20",
 			details: [
 				{
 					label: "Verified Users",
 					value: stats.verified_users,
-					color: "text-green-600",
+					color: "text-sauti-teal",
 				},
 				{
 					label: "Active Services",
 					value: stats.active_services,
-					color: "text-green-600",
+					color: "text-sauti-teal",
 				},
 			],
 		},
@@ -86,15 +86,15 @@ export function AdminStatsCards({ stats }: AdminStatsCardsProps) {
 			title: "Banned Content",
 			value: stats.banned_users + stats.banned_services,
 			icon: UserX,
-			color: "text-red-600",
-			bgColor: "bg-red-50",
-			borderColor: "border-red-200",
+			color: "text-sauti-red",
+			bgColor: "bg-sauti-red/10",
+			borderColor: "border-sauti-red/20",
 			details: [
-				{ label: "Banned Users", value: stats.banned_users, color: "text-red-600" },
+				{ label: "Banned Users", value: stats.banned_users, color: "text-sauti-red" },
 				{
 					label: "Banned Services",
 					value: stats.banned_services,
-					color: "text-red-600",
+					color: "text-sauti-red",
 				},
 			],
 		},
@@ -103,22 +103,29 @@ export function AdminStatsCards({ stats }: AdminStatsCardsProps) {
 	return (
 		<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
 			{cards.map((card, index) => (
-				<Card key={index} className={`${card.borderColor} ${card.bgColor}`}>
+				<Card
+					key={index}
+					className="bg-white border-serene-neutral-200 shadow-sm hover:shadow-md transition-all duration-300"
+				>
 					<CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-						<CardTitle className="text-sm font-medium text-gray-600">
+						<CardTitle className="text-sm font-bold uppercase tracking-wider text-sauti-dark/60">
 							{card.title}
 						</CardTitle>
-						<card.icon className={`h-4 w-4 ${card.color}`} />
+						<div className={`p-2 rounded-xl ${card.bgColor}`}>
+							<card.icon className={`h-4 w-4 ${card.color}`} />
+						</div>
 					</CardHeader>
 					<CardContent>
-						<div className="text-2xl font-bold text-gray-900 mb-2">
+						<div className="text-2xl font-bold text-sauti-dark mb-4">
 							{card.value.toLocaleString()}
 						</div>
-						<div className="space-y-1">
+						<div className="space-y-2">
 							{card.details.map((detail, detailIndex) => (
 								<div key={detailIndex} className="flex justify-between text-xs">
-									<span className="text-gray-500">{detail.label}</span>
-									<span className={`font-medium ${detail.color}`}>
+									<span className="text-serene-neutral-500 font-medium">
+										{detail.label}
+									</span>
+									<span className={`font-bold ${detail.color}`}>
 										{detail.value.toLocaleString()}
 									</span>
 								</div>
