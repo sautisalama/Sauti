@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ArrowRightCircle, Check, Search, Loader2, FileText, MessageSquare, Clock, AlertCircle } from 'lucide-react';
 import { format } from 'date-fns';
+import { forwardCase } from '@/app/actions/case-forwarding';
 
 interface Professional {
   id: string;
@@ -121,25 +122,18 @@ export function CaseForwardModal({
     setError(null);
 
     try {
-      const { error: insertError } = await supabase
-        .from('case_shares')
-        .insert({
-          match_id: matchId,
-          from_professional_id: currentProfessionalId,
-          to_professional_id: selectedProfessional,
-          to_service_pool: !selectedProfessional && !!selectedService,
-          include_notes: includeNotes,
-          include_recommendations: includeRecommendations,
-          required_services: selectedService ? [selectedService] : null,
-          reason: reason.trim() || null,
-          original_match_date: matchDate,
-          support_history: supportHistory.length > 0 ? supportHistory : null,
-          status: 'pending'
-        });
-
-      if (insertError) throw insertError;
-
-      // TODO: Send notification to receiving professional
+      await forwardCase({
+        matchId,
+        fromProfessionalId: currentProfessionalId,
+        toProfessionalId: selectedProfessional,
+        toServicePool: !selectedProfessional && !!selectedService,
+        includeNotes,
+        includeRecommendations,
+        requiredServices: selectedService ? [selectedService] : null,
+        reason: reason.trim() || null,
+        originalMatchDate: matchDate,
+        supportHistory: supportHistory.length > 0 ? supportHistory : null,
+      });
 
       onCaseForwarded?.();
       handleClose();

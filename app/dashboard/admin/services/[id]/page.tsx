@@ -45,6 +45,7 @@ import {
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { performAdminAction } from "@/app/actions/admin-actions";
 
 type ReviewHistoryItem = {
     id: string;
@@ -186,70 +187,20 @@ export default function ServiceDetailPage() {
         const status = action === 'verify' ? 'verified' : (action === 'ban' ? 'suspended' : 'rejected');
 
         try {
-            const { data: { user } } = await supabase.auth.getUser();
-            if (!user) {
-                toast({ title: "Error", description: "You must be logged in.", variant: "destructive" });
-                return;
-            }
-
-            // 1. Update Service Status
-            const updatePayload: any = {
-                verification_status: status,
-                verification_notes: notes,
-                verification_updated_at: new Date().toISOString(),
-                reviewed_by: {
-                    reviewer_id: user.id,
-                    reviewed_at: new Date().toISOString(),
-                    action: action,
-                    notes: notes
-                }
-            };
-
-            const { error: updateError } = await supabase
-                .from('support_services')
-                .update(updatePayload)
-                .eq('id', targetId);
-
-            if (updateError) throw updateError;
-
-            // 2. Log Action
-            await supabase.from('admin_actions').insert({
-                admin_id: user.id,
-                action_type: `${action}_service`,
-                target_id: targetId,
-                target_type: 'service',
-                details: { notes, previous_status: service?.verification_status }
+            await performAdminAction({
+                targetId,
+                targetType: 'service',
+                action,
+                notes
             });
-
-            // 3. Send Notification
-            if (owner) {
-                const notificationTitle = "Service Verification Update";
-                const notificationMessage = `Your service "${service?.name}" verification status has been updated to ${status}.`;
-                const notificationLink = '/dashboard/profile?section=services';
-
-                await supabase.from('notifications').insert({
-                    user_id: owner.id,
-                    type: `verification_${status}`,
-                    title: notificationTitle,
-                    message: notificationMessage,
-                    link: notificationLink,
-                    read: false,
-                    metadata: { 
-                        target_type: 'service', 
-                        target_id: targetId,
-                        notes: notes,
-                        action_by: user.id
-                    }
-                });
-            }
 
             toast({ title: "Success", description: `Service marked as ${status}.` });
             setActionDialog(prev => ({ ...prev, isOpen: false, notes: '' }));
             fetchData(); // Refresh
 
-        } catch (error) {
+        } catch (error: any) {
             console.error("Action error:", error);
-            toast({ title: "Error", description: "Failed to update status", variant: "destructive" });
+            toast({ title: "Error", description: error.message || "Failed to update status", variant: "destructive" });
         }
     };
 

@@ -1,6 +1,11 @@
 import { createClient } from "@/utils/supabase/server";
 import { Database } from "@/types/db-schema";
 import { SupabaseClient } from "@supabase/supabase-js";
+import { sendNotification } from "@/lib/notifications";
+import {
+	matchFoundProfessionalEmail,
+	matchFoundSurvivorEmail,
+} from "@/lib/notifications/templates";
 
 type SupportService = Database["public"]["Tables"]["support_services"]["Row"];
 type Report = Database["public"]["Tables"]["reports"]["Row"];
@@ -173,6 +178,44 @@ export async function matchReportWithServices(reportId: string, customClient?: S
 			if (matchError) {
 				console.error("Match insert error:", matchError);
 				throw new Error("Failed to insert matches");
+			}
+
+			// --- SEND NOTIFICATIONS ---
+			// 1. Notify each matched Professional
+			for (const match of closestMatches) {
+				if (match.service.user_id) {
+					await sendNotification({
+						userId: match.service.user_id,
+						type: "match_found", // Or 'new_referral'
+						title: "New Case Assignment",
+						message: `You have been matched with a new case requiring ${match.service.service_types} services.`,
+						link: "/dashboard/cases",
+						metadata: {
+							report_id: reportId,
+							service_id: match.service.id,
+						},
+						sendEmail: true,
+						emailHtml: matchFoundProfessionalEmail(match.service.service_types),
+					});
+				}
+			}
+
+			// 2. Notify the Survivor (User) - Send ONE summary notification
+			if (report.user_id) {
+				const primaryMatch = closestMatches[0];
+				await sendNotification({
+					userId: report.user_id,
+					type: "match_found",
+					title: "Match Found",
+					message: `We have matched you with verified professionals for your request. View the details in your dashboard.`,
+					link: "/dashboard/cases", // Or /dashboard/reports?
+					metadata: { report_id: reportId },
+					sendEmail: true,
+					emailHtml: matchFoundSurvivorEmail(
+						primaryMatch.service.name || "a verified professional",
+						primaryMatch.service.service_types
+					),
+				});
 			}
 		}
 

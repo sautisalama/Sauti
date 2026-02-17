@@ -1,12 +1,11 @@
 import { NextResponse } from "next/server";
-import { MailtrapClient } from "mailtrap";
 import { REPORT_EMAIL_RECIPIENTS, REPORT_EMAIL_SENDER } from "@/lib/constants";
 import { createClient } from "@/utils/supabase/server";
 import { Database, TablesInsert } from "@/types/db-schema";
 import { matchReportWithServices } from "@/app/actions/match-services";
-
-const TOKEN = process.env.MAILTRAP_TOKEN!;
-const client = new MailtrapClient({ token: TOKEN });
+import { sendEmail } from "@/lib/notifications/email";
+import { sendNotification } from "@/lib/notifications";
+import { newReportAdminEmail } from "@/lib/notifications/templates";
 
 export const dynamic = "force-dynamic";
 
@@ -81,37 +80,38 @@ export async function POST(request: Request) {
 			console.warn("Auto-link by phone failed", linkErr);
 		}
 
+		// Send Notifications
 		try {
-			await client.send({
-				from: REPORT_EMAIL_SENDER,
-				to: REPORT_EMAIL_RECIPIENTS,
-				subject: `New Abuse Report: ${formData.type_of_incident} (${formData.urgency} urgency)`,
-				text: `
-					New abuse report submitted:
-					Type of Incident: ${formData.type_of_incident}
-					Urgency: ${formData.urgency}
-					Description: ${formData.incident_description || "(none)"}
-					Required Services: ${
-						Array.isArray(formData.required_services)
-							? formData.required_services.join(", ")
-							: formData.required_services || ""
-					}
-					Voice Note: ${
-						formData?.media?.url ? `Available at ${formData.media.url}` : "(none)"
-					}
-					Reporter Information:
-					Name: ${formData.first_name}
-					Email: ${formData.email}
-					Phone: ${formData.phone || "Not provided"}
-					Preferred Contact Method: ${formData.contact_preference}
-					Consent to Share: ${formData.consent}
+            // 1. Notify Admins (Email only)
+            const adminEmailHtml = newReportAdminEmail(
+                insertedReport.report_id,
+                formData.type_of_incident,
+                formData.urgency,
+                Array.isArray(formData.required_services) ? formData.required_services : [formData.required_services || 'None']
+            );
+            
+			await sendEmail(
+				REPORT_EMAIL_RECIPIENTS.map((r) => r.email),
+				`New Abuse Report: ${formData.type_of_incident} (${formData.urgency})`,
+				adminEmailHtml
+			);
 
-					Submitted at: ${formData.submission_timestamp}
-				`.trim(),
-				category: "Abuse Reports",
-			});
-		} catch (emailError) {
-			console.error("Email sending failed:", emailError);
+            // 2. Notify Reporter (if authenticated)
+            if (insertedReport.user_id) {
+                await sendNotification({
+                    userId: insertedReport.user_id,
+                    type: 'system_alert', // Using system_alert as generic "Report Received"
+                    title: 'Report Received',
+                    message: `We have received your report regarding "${formData.type_of_incident}". Our team is reviewing it.`,
+                    link: '/dashboard/reports',
+                    metadata: { report_id: insertedReport.report_id },
+                    sendEmail: false // Don't spam email for receipt confirmation unless critical? user probably knows they sent it.
+                });
+            }
+
+		} catch (notificationError) {
+			console.error("Notification failed:", notificationError);
+            // Don't fail the request
 		}
 
 		return new NextResponse(
