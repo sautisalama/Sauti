@@ -170,6 +170,7 @@ export function VerificationSection({
 	
     // Robustly filter out IDs from other docs list
     const otherDocs = documents.filter(d => {
+        if (!d || !d.title) return false;
         const title = d.title.toLowerCase();
         return !title.includes("national id (front)") && 
                !title.includes("national id (back)") && 
@@ -308,58 +309,71 @@ export function VerificationSection({
 
 	const DocumentCard = ({ doc, onDelete }: { doc: VerificationDocument, onDelete: () => void }) => {
 		const isRejected = doc.status === 'rejected';
+		const isImage = doc.url?.match(/\.(jpg|jpeg|png|gif|webp)$/i);
+
 		return (
 			<div className={cn(
-				"group relative bg-white border rounded-2xl p-4 transition-all hover:shadow-md",
-				isRejected ? "border-red-200 bg-red-50/10 shadow-red-100/50" : "border-neutral-200 hover:border-sauti-teal/30"
+				"group relative bg-white border rounded-2xl overflow-hidden transition-all hover:shadow-md flex flex-col h-full",
+				isRejected ? "border-red-200 shadow-red-100/50" : "border-neutral-200 hover:border-sauti-teal/30"
 			)}>
-				<div className="flex items-center gap-4">
-					<div className={cn(
-						"h-12 w-12 rounded-xl flex items-center justify-center shrink-0",
-						isRejected ? "bg-red-100 text-red-600" : "bg-sauti-teal/5 border border-sauti-teal/10 text-sauti-teal"
-					)}>
-						{isRejected ? <AlertCircle className="h-6 w-6" /> : <FileText className="h-6 w-6" />}
-					</div>
-					<div className="flex-1 min-w-0">
-						<div className="flex items-center justify-between mb-0.5">
-							<h4 className={cn("font-bold text-sm truncate pr-2", isRejected ? "text-red-900" : "text-neutral-900")} title={doc.title}>
-								{doc.title}
-							</h4>
-							<Badge variant="outline" className={cn(
-								"text-[10px] uppercase font-bold tracking-wider px-1.5 py-0 h-5",
-								isRejected ? "border-red-200 text-red-600 bg-white" : "border-neutral-200 text-neutral-500"
+				{/* Preview Area - Matches Admin Style */}
+				<div 
+					className={cn(
+						"aspect-[4/3] w-full relative overflow-hidden flex items-center justify-center transition-colors border-b border-neutral-100",
+						isRejected ? "bg-red-50/30" : "bg-neutral-50"
+					)}
+					onClick={() => window.open(doc.url, '_blank')}
+				>
+					{isImage ? (
+						// eslint-disable-next-line @next/next/no-img-element
+						<img
+							src={doc.url}
+							alt={doc.title}
+							className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105 cursor-pointer"
+						/>
+					) : (
+						<div className="w-full h-full flex flex-col items-center justify-center p-4 cursor-pointer">
+							<div className={cn(
+								"h-10 w-10 rounded-xl bg-white shadow-sm border border-neutral-200 flex items-center justify-center mb-2 group-hover:scale-110 transition-transform duration-300",
+								isRejected ? "text-red-500" : "text-sauti-teal"
 							)}>
-								{isRejected ? 'Rejected' : (doc.type === 'identity' ? 'Identity' : 'Qualification')}
-							</Badge>
+								{isRejected ? <AlertCircle className="h-5 w-5" /> : <FileText className="h-5 w-5" />}
+							</div>
+							<div className={cn(
+								"px-2 py-0.5 rounded text-[9px] font-bold tracking-tight border shadow-sm uppercase",
+								isRejected ? "bg-red-100 text-red-700 border-red-200" : "bg-sauti-teal/10 text-sauti-teal border-sauti-teal/20"
+							)}>
+								{doc.type === 'identity' ? 'ID' : 'PDF'}
+							</div>
 						</div>
-						<div className="flex items-center gap-2 text-xs text-neutral-500">
-							{isRejected ? (
-								<div className="flex items-center gap-1.5 text-red-700 font-medium">
-									<p>{doc.notes || "Please re-upload this document."}</p>
-								</div>
-							) : (
-								<>
-									<span>{formatDate(doc.uploadedAt)}</span>
-									{doc.type === 'qualification' && doc.metadata?.issuer && (
-										<>
-											<span className="text-neutral-300">•</span>
-											<span className="truncate">{doc.metadata.issuer}</span>
-										</>
-									)}
-								</>
-							)}
+					)}
+				</div>
+
+				{/* Content Area */}
+				<div className="p-3 flex flex-col flex-1">
+					<div className="flex items-start justify-between gap-2 mb-1">
+						<h4 className={cn(
+							"font-bold text-xs truncate leading-snug flex-1", 
+							isRejected ? "text-red-900" : "text-neutral-900"
+						)} title={doc.title}>
+							{doc.title}
+						</h4>
+						<div className="flex shrink-0">
+							<Button variant="ghost" size="icon" className="h-6 w-6 -mr-1 text-neutral-400 hover:text-red-500 hover:bg-red-50 rounded-lg" onClick={(e) => { e.stopPropagation(); onDelete(); }}>
+								<Trash2 className="h-3.5 w-3.5" />
+							</Button>
 						</div>
 					</div>
-					<div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-						<Button variant="ghost" size="icon" className="h-9 w-9 text-neutral-400 hover:text-sauti-teal hover:bg-sauti-teal/10 rounded-xl" asChild>
-							<a href={doc.url} target="_blank" rel="noopener noreferrer">
-								<Eye className="h-5 w-5" />
-							</a>
-						</Button>
-						<Button variant="ghost" size="icon" className="h-9 w-9 text-neutral-400 hover:text-red-500 hover:bg-red-50 rounded-xl" onClick={onDelete}>
-							<Trash2 className="h-5 w-5" />
-						</Button>
-					</div>
+					
+					{isRejected ? (
+						<div className="text-[10px] text-red-600 font-medium mt-auto bg-red-50 p-1.5 rounded-lg break-words leading-tight">
+							{doc.notes || "Rejected"}
+						</div>
+					) : (
+						<div className="text-[10px] text-neutral-400 mt-auto flex items-center justify-between">
+							<span>{formatDate(doc.uploadedAt)}</span>
+						</div>
+					)}
 				</div>
 			</div>
 		);
@@ -367,9 +381,9 @@ export function VerificationSection({
 
 	// Helper to safely format dates
 	const formatDate = (dateString?: string) => {
-		if (!dateString) return "Date not available";
+		if (!dateString) return "No Date";
 		const date = new Date(dateString);
-		return isNaN(date.getTime()) ? "Date not available" : date.toLocaleDateString("en-US", { month: 'short', day: 'numeric', year: 'numeric' });
+		return isNaN(date.getTime()) ? "No Date" : date.toLocaleDateString("en-US", { month: 'short', day: 'numeric', year: 'numeric' });
 	};
 
 	// ID Upload Slot Component
@@ -577,7 +591,7 @@ export function VerificationSection({
 				</CardHeader>
 				<CardContent className="p-5">
 					{otherDocs.length > 0 ? (
-						<div className="grid gap-3">
+						<div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
 							{otherDocs.map((doc, idx) => (
 								<DocumentCard key={idx} doc={doc} onDelete={() => handleDelete(doc)} />
 							))}

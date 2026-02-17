@@ -206,34 +206,48 @@ export function MobileVerificationSection({
 		}
 	};
 
-	const MobileDocCard = ({ doc, onDelete }: { doc: VerificationDocument, onDelete: () => void }) => (
-		<div className="group relative bg-white border border-serene-neutral-200 rounded-2xl p-4 shadow-sm active:scale-[0.98] transition-transform">
-			<div className="flex items-center gap-4">
-				<div className="h-12 w-12 rounded-xl bg-sauti-teal/5 border border-sauti-teal/10 flex items-center justify-center shrink-0 text-sauti-teal">
-					<FileText className="h-6 w-6" />
+	const MobileDocCard = ({ doc, onDelete }: { doc: VerificationDocument, onDelete: () => void }) => {
+		const isImage = doc.url?.match(/\.(jpg|jpeg|png|gif|webp)$/i);
+		
+		return (
+			<div className="group relative bg-white border border-serene-neutral-200 rounded-2xl overflow-hidden shadow-sm active:scale-[0.98] transition-transform flex flex-col h-full">
+				<div 
+					className="aspect-[4/3] w-full relative overflow-hidden flex items-center justify-center bg-serene-neutral-50 border-b border-serene-neutral-100"
+					onClick={() => window.open(doc.url, '_blank')}
+				>
+					{isImage ? (
+						// eslint-disable-next-line @next/next/no-img-element
+						<img
+							src={doc.url}
+							alt={doc.title}
+							className="w-full h-full object-cover"
+						/>
+					) : (
+						<div className="flex flex-col items-center justify-center p-3">
+							<div className="h-10 w-10 rounded-xl bg-white border border-serene-neutral-200 flex items-center justify-center text-sauti-teal mb-1.5 shadow-sm">
+								<FileText className="h-5 w-5" />
+							</div>
+							<Badge variant="outline" className="text-[10px] uppercase font-bold tracking-wider px-1.5 py-0 h-5 border-serene-neutral-200 text-serene-neutral-500 bg-white">
+								{doc.type === 'identity' ? 'ID' : 'PDF'}
+							</Badge>
+						</div>
+					)}
 				</div>
-				<div className="flex-1 min-w-0">
-					<div className="flex items-center justify-between mb-0.5">
-						<h4 className="font-bold text-serene-neutral-900 text-sm truncate pr-2">{doc.title}</h4>
-						<Badge variant="outline" className="text-[10px] uppercase font-bold tracking-wider px-1.5 py-0 h-5 border-serene-neutral-200 text-serene-neutral-500">
-							{doc.type === 'identity' ? 'ID' : 'CERT'}
-						</Badge>
+				
+				<div className="p-3 flex flex-col flex-1">
+					<div className="flex items-start justify-between gap-1 mb-1">
+						<h4 className="font-bold text-serene-neutral-900 text-xs truncate leading-snug flex-1">{doc.title}</h4>
+						<button onClick={onDelete} className="p-1 -mr-1 text-red-400">
+							<Trash2 className="h-3.5 w-3.5" />
+						</button>
 					</div>
-					<p className="text-xs text-serene-neutral-500">
+					<p className="text-[10px] text-serene-neutral-500 mt-auto">
 						{new Date(doc.uploadedAt || "").toLocaleDateString("en-US", { month: 'short', day: 'numeric', year: 'numeric' })}
 					</p>
 				</div>
-				<div className="flex items-center gap-1">
-					<a href={doc.url} target="_blank" rel="noopener noreferrer" className="p-2 text-serene-neutral-400">
-						<Eye className="h-5 w-5" />
-					</a>
-					<button onClick={onDelete} className="p-2 text-red-400">
-						<Trash2 className="h-5 w-5" />
-					</button>
-				</div>
 			</div>
-		</div>
-	);
+		);
+	};
 
 	const MobileIDSlot = ({ title, existingDoc, side }: { title: string, existingDoc?: VerificationDocument, side: 'front' | 'back' }) => (
 		<div 
@@ -335,7 +349,7 @@ export function MobileVerificationSection({
 					</Button>
 				</div>
 
-				<div className="space-y-3">
+				<div className="grid grid-cols-2 gap-3">
 					{otherDocs.length > 0 ? (
 						otherDocs.map((doc, idx) => (
 							<MobileDocCard key={idx} doc={doc} onDelete={() => handleDelete(doc)} />
@@ -343,7 +357,7 @@ export function MobileVerificationSection({
 					) : (
 						<div 
 							onClick={() => setShowAddCert(true)}
-							className="rounded-xl border border-dashed border-serene-neutral-200 bg-serene-neutral-50 p-6 flex flex-col items-center justify-center text-center gap-2 active:bg-serene-neutral-100"
+							className="col-span-2 rounded-xl border border-dashed border-serene-neutral-200 bg-serene-neutral-50 p-6 flex flex-col items-center justify-center text-center gap-2 active:bg-serene-neutral-100"
 						>
 							<Shield className="h-8 w-8 text-serene-neutral-300" />
 							<p className="text-sm text-serene-neutral-500">Tap to add your first certificate</p>

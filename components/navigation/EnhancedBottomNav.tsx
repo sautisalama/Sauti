@@ -6,13 +6,14 @@ import { useState, useEffect } from "react";
 import { 
   MessageCircle, 
   FileText, 
-  LayoutDashboard,
-  ClipboardList,
-  Calendar,
-  Heart,
-  TrendingUp,
-  Users,
-  Shield
+  LayoutDashboard, 
+  ClipboardList, 
+  Calendar, 
+  Heart, 
+  TrendingUp, 
+  Users, 
+  Shield, 
+  Building2 
 } from "lucide-react";
 import { useUser } from "@/hooks/useUser";
 import { cn } from "@/lib/utils";
@@ -120,8 +121,8 @@ export function EnhancedBottomNav({ forceShow = false, className }: EnhancedBott
                 href: "/dashboard/admin/review", // Assuming this is the verifications list page
                 badge: dash?.data?.verification?.pendingCount || undefined
             },
-             // Admins manage services, so replacing Learn with Services seems appropriate for "important tasks"
-            { id: "services", label: "Services", icon: Users, href: "/dashboard/admin/services" },
+            { id: "professionals", label: "Professionals", icon: Users, href: "/dashboard/admin/professionals" },
+            { id: "services", label: "Services", icon: Building2, href: "/dashboard/admin/services" },
             { id: "chat", label: "Chats", icon: MessageCircle, href: "/dashboard/chat", badge: unreadMessages > 0 ? unreadMessages : undefined },
         ];
     }

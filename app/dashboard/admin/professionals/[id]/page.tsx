@@ -1,39 +1,50 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams, useSearchParams, useRouter } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, CheckCircle, XCircle, FileText, AlertTriangle, ShieldCheck, Building2, User, ChevronDown, ChevronUp, AlertCircle, Briefcase, MapPin } from "lucide-react";
+import { 
+    ArrowLeft, 
+    FileText, 
+    Building2, 
+    ShieldCheck, 
+    Clock, 
+    Users, 
+    Target,
+    Briefcase,
+    MapPin,
+    AlertCircle,
+    CheckCircle,
+    XCircle,
+    AlertTriangle
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { useToast } from "@/hooks/use-toast";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 import { DocumentSidepanel } from "../../_components/DocumentSidepanel";
 import { 
-    InfoBlock,
-    DocumentsGrid,
-    ActionButtons,
-    VerificationStatusBadge,
+    InfoBlock, 
+    DocumentsGrid, 
+    ActionButtons, 
+    VerificationStatusBadge, 
     type AccreditationDocument,
     DetailHeader
 } from "../../_components/AdminDetailComponents";
+
 import { 
     Dialog, 
     DialogContent, 
-    DialogHeader, 
     DialogTitle,
     DialogDescription,
-    DialogFooter 
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-
-
 
 type ReviewHistoryItem = {
     id: string;
@@ -55,7 +66,7 @@ type ServiceItem = {
     helpline?: string;
     website?: string;
     coverage_area_radius?: number;
-    description?: string; // Assuming description exists or falling back
+    description?: string;
     accreditation_files?: any;
     accreditation_files_metadata?: AccreditationDocument[];
     latitude?: number;
@@ -79,30 +90,16 @@ type ProfileItem = {
     accreditation_files_metadata?: AccreditationDocument[];
 };
 
-export default function ReviewPage() {
+export default function ProfessionalDetailPage() {
     const params = useParams();
-    const searchParams = useSearchParams();
     const router = useRouter();
     const { toast } = useToast();
-    const id = params.id as string; // This is the PROFILE ID
-    const initialType = searchParams.get("type"); // Might be 'service' or 'professional'
-    
-    // If we land here with a SERVICE ID (because dashboard link was for a service),
-    // we need to handle that. Ideally, the dashboard links to PROFILE ID.
-    // BUT, if dashboard links to SERVICE ID, we must fetch service first to get owner ID.
-    // For now, assuming standard flow: Dashboard passes PROFILE ID (or we redirect).
-    // Let's assume ID is PROFILE ID for simplicity as per plan "Refactor to Profile-Centric".
-    // If the dashboard passes a Service ID, this page will fail to load a profile.
-    // To fix dashboard links: The dashboard should pass `profile_id` if it knows it.
-    // Since dashboard has `profiles` and `support_services` separately:
-    // If `type` is 'service', we might need to fetch the service first to find the `user_id`.
+    const id = params.id as string;
 
-    const [isResolvingId, setIsResolvingId] = useState(initialType === 'service');
-    const [profileId, setProfileId] = useState<string>(initialType === 'service' ? '' : id);
-    
     const [profile, setProfile] = useState<ProfileItem | null>(null);
     const [services, setServices] = useState<ServiceItem[]>([]);
     const [history, setHistory] = useState<ReviewHistoryItem[]>([]);
+    const [stats, setStats] = useState<{ matches: number }>({ matches: 0 });
     const [isLoading, setIsLoading] = useState(true);
     
     const [viewingDoc, setViewingDoc] = useState<{ doc: AccreditationDocument, contextId: string, contextType: 'profile' | 'service' } | null>(null);
@@ -124,37 +121,11 @@ export default function ReviewPage() {
 
     const supabase = createClient();
 
-    // ID Resolution Effect
     useEffect(() => {
-        const resolveId = async () => {
-            if (initialType === 'service') {
-                const { data, error } = await supabase
-                    .from('support_services')
-                    .select('user_id')
-                    .eq('id', id)
-                    .single();
-                
-                if (data && data.user_id) {
-                    setProfileId(data.user_id);
-                } else {
-                    toast({ title: "Error", description: "Could not find owner of this service.", variant: "destructive" });
-                    router.push('/dashboard/admin'); // Fallback
-                }
-                setIsResolvingId(false);
-            }
-        };
-
-        if (initialType === 'service') {
-            resolveId();
-        }
-    }, [id, initialType]);
-
-    // Data Fetch Effect
-    useEffect(() => {
-        if (!isResolvingId && profileId) {
+        if (id) {
             fetchData();
         }
-    }, [profileId, isResolvingId]);
+    }, [id]);
 
     const fetchData = async () => {
         setIsLoading(true);
@@ -163,7 +134,7 @@ export default function ReviewPage() {
             const { data: profileData, error: profileError } = await supabase
                 .from('profiles')
                 .select('*')
-                .eq('id', profileId)
+                .eq('id', id)
                 .single();
 
             if (profileError) throw profileError;
@@ -172,16 +143,24 @@ export default function ReviewPage() {
             const { data: servicesData, error: servicesError } = await supabase
                 .from('support_services')
                 .select('*')
-                .eq('user_id', profileId);
+                .eq('user_id', id);
 
             if (servicesError) throw servicesError;
 
-            // 3. Fetch History (Profile + Services)
-            // We need to fetch actions where target_id IS profileId OR target_id IN servicesIds
+            // 3. Fetch Matches Count
             const serviceIds = servicesData?.map(s => s.id) || [];
-            const targetIds = [profileId, ...serviceIds];
-            
-            const { data: historyData, error: historyError } = await supabase
+            let matchesCount = 0;
+            if (serviceIds.length > 0) {
+                const { count, error: countError } = await supabase
+                    .from('matched_services')
+                    .select('id', { count: 'exact', head: true })
+                    .in('service_id', serviceIds);
+                if (!countError) matchesCount = count || 0;
+            }
+
+            // 4. Fetch History
+            const targetIds = [id, ...serviceIds];
+            const { data: historyData } = await supabase
                 .from('admin_actions')
                 .select('*, admin:admin_id(first_name, last_name)')
                 .in('target_id', targetIds)
@@ -201,10 +180,11 @@ export default function ReviewPage() {
             setProfile(parsedProfile);
             setServices(parsedServices);
             setHistory(historyData || []);
+            setStats({ matches: matchesCount });
 
         } catch (error) {
             console.error("Error fetching data:", error);
-            toast({ title: "Error", description: "Failed to load profile data", variant: "destructive" });
+            toast({ title: "Error", description: "Failed to load professional data", variant: "destructive" });
         } finally {
             setIsLoading(false);
         }
@@ -228,10 +208,10 @@ export default function ReviewPage() {
                 verification_status: status,
                 verification_notes: notes,
                 verification_updated_at: new Date().toISOString(),
-                ...(action === 'verify' ? { 
-                    verified_by: user.id, // Only for profile/service schema support? Check schema if verify_by exists for services.
-                    // Profiles has admin_verified_by. Services table schema? 
-                    // Let's check schema assumption. Assuming standard fields or JSON metadata.
+                ...(action === 'verify' && targetType === 'profile' ? { 
+                    isVerified: true,
+                    admin_verified_by: user.id,
+                    admin_verified_at: new Date().toISOString()
                 } : {}),
                 reviewed_by: {
                     reviewer_id: user.id,
@@ -240,14 +220,6 @@ export default function ReviewPage() {
                     notes: notes
                 }
             };
-            
-            // Schema check: profiles has `admin_verified_by`, support_services might not?
-            // Using `reviewed_by` JSONB for generic tracking is safer across both.
-            if (targetType === 'profile' && action === 'verify') {
-                updatePayload.admin_verified_by = user.id;
-                updatePayload.admin_verified_at = new Date().toISOString(); 
-                updatePayload.isVerified = true;
-            }
 
             const table = targetType === 'profile' ? 'profiles' : 'support_services';
             const { error: updateError } = await supabase
@@ -266,8 +238,8 @@ export default function ReviewPage() {
                 details: { notes, previous_status: targetType === 'profile' ? profile?.verification_status : services.find(s => s.id === targetId)?.verification_status }
             });
 
-            // 3. Send Notification to User
-            const notificationTitle = targetType === 'profile' 
+            // 3. Send Notification
+             const notificationTitle = targetType === 'profile' 
                 ? "Profile Verification Update"
                 : "Service Verification Update";
             
@@ -279,22 +251,22 @@ export default function ReviewPage() {
                 ? '/dashboard/profile?section=account'
                 : '/dashboard/profile?section=services';
 
-            if (!profile) throw new Error("Profile not loaded");
-
-            await supabase.from('notifications').insert({
-                user_id: profile.id, // The profile owner
-                type: `verification_${status}`,
-                title: notificationTitle,
-                message: notificationMessage,
-                link: notificationLink,
-                read: false,
-                metadata: { 
-                    target_type: targetType, 
-                    target_id: targetId,
-                    notes: notes,
-                    action_by: user.id
-                }
-            });
+            if (profile) {
+                await supabase.from('notifications').insert({
+                    user_id: profile.id,
+                    type: `verification_${status}`,
+                    title: notificationTitle,
+                    message: notificationMessage,
+                    link: notificationLink,
+                    read: false,
+                    metadata: { 
+                        target_type: targetType, 
+                        target_id: targetId,
+                        notes: notes,
+                        action_by: user.id
+                    }
+                });
+            }
 
             toast({ title: "Success", description: `${targetType === 'profile' ? 'Profile' : 'Service'} marked as ${status}.` });
             setActionDialog(prev => ({ ...prev, isOpen: false, notes: '' }));
@@ -310,7 +282,6 @@ export default function ReviewPage() {
         if (!viewingDoc) return;
         const { contextId, contextType } = viewingDoc;
 
-        // 1. Create Metadata Entry
         const reviewEntry = {
             url: doc.url,
             name: doc.name,
@@ -321,7 +292,6 @@ export default function ReviewPage() {
         };
 
         try {
-            // Get current metadata
              const table = contextType === 'profile' ? 'profiles' : 'support_services';
              const { data: currentData } = await supabase.from(table).select('accreditation_files_metadata').eq('id', contextId).single();
              
@@ -338,13 +308,11 @@ export default function ReviewPage() {
              currentMetadata = currentMetadata.filter((m: any) => m.url !== doc.url);
              currentMetadata.push(reviewEntry);
 
-             // Save
              const { error } = await supabase.from(table).update({ accreditation_files_metadata: currentMetadata }).eq('id', contextId);
              if (error) throw error;
 
              toast({ title: "Success", description: "Document status updated." });
              fetchData();
-
         } catch (error) {
             console.error("Doc review error:", error);
             toast({ title: "Error", description: "Failed to save document review", variant: "destructive" });
@@ -353,8 +321,6 @@ export default function ReviewPage() {
 
     const openActionDialog = (targetId: string, targetType: 'profile' | 'service', action: 'verify' | 'reject' | 'ban', targetName: string) => {
         let prefilledNotes = '';
-        
-        // Auto-fill rejection notes from flagged documents
         if (action === 'reject') {
             const targetObj = targetType === 'profile' ? profile : services.find(s => s.id === targetId);
             if (targetObj?.accreditation_files_metadata) {
@@ -376,88 +342,104 @@ export default function ReviewPage() {
         });
     };
 
-    if (isLoading || isResolvingId) {
-        return <div className="flex items-center justify-center h-screen text-serene-neutral-500 animate-pulse">Loading profile...</div>;
+    if (isLoading) {
+        return (
+            <div className="max-w-7xl mx-auto p-8 space-y-8">
+                <div className="h-16 w-3/4 bg-gray-100 rounded-xl animate-pulse" />
+                <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+                    <div className="lg:col-span-1 space-y-6">
+                        <div className="h-48 bg-gray-100 rounded-3xl animate-pulse" />
+                    </div>
+                    <div className="lg:col-span-3 space-y-6">
+                        <div className="h-96 bg-gray-100 rounded-3xl animate-pulse" />
+                    </div>
+                </div>
+            </div>
+        );
     }
 
-    if (!profile) {
-        return <div className="p-12 text-center text-serene-neutral-500">Profile not found.</div>;
-    }
+    if (!profile) return <div className="p-12 text-center text-serene-neutral-500">Profile not found.</div>;
 
     const unverifiedProfileWarning = profile.verification_status !== 'verified' && services.some(s => s.verification_status === 'verified');
 
     return (
-        <div className="max-w-7xl mx-auto p-6 lg:p-10 space-y-8 pb-20 bg-serene-neutral-50/30 min-h-screen">
+        <div className="max-w-7xl mx-auto p-4 md:p-8 lg:p-10 space-y-8 pb-32 bg-serene-neutral-50/30 min-h-screen">
             {/* Header */}
             <DetailHeader 
                 title={`${profile.first_name} ${profile.last_name}`}
                 type={profile.user_type}
-                backUrl="/dashboard/admin"
+                backUrl="/dashboard/admin/professionals"
                 status={profile.verification_status}
                 onAction={(action) => openActionDialog(profile.id, 'profile', action, `${profile.first_name} ${profile.last_name}`)}
                 meta={[
-                    <span key="joined">Joined {new Date(profile.created_at).toLocaleDateString()}</span>
+                    <span key="joined" className="flex items-center gap-1.5"><Clock className="h-3.5 w-3.5" /> Joined {new Date(profile.created_at).toLocaleDateString()}</span>
                 ]}
             />
 
             {unverifiedProfileWarning && (
-                <Alert variant="destructive" className="bg-amber-50 border-amber-200 text-amber-800">
+                <Alert variant="destructive" className="bg-amber-50 border-amber-200 text-amber-800 rounded-2xl shadow-sm">
                     <AlertCircle className="h-4 w-4" />
                     <AlertTitle>Action Recommended</AlertTitle>
                     <AlertDescription>
                         This profile has verified services but the profile itself is not verified. 
-                        Please verify the profile to allow matching.
+                        Please verify the profile to enforce consistent status.
                     </AlertDescription>
                 </Alert>
             )}
 
-            <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-                {/* Left Column: Navigation / Summary */}
+            <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+                {/* Left Column: Quick Stats */}
                 <div className="lg:col-span-1 space-y-6">
-                     <Card className="rounded-3xl border-serene-neutral-200 shadow-sm overflow-hidden bg-white">
-                        <CardHeader className="bg-gray-50/50 pb-4 border-b border-gray-100">
-                            <CardTitle className="text-sm font-bold uppercase tracking-wider text-gray-500">Quick Stats</CardTitle>
+                     <Card className="rounded-[2rem] border-transparent shadow-card bg-white overflow-hidden">
+                        <CardHeader className="bg-serene-neutral-50/50 pb-4 border-b border-serene-neutral-50">
+                            <CardTitle className="text-xs font-bold uppercase tracking-wider text-serene-neutral-400">Quick Stats</CardTitle>
                         </CardHeader>
-                        <CardContent className="pt-6 space-y-4">
-                            <div className="flex justify-between items-center">
-                                <span className="text-gray-600 text-sm font-medium">Services</span>
-                                <Badge variant="secondary" className="bg-white border border-gray-200 text-gray-700 shadow-sm">{services.length}</Badge>
+                        <CardContent className="pt-6 space-y-6">
+                            <div className="flex justify-between items-center group">
+                                <div className="flex items-center gap-3">
+                                    <div className="p-2 rounded-xl bg-serene-blue-50 text-serene-blue-600 group-hover:bg-serene-blue-100 transition-colors">
+                                        <Briefcase className="h-4 w-4" />
+                                    </div>
+                                    <span className="text-serene-neutral-600 font-medium">Services</span>
+                                </div>
+                                <span className="text-xl font-bold text-serene-neutral-900">{services.length}</span>
                             </div>
-                            <div className="flex justify-between items-center">
-                                <span className="text-gray-600 text-sm font-medium">Documents</span>
-                                <Badge variant="secondary" className="bg-white border border-gray-200 text-gray-700 shadow-sm">
+                            <div className="flex justify-between items-center group">
+                                <div className="flex items-center gap-3">
+                                    <div className="p-2 rounded-xl bg-purple-50 text-purple-600 group-hover:bg-purple-100 transition-colors">
+                                        <Target className="h-4 w-4" />
+                                    </div>
+                                    <span className="text-serene-neutral-600 font-medium">Matches</span>
+                                </div>
+                                <span className="text-xl font-bold text-serene-neutral-900">{stats.matches}</span>
+                            </div>
+                            <div className="flex justify-between items-center group">
+                                <div className="flex items-center gap-3">
+                                    <div className="p-2 rounded-xl bg-amber-50 text-amber-600 group-hover:bg-amber-100 transition-colors">
+                                        <FileText className="h-4 w-4" />
+                                    </div>
+                                    <span className="text-serene-neutral-600 font-medium">Documents</span>
+                                </div>
+                                <span className="text-xl font-bold text-serene-neutral-900">
                                     {(profile.accreditation_files_metadata?.length || 0) + services.reduce((acc, s) => acc + (s.accreditation_files_metadata?.length || 0), 0)}
-                                </Badge>
+                                </span>
                             </div>
                         </CardContent>
                      </Card>
                 </div>
 
-                {/* Right Column: Content */}
+                {/* Right Column: Detailed Content */}
                 <div className="lg:col-span-3">
-                    <Tabs defaultValue="profile" className="w-full space-y-6">
+                    <Tabs defaultValue="profile" className="w-full space-y-8">
                         <TabsList className="w-full justify-start border-b border-serene-neutral-200 bg-transparent p-0 gap-8 h-auto">
-                            <TabsTrigger value="profile" className="tab-trigger">Profile Info</TabsTrigger>
-                            <TabsTrigger value="services" className="tab-trigger">Services ({services.length})</TabsTrigger>
-                            <TabsTrigger value="history" className="tab-trigger">History</TabsTrigger>
+                            <TabsTrigger value="profile" className="pb-4 data-[state=active]:border-serene-blue-600 data-[state=active]:text-serene-blue-700 text-serene-neutral-500 font-medium text-base hover:text-serene-neutral-800 transition-colors border-b-2 border-transparent px-0 rounded-none bg-transparent shadow-none">Profile Info</TabsTrigger>
+                            <TabsTrigger value="services" className="pb-4 data-[state=active]:border-serene-blue-600 data-[state=active]:text-serene-blue-700 text-serene-neutral-500 font-medium text-base hover:text-serene-neutral-800 transition-colors border-b-2 border-transparent px-0 rounded-none bg-transparent shadow-none">Services ({services.length})</TabsTrigger>
+                            <TabsTrigger value="history" className="pb-4 data-[state=active]:border-serene-blue-600 data-[state=active]:text-serene-blue-700 text-serene-neutral-500 font-medium text-base hover:text-serene-neutral-800 transition-colors border-b-2 border-transparent px-0 rounded-none bg-transparent shadow-none">History</TabsTrigger>
                         </TabsList>
 
-                        <TabsContent value="profile" className="space-y-6 animate-in slide-in-from-bottom-2">
-                             {/* Profile Details Card */}
-                             <Card className="border-serene-neutral-200 shadow-sm rounded-3xl overflow-hidden bg-white">
-                                <CardHeader className="flex flex-row items-center justify-between pb-4 border-b border-gray-100 bg-gray-50/30">
-                                    <div className="space-y-1">
-                                        <CardTitle className="text-xl text-gray-900 font-bold">Personal Details</CardTitle>
-                                        <CardDescription className="text-gray-500">Basic information and identity documents</CardDescription>
-                                    </div>
-                                    <div className="flex gap-2">
-                                        <ActionButtons 
-                                            status={profile.verification_status} 
-                                            onAction={(action) => openActionDialog(profile.id, 'profile', action, `${profile.first_name} ${profile.last_name}`)} 
-                                        />
-                                    </div>
-                                </CardHeader>
-                                <CardContent className="space-y-6 pt-6">
+                        <TabsContent value="profile" className="space-y-6 animate-in slide-in-from-bottom-4 duration-500">
+                             <Card className="border-transparent shadow-card rounded-[2rem] overflow-hidden bg-white">
+                                <CardContent className="space-y-8 p-8">
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
                                         <InfoBlock label="Email" value={profile.email} variant="inline" />
                                         <InfoBlock label="Phone" value={profile.phone} variant="inline" />
@@ -465,10 +447,10 @@ export default function ReviewPage() {
                                         <InfoBlock label="Bio" value={profile.bio} fullWidth variant="inline" />
                                     </div>
 
-                                    <div className="pt-6 mt-2 border-t border-gray-100">
-                                        <h4 className="text-sm font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                                            <div className="p-1.5 rounded-md bg-blue-50 text-blue-600">
-                                                <FileText className="h-4 w-4" />
+                                    <div className="pt-6 border-t border-serene-neutral-50">
+                                        <h4 className="text-sm font-bold text-serene-neutral-900 mb-6 flex items-center gap-2 uppercase tracking-wide">
+                                            <div className="p-1.5 rounded-lg bg-blue-50 text-blue-600">
+                                                <FileText className="h-3.5 w-3.5" />
                                             </div>
                                             Identity Documents
                                         </h4>
@@ -481,127 +463,95 @@ export default function ReviewPage() {
                              </Card>
                         </TabsContent>
 
-                        <TabsContent value="services" className="space-y-6 animate-in slide-in-from-bottom-2">
+                        <TabsContent value="services" className="space-y-6 animate-in slide-in-from-bottom-4 duration-500">
                             {services.length === 0 ? (
-                                <div className="p-12 text-center bg-white rounded-3xl border border-dashed border-gray-200">
-                                    <Building2 className="h-10 w-10 text-gray-300 mx-auto mb-3" />
-                                    <p className="text-gray-500 font-medium">No services listed.</p>
+                                <div className="p-10 text-center bg-white rounded-[1.5rem] border border-dashed border-serene-neutral-200">
+                                    <div className="h-12 w-12 rounded-full bg-serene-neutral-50 flex items-center justify-center mx-auto mb-3">
+                                        <Building2 className="h-6 w-6 text-serene-neutral-400" />
+                                    </div>
+                                    <p className="text-sm font-medium text-serene-neutral-500">No services listed yet.</p>
                                 </div>
                             ) : (
                                 <Accordion type="multiple" defaultValue={services.map(s => s.id)} className="space-y-4">
                                     {services.map(service => (
                                         <AccordionItem key={service.id} value={service.id} className={cn(
-                                            "rounded-2xl px-2 shadow-sm transition-all overflow-hidden border bg-white",
-                                            service.verification_status === 'verified' ? "border-green-100 shadow-green-100/50" :
-                                            service.verification_status === 'rejected' ? "border-red-100 shadow-red-100/50" :
-                                            "border-amber-100 shadow-amber-100/50"
+                                            "rounded-xl px-2 shadow-sm transition-all duration-300 overflow-hidden border bg-white group hover:shadow-md",
+                                            service.verification_status === 'verified' ? "border-green-100 shadow-green-50/50" :
+                                            service.verification_status === 'rejected' ? "border-red-100 shadow-red-50/50" :
+                                            "border-amber-100 shadow-amber-50/50"
                                         )}>
-                                            <AccordionTrigger className="hover:no-underline py-4 px-4 group">
-                                                <div className="flex flex-col md:flex-row md:items-center gap-4 text-left w-full pr-4">
-                                                    {/* Icon & Name */}
+                                            <AccordionTrigger className="hover:no-underline py-5 px-6 group-open:pb-2">
+                                                <div className="flex flex-col md:flex-row md:items-center gap-5 text-left w-full pr-4">
                                                     <div className="flex items-center gap-4 flex-1">
                                                         <div className={cn(
-                                                            "h-10 w-10 rounded-full flex items-center justify-center border shrink-0 bg-white/40 backdrop-blur-sm",
-                                                            service.verification_status === 'verified' ? "text-sauti-teal border-sauti-teal/10" :
-                                                            service.verification_status === 'rejected' ? "text-sauti-red border-sauti-red/10" :
-                                                            "text-sauti-orange border-sauti-yellow/10"
+                                                            "h-12 w-12 rounded-2xl flex items-center justify-center border shrink-0 transition-colors",
+                                                            service.verification_status === 'verified' ? "bg-green-50 text-green-600 border-green-100" :
+                                                            service.verification_status === 'rejected' ? "bg-red-50 text-red-600 border-red-100" :
+                                                            "bg-amber-50 text-amber-600 border-amber-100"
                                                         )}>
-                                                            <Building2 className="h-5 w-5" />
+                                                            <Building2 className="h-6 w-6" />
                                                         </div>
                                                         <div>
-                                                            <h4 className="font-bold text-serene-neutral-900 line-clamp-1">{service.name}</h4>
-                                                            <p className="text-sm text-serene-neutral-600 capitalize md:hidden">{Array.isArray(service.service_types) ? service.service_types[0] : service.service_types}</p>
+                                                            <h4 className="font-bold text-lg text-serene-neutral-900 line-clamp-1">{service.name}</h4>
+                                                            <p className="text-sm text-serene-neutral-500 capitalize md:hidden mt-0.5">{Array.isArray(service.service_types) ? service.service_types[0] : service.service_types}</p>
                                                         </div>
                                                     </div>
 
-                                                    {/* Desktop Metadata Columns (Hidden on Mobile) */}
-                                                    <div className="hidden md:flex items-center gap-6 text-sm text-serene-neutral-600">
-                                                        <div className="flex items-center gap-1.5 min-w-[120px]">
-                                                            <Briefcase className="h-3.5 w-3.5 opacity-70" />
-                                                            <span className="capitalize truncate max-w-[140px]">{Array.isArray(service.service_types) ? service.service_types[0] : service.service_types}</span>
+                                                    <div className="hidden md:flex items-center gap-8 text-sm text-serene-neutral-600 font-medium">
+                                                        <div className="flex items-center gap-2 min-w-[140px]">
+                                                            <Briefcase className="h-4 w-4 text-serene-neutral-400" />
+                                                            <span className="capitalize truncate max-w-[160px]">{Array.isArray(service.service_types) ? service.service_types[0] : service.service_types}</span>
                                                         </div>
-                                                        <div className="flex items-center gap-1.5 min-w-[140px]">
-                                                            <MapPin className="h-3.5 w-3.5 opacity-70" />
-                                                            <span className="truncate max-w-[160px]">
+                                                        <div className="flex items-center gap-2 min-w-[160px]">
+                                                            <MapPin className="h-4 w-4 text-serene-neutral-400" />
+                                                            <span className="truncate max-w-[180px]">
                                                                 {service.coverage_area_radius && service.coverage_area_radius > 40000 ? "Matching nationwide" : 
                                                                  service.coverage_area_radius ? `Local (${(service.coverage_area_radius/1000).toFixed(0)}km)` : "Remote"}
                                                             </span>
                                                         </div>
                                                     </div>
 
-                                                    {/* Status Badge - Positioned cleanly */}
                                                     <div className="flex items-center shrink-0">
-                                                         <Badge variant="outline" className={cn(
-                                                            "capitalize border shadow-none font-medium px-2.5 py-0.5",
-                                                            service.verification_status === 'verified' ? "bg-white/50 text-sauti-teal border-sauti-teal/20" :
-                                                            service.verification_status === 'rejected' ? "bg-white/50 text-sauti-red border-sauti-red/20" :
-                                                            "bg-white/50 text-sauti-orange border-sauti-yellow/20"
-                                                        )}>
-                                                            {service.verification_status || 'Pending'}
-                                                        </Badge>
+                                                         <VerificationStatusBadge status={service.verification_status} />
                                                     </div>
                                                 </div>
                                             </AccordionTrigger>
-                                            <AccordionContent className="pb-6 pt-2 px-4 border-t border-black/5 mt-2">
+                                            <AccordionContent className="pb-8 pt-2 px-6 border-t border-serene-neutral-50 mt-4 mx-2">
                                                     <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 w-full">
                                                         {/* Details Card */}
                                                         <div className="xl:col-span-2 bg-serene-neutral-50/50 rounded-2xl border border-serene-neutral-100 p-5">
                                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
                                                                 <InfoBlock label="Helpline" value={service.helpline} variant="inline" />
                                                                 <InfoBlock label="Website" value={service.website} variant="inline" />
-                                                                <InfoBlock label="Service Types" value={Array.isArray(service.service_types) ? service.service_types.join(', ') : service.service_types} variant="inline" />
                                                                 <InfoBlock 
-                                                                    label="Location / Coverage" 
-                                                                    value={
-                                                                        <div className="flex flex-col gap-2">
-                                                                            <div className="flex flex-col gap-0.5">
-                                                                                <span className="font-medium">
-                                                                                    {service.coverage_area_radius && service.coverage_area_radius > 40000 ? "Wide Area / Nationwide" : 
-                                                                                    service.coverage_area_radius && service.coverage_area_radius > 10000 ? "Regional Coverage" : 
-                                                                                    service.coverage_area_radius ? `Local (${(service.coverage_area_radius/1000).toFixed(1)} km)` : "Remote / Online"}
-                                                                                </span>
-                                                                                {service.latitude && service.longitude && (
-                                                                                    <span className="text-xs text-xs text-gray-500 font-normal">
-                                                                                        {service.latitude.toFixed(4)}, {service.longitude.toFixed(4)}
-                                                                                    </span>
-                                                                                )}
-                                                                            </div>
-                                                                            {service.latitude && service.longitude && (
-                                                                                <div className="aspect-video w-full rounded-lg overflow-hidden border border-serene-neutral-200 mt-1">
-                                                                                    <iframe
-                                                                                        width="100%"
-                                                                                        height="100%"
-                                                                                        frameBorder="0"
-                                                                                        scrolling="no"
-                                                                                        marginHeight={0}
-                                                                                        marginWidth={0}
-                                                                                        src={`https://maps.google.com/maps?q=${service.latitude},${service.longitude}&z=15&output=embed`}
-                                                                                    ></iframe>
-                                                                                </div>
-                                                                            )}
-                                                                        </div>
-                                                                    } 
+                                                                    label="Description" 
+                                                                    value={service.description} 
+                                                                    fullWidth 
                                                                     variant="inline"
                                                                 />
-                                                                <InfoBlock label="Description" value={service.description} fullWidth variant="inline" />
                                                             </div>
                                                         </div>
 
                                                         {/* Quick Actions Card */}
                                                         <div className="flex flex-col gap-3 shrink-0 bg-white p-5 rounded-2xl border border-serene-neutral-200 shadow-sm h-fit">
-                                                            <span className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Actions</span>
+                                                            <span className="text-xs font-bold text-serene-neutral-400 uppercase tracking-wider mb-1">Quick Actions</span>
                                                             <ActionButtons 
                                                                 status={service.verification_status}
                                                                 onAction={(action) => openActionDialog(service.id, 'service', action, service.name)}
                                                                 size="sm"
                                                                 className="flex-col items-stretch w-full"
                                                             />
+                                                            <Button variant="ghost" size="sm" className="w-full text-serene-neutral-500 hover:text-serene-blue-600 text-xs h-8" onClick={() => router.push(`/dashboard/admin/services/${service.id}`)}>
+                                                                View Full Details
+                                                            </Button>
                                                         </div>
                                                     </div>
 
-                                                 <div className="mt-8 pt-4 border-t border-black/5">
-                                                     <h5 className="text-xs font-bold text-serene-neutral-500 uppercase tracking-wider mb-4 flex items-center gap-2">
-                                                         <FileText className="h-3 w-3" />
+                                                 <div className="mt-8 pt-6 border-t border-serene-neutral-50">
+                                                     <h5 className="text-xs font-bold text-serene-neutral-900 uppercase tracking-wider mb-6 flex items-center gap-2">
+                                                         <div className="p-1 rounded bg-serene-neutral-100 text-serene-neutral-500">
+                                                            <FileText className="h-3 w-3" />
+                                                         </div>
                                                          Service Documents
                                                      </h5>
                                                      <DocumentsGrid 
@@ -616,31 +566,47 @@ export default function ReviewPage() {
                             )}
                         </TabsContent>
 
-                        <TabsContent value="history" className="animate-in slide-in-from-bottom-2">
-                             <Card className="border-gray-200 shadow-sm rounded-3xl bg-white">
-                                <CardContent className="pt-6 space-y-6">
+                        <TabsContent value="history" className="animate-in slide-in-from-bottom-4 duration-500">
+                             <Card className="border-transparent shadow-card rounded-[2rem] overflow-hidden bg-white">
+                                <CardContent className="pt-8 pb-8 px-8 space-y-6">
                                     {history.length === 0 ? (
-                                        <p className="text-center text-gray-500 py-8">No history recorded.</p>
+                                        <div className="text-center py-12">
+                                            <div className="h-10 w-10 bg-serene-neutral-50 rounded-full flex items-center justify-center mx-auto mb-3">
+                                                <Clock className="h-5 w-5 text-serene-neutral-400" />
+                                            </div>
+                                            <p className="text-sm text-serene-neutral-500 font-medium">No history recorded.</p>
+                                        </div>
                                     ) : (
-                                        <div className="space-y-4">
-                                            {history.map(log => (
-                                                <div key={log.id} className="flex gap-4 p-4 rounded-xl bg-gray-50 border border-gray-100">
-                                                    <div className="mt-1">
-                                                        {log.action_type.includes('verify') ? <CheckCircle className="h-5 w-5 text-green-600" /> :
-                                                         log.action_type.includes('reject') ? <XCircle className="h-5 w-5 text-red-600" /> :
-                                                         <ShieldCheck className="h-5 w-5 text-blue-600" />}
+                                        <div className="relative border-l-2 border-serene-neutral-100 ml-4 space-y-8 pl-8 py-2">
+                                            {history.map((log, idx) => (
+                                                <div key={log.id} className="relative group">
+                                                    <div className={cn(
+                                                        "absolute -left-[41px] top-1 h-6 w-6 rounded-full border-2 border-white shadow-sm flex items-center justify-center bg-white z-10",
+                                                        log.action_type.includes('verify') ? "text-green-600 ring-2 ring-green-100" :
+                                                        log.action_type.includes('reject') ? "text-red-600 ring-2 ring-red-100" :
+                                                        "text-blue-600 ring-2 ring-blue-100"
+                                                    )}>
+                                                        {log.action_type.includes('verify') ? <CheckCircle className="h-3.5 w-3.5" /> :
+                                                         log.action_type.includes('reject') ? <XCircle className="h-3.5 w-3.5" /> :
+                                                         <ShieldCheck className="h-3.5 w-3.5" />}
                                                     </div>
-                                                    <div>
-                                                        <p className="font-medium text-gray-900 capitalize">
-                                                            {log.action_type.replace('_', ' ')}
-                                                        </p>
-                                                        <p className="text-sm text-gray-500">
-                                                            by {log.admin?.first_name} {log.admin?.last_name} • {new Date(log.created_at).toLocaleString()}
+                                                    <div className="bg-serene-neutral-50/40 rounded-2xl p-4 border border-transparent hover:border-serene-neutral-100 transition-all">
+                                                        <div className="flex justify-between items-start mb-2">
+                                                            <p className="font-bold text-serene-neutral-900 capitalize text-sm">
+                                                                {log.action_type.replace(/_/g, ' ')}
+                                                            </p>
+                                                            <span className="text-xs text-serene-neutral-400 font-medium whitespace-nowrap ml-4">
+                                                                {new Date(log.created_at).toLocaleString()}
+                                                            </span>
+                                                        </div>
+                                                        <p className="text-sm text-serene-neutral-500 mb-3">
+                                                            Performed by <span className="font-semibold text-serene-neutral-700">{log.admin?.first_name} {log.admin?.last_name}</span>
                                                         </p>
                                                         {log.details?.notes && (
-                                                            <p className="text-sm text-gray-700 mt-2 bg-white p-2 rounded border border-gray-200">
-                                                                "{log.details.notes}"
-                                                            </p>
+                                                            <div className="text-sm text-serene-neutral-700 bg-white p-3 rounded-xl border border-serene-neutral-100 italic relative">
+                                                                <span className="absolute top-2 left-2 text-serene-neutral-200 text-lg leading-none">"</span>
+                                                                <span className="relative z-10 px-2">{log.details.notes}</span>
+                                                            </div>
                                                         )}
                                                     </div>
                                                 </div>
@@ -654,7 +620,7 @@ export default function ReviewPage() {
                 </div>
             </div>
 
-            {/* Action Dialog - Premium Polish */}
+            {/* Action Dialog */}
             <Dialog open={actionDialog.isOpen} onOpenChange={(open) => !open && setActionDialog(prev => ({ ...prev, isOpen: false }))}>
                 <DialogContent className="rounded-3xl max-w-md overflow-hidden p-0 border-0 bg-white shadow-2xl">
                     <div className="p-8 pb-0">
@@ -663,7 +629,8 @@ export default function ReviewPage() {
                             actionDialog.action === 'verify' ? "bg-green-100 text-green-600" :
                             actionDialog.action === 'ban' ? "bg-amber-100 text-amber-600" : "bg-red-100 text-red-600"
                         )}>
-                            {actionDialog.action === 'verify' ? <CheckCircle className="w-8 h-8" /> : <AlertTriangle className="w-8 h-8" />}
+                            {actionDialog.action === 'verify' ? <CheckCircle className="w-8 h-8" /> : 
+                             actionDialog.action === 'ban' ? <AlertTriangle className="w-8 h-8" /> : <XCircle className="w-8 h-8" />}
                         </div>
                         
                         <DialogTitle className="text-2xl font-bold text-center text-gray-900 capitalize">
@@ -675,9 +642,6 @@ export default function ReviewPage() {
                         
                         <DialogDescription className="text-center text-gray-500 mt-2 text-base">
                             Are you sure you want to {actionDialog.action} <span className="font-semibold text-gray-900">{actionDialog.targetName}</span>?
-                            {actionDialog.action === 'verify' && actionDialog.targetType === 'profile' && " This will verify their personal details and identity documents."}
-                            {actionDialog.action === 'verify' && actionDialog.targetType === 'service' && " This will approve this specific service for public listing."}
-                            {actionDialog.action === 'reject' && " They will be notified to update their information."}
                         </DialogDescription>
                     </div>
                     
@@ -692,12 +656,6 @@ export default function ReviewPage() {
                                 placeholder={actionDialog.action === 'verify' ? "Add an internal note..." : "Please describe why this is being rejected..."}
                                 className="min-h-[120px] rounded-xl bg-gray-50 border-gray-200 focus:bg-white focus:border-serene-neutral-300 transition-all resize-none text-base"
                              />
-                             {actionDialog.action === 'reject' && (
-                                 <p className="text-xs text-gray-500 flex items-center gap-1.5">
-                                     <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
-                                     Notes from flagged documents are auto-filled above.
-                                 </p>
-                             )}
                         </div>
                     </div>
 
@@ -725,8 +683,6 @@ export default function ReviewPage() {
                 </DialogContent>
             </Dialog>
 
-
-            {/* Document Sidepanel */}
             <DocumentSidepanel 
                 isOpen={!!viewingDoc}
                 onClose={() => setViewingDoc(null)}
@@ -740,7 +696,6 @@ export default function ReviewPage() {
 }
 
 const parseDocuments = (filesJson: any, metadataJson: any): AccreditationDocument[] => {
-    // Prefer metadata as it has review status and extended info
     if (metadataJson && Array.isArray(metadataJson)) {
         return metadataJson.map((meta: any) => ({
             url: meta.url || filesJson?.find((f: any) => f.url === meta.url)?.url || '#',
@@ -762,4 +717,3 @@ const parseDocuments = (filesJson: any, metadataJson: any): AccreditationDocumen
     }
     return [];
 };
-

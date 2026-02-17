@@ -74,10 +74,10 @@ export function DesktopHeader() {
 
 	return (
 		<header className="sticky top-0 z-40 w-full bg-white/80 backdrop-blur-xl border-b border-serene-neutral-200/60 transition-all duration-200">
-			<div className="flex h-16 items-center px-6 lg:px-8 gap-4">
+			<div className="flex items-center px-6 lg:px-8 gap-4">
                 
                 {/* Search & Notifications Group - Centered */}
-				<div className="flex items-center gap-3 flex-1 max-w-2xl mx-auto">
+				<div className="hidden md:flex items-center gap-3 flex-1 max-w-2xl mx-auto">
                     {/* Search Input - Pill Shape */}
 					<div className="relative flex-1 max-w-md group mx-auto">
 						<Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-serene-neutral-400 group-focus-within:text-serene-blue-500 transition-colors" />
