@@ -170,6 +170,7 @@ export function VerificationSection({
 	
     // Robustly filter out IDs from other docs list
     const otherDocs = documents.filter(d => {
+        if (!d || !d.title) return false;
         const title = d.title.toLowerCase();
         return !title.includes("national id (front)") && 
                !title.includes("national id (back)") && 
