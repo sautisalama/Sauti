@@ -59,9 +59,11 @@ interface VerificationDocument {
 	url: string;
 	uploadedAt?: string;
 	type?: 'identity' | 'qualification'; // Optional, can infer
+    docType?: string;
 	metadata?: any; 
 	status?: string; // 'verified' | 'rejected' | 'pending'
 	notes?: string;
+	sourceName?: string;
 }
 
 export function VerificationSection({
@@ -168,8 +170,15 @@ export function VerificationSection({
 	const idFront = documents.find(d => d.title === "National ID (Front)" || d.title?.includes("ID Front"));
 	const idBack = documents.find(d => d.title === "National ID (Back)" || d.title?.includes("ID Back"));
 	
-    // Robustly filter out IDs from other docs list
-    const otherDocs = documents.filter(d => {
+    // Combine Profile Docs + Service Docs for the "Professional Qualifications" list
+    // Filter out IDs from both
+    const allDocs = [...documents, ...availableDocs].filter((doc, index, self) => 
+        index === self.findIndex((t) => (
+            t.url === doc.url // Uniqueness by URL
+        ))
+    );
+
+    const otherDocs = allDocs.filter(d => {
         if (!d || !d.title) return false;
         const title = d.title.toLowerCase();
         return !title.includes("national id (front)") && 
@@ -184,21 +193,24 @@ export function VerificationSection({
 			const result = await fileUploadService.uploadFile({
 				userId,
 				userType,
-				fileType: "accreditation", // or accreditation
+				fileType: "accreditation",
 				fileName: file.name,
 				file,
 			});
 
 			if (!result.url) throw new Error("Upload failed");
 
-			// Create new doc object
-			const newDoc = {
+            // Create new doc object explicitly
+            const docType = type === 'identity' ? 'Identity' : (metadata.number ? 'License' : 'Certificate');
+            
+			const newDoc: VerificationDocument = {
 				id: result.filePath, 
 				title,
 				url: result.url,
 				uploadedAt: new Date().toISOString(),
 				type,
-				status: 'pending', // Default to pending on upload
+                docType,
+				status: 'pending',
 				...metadata
 			};
 
@@ -215,8 +227,8 @@ export function VerificationSection({
 			updatedDocs.push(newDoc);
 
 			// Check if we have both IDs to trigger review
-			const hasIdFront = updatedDocs.some(d => d.title === "National ID (Front)" || d.title?.includes("ID Front"));
-			const hasIdBack = updatedDocs.some(d => d.title === "National ID (Back)" || d.title?.includes("ID Back"));
+			const hasIdFront = updatedDocs.some(d => d && (d.title === "National ID (Front)" || d.title?.includes("ID Front")));
+			const hasIdBack = updatedDocs.some(d => d && (d.title === "National ID (Back)" || d.title?.includes("ID Back")));
 			const shouldReview = hasIdFront && hasIdBack;
 
 			const updateData: any = {
@@ -242,8 +254,12 @@ export function VerificationSection({
 			return true;
 		} catch (error) {
 			console.error("Upload error:", error);
-			toast({ title: "Upload Failed", description: "Please try again.", variant: "destructive" });
-			return false;
+            toast({
+				title: "Upload Failed",
+				description: "Please try again.",
+				variant: "destructive",
+			});
+            return false;
 		}
 	};
 
@@ -292,6 +308,16 @@ export function VerificationSection({
 	};
 
 	const handleDelete = (doc: VerificationDocument) => {
+        // Check if doc is from a Service (has sourceName)
+        if (doc.sourceName) {
+            toast({
+                title: "Cannot Delete Service Document",
+                description: `This document is managed by your service "${doc.sourceName}". Please manage it from the Support Services section.`,
+                variant: "destructive",
+            });
+            return;
+        }
+
 		// Check if document is an ID and user has support services
 		const isID = doc.title === "National ID (Front)" || doc.title === "National ID (Back)" || doc.title?.includes("ID Front") || doc.title?.includes("ID Back");
 		
@@ -343,7 +369,7 @@ export function VerificationSection({
 								"px-2 py-0.5 rounded text-[9px] font-bold tracking-tight border shadow-sm uppercase",
 								isRejected ? "bg-red-100 text-red-700 border-red-200" : "bg-sauti-teal/10 text-sauti-teal border-sauti-teal/20"
 							)}>
-								{doc.type === 'identity' ? 'ID' : 'PDF'}
+								{doc.docType || (doc.type === 'identity' ? 'ID' : 'PDF')}
 							</div>
 						</div>
 					)}
@@ -365,13 +391,26 @@ export function VerificationSection({
 						</div>
 					</div>
 					
+                    {/* Issuer Line */}
+                    {doc.metadata?.issuer && (
+                        <div className="text-[10px] text-neutral-500 font-medium truncate mb-2">
+                             {doc.metadata.issuer}
+                        </div>
+                    )}
+
 					{isRejected ? (
 						<div className="text-[10px] text-red-600 font-medium mt-auto bg-red-50 p-1.5 rounded-lg break-words leading-tight">
 							{doc.notes || "Rejected"}
 						</div>
 					) : (
 						<div className="text-[10px] text-neutral-400 mt-auto flex items-center justify-between">
-							<span>{formatDate(doc.uploadedAt)}</span>
+                            {doc.sourceName ? (
+                                <span className="text-sauti-teal font-medium flex items-center gap-1">
+                                    <Briefcase className="h-3 w-3" /> Service Doc
+                                </span>
+                            ) : (
+							    <span>{formatDate(doc.uploadedAt)}</span>
+                            )}
 						</div>
 					)}
 				</div>
@@ -535,18 +574,6 @@ export function VerificationSection({
 						<h4 className="font-bold text-amber-800">Your documents are under review</h4>
 						<p className="text-sm text-amber-700">
 							We'll notify you once verified. This usually takes 24-48 hours.
-						</p>
-					</div>
-				</div>
-			)}
-			
-			{profile.verification_status === "rejected" && (
-				<div className="bg-red-50 border border-red-200 rounded-2xl p-4 flex items-start gap-3 shadow-sm">
-					<AlertCircle className="h-5 w-5 text-red-600 mt-0.5" />
-					<div>
-						<h4 className="font-bold text-red-800">Action Required</h4>
-						<p className="text-sm text-red-700">
-							Verification needs attention. Please check the admin notes and re-upload the necessary documents.
 						</p>
 					</div>
 				</div>

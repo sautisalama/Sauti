@@ -258,9 +258,10 @@ export default function ReviewPage() {
             if (updateError) throw updateError;
 
             // 2. Log Action
+            const actionTypeSuffix = targetType === 'profile' ? 'user' : 'service';
             await supabase.from('admin_actions').insert({
                 admin_id: user.id,
-                action_type: `${action}_${targetType}`,
+                action_type: `${action}_${actionTypeSuffix}`,
                 target_id: targetId,
                 target_type: targetType === 'profile' ? 'user' : 'service',
                 details: { notes, previous_status: targetType === 'profile' ? profile?.verification_status : services.find(s => s.id === targetId)?.verification_status }

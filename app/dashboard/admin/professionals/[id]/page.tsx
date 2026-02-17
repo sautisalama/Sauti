@@ -17,7 +17,9 @@ import {
     AlertCircle,
     CheckCircle,
     XCircle,
-    AlertTriangle
+    AlertTriangle,
+    CreditCard,
+    Shield
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -102,6 +104,10 @@ export default function ProfessionalDetailPage() {
     const [history, setHistory] = useState<ReviewHistoryItem[]>([]);
     const [stats, setStats] = useState<{ matches: number }>({ matches: 0 });
     const [isLoading, setIsLoading] = useState(true);
+    
+    // Filter documents
+    const identityDocs = profile?.accreditation_files_metadata?.filter(d => d.docType === 'Identity') || [];
+    const otherDocs = profile?.accreditation_files_metadata?.filter(d => d.docType !== 'Identity') || [];
     
     const [viewingDoc, setViewingDoc] = useState<{ doc: AccreditationDocument, contextId: string, contextType: 'profile' | 'service' } | null>(null);
     const [actionDialog, setActionDialog] = useState<{
@@ -363,6 +369,40 @@ export default function ProfessionalDetailPage() {
                             </div>
                         </CardContent>
                      </Card>
+
+                     {/* Identity Documents Card */}
+                     {identityDocs.length > 0 && (
+                        <Card className="rounded-[2rem] border-transparent shadow-card bg-white overflow-hidden">
+                            <CardHeader className="bg-serene-neutral-50/50 pb-4 border-b border-serene-neutral-50">
+                                <CardTitle className="text-xs font-bold uppercase tracking-wider text-serene-neutral-400 flex items-center gap-2">
+                                    <Shield className="h-3.5 w-3.5" />
+                                    Identity Verification
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent className="pt-6 pb-6 space-y-4">
+                                {identityDocs.map((doc, idx) => (
+                                    <div 
+                                        key={idx} 
+                                        onClick={() => setViewingDoc({ doc, contextId: profile.id, contextType: 'profile' })}
+                                        className="group relative flex items-center gap-3 p-3 rounded-xl border border-serene-neutral-200 bg-white hover:border-sauti-blue-200 hover:shadow-md transition-all cursor-pointer"
+                                    >
+                                        <div className="h-10 w-10 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 border border-blue-100">
+                                            <CreditCard className="h-5 w-5" />
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <p className="text-sm font-bold text-serene-neutral-900 truncate">{doc.name}</p>
+                                            <div className="flex items-center gap-2 text-[10px] text-serene-neutral-500 uppercase tracking-wide">
+                                                <span className="truncate max-w-[120px]">{doc.issuer || 'ID Document'}</span>
+                                                {doc.status === 'verified' && <CheckCircle className="h-3 w-3 text-green-500 shrink-0" />}
+                                                {doc.status === 'rejected' && <XCircle className="h-3 w-3 text-red-500 shrink-0" />}
+                                            </div>
+                                        </div>
+                                         <div className="absolute inset-0 border-2 border-dashed border-transparent group-hover:border-sauti-blue-200/50 rounded-xl pointer-events-none transition-colors" />
+                                    </div>
+                                ))}
+                            </CardContent>
+                        </Card>
+                     )}
                 </div>
 
                 {/* Right Column: Detailed Content */}
@@ -392,7 +432,7 @@ export default function ProfessionalDetailPage() {
                                             Identity Documents
                                         </h4>
                                         <DocumentsGrid 
-                                            documents={profile.accreditation_files_metadata || []} 
+                                            documents={otherDocs} 
                                             onView={(doc) => setViewingDoc({ doc, contextId: profile.id, contextType: 'profile' })}
                                         />
                                     </div>
@@ -636,13 +676,15 @@ const parseDocuments = (filesJson: any, metadataJson: any): AccreditationDocumen
     if (metadataJson && Array.isArray(metadataJson)) {
         return metadataJson.map((meta: any) => ({
             url: meta.url || filesJson?.find((f: any) => f.url === meta.url)?.url || '#',
-            name: meta.name || 'Untitled Document',
+            name: meta.title || meta.name || 'Untitled Document',
             type: meta.type || filesJson?.find((f: any) => f.url === meta.url)?.type || 'unknown',
             status: meta.status,
-            notes: meta.notes,
+            notes: meta.notes || meta.note,
             docNumber: meta.docNumber,
             issuer: meta.issuer,
             reviewed_at: meta.reviewed_at,
+            docType: meta.docType,
+            reviewer_id: meta.reviewer_id
         }));
     } else if (filesJson && Array.isArray(filesJson)) {
         return filesJson.map((file: any) => ({
@@ -650,6 +692,7 @@ const parseDocuments = (filesJson: any, metadataJson: any): AccreditationDocumen
             name: file.name || 'Untitled Document',
             type: file.type || 'unknown',
             status: 'pending', 
+            docType: 'Other',
         }));
     }
     return [];

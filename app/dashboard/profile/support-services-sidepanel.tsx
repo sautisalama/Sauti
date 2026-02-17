@@ -363,6 +363,7 @@ export function SupportServiceSidepanel({
 						sourceId: "profile",
 						uploadedAt: doc.uploadedAt,
 						fileSize: doc.fileSize,
+                        docType: doc.docType,
 					});
 				});
 			}
@@ -388,6 +389,7 @@ export function SupportServiceSidepanel({
 								sourceId: otherSvc.id,
 								uploadedAt: doc.uploadedAt,
 								fileSize: doc.fileSize,
+                                docType: doc.docType,
 							});
 						});
 					}
@@ -685,6 +687,7 @@ export function SupportServiceSidepanel({
 				uploaded: true,
 				docNumber: uploadDocNumber,
 				issuer: uploadIssuer,
+                docType: uploadDocNumber ? 'License' : 'Certificate',
 			};
 
 			// 2. Save metadata
@@ -721,6 +724,7 @@ export function SupportServiceSidepanel({
 			sourceId: doc.sourceId || null,
 			sourceName: doc.source || doc.sourceName || "Unknown Source",
 			fileSize: doc.fileSize || 0,
+            docType: doc.docType,
 		};
 
 		const updatedDocs = [...documents, linkedDoc];
@@ -1249,6 +1253,11 @@ export function SupportServiceSidepanel({
 																	<LinkIcon className="h-3 w-3" /> Linked
 																</Badge>
 															)}
+                                                            {doc.docType && (
+                                                                <Badge variant="outline" className="text-[10px] h-5 border-serene-neutral-200 text-serene-neutral-500 bg-white">
+                                                                    {doc.docType}
+                                                                </Badge>
+                                                            )}
 														</div>
 														<div className="flex items-center gap-3 text-xs text-serene-neutral-500">
 															<span>{formatFileSize(doc.fileSize)}</span>
@@ -1400,7 +1409,7 @@ export function SupportServiceSidepanel({
 			
 			{/* Document Upload Modal */}
 			<Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-				<DialogContent className="max-w-md rounded-2xl bg-white shadow-2xl border-none p-6">
+				<DialogContent className="max-w-md rounded-2xl bg-white shadow-2xl border-none p-6 z-[70]">
 					<DialogHeader className="space-y-3 pb-4">
 						<DialogTitle className="text-xl font-bold text-serene-neutral-900 flex items-center gap-2">
 							<FileText className="h-5 w-5 text-sauti-teal" />
@@ -1565,7 +1574,7 @@ export function SupportServiceSidepanel({
 
 			{/* Suspend Modal */}
 			<Dialog open={isSuspendModalOpen} onOpenChange={setIsSuspendModalOpen}>
-				<DialogContent className="max-w-md rounded-2xl">
+				<DialogContent className="max-w-md rounded-2xl z-[70]">
 					<DialogHeader>
 						<DialogTitle className="text-lg font-bold text-serene-neutral-900">Suspend Service</DialogTitle>
 						<DialogDescription className="text-serene-neutral-500">

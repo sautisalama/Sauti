@@ -18,7 +18,9 @@ import {
     CheckCircle,
     ExternalLink,
     AlertTriangle,
-    XCircle
+    XCircle,
+    CreditCard,
+    Shield
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -97,6 +99,9 @@ export default function ServiceDetailPage() {
     const [history, setHistory] = useState<ReviewHistoryItem[]>([]);
     const [stats, setStats] = useState<{ matches: number }>({ matches: 0 });
     const [isLoading, setIsLoading] = useState(true);
+
+    // Filter documents (Primary fix: ensure parseDocuments works, but UI might not need separate ID card unless required)
+    // However, for consistency, let's prepare the updated DocumentPreviewCard usage.
     
     const [viewingDoc, setViewingDoc] = useState<{ doc: AccreditationDocument, contextId: string, contextType: 'service' } | null>(null);
     const [actionDialog, setActionDialog] = useState<{
@@ -559,13 +564,15 @@ const parseDocuments = (filesJson: any, metadataJson: any): AccreditationDocumen
     if (metadataJson && Array.isArray(metadataJson)) {
         return metadataJson.map((meta: any) => ({
             url: meta.url || filesJson?.find((f: any) => f.url === meta.url)?.url || '#',
-            name: meta.name || 'Untitled Document',
+            name: meta.title || meta.name || 'Untitled Document',
             type: meta.type || filesJson?.find((f: any) => f.url === meta.url)?.type || 'unknown',
             status: meta.status,
-            notes: meta.notes,
+            notes: meta.notes || meta.note,
             docNumber: meta.docNumber,
             issuer: meta.issuer,
             reviewed_at: meta.reviewed_at,
+            docType: meta.docType,
+            reviewer_id: meta.reviewer_id
         }));
     } else if (filesJson && Array.isArray(filesJson)) {
         return filesJson.map((file: any) => ({
@@ -573,6 +580,7 @@ const parseDocuments = (filesJson: any, metadataJson: any): AccreditationDocumen
             name: file.name || 'Untitled Document',
             type: file.type || 'unknown',
             status: 'pending', 
+            docType: 'Other'
         }));
     }
     return [];

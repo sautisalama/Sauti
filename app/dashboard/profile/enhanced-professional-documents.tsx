@@ -24,6 +24,9 @@ import {
 	Building,
 	Shield,
 	X,
+	CreditCard,
+	Award,
+	ScrollText,
 } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -33,6 +36,7 @@ import {
 	UploadedFile,
 } from "@/lib/file-upload";
 import { Database } from "@/types/db-schema";
+import { Label } from "@/components/ui/label";
 
 type SupportServiceType = Database["public"]["Enums"]["support_service_type"];
 type UserType = Database["public"]["Enums"]["user_type"];
@@ -46,6 +50,9 @@ interface Document {
 	uploaded?: boolean;
 	serviceId?: string;
 	serviceType?: SupportServiceType;
+	docType?: "Identity" | "License" | "Certificate" | "Other";
+	issuer?: string;
+	docNumber?: string;
 }
 
 interface Service {
@@ -59,6 +66,7 @@ interface EnhancedProfessionalDocumentsFormProps {
 	initialData?: {
 		accreditation_files?: any;
 		accreditation_member_number?: any;
+		accreditation_files_metadata?: any;
 	};
 	onSaveDocuments?: (documents: any[]) => void;
 	userId: string;
@@ -122,23 +130,29 @@ export function EnhancedProfessionalDocumentsForm({
 
 	// Load existing documents from initialData
 	useEffect(() => {
-		if (initialData?.accreditation_files) {
+        // Prioritize accreditation_files_metadata if available as it contains richer data
+        const sourceData = initialData?.accreditation_files_metadata || initialData?.accreditation_files;
+
+		if (sourceData) {
 			try {
-				const existingDocs = Array.isArray(initialData.accreditation_files)
-					? initialData.accreditation_files
-					: JSON.parse(initialData.accreditation_files);
+				const existingDocs = Array.isArray(sourceData)
+					? sourceData
+					: JSON.parse(sourceData);
 
 				if (existingDocs.length > 0) {
 					setDocs(
 						existingDocs.map((doc: any, index: number) => ({
 							id: `existing-${index}`,
-							title: doc.title || "",
-							note: doc.note || "",
+							title: doc.title || doc.name || "",
+							note: doc.note || doc.notes || "",
 							file: null,
 							url: doc.url || "",
 							uploaded: true,
 							serviceId: doc.serviceId,
 							serviceType: doc.serviceType,
+							docType: doc.docType || "Other",
+							issuer: doc.issuer || "",
+							docNumber: doc.docNumber || "",
 						}))
 					);
 				}
@@ -166,6 +180,9 @@ export function EnhancedProfessionalDocumentsForm({
 			uploaded: false,
 			serviceId: selectedServiceId || undefined,
 			serviceType: selectedServiceType || undefined,
+			docType: "Other", // Default
+			issuer: "",
+			docNumber: "",
 		};
 
 		setDocs((prev) => [...prev, newDoc]);
@@ -231,9 +248,14 @@ export function EnhancedProfessionalDocumentsForm({
 
 				const documentData: any = {
 					title: doc.title,
+                    name: doc.title, // Save as name too for compatibility
 					note: doc.note || "",
 					serviceId: doc.serviceId,
 					serviceType: doc.serviceType,
+					docType: doc.docType,
+					issuer: doc.issuer,
+					docNumber: doc.docNumber,
+                    status: 'pending', // Reset status on update usually, or keep existing? simple approach: pending
 				};
 
 				// If there's a new file to upload
@@ -242,13 +264,18 @@ export function EnhancedProfessionalDocumentsForm({
 					if (url) {
 						documentData.url = url;
 						documentData.uploaded = true;
+                        documentData.type = doc.file.type;
 					} else {
 						continue;
 					}
 				} else if (doc.url) {
 					documentData.url = doc.url;
 					documentData.uploaded = true;
+                    // Try to preserve type/status from existing if not changed?
 				}
+                
+                // Preserve status if not changing file? A bit complex without tracking dirty state perfectly.
+                // ideally, we merge with existing partial data if available.
 
 				documentsToSave.push(documentData);
 			}
@@ -377,74 +404,125 @@ export function EnhancedProfessionalDocumentsForm({
 				) : (
 					<div className="grid gap-4">
 						{docs.map((doc) => (
-							<Card key={doc.id} className="border rounded-lg">
-								<CardContent className="p-4 space-y-3">
-									{/* Service Badge for NGO users */}
-									{userType === "ngo" && doc.serviceId && (
-										<div className="flex items-center gap-2 mb-2">
-											<Badge className={getServiceTypeColor(doc.serviceType)}>
-												{getServiceName(doc.serviceId)}
-											</Badge>
-											{doc.serviceType && (
-												<Badge variant="outline">{doc.serviceType.replace("_", " ")}</Badge>
-											)}
-										</div>
-									)}
+							<Card key={doc.id} className="border rounded-lg overflow-hidden">
+								<CardContent className="p-0">
+                                    <div className="bg-gray-50/50 p-4 border-b border-gray-100 flex items-start gap-3">
+                                        <div className="p-2 bg-white rounded-lg border shadow-sm shrink-0">
+                                            {doc.docType === 'Identity' ? <CreditCard className="h-5 w-5 text-blue-500" /> :
+                                             doc.docType === 'License' ? <Award className="h-5 w-5 text-purple-500" /> :
+                                             doc.docType === 'Certificate' ? <ScrollText className="h-5 w-5 text-green-500" /> :
+                                             <FileText className="h-5 w-5 text-gray-500" />}
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            {/* Top Row: Title & Type */}
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-3">
+                                                <div>
+                                                    <Label className="text-xs text-gray-500 mb-1.5 block">Document Title</Label>
+                                                    <Input
+                                                        placeholder="e.g. Medical License"
+                                                        value={doc.title}
+                                                        onChange={(e) => updateDoc(doc.id, { title: e.target.value })}
+                                                        className="h-9"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <Label className="text-xs text-gray-500 mb-1.5 block">Document Type</Label>
+                                                    <Select 
+                                                        value={doc.docType} 
+                                                        onValueChange={(val: any) => updateDoc(doc.id, { docType: val })}
+                                                    >
+                                                        <SelectTrigger className="h-9">
+                                                            <SelectValue />
+                                                        </SelectTrigger>
+                                                        <SelectContent>
+                                                            <SelectItem value="Identity">Identity Document (ID/Passport)</SelectItem>
+                                                            <SelectItem value="License">Professional License</SelectItem>
+                                                            <SelectItem value="Certificate">Certificate / Degree</SelectItem>
+                                                            <SelectItem value="Other">Other Document</SelectItem>
+                                                        </SelectContent>
+                                                    </Select>
+                                                </div>
+                                            </div>
 
-									<div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-										<Input
-											placeholder="Document title (e.g., License, Certificate)"
-											value={doc.title}
-											onChange={(e) => updateDoc(doc.id, { title: e.target.value })}
-										/>
-										<div className="flex items-center gap-2">
-											<Input
-												type="file"
-												onChange={(e) =>
-													updateDoc(doc.id, { file: e.target.files?.[0] || null })
-												}
-												className="flex-1"
-												accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx"
-											/>
-											{doc.uploaded && (
-												<div className="flex items-center gap-1 text-green-600">
-													<CheckCircle className="h-4 w-4" />
-													<span className="text-xs">Uploaded</span>
-												</div>
-											)}
-										</div>
-									</div>
-
-									<div className="flex items-start gap-2">
-										<Textarea
-											placeholder="Notes (optional)"
-											value={doc.note || ""}
-											onChange={(e) => updateDoc(doc.id, { note: e.target.value })}
-											className="flex-1 min-h-[60px]"
-										/>
-										<Button
+                                            {/* Metadata Row */}
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-3">
+                                                 <div>
+                                                    <Label className="text-xs text-gray-500 mb-1.5 block">Issuing Authority</Label>
+                                                    <Input
+                                                        placeholder="e.g. Medical Board"
+                                                        value={doc.issuer || ''}
+                                                        onChange={(e) => updateDoc(doc.id, { issuer: e.target.value })}
+                                                        className="h-9"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <Label className="text-xs text-gray-500 mb-1.5 block">Reference / License Number</Label>
+                                                    <Input
+                                                        placeholder="e.g. LIC-123456"
+                                                        value={doc.docNumber || ''}
+                                                        onChange={(e) => updateDoc(doc.id, { docNumber: e.target.value })}
+                                                        className="h-9"
+                                                    />
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <Button
 											type="button"
 											variant="ghost"
-											className="shrink-0 text-destructive p-2"
+											className="shrink-0 text-gray-400 hover:text-destructive hover:bg-destructive/10 -mr-2"
+                                            size="icon"
 											onClick={() => removeDoc(doc.id)}
 										>
 											<Trash2 className="h-4 w-4" />
 										</Button>
-									</div>
+                                    </div>
+                                    
+                                    <div className="p-4 space-y-4">
+                                        <div className="flex flex-col md:flex-row gap-4">
+                                            <div className="flex-1">
+                                                <Label className="text-xs text-gray-500 mb-1.5 block">File Upload</Label>
+                                                <div className="flex items-center gap-2">
+                                                    <Input
+                                                        type="file"
+                                                        onChange={(e) =>
+                                                            updateDoc(doc.id, { file: e.target.files?.[0] || null })
+                                                        }
+                                                        className="flex-1 text-sm file:text-sm file:font-medium"
+                                                        accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx"
+                                                    />
+                                                    {doc.uploaded && (
+                                                        <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 gap-1 h-9 px-2">
+                                                            <CheckCircle className="h-3.5 w-3.5" />
+                                                            Uploaded
+                                                        </Badge>
+                                                    )}
+                                                </div>
+                                            </div>
+                                             <div className="flex-1">
+                                                <Label className="text-xs text-gray-500 mb-1.5 block">Notes (Optional)</Label>
+                                                <Textarea
+                                                    placeholder="Additional context..."
+                                                    value={doc.note || ""}
+                                                    onChange={(e) => updateDoc(doc.id, { note: e.target.value })}
+                                                    className="min-h-[38px] h-9 py-2 resize-none"
+                                                />
+                                            </div>
+                                        </div>
 
-									{doc.url && (
-										<div className="flex items-center gap-2 p-2 bg-green-50 rounded border">
-											<FileText className="h-4 w-4 text-green-600" />
-											<a
-												href={doc.url}
-												target="_blank"
-												rel="noopener noreferrer"
-												className="text-sm text-green-700 hover:underline flex-1 truncate"
-											>
-												{doc.title || "Document"}
-											</a>
-										</div>
-									)}
+                                        {doc.url && (
+                                            <div className="flex items-center gap-2 p-2 bg-blue-50/50 rounded border border-blue-100/50">
+                                                <FileText className="h-3.5 w-3.5 text-blue-500" />
+                                                <a
+                                                    href={doc.url}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="text-xs text-blue-600 hover:underline flex-1 truncate"
+                                                >
+                                                    View uploaded file: {doc.title || "Document"}
+                                                </a>
+                                            </div>
+                                        )}
+                                    </div>
 								</CardContent>
 							</Card>
 						))}

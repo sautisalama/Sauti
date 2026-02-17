@@ -1,6 +1,5 @@
-"use client";
-
-import { FileText, CheckCircle, XCircle, Eye, AlertCircle } from "lucide-react";
+// ... imports
+import { FileText, CheckCircle, XCircle, Eye, AlertCircle, CreditCard, Award, ScrollText } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 type DocumentPreviewCardProps = {
@@ -8,8 +7,13 @@ type DocumentPreviewCardProps = {
         url: string;
         name: string;
         type: string;
-        status?: string;
-        title?: string; // Optional title from metadata
+        status?: string; // Type 'string' is too loose, but matches usage
+        title?: string;
+        fileName?: string;
+        file_name?: string;
+        docType?: string;
+        issuer?: string;
+        docNumber?: string;
     };
     onClick: () => void;
 };
@@ -22,6 +26,16 @@ export function DocumentPreviewCard({
 		document.type?.startsWith("image/") ||
 		document.url?.match(/\.(jpg|jpeg|png|gif|webp)$/i);
 	const displayName = document.title || document.name || (document as any).fileName || (document as any).file_name || "Untitled";
+
+    // Icon based on docType
+    const getIcon = () => {
+        switch(document.docType) {
+            case 'Identity': return <CreditCard className="h-6 w-6" />;
+            case 'License': return <Award className="h-6 w-6" />;
+            case 'Certificate': return <ScrollText className="h-6 w-6" />;
+            default: return <FileText className="h-6 w-6" />;
+        }
+    };
 
 	return (
 		<div
@@ -46,7 +60,7 @@ export function DocumentPreviewCard({
 					// Updated PDF/File UI: Soft background + centered icon
 					<div className="w-full h-full bg-serene-neutral-50 flex flex-col items-center justify-center p-4">
                         <div className="h-12 w-12 rounded-2xl bg-white shadow-sm border border-serene-neutral-200 flex items-center justify-center text-sauti-teal mb-2 group-hover:scale-110 transition-transform duration-300">
-                             <FileText className="h-6 w-6" />
+                             {getIcon()}
                         </div>
                         <div className="bg-sauti-red-light text-sauti-red px-2 py-0.5 rounded text-[10px] font-bold tracking-tight border border-sauti-red/20 shadow-sm uppercase">
 								PDF
@@ -63,27 +77,33 @@ export function DocumentPreviewCard({
 			</div>
 
 			{/* Footer Info */}
-			<div className="h-16 bg-white border-t border-serene-neutral-100 px-4 py-3 flex items-center justify-between shrink-0 min-h-[44px]">
-				<div className="min-w-0 pr-2">
-					<p
-						className="text-xs font-bold text-sauti-dark truncate"
+			<div className="h-auto min-h-[64px] bg-white border-t border-serene-neutral-100 px-4 py-3 flex flex-col justify-center shrink-0">
+                <div className="flex items-start justify-between w-full mb-1">
+                     <p
+						className="text-xs font-bold text-sauti-dark truncate flex-1 pr-2"
 						title={displayName}
 					>
 						{displayName}
 					</p>
-					<p className="text-[10px] text-serene-neutral-500 capitalize truncate font-medium">
-						{document.type?.split("/").pop()?.toUpperCase() || "FILE"}
-					</p>
-				</div>
-				<div>
-					{document.status === "verified" && (
-						<CheckCircle className="h-5 w-5 text-sauti-teal" />
+                    {document.status === "verified" && (
+						<CheckCircle className="h-4 w-4 text-sauti-teal shrink-0" />
 					)}
 					{document.status === "rejected" && (
-						<XCircle className="h-5 w-5 text-sauti-red" />
+						<XCircle className="h-4 w-4 text-sauti-red shrink-0" />
 					)}
-					{/* If no status, show nothing or pending icon? User prefers minimal. */}
-				</div>
+                </div>
+               
+                {/* Secondary Info (Type/Issuer) */}
+                <div className="text-[10px] text-serene-neutral-500 font-medium truncate">
+                     {document.docType ? (
+                         <span className="capitalize text-sauti-blue/80">{document.docType}</span>
+                     ) : (
+                         <span className="capitalize">{document.type?.split("/").pop()?.toUpperCase() || "FILE"}</span>
+                     )}
+                     {document.issuer && (
+                         <span className="text-serene-neutral-400"> • {document.issuer}</span>
+                     )}
+                </div>
 			</div>
 
 			{/* Status Stripe (Optional, for quick scanning) */}

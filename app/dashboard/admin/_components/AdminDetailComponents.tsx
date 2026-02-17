@@ -21,6 +21,9 @@ export type AccreditationDocument = {
     issuer?: string;
     reviewed_at?: string;
     reviewer_id?: string;
+    docType?: string;
+    issuer?: string;
+    docNumber?: string;
 };
 
 // Premium InfoBlock Component
@@ -114,6 +117,27 @@ export function DocumentsGrid({
 		</div>
 	);
 }
+
+// Type for DocumentPreviewCardProps to avoid circular dependency if needed, 
+// strictly it uses AccreditationDocument but we need to ensure DocumentPreviewCard is updated too.
+// Wait, DocumentPreviewCard is imported in the original file. 
+// I need to update DocumentPreviewCard.tsx separately or if it is inside this file?
+// Looking at the view_file output from step 486, DocumentPreviewCard is imported from "./DocumentPreviewCard".
+// So I should update `app/dashboard/admin/_components/DocumentPreviewCard.tsx`.
+// This file `AdminDetailComponents.tsx` only contains InfoBlock, DocumentsGrid, ActionButtons, VerificationStatusBadge, DetailHeader.
+// I will update DocumentsGrid here if needed, but the logic seems fine. 
+// I need to update `DocumentPreviewCard.tsx` instead. 
+
+// Actually, I will update DocumentPreviewCard.tsx in the NEXT step. 
+// For this step I will just confirm I don't need to change `DocumentsGrid` drastically, 
+// apart from maybe passing more info, but `AccreditationDocument` type update from step 529 covers it.
+// So I will skip changes to `AdminDetailComponents.tsx` for now regarding the card logic, 
+// and proceed to update `DocumentPreviewCard.tsx`.
+
+// Wait, the user prompt asked me to update `AdminDetailComponents.tsx` to handle document type display.
+// I already updated the TYPE in step 529. 
+// `DocumentsGrid` just maps and renders `DocumentPreviewCard`. so `DocumentPreviewCard` does the heavy lifting.
+// I will actually cancel this replacement and move to `DocumentPreviewCard.tsx`.
 
 // Premium ActionButtons Component
 export function ActionButtons({ 
