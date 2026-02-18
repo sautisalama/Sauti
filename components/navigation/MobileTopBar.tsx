@@ -43,6 +43,12 @@ export function MobileTopBar() {
     }
   };
 
+  const profile = user?.profile;
+  const hasAcceptedPolicies = !!(profile?.settings as any)?.all_policies_accepted;
+  const needsOnboarding = !profile?.user_type || 
+    !hasAcceptedPolicies ||
+    ((profile.user_type === 'professional' || profile.user_type === 'ngo') && !profile.professional_title);
+
   return (
     <div className="lg:hidden fixed top-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-xl border-b border-serene-neutral-100 px-4 py-2.5 flex items-center justify-between shadow-sm transition-all duration-300">
       
@@ -59,7 +65,7 @@ export function MobileTopBar() {
       </Link>
 
       <div className="flex items-center gap-2">
-        <NotificationDropdown />
+        {!needsOnboarding && <NotificationDropdown />}
         
         {/* User Profile Dropdown */}
         <DropdownMenu>
@@ -80,49 +86,53 @@ export function MobileTopBar() {
               <p className="text-xs leading-none text-serene-neutral-500 truncate">{user?.email}</p>
             </div>
           </DropdownMenuLabel>
-          <DropdownMenuSeparator className="bg-serene-neutral-100" />
-          <DropdownMenuItem asChild>
-            <Link href="/dashboard/profile" className="cursor-pointer rounded-xl focus:bg-serene-neutral-50 focus:text-sauti-teal p-3">
-              <User className="mr-3 h-4 w-4" />
-              <span>Profile</span>
-            </Link>
-          </DropdownMenuItem>
-
-          {user?.profile?.user_type === "professional" && (
-             <DropdownMenuItem asChild>
-                <Link href="/dashboard/verification" className="cursor-pointer rounded-xl focus:bg-serene-neutral-50 focus:text-sauti-teal p-3">
-                  <Shield className="mr-3 h-4 w-4 text-sauti-teal" />
-                  <span>Verification</span>
+          {!needsOnboarding && (
+            <>
+              <DropdownMenuSeparator className="bg-serene-neutral-100" />
+              <DropdownMenuItem asChild>
+                <Link href="/dashboard/profile" className="cursor-pointer rounded-xl focus:bg-serene-neutral-50 focus:text-sauti-teal p-3">
+                  <User className="mr-3 h-4 w-4" />
+                  <span>Profile</span>
                 </Link>
-             </DropdownMenuItem>
-          )}
+              </DropdownMenuItem>
 
-          {/* Role Switcher Options */}
-          {roleContext?.can_switch_to_admin && (
-                <>
-                    <DropdownMenuSeparator className="bg-serene-neutral-100 my-1" />
-                    {!isAdminMode ? (
-                        <DropdownMenuItem 
-                            onClick={switchToAdmin} 
-                            className="flex items-center gap-3 cursor-pointer rounded-xl focus:bg-blue-50 focus:text-blue-700 p-3"
-                        >
-                            <div className="h-6 w-6 rounded-md bg-blue-100 flex items-center justify-center text-blue-600">
-                                <Shield className="h-3.5 w-3.5" />
-                            </div>
-                            <span className="font-semibold text-sm">Switch to Admin</span>
-                        </DropdownMenuItem>
-                    ) : (
-                        <DropdownMenuItem 
-                            onClick={switchToUser} 
-                            className="flex items-center gap-3 cursor-pointer rounded-xl focus:bg-serene-neutral-50 focus:text-serene-neutral-900 p-3"
-                        >
-                             <div className="h-6 w-6 rounded-md bg-serene-neutral-100 flex items-center justify-center text-serene-neutral-600">
-                                {roleContext.primary_role === 'ngo' ? <Building2 className="h-3.5 w-3.5" /> : <User className="h-3.5 w-3.5" />}
-                            </div>
-                            <span className="font-semibold text-sm">Switch to {getRoleLabel(roleContext.primary_role)}</span>
-                        </DropdownMenuItem>
-                    )}
-                </>
+              {user?.profile?.user_type === "professional" && (
+                <DropdownMenuItem asChild>
+                    <Link href="/dashboard/verification" className="cursor-pointer rounded-xl focus:bg-serene-neutral-50 focus:text-sauti-teal p-3">
+                      <Shield className="mr-3 h-4 w-4 text-sauti-teal" />
+                      <span>Verification</span>
+                    </Link>
+                </DropdownMenuItem>
+              )}
+
+              {/* Role Switcher Options */}
+              {roleContext?.can_switch_to_admin && (
+                    <>
+                        <DropdownMenuSeparator className="bg-serene-neutral-100 my-1" />
+                        {!isAdminMode ? (
+                            <DropdownMenuItem 
+                                onClick={switchToAdmin} 
+                                className="flex items-center gap-3 cursor-pointer rounded-xl focus:bg-blue-50 focus:text-blue-700 p-3"
+                            >
+                                <div className="h-6 w-6 rounded-md bg-blue-100 flex items-center justify-center text-blue-600">
+                                    <Shield className="h-3.5 w-3.5" />
+                                </div>
+                                <span className="font-semibold text-sm">Switch to Admin</span>
+                            </DropdownMenuItem>
+                        ) : (
+                            <DropdownMenuItem 
+                                onClick={switchToUser} 
+                                className="flex items-center gap-3 cursor-pointer rounded-xl focus:bg-serene-neutral-50 focus:text-serene-neutral-900 p-3"
+                            >
+                                 <div className="h-6 w-6 rounded-md bg-serene-neutral-100 flex items-center justify-center text-serene-neutral-600">
+                                    {roleContext.primary_role === 'ngo' ? <Building2 className="h-3.5 w-3.5" /> : <User className="h-3.5 w-3.5" />}
+                                </div>
+                                <span className="font-semibold text-sm">Switch to {getRoleLabel(roleContext.primary_role)}</span>
+                            </DropdownMenuItem>
+                        )}
+                    </>
+              )}
+            </>
           )}
 
           <DropdownMenuSeparator className="bg-serene-neutral-100" />

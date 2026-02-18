@@ -298,8 +298,8 @@ export function AdminUsersTable({ onRefresh }: AdminUsersTableProps) {
 						</SelectTrigger>
 						<SelectContent>
 							<SelectItem value="all">All Roles</SelectItem>
-							<SelectItem value="professional">Professional</SelectItem>
-							<SelectItem value="ngo">NGO</SelectItem>
+							<SelectItem value="professional">Service Provider</SelectItem>
+							<SelectItem value="ngo">Organisation</SelectItem>
 							<SelectItem value="survivor">Survivor</SelectItem>
 						</SelectContent>
 					</Select>
@@ -369,7 +369,7 @@ export function AdminUsersTable({ onRefresh }: AdminUsersTableProps) {
 										    </TableCell>
 										    <TableCell className="py-4">
 											    <Badge variant="outline" className="capitalize text-serene-neutral-600 border-serene-neutral-200 font-medium bg-white">
-												    {user.user_type}
+												    {user.user_type === 'professional' ? 'Service Provider' : user.user_type === 'ngo' ? 'Organisation' : user.user_type}
 											    </Badge>
 										    </TableCell>
 										    <TableCell className="py-4">
@@ -473,7 +473,7 @@ export function AdminUsersTable({ onRefresh }: AdminUsersTableProps) {
                                                 <h3 className="font-semibold text-serene-neutral-900">{user.first_name} {user.last_name}</h3>
                                                 <div className="flex items-center gap-1.5 text-xs text-serene-neutral-500 mt-0.5">
                                                     <Badge variant="outline" className="capitalize text-[10px] h-4 px-1 py-0 font-normal">
-                                                        {user.user_type}
+                                                        {user.user_type === 'professional' ? 'Service Provider' : user.user_type === 'ngo' ? 'Organisation' : user.user_type}
                                                     </Badge>
                                                 </div>
                                             </div>

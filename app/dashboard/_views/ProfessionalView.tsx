@@ -62,6 +62,7 @@ import {
 	SereneQuickActionCard,
 	SereneSectionHeader
 } from "../_components/SurvivorDashboardComponents";
+import { CalendarConnectionStatus } from "../_components/CalendarConnectionStatus";
 import { ReportWithRelations, MatchedServiceWithRelations } from "../_types";
 import { fetchUserReports, deleteReport } from "./actions/reports";
 import { fetchUserSupportServices, deleteSupportService } from "./actions/support-services";
@@ -362,7 +363,7 @@ export default function ProfessionalView({
                             // 5. No Services (Onboarding)
                             else if (total === 0) {
 								bannerTitle = "Register your first service";
-								bannerDesc = "Add a support service to start helping survivors and complete your provider profile.";
+								bannerDesc = "Add a support service to start helping survivors and complete your service provider profile.";
                                 bannerVariant = "warning"; // Encouragement
 							}
 
@@ -468,8 +469,15 @@ export default function ProfessionalView({
 								</div>
 							</div>
 
-							{/* Weekly Schedule Calendar */}
-							<div className="bg-white rounded-2xl border border-serene-neutral-100 overflow-hidden shadow-sm">
+						{/* Calendar Connection Status Alert (Prominent when not connected) */}
+						<CalendarConnectionStatus 
+							userId={userId} 
+							variant="alert" 
+							className="mb-4" 
+						/>
+
+						{/* Weekly Schedule Calendar */}
+						<div className="bg-white rounded-2xl border border-serene-neutral-100 overflow-hidden shadow-sm">
 								<button 
 									onClick={() => setIsCalendarExpanded(!isCalendarExpanded)}
 									className="w-full flex items-center justify-between px-5 py-4 hover:bg-serene-neutral-50/50 transition-colors"

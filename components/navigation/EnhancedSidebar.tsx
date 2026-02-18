@@ -99,10 +99,14 @@ export function EnhancedSidebar({
 	const [casesCount, setCasesCount] = useState<number>(0);
 	const [isAdminMode, setIsAdminMode] = useState(false);
 	const supabase = useMemo(() => createClient(), []);
-	const role = (dash?.data?.userType as any) ?? user?.profile?.user_type;
-
-
-	// Auto-collapse on mobile screen sizes
+	const userType = dash?.data?.profile?.user_type || user?.profile?.user_type || null;
+	const role = isAdminMode ? "admin" : userType;
+    
+    const profile = dash?.data?.profile || user?.profile;
+    const hasAcceptedPolicies = !!(profile?.settings as any)?.all_policies_accepted;
+    const needsOnboarding = !profile?.user_type || 
+        !hasAcceptedPolicies ||
+        ((profile.user_type === 'professional' || profile.user_type === 'ngo') && !profile.professional_title);
 	useEffect(() => {
 		const handleResize = () => {
 			if (window.innerWidth < 1024) {
@@ -190,6 +194,19 @@ export function EnhancedSidebar({
 	const getSidebarItems = useCallback((): SidebarItem[] => {
 		const isDashboard = pathname?.startsWith("/dashboard");
 		const isAdminRoute = pathname?.startsWith("/dashboard/admin");
+
+        // Onboarding State - Simplified Navigation
+        if (needsOnboarding && isDashboard && !isAdminRoute) {
+            return [
+                {
+                    id: "onboarding",
+                    label: "Complete Setup",
+                    icon: Shield,
+                    href: "/dashboard",
+                    section: "main",
+                }
+            ];
+        }
 
 		if (!isDashboard) {
 			return [
@@ -539,7 +556,7 @@ export function EnhancedSidebar({
 				</div>
 
 				{/* Collapsed expand button */}
-				{isCollapsed && (
+				{isCollapsed && !needsOnboarding && (
 					<div className="px-2 py-2">
 						<Button
 							variant="ghost"
@@ -566,7 +583,7 @@ export function EnhancedSidebar({
 								<Avatar className="h-10 w-10 border border-neutral-200 dark:border-neutral-700">
 									<AvatarImage
 										src={
-											typeof window !== "undefined" &&
+											mounted &&
 											window.localStorage.getItem("ss_anon_mode") === "1"
 												? "/anon.svg"
 												: dash?.data?.profile?.avatar_url ||
@@ -617,13 +634,17 @@ export function EnhancedSidebar({
 									<p className="text-xs leading-none text-serene-neutral-500 truncate">{user?.email}</p>
 								</div>
 							</DropdownMenuLabel>
-							<DropdownMenuSeparator className="bg-serene-neutral-100" />
-							<DropdownMenuItem asChild>
-								<Link href="/dashboard/profile" className="cursor-pointer rounded-xl focus:bg-serene-neutral-50 focus:text-serene-blue-600 m-1">
-									<User className="mr-2 h-4 w-4 text-serene-neutral-500" />
-									<span>Profile</span>
-								</Link>
-							</DropdownMenuItem>
+							{!needsOnboarding && (
+								<>
+									<DropdownMenuSeparator className="bg-serene-neutral-100" />
+									<DropdownMenuItem asChild>
+										<Link href="/dashboard/profile" className="cursor-pointer rounded-xl focus:bg-serene-neutral-50 focus:text-serene-blue-600 m-1">
+											<User className="mr-2 h-4 w-4 text-serene-neutral-500" />
+											<span>Profile</span>
+										</Link>
+									</DropdownMenuItem>
+								</>
+							)}
 
 							<DropdownMenuSeparator className="bg-serene-neutral-100" />
 							<DropdownMenuItem
@@ -642,7 +663,7 @@ export function EnhancedSidebar({
 				</div>
 
 				{/* Role Switcher */}
-				{!isCollapsed && (
+				{!isCollapsed && !needsOnboarding && (
 					<div className="px-4 py-2 border-b border-neutral-200 dark:border-neutral-800">
 						<RoleSwitcher />
 					</div>
@@ -650,6 +671,45 @@ export function EnhancedSidebar({
 
 				{/* Navigation */}
 				<div className="flex-1 flex flex-col justify-between px-2 py-4">
+                    {needsOnboarding && !isCollapsed ? (
+                         <div className="px-3 py-4 space-y-4">
+                            <div className="bg-serene-blue-50/50 border border-serene-blue-100 rounded-[2rem] p-5 space-y-4 shadow-sm">
+                                <div className="h-10 w-10 rounded-xl bg-serene-blue-600 flex items-center justify-center shadow-lg shadow-serene-blue-200 transition-transform hover:scale-105">
+                                    <Shield className="h-5 w-5 text-white" />
+                                </div>
+                                <div>
+                                    <p className="text-sm font-bold text-serene-neutral-900">Setup in Progress</p>
+                                    <p className="text-xs text-serene-neutral-500 mt-2 leading-relaxed">
+                                        Please complete your profile to unlock all dashboard features.
+                                    </p>
+                                </div>
+                                <div className="pt-2">
+                                     <div className="h-2 w-full bg-serene-blue-100/50 rounded-full overflow-hidden shadow-inner">
+                                        <div 
+											className="h-full bg-serene-blue-600 rounded-full transition-all duration-1000" 
+											style={{ width: '35%' }}
+										/>
+                                     </div>
+                                </div>
+								<Link href="/dashboard" className="block">
+									<Button className="w-full h-9 rounded-xl text-xs font-bold bg-serene-blue-600 hover:bg-serene-blue-700 text-white shadow-md">
+										Continue Setup
+									</Button>
+								</Link>
+                            </div>
+                        </div>
+                    ) : needsOnboarding && isCollapsed ? (
+						<div className="flex flex-col items-center py-6 gap-6">
+                             <Tooltip>
+								<TooltipTrigger asChild>
+									<div className="h-10 w-10 rounded-xl bg-serene-blue-100 flex items-center justify-center cursor-help">
+										<Shield className="h-5 w-5 text-serene-blue-600" />
+									</div>
+								</TooltipTrigger>
+								<TooltipContent side="right">Setup in Progress</TooltipContent>
+							 </Tooltip>
+						</div>
+					) : (
 					<div className="space-y-1">
 						{/* Main Navigation */}
 						<div className="space-y-1">
@@ -672,14 +732,16 @@ export function EnhancedSidebar({
 							</div>
 						)}
 					</div>
+                    )}
 
 					{/* Footer Navigation */}
-					<div className="border-t border-neutral-200 dark:border-neutral-800 pt-4 space-y-1">
-						{footerItems.map((item) => (
-							<SidebarItemComponent key={item.id} item={item} />
-						))}
-
-					</div>
+					{!needsOnboarding && (
+						<div className="border-t border-neutral-200 dark:border-neutral-800 pt-4 space-y-1">
+							{footerItems.map((item) => (
+								<SidebarItemComponent key={item.id} item={item} />
+							))}
+						</div>
+					)}
 				</div>
 			</div>
 

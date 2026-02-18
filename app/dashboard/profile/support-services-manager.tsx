@@ -292,7 +292,7 @@ export function SupportServicesManager({
 							<p className="text-sm text-serene-neutral-500 max-w-md leading-relaxed">
 								{services.length === 0 
 									? "Add your first service to start helping survivors." 
-									: `Managing ${services.length} ${services.length === 1 ? 'service' : 'services'}. professionals are limited to 2 active services.`}
+									: `Managing ${services.length} ${services.length === 1 ? 'service' : 'services'}. Service Providers are limited to 2 active services.`}
 							</p>
 						</div>
 					</div>

@@ -112,7 +112,7 @@ export default function MatchesPage() {
        <div className="max-w-xl mx-auto px-4 pt-6 space-y-6">
           <SereneSectionHeader 
              title="Connected Services"
-             description="Professionals and organizations matched with your cases."
+             description="Service Providers and organisations matched with your cases."
           />
 
           {loading ? (

@@ -41,12 +41,17 @@ export function DashboardDataProvider({
   children: React.ReactNode;
 }) {
   const [data, setData] = useState<DashboardData | null>(initialData ?? null);
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+
+  // Initial load from localStorage
+  useEffect(() => {
     if (typeof window !== "undefined") {
-      return localStorage.getItem("ss_sidebar_collapsed") === "1";
+      const saved = localStorage.getItem("ss_sidebar_collapsed");
+      if (saved !== null) {
+        setIsSidebarCollapsed(saved === "1");
+      }
     }
-    return false;
-  });
+  }, []);
 
   useEffect(() => {
     if (typeof window !== "undefined") {

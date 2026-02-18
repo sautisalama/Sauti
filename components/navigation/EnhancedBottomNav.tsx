@@ -59,8 +59,16 @@ export function EnhancedBottomNav({ forceShow = false, className }: EnhancedBott
   const isChat = pathname?.startsWith("/dashboard/chat");
   const isChatDetail = isChat && !!chatId; // If /dashboard/chat AND ?id=... exists
   
+  const profile = dash?.data?.profile || user?.profile;
+  const hasAcceptedPolicies = !!(profile?.settings as any)?.all_policies_accepted;
+  const needsOnboarding = !profile?.user_type || 
+    !hasAcceptedPolicies ||
+    ((profile.user_type === 'professional' || profile.user_type === 'ngo') && !profile.professional_title);
+
   // Hide on immersive views unless forced to show
+  // ... and always hide during onboarding
   const hide = forceShow ? false : (
+    needsOnboarding ||
     // Hide ONLY on chat detail page (either by UUID path OR by query param)
     isChatDetail || 
     (pathname?.startsWith("/dashboard/chat/") && pathname !== "/dashboard/chat") || // Fallback for uuid path

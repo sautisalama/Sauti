@@ -38,6 +38,12 @@ export function DashboardContent({ children }: DashboardContentProps) {
   const isApptDetail = pathname?.includes("/appointment/");
   const showBottomPadding = !isChatDetail && !isApptDetail;
 
+  const profile = dash?.data?.profile;
+  const hasAcceptedPolicies = !!(profile?.settings as any)?.all_policies_accepted;
+  const needsOnboarding = !profile?.user_type || 
+    !hasAcceptedPolicies ||
+    ((profile.user_type === 'professional' || profile.user_type === 'ngo') && !profile.professional_title);
+
   return (
     <>
         <main
@@ -53,11 +59,16 @@ export function DashboardContent({ children }: DashboardContentProps) {
                 showTopPadding ? "pt-16" : "", // 64px top bar
                 showBottomPadding ? "pb-24" : "" // Bottom nav spacing
             )}>
-                {!isChat && <DesktopHeader />}
+                {!isChat && (
+                    <DesktopHeader 
+                        showSearch={!needsOnboarding} 
+                        showNotifications={!needsOnboarding}
+                    />
+                )}
                 {children}
             </div>
         </main>
-        {user && (
+        {user && !needsOnboarding && (
             <div className="hidden lg:block">
                 {(pathname === "/dashboard" || pathname === "/dashboard/reports") && (
                     <GlobalReportFab userId={user} />

@@ -160,7 +160,7 @@ export function VerificationSection({
 	const idFront = documents.find(d => d.title === "National ID (Front)" || d.title?.includes("ID Front"));
 	const idBack = documents.find(d => d.title === "National ID (Back)" || d.title?.includes("ID Back"));
 	
-    // Combine Profile Docs + Service Docs for the "Professional Qualifications" list
+    // Combine Profile Docs + Service Docs for the "Qualifications" list
     // Filter out IDs from both
     const allDocs = [...documents, ...availableDocs].filter((doc, index, self) => 
         index === self.findIndex((t) => (
@@ -584,7 +584,7 @@ export function VerificationSection({
 				</CardContent>
 			</Card>
 
-			{/* Professional Qualifications */}
+			{/* Qualifications */}
 			<Card className="border-neutral-200 shadow-sm overflow-hidden">
 				<CardHeader className="bg-neutral-50/50 border-b border-neutral-100 pb-4 flex flex-row items-center justify-between">
 					<div className="flex items-center gap-2">
@@ -592,7 +592,7 @@ export function VerificationSection({
 							<Briefcase className="h-5 w-5" />
 						</div>
 						<div>
-							<CardTitle className="text-lg">Professional Qualifications</CardTitle>
+							<CardTitle className="text-lg">Qualifications</CardTitle>
 							<CardDescription>Certificates, licenses, and accreditation</CardDescription>
 						</div>
 					</div>
@@ -610,7 +610,7 @@ export function VerificationSection({
 					) : (
 						<div className="text-center py-8 text-neutral-500 bg-neutral-50 rounded-xl border border-dashed border-neutral-200">
 							<Shield className="h-10 w-10 mx-auto mb-3 text-neutral-300" />
-							<p>No professional certificates uploaded yet.</p>
+							<p>No certificates uploaded yet.</p>
 							<Button variant="link" onClick={() => setShowAddCert(true)} className="text-sauti-teal">
 								Upload your first certificate
 							</Button>

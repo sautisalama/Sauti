@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import SurvivorView from "./_views/SurvivorView";
 import AnonymousSurvivorView from "./_views/AnonymousSurvivorView";
 import ProfessionalView from "./_views/ProfessionalView";
-import ChooseUser from "./_views/ChooseUser";
+import OnboardingFlow from "./_views/OnboardingFlow";
 import { Suspense } from "react";
 
 export default async function Dashboard() {
@@ -20,13 +20,21 @@ export default async function Dashboard() {
 		!!user.anon_username || 
 		user.email?.endsWith("@anon.sautisalama.org");
 
+	// Check for policy acceptance in settings
+	const hasAcceptedPolicies = !!(user.settings as any)?.all_policies_accepted;
+
 	if (isAnonymous) {
 		return <AnonymousSurvivorView userId={user.id} profileDetails={user} />;
 	}
 
-	// If user exists but has no user_type, show the ChooseUser component
-	if (!user.user_type) {
-		return <ChooseUser />;
+	// If user exists but has no user_type, or is a pro without a title (incomplete onboarding), or hasn't accepted policies
+	const needsOnboarding = 
+		!user.user_type || 
+		!hasAcceptedPolicies ||
+		((user.user_type === 'professional' || user.user_type === 'ngo') && !user.professional_title);
+
+	if (needsOnboarding) {
+		return <OnboardingFlow />;
 	}
 
 	return (

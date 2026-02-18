@@ -14,6 +14,7 @@ import { usePathname } from "next/navigation";
 import { useUser } from "@/hooks/useUser";
 import { useToast } from "@/hooks/use-toast";
 import { Textarea } from "@/components/ui/textarea";
+import { useDashboardData } from "@/components/providers/DashboardDataProvider";
 
 export function MobileReportFAB() {
   const pathname = usePathname();
@@ -29,13 +30,16 @@ export function MobileReportFAB() {
   const [description, setDescription] = useState("");
   const [isRecording, setIsRecording] = useState(false);
 
+  const dash = useDashboardData();
+  const profile = dash?.data?.profile;
+  const hasAcceptedPolicies = !!(profile?.settings as any)?.all_policies_accepted;
+  const needsOnboarding = !profile?.user_type || 
+    !hasAcceptedPolicies ||
+    ((profile.user_type === 'professional' || profile.user_type === 'ngo') && !profile.professional_title);
+
   // Visibility Logic: Only show on Home or Reports (list)
-  // Home: /dashboard
-  // Reports: /dashboard/reports
-  // NOT on /dashboard/reports/[id] (detail view handles selection)
-  // Although master-detail is on same page for desktop, mobile detail view might be overlay.
-  // Assuming standard routing: visible on /dashboard and /dashboard/reports
-  const isVisible = pathname === "/dashboard" || pathname === "/dashboard/reports";
+  // ... and only if onboarding is complete
+  const isVisible = (pathname === "/dashboard" || pathname === "/dashboard/reports") && !needsOnboarding;
 
   if (!isVisible) return null;
 

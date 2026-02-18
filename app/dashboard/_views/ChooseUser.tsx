@@ -44,8 +44,8 @@ export default function ChooseUser() {
 
 			if (error) throw error;
 
-			// Refresh the page to reflect the new user type
-			router.refresh();
+			// Go to onboarding flow
+			router.push("/dashboard/onboarding");
 		} catch (error) {
 			console.error("Error updating user type:", error);
 		} finally {
@@ -145,10 +145,10 @@ export default function ChooseUser() {
 							</div>
 							<div className="flex-1 sm:w-full">
 								<h3 className="text-lg font-black text-sauti-dark left sm:text-center group-hover:text-sauti-teal transition-colors">
-									NGO
+									Organisation
 								</h3>
 								<p className="text-xs font-medium text-neutral-500 text-left sm:text-center mt-1">
-									Organization providing services
+									Professional body or group
 								</p>
 							</div>
 						</div>
@@ -162,7 +162,7 @@ export default function ChooseUser() {
 						disabled={!selectedType || isSubmitting}
 						className="bg-sauti-teal hover:bg-sauti-dark text-white font-black py-6 px-12 rounded-full shadow-lg hover:shadow-xl transition-all duration-300 min-w-[240px]"
 					>
-						{isSubmitting ? "Updating Role..." : "Continue to Dashboard"}
+						{isSubmitting ? "Updating Role..." : "Next"}
 					</Button>
 				</div>
 			</div>

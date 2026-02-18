@@ -24,6 +24,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useDashboardData } from "@/components/providers/DashboardDataProvider";
 import Link from "next/link";
 import { UpgradeAccountBanner } from "../_components/UpgradeAccountBanner";
+import { PolicyModal } from "../_components/PolicyModal";
 
 interface ReportWithRelations extends Tables<"reports"> {
 	matched_services?: any[];
@@ -41,6 +42,9 @@ export default function AnonymousSurvivorView({
 	const dash = useDashboardData();
 	const [reports, setReports] = useState<ReportWithRelations[]>([]);
 	const [open, setOpen] = useState(false);
+	const [hasAcceptedPolicies, setHasAcceptedPolicies] = useState(
+		!!(profileDetails.settings as any)?.all_policies_accepted
+	);
 	const { toast } = useToast();
 	const supabase = useMemo(() => createClient(), []);
 
@@ -71,6 +75,19 @@ export default function AnonymousSurvivorView({
 
 	return (
 		<>
+			{!hasAcceptedPolicies && (
+				<PolicyModal 
+					userId={userId} 
+					initialSettings={profileDetails.settings} 
+					onAccepted={() => {
+						setHasAcceptedPolicies(true);
+						toast({
+							title: "Policies Accepted",
+							description: "Welcome to your secure support space.",
+						});
+					}}
+				/>
+			)}
 			<div className="max-w-7xl mx-auto p-4 lg:p-6 lg:py-12">
 				{/* Header Section */}
 				<div className="flex flex-col md:flex-row md:items-center justify-between gap-8 mb-16">
