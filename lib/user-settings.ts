@@ -130,13 +130,18 @@ export function getOrCreateDeviceId(): string {
 
 /**
  * Detect browser and OS info from User-Agent for device display.
+ * Supports both client-side and server-side execution.
  */
-export function detectDeviceInfo(): { device_name: string; browser: string; os: string; location: string } {
-	if (typeof window === "undefined") {
+export function detectDeviceInfo(userAgent?: string): {
+	device_name: string;
+	browser: string;
+	os: string;
+	location: string;
+} {
+	const ua = userAgent || (typeof window !== "undefined" ? navigator.userAgent : "");
+	if (!ua) {
 		return { device_name: "Unknown", browser: "Unknown", os: "Unknown", location: "Unknown" };
 	}
-
-	const ua = navigator.userAgent;
 
 	// Detect browser
 	let browser = "Unknown Browser";
@@ -183,12 +188,12 @@ export function detectDeviceInfo(): { device_name: string; browser: string; os: 
 }
 
 /**
- * Build a TrackedDevice object for the current browser session.
+ * Build a TrackedDevice object for the current session.
  */
-export function buildCurrentDevice(): TrackedDevice {
-	const info = detectDeviceInfo();
+export function buildCurrentDevice(deviceId: string, userAgent?: string): TrackedDevice {
+	const info = detectDeviceInfo(userAgent);
 	return {
-		id: getOrCreateDeviceId(),
+		id: deviceId,
 		device_name: info.device_name,
 		browser: info.browser,
 		os: info.os,
@@ -199,17 +204,21 @@ export function buildCurrentDevice(): TrackedDevice {
 }
 
 /**
- * Register the current device in a devices list.
+ * Register a device in a devices list.
  * If the device already exists (by id), update last_active.
- * Also marks only the current device as is_current.
+ * Also marks only the registration device as is_current.
  * 
  * Returns updated devices array.
  */
-export function registerDevice(existingDevices: TrackedDevice[] | undefined | null): TrackedDevice[] {
-	const current = buildCurrentDevice();
-	const devices = (existingDevices || []).map(d => ({ ...d, is_current: false }));
+export function registerDevice(
+	existingDevices: TrackedDevice[] | undefined | null,
+	deviceId: string,
+	userAgent?: string
+): TrackedDevice[] {
+	const current = buildCurrentDevice(deviceId, userAgent);
+	const devices = (existingDevices || []).map((d) => ({ ...d, is_current: false }));
 
-	const existingIdx = devices.findIndex(d => d.id === current.id);
+	const existingIdx = devices.findIndex((d) => d.id === current.id);
 	if (existingIdx >= 0) {
 		// Update existing
 		devices[existingIdx] = {
@@ -223,8 +232,8 @@ export function registerDevice(existingDevices: TrackedDevice[] | undefined | nu
 	// Keep max 10 devices, remove oldest inactive ones
 	if (devices.length > 10) {
 		const sorted = devices.sort((a, b) => {
-			if (a.is_current) return -1;
-			if (b.is_current) return 1;
+			if (a.id === deviceId) return -1;
+			if (b.id === deviceId) return 1;
 			return new Date(b.last_active).getTime() - new Date(a.last_active).getTime();
 		});
 		return sorted.slice(0, 10);

@@ -11,6 +11,7 @@ import AccessibilityFAB from "@/components/a11y/AccessibilityFAB";
 
 import { OrientationGuard } from "@/components/OrientationGuard";
 import { Suspense } from "react";
+import { DeviceInitializer } from "@/components/auth/DeviceInitializer";
 
 const inter = Inter({ subsets: ["latin"] });
 const hyper = Atkinson_Hyperlegible({
@@ -94,6 +95,7 @@ export default function RootLayout({
 	return (
 		<html lang="en">
 			<body className={`${inter.className} ${hyper.variable}`} suppressHydrationWarning>
+				<DeviceInitializer />
 				{/* <SafetyBar /> */}
 				<a
 					href="#main-content"

@@ -75,7 +75,7 @@ export function PrivacySecuritySettings() {
 		// Only register if device is new or hasn't been updated in 5 minutes
 		const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
 		if (!existingDevice || existingDevice.last_active < fiveMinutesAgo) {
-			const updatedDevices = registerDevice(currentDevices);
+			const updatedDevices = registerDevice(currentDevices, currentDeviceId);
 			
 			// Perist to dedicated column
 			supabase
@@ -165,7 +165,7 @@ export function PrivacySecuritySettings() {
 			});
 		} else {
 			// Turning on — register current device
-			const devices = registerDevice([]);
+			const devices = registerDevice([], getOrCreateDeviceId());
 			await persistSettings({ device_tracking_enabled: true });
 			
 			const { error } = await supabase
@@ -426,14 +426,14 @@ export function PrivacySecuritySettings() {
 													{getDeviceIcon(device)}
 												</div>
 												<div>
-													<p className="text-sm font-medium text-neutral-900 flex items-center gap-2">
+													<div className="text-sm font-medium text-neutral-900 flex items-center gap-2">
 														{device.device_name}
 														{isCurrent && (
 															<Badge className="bg-green-100 text-green-700 text-[10px] px-1.5 py-0 font-bold border-0">
 																This Device
 															</Badge>
 														)}
-													</p>
+													</div>
 													<div className="flex items-center gap-2 mt-0.5">
 														{device.location && (
 															<span className="text-xs text-neutral-400 flex items-center gap-1">

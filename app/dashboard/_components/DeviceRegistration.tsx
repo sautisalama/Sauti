@@ -29,28 +29,15 @@ export function DeviceRegistration() {
 		const currentDeviceId = getOrCreateDeviceId();
 		const currentDevices = (profile.devices as any[]) || [];
 
-		// check if authorized
-		if (settings.device_tracking_enabled && currentDevices.length > 0) {
-			const isAuthorized = currentDevices.some(d => d.id === currentDeviceId);
-			if (!isAuthorized) {
-				console.warn("This device has been revoked. Logging out.");
-				const supabase = createClient();
-				supabase.auth.signOut().then(() => {
-					window.location.href = "/signin?reason=session_revoked";
-				});
-				return;
-			}
-		}
-
-		// Only run registration once per browser session
+		// Registration logic
 		const sessionKey = `ss_device_registered_${userId}`;
 		if (sessionStorage.getItem(sessionKey)) return;
 
 		// If device tracking is disabled, skip
 		if (settings.device_tracking_enabled === false) return;
 
-		// Only register if device is new or if the session hasn't registered yet
-		const updatedDevices = registerDevice(currentDevices);
+		// Update or register the device
+		const updatedDevices = registerDevice(currentDevices, currentDeviceId);
 
 		const supabase = createClient();
 

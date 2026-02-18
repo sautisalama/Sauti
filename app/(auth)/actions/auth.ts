@@ -3,6 +3,8 @@
 import { createClient } from "@/utils/supabase/server";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import { cookies, headers } from "next/headers";
+import { registerDevice, parseSettings } from "@/lib/user-settings";
 
 export async function signUp(formData: FormData) {
 	const supabase = await createClient();
@@ -31,6 +33,25 @@ export async function signUp(formData: FormData) {
 
 	if (authData.user) {
 		const now = new Date().toISOString();
+		
+		// Get device info for registration
+		const cookieStore = await cookies();
+		const deviceId = cookieStore.get("ss_device_id")?.value;
+		const userAgent = (await headers()).get("user-agent") || "";
+		
+		const { data: currentProfile } = await supabase
+			.from("profiles")
+			.select("settings, devices")
+			.eq("id", authData.user.id)
+			.single();
+
+		const settings = parseSettings(currentProfile?.settings);
+		let updatedDevices = currentProfile?.devices || [];
+
+		if (deviceId && settings.device_tracking_enabled !== false) {
+			updatedDevices = registerDevice(updatedDevices, deviceId, userAgent);
+		}
+
 		const { error: profileError } = await supabase.from("profiles").upsert(
 			{
 				id: authData.user.id,
@@ -38,6 +59,7 @@ export async function signUp(formData: FormData) {
 				last_name: lastName,
 				created_at: now,
 				updated_at: now,
+				devices: updatedDevices,
 			},
 			{ onConflict: "id" }
 		);
@@ -66,7 +88,30 @@ export async function signIn(formData: FormData) {
 		console.error("Sign in error:", error);
 		return redirect("/?message=account_not_found");
 	}
-// Add revalidation before redirect
+
+	// Register device on sign in
+	const { data: { user } } = await supabase.auth.getUser();
+	if (user) {
+		const cookieStore = await cookies();
+		const deviceId = cookieStore.get("ss_device_id")?.value;
+		const userAgent = (await headers()).get("user-agent") || "";
+
+		const { data: profile } = await supabase
+			.from("profiles")
+			.select("settings, devices")
+			.eq("id", user.id)
+			.single();
+
+		const settings = parseSettings(profile?.settings);
+		if (deviceId && settings.device_tracking_enabled !== false) {
+			const updatedDevices = registerDevice(profile?.devices, deviceId, userAgent);
+			await supabase
+				.from("profiles")
+				.update({ devices: updatedDevices })
+				.eq("id", user.id);
+		}
+	}
+
 	revalidatePath("/", "layout");
 	return redirect("/dashboard");
 }

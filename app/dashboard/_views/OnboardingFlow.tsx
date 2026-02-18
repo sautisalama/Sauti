@@ -40,6 +40,7 @@ import {
 import { POLICIES, Policy, PolicySection } from "./PolicyContent";
 import { cn } from "@/lib/utils";
 import { parsePolicies } from "@/lib/user-settings";
+import { useDashboardData } from "@/components/providers/DashboardDataProvider";
 
 interface Step {
 	id: string;
@@ -84,6 +85,7 @@ const titleConfigs: Record<string, { icon: any, color: string, bgColor: string, 
 
 export default function OnboardingFlow() {
 	const user = useUser();
+	const dash = useDashboardData();
 	const supabase = createClient();
 	const [stepIndex, setStepIndex] = useState(0);
 	const [saving, setSaving] = useState(false);
@@ -111,6 +113,7 @@ export default function OnboardingFlow() {
 
 	// Track if we've already done the initial check to avoid skipping steps twice if we manually go back
 	const [hasResumed, setHasResumed] = useState(false);
+	const [openPolicy, setOpenPolicy] = useState<string | undefined>("terms");
 
 	useEffect(() => {
 		if (user?.profile && !hasResumed) {
@@ -167,10 +170,13 @@ export default function OnboardingFlow() {
 			if (!user?.id) return setStepIndex((i) => Math.min(i + 1, filteredSteps.length - 1));
 			setSaving(true);
 			
+			const currentPolicies = parsePolicies(user.profile?.policies);
 			const policyUpdate = {
 				accepted_policies: profile.accepted_policies,
-				all_policies_accepted: current === 'policies' ? allPoliciesAccepted : parsePolicies(user.profile?.policies).all_policies_accepted,
-				policies_accepted_at: current === 'policies' && allPoliciesAccepted ? new Date().toISOString() : parsePolicies(user.profile?.policies).policies_accepted_at
+				all_policies_accepted: allPoliciesAccepted,
+				policies_accepted_at: allPoliciesAccepted 
+					? (currentPolicies.policies_accepted_at || new Date().toISOString()) 
+					: null
 			};
 
 			// Always sync current state to DB on Next
@@ -189,6 +195,22 @@ export default function OnboardingFlow() {
 				.eq("id", user.id);
 
 			if (isLastStep) {
+				// Update provider instantly for UI response
+				if (dash && user?.profile) {
+					dash.updatePartial({
+						profile: {
+							...user.profile,
+							first_name: profile.first_name || null,
+							last_name: profile.last_name || null,
+							phone: profile.phone || null,
+							professional_title: profile.professional_title || null,
+							bio: profile.bio || null,
+							is_public_booking: profile.is_public_booking,
+							user_type: profile.user_type,
+							policies: policyUpdate as any
+						}
+					});
+				}
 				router.refresh();
 				return;
 			}
@@ -232,7 +254,13 @@ export default function OnboardingFlow() {
 				</p>
 			</CardHeader>
 			<CardContent className="p-3 md:p-6 flex-1 overflow-y-auto no-scrollbar">
-				<Accordion type="single" collapsible className="w-full space-y-3">
+				<Accordion 
+					type="single" 
+					collapsible 
+					className="w-full space-y-3"
+					value={openPolicy}
+					onValueChange={setOpenPolicy}
+				>
 					{relevantPolicies.map((policy) => {
 						const isAccepted = profile.accepted_policies.includes(policy.id);
 						return (
@@ -278,10 +306,19 @@ export default function OnboardingFlow() {
 										size="sm"
 										onClick={() => {
 											if (!isAccepted) {
+												const nextAcceptedPolicies = [...profile.accepted_policies, policy.id];
 												setProfile(p => ({
 													...p,
-													accepted_policies: [...p.accepted_policies, policy.id]
+													accepted_policies: nextAcceptedPolicies
 												}));
+
+												// Find next unaccepted policy and open it
+												const nextUnaccepted = relevantPolicies.find(p => !nextAcceptedPolicies.includes(p.id));
+												if (nextUnaccepted) {
+													setOpenPolicy(nextUnaccepted.id);
+												} else {
+													setOpenPolicy(undefined);
+												}
 											}
 										}}
 										className={cn(
@@ -555,16 +592,6 @@ export default function OnboardingFlow() {
 				</Button>
 				
 				<div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto order-1 sm:order-2">
-					{currentStepId === 'services' && (
-						<Button 
-							variant="outline" 
-							onClick={() => router.refresh()} 
-							className="rounded-full px-6 sm:px-8 border-serene-blue-200 hover:bg-serene-blue-50 text-serene-blue-600 font-bold uppercase tracking-widest text-[10px] h-10 sm:h-12 w-full sm:w-auto"
-						>
-							Skip for now
-						</Button>
-					)}
-					
 					<Button 
 						onClick={next} 
 						disabled={
