@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 // The client you created from the Server-Side Auth instructions
 import { createClient } from "@/utils/supabase/server";
+import { cookies, headers } from "next/headers";
+import { registerDevice, parseSettings } from "@/lib/user-settings";
+import { revalidatePath } from "next/cache";
 
 export async function GET(request: Request) {
 	const { searchParams, origin } = new URL(request.url);
@@ -41,6 +44,29 @@ export async function GET(request: Request) {
 					}
 				}
 			}
+
+			// Device registration logic
+			const cookieStore = await cookies();
+			const deviceId = cookieStore.get("ss_device_id")?.value;
+			const userAgent = (await headers()).get("user-agent") || "";
+
+			const { data: profile } = await supabase
+				.from("profiles")
+				.select("settings, devices")
+				.eq("id", user.id)
+				.single();
+
+			const settings = parseSettings(profile?.settings);
+			if (deviceId && settings.device_tracking_enabled !== false) {
+				const updatedDevices = registerDevice(profile?.devices, deviceId, userAgent);
+				await supabase
+					.from("profiles")
+					.update({ devices: updatedDevices })
+					.eq("id", user.id);
+			}
+			
+			// Revalidate before dashboard redirect
+			revalidatePath("/dashboard", "layout");
 		}
 
 		if (!error) {

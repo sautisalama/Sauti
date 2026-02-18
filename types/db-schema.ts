@@ -758,6 +758,7 @@ export type Database = {
           calendar_sync_enabled: boolean | null
           calendar_sync_settings: Json | null
           created_at: string | null
+          devices: Json | null
           email: string | null
           first_name: string | null
           google_calendar_refresh_token: string | null
@@ -772,6 +773,7 @@ export type Database = {
           last_name: string | null
           last_verification_check: string | null
           phone: string | null
+          policies: Json | null
           professional_title: string | null
           profile_image_metadata: Json | null
           profile_image_url: string | null
@@ -801,6 +803,7 @@ export type Database = {
           calendar_sync_enabled?: boolean | null
           calendar_sync_settings?: Json | null
           created_at?: string | null
+          devices?: Json | null
           email?: string | null
           first_name?: string | null
           google_calendar_refresh_token?: string | null
@@ -815,6 +818,7 @@ export type Database = {
           last_name?: string | null
           last_verification_check?: string | null
           phone?: string | null
+          policies?: Json | null
           professional_title?: string | null
           profile_image_metadata?: Json | null
           profile_image_url?: string | null
@@ -844,6 +848,7 @@ export type Database = {
           calendar_sync_enabled?: boolean | null
           calendar_sync_settings?: Json | null
           created_at?: string | null
+          devices?: Json | null
           email?: string | null
           first_name?: string | null
           google_calendar_refresh_token?: string | null
@@ -858,6 +863,7 @@ export type Database = {
           last_name?: string | null
           last_verification_check?: string | null
           phone?: string | null
+          policies?: Json | null
           professional_title?: string | null
           profile_image_metadata?: Json | null
           profile_image_url?: string | null
@@ -1266,6 +1272,14 @@ export type Database = {
         }[]
       }
       is_admin: { Args: { user_id?: string }; Returns: boolean }
+      is_device_session_valid: {
+        Args: { p_device_id: string; p_user_id: string }
+        Returns: boolean
+      }
+      revoke_device_session: {
+        Args: { p_device_id: string; p_user_id: string }
+        Returns: undefined
+      }
     }
     Enums: {
       admin_action_type:

@@ -42,7 +42,7 @@ export async function GET() {
 	} catch (error) {
 		console.error("Google OAuth initiation error:", error);
 		const redirectUrl = new URL(
-			"/dashboard/profile?section=settings&calendar_error=initiation_failed",
+			"/dashboard/profile?section=calendar&calendar_error=initiation_failed",
 			process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"
 		);
 		return NextResponse.redirect(redirectUrl);

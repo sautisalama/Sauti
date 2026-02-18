@@ -63,9 +63,21 @@ function applyAttrs(state: Omit<AccessibilityState, "set" | "reset">) {
 }
 
 export function AccessibilityProvider({ children }: { children: React.ReactNode }) {
-  const [state, setState] = useState<Omit<AccessibilityState, "set" | "reset">>(() => load());
+  const [state, setState] = useState<Omit<AccessibilityState, "set" | "reset">>(DEFAULT_STATE);
+  const [mounted, setMounted] = useState(false);
 
-  useEffect(() => { applyAttrs(state); save(state); }, [state]);
+  useEffect(() => {
+    const loaded = load();
+    setState(loaded);
+    setMounted(true);
+  }, []);
+
+  useEffect(() => { 
+    if (mounted) {
+      applyAttrs(state); 
+      save(state); 
+    }
+  }, [state, mounted]);
 
   const value = useMemo<AccessibilityState>(() => ({
     ...state,

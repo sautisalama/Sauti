@@ -52,6 +52,8 @@
 		"google-auth-library": "^10.3.0",
 		"googleapis": "^159.0.0",
 		"ics": "^3.8.1",
+		"jspdf": "^4.1.0",
+		"jspdf-autotable": "^5.0.7",
 		"lottie-react": "^2.4.0",
 		"lucide-react": "^0.548.0",
 		"mailtrap": "^3.4.0",

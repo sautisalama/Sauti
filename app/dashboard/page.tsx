@@ -20,8 +20,8 @@ export default async function Dashboard() {
 		!!user.anon_username || 
 		user.email?.endsWith("@anon.sautisalama.org");
 
-	// Check for policy acceptance in settings
-	const hasAcceptedPolicies = !!(user.settings as any)?.all_policies_accepted;
+	// Check for policy acceptance in dedicated column
+	const hasAcceptedPolicies = !!(user.policies as any)?.all_policies_accepted;
 
 	if (isAnonymous) {
 		return <AnonymousSurvivorView userId={user.id} profileDetails={user} />;

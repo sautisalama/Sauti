@@ -72,15 +72,69 @@ export async function updateSession(request: NextRequest) {
 		return NextResponse.redirect(url);
 	}
 
-	// Add a new check for authenticated users trying to access auth pages
-	if (
-		user &&
-		(request.nextUrl.pathname.startsWith("/signin") ||
-			request.nextUrl.pathname.startsWith("/signup"))
-	) {
-		const url = request.nextUrl.clone();
-		url.pathname = "/dashboard";
-		return NextResponse.redirect(url);
+	// Handle authentication and device authorization
+	if (user) {
+		// Verify device authorization
+		const { data: profile } = await supabase
+			.from("profiles")
+			.select("settings, devices")
+			.eq("id", user.id)
+			.single();
+
+		const settings = profile?.settings as any;
+		const deviceId = request.cookies.get("ss_device_id")?.value;
+		const activeDevices = (profile?.devices || []) as any[];
+		
+		// Registration happens in sign-in actions/callbacks.
+		// If tracking is enabled, the device MUST be in the activeDevices list.
+		const isAuthorized =
+			!settings?.device_tracking_enabled ||
+			(!!deviceId && activeDevices.some((d) => d.id === deviceId));
+
+		// 1. Block dashboard access for unauthorized devices
+		if (!isAuthorized && request.nextUrl.pathname.startsWith("/dashboard")) {
+			console.warn(
+				`[Middleware] Unauthorized device ${deviceId} for user ${user.id}. Revoking session.`
+			);
+			
+			// Destructive sign out - only safe because we sync cookies below
+			await supabase.auth.signOut();
+			
+			const url = request.nextUrl.clone();
+			url.pathname = "/signin";
+			url.searchParams.set("error", "unauthorized_device");
+			
+			// Create redirect response
+			const redirectResponse = NextResponse.redirect(url);
+			
+			// IMPORTANT: Copy Supabase response cookies to the redirect
+			// This ensures session state (like the signout result) is preserved
+			supabaseResponse.cookies.getAll().forEach(cookie => {
+				const { name, value, ...options } = cookie;
+				redirectResponse.cookies.set(name, value, options);
+			});
+			
+			return redirectResponse;
+		}
+
+		// 2. Redirect authorized users away from auth pages
+		if (
+			isAuthorized &&
+			(request.nextUrl.pathname.startsWith("/signin") ||
+				request.nextUrl.pathname.startsWith("/signup"))
+		) {
+			const url = request.nextUrl.clone();
+			url.pathname = "/dashboard";
+			const redirectResponse = NextResponse.redirect(url);
+			
+			// Sync cookies here too
+			supabaseResponse.cookies.getAll().forEach(cookie => {
+				const { name, value, ...options } = cookie;
+				redirectResponse.cookies.set(name, value, options);
+			});
+			
+			return redirectResponse;
+		}
 	}
 
 	// IMPORTANT: You *must* return the supabaseResponse object as it is.

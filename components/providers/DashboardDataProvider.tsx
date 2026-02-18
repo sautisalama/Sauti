@@ -59,6 +59,13 @@ export function DashboardDataProvider({
     }
   }, [isSidebarCollapsed]);
 
+  // Sync state with fresh initialData from server re-renders (router.refresh)
+  useEffect(() => {
+    if (initialData) {
+      setData(initialData);
+    }
+  }, [initialData]);
+
   const setUnreadChatCount = useCallback((n: number) => {
     setData((prev) => {
       if (!prev) return prev;

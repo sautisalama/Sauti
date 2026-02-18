@@ -20,17 +20,18 @@ import { POLICIES, PolicySection } from "../_views/PolicyContent";
 import { Shield, Check, AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { createClient } from "@/utils/supabase/client";
+import { mergeSettings, type UserSettings } from "@/lib/user-settings";
 
 interface PolicyModalProps {
 	userId: string;
-	initialSettings: any;
+	initialPolicies: any;
 	onAccepted: () => void;
 }
 
-export function PolicyModal({ userId, initialSettings, onAccepted }: PolicyModalProps) {
+export function PolicyModal({ userId, initialPolicies, onAccepted }: PolicyModalProps) {
 	const supabase = createClient();
 	const [acceptedPolicies, setAcceptedPolicies] = useState<string[]>(
-		initialSettings?.accepted_policies || []
+		initialPolicies?.accepted_policies || []
 	);
 	const [saving, setSaving] = useState(false);
 
@@ -46,14 +47,16 @@ export function PolicyModal({ userId, initialSettings, onAccepted }: PolicyModal
 		
 		setSaving(true);
 		try {
+			const policyData = {
+				accepted_policies: acceptedPolicies,
+				all_policies_accepted: true,
+				policies_accepted_at: new Date().toISOString(),
+			};
+
 			await supabase
 				.from("profiles")
 				.update({
-					settings: {
-						...initialSettings,
-						accepted_policies: acceptedPolicies,
-						all_policies_accepted: true,
-					}
+					policies: policyData as any,
 				})
 				.eq("id", userId);
 			

@@ -11,6 +11,7 @@ import AccessibilityFAB from "@/components/a11y/AccessibilityFAB";
 
 import { OrientationGuard } from "@/components/OrientationGuard";
 import { Suspense } from "react";
+import { DeviceInitializer } from "@/components/auth/DeviceInitializer";
 
 const inter = Inter({ subsets: ["latin"] });
 const hyper = Atkinson_Hyperlegible({
@@ -93,7 +94,28 @@ export default function RootLayout({
 }>) {
 	return (
 		<html lang="en">
+			<head>
+				<script
+					dangerouslySetInnerHTML={{
+						__html: `
+							(function() {
+								try {
+									var config = JSON.parse(localStorage.getItem('ss_a11y') || '{}');
+									var el = document.documentElement;
+									if (config.highContrast) el.setAttribute('data-a11y-high-contrast', '1');
+									if (config.reduceMotion) el.setAttribute('data-a11y-reduce-motion', '1');
+									if (config.readableFont) el.setAttribute('data-a11y-readable-font', '1');
+									if (config.underlineLinks) el.setAttribute('data-a11y-underline-links', '1');
+									if (config.dyslexic) el.setAttribute('data-a11y-dyslexic', '1');
+									if (config.textScale) el.setAttribute('data-a11y-text-scale', config.textScale);
+								} catch (e) {}
+							})();
+						`,
+					}}
+				/>
+			</head>
 			<body className={`${inter.className} ${hyper.variable}`} suppressHydrationWarning>
+				<DeviceInitializer />
 				{/* <SafetyBar /> */}
 				<a
 					href="#main-content"

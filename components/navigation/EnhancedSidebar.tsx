@@ -103,7 +103,7 @@ export function EnhancedSidebar({
 	const role = isAdminMode ? "admin" : userType;
     
     const profile = dash?.data?.profile || user?.profile;
-    const hasAcceptedPolicies = !!(profile?.settings as any)?.all_policies_accepted;
+    const hasAcceptedPolicies = !!(profile?.policies as any)?.all_policies_accepted;
     const needsOnboarding = !profile?.user_type || 
         !hasAcceptedPolicies ||
         ((profile.user_type === 'professional' || profile.user_type === 'ngo') && !profile.professional_title);

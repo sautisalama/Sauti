@@ -60,7 +60,7 @@ export function EnhancedBottomNav({ forceShow = false, className }: EnhancedBott
   const isChatDetail = isChat && !!chatId; // If /dashboard/chat AND ?id=... exists
   
   const profile = dash?.data?.profile || user?.profile;
-  const hasAcceptedPolicies = !!(profile?.settings as any)?.all_policies_accepted;
+  const hasAcceptedPolicies = !!(profile?.policies as any)?.all_policies_accepted;
   const needsOnboarding = !profile?.user_type || 
     !hasAcceptedPolicies ||
     ((profile.user_type === 'professional' || profile.user_type === 'ngo') && !profile.professional_title);

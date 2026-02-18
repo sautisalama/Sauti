@@ -20,9 +20,6 @@
 }
 
 /* Accessibility attribute-driven overrides */
-html[data-a11y-lg-text="1"] {
-	font-size: 112.5%; /* 18px base, scales rem */
-}
 
 html[data-a11y-readable-font="1"] body {
 	letter-spacing: 0.01em;
@@ -105,6 +102,26 @@ html[data-a11y-high-contrast="1"] {
 	--border: 0 0% 75%;
 	--input: 0 0% 75%;
 	--ring: 201 96% 36%;
+
+	/* Brand colors overrides for high contrast visibility */
+	--serene-blue-50: 210 100% 98%;
+	--serene-blue-100: 210 100% 96%;
+	--serene-blue-500: 210 100% 30%;
+	--serene-blue-600: 210 100% 25%;
+	--serene-blue-700: 210 100% 20%;
+	--serene-blue-800: 210 100% 15%;
+	--serene-blue-900: 210 100% 10%;
+
+	--sauti-teal: 190 100% 25%;
+	--sauti-teal-light: 190 100% 95%;
+	--sauti-orange: 35 100% 40%;
+	--sauti-red: 0 100% 40%;
+
+	--serene-neutral-50: 0 0% 100%;
+	--serene-neutral-100: 0 0% 96%;
+	--serene-neutral-200: 0 0% 85%;
+	--serene-neutral-600: 0 0% 20%;
+	--serene-neutral-900: 0 0% 0%;
 }
 
 @layer base {
