@@ -23,8 +23,8 @@ export default function AdminDashboard() {
         pendingVerifications: number;
         activeServices: number;
         serviceGrowth: { value: string; trend: 'up' | 'down' | 'neutral' };
-        totalProfessionals: number;
-        professionalGrowth: { value: string; trend: 'up' | 'down' | 'neutral' };
+        totalServiceProviders: number;
+        serviceProviderGrowth: { value: string; trend: 'up' | 'down' | 'neutral' };
         blogGrowth: { value: string; trend: 'up' | 'down' | 'neutral' };
         unreadMessages: number;
     } | null>(null);
@@ -134,12 +134,12 @@ export default function AdminDashboard() {
                 .eq("verification_status", "verified");
             const serviceGrowth = await calculateGrowth("support_services", { verification_status: "verified" });
 
-            // Professionals
-            const { count: proCount } = await supabase
+            // Service Providers
+            const { count: spCount } = await supabase
                 .from("profiles")
                 .select("*", { count: 'exact', head: true })
                 .in("user_type", ["professional", "ngo"]);
-            const professionalGrowth = await calculateGrowth("profiles", { user_type: ["professional", "ngo"] });
+            const serviceProviderGrowth = await calculateGrowth("profiles", { user_type: ["professional", "ngo"] });
 
             // Blogs
             const blogGrowth = await calculateGrowth("blogs");
@@ -151,8 +151,8 @@ export default function AdminDashboard() {
                 pendingVerifications: totalPending,
                 activeServices: serviceCount || 0,
                 serviceGrowth,
-                totalProfessionals: proCount || 0,
-                professionalGrowth,
+                totalServiceProviders: spCount || 0,
+                serviceProviderGrowth: serviceProviderGrowth,
                 blogGrowth,
                 unreadMessages
             });
@@ -222,13 +222,13 @@ export default function AdminDashboard() {
                         stats={stats?.serviceGrowth}
                      />
                      <SereneQuickActionCard 
-                        title="Professionals"
-                        description={stats ? `${stats.totalProfessionals} Registered` : "Userbase"}
+                        title="Service Providers"
+                        description={stats ? `${stats.totalServiceProviders} Registered` : "Userbase"}
                         icon={<Users className="h-6 w-6 text-sauti-teal" />}
                         href="/dashboard/admin/professionals"
                         variant="custom"
                         className="bg-sauti-teal-light border-sauti-teal/10 shadow-sm hover:shadow-md transition-all"
-                        stats={stats?.professionalGrowth}
+                        stats={stats?.serviceProviderGrowth}
                      />
                      <SereneQuickActionCard 
                         title="Content"

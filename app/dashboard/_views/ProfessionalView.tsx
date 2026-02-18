@@ -362,7 +362,7 @@ export default function ProfessionalView({
                             // 5. No Services (Onboarding)
                             else if (total === 0) {
 								bannerTitle = "Register your first service";
-								bannerDesc = "Add a support service to start helping survivors and complete your provider profile.";
+								bannerDesc = "Add a support service to start helping survivors and complete your service provider profile.";
                                 bannerVariant = "warning"; // Encouragement
 							}
 

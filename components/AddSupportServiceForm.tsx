@@ -25,6 +25,7 @@ import { EnhancedSelect } from "@/components/ui/enhanced-select";
 import { cn } from "@/lib/utils";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { LocationPicker } from "@/components/ui/location-picker";
+import { Badge } from "@/components/ui/badge";
 
 type ServiceType = Database["public"]["Enums"]["support_service_type"];
 
@@ -56,8 +57,10 @@ const COVERAGE_OPTIONS = [
 
 export function AddSupportServiceForm({
 	onSuccess,
+	embedded = false,
 }: {
 	onSuccess?: (newServiceId?: string) => void;
+	embedded?: boolean;
 }) {
 	const { toast } = useToast();
 	const dash = useDashboardData();
@@ -163,213 +166,229 @@ export function AddSupportServiceForm({
 	};
 
 	return (
-		<div className="flex flex-col h-full bg-white sm:rounded-3xl overflow-hidden">
-			{/* Header */}
-			<div className="px-6 py-5 border-b border-neutral-100 flex items-center justify-between bg-white sticky top-0 z-10">
-				<div>
-					<h2 className="text-xl font-bold text-neutral-900 tracking-tight">
-						Add Support Service
-					</h2>
-					<p className="text-sm text-neutral-500 font-medium">
-						Step 1 of 2: Service Details
-					</p>
-				</div>
-			</div>
-
-			<div className="flex-1 overflow-y-auto">
-				<form id="add-service-form" onSubmit={handleSubmit} className="max-w-2xl mx-auto p-6 space-y-8">
-					
-					{/* Organization Info */}
-					<div className="space-y-4">
-						<div className="flex items-center gap-2 mb-2">
-							<Building2 className="h-5 w-5 text-sauti-teal" />
-							<h3 className="text-lg font-bold text-neutral-900">Organization Details</h3>
+		<div className={cn("flex flex-col h-full bg-white sm:rounded-3xl overflow-hidden", embedded && "h-auto bg-transparent sm:rounded-none overflow-visible")}>
+			{/* Premium Glass Header */}
+			{!embedded && (
+				<div className="px-4 py-3 border-b border-serene-blue-100 flex items-center justify-between bg-serene-blue-50/50 backdrop-blur-xl sticky top-0 z-10 shrink-0">
+					<div className="flex items-center gap-2">
+						<div className="h-8 w-8 rounded-xl bg-white shadow-sm flex items-center justify-center border border-serene-blue-100">
+							<Briefcase className="h-4 w-4 text-serene-blue-600" />
 						</div>
-						
-						<div className="space-y-4">
-							<div className="space-y-1.5">
-								<Label htmlFor="name" className="text-sm font-semibold text-neutral-700">
-									Organization Name <span className="text-red-500">*</span>
+						<div>
+							<h2 className="text-lg font-black text-serene-blue-900 tracking-tight leading-none mb-1">
+								Define Your Service
+							</h2>
+							<p className="text-[10px] font-black text-serene-blue-500 uppercase tracking-widest">
+								Setup your professional profile
+							</p>
+						</div>
+					</div>
+					<Badge variant="outline" className="rounded-full border-serene-blue-200 text-serene-blue-700 bg-white font-black text-[9px] uppercase px-2 py-0">
+						Step 3 of 3
+					</Badge>
+				</div>
+			)}
+
+			<div className={cn("flex-1 overflow-y-auto no-scrollbar", embedded && "flex-initial overflow-visible")}>
+				<form id="add-service-form" onSubmit={handleSubmit} className={cn("max-w-2xl mx-auto p-4 md:p-6 space-y-4 md:space-y-8", embedded && "p-0")}>
+					
+					{/* Primary Details Grid - Dashboard inspired */}
+					<div className={cn("bg-white p-4 md:p-6 rounded-[1.5rem] md:rounded-[2.5rem] border border-serene-neutral-100 shadow-sm space-y-4 md:space-y-6", embedded && "bg-transparent border-none shadow-none p-0")}>
+						<div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4 md:gap-y-5">
+							<div className="space-y-2">
+								<Label htmlFor="name" className="text-[11px] font-black text-serene-neutral-600 uppercase tracking-widest px-1">
+									Service/Org Name <span className="text-red-500">*</span>
 								</Label>
 								<Input
 									id="name"
-									placeholder="e.g. Hope Counseling Center"
+									placeholder="e.g. Sauti Hope Solutions"
 									value={formData.name}
 									onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-									className="h-11 rounded-xl border-neutral-200 focus:border-sauti-teal focus:ring-sauti-teal/20"
+									className="h-11 rounded-[1rem] border-serene-neutral-200 focus:border-serene-blue-500 focus:ring-serene-blue-500/10 bg-serene-neutral-50/50 transition-all font-medium"
 								/>
 							</div>
 
-							<div className="space-y-1.5">
-								<Label className="text-sm font-semibold text-neutral-700">
-									Service Type <span className="text-red-500">*</span>
+							<div className="space-y-2">
+								<Label className="text-[11px] font-black text-serene-neutral-600 uppercase tracking-widest px-1">
+									Field of Expertise <span className="text-red-500">*</span>
 								</Label>
 								<EnhancedSelect
 									options={SERVICE_OPTIONS}
 									value={formData.service_types}
 									onChange={(val) => setFormData({ ...formData, service_types: val as ServiceType })}
-									placeholder="Select service type..."
+									placeholder="Select category..."
 								/>
 							</div>
-						</div>
-					</div>
 
-					{/* Contact Info */}
-					<div className="space-y-4">
-						<div className="flex items-center gap-2 mb-2">
-							<Phone className="h-5 w-5 text-sauti-teal" />
-							<h3 className="text-lg font-bold text-neutral-900">Contact Information</h3>
-						</div>
-
-						<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-							<div className="space-y-1.5">
-								<Label htmlFor="phone" className="text-sm font-semibold text-neutral-700">Phone Number <span className="text-red-500">*</span></Label>
+							<div className="space-y-2">
+								<Label htmlFor="phone" className="text-[11px] font-black text-serene-neutral-600 uppercase tracking-widest px-1">Contact Phone <span className="text-red-500">*</span></Label>
 								<Input
 									id="phone"
 									type="tel"
-									placeholder="+254..."
+									placeholder="+254 7XX XXX XXX"
 									value={formData.phone_number}
 									onChange={(e) => setFormData({ ...formData, phone_number: e.target.value })}
-									className="h-11 rounded-xl border-neutral-200 focus:border-sauti-teal focus:ring-sauti-teal/20"
+									className="h-11 rounded-[1rem] border-serene-neutral-200 focus:border-serene-blue-500 focus:ring-serene-blue-500/10 bg-serene-neutral-50/50 transition-all font-medium"
 								/>
 							</div>
-							<div className="space-y-1.5">
-								<Label htmlFor="email" className="text-sm font-semibold text-neutral-700">Email Address</Label>
-								<Input
-									id="email"
-									type="email"
-									placeholder="contact@org.com"
-									value={formData.email}
-									onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-									className="h-11 rounded-xl border-neutral-200 focus:border-sauti-teal focus:ring-sauti-teal/20"
+
+							<div className="space-y-2">
+								<Label className="text-[11px] font-black text-serene-neutral-600 uppercase tracking-widest px-1">
+									Work Schedule <span className="text-red-500">*</span>
+								</Label>
+								<EnhancedSelect
+									options={AVAILABILITY_OPTIONS}
+									value={formData.availability}
+									onChange={(val) => setFormData({ ...formData, availability: val })}
+									placeholder="Select availability..."
 								/>
 							</div>
-						</div>
-						<div className="space-y-1.5">
-							<Label htmlFor="website" className="text-sm font-semibold text-neutral-700">Website</Label>
-							<Input
-								id="website"
-								placeholder="https://..."
-								value={formData.website}
-								onChange={(e) => setFormData({ ...formData, website: e.target.value })}
-								className="h-11 rounded-xl border-neutral-200 focus:border-sauti-teal focus:ring-sauti-teal/20"
-							/>
 						</div>
 					</div>
 
-					{/* Availability & Coverage */}
-					<div className="space-y-4">
-						<div className="flex items-center gap-2 mb-2">
-							<Globe className="h-5 w-5 text-sauti-teal" />
-							<h3 className="text-lg font-bold text-neutral-900">Availability & Coverage</h3>
-						</div>
+					{/* Progressive Disclosure (Accordions) */}
+					<div className="space-y-2">
+						<Accordion type="single" collapsible className="w-full">
+							<AccordionItem value="reach" className="border-none bg-serene-blue-50/30 rounded-[1.5rem] mb-3 overflow-hidden transition-all hover:bg-serene-blue-50/50">
+								<AccordionTrigger className="hover:no-underline py-3 px-4 group">
+									<div className="flex items-center gap-3">
+										<div className="h-7 w-7 rounded-lg bg-white shadow-sm flex items-center justify-center border border-serene-blue-100 group-hover:scale-110 transition-transform">
+											<Globe className="h-3.5 w-3.5 text-serene-blue-600" />
+										</div>
+										<div className="text-left">
+											<span className="block text-[11px] font-black text-serene-blue-900 uppercase tracking-widest leading-none mb-1">Reach & Coverage</span>
+											<span className="block text-[9px] text-serene-neutral-500 font-medium tracking-tight">Set radius or remote status</span>
+										</div>
+									</div>
+								</AccordionTrigger>
+								<AccordionContent className="pt-2 pb-4 px-4 space-y-3 border-t border-serene-blue-100/50 mt-1">
+									<div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+										<div 
+											onClick={() => setFormData({ ...formData, is_remote: !formData.is_remote })}
+											className={cn(
+												"cursor-pointer p-4 rounded-[1.25rem] border-2 transition-all flex items-center gap-4 bg-white",
+												formData.is_remote 
+													? "border-serene-blue-500 shadow-md ring-2 ring-serene-blue-500/10" 
+													: "border-serene-neutral-100 hover:border-serene-blue-200"
+											)}
+										>
+											<div className={cn("h-5 w-5 rounded-full border-2 flex items-center justify-center shrink-0", 
+												formData.is_remote ? "border-serene-blue-500 bg-serene-blue-500" : "border-serene-neutral-300"
+											)}>
+												{formData.is_remote && <CheckCircle className="h-3 w-3 text-white" />}
+											</div>
+											<span className="text-sm font-bold text-serene-neutral-900">Virtual/Remote</span>
+										</div>
 
-						<div className="space-y-1.5">
-							<Label className="text-sm font-semibold text-neutral-700">
-								Typical Availability <span className="text-red-500">*</span>
-							</Label>
-							<EnhancedSelect
-								options={AVAILABILITY_OPTIONS}
-								value={formData.availability}
-								onChange={(val) => setFormData({ ...formData, availability: val })}
-								placeholder="Select availability..."
-							/>
-						</div>
+										<div 
+											onClick={() => setFormData({ ...formData, coverage_area_radius: formData.coverage_area_radius ? "" : "5" })}
+											className={cn(
+												"cursor-pointer p-4 rounded-[1.25rem] border-2 transition-all flex items-center gap-4 bg-white",
+												formData.coverage_area_radius 
+													? "border-serene-blue-500 shadow-md ring-2 ring-serene-blue-500/10" 
+													: "border-serene-neutral-100 hover:border-serene-blue-200"
+											)}
+										>
+											<div className={cn("h-5 w-5 rounded-full border-2 flex items-center justify-center shrink-0", 
+												formData.coverage_area_radius ? "border-serene-blue-500 bg-serene-blue-500" : "border-serene-neutral-300"
+											)}>
+												{formData.coverage_area_radius && <CheckCircle className="h-3 w-3 text-white" />}
+											</div>
+											<span className="text-sm font-bold text-serene-neutral-900">In-Person/Local</span>
+										</div>
+									</div>
 
-						<div className="space-y-3 pt-2">
-							<Label className="text-sm font-semibold text-neutral-700">Service Reach <span className="text-red-500">*</span></Label>
-							<div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-								{/* Remote Option */}
-								<div 
-									onClick={() => setFormData({ ...formData, is_remote: !formData.is_remote })}
-									className={cn(
-										"cursor-pointer p-4 rounded-xl border-2 transition-all flex items-start gap-3",
-										formData.is_remote 
-											? "border-sauti-teal bg-sauti-teal/5 ring-1 ring-sauti-teal" 
-											: "border-neutral-100 bg-neutral-50 hover:border-neutral-200"
+									{formData.coverage_area_radius && (
+										<div className="pt-2 animate-in fade-in slide-in-from-top-4 duration-500">
+											<div className="p-1 bg-serene-neutral-50 rounded-[1.75rem] border border-serene-neutral-200 overflow-hidden shadow-inner">
+												<LocationPicker
+													initialLat={location?.lat || -1.2921}
+													initialLng={location?.lng || 36.8219}
+													initialRadius={Number(formData.coverage_area_radius) === 0 ? 5000 : Number(formData.coverage_area_radius)}
+													onLocationChange={(lat, lng, address) => {
+														setFormData(prev => ({ ...prev, latitude: lat, longitude: lng, address }));
+													}}
+													onRadiusChange={(radius) => {
+														setFormData(prev => ({ ...prev, coverage_area_radius: String(radius) }));
+													}}
+												/>
+											</div>
+										</div>
 									)}
-								>
-									<div className={cn("mt-0.5 h-5 w-5 rounded-full border flex items-center justify-center shrink-0", 
-										formData.is_remote ? "border-sauti-teal bg-sauti-teal" : "border-neutral-300 bg-white"
-									)}>
-										{formData.is_remote && <CheckCircle className="h-3.5 w-3.5 text-white" />}
-									</div>
-									<div>
-										<span className="block font-semibold text-neutral-900">Remote Services</span>
-										<span className="text-xs text-neutral-500">Phone, video, or online support available anywhere.</span>
-									</div>
-								</div>
+								</AccordionContent>
+							</AccordionItem>
 
-								{/* In-Person Option */}
-								<div 
-									onClick={() => setFormData({ ...formData, coverage_area_radius: formData.coverage_area_radius ? "" : "5" })}
-									className={cn(
-										"cursor-pointer p-4 rounded-xl border-2 transition-all flex items-start gap-3",
-										formData.coverage_area_radius 
-											? "border-sauti-teal bg-sauti-teal/5 ring-1 ring-sauti-teal" 
-											: "border-neutral-100 bg-neutral-50 hover:border-neutral-200"
-									)}
-								>
-									<div className={cn("mt-0.5 h-5 w-5 rounded-full border flex items-center justify-center shrink-0", 
-										formData.coverage_area_radius ? "border-sauti-teal bg-sauti-teal" : "border-neutral-300 bg-white"
-									)}>
-										{formData.coverage_area_radius && <CheckCircle className="h-3.5 w-3.5 text-white" />}
+							<AccordionItem value="digital" className="border-none bg-serene-neutral-50/50 rounded-[1.5rem] overflow-hidden transition-all hover:bg-serene-neutral-100/50">
+								<AccordionTrigger className="hover:no-underline py-3 px-4 group">
+									<div className="flex items-center gap-3">
+										<div className="h-7 w-7 rounded-lg bg-white shadow-sm flex items-center justify-center border border-serene-neutral-200 group-hover:scale-110 transition-transform">
+											<Mail className="h-3.5 w-3.5 text-serene-neutral-600" />
+										</div>
+										<div className="text-left">
+											<span className="block text-[11px] font-black text-serene-neutral-900 uppercase tracking-widest leading-none mb-1">Digital Presence</span>
+											<span className="block text-[9px] text-serene-neutral-500 font-medium tracking-tight">Email and website for searchability</span>
+										</div>
 									</div>
-									<div>
-										<span className="block font-semibold text-neutral-900">In-Person Services</span>
-										<span className="text-xs text-neutral-500">Physical support within a specific radius.</span>
+								</AccordionTrigger>
+								<AccordionContent className="pt-2 pb-4 px-4 border-t border-serene-neutral-200/50 mt-1">
+									<div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
+										<div className="space-y-1.5">
+											<Label htmlFor="email" className="text-[10px] font-black text-serene-neutral-500 uppercase tracking-widest px-1">Email (Optional)</Label>
+											<Input
+												id="email"
+												type="email"
+												placeholder="provider@service.com"
+												value={formData.email}
+												onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+												className="h-10 rounded-[0.75rem] border-serene-neutral-200 focus:border-serene-blue-500 bg-white"
+											/>
+										</div>
+										<div className="space-y-1.5">
+											<Label htmlFor="website" className="text-[10px] font-black text-serene-neutral-500 uppercase tracking-widest px-1">Website (Optional)</Label>
+											<Input
+												id="website"
+												placeholder="https://myservice.com"
+												value={formData.website}
+												onChange={(e) => setFormData({ ...formData, website: e.target.value })}
+												className="h-10 rounded-[0.75rem] border-serene-neutral-200 focus:border-serene-blue-500 bg-white"
+											/>
+										</div>
 									</div>
-								</div>
-							</div>
-
-							{/* Location Picker if In-Person */}
-							{/* We use an existing location check or default to Nairobi if geolocation failed/not ready */}
-							{formData.coverage_area_radius && (
-								<div className="pt-2 animate-in fade-in slide-in-from-top-2">
-									<Label className="text-sm font-semibold text-neutral-700 mb-2 block">Service Location & Coverage</Label>
-									<LocationPicker
-										initialLat={location?.lat || -1.2921}
-										initialLng={location?.lng || 36.8219}
-										initialRadius={Number(formData.coverage_area_radius) === 0 ? 5000 : Number(formData.coverage_area_radius)}
-										onLocationChange={(lat, lng, address) => {
-											setFormData(prev => ({ ...prev, latitude: lat, longitude: lng, address }));
-										}}
-										onRadiusChange={(radius) => {
-											setFormData(prev => ({ ...prev, coverage_area_radius: String(radius) }));
-										}}
-									/>
-								</div>
-							)}
-						</div>
+								</AccordionContent>
+							</AccordionItem>
+						</Accordion>
 					</div>
+
 				</form>
 			</div>
 
-			{/* Sticky Footer */}
-			<div className="p-6 border-t border-neutral-100 bg-white shrink-0">
-				<Button
-					form="add-service-form"
-					type="submit"
-					disabled={!isFormFilled || loading}
-					className={cn(
-						"w-full h-12 text-base font-bold rounded-xl shadow-md transition-all",
-						!isFormFilled || loading
-							? "bg-neutral-200 text-neutral-400 cursor-not-allowed shadow-none"
-							: "bg-sauti-teal hover:bg-sauti-dark text-white shadow-sauti-teal/20"
-					)}
-				>
-					{loading ? (
-						<>
-							<Loader2 className="mr-2 h-5 w-5 animate-spin" />
-							Creating Service...
-						</>
-					) : (
-						<>
-							Create & Continue <ArrowRight className="ml-2 h-5 w-5" />
-						</>
-					)}
-				</Button>
-			</div>
+			{/* Sticky Dashboard-Style Footer */}
+			{!embedded && (
+				<div className="p-5 border-t border-serene-blue-100 bg-serene-blue-50/80 backdrop-blur-xl shrink-0">
+					<Button
+						form="add-service-form"
+						type="submit"
+						disabled={!isFormFilled || loading}
+						className={cn(
+							"w-full h-12 text-xs font-black rounded-2xl shadow-xl transition-all uppercase tracking-[0.2em]",
+							!isFormFilled || loading
+								? "bg-serene-neutral-200 text-serene-neutral-400 cursor-not-allowed shadow-none"
+								: "bg-serene-blue-600 hover:bg-serene-blue-700 text-white shadow-serene-blue-500/20 hover:scale-[1.02] active:scale-95"
+						)}
+					>
+						{loading ? (
+							<>
+								<Loader2 className="mr-2 h-4 w-4 animate-spin" />
+								Finalizing...
+							</>
+						) : (
+							<>
+								Create Professional Profile <ArrowRight className="ml-2 h-4 w-4" />
+							</>
+						)}
+					</Button>
+				</div>
+			)}
 		</div>
 	);
 }

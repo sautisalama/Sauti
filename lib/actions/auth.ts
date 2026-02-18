@@ -12,9 +12,6 @@ export async function signUp(formData: FormData) {
 	const firstName = formData.get("firstName") as string;
 	const lastName = formData.get("lastName") as string;
 	const redirectUrl = process.env.NEXT_PUBLIC_APP_URL;
-	const userType = formData.get(
-		"userType"
-	) as Database["public"]["Enums"]["user_type"];
 
 	// First create the auth user
 	const { data: authData, error: authError } = await supabase.auth.signUp({
@@ -26,7 +23,6 @@ export async function signUp(formData: FormData) {
 				email,
 				first_name: firstName,
 				last_name: lastName,
-				user_type: userType,
 			},
 		},
 	});
@@ -44,7 +40,6 @@ export async function signUp(formData: FormData) {
 				id: authData.user.id,
 				first_name: firstName,
 				last_name: lastName,
-				user_type: userType,
 				created_at: now,
 				updated_at: now,
 			},
@@ -59,6 +54,7 @@ export async function signUp(formData: FormData) {
 			redirect("/error");
 		}
 	}
+
 
 	revalidatePath("/", "layout");
 	redirect("/dashboard");

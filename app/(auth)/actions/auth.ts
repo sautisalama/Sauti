@@ -3,7 +3,6 @@
 import { createClient } from "@/utils/supabase/server";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import { Database } from "@/types/db-schema";
 
 export async function signUp(formData: FormData) {
 	const supabase = await createClient();
@@ -11,32 +10,25 @@ export async function signUp(formData: FormData) {
 	const password = formData.get("password") as string;
 	const firstName = formData.get("firstName") as string;
 	const lastName = formData.get("lastName") as string;
-	const redirectUrl = process.env.NEXT_PUBLIC_APP_URL;
-	const userType = formData.get(
-		"userType"
-	) as Database["public"]["Enums"]["user_type"];
+	const redirectUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 
-	// First create the auth user
 	const { data: authData, error: authError } = await supabase.auth.signUp({
 		email,
 		password,
 		options: {
 			emailRedirectTo: `${redirectUrl}/api/auth/confirm`,
 			data: {
-				email,
 				first_name: firstName,
 				last_name: lastName,
-				user_type: userType,
 			},
 		},
 	});
 
 	if (authError) {
 		console.error("Sign up error:", authError);
-		redirect("/?message=signup_failed");
+		return redirect("/?message=signup_failed");
 	}
 
-	// Then handle the profile
 	if (authData.user) {
 		const now = new Date().toISOString();
 		const { error: profileError } = await supabase.from("profiles").upsert(
@@ -44,52 +36,44 @@ export async function signUp(formData: FormData) {
 				id: authData.user.id,
 				first_name: firstName,
 				last_name: lastName,
-				user_type: userType,
 				created_at: now,
 				updated_at: now,
 			},
-			{
-				onConflict: "id",
-				ignoreDuplicates: false, // This will update the record if it exists
-			}
+			{ onConflict: "id" }
 		);
 
 		if (profileError) {
 			console.error("Profile creation error:", profileError);
-			redirect("/?message=profile_creation_failed");
+			return redirect("/?message=profile_creation_failed");
 		}
 	}
 
 	revalidatePath("/", "layout");
-	redirect("/dashboard?message=signup_success");
+	return redirect("/dashboard?message=signup_success");
 }
 
 export async function signIn(formData: FormData) {
 	const supabase = await createClient();
 	const email = formData.get("email") as string;
 	const password = formData.get("password") as string;
+	
 	const { error } = await supabase.auth.signInWithPassword({
 		email,
 		password,
 	});
 
 	if (error) {
-		// Check specifically for invalid login credentials
-		if (error.message === "Invalid login credentials") {
-			redirect("/?message=account_not_found");
-		}
 		console.error("Sign in error:", error);
-		redirect("/?message=account_not_found");
+		return redirect("/?message=account_not_found");
 	}
-
-	// Add revalidation before redirect
+// Add revalidation before redirect
 	revalidatePath("/", "layout");
-	redirect("/dashboard");
+	return redirect("/dashboard");
 }
 
 export async function signInWithGoogle() {
 	const supabase = await createClient();
-	const redirectUrl = process.env.NEXT_PUBLIC_APP_URL;
+	const redirectUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 
 	const { data, error } = await supabase.auth.signInWithOAuth({
 		provider: "google",
@@ -105,19 +89,18 @@ export async function signInWithGoogle() {
 
 	if (error) {
 		console.error("Google sign in error:", error);
-		redirect("/?message=google_signin_failed");
+		return redirect("/?message=google_signin_failed");
 	}
 
 	if (data.url) {
-		redirect(data.url);
+		return redirect(data.url);
 	}
 }
 
 export async function signOut() {
 	const supabase = await createClient();
 	await supabase.auth.signOut();
-
 	// Revalidate all pages before redirect
 	revalidatePath("/", "layout");
-	redirect("/");
+	return redirect("/");
 }

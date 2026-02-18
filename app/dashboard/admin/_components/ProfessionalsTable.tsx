@@ -176,7 +176,7 @@ export function ProfessionalsTable() {
 
 			toast({
 				title: "Success",
-				description: `Professional ${ban ? "banned" : "unbanned"} successfully`,
+				description: `Service Provider ${ban ? "banned" : "unbanned"} successfully`,
 			});
 			loadProfessionals();
 		} catch (error) {
@@ -226,14 +226,14 @@ export function ProfessionalsTable() {
 			{/* Header & Filters */}
 			<div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
 				<div>
-					<h2 className="text-2xl font-bold text-serene-neutral-900 tracking-tight">Professionals Directory</h2>
-					<p className="text-serene-neutral-500 text-sm mt-1">Manage verified professionals and account status</p>
+					<h2 className="text-2xl font-bold text-serene-neutral-900 tracking-tight">Service Provider Directory</h2>
+					<p className="text-serene-neutral-500 text-sm mt-1">Manage verified service providers and account status</p>
 				</div>
 				<div className="flex flex-col sm:flex-row gap-3">
 					<div className="relative">
 						<Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-serene-neutral-400 h-4 w-4" />
 						<Input
-							placeholder="Search professionals..."
+							placeholder="Search service providers..."
 							value={searchTerm}
 							onChange={(e) => setSearchTerm(e.target.value)}
 							className="pl-10 h-10 w-full sm:w-[280px] rounded-xl bg-white border-serene-neutral-200 focus:border-serene-blue-300 focus:ring-4 focus:ring-serene-blue-100 transition-all shadow-sm"
@@ -262,7 +262,7 @@ export function ProfessionalsTable() {
 						<Table>
 							<TableHeader className="bg-serene-neutral-50/50">
 								<TableRow className="hover:bg-transparent border-b border-serene-neutral-100">
-									<TableHead className="font-semibold text-xs uppercase tracking-wider text-serene-neutral-500 py-5 pl-8">Professional</TableHead>
+									<TableHead className="font-semibold text-xs uppercase tracking-wider text-serene-neutral-500 py-5 pl-8">Service Provider</TableHead>
 									<TableHead className="font-semibold text-xs uppercase tracking-wider text-serene-neutral-500 py-5">Contact</TableHead>
 									<TableHead className="font-semibold text-xs uppercase tracking-wider text-serene-neutral-500 py-5">Verification</TableHead>
 									<TableHead className="font-semibold text-xs uppercase tracking-wider text-serene-neutral-500 py-5">Joined</TableHead>
@@ -365,10 +365,10 @@ export function ProfessionalsTable() {
                                                 <User className="h-10 w-10 text-sauti-teal" />
                                             </div>
                                             <h3 className="text-lg font-bold text-sauti-teal mb-1">
-                                                No professionals found
+                                                No service providers found
                                             </h3>
                                             <p className="text-sm text-serene-neutral-500 max-w-sm mx-auto mb-6">
-                                                We couldn't find any professionals matching your criteria.
+                                                We couldn't find any service providers matching your criteria.
                                             </p>
                                             <Button 
                                                 variant="outline" 
@@ -459,7 +459,7 @@ export function ProfessionalsTable() {
 							))
 						) : (
 							<div className="p-8 text-center text-serene-neutral-400">
-								No professionals found.
+								No service providers found.
 							</div>
 						)}
 					</div>

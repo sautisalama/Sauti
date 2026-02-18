@@ -316,7 +316,7 @@ export default function ProfilePage() {
 												{isProfessional && (
 													<div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-serene-blue-50 text-serene-blue-700 rounded-full text-xs font-semibold mt-2">
 														<Shield className="h-3 w-3" />
-														Professional
+														{profile?.user_type === 'professional' ? 'Service Provider' : 'Organisation'}
 													</div>
 												)}
 											</div>

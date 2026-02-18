@@ -110,6 +110,10 @@ export function NotificationDropdown() {
 
     const formatTimeAgo = (dateString: string | null) => {
         if (!dateString) return 'Just now';
+        
+        // Hydration stability: don't compute relative time on server
+        if (typeof window === 'undefined') return 'Just now';
+        
         const date = new Date(dateString);
         const now = new Date();
         const diffInSeconds = Math.max(0, Math.floor((now.getTime() - date.getTime()) / 1000));
