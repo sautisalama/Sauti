@@ -107,10 +107,10 @@ export async function GET(request: Request) {
 			);
 		}
 
-		// Success — redirect back to settings
+		// Success — redirect to the calendar tab
 		return NextResponse.redirect(
 			new URL(
-				"/dashboard/profile?section=settings&calendar_success=true",
+				"/dashboard/profile?section=calendar&calendar_success=true",
 				appUrl
 			)
 		);
@@ -118,7 +118,7 @@ export async function GET(request: Request) {
 		console.error("Google OAuth callback error:", err);
 		return NextResponse.redirect(
 			new URL(
-				"/dashboard/profile?section=settings&calendar_error=token_exchange_failed",
+				"/dashboard/profile?section=calendar&calendar_error=token_exchange_failed",
 				appUrl
 			)
 		);

@@ -70,7 +70,25 @@ export async function getUser(): Promise<Tables<"profiles"> | null> {
 
 		// If profile exists, return it
 		if (data && !error) {
-			return data;
+			// ── SESSION VALIDATION ──
+			// Check if the current device is authorized if tracking is enabled
+			const cookieStore = await cookies();
+			const deviceId = cookieStore.get("ss_device_id")?.value;
+			const settings = data.settings as any;
+
+			if (settings?.device_tracking_enabled && deviceId) {
+				const activeDevices = (data.devices || []) as any[];
+				const isAuthorized = activeDevices.some((d) => d.id === deviceId);
+
+				if (!isAuthorized) {
+					console.warn(
+						`[Auth] Unauthorized device ${deviceId} for user ${user.id}. Session revoked.`
+					);
+					return null;
+				}
+			}
+
+			return data as Tables<"profiles">;
 		}
 
 		// If profile doesn't exist, create one
@@ -92,6 +110,13 @@ export async function getUser(): Promise<Tables<"profiles"> | null> {
 					profile_image_metadata: "{}",
 					verification_notes: null,
 					last_verification_check: null,
+					settings: {
+						device_tracking_enabled: true,
+						login_alerts_enabled: true,
+						public_profile: true,
+						email_notifications: true,
+						push_notifications: true,
+					},
 					created_at: new Date().toISOString(),
 					updated_at: new Date().toISOString(),
 				})

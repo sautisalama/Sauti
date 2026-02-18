@@ -39,6 +39,7 @@ import {
 } from "@/components/ui/accordion";
 import { POLICIES, Policy, PolicySection } from "./PolicyContent";
 import { cn } from "@/lib/utils";
+import { parsePolicies } from "@/lib/user-settings";
 
 interface Step {
 	id: string;
@@ -113,6 +114,7 @@ export default function OnboardingFlow() {
 
 	useEffect(() => {
 		if (user?.profile && !hasResumed) {
+			const policies = parsePolicies(user.profile.policies);
 			setProfile({
 				first_name: user.profile.first_name || "",
 				last_name: user.profile.last_name || "",
@@ -121,14 +123,14 @@ export default function OnboardingFlow() {
 				bio: user.profile.bio || "",
 				is_public_booking: Boolean(user.profile.is_public_booking),
 				user_type: user.profile.user_type || null,
-				accepted_policies: (user.profile.settings as any)?.accepted_policies || [],
+				accepted_policies: policies.accepted_policies || [],
 			});
 
 			// Only resume once on load
 			if (user.profile.user_type && stepIndex === 0) {
 				const uType = user.profile.user_type;
 				const isProfessionalOrNGO = uType === 'professional' || uType === 'ngo';
-				const hasAcceptedAll = ((user.profile.settings as any)?.accepted_policies || []).length >= 3; 
+				const hasAcceptedAll = policies.all_policies_accepted; 
 
 				if (hasAcceptedAll) {
 					if (isProfessionalOrNGO) {
@@ -165,6 +167,12 @@ export default function OnboardingFlow() {
 			if (!user?.id) return setStepIndex((i) => Math.min(i + 1, filteredSteps.length - 1));
 			setSaving(true);
 			
+			const policyUpdate = {
+				accepted_policies: profile.accepted_policies,
+				all_policies_accepted: current === 'policies' ? allPoliciesAccepted : parsePolicies(user.profile?.policies).all_policies_accepted,
+				policies_accepted_at: current === 'policies' && allPoliciesAccepted ? new Date().toISOString() : parsePolicies(user.profile?.policies).policies_accepted_at
+			};
+
 			// Always sync current state to DB on Next
 			await supabase
 				.from("profiles")
@@ -176,11 +184,7 @@ export default function OnboardingFlow() {
 					bio: profile.bio || null,
 					is_public_booking: profile.is_public_booking,
 					user_type: profile.user_type,
-					settings: {
-						...(user.profile?.settings as any || {}),
-						accepted_policies: profile.accepted_policies,
-						all_policies_accepted: current === 'policies' ? allPoliciesAccepted : (user.profile?.settings as any)?.all_policies_accepted
-					}
+					policies: policyUpdate as any
 				})
 				.eq("id", user.id);
 

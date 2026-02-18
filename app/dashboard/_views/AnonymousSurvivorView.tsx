@@ -43,7 +43,7 @@ export default function AnonymousSurvivorView({
 	const [reports, setReports] = useState<ReportWithRelations[]>([]);
 	const [open, setOpen] = useState(false);
 	const [hasAcceptedPolicies, setHasAcceptedPolicies] = useState(
-		!!(profileDetails.settings as any)?.all_policies_accepted
+		!!(profileDetails.policies as any)?.all_policies_accepted
 	);
 	const { toast } = useToast();
 	const supabase = useMemo(() => createClient(), []);
@@ -78,7 +78,7 @@ export default function AnonymousSurvivorView({
 			{!hasAcceptedPolicies && (
 				<PolicyModal 
 					userId={userId} 
-					initialSettings={profileDetails.settings} 
+					initialPolicies={profileDetails.policies} 
 					onAccepted={() => {
 						setHasAcceptedPolicies(true);
 						toast({

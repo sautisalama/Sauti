@@ -8,6 +8,7 @@ import { MobileReportFAB } from "@/components/reports/MobileReportFAB";
 
 import { DashboardDataProvider } from "@/components/providers/DashboardDataProvider";
 import { fetchDashboardData } from "./_data/aggregate";
+import { DeviceRegistration } from "./_components/DeviceRegistration";
 
 
 export default async function DashboardLayout({
@@ -40,6 +41,8 @@ export default async function DashboardLayout({
 	return (
 		<div className="flex min-h-screen bg-serene-neutral-50 dark:bg-neutral-950 overflow-x-hidden">
 			<DashboardDataProvider initialData={initialData || fallbackData}>
+				{/* Device session tracking */}
+				<DeviceRegistration />
 				{/* Desktop Sidebar */}
 				<EnhancedSidebar />
 

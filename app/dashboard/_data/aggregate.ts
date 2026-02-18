@@ -1,6 +1,7 @@
 "use server";
 
 import { createClient, getUser } from "@/utils/supabase/server";
+import { cookies } from "next/headers";
 import { Tables } from "@/types/db-schema";
 import { fetchUserReports } from "@/app/dashboard/_views/actions/reports";
 import {
@@ -35,14 +36,14 @@ export async function fetchDashboardData(): Promise<AggregatedDashboardData | nu
 			return null;
 		}
 
+		const supabase = await createClient();
+
 		console.log(
 			"Fetching dashboard data for user:",
 			profile.id,
 			"type:",
 			profile.user_type
 		);
-
-		const supabase = await createClient();
 
 		const userId = profile.id;
 		const userType = profile.user_type ?? null;

@@ -12,6 +12,7 @@ import { VerificationSection } from "./verification-section";
 import { SupportServicesManager } from "./support-services-manager";
 import { PrivacySecuritySettings } from "./privacy-security-settings";
 import { CalendarIntegrationSettings } from "./calendar-integration-settings";
+import { AppSettingsSection } from "./app-settings-section";
 import { signOut } from "@/app/(auth)/actions/auth";
 import { createClient } from "@/utils/supabase/client";
 import { useDashboardData } from "@/components/providers/DashboardDataProvider";
@@ -528,6 +529,11 @@ export default function ProfilePage() {
 									userId={userId || ""}
 									isProfessional={isProfessional}
 								/>
+							)}
+
+							{/* Section: App Settings */}
+							{activeSection === 'settings' && (
+								<AppSettingsSection />
 							)}
 						</div>
 					</div>
