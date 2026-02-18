@@ -1,12 +1,12 @@
-# Device Tracking and Session Management (V2)
+# Device Tracking and Session Management (V3)
 
-This document outlines the enhanced implementation of device tracking and server-side session validation in Sauti Salama. The system has been upgraded from a simple tracking list to a robust session management flow that allows for real-time revocation of access across different devices.
+This document outlines the enhanced implementation of device tracking and server-side session validation in Sauti Salama. The system has been upgraded to V3, which moves enforcement to the **Middleware** layer for immediate protection and implements a "Destructive Sign-Out" flow to prevent the dreaded "loop of death" (infinite redirection).
 
 ## 1. Core Architecture
 
 ### Dedicated Data Storage
 
-Unlike the previous implementation which stored all data in a generic `settings` column, V2 uses dedicated columns in the `profiles` table:
+V2 introduced and V3 maintains dedicated columns in the `profiles` table to avoid the complexity of nesting device data within generic settings:
 
 - **`devices` (JSONB)**: Stores an array of active device sessions.
 - **`settings` (JSONB)**: Stores general user preferences (including `device_tracking_enabled`).
@@ -22,7 +22,6 @@ interface TrackedDevice {
 	os: string;
 	last_active: string; // ISO timestamp
 	location?: string; // Timezone-based location hint
-	ip?: string; // (Planned) Last active IP
 }
 ```
 
@@ -30,63 +29,67 @@ interface TrackedDevice {
 
 ## 2. The Session Lifecycle
 
-### Phase 1: Identification & Multi-Layer Persistence
+### Phase 1: Identification & Persistence
 
 Device identification relies on a unique UUID (`ss_device_id`) that is persisted in two places:
 
-1. **`localStorage`**: Ensures the ID survives across browser sessions and tab closes.
-2. **`HttpOnly` Cookie**: Mirroring the ID into a secure cookie allows Sauti Salama to access the device identity in **Server Components** and **API Routes**.
+1. **`localStorage`**: Serves as the primary stable storage for the ID.
+2. **`HttpOnly` Cookie**: Mirroring the ID into a secure cookie allows the **Middleware** and **Server Components** to verify the device identity.
 
-### Phase 2: Registration & Heartbeat
+### Phase 2: Registration (The Auth Callback)
 
-The registration flow is managed by the client-side `<DeviceRegistration />` component:
+Unlike V1/V2 which relied heavily on client-side registration, V3 ensures the device is registered **during the authentication handshake**. In `/api/auth/callback/route.ts`:
 
-- **Registration**: On the first visit of a session, if device tracking is enabled, the device details are merged into the `profiles.devices` column.
-- **Heartbeat**: To keep the list current, the `last_active` timestamp is updated periodically if it hasn't been refreshed in the last 5 minutes.
+- The server exchanges the auth code for a session.
+- It immediately reads the `ss_device_id` cookie.
+- It registers the device in the `profiles` table _before_ the user ever reaches the dashboard. This ensures the first redirect to `/dashboard` is authorized.
 
-### Phase 3: Server-Side Validation (The "Lock")
+### Phase 3: Middleware Enforcement (The "Gatekeeper")
 
-This is the most critical security improvement. The `getUser()` utility in `utils/supabase/server.ts` now performs a mandatory session check:
+In V3, `middleware.ts` handles the heavy lifting of security enforcement:
 
-1. It extracts the `ss_device_id` from the secure HttpOnly cookie.
-2. It fetches the user's `profiles.devices` list.
-3. If `device_tracking_enabled` is **ON**, it verifies that the current `deviceId` exists in the authorized list.
-4. **Result**: If the device is not found (meaning it was revoked), `getUser()` returns `null`, denying access to data and forcing a client-side redirect to login.
+1. **Identify**: It extracts the `ss_device_id` from the request cookies.
+2. **Retrieve**: It fetches the user's `profiles.devices` list.
+3. **Verify**: If `device_tracking_enabled` is **ON**, it checks if the current `deviceId` exists in the authorized list.
+4. **Enforce**: If the device is NOT authorized:
+   - It performs a **Destructive Sign-Out** (`supabase.auth.signOut()`) to clear the Supabase session cookies.
+   - It redirects the user to `/signin?error=unauthorized_device`.
+   - **Crucially**, it syncs the Supabase response cookies into the redirect response. This clears the session on the client immediately, preventing the browser from attempting to access `/dashboard` again with a "half-logged-in" state, thus **avoiding the infinite redirection loop**.
 
 ---
 
 ## 3. Revocation & Management
 
-Users manage their security through the **Privacy & Security** dashboard.
-
-- **Revoking a Single Device**: Clicking "Revoke" removes that specific ID from the `devices` table. The next time that device makes a server request, it will be rejected.
-- **Logging Out Others**: Filters the `devices` array to only contain the current device ID.
-- **Disabling Tracking**: Disabling the feature clears the `devices` array entirely and disables the server-side enforce check.
+- **Real-time Revocation**: When an admin or user removes a device from the `devices` array in the DB, the **Middleware** catches this on the next page load or API request.
+- **Logout Others**: The dashboard allows users to "Log out other sessions," which simply filters the `devices` array to only contain the ID of the device currently in use.
+- **Heartbeat**: The client-side `<DeviceRegistration />` component continues to provide "Heartbeats," updating the `last_active` timestamp in the database every 5 minutes to keep the device list current without over-straining the database.
 
 ---
 
-## 4. Investigations & Recommendations
+## 4. Stability & Security Metrics
 
-### Current Flow Assessment
+| Feature             | Implementation                     | Security Level                          |
+| :------------------ | :--------------------------------- | :-------------------------------------- |
+| **Identification**  | Dual Layer (LocalStorage + Cookie) | High (SSR-ready)                        |
+| **Enforcement**     | Middleware (V3)                    | Highest (Checks every request)          |
+| **Loop Mitigation** | Destructive Sign-Out + Cookie Sync | Vital (UX stability)                    |
+| **Registration**    | Auth Callback (Server-side)        | High (Prevents initial race conditions) |
 
-| Feature            | Implementation                       | Security Level                         |
-| :----------------- | :----------------------------------- | :------------------------------------- |
-| **Identification** | Dual Layer (LocalStorage + Cookie)   | High (Prevents tampering, enables SSR) |
-| **Validation**     | Server-Side check in `getUser()`     | High (Immediate effect on data access) |
-| **UX**             | Relative timestamps & Active markers | Excellent                              |
+---
 
-### Potential Issues & Mitigations
+## 5. Potential Issues & Mitigations
 
-1. **Cookie/Storage Desync**: If a user clears cookies but not localStorage, we might lose the server-side link temporarily.
-   - _Mitigation_: The `getOrCreateDeviceId` utility and `DeviceRegistration` component are designed to re-sync the cookie from localStorage automatically on the first client interaction.
-2. **Database Load**: Frequent `last_active` updates could strain the DB.
-   - _Mitigation_: We only update the timestamp if it's older than 5 minutes.
-3. **Public/Shared Devices**: Users might forget to logout or revoke.
-   - _Mitigation_: Recommend implementing a "Session Expiry" logic where devices older than 30 days are automatically pruned from the active list.
+1. **Cookie Deletion**: If a user manually deletes the `ss_device_id` cookie but keeps their session, the middleware will treat them as an "Unknown Device."
+   - _Mitigation_: The `DeviceRegistration` component on the client-side will promptly re-sync the cookie from `localStorage` upon its first render.
+2. **Race Conditions**: A user logging in for the first time might hit the dashboard before registration finishes.
+   - _Mitigation_: By performing registration in the `auth/callback` route, we ensure the DB is updated _before_ the browser is redirected to the dashboard.
+3. **Database Load**: Middleware runs on every request within protected routes.
+   - _Mitigation_: The Supabase client in Middleware uses the same session context, and lookups are performed via indexed UUIDs. For extremely high-traffic apps, session caching in Redis could be considered.
 
-### Future Roadmap (Recommendations)
+---
 
-1. **Geo-IP Enhancement**: Currently, location is derived from timezone. Integrating an IP-based geo-location service would provide City/Country level accuracy.
-2. **Security Notifications**: Trigger an email notification via a Supabase Edge Function whenever a **new** device ID is registered for the first time.
-3. **Middleware Enforcement**: Move the session validation check into `middleware.ts` to block requests even earlier in the lifecycle, reducing server load for revoked sessions.
-4. **Hardware Fingerprinting**: Consider integrating `FingerprintJS` to make the `device_id` even more stable, preventing it from changing if a user clears their browser data.
+## 6. Future Roadmap
+
+1. **Hardware Fingerprinting**: Integrating `FingerprintJS` to make the `device_id` even more resistant to browser clearing.
+2. **Geo-IP Enhancement**: Converting timezone-based location hints into precise City/Country data using a Geo-IP provider.
+3. **Security Webhooks**: Sending real-time emails/SMS when a "New Device" login is detected.
