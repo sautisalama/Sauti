@@ -138,31 +138,35 @@ export function AppSettingsSection() {
 				</CardHeader>
 				<CardContent className="p-0">
 					<div className="divide-y divide-neutral-100">
-						<div className="p-4 flex items-center justify-between hover:bg-neutral-50/50 transition-colors">
+						<div className="p-4 flex items-center justify-between opacity-60">
 							<div className="space-y-0.5">
-								<div className="font-medium text-sm">Email Notifications</div>
+								<div className="font-medium text-sm flex items-center gap-2">
+									Email Notifications
+									<Badge className="bg-amber-50 text-amber-600 border-amber-100 text-[10px] uppercase font-bold px-1.5 py-0">Coming Soon</Badge>
+								</div>
 								<p className="text-xs text-neutral-500">
 									Receive updates about messages, appointments, and matches via email.
 								</p>
 							</div>
 							<Switch
-								checked={!!settings.email_notifications}
-								onCheckedChange={() => handleToggle("email_notifications")}
-								disabled={savingKey === "email_notifications"}
+								checked={false}
+								disabled={true}
 							/>
 						</div>
 
-						<div className="p-4 flex items-center justify-between hover:bg-neutral-50/50 transition-colors">
+						<div className="p-4 flex items-center justify-between opacity-60">
 							<div className="space-y-0.5">
-								<div className="font-medium text-sm">Push Notifications</div>
+								<div className="font-medium text-sm flex items-center gap-2">
+									Push Notifications
+									<Badge className="bg-amber-50 text-amber-600 border-amber-100 text-[10px] uppercase font-bold px-1.5 py-0">Coming Soon</Badge>
+								</div>
 								<p className="text-xs text-neutral-500">
 									Browser notifications for real-time alerts and messages.
 								</p>
 							</div>
 							<Switch
-								checked={!!settings.push_notifications}
-								onCheckedChange={() => handleToggle("push_notifications")}
-								disabled={savingKey === "push_notifications"}
+								checked={false}
+								disabled={true}
 							/>
 						</div>
 					</div>

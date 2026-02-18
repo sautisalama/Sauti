@@ -33,10 +33,14 @@ import {
 	removeDevice,
 	getRelativeTime,
 	getOrCreateDeviceId,
+	detectDeviceInfo,
 	type UserSettings,
 	type UserPolicies,
 	type TrackedDevice,
 } from "@/lib/user-settings";
+import { POLICIES } from "../_views/PolicyContent";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 
 export function PrivacySecuritySettings() {
 	const { toast } = useToast();
@@ -266,6 +270,141 @@ export function PrivacySecuritySettings() {
 	const activeDevices = (profile?.devices as any[]) || [];
 	const otherDevices = activeDevices.filter(d => d.id !== currentDeviceId);
 
+	const handleDownloadData = async () => {
+		if (!profile) return;
+		setLoading("download");
+
+		try {
+			const { default: jsPDF } = await import("jspdf");
+			const { default: autoTable } = await import("jspdf-autotable");
+
+			const doc = new jsPDF();
+			const now = new Date();
+			const deviceInfo = detectDeviceInfo();
+
+			// Handle Logo
+			try {
+				const logoImg = new Image();
+				logoImg.src = "/Logo.png";
+				await new Promise((resolve) => {
+					logoImg.onload = resolve;
+					logoImg.onerror = resolve;
+				});
+				if (logoImg.complete && logoImg.naturalWidth > 0) {
+					// Position at top right
+					doc.addImage(logoImg, "PNG", 165, 10, 25, 25);
+				}
+			} catch (e) {
+				console.error("Logo load error:", e);
+			}
+
+			// Add Header
+			doc.setFontSize(22);
+			doc.setTextColor(14, 165, 233); // matches sauti blue ish
+			doc.text("Sauti Salama", 20, 25);
+			
+			doc.setFontSize(10);
+			doc.setTextColor(100);
+			doc.text("Personal Data Export", 20, 32);
+			
+			doc.setDrawColor(229, 231, 235);
+			doc.line(20, 38, 190, 38);
+
+			// Metadata
+			doc.setFontSize(9);
+			doc.setTextColor(156, 163, 175);
+			doc.text(`Generated on: ${now.toLocaleString()}`, 20, 48);
+			doc.text(`Access Device: ${deviceInfo.device_name}`, 20, 53);
+			doc.text(`Browser Environment: ${deviceInfo.browser} (${deviceInfo.os})`, 20, 58);
+
+			// Personal Profile
+			doc.setFontSize(14);
+			doc.setTextColor(17, 24, 39);
+			doc.text("Account Profile", 20, 75);
+			
+			const profileData = [
+				["Full Name", `${profile.first_name || ""} ${profile.last_name || ""}`.trim() || "Anonymous"],
+				["Email Address", profile.email || "N/A"],
+				["User Role", (profile.user_type || "N/A").toUpperCase()],
+				["Professional Title", profile.professional_title || "N/A"],
+				["Verification Status", (profile.verification_status || "Pending").toUpperCase()],
+				["Phone Number", profile.phone || "Not Set"],
+				["Biography", profile.bio || "None provided"],
+			];
+
+			autoTable(doc, {
+				startY: 80,
+				head: [["Information Field", "Registered Data"]],
+				body: profileData,
+				theme: "striped",
+				headStyles: { fillColor: [14, 165, 233], textColor: [255, 255, 255], fontStyle: "bold" },
+				styles: { fontSize: 9, cellPadding: 3 },
+				columnStyles: { 0: { fontStyle: "bold", cellWidth: 50 } }
+			});
+
+			// Support Services (if Professional/NGO)
+			const services = dash?.data?.supportServices || [];
+			if (services.length > 0) {
+				const finalY = (doc as any).lastAutoTable.finalY + 15;
+				doc.setFontSize(14);
+				doc.setTextColor(17, 24, 39);
+				doc.text("Registered Support Services", 20, finalY);
+
+				const servicesData = services.map(s => [
+					s.name,
+					(s.service_types as string).replace("_", " ").toUpperCase(),
+					s.coverage_area_radius ? "In-Person" : "Remote",
+					s.is_active ? "ACTIVE" : "INACTIVE"
+				]);
+
+				autoTable(doc, {
+					startY: finalY + 5,
+					head: [["Service Name", "Category", "Location", "Status"]],
+					body: servicesData,
+					theme: "grid",
+					headStyles: { fillColor: [79, 70, 229], textColor: [255, 255, 255] },
+					styles: { fontSize: 8 }
+				});
+			}
+
+			// Security Notice Footer
+			const pageCount = doc.getNumberOfPages();
+			for (let i = 1; i <= pageCount; i++) {
+				doc.setPage(i);
+				doc.setFontSize(8);
+				doc.setTextColor(156, 163, 175);
+				doc.text(
+					"CONFIDENTIAL: This document contains sensitive personal information managed by Sauti Salama.",
+					doc.internal.pageSize.width / 2,
+					doc.internal.pageSize.height - 15,
+					{ align: "center" }
+				);
+				doc.text(
+					`Page ${i} of ${pageCount}`,
+					doc.internal.pageSize.width / 2,
+					doc.internal.pageSize.height - 10,
+					{ align: "center" }
+				);
+			}
+
+			doc.save(`sauti_salama_export_${profile.first_name || "user"}_${now.getTime()}.pdf`);
+			
+			toast({
+				title: "Data Export Complete",
+				description: "Your personal data has been securely exported.",
+			});
+		} catch (err) {
+			console.error("Export Error:", err);
+			toast({
+				title: "Export Failed",
+				description: "Could not generate your data export. Please try again.",
+				variant: "destructive",
+			});
+		} finally {
+			setLoading(null);
+		}
+	};
+
 	return (
 		<div className="space-y-6 max-w-4xl">
 			{/* Header */}
@@ -280,89 +419,6 @@ export function PrivacySecuritySettings() {
 					</p>
 				</div>
 			</div>
-
-			{/* Account Security */}
-			<Card className="border-neutral-200 shadow-sm">
-				<CardHeader className="border-b border-neutral-100 pb-4">
-					<div className="flex items-center gap-2">
-						<Lock className="h-5 w-5 text-neutral-500" />
-						<CardTitle className="text-base">Login & Security</CardTitle>
-					</div>
-				</CardHeader>
-				<CardContent className="p-0">
-					<div className="divide-y divide-neutral-100">
-						<div className="p-4 flex items-center justify-between hover:bg-neutral-50/50 transition-colors">
-							<div className="space-y-0.5">
-								<div className="font-medium text-sm flex items-center gap-2">
-									Two-Factor Authentication
-									<Badge variant="outline" className="text-xs font-normal text-neutral-500">Recommended</Badge>
-								</div>
-								<p className="text-xs text-neutral-500">Add an extra layer of security to your account.</p>
-							</div>
-							<Switch 
-								checked={!!settings.two_factor_enabled}
-								onCheckedChange={() => handleToggle('two_factor_enabled')}
-								disabled={savingKey === 'two_factor_enabled'}
-							/>
-						</div>
-						
-						<div className="p-4 flex items-center justify-between hover:bg-neutral-50/50 transition-colors">
-							<div className="space-y-0.5">
-								<div className="font-medium text-sm">Login Alerts</div>
-								<p className="text-xs text-neutral-500">Get notified of new sign-ins on your account.</p>
-							</div>
-							<Switch 
-								checked={!!settings.login_alerts_enabled}
-								onCheckedChange={() => handleToggle('login_alerts_enabled')}
-								disabled={savingKey === 'login_alerts_enabled'}
-							/>
-						</div>
-
-						<div className="p-4 flex items-center justify-between hover:bg-neutral-50/50 transition-colors cursor-pointer group">
-							<div className="space-y-0.5">
-								<div className="font-medium text-sm group-hover:text-purple-600 transition-colors">Change Password</div>
-								<p className="text-xs text-neutral-500">Update your password periodically.</p>
-							</div>
-							<ChevronRight className="h-4 w-4 text-neutral-300 group-hover:text-purple-600" />
-						</div>
-					</div>
-				</CardContent>
-			</Card>
-
-			{/* Data Privacy */}
-			<Card className="border-neutral-200 shadow-sm">
-				<CardHeader className="border-b border-neutral-100 pb-4">
-					<div className="flex items-center gap-2">
-						<Eye className="h-5 w-5 text-neutral-500" />
-						<CardTitle className="text-base">Data & Privacy</CardTitle>
-					</div>
-				</CardHeader>
-				<CardContent className="p-0">
-					<div className="divide-y divide-neutral-100">
-						<div className="p-4 flex items-center justify-between hover:bg-neutral-50/50 transition-colors">
-							<div className="space-y-0.5">
-								<div className="font-medium text-sm">Profile Visibility</div>
-								<p className="text-xs text-neutral-500">Allow survivors to see your professional profile.</p>
-							</div>
-							<Switch 
-								checked={!!settings.public_profile}
-								onCheckedChange={() => handleToggle('public_profile')}
-								disabled={savingKey === 'public_profile'}
-							/>
-						</div>
-						
-						<div className="p-4 flex items-center justify-between hover:bg-neutral-50/50 transition-colors group cursor-pointer">
-							<div className="space-y-0.5">
-								<div className="font-medium text-sm group-hover:text-purple-600">Download My Data</div>
-								<p className="text-xs text-neutral-500">Get a copy of your data on Sauti Salama.</p>
-							</div>
-							<Button variant="ghost" size="sm" className="gap-2 text-neutral-600 group-hover:text-purple-600">
-								<Download className="h-4 w-4" /> Download
-							</Button>
-						</div>
-					</div>
-				</CardContent>
-			</Card>
 
 			{/* Active Sessions / Device Tracking */}
 			<Card className="border-neutral-200 shadow-sm">
@@ -497,27 +553,128 @@ export function PrivacySecuritySettings() {
 				)}
 			</Card>
 
+			{/* Data Privacy */}
+			<Card className="border-neutral-200 shadow-sm">
+				<CardHeader className="border-b border-neutral-100 pb-4">
+					<div className="flex items-center gap-2">
+						<Eye className="h-5 w-5 text-neutral-500" />
+						<CardTitle className="text-base">Data & Privacy</CardTitle>
+					</div>
+				</CardHeader>
+				<CardContent className="p-0">
+					<div className="divide-y divide-neutral-100">
+						<div className="p-4 flex items-center justify-between hover:bg-neutral-50/50 transition-colors group">
+							<div className="space-y-0.5">
+								<div className="font-medium text-sm group-hover:text-purple-600">Download My Data</div>
+								<p className="text-xs text-neutral-500">Get a copy of your data on Sauti Salama.</p>
+							</div>
+							<Button 
+								variant="ghost" 
+								size="sm" 
+								className="gap-2 text-neutral-600 group-hover:text-purple-600"
+								onClick={handleDownloadData}
+								disabled={loading === "download"}
+							>
+								{loading === "download" ? (
+									<Loader2 className="h-4 w-4 animate-spin" />
+								) : (
+									<>
+										<Download className="h-4 w-4" /> 
+										Download
+									</>
+								)}
+							</Button>
+						</div>
+					</div>
+				</CardContent>
+			</Card>
+
 			{/* Policy Acceptance Status */}
 			{policies.all_policies_accepted && (
 				<Card className="border-neutral-200 shadow-sm">
-					<CardContent className="p-4">
-						<div className="flex items-center gap-3">
-							<div className="p-2 bg-emerald-100 rounded-full">
-								<Shield className="h-4 w-4 text-emerald-600" />
-							</div>
-							<div className="flex-1">
-								<p className="text-sm font-medium text-neutral-900">Platform Policies Accepted</p>
-								<p className="text-xs text-neutral-400">
-									{policies.policies_accepted_at
-										? `Accepted on ${new Date(policies.policies_accepted_at).toLocaleDateString()}`
-										: "All required policies have been accepted."}
-								</p>
-							</div>
-							<Badge className="bg-emerald-100 text-emerald-700 border-0 text-xs">✓ Accepted</Badge>
+					<CardHeader className="border-b border-neutral-100 pb-3">
+						<div className="flex items-center gap-2">
+							<Shield className="h-4 w-4 text-emerald-600" />
+							<CardTitle className="text-sm font-bold">Platform Policies</CardTitle>
+						</div>
+					</CardHeader>
+					<CardContent className="p-0">
+						<div className="divide-y divide-neutral-100">
+							{POLICIES.filter(p => {
+								const base = p.id === 'terms' || p.id === 'privacy';
+								if (profile?.user_type === 'survivor') return base || p.id === 'survivor_safety';
+								if (profile?.user_type === 'professional') return base || p.id === 'professional_conduct';
+								if (profile?.user_type === 'ngo') return base || p.id === 'professional_conduct' || p.id === 'referral_policy';
+								return base;
+							}).map((policy) => (
+								<div key={policy.id} className="p-4 flex items-center justify-between">
+									<div className="space-y-0.5">
+										<div className="font-medium text-sm text-neutral-900">{policy.title}</div>
+										<p className="text-xs text-neutral-500">
+											{policies.policies_accepted_at
+												? `Accepted on ${new Date(policies.policies_accepted_at).toLocaleDateString()}`
+												: "Policy accepted during onboarding."}
+										</p>
+									</div>
+									<Badge className="bg-emerald-50 text-emerald-700 border-emerald-100 text-[10px] px-2 py-0">✓ Accepted</Badge>
+								</div>
+							))}
 						</div>
 					</CardContent>
 				</Card>
 			)}
+
+						{/* Account Security */}
+			<Card className="border-neutral-200 shadow-sm">
+				<CardHeader className="border-b border-neutral-100 pb-4">
+					<div className="flex items-center gap-2">
+						<Lock className="h-5 w-5 text-neutral-500" />
+						<CardTitle className="text-base">Login & Security</CardTitle>
+					</div>
+				</CardHeader>
+				<CardContent className="p-0">
+					<div className="divide-y divide-neutral-100">
+						<div className="p-4 flex items-center justify-between opacity-60">
+							<div className="space-y-0.5">
+								<div className="font-medium text-sm flex items-center gap-2">
+									Two-Factor Authentication
+									<Badge className="bg-amber-50 text-amber-600 border-amber-100 text-[10px] uppercase font-bold px-1.5 py-0">Coming Soon</Badge>
+								</div>
+								<p className="text-xs text-neutral-500">Add an extra layer of security to your account.</p>
+							</div>
+							<Switch 
+								checked={false}
+								disabled={true}
+							/>
+						</div>
+						
+						<div className="p-4 flex items-center justify-between opacity-60">
+							<div className="space-y-0.5">
+								<div className="font-medium text-sm flex items-center gap-2">
+									Login Alerts
+									<Badge className="bg-amber-50 text-amber-600 border-amber-100 text-[10px] uppercase font-bold px-1.5 py-0">Coming Soon</Badge>
+								</div>
+								<p className="text-xs text-neutral-500">Get notified of new sign-ins on your account.</p>
+							</div>
+							<Switch 
+								checked={false}
+								disabled={true}
+							/>
+						</div>
+
+						<div className="p-4 flex items-center justify-between opacity-60">
+							<div className="space-y-0.5">
+								<div className="font-medium text-sm flex items-center gap-2">
+									Change Password
+									<Badge className="bg-amber-50 text-amber-600 border-amber-100 text-[10px] uppercase font-bold px-1.5 py-0">Coming Soon</Badge>
+								</div>
+								<p className="text-xs text-neutral-500">Update your password periodically.</p>
+							</div>
+							<ChevronRight className="h-4 w-4 text-neutral-300" />
+						</div>
+					</div>
+				</CardContent>
+			</Card>
 
 			<div className="flex justify-center pt-4">
 				<button className="text-xs text-neutral-400 hover:underline flex items-center gap-1">
