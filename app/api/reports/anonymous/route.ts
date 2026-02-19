@@ -4,7 +4,7 @@ import { createClient as createAdminClient } from "@supabase/supabase-js";
 import { TablesInsert } from "@/types/db-schema";
 import { matchReportWithServices } from "@/app/actions/match-services";
 import { cookies, headers } from "next/headers";
-import { registerDevice, parseSettings } from "@/lib/user-settings";
+import { registerDevice, parseSettings, TrackedDevice } from "@/lib/user-settings";
 
 // Word lists for generating human-readable usernames
 const ADJECTIVES = [
@@ -144,7 +144,7 @@ export async function POST(request: Request) {
 					const deviceId = cookieStore.get("ss_device_id")?.value;
 					const userAgent = (await headers()).get("user-agent") || "";
 					
-					let updatedDevices = [];
+					let updatedDevices: TrackedDevice[] = [];
 					if (deviceId) {
 						// Pass screen dimensions if provided in formData
 						const screenHint = formData.screen ? { 
