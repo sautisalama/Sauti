@@ -19,16 +19,18 @@ import Image from "next/image";
 import { useRoleSwitcher } from "@/hooks/useRoleSwitcher";
 import { Badge } from "@/components/ui/badge";
 import { NotificationDropdown } from "./NotificationDropdown";
+import { useDashboardData } from "@/components/providers/DashboardDataProvider";
 
 export function MobileTopBar() {
   const user = useUser();
   const pathname = usePathname();
   const names = `${user?.profile?.first_name || ""} ${user?.profile?.last_name || ""}`.trim() || user?.email || "User";
   const initials = names.charAt(0).toUpperCase();
+  const dash = useDashboardData();
   
-  // Use Role Switcher Hook
-  const { roleContext, isAdminMode, switchToAdmin, switchToUser } = useRoleSwitcher();
-
+  // Use Role Switcher Hook for actions, but global context for state if possible
+  const { roleContext, switchToAdmin, switchToUser } = useRoleSwitcher();
+  const isAdminMode = dash?.isAdminMode || false;
   // Hide on desktop (lg hidden)
   // Hide on chat pages (both list and detail) as requested
   const isChat = pathname?.startsWith("/dashboard/chat");

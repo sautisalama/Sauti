@@ -21,6 +21,7 @@ export type DashboardData = {
     documentsCount?: number;
     pendingCount?: number;
   };
+  isAdminMode: boolean;
 };
 
 export type DashboardDataContextType = {
@@ -29,6 +30,7 @@ export type DashboardDataContextType = {
   updatePartial: (patch: Partial<DashboardData>) => void;
   isSidebarCollapsed: boolean;
   setIsSidebarCollapsed: (v: boolean) => void;
+  isAdminMode: boolean;
 };
 
 const DashboardDataContext = createContext<DashboardDataContextType | null>(null);
@@ -42,7 +44,7 @@ export function DashboardDataProvider({
 }) {
   const [data, setData] = useState<DashboardData | null>(initialData ?? null);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
-
+  const [isAdminMode, setIsAdminMode] = useState(false);
   // Initial load from localStorage
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -59,6 +61,22 @@ export function DashboardDataProvider({
     }
   }, [isSidebarCollapsed]);
 
+  // Track Admin Mode
+  useEffect(() => {
+    const checkAdminMode = () => {
+      const mode = localStorage.getItem("adminMode") === "true";
+      setIsAdminMode(mode);
+    };
+
+    checkAdminMode();
+    window.addEventListener("adminModeChanged", checkAdminMode);
+    window.addEventListener("storage", checkAdminMode);
+
+    return () => {
+      window.removeEventListener("adminModeChanged", checkAdminMode);
+      window.removeEventListener("storage", checkAdminMode);
+    };
+  }, []);
   // Sync state with fresh initialData from server re-renders (router.refresh)
   useEffect(() => {
     if (initialData) {
@@ -83,8 +101,9 @@ export function DashboardDataProvider({
     setUnreadChatCount, 
     updatePartial,
     isSidebarCollapsed,
-    setIsSidebarCollapsed
-  }), [data, setUnreadChatCount, updatePartial, isSidebarCollapsed]);
+    setIsSidebarCollapsed,
+    isAdminMode
+  }), [data, setUnreadChatCount, updatePartial, isSidebarCollapsed, isAdminMode]);
 
   return <DashboardDataContext.Provider value={value}>{children}</DashboardDataContext.Provider>;
 }
