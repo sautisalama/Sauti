@@ -97,7 +97,7 @@ export function EnhancedSidebar({
 	const [reportDialogOpen, setReportDialogOpen] = useState(false);
 	const [notifications, setNotifications] = useState(0);
 	const [casesCount, setCasesCount] = useState<number>(0);
-	const [isAdminMode, setIsAdminMode] = useState(false);
+	const isAdminMode = dash?.isAdminMode || false;
 	const supabase = useMemo(() => createClient(), []);
 	const userType = dash?.data?.profile?.user_type || user?.profile?.user_type || null;
 	const role = isAdminMode ? "admin" : userType;
@@ -123,35 +123,14 @@ export function EnhancedSidebar({
 		return () => window.removeEventListener("resize", handleResize);
 	}, [setIsCollapsed]);
 
-	// Listen for Admin Mode changes
 	useEffect(() => {
 		const checkAdminMode = () => {
-			const mode = localStorage.getItem("adminMode") === "true";
-			setIsAdminMode(mode);
-
-            // Redirect if on main dashboard and admin mode is active
-            // We only redirect if exactly on "/dashboard" to allow navigating to other parts if needed,
-            // though usually admin mode implies using the admin layout.
-            if (mode && pathname === "/dashboard") {
+            if (isAdminMode && pathname === "/dashboard") {
                  router.push("/dashboard/admin");
             }
 		};
-
-		// Initial check
 		checkAdminMode();
-
-		// Listen for custom event from RoleSwitcher
-		window.addEventListener("adminModeChanged", checkAdminMode);
-		
-		// Also listen for storage events (if changed in another tab)
-		window.addEventListener("storage", checkAdminMode);
-
-		return () => {
-			window.removeEventListener("adminModeChanged", checkAdminMode);
-			window.removeEventListener("storage", checkAdminMode);
-		};
-	}, [pathname, router]);
-
+	}, [pathname, router, isAdminMode]);
 	useEffect(() => {
 		// Prefer provider data when available to avoid extra fetches
 		if (typeof dash?.data?.casesCount === "number") {

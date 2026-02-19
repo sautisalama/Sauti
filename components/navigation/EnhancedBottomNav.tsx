@@ -40,7 +40,6 @@ export function EnhancedBottomNav({ forceShow = false, className }: EnhancedBott
   const dash = useDashboardData();
   const [unreadMessages, setUnreadMessages] = useState(0);
   const [casesCount, setCasesCount] = useState(0);
-  const [activeTab, setActiveTab] = useState<string>("");
   const [chatActive, setChatActive] = useState(false);
 
   useEffect(() => {
@@ -54,6 +53,7 @@ export function EnhancedBottomNav({ forceShow = false, className }: EnhancedBott
     return () => window.removeEventListener('ss:chat-active', handler as EventListener);
   }, []);
 
+  const isAdminMode = dash?.isAdminMode || false;
   // Check query params for chat ID
   const chatId = searchParams.get('id');
   const isChat = pathname?.startsWith("/dashboard/chat");
@@ -116,10 +116,9 @@ export function EnhancedBottomNav({ forceShow = false, className }: EnhancedBott
 
     const userRole = dash?.data?.userType || user?.profile?.user_type;
     const isProfessional = userRole === 'professional' || userRole === 'ngo';
-    const isAdmin = user?.profile?.is_admin || false; // Check admin status
     
-    // Admin Navigation
-    if (isAdmin) {
+    // Admin Navigation - Only show if in Admin Mode
+    if (isAdminMode) {
         return [
             { id: "overview", label: "Overview", icon: LayoutDashboard, href: "/dashboard/admin" },
             { 
