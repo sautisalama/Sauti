@@ -86,19 +86,22 @@ export async function updateSession(request: NextRequest) {
 		const activeDevices = (profile?.devices || []) as any[];
 		
 		// Registration happens in sign-in actions/callbacks.
-		// If tracking is enabled, the device MUST be in the activeDevices list.
+		// If tracking is enabled, the device MUST be in the activeDevices list IF deviceId is present.
+		// If deviceId is missing, we don't nuke the session here to avoid logout loops on cookie desync,
+		// but we still deny if deviceId is present and NOT in the list.
 		const isAuthorized =
 			!settings?.device_tracking_enabled ||
-			(!!deviceId && activeDevices.some((d) => d.id === deviceId));
+			!deviceId || // Lenient if cookie is missing (client-side heartbeat will re-sync)
+			activeDevices.some((d) => d.id === deviceId);
 
 		// 1. Block dashboard access for unauthorized devices
 		if (!isAuthorized && request.nextUrl.pathname.startsWith("/dashboard")) {
 			console.warn(
-				`[Middleware] Unauthorized device ${deviceId} for user ${user.id}. Revoking session.`
+				`[Middleware] Unauthorized device ${deviceId} for user ${user.id}. Revoking session local to this device.`
 			);
 			
-			// Destructive sign out - only safe because we sync cookies below
-			await supabase.auth.signOut();
+			// Destructive but LOCAL sign out - prevent global nuke of all devices
+			await supabase.auth.signOut({ scope: 'local' });
 			
 			const url = request.nextUrl.clone();
 			url.pathname = "/signin";
