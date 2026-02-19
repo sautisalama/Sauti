@@ -622,6 +622,14 @@ export function EnhancedSidebar({
 											<span>Profile</span>
 										</Link>
 									</DropdownMenuItem>
+									{(role === "professional" || role === "ngo") && (
+										<DropdownMenuItem asChild>
+											<Link href="/dashboard/profile?section=verification" className="cursor-pointer rounded-xl focus:bg-serene-neutral-50 focus:text-serene-blue-600 m-1">
+												<Shield className="mr-2 h-4 w-4 text-serene-neutral-500" />
+												<span>Verification & Docs</span>
+											</Link>
+										</DropdownMenuItem>
+									)}
 								</>
 							)}
 

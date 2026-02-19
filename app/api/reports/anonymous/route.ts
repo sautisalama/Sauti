@@ -3,6 +3,8 @@ import { createClient } from "@/utils/supabase/server";
 import { createClient as createAdminClient } from "@supabase/supabase-js";
 import { TablesInsert } from "@/types/db-schema";
 import { matchReportWithServices } from "@/app/actions/match-services";
+import { cookies, headers } from "next/headers";
+import { registerDevice, parseSettings } from "@/lib/user-settings";
 
 // Word lists for generating human-readable usernames
 const ADJECTIVES = [
@@ -137,6 +139,22 @@ export async function POST(request: Request) {
 					anonUsername = username;
 					anonEmail = email;
 
+					// Register device for the new user to prevent middleware redirection
+					const cookieStore = await cookies();
+					const deviceId = cookieStore.get("ss_device_id")?.value;
+					const userAgent = (await headers()).get("user-agent") || "";
+					
+					let updatedDevices = [];
+					if (deviceId) {
+						// Pass screen dimensions if provided in formData
+						const screenHint = formData.screen ? { 
+							width: formData.screen.width, 
+							height: formData.screen.height 
+						} : undefined;
+						
+						updatedDevices = registerDevice([], deviceId, userAgent, screenHint);
+					}
+
 					// Create profile
 					await supabaseAdmin.from("profiles").insert({
 						id: userId,
@@ -149,6 +167,7 @@ export async function POST(request: Request) {
 						verification_status: "pending",
 						created_at: new Date().toISOString(),
 						updated_at: new Date().toISOString(),
+						devices: updatedDevices,
 					});
 				}
 			} catch (accountError) {

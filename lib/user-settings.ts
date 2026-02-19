@@ -14,6 +14,8 @@ export interface TrackedDevice {
 	device_name: string;  // e.g. "Chrome on Windows"
 	browser: string;      // e.g. "Chrome 120"
 	os: string;           // e.g. "Windows 11"
+	device_type?: string; // e.g. "mobile", "tablet", "desktop"
+	device_model?: string; // e.g. "Xiaomi Redmi Note 10"
 	last_active: string;  // ISO timestamp
 	ip_hint?: string;     // partial IP for location hint (e.g. "102.x.x.x")
 	is_current: boolean;  // true for the device making the request
@@ -129,21 +131,35 @@ export function getOrCreateDeviceId(): string {
 }
 
 /**
- * Detect browser and OS info from User-Agent for device display.
+ * Detect browser, OS, and device type/model info from User-Agent and client hints.
  * Supports both client-side and server-side execution.
  */
-export function detectDeviceInfo(userAgent?: string): {
+export function detectDeviceInfo(
+	userAgent?: string, 
+	screenHint?: { width: number; height: number }
+): {
 	device_name: string;
 	browser: string;
 	os: string;
+	device_type: "mobile" | "tablet" | "desktop" | "unknown";
+	device_model: string;
 	location: string;
 } {
 	const ua = userAgent || (typeof window !== "undefined" ? navigator.userAgent : "");
+	const screen = screenHint || (typeof window !== "undefined" ? { width: window.innerWidth, height: window.innerHeight } : undefined);
+	
 	if (!ua) {
-		return { device_name: "Unknown", browser: "Unknown", os: "Unknown", location: "Unknown" };
+		return { 
+			device_name: "Unknown", 
+			browser: "Unknown", 
+			os: "Unknown", 
+			device_type: "unknown",
+			device_model: "Unknown",
+			location: "Unknown" 
+		};
 	}
 
-	// Detect browser
+	// 1. Detect Browser
 	let browser = "Unknown Browser";
 	if (ua.includes("Edg/")) {
 		const match = ua.match(/Edg\/([\d.]+)/);
@@ -159,24 +175,80 @@ export function detectDeviceInfo(userAgent?: string): {
 		browser = `Safari ${match?.[1]?.split(".")[0] || ""}`;
 	}
 
-	// Detect OS
+	// 2. Detect OS & Specific Model
 	let os = "Unknown OS";
-	if (ua.includes("Windows NT 10")) os = "Windows";
-	else if (ua.includes("Windows NT 11") || (ua.includes("Windows NT 10") && ua.includes("Win64"))) os = "Windows";
-	else if (ua.includes("Mac OS X")) os = "macOS";
-	else if (ua.includes("Android")) os = "Android";
-	else if (ua.includes("iPhone") || ua.includes("iPad")) os = "iOS";
-	else if (ua.includes("Linux")) os = "Linux";
-	else if (ua.includes("CrOS")) os = "Chrome OS";
+	let device_model = "Unknown Device";
+	let device_type: "mobile" | "tablet" | "desktop" | "unknown" = "unknown";
 
-	const device_name = `${browser} on ${os}`;
+	// Check for Mobile/Tablet first
+	if (ua.includes("Android")) {
+		os = "Android";
+		device_type = "mobile";
+		// Try to extract model: "Android 10; SM-G991B" -> "SM-G991B"
+		const modelMatch = ua.match(/Android [^;]+; ([^;)]+)/);
+		if (modelMatch) device_model = modelMatch[1].trim();
+		
+		// Refine device type if it's a tablet
+		if (ua.includes("Tablet") || (screen && screen.width >= 600 && screen.width < 1024)) {
+			device_type = "tablet";
+		}
+	} else if (ua.includes("iPhone")) {
+		os = "iOS";
+		device_model = "iPhone";
+		device_type = "mobile";
+	} else if (ua.includes("iPad")) {
+		os = "iOS";
+		device_model = "iPad";
+		device_type = "tablet";
+	} else if (ua.includes("Windows NT")) {
+		os = "Windows";
+		device_type = "desktop";
+		if (ua.includes("Windows NT 10.0") || ua.includes("Windows NT 11.0")) os = "Windows 10/11";
+		device_model = "PC";
+	} else if (ua.includes("Mac OS X")) {
+		os = "macOS";
+		device_type = "desktop";
+		device_model = "Mac";
+	} else if (ua.includes("Linux")) {
+		os = "Linux";
+		device_type = "desktop";
+		device_model = "Generic Linux";
+	}
+
+	// 3. Brand specific detection (Grep for common brands in UA)
+	const brands = ["Samsung", "Xiaomi", "Redmi", "Huawei", "Oppo", "Vivo", "Pixel", "OnePlus", "Infinix", "Tecno"];
+	for (const brand of brands) {
+		if (ua.toLowerCase().includes(brand.toLowerCase())) {
+			if (device_model === "Unknown Device" || device_model === "Android") {
+				// Extract a bit more context if it's a brand match
+				const brandRegex = new RegExp(`${brand}[^;)]+`, "i");
+				const match = ua.match(brandRegex);
+				if (match) device_model = match[0];
+				else device_model = brand;
+			}
+			break;
+		}
+	}
+
+	// 4. Heuristic for Laptop vs Desktop (hard, but we can guess)
+	if (device_type === "desktop" && screen && screen.width < 1600) {
+		// Most desktops are 1920+, laptops are often 1366 or 1440
+		// This is a loose guess
+		device_model = `${os} Laptop`;
+	} else if (device_type === "desktop") {
+		device_model = `${os} Desktop`;
+	}
+
+	// Final Name Construction
+	const device_name = device_model !== "Unknown Device" 
+		? `${device_model} (${browser})` 
+		: `${browser} on ${os}`;
 
 	// Derive approximate location from timezone
 	let location = "Unknown";
 	try {
-		const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+		const tz = typeof Intl !== "undefined" ? Intl.DateTimeFormat().resolvedOptions().timeZone : null;
 		if (tz) {
-			// e.g. "Africa/Nairobi" → "Nairobi"
 			const parts = tz.split("/");
 			location = parts[parts.length - 1].replace(/_/g, " ");
 		}
@@ -184,19 +256,25 @@ export function detectDeviceInfo(userAgent?: string): {
 		// Ignore
 	}
 
-	return { device_name, browser, os, location };
+	return { device_name, browser, os, device_type, device_model, location };
 }
 
 /**
  * Build a TrackedDevice object for the current session.
  */
-export function buildCurrentDevice(deviceId: string, userAgent?: string): TrackedDevice {
-	const info = detectDeviceInfo(userAgent);
+export function buildCurrentDevice(
+	deviceId: string, 
+	userAgent?: string,
+	screenHint?: { width: number; height: number }
+): TrackedDevice {
+	const info = detectDeviceInfo(userAgent, screenHint);
 	return {
 		id: deviceId,
 		device_name: info.device_name,
 		browser: info.browser,
 		os: info.os,
+		device_type: info.device_type,
+		device_model: info.device_model,
 		last_active: new Date().toISOString(),
 		is_current: true,
 		location: info.location,
@@ -213,9 +291,10 @@ export function buildCurrentDevice(deviceId: string, userAgent?: string): Tracke
 export function registerDevice(
 	existingDevices: TrackedDevice[] | undefined | null,
 	deviceId: string,
-	userAgent?: string
+	userAgent?: string,
+	screenHint?: { width: number; height: number }
 ): TrackedDevice[] {
-	const current = buildCurrentDevice(deviceId, userAgent);
+	const current = buildCurrentDevice(deviceId, userAgent, screenHint);
 	const devices = (existingDevices || []).map((d) => ({ ...d, is_current: false }));
 
 	const existingIdx = devices.findIndex((d) => d.id === current.id);

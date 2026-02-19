@@ -17,9 +17,11 @@ V2 introduced and V3 maintains dedicated columns in the `profiles` table to avoi
 ```typescript
 interface TrackedDevice {
 	id: string; // Stable UUID (stored in localStorage & HttpOnly cookie)
-	device_name: string; // e.g., "Chrome on Windows"
+	device_name: string; // e.g. "iPhone (Chrome)" or "Xiaomi Redmi Note 10 (Edge)"
 	browser: string;
 	os: string;
+	device_type?: string; // "mobile", "tablet", "desktop"
+	device_model?: string; // Specific model like "Pixel 7" or "MacBook"
 	last_active: string; // ISO timestamp
 	location?: string; // Timezone-based location hint
 }
@@ -36,13 +38,13 @@ Device identification relies on a unique UUID (`ss_device_id`) that is persisted
 1. **`localStorage`**: Serves as the primary stable storage for the ID.
 2. **`HttpOnly` Cookie**: Mirroring the ID into a secure cookie allows the **Middleware** and **Server Components** to verify the device identity.
 
-### Phase 2: Registration (The Auth Callback)
+### Phase 2: Registration (The Auth Handshake)
 
-Unlike V1/V2 which relied heavily on client-side registration, V3 ensures the device is registered **during the authentication handshake**. In `/api/auth/callback/route.ts`:
+V3 ensures the device is registered **during the authentication handshake** to prevent unauthorized redirects:
 
-- The server exchanges the auth code for a session.
-- It immediately reads the `ss_device_id` cookie.
-- It registers the device in the `profiles` table _before_ the user ever reaches the dashboard. This ensures the first redirect to `/dashboard` is authorized.
+- **Auth Callback**: In `/api/auth/callback/route.ts`, the server exchanges the auth code for a session and registers the device before redirecting to the dashboard.
+- **Sign-In/Sign-Up Actions**: Standard auth actions in `app/(auth)/actions/auth.ts` register the device immediately upon successful credential verification.
+- **Anonymous Reporting**: When a survivor submits an anonymous report and creates an account, the backend (`/api/reports/anonymous`) registers the current device using the `ss_device_id` cookie and screen dimension hints. This ensures they can seamlessly access their dashboard without being blocked by middleware.
 
 ### Phase 3: Middleware Enforcement (The "Gatekeeper")
 

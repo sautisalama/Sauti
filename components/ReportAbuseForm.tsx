@@ -246,6 +246,10 @@ export default function ReportAbuseForm({ onClose }: { onClose?: () => void }) {
 				additional_info,
 				support_services: formData.get("support_services") || null,
 				password: password,
+				screen: typeof window !== "undefined" ? {
+					width: window.innerWidth,
+					height: window.innerHeight
+				} : undefined,
 			};
 
 			const response = await fetch("/api/reports/anonymous", {
