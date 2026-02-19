@@ -20,10 +20,14 @@ export class ServiceValidationService {
 	// Define related service fields that NGOs cannot mix
 	private readonly RELATED_FIELDS = {
 		legal: ["legal"],
-		medical: ["medical", "mental_health"],
-		mental_health: ["medical", "mental_health"],
+		medical: ["medical", "mental_health", "substance_abuse"],
+		mental_health: ["medical", "mental_health", "substance_abuse"],
 		shelter: ["shelter", "financial_assistance"],
 		financial_assistance: ["shelter", "financial_assistance"],
+		police_reporting: ["police_reporting"],
+		child_protection: ["child_protection"],
+		disability_support: ["disability_support"],
+		substance_abuse: ["medical", "mental_health", "substance_abuse"],
 		other: ["other"],
 	};
 
@@ -34,6 +38,10 @@ export class ServiceValidationService {
 		mental_health: "Mental Health Services",
 		shelter: "Shelter Services",
 		financial_assistance: "Financial Assistance",
+		police_reporting: "Police Reporting",
+		child_protection: "Child Protection",
+		disability_support: "Disability Support",
+		substance_abuse: "Substance Abuse Support",
 		other: "Other Services",
 	};
 
@@ -138,12 +146,16 @@ export class ServiceValidationService {
 		userType: UserType
 	): ServiceValidationResult {
 		// Define required document types for each service
-		const requiredDocuments = {
+		const requiredDocuments: Record<SupportServiceType, string[]> = {
 			legal: ["license", "certification", "bar_admission"],
 			medical: ["license", "certification", "medical_degree"],
 			mental_health: ["license", "certification", "psychology_degree"],
 			shelter: ["registration", "accreditation", "facility_license"],
 			financial_assistance: ["registration", "accreditation", "financial_license"],
+			police_reporting: ["registration", "authorization", "official_badge"],
+			child_protection: ["registration", "certification", "clearance_certificate"],
+			disability_support: ["registration", "certification", "specialist_license"],
+			substance_abuse: ["registration", "license", "counseling_certification"],
 			other: ["registration", "accreditation"],
 		};
 
@@ -172,6 +184,10 @@ export class ServiceValidationService {
 			"mental_health",
 			"shelter",
 			"financial_assistance",
+			"police_reporting",
+			"child_protection",
+			"disability_support",
+			"substance_abuse",
 			"other",
 		];
 
@@ -230,13 +246,21 @@ export class ServiceValidationService {
 			legal:
 				"Legal services including court representation, legal advice, and advocacy",
 			medical:
-				"Medical and healthcare services including physical and mental health support",
+				"Medical and healthcare services including physical health support",
 			mental_health:
 				"Mental health services including counseling, therapy, and psychological support",
 			shelter:
-				"Shelter and housing services including emergency accommodation and housing support",
+				"Shelter and housing services including emergency accommodation",
 			financial_assistance:
 				"Financial assistance services including grants, loans, and financial counseling",
+			police_reporting:
+				"Assistance with filing police reports and navigating the justice system",
+			child_protection:
+				"Specialized services for the protection and welfare of children",
+			disability_support:
+				"Support services for individuals with physical or cognitive disabilities",
+			substance_abuse:
+				"Support and treatment for substance abuse and addiction recovery",
 			other: "Other specialized services not covered by the main categories",
 		};
 

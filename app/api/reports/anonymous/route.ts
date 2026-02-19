@@ -197,6 +197,14 @@ export async function POST(request: Request) {
 			is_onBehalf: !!formData.is_onBehalf,
 			// Ensure additional_info is a JSON string as per schema
 			additional_info: formData.additional_info ? JSON.stringify(formData.additional_info) : null,
+			gender: formData.gender || null,
+			preferred_language: formData.preferred_language || null,
+			dob: formData.dob || null,
+			city: formData.city || null,
+			state: formData.state || null,
+			country: formData.country || null,
+			record_only: !!formData.record_only,
+			is_workplace_incident: !!formData.is_workplace_incident,
 		};
 
 		console.log("Inserting report...");

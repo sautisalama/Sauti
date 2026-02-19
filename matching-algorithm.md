@@ -1,309 +1,126 @@
-# Survivor-Professional Matching System
+# Sauti Salama: Comprehensive Matching Specification & Walkthrough
 
-## Overview
+## 1. Executive Summary
 
-The platform implements an automated matching system that connects survivors reporting abuse with relevant professional service providers. The core matching logic is implemented in the `matchReportWithServices` action, which evaluates multiple factors:
+The Sauti Salama Matching Engine is a multi-dimensional recommendation system designed to connect survivors of abuse with the most "clinically" and geographically appropriate verified professionals. Unlike simple search-based systems, it evaluates a survivor's entire profile against a professional's specialized capabilities and operational constraints in real-time.
 
-- Service type compatibility and priority weighting
-- Geographic distance calculation using Haversine formula
-- Professional's defined coverage area
-- Service availability status
+---
 
-## Technical Implementation
+## 2. Exhaustive Data Schema (Matching Inputs)
 
-### 1. Report Submission Flow
+The algorithm consumes data from three primary tables. Below are all fields currently influencing the match results:
 
-When a survivor submits a report through the platform:
+### A. The Survivor Request (`reports` table)
 
-1. The report data is submitted via POST `/api/reports`
-2. The system stores the report in the Supabase database
-3. The matching algorithm is triggered automatically
-4. Email notifications are sent to configured recipients
-5. Real-time updates are pushed to relevant professionals
+| Field                    | Data Type              | Usage in Algorithm                                                           |
+| :----------------------- | :--------------------- | :--------------------------------------------------------------------------- |
+| `type_of_incident`       | `incident_type` (Enum) | Primary key for selecting the Clinical Specialty Map.                        |
+| `required_services`      | `text[]`               | Explicit survivor requests that grant a +20 point bonus.                     |
+| `urgency`                | `urgency_level` (Enum) | Determines the final scoring multiplier (1.0x to 1.15x).                     |
+| `latitude` / `longitude` | `float8`               | Used as the origin point for Haversine distance calculations.                |
+| `preferred_language`     | `language_type` (Enum) | Triggers a +15 point bonus match against professional traits.                |
+| `gender`                 | `gender_type` (Enum)   | Triggers a +10 point bonus for specific gender preferences.                  |
+| `consent`                | `consent_type` (Enum)  | **Negative Weighting**: If 'no', Legal services are penalized by -50 points. |
+| `additional_info`        | `jsonb`                | Parsed for `special_needs` (e.g., `disabled`, `queer_support`).              |
+| `record_only`            | `boolean`              | **Control Flag**: Prevents matching for non-child cases if set to true.      |
 
-#### Reference implementation:
+### B. The Professional Service (`support_services` table)
 
-typescript:app/api/reports/route.ts
-startLine: 11
-endLine: 74
+| Field                    | Data Type              | Usage in Algorithm                                             |
+| :----------------------- | :--------------------- | :------------------------------------------------------------- |
+| `service_types`          | `support_service_type` | Evaluated against the Clinical Specialty Map.                  |
+| `coverage_area_radius`   | `integer` (km)         | Defines the maximum proximity boundary. `null` = Remote.       |
+| `availability`           | `availability_type`    | Weighted against the Report Urgency level (1-10 points).       |
+| `verification_status`    | `text`                 | **Hard Filter**: Only `verified` services are considered.      |
+| `specialises_in_...`     | `boolean`              | Flags for Disability, Queer Support, and Child specialization. |
+| `latitude` / `longitude` | `float8`               | Destination point for proximity calculations.                  |
 
-### 2. Matching Algorithm Details
+### C. The Professional Profile (`profiles` table)
 
-The matching service implements a scoring system that:
+| Field                      | Data Type | Usage in Algorithm                                                        |
+| :------------------------- | :-------- | :------------------------------------------------------------------------ |
+| `professional_title`       | `text`    | Maps to `PROFESSIONAL_AUTHORITY` scores (e.g., "Doctor" knows "Medical"). |
+| `settings`                 | `jsonb`   | Parsed for `matching_traits` (Gender and Languages).                      |
+| `bio` / `city` / `country` | `text`    | Snapshotted into `matched_services` for survivor UI display.              |
 
-1. Calculates service compatibility scores:
+---
 
-   - Matches required services with professional service types
-   - Applies priority weighting based on service order
-   - Higher scores for primary service matches
+## 3. The Matching Workflow (The Algorithm)
 
-2. Evaluates geographic proximity:
+The engine follows a strict 8-step pipeline to ensure high-fidelity matches:
 
-   - Uses Haversine formula for accurate distance calculation
-   - Considers professional's coverage radius (default 50km)
-   - Scores inversely proportional to distance
+### Step 1: Candidate Aggregation
 
-3. Selects best matches:
-   - Filters services above score threshold
-   - Sorts by total score
-   - Returns top 3 matching professionals
+The engine compiles a unified list of "Candidate" objects by merging:
 
-#### Reference implementation:
+- **Verified Support Services**: Linked to their owner's profile.
+- **Standalone Experts (HRDs & Paralegals)**: Individuals who don't have a formal "Service" entity but provide verified expertise. HRDs focus on "Other" support, while Paralegals are automatically mapped to "Legal" services.
 
-typescript:app/actions/match-services.ts
-startLine: 26
-endLine: 121
+### Level 2: Clinical Specialty Map (The Standalone Logic)
 
-### 3. Real-time Updates
+- **Human Rights Defenders**: Default radius 100km, Focus on "Other" / Protection.
+- **Paralegals**: Default radius 60km, Focus on "Legal" / Front-line legal aid.
 
-The system leverages Supabase's real-time capabilities for:
+### Step 2: Service-Type Compatibility (+25 to +45 pts)
 
-1. Professional Dashboard:
+It uses a `INCIDENT_SPECIALTY_MAP` to determine relevance:
 
-   - Live updates of new matches
-   - Real-time status changes
-   - Immediate match notifications
+- **Primary Match**: e.g., Physical Incident -> Medical Service (+25 pts).
+- **Secondary Match**: e.g., Physical Incident -> Mental Health Service (+15 pts).
+- **Explicit Request**: If the survivor manually requested the service type (+20 pts).
 
-2. Survivor Dashboard:
-   - Match status updates
-   - Service provider responses
-   - Case progress tracking
+### Step 3: Proximity Scoring (0 to 20 pts)
 
-#### Reference implementation:
+- For locals: $Score = 20 \times (1 - \frac{Distance}{Radius})$.
+- For remote: Proximity score is skipped, but the candidate is flagged with "Remote service available".
 
-typescript:app/dashboard/views/ProfesionalView.tsx
-startLine: 135
-endLine: 193
+### Step 4: Demographic Alignment (+10 to +30 pts)
 
-### 4. Security Measures
+- **Language**: Exact match on preferred language (+15 pts).
+- **Gender**: Exact match on survivor's gender preference (+10 pts).
+- **Special Needs**: Matching `special_needs` flags from the report to specialization toggles on the service (+15 pts each).
 
-The system implements several security measures:
+### Step 5: Professional Authority (0 to 10 pts)
 
-1. Authentication checks:
+A static matrix boosts specifically qualified titles. A **Lawyer** matching a **Trafficking** report gets +10, whereas a **Paralegal** gets +4, reflecting the higher capacity for high-stakes legal intervention.
 
-   - Required for all sensitive operations
-   - Session validation on API routes
-   - User type-specific access controls
+### Step 6: Negative Weights & Safety Filters
 
-2. Data ownership verification:
-   - Report ownership validation
-   - Service provider verification
-   - Match status update authorization
+- **Consent Check**: If a survivor withholds legal consent, Professionals with "Lawyer" or "Law Firm" titles are penalized (-50 pts), effectively filtering them out unless the survivor changes their mind.
+- **Child Safety**: If a report involves children, the algorithm ignores `record_only` and forces a match with specialists capable of child protection.
 
-#### Reference implementation:
+### Step 7: Load Balancing (Dynamic Penalty)
 
-typescript:app/api/reports/[id]/route.ts
-startLine: 4
-endLine: 44
+The engine calls `get_active_case_count`. For every active case a professional is currently handling, their score for the new match is reduced by **5 points**. This prevents "super-providers" from being overwhelmed and ensures survivors get matched with responsive professionals.
 
-## Database Schema
+### Step 8: Urgency Scaling & Selection
 
-### Reports Table
+The final raw score is multiplied by the urgency factor (1.15x or 1.05x). Only the **Top 5** candidates scoring above **10 points** are persisted.
 
-- `report_id`: UUID primary key
-- `user_id`: Foreign key to users (optional for anonymous reports)
-- `type_of_incident`: Enum of incident types
-- `required_services`: Array of required service types
-- `latitude`, `longitude`: Geographic coordinates
-- `submission_timestamp`: Timestamp
-- `urgency`: Enum of urgency levels
+---
 
-### Support Services Table
+## 4. Nuances & Recent Enhancements (Walkthrough)
 
-- `id`: UUID primary key
-- `user_id`: Foreign key to users
-- `service_types`: Comma-separated list of services
-- `coverage_area_radius`: Number (kilometers)
-- `latitude`, `longitude`: Service location
-- `availability`: Service availability status
+### Remote vs. Local Heuristics
 
-### Matched Services Table
+One of the most significant recent changes is the removal of the explicit `is_remote` column in favor of an **Implicit Heuristic**.
 
-- `id`: UUID primary key
-- `report_id`: Foreign key to reports
-- `service_id`: Foreign key to support services
-- `match_score`: Numeric score
-- `match_date`: Timestamp
-- `status`: Match status enum
+- **The Nuance**: We now treat `coverage_area_radius === null` as the single source of truth for remote services. This simplifies the DB schema and allows the UI to dynamically toggle proximity logic based on a single numeric field.
 
-## Future Enhancements
+### HRD Merging Logic
 
-Planned improvements to the matching system:
+Standalone Human Rights Defenders (HRDs) often operate without a fixed "Service" address but are vital for protection.
 
-1. Machine Learning Integration:
+- **The Change**: The algorithm now performs a `LEFT JOIN` or separate query to find verified profiles with the title "Human rights defender" who **do not** have a linked `support_service`. It synthesizes a candidate object for them so they are weighted identically to formal organizations.
 
-   - Pattern recognition for service matching
-   - Predictive scoring based on historical success
-   - Dynamic coverage area optimization
+### The "Address Snapshot" (Privacy & Speed)
 
-2. Enhanced Geographic Matching:
+When a match is found, we store the provider's Bio and Location (City/Country) in the `matched_services.description` and `matched_services.notes` columns.
 
-   - Multi-point service coverage areas
-   - Public transport accessibility
-   - Service capacity balancing
+- **Why?**: This creates a "snapshot" of the provider's status at the time of the match. If the provider later edits their profile, the survivor's match record retains the context that led to the connection, and it avoids complex triple-joins when loading the survivor's dashboard list.
 
-3. Automated Follow-up:
-   - Status update reminders
-   - Service delivery verification
-   - Feedback collection and analysis
+### Real-time Escalation Flow
 
-````markdown
-# Survivor-Professional Matching System
+Matching isn't just a one-time event.
 
-## Overview
-
-The platform implements an automated matching system that connects survivors reporting abuse with relevant professional service providers. The core matching logic is implemented in the `matchReportWithServices` action, which evaluates multiple factors:
-
-- Service type compatibility and priority weighting
-- Geographic distance calculation using Haversine formula
-- Professional's defined coverage area
-- Service availability status
-
-## Technical Implementation
-
-### 1. Report Submission Flow
-
-When a survivor submits a report through the platform:
-
-1. The report data is submitted via POST `/api/reports`
-2. The system stores the report in the Supabase database
-3. The matching algorithm is triggered automatically
-4. Email notifications are sent to configured recipients
-5. Real-time updates are pushed to relevant professionals
-
-Reference implementation:
-
-```typescript:app/api/reports/route.ts
-startLine: 11
-endLine: 74
-```
-````
-
-### 2. Matching Algorithm Details
-
-The matching service implements a scoring system that:
-
-1. Calculates service compatibility scores:
-
-   - Matches required services with professional service types
-   - Applies priority weighting based on service order
-   - Higher scores for primary service matches
-
-2. Evaluates geographic proximity:
-
-   - Uses Haversine formula for accurate distance calculation
-   - Considers professional's coverage radius (default 50km)
-   - Scores inversely proportional to distance
-
-3. Selects best matches:
-   - Filters services above score threshold
-   - Sorts by total score
-   - Returns top 3 matching professionals
-
-Reference implementation:
-
-```typescript:app/actions/match-services.ts
-startLine: 26
-endLine: 121
-```
-
-### 3. Real-time Updates
-
-The system leverages Supabase's real-time capabilities for:
-
-1. Professional Dashboard:
-
-   - Live updates of new matches
-   - Real-time status changes
-   - Immediate match notifications
-
-2. Survivor Dashboard:
-   - Match status updates
-   - Service provider responses
-   - Case progress tracking
-
-Reference implementation:
-
-```typescript:app/dashboard/_views/ProfesionalView.tsx
-startLine: 135
-endLine: 193
-```
-
-### 4. Security Measures
-
-The system implements several security measures:
-
-1. Authentication checks:
-
-   - Required for all sensitive operations
-   - Session validation on API routes
-   - User type-specific access controls
-
-2. Data ownership verification:
-   - Report ownership validation
-   - Service provider verification
-   - Match status update authorization
-
-Reference implementation:
-
-```typescript:app/api/reports/[id]/route.ts
-startLine: 4
-endLine: 44
-```
-
-## Database Schema
-
-### Reports Table
-
-- `report_id`: UUID primary key
-- `user_id`: Foreign key to users (optional for anonymous reports)
-- `type_of_incident`: Enum of incident types
-- `required_services`: Array of required service types
-- `latitude`, `longitude`: Geographic coordinates
-- `submission_timestamp`: Timestamp
-- `urgency`: Enum of urgency levels
-
-### Support Services Table
-
-- `id`: UUID primary key
-- `user_id`: Foreign key to users
-- `service_types`: Comma-separated list of services
-- `coverage_area_radius`: Number (kilometers)
-- `latitude`, `longitude`: Service location
-- `availability`: Service availability status
-
-### Matched Services Table
-
-- `id`: UUID primary key
-- `report_id`: Foreign key to reports
-- `service_id`: Foreign key to support services
-- `match_score`: Numeric score
-- `match_date`: Timestamp
-- `status`: Match status enum
-
-## Future Enhancements
-
-Planned improvements to the matching system:
-
-1. Machine Learning Integration:
-
-   - Pattern recognition for service matching
-   - Predictive scoring based on historical success
-   - Dynamic coverage area optimization
-
-2. Enhanced Geographic Matching:
-
-   - Multi-point service coverage areas
-   - Public transport accessibility
-   - Service capacity balancing
-
-3. Automated Follow-up:
-   - Status update reminders
-   - Service delivery verification
-   - Feedback collection and analysis
-
-```
-
-This documentation provides a technical overview of the matching system's implementation while maintaining readability for developers who need to understand or contribute to the system.
-
-```
+- **The Flow**: If a survivor initially submits a "Record Only" report (no match), they can later click "Request Help". This triggers the `/api/reports/[id]/escalate` route, which flips the `record_only` bit and **reruns the entire matching engine**. This ensures help is available exactly when the survivor is ready for it.

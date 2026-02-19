@@ -314,12 +314,16 @@ export function EnhancedProfessionalDocumentsForm({
 	};
 
 	const getServiceTypeColor = (serviceType?: SupportServiceType) => {
-		const colors = {
+		const colors: Record<SupportServiceType, string> = {
 			legal: "bg-blue-100 text-blue-800",
 			medical: "bg-red-100 text-red-800",
 			mental_health: "bg-purple-100 text-purple-800",
 			shelter: "bg-green-100 text-green-800",
 			financial_assistance: "bg-yellow-100 text-yellow-800",
+			police_reporting: "bg-indigo-100 text-indigo-800",
+			child_protection: "bg-rose-100 text-rose-800",
+			disability_support: "bg-teal-100 text-teal-800",
+			substance_abuse: "bg-orange-100 text-orange-800",
 			other: "bg-gray-100 text-gray-800",
 		};
 		return colors[serviceType || "other"];

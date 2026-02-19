@@ -557,9 +557,12 @@ export type Database = {
       matched_services: {
         Row: {
           description: string | null
+          escalation_required: boolean | null
           feedback: string | null
+          hrd_profile_id: string | null
           id: string
           match_date: string | null
+          match_reason: string | null
           match_score: number | null
           match_status_type:
             | Database["public"]["Enums"]["match_status_type"]
@@ -577,9 +580,12 @@ export type Database = {
         }
         Insert: {
           description?: string | null
+          escalation_required?: boolean | null
           feedback?: string | null
+          hrd_profile_id?: string | null
           id?: string
           match_date?: string | null
+          match_reason?: string | null
           match_score?: number | null
           match_status_type?:
             | Database["public"]["Enums"]["match_status_type"]
@@ -597,9 +603,12 @@ export type Database = {
         }
         Update: {
           description?: string | null
+          escalation_required?: boolean | null
           feedback?: string | null
+          hrd_profile_id?: string | null
           id?: string
           match_date?: string | null
+          match_reason?: string | null
           match_score?: number | null
           match_status_type?:
             | Database["public"]["Enums"]["match_status_type"]
@@ -616,6 +625,13 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "matched_services_hrd_profile_id_fkey"
+            columns: ["hrd_profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "matched_services_report_id_fkey"
             columns: ["report_id"]
@@ -913,6 +929,7 @@ export type Database = {
           gender: Database["public"]["Enums"]["gender_type"] | null
           incident_description: string | null
           is_onBehalf: boolean | null
+          is_workplace_incident: boolean | null
           ismatched: boolean | null
           last_name: string | null
           latitude: number | null
@@ -960,6 +977,7 @@ export type Database = {
           gender?: Database["public"]["Enums"]["gender_type"] | null
           incident_description?: string | null
           is_onBehalf?: boolean | null
+          is_workplace_incident?: boolean | null
           ismatched?: boolean | null
           last_name?: string | null
           latitude?: number | null
@@ -1007,6 +1025,7 @@ export type Database = {
           gender?: Database["public"]["Enums"]["gender_type"] | null
           incident_description?: string | null
           is_onBehalf?: boolean | null
+          is_workplace_incident?: boolean | null
           ismatched?: boolean | null
           last_name?: string | null
           latitude?: number | null
@@ -1121,6 +1140,9 @@ export type Database = {
           priority: number | null
           reviewed_by: Json | null
           service_types: Database["public"]["Enums"]["support_service_type"]
+          specialises_in_children: boolean | null
+          specialises_in_disability: boolean | null
+          specialises_in_queer_support: boolean | null
           suspension_end_date: string | null
           suspension_reason: string | null
           user_id: string | null
@@ -1155,6 +1177,9 @@ export type Database = {
           priority?: number | null
           reviewed_by?: Json | null
           service_types: Database["public"]["Enums"]["support_service_type"]
+          specialises_in_children?: boolean | null
+          specialises_in_disability?: boolean | null
+          specialises_in_queer_support?: boolean | null
           suspension_end_date?: string | null
           suspension_reason?: string | null
           user_id?: string | null
@@ -1189,6 +1214,9 @@ export type Database = {
           priority?: number | null
           reviewed_by?: Json | null
           service_types?: Database["public"]["Enums"]["support_service_type"]
+          specialises_in_children?: boolean | null
+          specialises_in_disability?: boolean | null
+          specialises_in_queer_support?: boolean | null
           suspension_end_date?: string | null
           suspension_reason?: string | null
           user_id?: string | null
@@ -1248,6 +1276,10 @@ export type Database = {
     Functions: {
       cleanup_expired_calendar_tokens: { Args: never; Returns: undefined }
       cleanup_orphaned_files: { Args: never; Returns: number }
+      get_active_case_count: {
+        Args: { provider_user_id: string }
+        Returns: number
+      }
       get_coverage_map_data: {
         Args: never
         Returns: {
@@ -1312,6 +1344,12 @@ export type Database = {
         | "financial"
         | "child_abuse"
         | "other"
+        | "child_labor"
+        | "neglect"
+        | "trafficking"
+        | "stalking"
+        | "cyber"
+        | "racial"
       invitation_status_type: "pending" | "accepted" | "declined" | "expired"
       language_type: "english" | "swahili" | "other"
       match_status_type:
@@ -1342,6 +1380,10 @@ export type Database = {
         | "shelter"
         | "financial_assistance"
         | "other"
+        | "police_reporting"
+        | "child_protection"
+        | "disability_support"
+        | "substance_abuse"
       target_type: "user" | "service"
       urgency_type: "high" | "medium" | "low"
       user_type: "ngo" | "professional" | "survivor"
@@ -1510,6 +1552,12 @@ export const Constants = {
         "financial",
         "child_abuse",
         "other",
+        "child_labor",
+        "neglect",
+        "trafficking",
+        "stalking",
+        "cyber",
+        "racial",
       ],
       invitation_status_type: ["pending", "accepted", "declined", "expired"],
       language_type: ["english", "swahili", "other"],
@@ -1544,6 +1592,10 @@ export const Constants = {
         "shelter",
         "financial_assistance",
         "other",
+        "police_reporting",
+        "child_protection",
+        "disability_support",
+        "substance_abuse",
       ],
       target_type: ["user", "service"],
       urgency_type: ["high", "medium", "low"],

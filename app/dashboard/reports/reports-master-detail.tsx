@@ -204,6 +204,13 @@ export default function ReportsMasterDetail({ userId }: { userId: string }) {
 									phone_number,
 									email
 								),
+								hrd_details:profiles!matched_services_hrd_profile_id_fkey (
+									id,
+									first_name,
+									last_name,
+									email,
+									phone
+								),
 								appointments (
 									id,
 									appointment_id,
@@ -226,7 +233,12 @@ export default function ReportsMasterDetail({ userId }: { userId: string }) {
 					matched_services:
 						r.matched_services?.map((m: any) => ({
 							...m,
-							support_services: m.service_details || m.support_services || null,
+							support_services: m.service_details || m.support_services || (m.hrd_details ? {
+								id: m.hrd_details.id,
+								name: `${m.hrd_details.first_name || ''} ${m.hrd_details.last_name || ''}`.trim() || 'HRD',
+								phone_number: m.hrd_details.phone,
+								email: m.hrd_details.email
+							} : null),
 						})) || [],
 				}));
 				setReports(normalized || []);
