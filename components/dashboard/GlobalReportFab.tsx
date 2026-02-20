@@ -12,6 +12,9 @@ import {
 import AuthenticatedReportAbuseForm from "@/components/AuthenticatedReportAbuseForm";
 import { cn } from "@/lib/utils";
 
+import { useDashboardData } from "@/components/providers/DashboardDataProvider";
+import { usePathname } from "next/navigation";
+
 interface GlobalReportFabProps {
 	userId?: string;
 }
@@ -19,20 +22,29 @@ interface GlobalReportFabProps {
 export function GlobalReportFab({ userId }: GlobalReportFabProps) {
 	const [isOpen, setIsOpen] = useState(false);
 	const [isExpanded, setIsExpanded] = useState(true);
+	const pathname = usePathname();
+	const dash = useDashboardData();
 
-	// Auto-collapse after 30 seconds
+	// Auto-collapse after 15 seconds (reduced from 30)
 	useEffect(() => {
 		const timer = setTimeout(() => {
 			setIsExpanded(false);
-		}, 30000);
+		}, 15000);
 
 		return () => clearTimeout(timer);
 	}, []);
 
-	if (!userId) return null;
+	const isAdmin = dash?.isAdminMode || pathname.startsWith("/dashboard/admin");
+	const isDashboardPage = pathname === "/dashboard";
+	const isReportPage = pathname === "/dashboard/reports" || pathname.startsWith("/dashboard/reports/");
+	
+	// Visibility Logic: Only show on Home or Reports (list/detail), hide for admins
+	const isVisible = (isDashboardPage || isReportPage) && !isAdmin && !!userId;
+
+	if (!isVisible) return null;
 
 	return (
-		<div className="fixed bottom-6 right-6 z-50">
+		<div className="fixed bottom-24 lg:bottom-8 right-6 z-50">
 			<Sheet open={isOpen} onOpenChange={setIsOpen}>
 				<SheetTrigger asChild>
 					<div
@@ -45,14 +57,14 @@ export function GlobalReportFab({ userId }: GlobalReportFabProps) {
 								isExpanded ? "px-8" : "w-14 px-0 justify-center"
 							)}
 						>
-							<Plus className="h-6 w-6" />
+							<Plus className="h-6 w-6 shrink-0" />
 							<span
 								className={cn(
 									"whitespace-nowrap overflow-hidden transition-all duration-300",
 									isExpanded ? "max-w-[200px] opacity-100" : "max-w-0 opacity-0"
 								)}
 							>
-								New Report
+								Report Abuse
 							</span>
 						</Button>
 					</div>
@@ -61,7 +73,7 @@ export function GlobalReportFab({ userId }: GlobalReportFabProps) {
 					side="right"
 					className="w-full sm:max-w-xl md:max-w-2xl lg:max-w-3xl p-0 border-0 bg-transparent shadow-2xl overflow-hidden"
 				>
-					<SheetTitle className="sr-only">New Report Form</SheetTitle>
+					<SheetTitle className="sr-only">Report Abuse Form</SheetTitle>
 					<div className="h-full flex flex-col bg-white/95 backdrop-blur-sm">
 						<AuthenticatedReportAbuseForm
 							onClose={() => setIsOpen(false)}

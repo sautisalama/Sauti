@@ -13,7 +13,7 @@ import {
 	BookOpen, HandHeart, ArrowRight,
 	Mic, FileText, PenLine, Home
 } from "lucide-react";
-import { useState, useEffect, useCallback, use } from "react";
+import { useState, useEffect, useCallback, use, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent } from "@/components/ui/card";
@@ -71,7 +71,7 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
 	const needsOnboarding = useMemo(() => {
 		const profile = dash?.data?.profile;
 		if (!profile) return false;
-		const hasAcceptedPolicies = !!(profile.settings as any)?.all_policies_accepted;
+		const hasAcceptedPolicies = !!(profile.policies as any)?.all_policies_accepted;
 		return !profile.user_type || 
 			!hasAcceptedPolicies ||
 			((profile.user_type === 'professional' || profile.user_type === 'ngo') && !profile.professional_title);

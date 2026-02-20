@@ -39,7 +39,7 @@ export function DashboardContent({ children }: DashboardContentProps) {
   const showBottomPadding = !isChatDetail && !isApptDetail;
 
   const profile = dash?.data?.profile;
-  const hasAcceptedPolicies = !!(profile?.settings as any)?.all_policies_accepted;
+  const hasAcceptedPolicies = !!(profile?.policies as any)?.all_policies_accepted;
   const needsOnboarding = !profile?.user_type || 
     !hasAcceptedPolicies ||
     ((profile.user_type === 'professional' || profile.user_type === 'ngo') && !profile.professional_title);
@@ -68,13 +68,7 @@ export function DashboardContent({ children }: DashboardContentProps) {
                 {children}
             </div>
         </main>
-        {user && !needsOnboarding && (
-            <div className="hidden lg:block">
-                {(pathname === "/dashboard" || pathname === "/dashboard/reports") && (
-                    <GlobalReportFab userId={user} />
-                )}
-            </div>
-        )}
+        {/* FAB removed as per request for cleaner UI */}
     </>
   );
 }

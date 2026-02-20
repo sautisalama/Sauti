@@ -293,13 +293,6 @@ export default function ProfessionalView({
 								compact={isWelcomeCompact}
 								welcomeMessage="Welcome back, ready to make a difference?"
 							/>
-							<Button 
-								onClick={() => setReportDialogOpen(true)}
-								className="hidden md:flex bg-serene-blue-600 hover:bg-serene-blue-700 text-white rounded-full px-6 font-bold shadow-md gap-2 h-12 transition-all hover:scale-[1.02]"
-							>
-								<Plus className="h-5 w-5" />
-								Report Abuse
-							</Button>
 						</div>
 
 						{/* Out of Office Banner */}
@@ -454,6 +447,8 @@ export default function ProfessionalView({
 									className="bg-sauti-teal-light border-sauti-teal/10 shadow-sm hover:shadow-md transition-all"
 									badge={pendingCasesCount > 0 ? pendingCasesCount : undefined}
                                     badgeClassName="bg-sauti-teal text-white"
+                                    actionIcon={<Plus className="h-4 w-4" />}
+                                    onActionClick={() => setReportDialogOpen(true)}
 								/>
 								<SereneQuickActionCard
 									title="Messages"

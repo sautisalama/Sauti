@@ -99,7 +99,7 @@ export default function ReportsMasterDetail({ userId }: { userId: string }) {
 	const needsOnboarding = useMemo(() => {
 		const profile = dash?.data?.profile;
 		if (!profile) return false;
-		const hasAcceptedPolicies = !!(profile.settings as any)?.all_policies_accepted;
+		const hasAcceptedPolicies = !!(profile.policies as any)?.all_policies_accepted;
 		return !profile.user_type || 
 			!hasAcceptedPolicies ||
 			((profile.user_type === 'professional' || profile.user_type === 'ngo') && !profile.professional_title);
