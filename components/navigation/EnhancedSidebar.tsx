@@ -94,7 +94,8 @@ export function EnhancedSidebar({
 	const rawIsCollapsed = dash?.isSidebarCollapsed ?? defaultCollapsed;
     const isCollapsed = mounted ? rawIsCollapsed : false; // Default expanded on server to match desktop usually
     const setIsCollapsed = dash?.setIsSidebarCollapsed ?? (() => {});
-	const [reportDialogOpen, setReportDialogOpen] = useState(false);
+	const reportDialogOpen = dash?.isReportDialogOpen || false;
+	const setReportDialogOpen = dash?.setIsReportDialogOpen || (() => {});
 	const [notifications, setNotifications] = useState(0);
 	const [casesCount, setCasesCount] = useState<number>(0);
 	const isAdminMode = dash?.isAdminMode || false;
@@ -267,7 +268,14 @@ export function EnhancedSidebar({
 					section: "main",
 				},
 
-
+				{
+					id: "report",
+					label: "Report Abuse",
+					icon: Megaphone,
+					onClick: () => setReportDialogOpen(true),
+					section: "secondary",
+					separator: true,
+				},
 			];
 		}
 
@@ -313,7 +321,14 @@ export function EnhancedSidebar({
 			];
 			return [
 				...survivorMain,
-
+				{
+					id: "report",
+					label: "Report Abuse",
+					icon: Megaphone,
+					onClick: () => setReportDialogOpen(true),
+					section: "secondary",
+					separator: true,
+				},
 			];
 		}
 

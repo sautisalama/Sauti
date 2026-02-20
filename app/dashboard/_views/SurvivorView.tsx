@@ -18,7 +18,8 @@ import {
     User,
     ArrowRight,
 	ChevronRight,
-	SlidersHorizontal
+	SlidersHorizontal,
+	Plus
 } from "lucide-react";
 import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
@@ -128,14 +129,23 @@ export default function SurvivorView({
 		<div className="min-h-screen bg-serene-neutral-50 pb-24">
 			{/* Floating Search Bar (Mobile/Desktop) */}
 			<div className="sticky top-0 z-40 bg-serene-neutral-50/90 backdrop-blur-md px-4 py-3 lg:px-8 border-b border-serene-neutral-200/50">
-				<div className="max-w-xl mx-auto relative">
-					<Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-serene-neutral-400" />
-					<Input 
-						placeholder="Search your cases, resources..." 
-						className="pl-10 pr-10 bg-white border-serene-neutral-200 rounded-full h-11 shadow-sm focus-visible:ring-serene-blue-200"
-						value={searchQuery}
-						onChange={(e) => setSearchQuery(e.target.value)}
-					/>
+				<div className="max-w-4xl mx-auto flex items-center gap-4">
+					<div className="relative flex-1">
+						<Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-serene-neutral-400" />
+						<Input 
+							placeholder="Search your cases, resources..." 
+							className="pl-10 pr-10 bg-white border-serene-neutral-200 rounded-full h-11 shadow-sm focus-visible:ring-serene-blue-200"
+							value={searchQuery}
+							onChange={(e) => setSearchQuery(e.target.value)}
+						/>
+					</div>
+					<Button 
+						onClick={() => dash?.setIsReportDialogOpen(true)}
+						className="hidden md:flex bg-serene-blue-600 hover:bg-serene-blue-700 text-white rounded-full px-6 font-bold shadow-md gap-2 h-11 transition-all hover:scale-[1.02]"
+					>
+						<Plus className="h-4 w-4" />
+						Report Abuse
+					</Button>
 				</div>
 			</div>
 

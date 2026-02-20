@@ -33,6 +33,7 @@ import {
 	Search,
 	MessageCircle,
 	Calendar,
+	Plus
 } from "lucide-react";
 import { Tables } from "@/types/db-schema";
 import RichTextNotesEditor from "./rich-text-notes-editor";
@@ -94,6 +95,15 @@ export default function ReportsMasterDetail({ userId }: { userId: string }) {
 	// Calendar State
 	const [calendarViewMode, setCalendarViewMode] = useState<'week' | 'month'>('week');
 	const [calendarSelectedDate, setCalendarSelectedDate] = useState(new Date());
+
+	const needsOnboarding = useMemo(() => {
+		const profile = dash?.data?.profile;
+		if (!profile) return false;
+		const hasAcceptedPolicies = !!(profile.settings as any)?.all_policies_accepted;
+		return !profile.user_type || 
+			!hasAcceptedPolicies ||
+			((profile.user_type === 'professional' || profile.user_type === 'ngo') && !profile.professional_title);
+	}, [dash?.data?.profile]);
 
 	// Calendar Helpers
 	const getWeekDays = (baseDate: Date) => {
@@ -548,7 +558,7 @@ export default function ReportsMasterDetail({ userId }: { userId: string }) {
 				</div>
 				{/* Master list */}
 				<div
-					className={`flex-1 lg:flex-[7] xl:flex-[7] h-full overflow-y-auto pr-2 pb-8 scroll-smooth ${
+					className={`flex-1 lg:flex-[7] xl:flex-[7] min-w-0 h-full overflow-y-auto overflow-x-hidden pr-2 pb-8 scroll-smooth ${
 						mobileView !== "list" ? "hidden lg:block" : ""
 					}`}
 				>
@@ -559,13 +569,22 @@ export default function ReportsMasterDetail({ userId }: { userId: string }) {
 								<h1 className="text-2xl lg:text-3xl font-bold text-sauti-dark tracking-tight">My Reports</h1>
 								<p className="text-serene-neutral-500 mt-1 text-sm lg:text-base font-medium">View your reports and check their status.</p>
 							</div>
+							{!needsOnboarding && (
+								<Button 
+									onClick={() => dash?.setIsReportDialogOpen(true)}
+									className="bg-serene-blue-600 hover:bg-serene-blue-700 text-white rounded-2xl px-6 font-bold shadow-lg shadow-serene-blue-100 transition-all hover:scale-[1.02] h-11"
+								>
+									<Plus className="h-5 w-5 mr-1" />
+									Report Abuse
+								</Button>
+							)}
 						</div>
 					</div>
 					{/* Premium Search and Filter Bar */}
 					<div className="mb-6 sticky top-0 z-30 bg-serene-neutral-50/95 backdrop-blur-lg border-b border-serene-neutral-100 pb-4 pt-3 -mx-1 px-1">
 						<div className="flex items-center gap-3">
 							{/* Search Bar */}
-							<div className="relative flex-1">
+							<div className="relative flex-1 min-w-0">
 								<Input
 									placeholder="Search reports..."
 									value={q}
@@ -703,7 +722,7 @@ export default function ReportsMasterDetail({ userId }: { userId: string }) {
 							filtered.map((r) => {
 								const isActive = selected?.report_id === r.report_id;
 								return (
-									<div key={r.report_id} className="transition-all duration-200">
+									<div key={r.report_id} className="transition-all duration-200 min-w-0">
 										<SereneReportCard
 											type={r.type_of_incident?.replace(/_/g, " ") || "Incident Report"}
 											date={formatDate(r.submission_timestamp)}
@@ -723,7 +742,7 @@ export default function ReportsMasterDetail({ userId }: { userId: string }) {
 
 				{/* Right column: Calendar by default */}
 				<div
-					className={`flex-1 lg:flex-[5] xl:flex-[5] h-full overflow-y-auto ${
+					className={`flex-1 lg:flex-[5] xl:flex-[5] min-w-0 h-full overflow-y-auto overflow-x-hidden ${
 						mobileView !== "calendar" ? "hidden lg:block" : ""
 					}`}
 				>

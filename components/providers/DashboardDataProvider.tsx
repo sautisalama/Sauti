@@ -31,6 +31,8 @@ export type DashboardDataContextType = {
   isSidebarCollapsed: boolean;
   setIsSidebarCollapsed: (v: boolean) => void;
   isAdminMode: boolean;
+  isReportDialogOpen: boolean;
+  setIsReportDialogOpen: (v: boolean) => void;
 };
 
 const DashboardDataContext = createContext<DashboardDataContextType | null>(null);
@@ -96,14 +98,18 @@ export function DashboardDataProvider({
     setData((prev) => (prev ? { ...prev, ...patch } : prev));
   }, []);
 
+  const [isReportDialogOpen, setIsReportDialogOpen] = useState(false);
+  
   const value = useMemo<DashboardDataContextType>(() => ({ 
     data, 
     setUnreadChatCount, 
     updatePartial,
     isSidebarCollapsed,
     setIsSidebarCollapsed,
-    isAdminMode
-  }), [data, setUnreadChatCount, updatePartial, isSidebarCollapsed, isAdminMode]);
+    isAdminMode,
+    isReportDialogOpen,
+    setIsReportDialogOpen
+  }), [data, setUnreadChatCount, updatePartial, isSidebarCollapsed, isAdminMode, isReportDialogOpen]);
 
   return <DashboardDataContext.Provider value={value}>{children}</DashboardDataContext.Provider>;
 }

@@ -69,6 +69,7 @@ import { fetchUserSupportServices, deleteSupportService } from "./actions/suppor
 import { fetchMatchedServices } from "./actions/matched-services";
 import { fetchUserAppointments } from "./actions/appointments";
 import AuthenticatedReportAbuseForm from "@/components/AuthenticatedReportAbuseForm";
+import { OutOfOfficeBanner } from "@/components/dashboard/OutOfOfficeBanner";
 
 interface ProfessionalViewProps {
 	userId: string;
@@ -85,7 +86,8 @@ export default function ProfessionalView({
     const router = useRouter(); 
     const pathname = usePathname();
 	const searchQuery = searchParams.get("q") || "";
-	const [reportDialogOpen, setReportDialogOpen] = useState(false);
+	const reportDialogOpen = dash?.isReportDialogOpen || false;
+	const setReportDialogOpen = dash?.setIsReportDialogOpen || (() => {});
 	const [isWelcomeCompact, setIsWelcomeCompact] = useState(false);
 	const [isCalendarExpanded, setIsCalendarExpanded] = useState(false);
 	const [selectedDate, setSelectedDate] = useState(new Date());
@@ -284,12 +286,24 @@ export default function ProfessionalView({
 				) : (
 					<>
 						{/* Welcome Header */}
-						<SereneWelcomeHeader
-							name={profileDetails.first_name || "Partner"}
-							timeOfDay={getTimeOfDay()}
-							compact={isWelcomeCompact}
-							welcomeMessage="Welcome back, ready to make a difference?"
-						/>
+						<div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+							<SereneWelcomeHeader
+								name={profileDetails.first_name || "Partner"}
+								timeOfDay={getTimeOfDay()}
+								compact={isWelcomeCompact}
+								welcomeMessage="Welcome back, ready to make a difference?"
+							/>
+							<Button 
+								onClick={() => setReportDialogOpen(true)}
+								className="hidden md:flex bg-serene-blue-600 hover:bg-serene-blue-700 text-white rounded-full px-6 font-bold shadow-md gap-2 h-12 transition-all hover:scale-[1.02]"
+							>
+								<Plus className="h-5 w-5" />
+								Report Abuse
+							</Button>
+						</div>
+
+						{/* Out of Office Banner */}
+						<OutOfOfficeBanner userId={userId} />
 
 						{/* Verification Banner */}
 						{(() => {
@@ -894,18 +908,6 @@ export default function ProfessionalView({
 				)}
 			</div>
 
-			{/* Report Dialog */}
-			<Dialog open={reportDialogOpen} onOpenChange={setReportDialogOpen}>
-				<DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-y-auto rounded-3xl">
-					<DialogHeader>
-						<DialogTitle className="text-xl font-bold">Report Incident</DialogTitle>
-						<DialogDescription>
-							Your safety is our priority. All information is kept confidential.
-						</DialogDescription>
-					</DialogHeader>
-					<AuthenticatedReportAbuseForm userId={userId} onClose={() => setReportDialogOpen(false)} />
-				</DialogContent>
-			</Dialog>
 		</div>
 	);
 }

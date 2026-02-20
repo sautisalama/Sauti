@@ -432,7 +432,7 @@ export function SereneReportCard({
               <Shield className="h-6 w-6" />
            </div>
            <div>
-             <h4 className="font-bold text-serene-neutral-900 group-hover:text-serene-blue-900 transition-colors text-base">{type}</h4>
+             <h4 className="font-bold text-serene-neutral-900 group-hover:text-serene-blue-900 transition-colors text-base truncate">{type}</h4>
              <span className="text-xs text-serene-neutral-500 font-medium flex items-center gap-1.5 mt-0.5">
                <Clock className="h-3.5 w-3.5" /> {date}
              </span>

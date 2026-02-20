@@ -1,16 +1,17 @@
 import { Chat, Message } from '@/types/chat';
 import { useState, useEffect, useRef } from 'react';
-import { getMessages, sendMessage } from '@/app/actions/chat';
+import { getMessages, sendMessage, markMessagesAsRead } from '@/app/actions/chat';
 import { fetchLinkMetadata } from '@/app/actions/chat-media';
 import { createClient } from '@/utils/supabase/client';
 import { MessageBubble } from './MessageBubble';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { Phone, Video, Search, MoreVertical, Smile, Paperclip, Mic, Send, X, Lock } from 'lucide-react';
+import { Phone, Video, Search, MoreVertical, Smile, Paperclip, Mic, Send, X, Lock, ArrowLeft, Info } from 'lucide-react';
 import { ChatMediaDrawer } from './ChatMediaDrawer';
 import { EmojiPicker } from './EmojiPicker';
 import { AttachmentMenu } from './AttachmentMenu';
 import { FilePreviewModal } from './FilePreviewModal';
+import { format } from 'date-fns';
 
 interface ChatWindowProps {
   chat: Chat;
@@ -107,6 +108,8 @@ export function ChatWindow({ chat, onBack }: ChatWindowProps) {
       } else {
           const data = await getMessages(chat.id);
           setMessages(data);
+          // Mark as read immediately on load
+          markMessagesAsRead(chat.id).catch(err => console.error('Failed to mark read', err));
       }
       scrollToBottom();
     } catch (error) {
@@ -297,28 +300,50 @@ export function ChatWindow({ chat, onBack }: ChatWindowProps) {
   const avatar = meta.image_url || otherParticipant?.user?.avatar_url;
 
   return (
-    <div className="flex flex-col h-full bg-serene-neutral-50 relative w-full font-sans">
-       {/* Background Pattern - subtle dots or just white/gray */}
-       <div className="absolute inset-0 z-0 opacity-[0.03]" style={{ backgroundImage: 'radial-gradient(#000 1px, transparent 1px)', backgroundSize: '20px 20px' }}></div>
-       <div className="flex items-center justify-between px-6 py-4 bg-white/80 backdrop-blur-md border-b border-serene-neutral-200 z-10 shadow-sm">
-         <div className="flex items-center gap-4">
-           <Button variant="ghost" size="icon" className="md:hidden text-serene-neutral-500" onClick={(e) => { e.stopPropagation(); onBack(); }}>
-             <span className="text-xl">←</span>
+    <div className="flex flex-col h-full bg-gradient-to-b from-serene-neutral-50 to-white relative w-full font-sans">
+       {/* Background Pattern - subtle and premium */}
+       <div className="absolute inset-0 z-0 opacity-[0.02]" style={{ backgroundImage: 'radial-gradient(#374151 0.5px, transparent 0.5px)', backgroundSize: '24px 24px' }}></div>
+       
+       {/* Header - Premium Glassmorphism */}
+       <div className="flex items-center justify-between px-5 py-3.5 bg-white/70 backdrop-blur-xl border-b border-serene-neutral-100/80 z-10 shadow-sm">
+         <div className="flex items-center gap-3">
+           <Button 
+             variant="ghost" 
+             size="icon" 
+             className="md:hidden text-serene-neutral-500 hover:text-serene-neutral-700 hover:bg-serene-neutral-100 rounded-full h-9 w-9" 
+             onClick={(e) => { e.stopPropagation(); onBack(); }}
+           >
+             <ArrowLeft className="h-5 w-5" />
            </Button>
-           <Avatar className="h-10 w-10 cursor-pointer ring-2 ring-white shadow-sm">
+           <Avatar className="h-11 w-11 cursor-pointer ring-2 ring-white shadow-md transition-transform hover:scale-105">
              <AvatarImage src={avatar} />
-             <AvatarFallback className="bg-serene-blue-50 text-serene-blue-600">{name.charAt(0)}</AvatarFallback>
+             <AvatarFallback className="bg-gradient-to-br from-serene-blue-100 to-serene-blue-50 text-serene-blue-600 font-bold">{name.charAt(0)}</AvatarFallback>
            </Avatar>
            <div className="flex flex-col">
-             <span className="text-serene-neutral-900 font-bold leading-tight">{name}</span>
-             {chat.id === 'salama-ai-bot' && <span className="text-xs text-serene-blue-600 font-medium flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-serene-blue-600 animate-pulse"/> AI Assistant</span>}
+             <span className="text-serene-neutral-900 font-bold leading-tight text-[15px]">{name}</span>
+             {chat.id === 'salama-ai-bot' ? (
+               <span className="text-xs text-serene-blue-600 font-medium flex items-center gap-1.5">
+                 <span className="w-2 h-2 rounded-full bg-serene-blue-500 animate-pulse"/> AI Assistant
+               </span>
+             ) : (
+               <span className="text-xs text-serene-neutral-400">Click for contact info</span>
+             )}
            </div>
          </div>
-         <div className="flex items-center gap-1 text-serene-neutral-400">
-           <Button variant="ghost" size="icon" className="rounded-full hover:bg-serene-neutral-50 hover:text-serene-blue-600" disabled title="Coming Soon"><Video className="h-5 w-5" /></Button>
-           <Button variant="ghost" size="icon" className="rounded-full hover:bg-serene-neutral-50 hover:text-serene-blue-600" disabled title="Coming Soon"><Phone className="h-5 w-5" /></Button>
-           <div className="w-[1px] h-6 bg-serene-neutral-200 mx-2" />
-           <Button variant="ghost" size="icon" className="rounded-full hover:bg-serene-neutral-50 hover:text-serene-neutral-600" onClick={(e) => { e.stopPropagation(); setIsDrawerOpen(true); }}>
+         <div className="flex items-center gap-0.5">
+           <Button variant="ghost" size="icon" className="rounded-full h-10 w-10 text-serene-neutral-400 hover:bg-serene-blue-50 hover:text-serene-blue-600 transition-all" disabled title="Coming Soon">
+             <Video className="h-5 w-5" />
+           </Button>
+           <Button variant="ghost" size="icon" className="rounded-full h-10 w-10 text-serene-neutral-400 hover:bg-serene-blue-50 hover:text-serene-blue-600 transition-all" disabled title="Coming Soon">
+             <Phone className="h-5 w-5" />
+           </Button>
+           <div className="w-px h-7 bg-serene-neutral-200 mx-1.5" />
+           <Button 
+             variant="ghost" 
+             size="icon" 
+             className="rounded-full h-10 w-10 text-serene-neutral-400 hover:bg-serene-neutral-100 hover:text-serene-neutral-600 transition-all" 
+             onClick={(e) => { e.stopPropagation(); setIsDrawerOpen(true); }}
+           >
               <MoreVertical className="h-5 w-5" />
            </Button>
          </div>
@@ -348,6 +373,13 @@ export function ChatWindow({ chat, onBack }: ChatWindowProps) {
               View Case
             </Button>
          </div>
+       )}
+
+       {/* Out of Office Warning */}
+       {(otherParticipant?.user as any)?.out_of_office && (
+           <div className="bg-amber-50 border-b border-amber-100 p-2 flex items-center justify-center z-10 text-sm text-amber-900 gap-2">
+                <span>⚠️ <b>{name}</b> is currently Out of Office. Replies may be delayed.</span>
+           </div>
        )}
 
        {/* Messages */}
@@ -396,8 +428,8 @@ export function ChatWindow({ chat, onBack }: ChatWindowProps) {
           </div>
        )}
 
-       {/* Input Area */}
-       <div className="bg-white px-4 py-3 flex items-center gap-3 z-10 border-t border-serene-neutral-100 relative">
+       {/* Input Area - Premium Design */}
+       <div className="bg-white/80 backdrop-blur-xl px-4 py-3 flex items-end gap-2 z-10 border-t border-serene-neutral-100/80 relative">
          {/* Emoji Picker Popover */}
          {showEmojiPicker && (
            <div 
@@ -416,16 +448,16 @@ export function ChatWindow({ chat, onBack }: ChatWindowProps) {
          <Button 
            variant="ghost" 
            size="icon" 
-           className={`text-serene-neutral-400 hover:text-serene-blue-500 hover:bg-serene-blue-50 rounded-full transition-colors ${showEmojiPicker ? 'bg-serene-blue-50 text-serene-blue-500' : ''}`}
+           className={`text-serene-neutral-400 hover:text-serene-blue-500 hover:bg-serene-blue-50 rounded-full h-10 w-10 transition-all flex-shrink-0 ${showEmojiPicker ? 'bg-serene-blue-50 text-serene-blue-500' : ''}`}
            onClick={() => setShowEmojiPicker(!showEmojiPicker)}
          >
-           <Smile className="h-6 w-6" />
+           <Smile className="h-5 w-5" />
          </Button>
 
-         {/* Attachment Menu Replaces old Paperclip */}
+         {/* Attachment Menu */}
          <AttachmentMenu onFileSelect={handleFileSelect} />
          
-         <div className="flex-1 bg-serene-neutral-50 hover:bg-serene-neutral-100 transition-colors rounded-2xl flex items-end px-4 py-2 border border-transparent focus-within:border-serene-blue-200 focus-within:bg-white focus-within:ring-2 focus-within:ring-serene-blue-100">
+         <div className="flex-1 bg-serene-neutral-50/80 hover:bg-serene-neutral-100/80 transition-all rounded-2xl flex items-end px-4 py-2.5 border border-serene-neutral-100 focus-within:border-serene-blue-300 focus-within:bg-white focus-within:ring-2 focus-within:ring-serene-blue-100 focus-within:shadow-sm">
            <textarea
              ref={(el) => {
                 // @ts-ignore
@@ -435,7 +467,7 @@ export function ChatWindow({ chat, onBack }: ChatWindowProps) {
                     el.style.height = el.scrollHeight + 'px';
                 }
              }}
-             className="flex-1 bg-transparent border-none outline-none text-serene-neutral-900 placeholder-serene-neutral-400 text-[15px] resize-none max-h-[120px] py-1"
+             className="flex-1 bg-transparent border-none outline-none text-serene-neutral-900 placeholder-serene-neutral-400 text-[15px] resize-none max-h-[120px] py-0.5 leading-relaxed"
              onFocus={() => setShowEmojiPicker(false)} 
              placeholder="Type a message..."
              rows={1}
@@ -458,13 +490,17 @@ export function ChatWindow({ chat, onBack }: ChatWindowProps) {
            <Button 
              onClick={handleSend} 
              disabled={sending}
-             className="bg-serene-blue-600 hover:bg-serene-blue-700 text-white rounded-full h-12 w-12 flex items-center justify-center p-0 shadow-lg shadow-serene-blue-200 transition-all"
+             className="bg-gradient-to-r from-serene-blue-600 to-serene-blue-500 hover:from-serene-blue-700 hover:to-serene-blue-600 text-white rounded-full h-11 w-11 flex items-center justify-center p-0 shadow-lg shadow-serene-blue-200/50 transition-all hover:scale-105 active:scale-95 flex-shrink-0"
            >
              <Send className="h-5 w-5 ml-0.5" />
            </Button>
          ) : (
-           <Button variant="ghost" size="icon" className="text-serene-neutral-400 hover:text-serene-blue-600 hover:bg-serene-blue-50 rounded-full transition-colors">
-             <Mic className="h-6 w-6" />
+           <Button 
+             variant="ghost" 
+             size="icon" 
+             className="text-serene-neutral-400 hover:text-serene-blue-600 hover:bg-serene-blue-50 rounded-full h-10 w-10 transition-all flex-shrink-0"
+           >
+             <Mic className="h-5 w-5" />
            </Button>
          )}
        </div>
