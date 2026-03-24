@@ -9,6 +9,16 @@ import {
 	LayoutDashboard,
 	LogIn,
 	UsersRound,
+	Heart,
+	Shield,
+	Scale,
+	Cpu,
+	GraduationCap,
+	BookOpen,
+	Users,
+	Map,
+	Handshake,
+	Info,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger, SheetTitle, SheetDescription } from "@/components/ui/sheet";
@@ -117,21 +127,43 @@ export function Nav() {
 								Programs <ChevronDown className="h-3 w-3" />
 							</button>
 						</DropdownMenuTrigger>
-						<DropdownMenuContent className="rounded-2xl p-2 min-w-[220px] bg-white border-2 border-gray-100 shadow-2xl z-50">
+						<DropdownMenuContent className="rounded-2xl p-2 min-w-[260px] bg-white border-2 border-gray-100 shadow-2xl z-50">
 							<DropdownMenuItem asChild>
-								<Link href="/programs/access-to-care" className="block rounded-xl px-4 py-3 hover:bg-gray-50 font-bold text-sauti-blue cursor-pointer outline-none">Access to Care</Link>
+								<Link href="/programs" className="flex items-center gap-3 rounded-xl px-4 py-3 hover:bg-gray-50 font-bold text-sauti-blue cursor-pointer outline-none transition-colors group">
+									<Package2 className="h-5 w-5 text-sauti-teal" />
+									<span>All Programs</span>
+								</Link>
+							</DropdownMenuItem>
+							<div className="h-px bg-gray-100 my-1 mx-2" />
+							<DropdownMenuItem asChild>
+								<Link href="/programs/access-to-care" className="flex items-center gap-3 rounded-xl px-4 py-3 hover:bg-gray-50 font-bold text-sauti-blue cursor-pointer outline-none transition-colors group">
+									<Heart className="h-5 w-5 text-pink-500" />
+									<span>Access to Care</span>
+								</Link>
 							</DropdownMenuItem>
 							<DropdownMenuItem asChild>
-								<Link href="/programs/prevention" className="block rounded-xl px-4 py-3 hover:bg-gray-50 font-bold text-sauti-blue cursor-pointer outline-none">Prevention</Link>
+								<Link href="/programs/prevention" className="flex items-center gap-3 rounded-xl px-4 py-3 hover:bg-gray-50 font-bold text-sauti-blue cursor-pointer outline-none transition-colors group">
+									<Shield className="h-5 w-5 text-sauti-teal" />
+									<span>Prevention</span>
+								</Link>
 							</DropdownMenuItem>
 							<DropdownMenuItem asChild>
-								<Link href="/programs/legal-access" className="block rounded-xl px-4 py-3 hover:bg-gray-50 font-bold text-sauti-blue cursor-pointer outline-none">Legal Access</Link>
+								<Link href="/programs/legal-access" className="flex items-center gap-3 rounded-xl px-4 py-3 hover:bg-gray-50 font-bold text-sauti-blue cursor-pointer outline-none transition-colors group">
+									<Scale className="h-5 w-5 text-amber-600" />
+									<span>Legal Access</span>
+								</Link>
 							</DropdownMenuItem>
 							<DropdownMenuItem asChild>
-								<Link href="/programs/feminist-tech" className="block rounded-xl px-4 py-3 hover:bg-gray-50 font-bold text-sauti-blue cursor-pointer outline-none">Feminist Tech</Link>
+								<Link href="/programs/feminist-tech" className="flex items-center gap-3 rounded-xl px-4 py-3 hover:bg-gray-50 font-bold text-sauti-blue cursor-pointer outline-none transition-colors group">
+									<Cpu className="h-5 w-5 text-indigo-500" />
+									<span>Feminist Tech</span>
+								</Link>
 							</DropdownMenuItem>
 							<DropdownMenuItem asChild>
-								<Link href="/learn" className="block rounded-xl px-4 py-3 hover:bg-gray-50 font-bold text-sauti-blue cursor-pointer outline-none">Capacity Building</Link>
+								<Link href="/learn" className="flex items-center gap-3 rounded-xl px-4 py-3 hover:bg-gray-50 font-bold text-sauti-blue cursor-pointer outline-none transition-colors group">
+									<GraduationCap className="h-5 w-5 text-sauti-blue" />
+									<span>Capacity Building</span>
+								</Link>
 							</DropdownMenuItem>
 						</DropdownMenuContent>
 					</DropdownMenu>
@@ -161,10 +193,23 @@ export function Nav() {
 						</DropdownMenuTrigger>
 						<DropdownMenuContent className="rounded-2xl p-2 min-w-[200px] bg-white border-2 border-gray-100 shadow-2xl z-50">
 							<DropdownMenuItem asChild>
-								<Link href="/learn?type=courses" className="block rounded-xl px-4 py-3 hover:bg-gray-50 font-bold text-sauti-blue cursor-pointer outline-none">Courses</Link>
+								<Link href="/learn" className="flex items-center gap-3 rounded-xl px-4 py-3 hover:bg-gray-50 font-bold text-sauti-blue cursor-pointer outline-none transition-colors group">
+									<Info className="h-5 w-5 text-sauti-teal" />
+									<span>Learning Hub</span>
+								</Link>
+							</DropdownMenuItem>
+							<div className="h-px bg-gray-100 my-1 mx-2" />
+							<DropdownMenuItem asChild>
+								<Link href="/learn?type=courses" className="flex items-center gap-3 rounded-xl px-4 py-3 hover:bg-gray-50 font-bold text-sauti-blue cursor-pointer outline-none transition-colors group">
+									<GraduationCap className="h-5 w-5 text-amber-600" />
+									<span>Courses</span>
+								</Link>
 							</DropdownMenuItem>
 							<DropdownMenuItem asChild>
-								<Link href="/learn?type=resources" className="block rounded-xl px-4 py-3 hover:bg-gray-50 font-bold text-sauti-blue cursor-pointer outline-none">Resources</Link>
+								<Link href="/learn?type=resources" className="flex items-center gap-3 rounded-xl px-4 py-3 hover:bg-gray-50 font-bold text-sauti-blue cursor-pointer outline-none transition-colors group">
+									<BookOpen className="h-5 w-5 text-indigo-500" />
+									<span>Resources</span>
+								</Link>
 							</DropdownMenuItem>
 						</DropdownMenuContent>
 					</DropdownMenu>
@@ -181,15 +226,31 @@ export function Nav() {
 								Get Involved <ChevronDown className="h-3 w-3" />
 							</button>
 						</DropdownMenuTrigger>
-						<DropdownMenuContent className="rounded-2xl p-2 min-w-[220px] bg-white border-2 border-gray-100 shadow-2xl z-50">
+						<DropdownMenuContent className="rounded-2xl p-2 min-w-[240px] bg-white border-2 border-gray-100 shadow-2xl z-50">
 							<DropdownMenuItem asChild>
-								<Link href="/volunteer#professionals" className="block rounded-xl px-4 py-3 hover:bg-gray-50 font-bold text-sauti-blue cursor-pointer outline-none">For Professionals</Link>
+								<Link href="/volunteer" className="flex items-center gap-3 rounded-xl px-4 py-3 hover:bg-gray-50 font-bold text-sauti-blue cursor-pointer outline-none transition-colors group">
+									<Cloud className="h-5 w-5 text-sauti-teal" />
+									<span>Overview</span>
+								</Link>
+							</DropdownMenuItem>
+							<div className="h-px bg-gray-100 my-1 mx-2" />
+							<DropdownMenuItem asChild>
+								<Link href="/volunteer#professionals" className="flex items-center gap-3 rounded-xl px-4 py-3 hover:bg-gray-50 font-bold text-sauti-blue cursor-pointer outline-none transition-colors group">
+									<Users className="h-5 w-5 text-sauti-teal" />
+									<span>For Professionals</span>
+								</Link>
 							</DropdownMenuItem>
 							<DropdownMenuItem asChild>
-								<Link href="/volunteer#mapping" className="block rounded-xl px-4 py-3 hover:bg-gray-50 font-bold text-sauti-blue cursor-pointer outline-none">Resource Mapping</Link>
+								<Link href="/volunteer#mapping" className="flex items-center gap-3 rounded-xl px-4 py-3 hover:bg-gray-50 font-bold text-sauti-blue cursor-pointer outline-none transition-colors group">
+									<Map className="h-5 w-5 text-amber-600" />
+									<span>Resource Mapping</span>
+								</Link>
 							</DropdownMenuItem>
 							<DropdownMenuItem asChild>
-								<Link href="/volunteer#community" className="block rounded-xl px-4 py-3 hover:bg-gray-50 font-bold text-sauti-blue cursor-pointer outline-none">Community Action</Link>
+								<Link href="/volunteer#community" className="flex items-center gap-3 rounded-xl px-4 py-3 hover:bg-gray-50 font-bold text-sauti-blue cursor-pointer outline-none transition-colors group">
+									<Handshake className="h-5 w-5 text-indigo-500" />
+									<span>Community Action</span>
+								</Link>
 							</DropdownMenuItem>
 						</DropdownMenuContent>
 					</DropdownMenu>
@@ -285,12 +346,52 @@ export function Nav() {
 												{showPrograms ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
 											</button>
 											{showPrograms && (
-												<div className="ml-8 grid gap-2 border-l-4 border-sauti-yellow/30 pl-4 py-2">
-													<Link href="/programs" className="text-gray-600 py-2 font-bold hover:text-sauti-blue">All Programs</Link>
-													<Link href="/programs/access-to-care" className="text-gray-600 py-2 font-bold hover:text-sauti-blue">Access to Care</Link>
-													<Link href="/programs/prevention" className="text-gray-600 py-2 font-bold hover:text-sauti-blue">Prevention</Link>
-													<Link href="/programs/legal-access" className="text-gray-600 py-2 font-bold hover:text-sauti-blue">Legal Access</Link>
-													<Link href="/programs/feminist-tech" className="text-gray-600 py-2 font-bold hover:text-sauti-blue">Feminist Tech</Link>
+												<div className="ml-6 grid gap-1 border-l-2 border-sauti-yellow/20 pl-2 mt-2">
+													<Link 
+														href="/programs" 
+														className={`flex items-center gap-3 rounded-xl px-4 py-3 font-bold transition-all ${
+															isActive("/programs") ? "bg-sauti-teal/10 text-sauti-teal" : "text-gray-600 hover:bg-gray-50 hover:text-sauti-blue"
+														}`}
+													>
+														<Package2 className="h-4 w-4" />
+														<span>All Programs</span>
+													</Link>
+													<Link 
+														href="/programs/access-to-care" 
+														className={`flex items-center gap-3 rounded-xl px-4 py-3 font-bold transition-all ${
+															isActive("/programs/access-to-care") ? "bg-pink-50 text-pink-600" : "text-gray-600 hover:bg-gray-50 hover:text-sauti-blue"
+														}`}
+													>
+														<Heart className="h-4 w-4 text-pink-500" />
+														<span>Access to Care</span>
+													</Link>
+													<Link 
+														href="/programs/prevention" 
+														className={`flex items-center gap-3 rounded-xl px-4 py-3 font-bold transition-all ${
+															isActive("/programs/prevention") ? "bg-sauti-teal/5 text-sauti-teal" : "text-gray-600 hover:bg-gray-50 hover:text-sauti-blue"
+														}`}
+													>
+														<Shield className="h-4 w-4 text-sauti-teal" />
+														<span>Prevention</span>
+													</Link>
+													<Link 
+														href="/programs/legal-access" 
+														className={`flex items-center gap-3 rounded-xl px-4 py-3 font-bold transition-all ${
+															isActive("/programs/legal-access") ? "bg-amber-50 text-amber-600" : "text-gray-600 hover:bg-gray-50 hover:text-sauti-blue"
+														}`}
+													>
+														<Scale className="h-4 w-4 text-amber-600" />
+														<span>Legal Access</span>
+													</Link>
+													<Link 
+														href="/programs/feminist-tech" 
+														className={`flex items-center gap-3 rounded-xl px-4 py-3 font-bold transition-all ${
+															isActive("/programs/feminist-tech") ? "bg-indigo-50 text-indigo-600" : "text-gray-600 hover:bg-gray-50 hover:text-sauti-blue"
+														}`}
+													>
+														<Cpu className="h-4 w-4 text-indigo-500" />
+														<span>Feminist Tech</span>
+													</Link>
 												</div>
 											)}
 										</div>
@@ -320,10 +421,34 @@ export function Nav() {
 												{showLearn ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
 											</button>
 											{showLearn && (
-												<div className="ml-8 grid gap-2 border-l-4 border-sauti-yellow/30 pl-4 py-2">
-													<Link href="/learn" className="text-gray-600 py-2 font-bold hover:text-sauti-blue">Learning Hub</Link>
-													<Link href="/learn?type=courses" className="text-gray-600 py-2 font-bold hover:text-sauti-blue">Courses</Link>
-													<Link href="/learn?type=resources" className="text-gray-600 py-2 font-bold hover:text-sauti-blue">Resources</Link>
+												<div className="ml-6 grid gap-1 border-l-2 border-sauti-yellow/20 pl-2 mt-2">
+													<Link 
+														href="/learn" 
+														className={`flex items-center gap-3 rounded-xl px-4 py-3 font-bold transition-all ${
+															isActive("/learn") ? "bg-sauti-teal/10 text-sauti-teal" : "text-gray-600 hover:bg-gray-50 hover:text-sauti-blue"
+														}`}
+													>
+														<Info className="h-4 w-4 text-sauti-teal" />
+														<span>Learning Hub</span>
+													</Link>
+													<Link 
+														href="/learn?type=courses" 
+														className={`flex items-center gap-3 rounded-xl px-4 py-3 font-bold transition-all ${
+															pathname === "/learn" && pathname.includes("type=courses") ? "bg-amber-50 text-amber-600" : "text-gray-600 hover:bg-gray-50 hover:text-sauti-blue"
+														}`}
+													>
+														<GraduationCap className="h-4 w-4 text-amber-600" />
+														<span>Courses</span>
+													</Link>
+													<Link 
+														href="/learn?type=resources" 
+														className={`flex items-center gap-3 rounded-xl px-4 py-3 font-bold transition-all ${
+															pathname === "/learn" && pathname.includes("type=resources") ? "bg-indigo-50 text-indigo-600" : "text-gray-600 hover:bg-gray-50 hover:text-sauti-blue"
+														}`}
+													>
+														<BookOpen className="h-4 w-4 text-indigo-500" />
+														<span>Resources</span>
+													</Link>
 												</div>
 											)}
 										</div>
@@ -343,11 +468,43 @@ export function Nav() {
 												{showInvolved ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
 											</button>
 											{showInvolved && (
-												<div className="ml-8 grid gap-2 border-l-4 border-sauti-yellow/30 pl-4 py-2">
-													<Link href="/volunteer" className="text-gray-600 py-2 font-bold hover:text-sauti-blue">Overview</Link>
-													<Link href="/volunteer#professionals" className="text-gray-600 py-2 font-bold hover:text-sauti-blue">For Professionals</Link>
-													<Link href="/volunteer#mapping" className="text-gray-600 py-2 font-bold hover:text-sauti-blue">Resource Mapping</Link>
-													<Link href="/volunteer#community" className="text-gray-600 py-2 font-bold hover:text-sauti-blue">Community Action</Link>
+												<div className="ml-6 grid gap-1 border-l-2 border-sauti-yellow/20 pl-2 mt-2">
+													<Link 
+														href="/volunteer" 
+														className={`flex items-center gap-3 rounded-xl px-4 py-3 font-bold transition-all ${
+															isActive("/volunteer") ? "bg-sauti-teal/10 text-sauti-teal" : "text-gray-600 hover:bg-gray-50 hover:text-sauti-blue"
+														}`}
+													>
+														<Cloud className="h-4 w-4 text-sauti-teal" />
+														<span>Overview</span>
+													</Link>
+													<Link 
+														href="/volunteer#professionals" 
+														className={`flex items-center gap-3 rounded-xl px-4 py-3 font-bold transition-all ${
+															pathname.includes("#professionals") ? "bg-sauti-teal/5 text-sauti-teal" : "text-gray-600 hover:bg-gray-50 hover:text-sauti-blue"
+														}`}
+													>
+														<Users className="h-4 w-4 text-sauti-teal" />
+														<span>For Professionals</span>
+													</Link>
+													<Link 
+														href="/volunteer#mapping" 
+														className={`flex items-center gap-3 rounded-xl px-4 py-3 font-bold transition-all ${
+															pathname.includes("#mapping") ? "bg-amber-50 text-amber-600" : "text-gray-600 hover:bg-gray-50 hover:text-sauti-blue"
+														}`}
+													>
+														<Map className="h-4 w-4 text-amber-600" />
+														<span>Resource Mapping</span>
+													</Link>
+													<Link 
+														href="/volunteer#community" 
+														className={`flex items-center gap-3 rounded-xl px-4 py-3 font-bold transition-all ${
+															pathname.includes("#community") ? "bg-indigo-50 text-indigo-600" : "text-gray-600 hover:bg-gray-50 hover:text-sauti-blue"
+														}`}
+													>
+														<Handshake className="h-4 w-4 text-indigo-500" />
+														<span>Community Action</span>
+													</Link>
 												</div>
 											)}
 										</div>

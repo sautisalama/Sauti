@@ -122,7 +122,7 @@ export async function matchReportWithServices(reportId: string, customClient?: S
 		// Get all verified support services
 		const { data: services, error: servicesError } = await supabase
 			.from("support_services")
-			.select("*, profile:profiles(*)")
+			.select("*, profile:profiles!support_services_user_id_fkey(*)")
 			.eq("is_active", true)
 			.eq("is_banned", false)
 			.eq("is_permanently_suspended", false)
