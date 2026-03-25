@@ -41,6 +41,7 @@ import { CalendarConnectionStatus } from "../_components/CalendarConnectionStatu
 import { SereneBreadcrumb } from "@/components/ui/SereneBreadcrumb";
 import { useRouter } from "next/navigation";
 import { ChatWindow } from "@/components/chat/ChatWindow";
+import { CaseChatPanel } from "@/components/chat/CaseChatPanel";
 import { getCaseChat } from "@/app/actions/chat";
 import { Chat } from "@/types/chat";
 import { Badge } from "@/components/ui/badge";
@@ -607,7 +608,7 @@ export default function CasesMasterDetail({ userId }: { userId: string }) {
 
 				{/* Master list */}
 				<div
-					className={`flex-1 h-full overflow-y-auto pr-2 pb-8 scroll-smooth ${
+					className={`flex-1 lg:flex-[7] xl:flex-[7] min-w-0 h-full overflow-y-auto overflow-x-hidden pr-2 pb-8 scroll-smooth ${
 						mobileView !== "list" ? "hidden lg:block" : ""
 					}`}
 				>
@@ -624,7 +625,7 @@ export default function CasesMasterDetail({ userId }: { userId: string }) {
 					<div className="mb-6 sticky top-0 z-30 bg-serene-neutral-50/95 backdrop-blur-lg border-b border-serene-neutral-100 pb-4 pt-3 -mx-1 px-1">
 						<div className="flex items-center gap-3">
 							{/* Search Bar */}
-							<div className="relative flex-1">
+							<div className="relative flex-1 min-w-0">
 								<Input
 									placeholder="Search cases..."
 									value={q}
@@ -761,7 +762,7 @@ export default function CasesMasterDetail({ userId }: { userId: string }) {
 							filtered.map((c) => {
 								const isActive = selected?.id === c.id;
 								return (
-									<div key={c.id} className="transition-all duration-200">
+									<div key={c.id} className="transition-all duration-200 min-w-0">
 										<CaseCard
 											data={c as any}
 											active={isActive}
@@ -777,7 +778,7 @@ export default function CasesMasterDetail({ userId }: { userId: string }) {
 
 				{/* Right column: Calendar by default */}
 				<div
-					className={`flex-1 lg:flex-[5] xl:flex-[5] h-full overflow-y-auto ${
+					className={`flex-1 lg:flex-[5] xl:flex-[5] min-w-0 h-full overflow-y-auto overflow-x-hidden ${
 						mobileView !== "calendar" ? "hidden lg:block" : ""
 					}`}
 				>
@@ -1241,6 +1242,37 @@ export default function CasesMasterDetail({ userId }: { userId: string }) {
 												</div>
 											)}
 										</Card>
+
+										{/* Quick Chat Preview - Inline Panel */}
+										{selected.match_status_type === 'matched' && selected.report?.survivor_id && (
+											<Card className="overflow-hidden border-serene-neutral-200 shadow-sm bg-white">
+												<div className="p-4 border-b border-gray-100 bg-gray-50/30 flex justify-between items-center">
+													<h3 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
+														<MessageSquare className="h-4 w-4 text-gray-500" />
+														Case Chat
+													</h3>
+													<Button
+														variant="ghost"
+														size="sm"
+														className="h-7 text-xs text-serene-blue-600 hover:text-serene-blue-700 hover:bg-serene-blue-50"
+														onClick={() => setActiveTab('chat')}
+													>
+														Full Screen
+														<ChevronRight className="h-3 w-3 ml-1" />
+													</Button>
+												</div>
+												<CaseChatPanel
+													matchId={selected.id}
+													survivorId={selected.report.survivor_id}
+													professionalId={userId}
+													professionalName="You"
+													survivorName={selected.report.first_name || 'Survivor'}
+													existingChatId={activeChat?.id}
+													className="border-0 rounded-none shadow-none"
+													isExpanded={false}
+												/>
+											</Card>
+										)}
 
 										{/* Survivor & Incident Card */}
 										<Card className="overflow-hidden border-serene-neutral-200 shadow-sm bg-white">

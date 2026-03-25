@@ -19,7 +19,8 @@ import {
 	Briefcase,
 	Globe,
 	ArrowRight,
-	Loader2
+	Loader2,
+	Heart
 } from "lucide-react";
 import { EnhancedSelect } from "@/components/ui/enhanced-select";
 import { cn } from "@/lib/utils";
@@ -36,6 +37,10 @@ const SERVICE_OPTIONS = [
 	{ value: "shelter", label: "Shelter Services" },
 	{ value: "financial_assistance", label: "Financial Assistance" },
 	{ value: "other", label: "Other Support Services" },
+	{ value: "police_reporting", label: "Police Reporting" },
+	{ value: "child_protection", label: "Child Protection" },
+	{ value: "disability_support", label: "Disability Support" },
+	{ value: "substance_abuse", label: "Substance Abuse" },
 ];
 
 const AVAILABILITY_OPTIONS = [
@@ -80,6 +85,9 @@ export function AddSupportServiceForm({
 		longitude: null as number | null,
 		address: "",
 		is_remote: false,
+		specialises_in_disability: false,
+		specialises_in_queer_support: false,
+		specialises_in_children: false,
 	});
 
 	// Get location on mount
@@ -242,6 +250,66 @@ export function AddSupportServiceForm({
 									onChange={(val) => setFormData({ ...formData, availability: val })}
 									placeholder="Select availability..."
 								/>
+							</div>
+						</div>
+
+						{/* Specializations Section */}
+						<div className="pt-4 space-y-3">
+							<Label className="text-[11px] font-black text-serene-neutral-600 uppercase tracking-widest px-1">Specialized Support Groups (Optional)</Label>
+							<div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+								<div 
+									onClick={() => setFormData(prev => ({ ...prev, specialises_in_disability: !prev.specialises_in_disability }))}
+									className={cn(
+										"cursor-pointer p-4 rounded-2xl border-2 transition-all flex flex-col items-center justify-center text-center gap-2 group",
+										formData.specialises_in_disability 
+											? "border-sauti-teal bg-sauti-teal/5 ring-4 ring-sauti-teal/5" 
+											: "border-serene-neutral-100 hover:border-sauti-teal/30 hover:bg-serene-neutral-50/50"
+									)}
+								>
+									<div className={cn(
+										"w-10 h-10 rounded-full flex items-center justify-center transition-all",
+										formData.specialises_in_disability ? "bg-sauti-teal text-white shadow-md" : "bg-serene-neutral-100 text-serene-neutral-400 group-hover:bg-sauti-teal/10 group-hover:text-sauti-teal"
+									)}>
+										<Globe className="h-5 w-5" />
+									</div>
+									<span className={cn("text-xs font-bold", formData.specialises_in_disability ? "text-sauti-teal" : "text-serene-neutral-600")}>Disability Support</span>
+								</div>
+
+								<div 
+									onClick={() => setFormData(prev => ({ ...prev, specialises_in_queer_support: !prev.specialises_in_queer_support }))}
+									className={cn(
+										"cursor-pointer p-4 rounded-2xl border-2 transition-all flex flex-col items-center justify-center text-center gap-2 group",
+										formData.specialises_in_queer_support 
+											? "border-purple-500 bg-purple-50 ring-4 ring-purple-500/5" 
+											: "border-serene-neutral-100 hover:border-purple-300 hover:bg-serene-neutral-50/50"
+									)}
+								>
+									<div className={cn(
+										"w-10 h-10 rounded-full flex items-center justify-center transition-all",
+										formData.specialises_in_queer_support ? "bg-purple-500 text-white shadow-md" : "bg-serene-neutral-100 text-serene-neutral-400 group-hover:bg-purple-100 group-hover:text-purple-600"
+									)}>
+										<Heart className="h-5 w-5" />
+									</div>
+									<span className={cn("text-xs font-bold", formData.specialises_in_queer_support ? "text-purple-600" : "text-serene-neutral-600")}>Queer & LGBTQ+</span>
+								</div>
+
+								<div 
+									onClick={() => setFormData(prev => ({ ...prev, specialises_in_children: !prev.specialises_in_children }))}
+									className={cn(
+										"cursor-pointer p-4 rounded-2xl border-2 transition-all flex flex-col items-center justify-center text-center gap-2 group",
+										formData.specialises_in_children 
+											? "border-blue-500 bg-blue-50 ring-4 ring-blue-500/5" 
+											: "border-serene-neutral-100 hover:border-blue-300 hover:bg-serene-neutral-50/50"
+									)}
+								>
+									<div className={cn(
+										"w-10 h-10 rounded-full flex items-center justify-center transition-all",
+										formData.specialises_in_children ? "bg-blue-500 text-white shadow-md" : "bg-serene-neutral-100 text-serene-neutral-400 group-hover:bg-blue-100 group-hover:text-blue-600"
+									)}>
+										<Building2 className="h-5 w-5" />
+									</div>
+									<span className={cn("text-xs font-bold", formData.specialises_in_children ? "text-blue-600" : "text-serene-neutral-600")}>Child Protection</span>
+								</div>
 							</div>
 						</div>
 					</div>

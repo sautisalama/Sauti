@@ -2,7 +2,10 @@
 
 import { Message } from '@/types/chat';
 import { format } from 'date-fns';
-import { CheckCheck, Reply, Trash2, Copy, FileText } from 'lucide-react';
+import { Check, CheckCheck, Reply, Trash2, Copy, Smile, Clock, Play } from 'lucide-react';
+import { useState, useMemo } from 'react';
+import { addMessageReaction } from '@/app/actions/chat';
+import { DocumentPreview } from './DocumentPreview';
 import {
   ContextMenu,
   ContextMenuContent,
@@ -14,13 +17,82 @@ interface MessageBubbleProps {
   message: Message;
   isOwn: boolean;
   showTail?: boolean;
+  currentUserId?: string;
 }
 
-export function MessageBubble({ message, isOwn, showTail = true }: MessageBubbleProps) {
-  const time = format(new Date(message.created_at), 'HH:mm');
-  const status = 'read'; 
+type MessageStatus = 'sending' | 'sent' | 'delivered' | 'read';
 
-  // Link Preview Card with favicon
+export function MessageBubble({ message, isOwn, showTail = true, currentUserId }: MessageBubbleProps) {
+  const [showReactions, setShowReactions] = useState(false);
+  const [isReacting, setIsReacting] = useState(false);
+  
+  const time = useMemo(() => {
+    try {
+      return format(new Date(message.created_at), 'HH:mm');
+    } catch {
+      return '--:--';
+    }
+  }, [message.created_at]);
+
+  // Determine message status for tick display
+  const messageStatus = useMemo((): MessageStatus => {
+    const readBy = (message as any).read_by as Array<{ user_id: string; read_at: string }> | undefined;
+    
+    // Check if message is read by anyone other than sender
+    if (readBy && readBy.length > 0) {
+      const readByOthers = readBy.some(r => r.user_id !== message.sender_id);
+      if (readByOthers) return 'read';
+    }
+    
+    // If message has an ID, it's at least delivered (saved to DB)
+    if (message.id) return 'delivered';
+    
+    return 'sending';
+  }, [message]);
+
+  const handleReaction = async (emoji: string) => {
+      if (isReacting) return;
+      setIsReacting(true);
+      try {
+          await addMessageReaction(message.id, emoji);
+          setShowReactions(false);
+      } catch (e) {
+          console.error('Failed to react', e);
+      } finally {
+          setIsReacting(false);
+      }
+  };
+
+  const reactionCounts = useMemo(() => {
+      if (!message.reactions || typeof message.reactions !== 'object') return {};
+      const counts: Record<string, number> = {};
+      Object.values(message.reactions as Record<string, string>).forEach(emoji => {
+          counts[emoji] = (counts[emoji] || 0) + 1;
+      });
+      return counts;
+  }, [message.reactions]);
+
+  const toggleReactionPicker = () => setShowReactions(!showReactions);
+
+  // Status tick component - WhatsApp style
+  const StatusTicks = () => {
+    if (!isOwn) return null;
+    
+    switch (messageStatus) {
+      case 'sending':
+        return <Clock className="h-3 w-3 opacity-60" />;
+      case 'sent':
+        return <Check className="h-3.5 w-3.5 opacity-70" />;
+      case 'delivered':
+        return <CheckCheck className="h-3.5 w-3.5 opacity-70" />;
+      case 'read':
+        return <CheckCheck className="h-3.5 w-3.5 text-blue-300" />;
+      default:
+        return <Check className="h-3.5 w-3.5 opacity-70" />;
+    }
+  };
+
+  // Link Preview Card helper
   const LinkCard = ({ preview }: { preview: any }) => {
     const domain = (() => {
       try {
@@ -62,78 +134,124 @@ export function MessageBubble({ message, isOwn, showTail = true }: MessageBubble
   return (
     <ContextMenu>
       <ContextMenuTrigger>
-        <div className={`flex mb-1 ${isOwn ? 'justify-end' : 'justify-start'}`}>
-          <div 
-            className={`
-              relative max-w-[75%] px-3 py-2 rounded-2xl text-[15px] leading-relaxed shadow-sm
-              ${isOwn 
-                ? 'bg-serene-blue-600 text-white rounded-br-none' 
-                : 'bg-white text-serene-neutral-900 border border-serene-neutral-100 rounded-bl-none'
-              }
-            `}
-          >
-            {/* Tail removed for cleaner modern look */}
+        <div className={`flex mb-2 ${isOwn ? 'justify-end' : 'justify-start'} group relative`}>
+          
+          {/* Reaction Picker Popover - WhatsApp Style */}
+          {showReactions && (
+              <div className={`absolute bottom-full mb-2 z-50 bg-white shadow-xl rounded-full px-3 py-2 flex gap-0.5 border border-serene-neutral-100 animate-in fade-in zoom-in-95 duration-200 ${isOwn ? 'right-0' : 'left-0'}`}>
+                  {['👍', '❤️', '😂', '😮', '😢', '🙏'].map((emoji, idx) => (
+                      <button 
+                          key={emoji}
+                          onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleReaction(emoji); }}
+                          disabled={isReacting}
+                          className="hover:bg-serene-neutral-100 p-2 rounded-full transition-all text-xl leading-none hover:scale-125 active:scale-95 disabled:opacity-50"
+                          style={{ animationDelay: `${idx * 30}ms` }}
+                      >
+                          {emoji}
+                      </button>
+                  ))}
+              </div>
+          )}
 
-            <div className="px-1.5 pt-0.5">
-               {/* Media Attachment - Support both new attachments column and legacy metadata */}
-               {(message.attachments || []).concat(
-                  (message.metadata?.attachment_urls || []).map(url => ({ url, type: message.type as any }))
-               ).map((attachment, i) => (
-                   <div key={i} className="mb-2 rounded-lg overflow-hidden max-w-sm relative group">
-                       {attachment.type === 'image' && (
-                          <div className="relative">
-                            <img src={attachment.url} alt="Shared" className="w-full h-auto max-h-[300px] object-cover rounded-lg" />
-                             {/* Gradient overlay for text readability if we add caption later */}
-                          </div>
-                       )}
-                       {attachment.type === 'video' && <video src={attachment.url} controls className="w-full h-auto rounded-lg" />}
-                       {attachment.type === 'file' && (
-                           <a href={attachment.url} target="_blank" rel="noreferrer" className="flex items-center gap-3 p-3 bg-serene-neutral-100 rounded-lg border border-serene-neutral-200 hover:bg-serene-neutral-200 transition-colors">
-                               <div className="bg-white p-2 rounded-full text-sauti-teal">
-                                 <FileText className="h-5 w-5" />
-                               </div>
-                               <div className="flex-1 min-w-0">
-                                 <p className="font-medium text-sm text-serene-neutral-900 truncate">{attachment.name || 'Document'}</p>
-                                 {attachment.size && <p className="text-xs text-serene-neutral-500">{(attachment.size / 1024 / 1024).toFixed(2)} MB</p>}
-                               </div>
-                           </a>
-                       )}
-                   </div>
-               ))}
+          <div className={`flex flex-col ${isOwn ? 'items-end' : 'items-start'} max-w-[75%]`}>
+            <div 
+                className={`
+                relative px-4 py-2.5 rounded-2xl text-[15px] leading-relaxed shadow-sm
+                ${isOwn 
+                    ? 'bg-serene-blue-600 text-white rounded-br-none' 
+                    : 'bg-white text-serene-neutral-900 border border-serene-neutral-100 rounded-bl-none'
+                }
+                `}
+            >
+                <div className="pt-0.5">
+                    {/* Media Attachments - Enhanced */}
+                    {((message.attachments as any[]) || []).concat(
+                        ((message.metadata as any)?.attachment_urls || []).map((url: any) => ({ url, type: message.type as any }))
+                    ).map((attachment: any, i: number) => (
+                        <div key={i} className="mb-2 max-w-sm relative">
+                            {attachment.type === 'image' && (
+                                <div className="relative group/img rounded-xl overflow-hidden">
+                                    <img 
+                                        src={attachment.url} 
+                                        alt="Shared" 
+                                        className="w-full h-auto max-h-[300px] object-cover cursor-pointer transition-transform hover:scale-[1.02]" 
+                                        onClick={() => window.open(attachment.url, '_blank')}
+                                    />
+                                    <div className="absolute inset-0 bg-black/0 group-hover/img:bg-black/10 transition-colors pointer-events-none" />
+                                </div>
+                            )}
+                            {attachment.type === 'video' && (
+                                <div className="relative rounded-xl overflow-hidden bg-black">
+                                    <video 
+                                        src={attachment.url} 
+                                        controls 
+                                        className="w-full h-auto max-h-[300px] rounded-xl"
+                                        preload="metadata"
+                                    />
+                                </div>
+                            )}
+                            {attachment.type === 'file' && (
+                                <DocumentPreview
+                                    url={attachment.url}
+                                    name={attachment.name || 'Document'}
+                                    size={attachment.size}
+                                    isOwn={isOwn}
+                                />
+                            )}
+                        </div>
+                    ))}
 
-                {/* Text Content */}
-                {message.type !== 'image' && (
-                  <span className={`break-words whitespace-pre-wrap ${isOwn ? 'text-white' : 'text-serene-neutral-900'}`}>{message.content}</span>
-                )}
+                    {/* Text Content */}
+                    {message.type !== 'image' && message.type !== 'video' && (
+                        <span className={`break-words whitespace-pre-wrap ${isOwn ? 'text-white' : 'text-serene-neutral-900'}`}>{message.content}</span>
+                    )}
 
-               {/* Link Preview */}
-               {message.metadata?.link_preview && (
-                 <LinkCard preview={message.metadata.link_preview} />
-               )}
+                    {/* Link Preview */}
+                    {(message.metadata as any)?.link_preview && (
+                        <LinkCard preview={(message.metadata as any).link_preview} />
+                    )}
+                </div>
+
+                {/* Metadata & Status - WhatsApp Style */}
+                <div className={`flex justify-end items-center gap-1.5 mt-1 select-none text-[10px] ${isOwn ? 'text-blue-100/90' : 'text-serene-neutral-400'}`}>
+                    <span className="font-medium">{time}</span>
+                    <span title={messageStatus === 'read' ? 'Read' : messageStatus === 'delivered' ? 'Delivered' : 'Sent'}>
+                        <StatusTicks />
+                    </span>
+                </div>
             </div>
 
-            {/* Metadata (Time + Ticks) */}
-            <div className={`flex justify-end gap-1 items-end mt-1 min-h-[15px] select-none text-[10px] opacity-80 ${isOwn ? 'text-blue-100' : 'text-serene-neutral-400'}`}>
-               <span className="mr-0.5 font-medium">{time}</span>
-               {isOwn && (
-                 <span>
-                   <CheckCheck className="h-3 w-3" />
-                 </span>
-               )}
-            </div>
+            {/* Reactions Display - WhatsApp Style */}
+            {Object.keys(reactionCounts).length > 0 && (
+                <div className={`flex flex-wrap gap-1 mt-1.5 ${isOwn ? 'justify-end' : 'justify-start'}`}>
+                    {Object.entries(reactionCounts).map(([emoji, count]) => (
+                        <div 
+                            key={emoji} 
+                            className="bg-white border border-serene-neutral-100 shadow-sm rounded-full px-2 py-0.5 text-sm flex items-center gap-1 cursor-pointer hover:bg-serene-blue-50 hover:border-serene-blue-200 transition-all hover:scale-105 active:scale-95 animate-in zoom-in-95"
+                            onClick={toggleReactionPicker}
+                        >
+                            <span className="text-base">{emoji}</span>
+                            {count > 1 && <span className="text-serene-neutral-600 font-semibold text-xs">{count}</span>}
+                        </div>
+                    ))}
+                </div>
+            )}
           </div>
         </div>
       </ContextMenuTrigger>
       
-      <ContextMenuContent>
+      <ContextMenuContent className="w-48">
+        <ContextMenuItem onClick={toggleReactionPicker}>
+            <Smile className="mr-2 h-4 w-4" /> Add Reaction
+        </ContextMenuItem>
         <ContextMenuItem>
            <Reply className="mr-2 h-4 w-4" /> Reply
         </ContextMenuItem>
-        <ContextMenuItem>
-           <Copy className="mr-2 h-4 w-4" /> Copy
+        <ContextMenuItem onClick={() => navigator.clipboard.writeText(message.content || '')}>
+           <Copy className="mr-2 h-4 w-4" /> Copy Text
         </ContextMenuItem>
-        <ContextMenuItem className="text-red-500 focus:text-red-500">
-           <Trash2 className="mr-2 h-4 w-4" /> Delete
+        <ContextMenuItem className="text-red-600 focus:text-red-600 focus:bg-red-50">
+           <Trash2 className="mr-2 h-4 w-4" /> Delete Message
         </ContextMenuItem>
       </ContextMenuContent>
     </ContextMenu>

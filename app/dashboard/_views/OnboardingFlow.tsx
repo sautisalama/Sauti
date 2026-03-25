@@ -100,6 +100,8 @@ export default function OnboardingFlow() {
 		is_public_booking: boolean;
 		user_type: Database["public"]["Enums"]["user_type"] | null;
 		accepted_policies: string[];
+		gender: string;
+		languages: string[];
 	}>({
 		first_name: "",
 		last_name: "",
@@ -109,6 +111,8 @@ export default function OnboardingFlow() {
 		is_public_booking: false,
 		user_type: null,
 		accepted_policies: [],
+		gender: "",
+		languages: [],
 	});
 
 	// Track if we've already done the initial check to avoid skipping steps twice if we manually go back
@@ -127,6 +131,8 @@ export default function OnboardingFlow() {
 				is_public_booking: Boolean(user.profile.is_public_booking),
 				user_type: user.profile.user_type || null,
 				accepted_policies: policies.accepted_policies || [],
+				gender: (user.profile.settings as any)?.matching_traits?.gender || "",
+				languages: (user.profile.settings as any)?.matching_traits?.languages || [],
 			});
 
 			// Only resume once on load
@@ -190,7 +196,14 @@ export default function OnboardingFlow() {
 					bio: profile.bio || null,
 					is_public_booking: profile.is_public_booking,
 					user_type: profile.user_type,
-					policies: policyUpdate as any
+					policies: policyUpdate as any,
+					settings: {
+						...(user.profile?.settings as any || {}),
+						matching_traits: {
+							gender: profile.gender || null,
+							languages: profile.languages || []
+						}
+					}
 				})
 				.eq("id", user.id);
 
@@ -207,7 +220,14 @@ export default function OnboardingFlow() {
 							bio: profile.bio || null,
 							is_public_booking: profile.is_public_booking,
 							user_type: profile.user_type,
-							policies: policyUpdate as any
+							policies: policyUpdate as any,
+							settings: {
+								...(user.profile?.settings as any || {}),
+								matching_traits: {
+									gender: profile.gender || null,
+									languages: profile.languages || []
+								}
+							}
 						}
 					});
 				}
@@ -526,6 +546,61 @@ export default function OnboardingFlow() {
 						className="bg-serene-neutral-50/50 border-serene-neutral-200 rounded-[1.25rem] focus:ring-serene-blue-500/10 focus:border-serene-blue-500 transition-all text-sm p-4 shadow-inner min-h-[100px]"
 					/>
 				</div>
+
+				{profile.user_type === 'professional' && (
+					<div className="space-y-4 pt-2">
+						<div className="space-y-2">
+							<Label className="text-[10px] font-black text-serene-neutral-600 uppercase tracking-widest px-1">Your Gender</Label>
+							<div className="grid grid-cols-3 gap-2">
+								{['female', 'male', 'non_binary'].map((g) => (
+									<Button
+										key={g}
+										type="button"
+										variant={profile.gender === g ? 'default' : 'outline'}
+										size="sm"
+										onClick={() => setProfile(p => ({ ...p, gender: g }))}
+										className={cn(
+											"rounded-xl font-bold capitalize h-10 transition-all",
+											profile.gender === g ? "bg-serene-blue-600 border-transparent shadow-md" : "bg-white border-serene-neutral-100 text-serene-neutral-600"
+										)}
+									>
+										{g.replace('_', ' ')}
+									</Button>
+								))}
+							</div>
+						</div>
+
+						<div className="space-y-2">
+							<Label className="text-[10px] font-black text-serene-neutral-600 uppercase tracking-widest px-1">Languages You Speak</Label>
+							<div className="flex flex-wrap gap-2">
+								{['english', 'swahili', 'other'].map((lang) => {
+									const isSelected = profile.languages.includes(lang);
+									return (
+										<Badge
+											key={lang}
+											variant={isSelected ? 'default' : 'outline'}
+											className={cn(
+												"px-4 py-2 rounded-full cursor-pointer transition-all border-2 capitalize font-bold h-9",
+												isSelected 
+													? "bg-serene-blue-100 border-serene-blue-300 text-serene-blue-700 hover:bg-serene-blue-200" 
+													: "bg-white border-serene-neutral-100 text-serene-neutral-400 hover:border-serene-blue-200"
+											)}
+											onClick={() => {
+												const nextLangs = isSelected 
+													? profile.languages.filter(l => l !== lang)
+													: [...profile.languages, lang];
+												setProfile(p => ({ ...p, languages: nextLangs }));
+											}}
+										>
+											{lang}
+											{isSelected && <Check className="ml-1.5 h-3 w-3" />}
+										</Badge>
+									);
+								})}
+							</div>
+						</div>
+					</div>
+				)}
 			</CardContent>
 		</Card>
 	);
@@ -598,7 +673,11 @@ export default function OnboardingFlow() {
 							saving || 
 							(currentStepId === 'policies' && !allPoliciesAccepted) ||
 							(currentStepId === 'role' && !profile.user_type) || 
-							(currentStepId === 'about' && (!profile.professional_title || !profile.bio))
+							(currentStepId === 'about' && (
+								!profile.professional_title || 
+								!profile.bio || 
+								(profile.user_type === 'professional' && (!profile.gender || profile.languages.length === 0))
+							))
 						}
 						className="bg-serene-blue-600 hover:bg-serene-blue-700 text-white font-black h-11 sm:h-12 px-8 sm:px-12 rounded-full sm:min-w-[200px] shadow-lg shadow-serene-blue-500/20 transition-all active:scale-95 uppercase tracking-[0.1em] text-[11px] sm:text-xs w-full sm:w-auto"
 					>

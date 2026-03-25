@@ -43,11 +43,11 @@ export function DesktopHeader({
     }, [searchTerm, router, pathname, searchParams]);
 
 	return (
-		<header className="sticky top-0 z-40 w-full bg-white/80 backdrop-blur-xl border-b border-serene-neutral-200/60 transition-all duration-200">
-			<div className="flex items-center px-6 lg:px-8 gap-4">
+		<header className="sticky top-0 z-40 w-full bg-white/80 backdrop-blur-xl border-b border-serene-neutral-200/60 transition-all duration-200 h-16 flex items-center shrink-0">
+			<div className="flex items-center px-6 lg:px-8 gap-4 w-full h-full">
                 
                 {/* Search & Notifications Group - Centered */}
-				<div className="hidden md:flex items-center gap-3 flex-1 max-w-2xl mx-auto">
+				<div className="hidden md:flex items-center gap-4 flex-1 max-w-2xl mx-auto">
                     {/* Search Input - Pill Shape */}
 					{showSearch && (
                         <div className="relative flex-1 max-w-md group mx-auto">

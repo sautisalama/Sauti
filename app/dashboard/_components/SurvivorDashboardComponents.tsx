@@ -125,6 +125,8 @@ interface SereneQuickActionProps {
     trend: 'up' | 'down' | 'neutral';
     label?: string;
   };
+  actionIcon?: ReactNode;
+  onActionClick?: (e: React.MouseEvent) => void;
 }
 
 export function SereneQuickActionCard({ 
@@ -137,7 +139,9 @@ export function SereneQuickActionCard({
   badgeClassName,
   variant = "blue",
   className,
-  stats
+  stats,
+  actionIcon,
+  onActionClick
 }: SereneQuickActionProps) {
   const variants = {
     blue: "bg-serene-blue-50 hover:bg-serene-blue-100 text-serene-blue-900",
@@ -171,6 +175,19 @@ export function SereneQuickActionCard({
           <div className={cn("p-2.5 rounded-xl transition-colors duration-300", iconColors[variant])}>
             {icon}
           </div>
+          {actionIcon && (
+            <button
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                onActionClick?.(e);
+              }}
+              className="p-2 rounded-full bg-white/40 hover:bg-white/60 text-current transition-all duration-200 hover:scale-110 active:scale-95 shadow-sm"
+              title="Quick Action"
+            >
+              {actionIcon}
+            </button>
+          )}
         </div>
         
         <div>
@@ -432,7 +449,7 @@ export function SereneReportCard({
               <Shield className="h-6 w-6" />
            </div>
            <div>
-             <h4 className="font-bold text-serene-neutral-900 group-hover:text-serene-blue-900 transition-colors text-base">{type}</h4>
+             <h4 className="font-bold text-serene-neutral-900 group-hover:text-serene-blue-900 transition-colors text-base truncate">{type}</h4>
              <span className="text-xs text-serene-neutral-500 font-medium flex items-center gap-1.5 mt-0.5">
                <Clock className="h-3.5 w-3.5" /> {date}
              </span>

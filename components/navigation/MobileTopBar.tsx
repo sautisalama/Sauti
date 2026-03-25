@@ -100,7 +100,7 @@ export function MobileTopBar() {
 
               {user?.profile?.user_type === "professional" && (
                 <DropdownMenuItem asChild>
-                    <Link href="/dashboard/verification" className="cursor-pointer rounded-xl focus:bg-serene-neutral-50 focus:text-sauti-teal p-3">
+                    <Link href="/dashboard/profile?section=verification" className="cursor-pointer rounded-xl focus:bg-serene-neutral-50 focus:text-sauti-teal p-3">
                       <Shield className="mr-3 h-4 w-4 text-sauti-teal" />
                       <span>Verification</span>
                     </Link>

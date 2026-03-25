@@ -40,10 +40,18 @@ export async function POST(request: Request) {
 			additional_info: formData.additional_info
 				? JSON.stringify(formData.additional_info)
 				: null,
+			gender: formData.gender || null,
+			preferred_language: formData.preferred_language || null,
+			dob: formData.dob || null,
+			city: formData.city || null,
+			state: formData.state || null,
+			country: formData.country || null,
 			// Initialize match-related fields
 			ismatched: false,
 			match_status: "pending" as Database["public"]["Enums"]["match_status_type"],
 			email: formData.email,
+			record_only: !!formData.record_only,
+			is_workplace_incident: !!formData.is_workplace_incident,
 		};
 
 		const { error: supabaseError, data: insertedReport } = await supabase

@@ -9,21 +9,62 @@ import {
 
 type SupportService = Database["public"]["Tables"]["support_services"]["Row"];
 type Report = Database["public"]["Tables"]["reports"]["Row"];
+type Profile = Database["public"]["Tables"]["profiles"]["Row"];
+
+/**
+ * INCIDENT TO SPECIALTY MAPPING
+ * Maps incident types to primary and secondary support specialties.
+ * Used to focus initial matching on the most relevant providers.
+ */
+const INCIDENT_SPECIALTY_MAP: Record<string, { primary: string[]; secondary: string[] }> = {
+	physical: { primary: ["medical", "legal"], secondary: ["mental_health", "shelter"] },
+	emotional: { primary: ["mental_health"], secondary: ["legal", "shelter"] },
+	sexual: { primary: ["medical", "mental_health", "legal"], secondary: ["shelter"] },
+	financial: { primary: ["legal", "financial_assistance"], secondary: ["mental_health"] },
+	child_abuse: { primary: ["legal", "medical"], secondary: ["mental_health", "shelter", "child_protection"] },
+	child_labor: { primary: ["legal", "child_protection"], secondary: ["mental_health", "shelter"] },
+	neglect: { primary: ["medical", "mental_health"], secondary: ["shelter", "legal", "child_protection"] },
+	trafficking: { primary: ["legal", "police_reporting"], secondary: ["shelter", "mental_health"] },
+	stalking: { primary: ["legal", "police_reporting"], secondary: ["mental_health"] },
+	cyber: { primary: ["legal"], secondary: ["mental_health"] },
+	racial: { primary: ["legal"], secondary: ["mental_health"] },
+	other: { primary: [], secondary: [] },
+};
+
+/**
+ * PROFESSIONAL AUTHORITY SCORING
+ * Boosts matching scores based on the professional's title and the incident type.
+ * Higher values indicate higher expertise/authority for that specific incident.
+ */
+const PROFESSIONAL_AUTHORITY: Record<string, Record<string, number>> = {
+	"Doctor": { physical: 10, sexual: 10, child_abuse: 8, emotional: 3, neglect: 8 },
+	"Mental health expert": { emotional: 10, sexual: 8, physical: 5, child_abuse: 5, stalking: 5 },
+	"Lawyer": { child_abuse: 10, child_labor: 10, financial: 10, physical: 8, sexual: 8, trafficking: 10, stalking: 10, cyber: 10, racial: 10 },
+	"Paralegal": { financial: 6, physical: 4, emotional: 4, child_labor: 6 },
+	"Human rights defender": { child_abuse: 8, child_labor: 8, other: 8, emotional: 6, physical: 4, trafficking: 8, racial: 8 },
+	"Law firm": { child_abuse: 10, financial: 10, sexual: 8, child_labor: 10 },
+	"Rescue Center": { child_abuse: 8, physical: 8, sexual: 6, child_labor: 8, shelter: 10 },
+	"Hospital/Clinic": { physical: 10, sexual: 10, child_abuse: 8 },
+	"Local NGO": { emotional: 6, financial: 6, other: 8 },
+};
+
+/**
+ * AVAILABILITY SCORING MATRIX
+ * Weights availability profiles based on the urgency of the report.
+ */
+const AVAILABILITY_SCORE: Record<string, Record<string, number>> = {
+	"24/7": { high: 10, medium: 8, low: 5 },
+	"weekdays_extended": { high: 6, medium: 10, low: 8 },
+	"weekdays_9_5": { high: 3, medium: 8, low: 10 },
+	"weekends": { high: 4, medium: 6, low: 8 },
+	"flexible": { high: 7, medium: 8, low: 8 },
+	"by_appointment": { high: 1, medium: 5, low: 8 },
+};
 
 /**
  * Calculates the distance between two points using the Haversine formula
- * @param lat1 Latitude of first point
- * @param lon1 Longitude of first point
- * @param lat2 Latitude of second point
- * @param lon2 Longitude of second point
- * @returns Distance in kilometers
  */
-function calculateDistance(
-	lat1: number,
-	lon1: number,
-	lat2: number,
-	lon2: number
-): number {
+function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
 	const R = 6371; // Earth's radius in kilometers
 	const dLat = (lat2 - lat1) * (Math.PI / 180);
 	const dLon = (lon2 - lon1) * (Math.PI / 180);
@@ -37,18 +78,14 @@ function calculateDistance(
 	return R * c;
 }
 
-
 /**
- * Matches a report with appropriate support services based on service types and location
- * @param reportId The ID of the report to match
- * @param customClient Optional Supabase client (e.g. admin client) to use
- * @returns Array of matched services with their distances
+ * Matches a report with appropriate support services.
  */
 export async function matchReportWithServices(reportId: string, customClient?: SupabaseClient<Database>) {
 	const supabase = customClient || await createClient();
 
 	try {
-		// Fetch the report with required services
+		// 1. Fetch Report Data
 		const { data: report, error: reportError } = await supabase
 			.from("reports")
 			.select("*")
@@ -60,168 +97,298 @@ export async function matchReportWithServices(reportId: string, customClient?: S
 			throw new Error("Failed to fetch report");
 		}
 
-		// Fetch all support services
+		// Pre-filter: Skip record-only matches unless it's child abuse/labor
+		const isChildCase = report.type_of_incident === 'child_abuse' || report.type_of_incident === 'child_labor';
+		if (report.record_only && !isChildCase) {
+			console.log(`Skipping matching for record-only report ${reportId}`);
+			return [];
+		}
+
+		// Parse additional_info
+		let additionalInfo: any = {};
+		try {
+			if (report.additional_info) {
+				additionalInfo = typeof report.additional_info === 'string' 
+					? JSON.parse(report.additional_info) 
+					: report.additional_info;
+			}
+		} catch (e) {
+			console.warn("Failed to parse additional_info:", e);
+		}
+
+		// 2. Fetch All Eligible Providers
+		// We fetch: verified support services AND verified standalone professionals (HRDs and Paralegals)
+		
+		// Get all verified support services
 		const { data: services, error: servicesError } = await supabase
 			.from("support_services")
-			.select("*");
+			.select("*, profile:profiles!support_services_user_id_fkey(*)")
+			.eq("is_active", true)
+			.eq("is_banned", false)
+			.eq("is_permanently_suspended", false)
+			.eq("verification_status", "verified");
 
-		if (servicesError || !services) {
-			console.error("Services fetch error:", servicesError);
-			throw new Error("Failed to fetch support services");
-		}
+		if (servicesError) throw servicesError;
 
-		// Fetch profiles for service owners to check verification completeness
-		const userIds = Array.from(new Set(services.map(s => s.user_id).filter(Boolean))) as string[];
-		const profilesById = new Map<string, { first_name: string | null; phone: string | null; professional_title: string | null }>();
-		if (userIds.length > 0) {
-			const { data: profiles, error: profileErr } = await supabase
-				.from("profiles")
-				.select("id, first_name, phone, professional_title")
-				.in("id", userIds);
-			if (!profileErr && profiles) {
-				profiles.forEach((p: any) => profilesById.set(p.id, p));
+		// Get all verified standalone profiles (those with specific clinical titles)
+		const { data: standaloneProfiles, error: standaloneError } = await supabase
+			.from("profiles")
+			.select("*")
+			.in("professional_title", ["Human rights defender", "Paralegal"])
+			.eq("verification_status", "verified");
+
+		if (standaloneError) throw standaloneError;
+
+		const providerUserIds = new Set((services || []).map(s => s.user_id).filter(Boolean));
+		const activeStandaloneProfiles = (standaloneProfiles || []).filter(p => !providerUserIds.has(p.id));
+
+		// Merge into a common matching structure
+		const candidates = [
+			...(services || []).map(s => ({
+				type: 'service' as const,
+				id: s.id,
+				name: s.name,
+				userId: s.user_id,
+				serviceTypes: [s.service_types],
+				profTitle: (s as any).profile?.professional_title,
+				lat: s.latitude,
+				lon: s.longitude,
+				radius: s.coverage_area_radius || 50,
+				isRemote: s.coverage_area_radius === null,
+				availability: s.availability,
+				specialisesInDisability: (s as any).specialises_in_disability || false,
+				specialisesInQueer: (s as any).specialises_in_queer_support || false,
+				specialisesInChildren: (s as any).specialises_in_children || false,
+				matchingTraits: ((s as any).profile?.settings as any)?.matching_traits || {},
+				bio: (s as any).profile?.bio || null,
+				city: (s as any).profile?.city || null,
+				country: (s as any).profile?.country || null
+			})),
+			...activeStandaloneProfiles.map(p => ({
+				type: 'profile' as const,
+				id: p.id,
+				name: `${p.first_name || ''} ${p.last_name || ''}`.trim() || p.professional_title || 'Expert',
+				userId: p.id,
+				serviceTypes: p.professional_title === "Paralegal" ? ["legal"] : ["other"], 
+				profTitle: p.professional_title,
+				lat: (p as any).latitude || null,
+				lon: (p as any).longitude || null,
+				radius: p.professional_title === "Paralegal" ? 60 : 100, 
+				isRemote: false,
+				availability: "flexible",
+				specialisesInDisability: false,
+				specialisesInQueer: false,
+				specialisesInChildren: p.professional_title === "Human rights defender", 
+				matchingTraits: (p.settings as any)?.matching_traits || {},
+				bio: p.bio || null,
+				city: (p as any).city || null,
+				country: (p as any).country || null
+			}))
+		];
+
+		// 3. Scoring
+		const results = await Promise.all(candidates.map(async (cand) => {
+			let score = 0;
+			const matchReasons: string[] = [];
+
+			// A. Service Type Matching
+			const requiredBySurvivor = (report.required_services as string[]) || [];
+			const mapping = INCIDENT_SPECIALTY_MAP[report.type_of_incident || 'other'];
+			
+			const isPrimary = cand.serviceTypes.some(t => mapping?.primary.includes(t));
+			const isSecondary = cand.serviceTypes.some(t => mapping?.secondary.includes(t));
+			const isExplicitlyRequested = cand.serviceTypes.some(t => requiredBySurvivor.includes(t));
+
+			if (isPrimary) {
+				score += 25;
+				matchReasons.push(`Primary specialty for ${report.type_of_incident}`);
+			} else if (isSecondary) {
+				score += 15;
+				matchReasons.push(`Secondary specialty for ${report.type_of_incident}`);
 			}
-		}
-		const isVerified = (userId: string | null) => {
-			if (!userId) return false;
-			const p = profilesById.get(userId);
-			if (!p) return false;
-			return Boolean(p.first_name && p.phone && p.professional_title);
-		};
-
-		// Ensure required_services is properly typed and handled
-		const requiredServices = (report.required_services as string[]) || [];
-
-		// First, filter services by type match AND only include verified providers
-		const matchingServices = services.filter((service) => {
-			const serviceType = service.service_types;
-			const typeMatch = requiredServices.some((required: string) => serviceType === required);
-			return typeMatch && isVerified(service.user_id);
-		});
-
-		// Then, calculate distances and scores for matching services
-		const servicesWithDistances = matchingServices.map((service) => {
-			let distance = Infinity;
-
-			if (
-				report.latitude &&
-				report.longitude &&
-				service.latitude &&
-				service.longitude
-			) {
-				distance = calculateDistance(
-					report.latitude,
-					report.longitude,
-					service.latitude,
-					service.longitude
-				);
+			
+			if (isExplicitlyRequested) {
+				score += 20;
+				matchReasons.push("Requested by survivor");
 			}
 
-			// Scoring: base for type match + proximity + availability, scaled by urgency
-			const radius = Number(service.coverage_area_radius) || 50;
-			const distanceScore = isFinite(distance)
-				? Math.max(0, 20 * (1 - Math.min(distance / radius, 1)))
-				: 0;
-			const availabilityBonus = /24\/7|open|available|always/i.test(service.availability || "")
-				? 10
-				: 0;
-			const base = 60; // service type match
-			const urgencyMult = report.urgency === "high" ? 1.15 : report.urgency === "medium" ? 1.05 : 1.0;
-			const score = Math.round((base + distanceScore + availabilityBonus) * urgencyMult);
+			// B. Distance Scoring
+			if (report.latitude && report.longitude && cand.lat && cand.lon && !cand.isRemote) {
+				const dist = calculateDistance(report.latitude, report.longitude, cand.lat, cand.lon);
+				if (cand.radius === null || dist <= cand.radius) {
+					const radius = cand.radius || 50;
+					const distScore = Math.max(0, 20 * (1 - dist / radius));
+					score += distScore;
+					if (distScore > 15) matchReasons.push("Very close proximity");
+				}
+			} else if (cand.isRemote) {
+				matchReasons.push("Remote service available");
+			}
 
-			return {
-				service,
-				distance,
-				score,
-			};
-		});
+			// C. Professional Authority
+			if (cand.profTitle && report.type_of_incident) {
+				const authority = PROFESSIONAL_AUTHORITY[cand.profTitle]?.[report.type_of_incident] || 0;
+				score += authority;
+				if (authority >= 8) matchReasons.push(`Expert in ${report.type_of_incident}`);
+			}
 
-		// Sort by score desc (then by distance asc) and take top 5
-		const closestMatches = servicesWithDistances
-			.sort((a, b) => (b.score - a.score) || (a.distance - b.distance))
+			// D. Availability
+			const urgency = (report.urgency || 'medium') as 'high' | 'medium' | 'low';
+			const availKey = cand.availability || 'flexible';
+			const availScore = AVAILABILITY_SCORE[availKey]?.[urgency] || 5;
+			score += availScore;
+
+			// E. Special Needs
+			if (additionalInfo.special_needs?.disabled && cand.specialisesInDisability) {
+				score += 15;
+				matchReasons.push("Disability specialist");
+			}
+			if (additionalInfo.special_needs?.queer_support && cand.specialisesInQueer) {
+				score += 15;
+				matchReasons.push("Queer support specialist");
+			}
+			
+			// F. Language and Gender Matching
+			if (report.preferred_language && cand.matchingTraits.languages) {
+				if (cand.matchingTraits.languages.includes(report.preferred_language)) {
+					score += 15;
+					matchReasons.push(`Matches preferred language (${report.preferred_language})`);
+				}
+			}
+			
+			if (report.gender && cand.matchingTraits.gender) {
+				if (cand.matchingTraits.gender === report.gender) {
+					score += 10;
+					matchReasons.push(`Matches gender preference`);
+				}
+			}
+
+			// G. Consent
+			if (report.consent === 'no' && !isChildCase && (cand.profTitle === 'Lawyer' || cand.profTitle === 'Law firm')) {
+				score -= 50; 
+			}
+
+			// G. Load Balancing
+			if (cand.userId) {
+				const { data: caseCount } = await supabase.rpc('get_active_case_count', { provider_user_id: cand.userId });
+				if (typeof caseCount === 'number' && caseCount > 0) {
+					score -= (caseCount * 5);
+				}
+			}
+
+			// H. Urgency Multiplier
+			if (urgency === 'high') score *= 1.15;
+			else if (urgency === 'medium') score *= 1.05;
+
+			return { cand, score, reasons: matchReasons };
+		}));
+
+		// 4. Filter & Select Top Matches
+		const finalMatches = results
+			.filter(r => r.score > 10)
+			.sort((a, b) => b.score - a.score)
 			.slice(0, 5);
 
-		// Update the report's match status
-		if (closestMatches.length > 0) {
-			const { error: updateError } = await supabase
-				.from("reports")
-				.update({
-					ismatched: true,
-					match_status:
-						"pending" as Database["public"]["Enums"]["match_status_type"],
-				})
-				.eq("report_id", reportId);
+		if (finalMatches.length > 0) {
+			await supabase.from("reports").update({
+				ismatched: true,
+				match_status: "pending"
+			}).eq("report_id", reportId);
 
-			if (updateError) {
-				console.error("Report update error:", updateError);
-			}
-
-			const matches = closestMatches.map((match) => ({
+			const matchInserts = finalMatches.map(m => ({
 				report_id: reportId,
-				service_id: match.service.id,
+				service_id: m.cand.type === 'service' ? m.cand.id : null,
+				hrd_profile_id: m.cand.type === 'profile' ? m.cand.id : null,
 				match_date: new Date().toISOString(),
-				match_score: match.score,
-				match_status_type:
-					"pending" as Database["public"]["Enums"]["match_status_type"],
-				description: report.incident_description,
-				feedback: null,
-				notes: null,
-				support_service: match.service.service_types, // Use the enum type directly
+				match_score: Math.round(m.score),
+				match_status_type: "pending" as any,
+				match_reason: m.reasons.join(", "),
+				description: (m.cand as any).bio || null,
+				notes: [(m.cand as any).city, (m.cand as any).country].filter(Boolean).join(", ") || null,
+				escalation_required: isChildCase,
+				support_service: (m.cand as any).serviceTypes[0] as any,
 				survivor_id: report.user_id,
 				updated_at: new Date().toISOString(),
 			}));
 
-			const { error: matchError } = await supabase
-				.from("matched_services")
-				.insert(matches);
+			const { error: matchError } = await supabase.from("matched_services").insert(matchInserts);
+			if (matchError) throw matchError;
 
-			if (matchError) {
-				console.error("Match insert error:", matchError);
-				throw new Error("Failed to insert matches");
-			}
-
-			// --- SEND NOTIFICATIONS ---
-			// 1. Notify each matched Professional
-			for (const match of closestMatches) {
-				if (match.service.user_id) {
+			// 5. Notifications
+			for (const m of finalMatches) {
+				if (m.cand.userId) {
 					await sendNotification({
-						userId: match.service.user_id,
-						type: "match_found", // Or 'new_referral'
-						title: "New Case Assignment",
-						message: `You have been matched with a new case requiring ${match.service.service_types} services.`,
+						userId: m.cand.userId,
+						type: "match_found",
+						title: isChildCase ? "URGENT: Child Case Escalation" : "New Case Assignment",
+						message: isChildCase 
+							? `Mandatory alert: You have been matched with a child-related case (${report.type_of_incident}).`
+							: `You have been matched with a new case requiring ${m.cand.serviceTypes[0]} services.`,
 						link: "/dashboard/cases",
-						metadata: {
-							report_id: reportId,
-							service_id: match.service.id,
-						},
+						metadata: { report_id: reportId },
 						sendEmail: true,
-						emailHtml: matchFoundProfessionalEmail(match.service.service_types),
+						emailHtml: matchFoundProfessionalEmail(m.cand.serviceTypes[0]),
 					});
 				}
 			}
 
-			// 2. Notify the Survivor (User) - Send ONE summary notification
 			if (report.user_id) {
-				const primaryMatch = closestMatches[0];
 				await sendNotification({
 					userId: report.user_id,
 					type: "match_found",
-					title: "Match Found",
-					message: `We have matched you with verified professionals for your request. View the details in your dashboard.`,
-					link: "/dashboard/cases", // Or /dashboard/reports?
+					title: "Help is on the way",
+					message: `We've matched your report with verified specialists. View them in your dashboard.`,
+					link: "/dashboard/cases",
 					metadata: { report_id: reportId },
 					sendEmail: true,
-					emailHtml: matchFoundSurvivorEmail(
-						primaryMatch.service.name || "a verified professional",
-						primaryMatch.service.service_types
-					),
+					emailHtml: matchFoundSurvivorEmail(finalMatches[0].cand.name || "Specialist", finalMatches[0].cand.serviceTypes[0]),
 				});
 			}
 		}
 
-		return closestMatches;
+
+		return finalMatches;
+
 	} catch (error) {
-		console.error("Error in matchReportWithServices:", error);
+		console.error("Critical matching engine error:", error);
+		throw error;
+	}
+}
+
+/**
+ * BACKFILL MATCHING
+ * Searches for reports that currently have no matches and attempts to match them.
+ * Usually triggered when a new professional or service is verified.
+ */
+export async function backfillUnmatchedReports() {
+	const supabase = await createClient();
+	
+	try {
+		// Find all reports that are not record-only and haven't been matched yet
+		const { data: unmatchedReports, error } = await supabase
+			.from("reports")
+			.select("report_id")
+			.eq("ismatched", false)
+			.eq("record_only", false);
+
+		if (error) throw error;
+		if (!unmatchedReports || unmatchedReports.length === 0) return;
+
+		console.log(`Starting backfill for ${unmatchedReports.length} unmatched reports...`);
+
+		// Process each unmatched report
+		// We use a sequential approach to avoid hitting rate limits or overwhelming the DB
+		for (const report of unmatchedReports) {
+			try {
+				await matchReportWithServices(report.report_id);
+			} catch (matchErr) {
+				console.error(`Backfill failed for report ${report.report_id}:`, matchErr);
+			}
+		}
+
+		return { processed: unmatchedReports.length };
+	} catch (error) {
+		console.error("Backfill matching error:", error);
 		throw error;
 	}
 }

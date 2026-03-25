@@ -59,6 +59,8 @@ export default function AuthenticatedReportAbuseForm({
 	const [contactPreference, setContactPreference] = useState<string>("");
 	const [consent, setConsent] = useState<string>("");
 	const [recordOnly, setRecordOnly] = useState(false);
+	const [isWorkplace, setIsWorkplace] = useState(false);
+	const isChildCase = incidentTypes.includes('child_abuse') || incidentTypes.includes('child_labor') || reportingFor === 'child';
 	const supabase = useMemo(() => createClient(), []);
 	const user = useUser();
 
@@ -206,6 +208,7 @@ export default function AuthenticatedReportAbuseForm({
 			sexual: "sexual",
 			financial: "financial",
 			child_abuse: "child_abuse",
+			child_labor: "child_labor",
 			other: "other",
 		};
 		const first = incidentTypes.find((t) => allowed[t]);
@@ -217,11 +220,9 @@ export default function AuthenticatedReportAbuseForm({
 			user_id: userId,
 			phone: phone,
 			type_of_incident,
-			// With expanded enum, you can also allow multi-select here:
-			// If you add MultiSelect later, map the first choice to type_of_incident and store all in additional_info
 			incident_description: description || null,
-			urgency: formData.get("urgency"),
-			consent: formData.get("consent") || null,
+			urgency: isChildCase ? "high" : (urgency as any),
+			consent: isChildCase ? "yes" : (consent as any),
 			contact_preference: contactPreference,
 			required_services: selectedServices,
 			latitude: location?.latitude || null,
@@ -230,7 +231,8 @@ export default function AuthenticatedReportAbuseForm({
 			email: user?.profile?.email || null,
 			media,
 			is_onBehalf: reportingFor !== 'self',
-			record_only: recordOnly,
+			record_only: isChildCase ? false : recordOnly,
+			is_workplace_incident: isWorkplace,
 			additional_info: {
 				incident_types: incidentTypes,
 				special_needs: { disabled: needsDisabled, queer_support: needsQueer },
@@ -347,6 +349,12 @@ export default function AuthenticatedReportAbuseForm({
 								{ value: "sexual", label: "Sexual abuse" },
 								{ value: "financial", label: "Financial abuse" },
 								{ value: "child_abuse", label: "Child abuse" },
+								{ value: "child_labor", label: "Child labor" },
+								{ value: "neglect", label: "Neglect" },
+								{ value: "trafficking", label: "Human Trafficking" },
+								{ value: "stalking", label: "Stalking/Harassment" },
+								{ value: "cyber", label: "Cyber Bullying" },
+								{ value: "racial", label: "Racial Discrimination" },
 								{ value: "other", label: "Other" },
 							]}
 							placeholder="Select types..."
@@ -381,6 +389,21 @@ export default function AuthenticatedReportAbuseForm({
 							<option value="medium">medium urgency</option>
 							<option value="low">low urgency</option>
 						</select>
+						{isChildCase && (
+							<div className="mt-4 mb-2 p-4 bg-orange-50 border-2 border-orange-200 rounded-2xl flex items-start gap-3">
+								<div className="p-2 bg-orange-100 rounded-full text-orange-600">
+									<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+								</div>
+								<div>
+									<p className="text-sm font-bold text-orange-900 leading-tight">Mandatory Reporting Notice</p>
+									<p className="text-xs text-orange-800 mt-1">
+										Under Kenya&apos;s <a href="https://www.ilo.org/dyn/natlex/natlex4.detail?p_lang=en&p_isn=113388" target="_blank" rel="noopener noreferrer" className="underline font-bold">Children Act, 2022</a>, 
+										it is mandatory to report all cases of child exploitation and abuse to relevant authorities. 
+										Consent is implied for these cases.
+									</p>
+								</div>
+							</div>
+						)}
 					</div>
 				</div>
 
@@ -483,6 +506,15 @@ export default function AuthenticatedReportAbuseForm({
 						<label className="inline-flex items-center gap-2 text-sm text-neutral-600 cursor-pointer hover:text-neutral-900">
 							<input
 								type="checkbox"
+								className="rounded border-neutral-300 text-sauti-teal focus:ring-sauti-teal h-4 w-4"
+								checked={isWorkplace}
+								onChange={(e) => setIsWorkplace(e.target.checked)}
+							/>
+							<span>Incident at workplace</span>
+						</label>
+						<label className="inline-flex items-center gap-2 text-sm text-neutral-600 cursor-pointer hover:text-neutral-900">
+							<input
+								type="checkbox"
 								checked={needsDisabled}
 								onChange={(e) => setNeedsDisabled(e.target.checked)}
 								className="rounded border-neutral-300 text-sauti-teal focus:ring-sauti-teal h-4 w-4"
@@ -546,65 +578,69 @@ export default function AuthenticatedReportAbuseForm({
 						</div>
 					</div>
 
-					<div className="space-y-1">
-						<label className="block text-sm font-medium text-neutral-700 mb-1">
-							Consent to share <span className="text-red-500">*</span>
-						</label>
-						<EnhancedSelect
-							options={[
-								{ value: "yes", label: "Yes, I consent" },
-								{ value: "no", label: "No, I do not consent" },
-							]}
-							value={consent}
-							onChange={(value) => {
-								setConsent(value);
-								const form = document.querySelector("form") as HTMLFormElement;
-								const select = form.querySelector('select[name="consent"]') as HTMLSelectElement;
-								if (select) select.value = value;
-							}}
-							placeholder="Select option"
-							required
-							name="consent"
-						/>
-						<select name="consent" className="hidden">
-							<option value="">select consent</option>
-							<option value="yes">Yes, I consent</option>
-							<option value="no">No, I don't consent</option>
-						</select>
-					</div>
+					{!isChildCase && (
+						<>
+							<div className="space-y-1">
+								<label className="block text-sm font-medium text-neutral-700 mb-1">
+									Consent to share <span className="text-red-500">*</span>
+								</label>
+								<EnhancedSelect
+									options={[
+										{ value: "yes", label: "Yes, I consent" },
+										{ value: "no", label: "No, I do not consent" },
+									]}
+									value={consent}
+									onChange={(value) => {
+										setConsent(value);
+										const form = document.querySelector("form") as HTMLFormElement;
+										const select = form.querySelector('select[name="consent"]') as HTMLSelectElement;
+										if (select) select.value = value;
+									}}
+									placeholder="Select option"
+									required
+									name="consent"
+								/>
+								<select name="consent" className="hidden">
+									<option value="">select consent</option>
+									<option value="yes">Yes, I consent</option>
+									<option value="no">No, I don't consent</option>
+								</select>
+							</div>
 
-					{/* Record Only Option */}
-					<div className={`p-4 rounded-xl border-2 transition-all cursor-pointer ${
-						recordOnly 
-							? 'border-amber-400 bg-amber-50' 
-							: 'border-neutral-200 bg-white hover:border-neutral-300'
-					}`}
-						onClick={() => setRecordOnly(!recordOnly)}
-					>
-						<label className="flex items-start gap-3 cursor-pointer">
-							<input
-								type="checkbox"
-								checked={recordOnly}
-								onChange={(e) => setRecordOnly(e.target.checked)}
-								className="mt-0.5 rounded border-neutral-300 text-amber-500 focus:ring-amber-500 h-5 w-5"
-							/>
-							<div className="flex-1">
-								<span className="text-sm font-semibold text-neutral-800 block">
-									I don't need immediate help right now
-								</span>
-								<span className="text-xs text-neutral-500 block mt-1">
-									Your report will be safely documented for your records. You can request support later at any time.
-								</span>
+							{/* Record Only Option */}
+							<div className={`p-4 rounded-xl border-2 transition-all cursor-pointer ${
+								recordOnly 
+									? 'border-amber-400 bg-amber-50' 
+									: 'border-neutral-200 bg-white hover:border-neutral-300'
+							}`}
+								onClick={() => setRecordOnly(!recordOnly)}
+							>
+								<label className="flex items-start gap-3 cursor-pointer">
+									<input
+										type="checkbox"
+										checked={recordOnly}
+										onChange={(e) => setRecordOnly(e.target.checked)}
+										className="mt-0.5 rounded border-neutral-300 text-amber-500 focus:ring-amber-500 h-5 w-5"
+									/>
+									<div className="flex-1">
+										<span className="text-sm font-semibold text-neutral-800 block">
+											I don't need immediate help right now
+										</span>
+										<span className="text-xs text-neutral-500 block mt-1">
+											Your report will be safely documented for your records. You can request support later at any time.
+										</span>
+									</div>
+								</label>
+								{recordOnly && (
+									<div className="mt-3 p-3 bg-amber-100/50 rounded-lg">
+										<p className="text-xs text-amber-800">
+											<strong>Note:</strong> Your report will be stored securely but won't be shared with service providers unless you request help later. You can always access your report from your dashboard.
+										</p>
+									</div>
+								)}
 							</div>
-						</label>
-						{recordOnly && (
-							<div className="mt-3 p-3 bg-amber-100/50 rounded-lg">
-								<p className="text-xs text-amber-800">
-									<strong>Note:</strong> Your report will be stored securely but won't be shared with service providers unless you request help later. You can always access your report from your dashboard.
-								</p>
-							</div>
-						)}
-					</div>
+						</>
+					)}
 				</div>
 
 				</form>

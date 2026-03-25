@@ -74,6 +74,9 @@ export async function POST(request: Request) {
 				longitude: data.longitude,
 				coverage_area_radius: data.coverage_area_radius,
 				user_id: user.id,
+				specialises_in_disability: !!data.specialises_in_disability,
+				specialises_in_queer_support: !!data.specialises_in_queer_support,
+				specialises_in_children: !!data.specialises_in_children,
 				// Optional fields from schema
 				helpline: null,
 				priority: null,

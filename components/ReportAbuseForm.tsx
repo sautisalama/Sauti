@@ -35,6 +35,12 @@ const INCIDENT_OPTIONS = [
 	{ value: "sexual", label: "Sexual abuse" },
 	{ value: "financial", label: "Financial abuse" },
 	{ value: "child_abuse", label: "Child abuse" },
+	{ value: "child_labor", label: "Child labor" },
+	{ value: "neglect", label: "Neglect" },
+	{ value: "trafficking", label: "Human Trafficking" },
+	{ value: "stalking", label: "Stalking/Harassment" },
+	{ value: "cyber", label: "Cyber Bullying" },
+	{ value: "racial", label: "Racial Discrimination" },
 	{ value: "other", label: "Other" },
 ] as const;
 
@@ -58,13 +64,16 @@ export default function ReportAbuseForm({ onClose }: { onClose?: () => void }) {
 	const audioFilenameRef = useRef<string | null>(null);
 	const [reportingFor, setReportingFor] = useState<'self' | 'someone_else' | 'child'>('self');
 	const [incidentTypes, setIncidentTypes] = useState<string[]>([]);
+	const [isWorkplace, setIsWorkplace] = useState(false);
 	const [needsDisabled, setNeedsDisabled] = useState(false);
 	const [needsQueer, setNeedsQueer] = useState(false);
-	const [autofilledPhone, setAutofilledPhone] = useState<string | null>(null);
+	const [consent, setConsent] = useState<string>("");
 	const [urgency, setUrgency] = useState<string>("");
 	const [supportServices, setSupportServices] = useState<string>("");
+
+	const isChildCase = incidentTypes.includes('child_abuse') || incidentTypes.includes('child_labor') || reportingFor === 'child';
+	const [autofilledPhone, setAutofilledPhone] = useState<string | null>(null);
 	const [contactPreference, setContactPreference] = useState<string>("");
-	const [consent, setConsent] = useState<string>("");
 	// Password for anonymous account
 	const [password, setPassword] = useState("");
 	const [showPassword, setShowPassword] = useState(false);
@@ -205,6 +214,7 @@ export default function ReportAbuseForm({ onClose }: { onClose?: () => void }) {
 				sexual: "sexual",
 				financial: "financial",
 				child_abuse: "child_abuse",
+				child_labor: "child_labor",
 				other: "other",
 			};
 			const first = incidentTypes.find((t) => allowed[t]);
@@ -234,8 +244,8 @@ export default function ReportAbuseForm({ onClose }: { onClose?: () => void }) {
 				phone: null,
 				incident_description: description || null,
 				type_of_incident,
-				urgency: urgencyValue,
-				consent: formData.get("consent") || null,
+				urgency: isChildCase ? "high" : urgencyValue,
+				consent: isChildCase ? "yes" : (formData.get("consent") || null),
 				contact_preference: "do_not_contact",
 				required_services: [],
 				latitude: location?.latitude || null,
@@ -244,8 +254,14 @@ export default function ReportAbuseForm({ onClose }: { onClose?: () => void }) {
 				media,
 				is_onBehalf: reportingFor !== 'self',
 				additional_info,
+				is_workplace_incident: isWorkplace,
 				support_services: formData.get("support_services") || null,
 				password: password,
+				screen: typeof window !== "undefined" ? {
+					width: window.innerWidth,
+					height: window.innerHeight
+				} : undefined,
+				record_only: isChildCase ? false : formData.get("record_only") === "true",
 			};
 
 			const response = await fetch("/api/reports/anonymous", {
@@ -430,6 +446,21 @@ export default function ReportAbuseForm({ onClose }: { onClose?: () => void }) {
 							<option value="medium">medium urgency</option>
 							<option value="low">low urgency</option>
 						</select>{" "}
+						{isChildCase && (
+							<div className="mt-4 mb-4 p-4 bg-orange-50 border-2 border-orange-200 rounded-2xl flex items-start gap-3">
+								<div className="p-2 bg-orange-100 rounded-full text-orange-600">
+									<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+								</div>
+								<div>
+									<p className="text-sm font-bold text-orange-900 leading-tight">Mandatory Reporting Notice</p>
+									<p className="text-xs text-orange-800 mt-1">
+										Under Kenya&apos;s <a href="https://www.ilo.org/dyn/natlex/natlex4.detail?p_lang=en&p_isn=113388" target="_blank" rel="noopener noreferrer" className="underline font-bold">Children Act, 2022</a>, 
+										it is mandatory to report all cases of child exploitation and abuse to relevant authorities. 
+										Consent is required by law for these cases.
+									</p>
+								</div>
+							</div>
+						)}
 						attention. I most urgently need{" "}
 						<EnhancedSelect
 							options={SUPPORT_SERVICE_OPTIONS as any}
@@ -571,32 +602,46 @@ export default function ReportAbuseForm({ onClose }: { onClose?: () => void }) {
 							I need queer support
 						</label>
 					</div>
-					<span className="block mt-3 w-full md:inline-block md:w-auto">
-						<EnhancedSelect
-							options={[
-								{ value: "yes", label: "I consent" },
-								{ value: "no", label: "I don't consent" },
-							]}
-							value={consent}
-							onChange={(value) => {
-								setConsent(value);
-								const form = document.querySelector("form") as HTMLFormElement;
-								const select = form.querySelector(
-									'select[name="consent"]'
-								) as HTMLSelectElement;
-								if (select) select.value = value;
-							}}
-							placeholder="select consent"
-							required
-							name="consent"
-						/>
-					</span>
+					{!isChildCase && (
+						<span className="block mt-3 w-full md:inline-block md:w-auto">
+							<EnhancedSelect
+								options={[
+									{ value: "yes", label: "I consent" },
+									{ value: "no", label: "I don't consent" },
+								]}
+								value={consent}
+								onChange={(value) => {
+									setConsent(value);
+									const form = document.querySelector("form") as HTMLFormElement;
+									const select = form.querySelector(
+										'select[name="consent"]'
+									) as HTMLSelectElement;
+									if (select) select.value = value;
+								}}
+								placeholder="select consent"
+								required
+								name="consent"
+							/>
+						</span>
+					)}
 					<select name="consent" className="hidden">
 						<option value="">select consent</option>
 						<option value="yes">I consent</option>
 						<option value="no">I don't consent</option>
 					</select>{" "}
-					to share this information with relevant authorities if needed.
+					{!isChildCase ? "to share this information with relevant authorities if needed." : ""}
+					
+					<div className="w-full mt-4">
+						<label className="inline-flex items-center gap-2 text-sm font-bold text-sauti-dark/80 bg-white px-3 py-2 rounded-xl border border-neutral-200 shadow-sm hover:border-sauti-teal/50 transition-colors cursor-pointer">
+							<input
+								type="checkbox"
+								className="w-4 h-4 accent-sauti-teal"
+								checked={isWorkplace}
+								onChange={(e) => setIsWorkplace(e.target.checked)}
+							/>{" "}
+							This happened at the workplace
+						</label>
+					</div>
 				</div>
 				</div>
 

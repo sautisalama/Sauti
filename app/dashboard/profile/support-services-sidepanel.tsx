@@ -184,6 +184,9 @@ export function SupportServiceSidepanel({
 		address: "",
 		is_remote: false,
 		is_in_person: false,
+		specialises_in_disability: false,
+		specialises_in_queer_support: false,
+		specialises_in_children: false,
 	});
 	const [isSaving, setIsSaving] = useState(false);
 	const [isModalOpen, setIsModalOpen] = useState(false); // Document Upload modal
@@ -280,6 +283,9 @@ export function SupportServiceSidepanel({
 				address: "", // Address not stored in DB yet, but used for UI
 				is_remote: !service.coverage_area_radius, // heuristic
 				is_in_person: !!service.coverage_area_radius,
+				specialises_in_disability: service.specialises_in_disability || false,
+				specialises_in_queer_support: service.specialises_in_queer_support || false,
+				specialises_in_children: service.specialises_in_children || false,
 			});
 		}
 	}, [service]);
@@ -485,6 +491,9 @@ export function SupportServiceSidepanel({
 				address: "",
 				is_remote: !service?.coverage_area_radius,
 				is_in_person: !!service?.coverage_area_radius,
+				specialises_in_disability: service?.specialises_in_disability || false,
+				specialises_in_queer_support: service?.specialises_in_queer_support || false,
+				specialises_in_children: service?.specialises_in_children || false,
 			});
 		} else {
 			setIsEditing(true);
@@ -510,6 +519,9 @@ export function SupportServiceSidepanel({
 					coverage_area_radius: (editData.is_in_person && editData.coverage_area_radius) ? Number(editData.coverage_area_radius) : null,
 					latitude: (editData.is_in_person && editData.latitude) ? editData.latitude : null,
 					longitude: (editData.is_in_person && editData.longitude) ? editData.longitude : null,
+					specialises_in_disability: editData.specialises_in_disability,
+					specialises_in_queer_support: editData.specialises_in_queer_support,
+					specialises_in_children: editData.specialises_in_children,
 					accreditation_files_metadata: [], // Clear documents
 				})
 				.eq("id", service.id);
@@ -1094,6 +1106,37 @@ export function SupportServiceSidepanel({
 																			</SelectContent>
 																		</Select>
 																	</div>
+
+																	{/* Specializations (Edit Mode) */}
+																	<div className="pt-2 space-y-3">
+																		<span className="text-xs font-semibold text-serene-neutral-500 uppercase tracking-wide">Specializations</span>
+																		<div className="grid grid-cols-1 gap-2">
+																			<div className="flex items-center space-x-2 bg-serene-neutral-50/50 p-2.5 rounded-xl border border-serene-neutral-200/50">
+																				<Checkbox 
+																					id="edit-disability" 
+																					checked={editData.specialises_in_disability} 
+																					onCheckedChange={(checked) => setEditData({...editData, specialises_in_disability: !!checked})} 
+																				/>
+																				<Label htmlFor="edit-disability" className="text-sm font-medium cursor-pointer flex-1">Specializes in Disability Support</Label>
+																			</div>
+																			<div className="flex items-center space-x-2 bg-serene-neutral-50/50 p-2.5 rounded-xl border border-serene-neutral-200/50">
+																				<Checkbox 
+																					id="edit-queer" 
+																					checked={editData.specialises_in_queer_support} 
+																					onCheckedChange={(checked) => setEditData({...editData, specialises_in_queer_support: !!checked})} 
+																				/>
+																				<Label htmlFor="edit-queer" className="text-sm font-medium cursor-pointer flex-1">Specializes in Queer/LGBTQ+ Support</Label>
+																			</div>
+																			<div className="flex items-center space-x-2 bg-serene-neutral-50/50 p-2.5 rounded-xl border border-serene-neutral-200/50">
+																				<Checkbox 
+																					id="edit-children" 
+																					checked={editData.specialises_in_children} 
+																					onCheckedChange={(checked) => setEditData({...editData, specialises_in_children: !!checked})} 
+																				/>
+																				<Label htmlFor="edit-children" className="text-sm font-medium cursor-pointer flex-1">Specializes in Child Protection</Label>
+																			</div>
+																		</div>
+																	</div>
 																</div>
 															</CardContent>
 														</Card>
@@ -1207,6 +1250,30 @@ export function SupportServiceSidepanel({
 																	</p>
 																</div>
 															</div>
+
+															{/* Specializations (View Mode) */}
+															{(service.specialises_in_disability || service.specialises_in_queer_support || service.specialises_in_children) && (
+																<div className="pt-2 border-t border-serene-neutral-100/50">
+																	<span className="text-xs font-semibold text-serene-neutral-500 uppercase tracking-wide block mb-2">Specializations</span>
+																	<div className="flex flex-wrap gap-2">
+																		{service.specialises_in_disability && (
+																			<Badge className="bg-sauti-teal/10 text-sauti-teal border-sauti-teal/20 text-[10px] font-bold uppercase tracking-wider">
+																				Disability Support
+																			</Badge>
+																		)}
+																		{service.specialises_in_queer_support && (
+																			<Badge className="bg-purple-50 text-purple-600 border-purple-100 text-[10px] font-bold uppercase tracking-wider">
+																				Queer & LGBTQ+
+																			</Badge>
+																		)}
+																		{service.specialises_in_children && (
+																			<Badge className="bg-blue-50 text-blue-600 border-blue-100 text-[10px] font-bold uppercase tracking-wider">
+																				Child Protection
+																			</Badge>
+																		)}
+																	</div>
+																</div>
+															)}
 														</CardContent>
 													</Card>
 												</section>

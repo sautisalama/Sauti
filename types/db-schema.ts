@@ -146,6 +146,50 @@ export type Database = {
           },
         ]
       }
+      availability_blocks: {
+        Row: {
+          created_at: string | null
+          end_time: string
+          id: string
+          is_recurring: boolean | null
+          reason: string | null
+          recurrence_rule: string | null
+          start_time: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          end_time: string
+          id?: string
+          is_recurring?: boolean | null
+          reason?: string | null
+          recurrence_rule?: string | null
+          start_time: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          end_time?: string
+          id?: string
+          is_recurring?: boolean | null
+          reason?: string | null
+          recurrence_rule?: string | null
+          start_time?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "availability_blocks_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       blogs: {
         Row: {
           admin_notes: string | null
@@ -387,6 +431,7 @@ export type Database = {
           created_by: string | null
           id: string
           last_message_at: string | null
+          match_id: string | null
           metadata: Json | null
           type: Database["public"]["Enums"]["chat_type"]
         }
@@ -395,6 +440,7 @@ export type Database = {
           created_by?: string | null
           id?: string
           last_message_at?: string | null
+          match_id?: string | null
           metadata?: Json | null
           type?: Database["public"]["Enums"]["chat_type"]
         }
@@ -403,6 +449,7 @@ export type Database = {
           created_by?: string | null
           id?: string
           last_message_at?: string | null
+          match_id?: string | null
           metadata?: Json | null
           type?: Database["public"]["Enums"]["chat_type"]
         }
@@ -412,6 +459,13 @@ export type Database = {
             columns: ["created_by"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "chats_match_id_fkey"
+            columns: ["match_id"]
+            isOneToOne: false
+            referencedRelation: "matched_services"
             referencedColumns: ["id"]
           },
         ]
@@ -556,15 +610,22 @@ export type Database = {
       }
       matched_services: {
         Row: {
+          chat_id: string | null
+          decline_reason: string | null
           description: string | null
+          escalation_required: boolean | null
           feedback: string | null
+          hrd_profile_id: string | null
           id: string
           match_date: string | null
+          match_reason: string | null
           match_score: number | null
           match_status_type:
             | Database["public"]["Enums"]["match_status_type"]
             | null
           notes: string | null
+          professional_accepted_at: string | null
+          proposed_meeting_times: Json | null
           recommendations: Json | null
           report_id: string | null
           service_id: string | null
@@ -572,19 +633,27 @@ export type Database = {
           support_service:
             | Database["public"]["Enums"]["support_service_type"]
             | null
+          survivor_accepted_at: string | null
           survivor_id: string | null
           updated_at: string | null
         }
         Insert: {
+          chat_id?: string | null
+          decline_reason?: string | null
           description?: string | null
+          escalation_required?: boolean | null
           feedback?: string | null
+          hrd_profile_id?: string | null
           id?: string
           match_date?: string | null
+          match_reason?: string | null
           match_score?: number | null
           match_status_type?:
             | Database["public"]["Enums"]["match_status_type"]
             | null
           notes?: string | null
+          professional_accepted_at?: string | null
+          proposed_meeting_times?: Json | null
           recommendations?: Json | null
           report_id?: string | null
           service_id?: string | null
@@ -592,19 +661,27 @@ export type Database = {
           support_service?:
             | Database["public"]["Enums"]["support_service_type"]
             | null
+          survivor_accepted_at?: string | null
           survivor_id?: string | null
           updated_at?: string | null
         }
         Update: {
+          chat_id?: string | null
+          decline_reason?: string | null
           description?: string | null
+          escalation_required?: boolean | null
           feedback?: string | null
+          hrd_profile_id?: string | null
           id?: string
           match_date?: string | null
+          match_reason?: string | null
           match_score?: number | null
           match_status_type?:
             | Database["public"]["Enums"]["match_status_type"]
             | null
           notes?: string | null
+          professional_accepted_at?: string | null
+          proposed_meeting_times?: Json | null
           recommendations?: Json | null
           report_id?: string | null
           service_id?: string | null
@@ -612,10 +689,25 @@ export type Database = {
           support_service?:
             | Database["public"]["Enums"]["support_service_type"]
             | null
+          survivor_accepted_at?: string | null
           survivor_id?: string | null
           updated_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "matched_services_chat_id_fkey"
+            columns: ["chat_id"]
+            isOneToOne: false
+            referencedRelation: "chats"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "matched_services_hrd_profile_id_fkey"
+            columns: ["hrd_profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "matched_services_report_id_fkey"
             columns: ["report_id"]
@@ -652,8 +744,14 @@ export type Database = {
           chat_id: string | null
           content: string | null
           created_at: string | null
+          deleted_at: string | null
+          delivered_at: string | null
           id: string
+          is_deleted: boolean | null
           metadata: Json | null
+          reactions: Json | null
+          read_by: Json | null
+          reply_to_id: string | null
           sender_id: string | null
           type: Database["public"]["Enums"]["message_type"]
           updated_at: string | null
@@ -663,8 +761,14 @@ export type Database = {
           chat_id?: string | null
           content?: string | null
           created_at?: string | null
+          deleted_at?: string | null
+          delivered_at?: string | null
           id?: string
+          is_deleted?: boolean | null
           metadata?: Json | null
+          reactions?: Json | null
+          read_by?: Json | null
+          reply_to_id?: string | null
           sender_id?: string | null
           type?: Database["public"]["Enums"]["message_type"]
           updated_at?: string | null
@@ -674,8 +778,14 @@ export type Database = {
           chat_id?: string | null
           content?: string | null
           created_at?: string | null
+          deleted_at?: string | null
+          delivered_at?: string | null
           id?: string
+          is_deleted?: boolean | null
           metadata?: Json | null
+          reactions?: Json | null
+          read_by?: Json | null
+          reply_to_id?: string | null
           sender_id?: string | null
           type?: Database["public"]["Enums"]["message_type"]
           updated_at?: string | null
@@ -686,6 +796,13 @@ export type Database = {
             columns: ["chat_id"]
             isOneToOne: false
             referencedRelation: "chats"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "messages_reply_to_id_fkey"
+            columns: ["reply_to_id"]
+            isOneToOne: false
+            referencedRelation: "messages"
             referencedColumns: ["id"]
           },
           {
@@ -772,12 +889,14 @@ export type Database = {
           isVerified: boolean | null
           last_name: string | null
           last_verification_check: string | null
+          out_of_office: boolean | null
           phone: string | null
           policies: Json | null
           professional_title: string | null
           profile_image_metadata: Json | null
           profile_image_url: string | null
           reviewed_by: Json | null
+          services_active_before_ooo: Json | null
           settings: Json | null
           updated_at: string | null
           user_type: Database["public"]["Enums"]["user_type"] | null
@@ -817,12 +936,14 @@ export type Database = {
           isVerified?: boolean | null
           last_name?: string | null
           last_verification_check?: string | null
+          out_of_office?: boolean | null
           phone?: string | null
           policies?: Json | null
           professional_title?: string | null
           profile_image_metadata?: Json | null
           profile_image_url?: string | null
           reviewed_by?: Json | null
+          services_active_before_ooo?: Json | null
           settings?: Json | null
           updated_at?: string | null
           user_type?: Database["public"]["Enums"]["user_type"] | null
@@ -862,12 +983,14 @@ export type Database = {
           isVerified?: boolean | null
           last_name?: string | null
           last_verification_check?: string | null
+          out_of_office?: boolean | null
           phone?: string | null
           policies?: Json | null
           professional_title?: string | null
           profile_image_metadata?: Json | null
           profile_image_url?: string | null
           reviewed_by?: Json | null
+          services_active_before_ooo?: Json | null
           settings?: Json | null
           updated_at?: string | null
           user_type?: Database["public"]["Enums"]["user_type"] | null
@@ -913,6 +1036,7 @@ export type Database = {
           gender: Database["public"]["Enums"]["gender_type"] | null
           incident_description: string | null
           is_onBehalf: boolean | null
+          is_workplace_incident: boolean | null
           ismatched: boolean | null
           last_name: string | null
           latitude: number | null
@@ -960,6 +1084,7 @@ export type Database = {
           gender?: Database["public"]["Enums"]["gender_type"] | null
           incident_description?: string | null
           is_onBehalf?: boolean | null
+          is_workplace_incident?: boolean | null
           ismatched?: boolean | null
           last_name?: string | null
           latitude?: number | null
@@ -1007,6 +1132,7 @@ export type Database = {
           gender?: Database["public"]["Enums"]["gender_type"] | null
           incident_description?: string | null
           is_onBehalf?: boolean | null
+          is_workplace_incident?: boolean | null
           ismatched?: boolean | null
           last_name?: string | null
           latitude?: number | null
@@ -1101,6 +1227,7 @@ export type Database = {
       support_services: {
         Row: {
           accreditation_files_metadata: Json | null
+          auto_inactive_when_ooo: boolean | null
           availability: string | null
           ban_reason: string | null
           banned_at: string | null
@@ -1121,6 +1248,9 @@ export type Database = {
           priority: number | null
           reviewed_by: Json | null
           service_types: Database["public"]["Enums"]["support_service_type"]
+          specialises_in_children: boolean | null
+          specialises_in_disability: boolean | null
+          specialises_in_queer_support: boolean | null
           suspension_end_date: string | null
           suspension_reason: string | null
           user_id: string | null
@@ -1135,6 +1265,7 @@ export type Database = {
         }
         Insert: {
           accreditation_files_metadata?: Json | null
+          auto_inactive_when_ooo?: boolean | null
           availability?: string | null
           ban_reason?: string | null
           banned_at?: string | null
@@ -1155,6 +1286,9 @@ export type Database = {
           priority?: number | null
           reviewed_by?: Json | null
           service_types: Database["public"]["Enums"]["support_service_type"]
+          specialises_in_children?: boolean | null
+          specialises_in_disability?: boolean | null
+          specialises_in_queer_support?: boolean | null
           suspension_end_date?: string | null
           suspension_reason?: string | null
           user_id?: string | null
@@ -1169,6 +1303,7 @@ export type Database = {
         }
         Update: {
           accreditation_files_metadata?: Json | null
+          auto_inactive_when_ooo?: boolean | null
           availability?: string | null
           ban_reason?: string | null
           banned_at?: string | null
@@ -1189,6 +1324,9 @@ export type Database = {
           priority?: number | null
           reviewed_by?: Json | null
           service_types?: Database["public"]["Enums"]["support_service_type"]
+          specialises_in_children?: boolean | null
+          specialises_in_disability?: boolean | null
+          specialises_in_queer_support?: boolean | null
           suspension_end_date?: string | null
           suspension_reason?: string | null
           user_id?: string | null
@@ -1248,6 +1386,21 @@ export type Database = {
     Functions: {
       cleanup_expired_calendar_tokens: { Args: never; Returns: undefined }
       cleanup_orphaned_files: { Args: never; Returns: number }
+      get_active_case_count: {
+        Args: { provider_user_id: string }
+        Returns: number
+      }
+      get_available_slots: {
+        Args: {
+          p_date: string
+          p_slot_duration_minutes?: number
+          p_user_id: string
+        }
+        Returns: {
+          slot_end: string
+          slot_start: string
+        }[]
+      }
       get_coverage_map_data: {
         Args: never
         Returns: {
@@ -1274,6 +1427,10 @@ export type Database = {
       is_admin: { Args: { user_id?: string }; Returns: boolean }
       is_device_session_valid: {
         Args: { p_device_id: string; p_user_id: string }
+        Returns: boolean
+      }
+      is_time_slot_available: {
+        Args: { p_end_time: string; p_start_time: string; p_user_id: string }
         Returns: boolean
       }
       revoke_device_session: {
@@ -1312,6 +1469,12 @@ export type Database = {
         | "financial"
         | "child_abuse"
         | "other"
+        | "child_labor"
+        | "neglect"
+        | "trafficking"
+        | "stalking"
+        | "cyber"
+        | "racial"
       invitation_status_type: "pending" | "accepted" | "declined" | "expired"
       language_type: "english" | "swahili" | "other"
       match_status_type:
@@ -1320,6 +1483,9 @@ export type Database = {
         | "declined"
         | "completed"
         | "cancelled"
+        | "proposed"
+        | "pending_survivor"
+        | "reschedule_requested"
       message_type:
         | "text"
         | "image"
@@ -1342,6 +1508,10 @@ export type Database = {
         | "shelter"
         | "financial_assistance"
         | "other"
+        | "police_reporting"
+        | "child_protection"
+        | "disability_support"
+        | "substance_abuse"
       target_type: "user" | "service"
       urgency_type: "high" | "medium" | "low"
       user_type: "ngo" | "professional" | "survivor"
@@ -1510,6 +1680,12 @@ export const Constants = {
         "financial",
         "child_abuse",
         "other",
+        "child_labor",
+        "neglect",
+        "trafficking",
+        "stalking",
+        "cyber",
+        "racial",
       ],
       invitation_status_type: ["pending", "accepted", "declined", "expired"],
       language_type: ["english", "swahili", "other"],
@@ -1519,6 +1695,9 @@ export const Constants = {
         "declined",
         "completed",
         "cancelled",
+        "proposed",
+        "pending_survivor",
+        "reschedule_requested",
       ],
       message_type: [
         "text",
@@ -1544,6 +1723,10 @@ export const Constants = {
         "shelter",
         "financial_assistance",
         "other",
+        "police_reporting",
+        "child_protection",
+        "disability_support",
+        "substance_abuse",
       ],
       target_type: ["user", "service"],
       urgency_type: ["high", "medium", "low"],

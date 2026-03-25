@@ -18,7 +18,8 @@ import {
     User,
     ArrowRight,
 	ChevronRight,
-	SlidersHorizontal
+	SlidersHorizontal,
+	Plus
 } from "lucide-react";
 import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
@@ -75,7 +76,8 @@ export default function SurvivorView({
 		if (seeded && Array.isArray(seeded) && seeded.length) return seeded as any;
 		return [];
 	});
-	const [searchQuery, setSearchQuery] = useState("");
+	const searchParams = useSearchParams();
+	const searchQuery = searchParams.get("q") || "";
 	const { toast } = useToast();
 
 	// Computed stats
@@ -126,19 +128,6 @@ export default function SurvivorView({
 
 	return (
 		<div className="min-h-screen bg-serene-neutral-50 pb-24">
-			{/* Floating Search Bar (Mobile/Desktop) */}
-			<div className="sticky top-0 z-40 bg-serene-neutral-50/90 backdrop-blur-md px-4 py-3 lg:px-8 border-b border-serene-neutral-200/50">
-				<div className="max-w-xl mx-auto relative">
-					<Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-serene-neutral-400" />
-					<Input 
-						placeholder="Search your cases, resources..." 
-						className="pl-10 pr-10 bg-white border-serene-neutral-200 rounded-full h-11 shadow-sm focus-visible:ring-serene-blue-200"
-						value={searchQuery}
-						onChange={(e) => setSearchQuery(e.target.value)}
-					/>
-				</div>
-			</div>
-
 			<div className="max-w-4xl mx-auto px-4 lg:px-6 pt-4 lg:pt-8 space-y-8 min-h-[calc(100vh-80px)] relative">
 				
                 {/* Search Overlay Mode */}
@@ -148,12 +137,6 @@ export default function SurvivorView({
                             <h3 className="text-lg font-bold text-serene-neutral-900">
                                 Search Results
                             </h3>
-                            <button 
-                                onClick={() => setSearchQuery("")}
-                                className="text-sm font-medium text-serene-neutral-500 hover:text-serene-red-500 transition-colors"
-                            >
-                                Clear Search
-                            </button>
                         </div>
                         
                         <div className="space-y-3">
@@ -232,6 +215,8 @@ export default function SurvivorView({
                                     className="bg-sauti-red-light border-sauti-red/10 shadow-sm hover:shadow-md transition-all"
                                     badge={activeCasesCount || undefined}
                                     badgeClassName="bg-sauti-red text-white"
+                                    actionIcon={<Plus className="h-4 w-4" />}
+                                    onActionClick={() => dash?.setIsReportDialogOpen(true)}
                                 />
                                 <SereneQuickActionCard
                                     title="Matches"

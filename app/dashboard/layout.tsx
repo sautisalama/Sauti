@@ -4,7 +4,6 @@ import { EnhancedSidebar } from "@/components/navigation/EnhancedSidebar";
 import { EnhancedBottomNav } from "@/components/navigation/EnhancedBottomNav";
 import { DashboardContent } from "@/components/dashboard/DashboardContent";
 import { MobileTopBar } from "@/components/navigation/MobileTopBar";
-import { MobileReportFAB } from "@/components/reports/MobileReportFAB";
 
 import { DashboardDataProvider } from "@/components/providers/DashboardDataProvider";
 import { fetchDashboardData } from "./_data/aggregate";
@@ -60,9 +59,6 @@ export default async function DashboardLayout({
 
 				{/* Mobile Bottom Navigation */}
 				<EnhancedBottomNav />
-                
-                {/* Mobile Report FAB */}
-                <MobileReportFAB />
 			</DashboardDataProvider>
 		</div>
 	);

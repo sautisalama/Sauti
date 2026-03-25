@@ -3,6 +3,8 @@ import { createClient } from "@/utils/supabase/server";
 import { createClient as createAdminClient } from "@supabase/supabase-js";
 import { TablesInsert } from "@/types/db-schema";
 import { matchReportWithServices } from "@/app/actions/match-services";
+import { cookies, headers } from "next/headers";
+import { registerDevice, parseSettings, TrackedDevice } from "@/lib/user-settings";
 
 // Word lists for generating human-readable usernames
 const ADJECTIVES = [
@@ -137,6 +139,22 @@ export async function POST(request: Request) {
 					anonUsername = username;
 					anonEmail = email;
 
+					// Register device for the new user to prevent middleware redirection
+					const cookieStore = await cookies();
+					const deviceId = cookieStore.get("ss_device_id")?.value;
+					const userAgent = (await headers()).get("user-agent") || "";
+					
+					let updatedDevices: TrackedDevice[] = [];
+					if (deviceId) {
+						// Pass screen dimensions if provided in formData
+						const screenHint = formData.screen ? { 
+							width: formData.screen.width, 
+							height: formData.screen.height 
+						} : undefined;
+						
+						updatedDevices = registerDevice([], deviceId, userAgent, screenHint);
+					}
+
 					// Create profile
 					await supabaseAdmin.from("profiles").insert({
 						id: userId,
@@ -149,6 +167,7 @@ export async function POST(request: Request) {
 						verification_status: "pending",
 						created_at: new Date().toISOString(),
 						updated_at: new Date().toISOString(),
+						devices: updatedDevices,
 					});
 				}
 			} catch (accountError) {
@@ -178,6 +197,14 @@ export async function POST(request: Request) {
 			is_onBehalf: !!formData.is_onBehalf,
 			// Ensure additional_info is a JSON string as per schema
 			additional_info: formData.additional_info ? JSON.stringify(formData.additional_info) : null,
+			gender: formData.gender || null,
+			preferred_language: formData.preferred_language || null,
+			dob: formData.dob || null,
+			city: formData.city || null,
+			state: formData.state || null,
+			country: formData.country || null,
+			record_only: !!formData.record_only,
+			is_workplace_incident: !!formData.is_workplace_incident,
 		};
 
 		console.log("Inserting report...");

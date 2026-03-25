@@ -32,14 +32,18 @@ export function MobileReportFAB() {
 
   const dash = useDashboardData();
   const profile = dash?.data?.profile;
-  const hasAcceptedPolicies = !!(profile?.settings as any)?.all_policies_accepted;
+  const hasAcceptedPolicies = !!(profile?.policies as any)?.all_policies_accepted;
   const needsOnboarding = !profile?.user_type || 
     !hasAcceptedPolicies ||
     ((profile.user_type === 'professional' || profile.user_type === 'ngo') && !profile.professional_title);
 
-  // Visibility Logic: Only show on Home or Reports (list)
-  // ... and only if onboarding is complete
-  const isVisible = (pathname === "/dashboard" || pathname === "/dashboard/reports") && !needsOnboarding;
+  const isAdmin = dash?.isAdminMode || pathname.startsWith("/dashboard/admin");
+  const isDashboardPage = pathname === "/dashboard";
+  const isReportPage = pathname === "/dashboard/reports" || pathname.startsWith("/dashboard/reports/");
+
+  // Visibility Logic: Only show on Home or Reports (list/detail)
+  // ... and only if onboarding is complete and NOT an admin
+  const isVisible = (isDashboardPage || isReportPage) && !needsOnboarding && !isAdmin;
 
   if (!isVisible) return null;
 

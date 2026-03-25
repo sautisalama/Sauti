@@ -21,14 +21,14 @@
 
 /* Accessibility attribute-driven overrides */
 
-html[data-a11y-readable-font="1"] body {
-	letter-spacing: 0.01em;
-	word-spacing: 0.02em;
-	line-height: 1.7;
+html[data-a11y-readable-font="1"] * {
+	letter-spacing: 0.01em !important;
+	word-spacing: 0.02em !important;
+	line-height: 1.7 !important;
 }
 
 /* Dyslexic-friendly font and spacing */
-html[data-a11y-dyslexic="1"] body {
+html[data-a11y-dyslexic="1"] * {
 	font-family:
 		var(--font-dyslexic),
 		system-ui,
@@ -40,31 +40,31 @@ html[data-a11y-dyslexic="1"] body {
 		Helvetica Neue,
 		Arial,
 		"Noto Sans",
-		sans-serif;
-	letter-spacing: 0.02em;
-	word-spacing: 0.04em;
-	line-height: 1.8;
+		sans-serif !important;
+	letter-spacing: 0.02em !important;
+	word-spacing: 0.04em !important;
+	line-height: 1.8 !important;
 }
 
 /* Text scale mapping */
 html[data-a11y-text-scale="100"] {
-	font-size: 100%;
+	font-size: 100% !important;
 }
 html[data-a11y-text-scale="112.5"] {
-	font-size: 112.5%;
+	font-size: 112.5% !important;
 }
 html[data-a11y-text-scale="125"] {
-	font-size: 125%;
+	font-size: 125% !important;
 }
 html[data-a11y-text-scale="137.5"] {
-	font-size: 137.5%;
+	font-size: 137.5% !important;
 }
 html[data-a11y-text-scale="150"] {
-	font-size: 150%;
+	font-size: 150% !important;
 }
 
 html[data-a11y-underline-links="1"] a {
-	text-decoration: underline;
+	text-decoration: underline !important;
 }
 
 html[data-a11y-reduce-motion="1"] * {

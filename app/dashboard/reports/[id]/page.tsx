@@ -13,17 +13,30 @@ import {
 	BookOpen, HandHeart, ArrowRight,
 	Mic, FileText, PenLine, Home
 } from "lucide-react";
-import { useState, useEffect, useCallback, use } from "react";
+import { useState, useEffect, useCallback, use, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
-import { getMockMatches, MockProvider } from "@/lib/mock-matches";
+// Redefine ProvideMatch to replace MockProvider
+interface ProviderMatch {
+    id: string;
+    name: string;
+    type: string;
+    phone: string;
+    address: string;
+    description: string;
+    availability: string;
+    focus_groups: string[];
+    professionalId?: string;
+}
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { AudioPlayer } from "../../_components/AudioPlayer";
 import { RichTextEditor } from "@/components/RichTextEditor";
 import { VoiceRecorderInline } from "@/components/VoiceRecorderInline";
+import { CaseChatPanel } from "@/components/chat/CaseChatPanel";
+import { useDashboardData } from "@/components/providers/DashboardDataProvider";
 
 // Type for media stored in reports
 interface MediaFile {
@@ -37,11 +50,12 @@ interface MediaFile {
 export default function ReportDetailPage({ params }: { params: Promise<{ id: string }> }) {
 	const resolvedParams = use(params);
 	const reportId = resolvedParams.id;
+	const dash = useDashboardData();
 	
 	const [report, setReport] = useState<Tables<"reports"> | null>(null);
-	const [allMatches, setAllMatches] = useState<MockProvider[]>([]);
+	const [allMatches, setAllMatches] = useState<ProviderMatch[]>([]);
 	const [matchIndex, setMatchIndex] = useState(0);
-	const [acceptedMatch, setAcceptedMatch] = useState<MockProvider | null>(null);
+	const [acceptedMatch, setAcceptedMatch] = useState<ProviderMatch | null>(null);
 	
 	const [loading, setLoading] = useState(true);
 	const [errorState, setErrorState] = useState<string | null>(null);
@@ -49,6 +63,27 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
 	const [newDetail, setNewDetail] = useState("");
 	const [showAddDetails, setShowAddDetails] = useState(false);
 	const [showVoiceRecorder, setShowVoiceRecorder] = useState(false);
+	const [escalating, setEscalating] = useState(false);
+	const [showChat, setShowChat] = useState(false);
+	const [isChatExpanded, setIsChatExpanded] = useState(false);
+	const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+
+	const needsOnboarding = useMemo(() => {
+		const profile = dash?.data?.profile;
+		if (!profile) return false;
+		const hasAcceptedPolicies = !!(profile.policies as any)?.all_policies_accepted;
+		return !profile.user_type || 
+			!hasAcceptedPolicies ||
+			((profile.user_type === 'professional' || profile.user_type === 'ngo') && !profile.professional_title);
+	}, [dash?.data?.profile]);
+
+	useEffect(() => {
+		const getUser = async () => {
+			const { data: { user } } = await supabase.auth.getUser();
+			if (user) setCurrentUserId(user.id);
+		};
+		getUser();
+	}, []);
 	
 	const { toast } = useToast();
 	const router = useRouter();
@@ -75,7 +110,37 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
 		try {
 			const { data, error } = await supabase
 				.from("reports")
-				.select("*")
+				.select(`
+					*,
+					matched_services (
+						id,
+						match_status_type,
+						match_reason,
+						description,
+						notes,
+						support_service,
+						service_details:support_services (
+							id,
+							user_id,
+							name,
+							phone_number,
+							email,
+							availability,
+							specialises_in_children,
+							specialises_in_disability,
+							specialises_in_queer_support
+						),
+						hrd_details:profiles!matched_services_hrd_profile_id_fkey (
+							id,
+							first_name,
+							last_name,
+							phone,
+							email,
+							professional_title,
+							bio
+						)
+					)
+				`)
 				.eq("report_id", reportId)
 				.maybeSingle();
 
@@ -85,8 +150,43 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
 			}
 
 			if (data) {
-				setReport(data);
-				const matches = getMockMatches(data.type_of_incident);
+				setReport(data as any);
+				
+				// Map real matches to our UI structure
+				const matches: ProviderMatch[] = (data.matched_services as any[] || []).map(m => {
+					const isService = !!m.service_details;
+					const name = isService 
+						? m.service_details.name 
+						: `${m.hrd_details?.first_name || ''} ${m.hrd_details?.last_name || ''}`.trim() || 'Specialist';
+					
+					const type = isService ? m.support_service : m.hrd_details?.professional_title || 'Expert';
+					const phone = isService ? m.service_details.phone_number : m.hrd_details?.phone;
+					const availability = isService ? m.service_details.availability : 'Flexible';
+					
+					const focus_groups = [];
+					if (isService && m.service_details) {
+						if (m.service_details.specialises_in_children) focus_groups.push("Children");
+						if (m.service_details.specialises_in_disability) focus_groups.push("Disability");
+						if (m.service_details.specialises_in_queer_support) focus_groups.push("Queer");
+					} else if (m.hrd_details?.professional_title === 'Human rights defender') {
+						focus_groups.push("Human Rights");
+					}
+					
+					const professionalId = isService ? m.service_details?.user_id : m.hrd_details?.id;
+
+					return {
+						id: m.id,
+						name,
+						type: (type as string)?.replace(/_/g, " ") || "Support Specialist",
+						phone: phone || "Private",
+						address: m.notes || "Contact for details",
+						description: m.description || "Verified support provider ready to assist with your case.",
+						availability: availability || "Flexible",
+						focus_groups,
+						professionalId
+					};
+				});
+
 				setAllMatches(matches);
 			} else {
 				setErrorState("Journey details not found. Please verify the link.");
@@ -177,12 +277,37 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
 		}
 	};
 
-	const acceptMatch = (provider: MockProvider) => {
+	const acceptMatch = (provider: ProviderMatch) => {
 		setAcceptedMatch(provider);
 		toast({
 			title: "Support Connection Active",
 			description: `You can now securely coordinate with ${provider.name}.`,
 		});
+	};
+
+	const handleEscalate = async () => {
+		if (!report) return;
+		setEscalating(true);
+		try {
+			const response = await fetch(`/api/reports/${reportId}/escalate`, {
+				method: "POST",
+			});
+			if (!response.ok) throw new Error("Escalation failed");
+			
+			toast({
+				title: "Help is on the way",
+				description: "Your report has been escalated for matching support.",
+			});
+			fetchReport();
+		} catch (err: any) {
+			toast({
+				title: "Error",
+				description: err.message,
+				variant: "destructive",
+			});
+		} finally {
+			setEscalating(false);
+		}
 	};
 
 	const exitSafely = () => {
@@ -264,15 +389,29 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
 						</div>
 					</div>
 					
-					{/* Quick Exit */}
-					<Button 
-						onClick={exitSafely} 
-						variant="outline"
-						className="bg-rose-50 hover:bg-rose-100 text-rose-600 border-rose-200 rounded-full text-xs font-bold px-3 h-8 gap-1.5 shadow-sm shrink-0"
-					>
-						<LogOut className="h-3.5 w-3.5" />
-						<span className="hidden sm:inline">Quick Exit</span>
-					</Button>
+					{/* Actions */}
+					<div className="flex items-center gap-2">
+						{!needsOnboarding && (
+							<Button 
+								onClick={() => dash?.setIsReportDialogOpen(true)}
+								variant="ghost"
+								className="text-sauti-teal hover:bg-sauti-teal/10 rounded-full text-xs font-bold px-3 h-8 gap-1.5 shadow-none hidden md:flex"
+							>
+								<Plus className="h-3.5 w-3.5" />
+								Report Abuse
+							</Button>
+						)}
+
+						{/* Quick Exit */}
+						<Button 
+							onClick={exitSafely} 
+							variant="outline"
+							className="bg-rose-50 hover:bg-rose-100 text-rose-600 border-rose-200 rounded-full text-xs font-bold px-3 h-8 gap-1.5 shadow-sm shrink-0"
+						>
+							<LogOut className="h-3.5 w-3.5" />
+							<span className="hidden sm:inline">Quick Exit</span>
+						</Button>
+					</div>
 				</div>
 			</header>
 
@@ -346,7 +485,29 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
 						<h2 className="text-lg font-bold text-sauti-dark">Your Support Team</h2>
 					</div>
 
-					{acceptedMatch ? (
+					{report.record_only ? (
+						<Card className="border-2 border-amber-200 bg-amber-50 rounded-3xl overflow-hidden shadow-sm">
+							<CardContent className="p-6 md:p-8 flex flex-col items-center text-center space-y-4">
+								<div className="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center">
+									<ShieldCheck className="h-8 w-8 text-amber-600" />
+								</div>
+								<div className="space-y-2">
+									<h3 className="text-xl font-bold text-amber-900">Record-Only Space</h3>
+									<p className="text-sm text-amber-800 leading-relaxed max-w-sm">
+										This report is currently stored safely but not shared with providers. 
+										If you need support now, you can escalate it to start the matching process.
+									</p>
+								</div>
+								<Button 
+									onClick={handleEscalate}
+									disabled={escalating}
+									className="w-full sm:w-auto h-12 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-2xl px-8 shadow-md"
+								>
+									{escalating ? "Requesting Help..." : "Request Help & Match Now"}
+								</Button>
+							</CardContent>
+						</Card>
+					) : acceptedMatch ? (
 						/* Accepted Match Card */
 						<Card className="border-2 border-sauti-teal bg-sauti-teal/5 rounded-3xl overflow-hidden">
 							<CardContent className="p-6 md:p-8 space-y-6">
@@ -377,7 +538,7 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
 										<Phone className="h-4 w-4 mr-2" />
 										Call Now
 									</Button>
-									<Button className="flex-1 h-12 bg-white hover:bg-serene-neutral-50 text-sauti-dark font-bold rounded-2xl border-2 border-serene-neutral-200">
+									<Button onClick={() => setShowChat(true)} className="flex-1 h-12 bg-white hover:bg-serene-neutral-50 text-sauti-dark font-bold rounded-2xl border-2 border-serene-neutral-200">
 										<MessageCircle className="h-4 w-4 mr-2" />
 										Chat
 									</Button>
@@ -601,6 +762,28 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
 					</CardContent>
 				</Card>
 			</main>
+
+			{/* Floating Chat Panel for Survivor */}
+			{showChat && acceptedMatch && currentUserId && (
+				<div 
+					className={cn(
+						"fixed bottom-4 right-4 z-[100] transition-all duration-300 ease-in-out shadow-2xl",
+						isChatExpanded ? "w-[90vw] sm:w-[500px] h-[600px] sm:h-[700px] max-h-[90vh]" : "w-[350px] sm:w-[400px] h-[450px]"
+					)}
+				>
+					<CaseChatPanel
+						matchId={acceptedMatch.id}
+						survivorId={currentUserId}
+						professionalId={acceptedMatch.professionalId || ''}
+						professionalName={acceptedMatch.name}
+						survivorName={(report as any)?.first_name || "Myself"}
+						onClose={() => setShowChat(false)}
+						isExpanded={isChatExpanded}
+						onToggleExpand={() => setIsChatExpanded(!isChatExpanded)}
+						className="h-full w-full rounded-2xl border border-serene-neutral-200 shadow-2xl"
+					/>
+				</div>
+			)}
 		</div>
 	);
 }
