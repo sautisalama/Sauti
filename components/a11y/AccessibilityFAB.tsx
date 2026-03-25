@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useAccessibility } from "@/components/a11y/AccessibilityProvider";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { Eye, Type, Contrast, RefreshCw, X, MousePointer2, Type as FontIcon, Underline } from "lucide-react";
+import { Eye, Type, Contrast, RefreshCw, X, MousePointer2, Type as FontIcon, Underline, ExternalLink } from "lucide-react";
 
 function ToggleRow({ label, property, icon: Icon }: { label: string; property: any; icon: any }) {
 	const a11y = useAccessibility();
@@ -62,9 +62,9 @@ export default function AccessibilityFAB() {
 	};
 
 	return (
-		<div className="fixed bottom-6 left-6 z-[100] hidden md:block">
+		<div className="fixed bottom-6 left-6 z-[100]">
 			{open && (
-				<div className="mb-4 w-80 rounded-[32px] border-2 border-gray-100 bg-white/95 backdrop-blur-xl shadow-2xl p-6 space-y-4 animate-in slide-in-from-bottom-4 duration-300">
+				<div className="mb-4 w-[calc(100vw-3rem)] sm:w-80 rounded-[32px] border-2 border-gray-100 bg-white/95 backdrop-blur-xl shadow-2xl p-6 space-y-4 animate-in slide-in-from-bottom-4 duration-300">
 					<div className="flex items-center justify-between mb-2">
                         <div className="flex items-center gap-2 text-sauti-dark font-black uppercase tracking-widest text-xs">
 						    <Contrast className="h-4 w-4 text-sauti-teal" /> Accessibility Tools
@@ -114,6 +114,12 @@ export default function AccessibilityFAB() {
                     >
                         <RefreshCw className="h-3 w-3 mr-2" /> Reset all settings
                     </Button>
+
+                    <div className="pt-2 border-t-2 border-gray-100">
+                        <a href="https://www.w3.org/WAI/standards-guidelines/wcag/" target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-1.5 py-1 text-[10px] font-bold uppercase tracking-widest text-gray-400 hover:text-sauti-teal transition-all">
+                            <ExternalLink className="h-3 w-3" /> WCAG 2 Guidelines
+                        </a>
+                    </div>
 				</div>
 			)}
 
