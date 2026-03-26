@@ -26,7 +26,7 @@ export default function ClimateJusticePage() {
                                     Addressing the disproportionate impact of climate change on gender-based violence and building resilient communities.
                                 </p>
                             </div>
-                            <div className="relative aspect-[4/3] rounded-[32px] md:rounded-[60px] overflow-hidden shadow-3xl">
+                            <div className="relative aspect-[4/3] rounded-2xl md:rounded-[60px] overflow-hidden shadow-3xl">
                                 <Image src="/events/impact/at cop30.png" alt="Climate Justice" fill className="object-cover" />
                             </div>
                         </div>
@@ -50,8 +50,8 @@ export default function ClimateJusticePage() {
 
 function FeatureCard({ icon, title, description }: { icon: React.ReactNode, title: string, description: string }) {
     return (
-        <div className="p-6 md:p-8 rounded-[32px] md:rounded-[40px] bg-white border-2 border-gray-50 hover:border-sauti-yellow/20 hover:shadow-2xl transition-all group">
-            <div className="w-12 h-12 md:w-16 md:h-16 rounded-[16px] md:rounded-2xl bg-gray-50 flex items-center justify-center mb-6">{icon}</div>
+        <div className="p-6 md:p-8 rounded-2xl md:rounded-2xl bg-white border-2 border-gray-50 hover:border-sauti-yellow/20 hover:shadow-2xl transition-all group">
+            <div className="w-12 h-12 md:w-16 md:h-16 rounded-lg md:rounded-2xl bg-gray-50 flex items-center justify-center mb-6">{icon}</div>
             <h3 className="text-xl md:text-2xl font-black text-sauti-dark mb-4 uppercase tracking-tight">{title}</h3>
             <p className="text-sm md:text-base text-gray-500 font-medium leading-relaxed">{description}</p>
         </div>

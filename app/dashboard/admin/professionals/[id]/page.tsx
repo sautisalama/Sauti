@@ -291,10 +291,10 @@ export default function ProfessionalDetailPage() {
                 <div className="h-16 w-3/4 bg-gray-100 rounded-xl animate-pulse" />
                 <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
                     <div className="lg:col-span-1 space-y-6">
-                        <div className="h-48 bg-gray-100 rounded-3xl animate-pulse" />
+                        <div className="h-48 bg-gray-100 rounded-2xl animate-pulse" />
                     </div>
                     <div className="lg:col-span-3 space-y-6">
-                        <div className="h-96 bg-gray-100 rounded-3xl animate-pulse" />
+                        <div className="h-96 bg-gray-100 rounded-2xl animate-pulse" />
                     </div>
                 </div>
             </div>
@@ -333,7 +333,7 @@ export default function ProfessionalDetailPage() {
             <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
                 {/* Left Column: Quick Stats */}
                 <div className="lg:col-span-1 space-y-6">
-                     <Card className="rounded-[2rem] border-transparent shadow-card bg-white overflow-hidden">
+                     <Card className="rounded-2xl border-transparent shadow-card bg-white overflow-hidden">
                         <CardHeader className="bg-serene-neutral-50/50 pb-4 border-b border-serene-neutral-50">
                             <CardTitle className="text-xs font-bold uppercase tracking-wider text-serene-neutral-400">Quick Stats</CardTitle>
                         </CardHeader>
@@ -372,7 +372,7 @@ export default function ProfessionalDetailPage() {
 
                      {/* Identity Documents Card */}
                      {identityDocs.length > 0 && (
-                        <Card className="rounded-[2rem] border-transparent shadow-card bg-white overflow-hidden">
+                        <Card className="rounded-2xl border-transparent shadow-card bg-white overflow-hidden">
                             <CardHeader className="bg-serene-neutral-50/50 pb-4 border-b border-serene-neutral-50">
                                 <CardTitle className="text-xs font-bold uppercase tracking-wider text-serene-neutral-400 flex items-center gap-2">
                                     <Shield className="h-3.5 w-3.5" />
@@ -415,7 +415,7 @@ export default function ProfessionalDetailPage() {
                         </TabsList>
 
                         <TabsContent value="profile" className="space-y-6 animate-in slide-in-from-bottom-4 duration-500">
-                             <Card className="border-transparent shadow-card rounded-[2rem] overflow-hidden bg-white">
+                             <Card className="border-transparent shadow-card rounded-2xl overflow-hidden bg-white">
                                 <CardContent className="space-y-8 p-8">
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
                                         <InfoBlock label="Email" value={profile.email} variant="inline" />
@@ -442,7 +442,7 @@ export default function ProfessionalDetailPage() {
 
                         <TabsContent value="services" className="space-y-6 animate-in slide-in-from-bottom-4 duration-500">
                             {services.length === 0 ? (
-                                <div className="p-10 text-center bg-white rounded-[1.5rem] border border-dashed border-serene-neutral-200">
+                                <div className="p-10 text-center bg-white rounded-xl border border-dashed border-serene-neutral-200">
                                     <div className="h-12 w-12 rounded-full bg-serene-neutral-50 flex items-center justify-center mx-auto mb-3">
                                         <Building2 className="h-6 w-6 text-serene-neutral-400" />
                                     </div>
@@ -544,7 +544,7 @@ export default function ProfessionalDetailPage() {
                         </TabsContent>
 
                         <TabsContent value="history" className="animate-in slide-in-from-bottom-4 duration-500">
-                             <Card className="border-transparent shadow-card rounded-[2rem] overflow-hidden bg-white">
+                             <Card className="border-transparent shadow-card rounded-2xl overflow-hidden bg-white">
                                 <CardContent className="pt-8 pb-8 px-8 space-y-6">
                                     {history.length === 0 ? (
                                         <div className="text-center py-12">
@@ -599,7 +599,7 @@ export default function ProfessionalDetailPage() {
 
             {/* Action Dialog */}
             <Dialog open={actionDialog.isOpen} onOpenChange={(open) => !open && setActionDialog(prev => ({ ...prev, isOpen: false }))}>
-                <DialogContent className="rounded-3xl max-w-md overflow-hidden p-0 border-0 bg-white shadow-2xl">
+                <DialogContent className="rounded-2xl max-w-md overflow-hidden p-0 border-0 bg-white shadow-2xl">
                     <div className="p-8 pb-0">
                         <div className={cn(
                             "w-16 h-16 rounded-full flex items-center justify-center mb-6 mx-auto transition-colors",

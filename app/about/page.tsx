@@ -57,7 +57,7 @@ export default function AboutPage() {
                                                 Get Support
                                             </Button>
                                         </DialogTrigger>
-                                        <DialogContent className="max-w-4xl p-0 overflow-hidden rounded-[24px]">
+                                        <DialogContent className="max-w-4xl p-0 overflow-hidden rounded-xl">
                                             <ReportAbuseForm />
                                         </DialogContent>
                                     </Dialog>
@@ -73,7 +73,7 @@ export default function AboutPage() {
                                      <Image src="/matscapades.png" alt="Sauti Salama Water Lorry" fill className="object-contain" />
                                 </div>
                                 {/* Why We Exist Float */}
-                                <div className="absolute -bottom-10 -left-10 bg-white p-8 rounded-[32px] shadow-xl max-w-md hidden md:block">
+                                <div className="absolute -bottom-10 -left-10 bg-white p-8 rounded-2xl shadow-xl max-w-md hidden md:block">
                                     <h3 className="text-xl font-bold text-sauti-dark mb-3">Why we exist</h3>
                                     <p className="text-gray-600 leading-relaxed">
                                         Gender-based violence is shaped by silence, distance from services, fear, and stigma. We exist to reduce these barriers and ensure support is reachable.
@@ -104,7 +104,7 @@ export default function AboutPage() {
                         </div>
 
                         <div className="grid lg:grid-cols-2 gap-16 items-start">
-                            <div className="bg-white p-10 md:p-14 rounded-[40px] shadow-lg">
+                            <div className="bg-white p-10 md:p-14 rounded-2xl shadow-lg">
                                 <h3 className="text-2xl md:text-4xl font-bold text-sauti-dark mb-10">Our Values</h3>
                                 <ul className="space-y-8">
                                     <ValueItem 
@@ -127,7 +127,7 @@ export default function AboutPage() {
                             </div>
                             <div>
                                 <h3 className="text-2xl md:text-4xl font-bold text-sauti-dark mb-8">Our Approach</h3>
-                                <div className="bg-sauti-teal/10 p-10 rounded-[40px] mb-8">
+                                <div className="bg-sauti-teal/10 p-10 rounded-2xl mb-8">
                                     <p className="text-lg md:text-xl text-sauti-dark leading-relaxed font-medium">
                                         We work across community organising, digital access, and institutional engagement to strengthen survivor-centred response systems.
                                     </p>
@@ -190,7 +190,7 @@ export default function AboutPage() {
                                 <p className="text-lg md:text-xl text-white/80 leading-relaxed mb-8 font-light">
                                     The Sauti Salama platform is designed to reduce barriers to support. It serves as our primary digital infrastructure, providing anonymous reporting, resource mapping, and secure communication channels.
                                 </p>
-                                <div className="bg-white/5 border border-white/10 rounded-[32px] p-8 mb-10 backdrop-blur-sm">
+                                <div className="bg-white/5 border border-white/10 rounded-2xl p-8 mb-10 backdrop-blur-sm">
                                     <ul className="space-y-4">
                                         {[
                                             "Access to rights and justice information", 
@@ -230,7 +230,7 @@ export default function AboutPage() {
                                 </div>
 
                                 {/* Mobile Mockup */}
-                                <div className="absolute bottom-0 right-4 lg:right-0 w-[180px] md:w-[240px] aspect-[9/19] bg-gray-900 rounded-[3rem] border-8 border-gray-900 shadow-2xl overflow-hidden z-20 transform translate-y-10 hover:translate-y-6 transition-transform duration-500">
+                                <div className="absolute bottom-0 right-4 lg:right-0 w-[180px] md:w-[240px] aspect-[9/19] bg-gray-900 rounded-2xl border-8 border-gray-900 shadow-2xl overflow-hidden z-20 transform translate-y-10 hover:translate-y-6 transition-transform duration-500">
                                      <div className="relative w-full h-full bg-white">
                                          <Image src="/platform/sauti salama - survivor dashboard - mobile.png" alt="Mobile App" fill className="object-cover" />
                                      </div>
@@ -264,10 +264,10 @@ export default function AboutPage() {
                                 </Link>
                             </div>
                             <div className="relative">
-                                <div className="relative z-10 rounded-[40px] overflow-hidden shadow-2xl aspect-square rotate-3 hover:rotate-0 transition-all duration-500">
+                                <div className="relative z-10 rounded-2xl overflow-hidden shadow-2xl aspect-square rotate-3 hover:rotate-0 transition-all duration-500">
                                      <Image src="/Kiwu Water lorry.png" alt="Kiwu Initiative" fill className="object-cover" />
                                 </div>
-                                <div className="absolute top-10 -right-10 w-full h-full bg-white/30 rounded-[40px] -rotate-6 z-0" />
+                                <div className="absolute top-10 -right-10 w-full h-full bg-white/30 rounded-2xl -rotate-6 z-0" />
                             </div>
                         </div>
                     </div>
@@ -317,7 +317,7 @@ export default function AboutPage() {
 
                         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8 mb-20">
                             {/* Card 1: Education */}
-                            <div className="bg-white rounded-[32px] overflow-hidden shadow-lg flex flex-col group">
+                            <div className="bg-white rounded-2xl overflow-hidden shadow-lg flex flex-col group">
                                 <div className="relative h-64 overflow-hidden">
                                      <Image src="/events/impact/Learning Program - 748 registered learners.png" alt="Learning Program" fill className="object-cover group-hover:scale-105 transition-transform duration-500" />
                                 </div>
@@ -331,7 +331,7 @@ export default function AboutPage() {
                             </div>
 
                             {/* Card 2: Advocacy */}
-                            <div className="bg-white rounded-[32px] overflow-hidden shadow-lg flex flex-col group">
+                            <div className="bg-white rounded-2xl overflow-hidden shadow-lg flex flex-col group">
                                 <div className="relative h-64 overflow-hidden">
                                      <Image src="/events/impact/at cop30.png" alt="Global Advocacy" fill className="object-cover group-hover:scale-105 transition-transform duration-500" />
                                 </div>
@@ -345,7 +345,7 @@ export default function AboutPage() {
                             </div>
                             
                              {/* Card 3: Community Action */}
-                            <div className="bg-white rounded-[32px] overflow-hidden shadow-lg flex flex-col group">
+                            <div className="bg-white rounded-2xl overflow-hidden shadow-lg flex flex-col group">
                                 <div className="relative h-64 overflow-hidden">
                                      <Image src="/events/impact/end femicide march.jpeg" alt="End Femicide March" fill className="object-cover group-hover:scale-105 transition-transform duration-500" />
                                 </div>
@@ -418,7 +418,7 @@ function ValueItem({ title, desc }: { title: string, desc: string }) {
 
 function WorkCard({ icon, title, desc }: { icon: React.ReactNode, title: string, desc: string }) {
     return (
-        <div className="bg-gray-50 p-8 rounded-[32px] hover:bg-sauti-light-teal/20 transition-colors duration-300">
+        <div className="bg-gray-50 p-8 rounded-2xl hover:bg-sauti-light-teal/20 transition-colors duration-300">
             <div className="w-14 h-14 rounded-2xl bg-white shadow-md flex items-center justify-center text-sauti-teal mb-6">
                 {icon}
             </div>

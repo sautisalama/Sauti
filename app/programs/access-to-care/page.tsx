@@ -89,7 +89,7 @@ export default function AccessToCarePage() {
                         <p className="text-xl md:text-2xl text-gray-500 leading-relaxed font-medium mb-12">
                             We don't just treat the immediate crisis; we build the path to long-term resilience. Through our network of specialized therapists, counsellors, and medical professionals, we ensure that every survivor receives the specific care they need without facing additional barriers.
                         </p>
-                        <div className="bg-sauti-dark rounded-[40px] p-12 text-white relative overflow-hidden group">
+                        <div className="bg-sauti-dark rounded-2xl p-12 text-white relative overflow-hidden group">
                             <div className="absolute top-0 right-0 w-32 h-32 bg-sauti-yellow/10 rounded-full -translate-y-1/2 translate-x-1/2" />
                             <h3 className="text-3xl font-bold mb-6">Need support now?</h3>
                             <p className="text-xl text-white/70 mb-8 font-medium">All our services are free, confidential, and survivor-led.</p>
@@ -107,7 +107,7 @@ export default function AccessToCarePage() {
 
 function FeatureCard({ icon, title, description }: { icon: React.ReactNode, title: string, description: string }) {
     return (
-        <div className="p-8 rounded-[40px] bg-white border-2 border-gray-50 hover:border-sauti-yellow/20 hover:shadow-2xl transition-all group">
+        <div className="p-8 rounded-2xl bg-white border-2 border-gray-50 hover:border-sauti-yellow/20 hover:shadow-2xl transition-all group">
             <div className="w-16 h-16 rounded-2xl bg-gray-50 flex items-center justify-center mb-6 group-hover:bg-sauti-yellow/10 transition-colors">
                 {icon}
             </div>

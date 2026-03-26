@@ -108,6 +108,18 @@ export function EnhancedSidebar({
     const needsOnboarding = !profile?.user_type || 
         !hasAcceptedPolicies ||
         ((profile.user_type === 'professional' || profile.user_type === 'ngo') && !profile.professional_title);
+
+    let setupProgress = 25;
+    if (needsOnboarding && profile) {
+        const isProRole = profile.user_type === 'professional' || profile.user_type === 'ngo';
+        const totalSteps = isProRole ? 4 : 2;
+        let stepCount = 0;
+        if (profile.user_type) stepCount = 1;
+        if (profile.user_type && hasAcceptedPolicies) stepCount = 2;
+        if (isProRole && hasAcceptedPolicies && profile.professional_title) stepCount = 3;
+        
+        setupProgress = ((stepCount + 1) / totalSteps) * 100;
+    }
 	useEffect(() => {
 		const handleResize = () => {
 			if (window.innerWidth < 1024) {
@@ -675,7 +687,7 @@ export function EnhancedSidebar({
 				<div className="flex-1 flex flex-col justify-between px-2 py-4">
                     {needsOnboarding && !isCollapsed ? (
                          <div className="px-3 py-4 space-y-4">
-                            <div className="bg-serene-blue-50/50 border border-serene-blue-100 rounded-[2rem] p-5 space-y-4 shadow-sm">
+                            <div className="bg-serene-blue-50/50 border border-serene-blue-100 rounded-2xl p-5 space-y-4 shadow-sm">
                                 <div className="h-10 w-10 rounded-xl bg-serene-blue-600 flex items-center justify-center shadow-lg shadow-serene-blue-200 transition-transform hover:scale-105">
                                     <Shield className="h-5 w-5 text-white" />
                                 </div>
@@ -686,10 +698,10 @@ export function EnhancedSidebar({
                                     </p>
                                 </div>
                                 <div className="pt-2">
-                                     <div className="h-2 w-full bg-serene-blue-100/50 rounded-full overflow-hidden shadow-inner">
+                                     <div className="h-1.5 w-full bg-serene-neutral-100 rounded-full overflow-hidden shadow-inner border border-serene-neutral-200/50">
                                         <div 
-											className="h-full bg-serene-blue-600 rounded-full transition-all duration-1000" 
-											style={{ width: '35%' }}
+											className="h-full bg-gradient-to-r from-serene-blue-400 to-serene-blue-600 transition-all duration-700 ease-out shadow-sm" 
+											style={{ width: `${setupProgress}%` }}
 										/>
                                      </div>
                                 </div>

@@ -174,7 +174,7 @@ export function AddSupportServiceForm({
 	};
 
 	return (
-		<div className={cn("flex flex-col h-full bg-white sm:rounded-3xl overflow-hidden", embedded && "h-auto bg-transparent sm:rounded-none overflow-visible")}>
+		<div className={cn("flex flex-col h-full bg-white sm:rounded-2xl overflow-hidden", embedded && "h-auto bg-transparent sm:rounded-none overflow-visible")}>
 			{/* Premium Glass Header */}
 			{!embedded && (
 				<div className="px-4 py-3 border-b border-serene-blue-100 flex items-center justify-between bg-serene-blue-50/50 backdrop-blur-xl sticky top-0 z-10 shrink-0">
@@ -201,7 +201,7 @@ export function AddSupportServiceForm({
 				<form id="add-service-form" onSubmit={handleSubmit} className={cn("max-w-2xl mx-auto p-4 md:p-6 space-y-4 md:space-y-8", embedded && "p-0")}>
 					
 					{/* Primary Details Grid - Dashboard inspired */}
-					<div className={cn("bg-white p-4 md:p-6 rounded-[1.5rem] md:rounded-[2.5rem] border border-serene-neutral-100 shadow-sm space-y-4 md:space-y-6", embedded && "bg-transparent border-none shadow-none p-0")}>
+					<div className={cn("bg-white p-4 md:p-6 rounded-xl md:rounded-2xl border border-serene-neutral-100 shadow-sm space-y-4 md:space-y-6", embedded && "bg-transparent border-none shadow-none p-0")}>
 						<div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4 md:gap-y-5">
 							<div className="space-y-2">
 								<Label htmlFor="name" className="text-[11px] font-black text-serene-neutral-600 uppercase tracking-widest px-1">
@@ -212,7 +212,7 @@ export function AddSupportServiceForm({
 									placeholder="e.g. Sauti Hope Solutions"
 									value={formData.name}
 									onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-									className="h-11 rounded-[1rem] border-serene-neutral-200 focus:border-serene-blue-500 focus:ring-serene-blue-500/10 bg-serene-neutral-50/50 transition-all font-medium"
+									className="h-11 rounded-lg border-serene-neutral-200 focus:border-serene-blue-500 focus:ring-serene-blue-500/10 bg-serene-neutral-50/50 transition-all font-medium"
 								/>
 							</div>
 
@@ -236,7 +236,7 @@ export function AddSupportServiceForm({
 									placeholder="+254 7XX XXX XXX"
 									value={formData.phone_number}
 									onChange={(e) => setFormData({ ...formData, phone_number: e.target.value })}
-									className="h-11 rounded-[1rem] border-serene-neutral-200 focus:border-serene-blue-500 focus:ring-serene-blue-500/10 bg-serene-neutral-50/50 transition-all font-medium"
+									className="h-11 rounded-lg border-serene-neutral-200 focus:border-serene-blue-500 focus:ring-serene-blue-500/10 bg-serene-neutral-50/50 transition-all font-medium"
 								/>
 							</div>
 
@@ -317,7 +317,7 @@ export function AddSupportServiceForm({
 					{/* Progressive Disclosure (Accordions) */}
 					<div className="space-y-2">
 						<Accordion type="single" collapsible className="w-full">
-							<AccordionItem value="reach" className="border-none bg-serene-blue-50/30 rounded-[1.5rem] mb-3 overflow-hidden transition-all hover:bg-serene-blue-50/50">
+							<AccordionItem value="reach" className="border-none bg-serene-blue-50/30 rounded-xl mb-3 overflow-hidden transition-all hover:bg-serene-blue-50/50">
 								<AccordionTrigger className="hover:no-underline py-3 px-4 group">
 									<div className="flex items-center gap-3">
 										<div className="h-7 w-7 rounded-lg bg-white shadow-sm flex items-center justify-center border border-serene-blue-100 group-hover:scale-110 transition-transform">
@@ -368,7 +368,7 @@ export function AddSupportServiceForm({
 
 									{formData.coverage_area_radius && (
 										<div className="pt-2 animate-in fade-in slide-in-from-top-4 duration-500">
-											<div className="p-1 bg-serene-neutral-50 rounded-[1.75rem] border border-serene-neutral-200 overflow-hidden shadow-inner">
+											<div className="p-1 bg-serene-neutral-50 rounded-xl border border-serene-neutral-200 overflow-hidden shadow-inner">
 												<LocationPicker
 													initialLat={location?.lat || -1.2921}
 													initialLng={location?.lng || 36.8219}
@@ -386,7 +386,7 @@ export function AddSupportServiceForm({
 								</AccordionContent>
 							</AccordionItem>
 
-							<AccordionItem value="digital" className="border-none bg-serene-neutral-50/50 rounded-[1.5rem] overflow-hidden transition-all hover:bg-serene-neutral-100/50">
+							<AccordionItem value="digital" className="border-none bg-serene-neutral-50/50 rounded-xl overflow-hidden transition-all hover:bg-serene-neutral-100/50">
 								<AccordionTrigger className="hover:no-underline py-3 px-4 group">
 									<div className="flex items-center gap-3">
 										<div className="h-7 w-7 rounded-lg bg-white shadow-sm flex items-center justify-center border border-serene-neutral-200 group-hover:scale-110 transition-transform">

@@ -31,7 +31,7 @@ export default function SignIn() {
 							</p>
 						</div>
                         
-                        <div className="bg-white/80 backdrop-blur-sm p-8 rounded-3xl border border-serene-neutral-100 shadow-xl shadow-serene-neutral-200/50 space-y-6">
+                        <div className="bg-white/80 backdrop-blur-sm p-8 rounded-2xl border border-serene-neutral-100 shadow-xl shadow-serene-neutral-200/50 space-y-6">
                             <form action={signIn} className="space-y-5">
                                 <div className="space-y-2">
                                     <Label htmlFor="email" className="text-sm font-semibold text-serene-neutral-700 ml-1">

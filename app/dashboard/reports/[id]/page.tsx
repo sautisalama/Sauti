@@ -347,7 +347,7 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
 	if (errorState) {
 		return (
 			<div className="flex items-center justify-center min-h-screen bg-serene-neutral-50 p-6">
-				<Card className="max-w-md w-full border-serene-neutral-200 rounded-3xl p-8 md:p-10 text-center shadow-sm">
+				<Card className="max-w-md w-full border-serene-neutral-200 rounded-2xl p-8 md:p-10 text-center shadow-sm">
 					<div className="w-16 h-16 bg-serene-neutral-100 rounded-full flex items-center justify-center mx-auto mb-6">
 						<FileText className="h-8 w-8 text-serene-neutral-400" />
 					</div>
@@ -486,7 +486,7 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
 					</div>
 
 					{report.record_only ? (
-						<Card className="border-2 border-amber-200 bg-amber-50 rounded-3xl overflow-hidden shadow-sm">
+						<Card className="border-2 border-amber-200 bg-amber-50 rounded-2xl overflow-hidden shadow-sm">
 							<CardContent className="p-6 md:p-8 flex flex-col items-center text-center space-y-4">
 								<div className="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center">
 									<ShieldCheck className="h-8 w-8 text-amber-600" />
@@ -509,7 +509,7 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
 						</Card>
 					) : acceptedMatch ? (
 						/* Accepted Match Card */
-						<Card className="border-2 border-sauti-teal bg-sauti-teal/5 rounded-3xl overflow-hidden">
+						<Card className="border-2 border-sauti-teal bg-sauti-teal/5 rounded-2xl overflow-hidden">
 							<CardContent className="p-6 md:p-8 space-y-6">
 								<div className="flex items-center gap-4">
 									<div className="w-14 h-14 bg-sauti-teal rounded-2xl flex items-center justify-center text-white shadow-md">
@@ -554,7 +554,7 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
 						</Card>
 					) : currentMatch ? (
 						/* Match Suggestion Card */
-						<Card className="border-serene-neutral-100 rounded-3xl overflow-hidden hover:shadow-md transition-shadow">
+						<Card className="border-serene-neutral-100 rounded-2xl overflow-hidden hover:shadow-md transition-shadow">
 							<CardContent className="p-6 md:p-8 space-y-6">
 								<div className="flex flex-wrap gap-2">
 									<Badge className="bg-serene-neutral-100 text-serene-neutral-600 border-0 font-bold text-[10px] uppercase tracking-wider">
@@ -607,7 +607,7 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
 						</Card>
 					) : (
 						/* No Matches State */
-						<Card className="border-dashed border-2 border-serene-neutral-200 rounded-3xl bg-serene-neutral-50/50">
+						<Card className="border-dashed border-2 border-serene-neutral-200 rounded-2xl bg-serene-neutral-50/50">
 							<CardContent className="p-8 text-center">
 								<div className="w-14 h-14 bg-serene-neutral-100 rounded-full flex items-center justify-center mx-auto mb-4">
 									<HandHeart className="h-7 w-7 text-serene-neutral-400" />
@@ -656,7 +656,7 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
 						</Button>
 					</div>
 
-					<Card className="border-serene-neutral-100 rounded-3xl overflow-hidden">
+					<Card className="border-serene-neutral-100 rounded-2xl overflow-hidden">
 						<CardContent className="p-6 md:p-8">
 							{report.incident_description ? (
 								<p className="text-serene-neutral-600 leading-relaxed whitespace-pre-wrap">
@@ -672,7 +672,7 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
 
 					{/* Add Details Form */}
 					{showAddDetails && (
-						<Card className="border-sauti-teal/20 bg-sauti-teal/5 rounded-3xl overflow-hidden animate-in slide-in-from-top-2 duration-300">
+						<Card className="border-sauti-teal/20 bg-sauti-teal/5 rounded-2xl overflow-hidden animate-in slide-in-from-top-2 duration-300">
 							<CardContent className="p-6 md:p-8 space-y-4">
 								<p className="text-sm text-serene-neutral-600">
 									It's okay if you remember more later. Share whenever it feels safe.
@@ -739,7 +739,7 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
 				)}
 
 				{/* === Privacy Notice === */}
-				<Card className="bg-sauti-dark rounded-3xl overflow-hidden">
+				<Card className="bg-sauti-dark rounded-2xl overflow-hidden">
 					<CardContent className="p-6 md:p-8 text-white relative">
 						<div className="absolute bottom-0 right-0 opacity-5 p-8">
 							<Lock className="h-24 w-24" />

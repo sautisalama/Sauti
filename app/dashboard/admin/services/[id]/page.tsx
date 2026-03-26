@@ -276,10 +276,10 @@ export default function ServiceDetailPage() {
                 <div className="h-16 w-3/4 bg-gray-100 rounded-xl animate-pulse" />
                 <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
                     <div className="lg:col-span-1 space-y-6">
-                        <div className="h-48 bg-gray-100 rounded-3xl animate-pulse" />
+                        <div className="h-48 bg-gray-100 rounded-2xl animate-pulse" />
                     </div>
                     <div className="lg:col-span-3 space-y-6">
-                        <div className="h-96 bg-gray-100 rounded-3xl animate-pulse" />
+                        <div className="h-96 bg-gray-100 rounded-2xl animate-pulse" />
                     </div>
                 </div>
             </div>
@@ -329,7 +329,7 @@ export default function ServiceDetailPage() {
             <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
                 {/* Left Column: Quick Stats */}
                 <div className="lg:col-span-1 space-y-6">
-                     <Card className="rounded-[2rem] border-transparent shadow-card bg-white overflow-hidden">
+                     <Card className="rounded-2xl border-transparent shadow-card bg-white overflow-hidden">
                         <CardHeader className="bg-serene-neutral-50/50 pb-4 border-b border-serene-neutral-50">
                             <CardTitle className="text-xs font-bold uppercase tracking-wider text-serene-neutral-400">Quick Stats</CardTitle>
                         </CardHeader>
@@ -358,7 +358,7 @@ export default function ServiceDetailPage() {
                      </Card>
                      
                      {/* Location Preview Card */}
-                     <Card className="rounded-[2rem] border-transparent shadow-card bg-white overflow-hidden">
+                     <Card className="rounded-2xl border-transparent shadow-card bg-white overflow-hidden">
                         <CardHeader className="bg-serene-neutral-50/50 pb-4 border-b border-serene-neutral-50">
                             <CardTitle className="text-xs font-bold uppercase tracking-wider text-serene-neutral-400">Location</CardTitle>
                         </CardHeader>
@@ -408,7 +408,7 @@ export default function ServiceDetailPage() {
                         </TabsList>
 
                         <TabsContent value="details" className="space-y-6 animate-in slide-in-from-bottom-4 duration-500">
-                             <Card className="border-transparent shadow-card rounded-[2rem] overflow-hidden bg-white">
+                             <Card className="border-transparent shadow-card rounded-2xl overflow-hidden bg-white">
                                 <CardContent className="space-y-8 p-8">
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
                                         <InfoBlock label="Service Type" value={Array.isArray(service.service_types) ? service.service_types.join(', ') : service.service_types} variant="inline" />
@@ -434,7 +434,7 @@ export default function ServiceDetailPage() {
                         </TabsContent>
 
                         <TabsContent value="history" className="animate-in slide-in-from-bottom-4 duration-500">
-                             <Card className="border-transparent shadow-card rounded-[2rem] overflow-hidden bg-white">
+                             <Card className="border-transparent shadow-card rounded-2xl overflow-hidden bg-white">
                                 <CardContent className="pt-8 pb-8 px-8 space-y-6">
                                     {history.length === 0 ? (
                                         <div className="text-center py-12">
@@ -489,7 +489,7 @@ export default function ServiceDetailPage() {
 
             {/* Action Dialog */}
             <Dialog open={actionDialog.isOpen} onOpenChange={(open) => !open && setActionDialog(prev => ({ ...prev, isOpen: false }))}>
-                <DialogContent className="rounded-3xl max-w-md overflow-hidden p-0 border-0 bg-white shadow-2xl">
+                <DialogContent className="rounded-2xl max-w-md overflow-hidden p-0 border-0 bg-white shadow-2xl">
                     <div className="p-8 pb-0">
                         <div className={cn(
                             "w-16 h-16 rounded-full flex items-center justify-center mb-6 mx-auto transition-colors",

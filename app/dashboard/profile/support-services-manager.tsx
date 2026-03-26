@@ -273,7 +273,7 @@ export function SupportServicesManager({
 	return (
 		<div className="space-y-8">
 			{/* Header Card */}
-			<div className="bg-white rounded-3xl border border-serene-neutral-200 p-5 sm:p-6 shadow-sm overflow-hidden relative">
+			<div className="bg-white rounded-2xl border border-serene-neutral-200 p-5 sm:p-6 shadow-sm overflow-hidden relative">
 				<div className="absolute top-0 right-0 w-32 h-32 bg-serene-blue-50/50 rounded-full -mr-16 -mt-16 blur-2xl" />
 				<div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6 relative z-10">
 					<div className="flex items-start sm:items-center gap-4">

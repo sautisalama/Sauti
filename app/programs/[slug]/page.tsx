@@ -88,7 +88,7 @@ export default function ProgramDetailPage() {
                                 </h1>
                                 <p className="text-xl md:text-2xl text-sauti-yellow font-bold uppercase tracking-widest">{program.subtitle}</p>
                             </div>
-                            <div className="bg-white p-8 md:p-12 rounded-[40px] md:rounded-[60px] shadow-3xl">
+                            <div className="bg-white p-8 md:p-12 rounded-2xl md:rounded-[60px] shadow-3xl">
                                 <p className="text-xl md:text-2xl text-gray-600 leading-relaxed font-medium italic">
                                     "{program.description}"
                                 </p>
@@ -112,7 +112,7 @@ export default function ProgramDetailPage() {
                             <div className="space-y-12">
                                 {program.details.map((detail: string, i: number) => (
                                     <div key={i} className="flex gap-4 md:gap-8 items-start">
-                                        <div className="w-12 h-12 md:w-16 md:h-16 rounded-2xl md:rounded-3xl bg-sauti-dark text-white flex items-center justify-center shrink-0 shadow-lg">
+                                        <div className="w-12 h-12 md:w-16 md:h-16 rounded-2xl md:rounded-2xl bg-sauti-dark text-white flex items-center justify-center shrink-0 shadow-lg">
                                             <CheckCircle2 className="w-6 h-6 md:w-8 md:h-8" />
                                         </div>
                                         <p className="text-xl md:text-3xl font-bold text-gray-800 leading-relaxed">

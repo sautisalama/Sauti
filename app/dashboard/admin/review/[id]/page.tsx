@@ -413,7 +413,7 @@ export default function ReviewPage() {
             <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
                 {/* Left Column: Navigation / Summary */}
                 <div className="lg:col-span-1 space-y-6">
-                     <Card className="rounded-3xl border-serene-neutral-200 shadow-sm overflow-hidden bg-white">
+                     <Card className="rounded-2xl border-serene-neutral-200 shadow-sm overflow-hidden bg-white">
                         <CardHeader className="bg-gray-50/50 pb-4 border-b border-gray-100">
                             <CardTitle className="text-sm font-bold uppercase tracking-wider text-gray-500">Quick Stats</CardTitle>
                         </CardHeader>
@@ -443,7 +443,7 @@ export default function ReviewPage() {
 
                         <TabsContent value="profile" className="space-y-6 animate-in slide-in-from-bottom-2">
                              {/* Profile Details Card */}
-                             <Card className="border-serene-neutral-200 shadow-sm rounded-3xl overflow-hidden bg-white">
+                             <Card className="border-serene-neutral-200 shadow-sm rounded-2xl overflow-hidden bg-white">
                                 <CardHeader className="flex flex-row items-center justify-between pb-4 border-b border-gray-100 bg-gray-50/30">
                                     <div className="space-y-1">
                                         <CardTitle className="text-xl text-gray-900 font-bold">Personal Details</CardTitle>
@@ -482,7 +482,7 @@ export default function ReviewPage() {
 
                         <TabsContent value="services" className="space-y-6 animate-in slide-in-from-bottom-2">
                             {services.length === 0 ? (
-                                <div className="p-12 text-center bg-white rounded-3xl border border-dashed border-gray-200">
+                                <div className="p-12 text-center bg-white rounded-2xl border border-dashed border-gray-200">
                                     <Building2 className="h-10 w-10 text-gray-300 mx-auto mb-3" />
                                     <p className="text-gray-500 font-medium">No services listed.</p>
                                 </div>
@@ -616,7 +616,7 @@ export default function ReviewPage() {
                         </TabsContent>
 
                         <TabsContent value="history" className="animate-in slide-in-from-bottom-2">
-                             <Card className="border-gray-200 shadow-sm rounded-3xl bg-white">
+                             <Card className="border-gray-200 shadow-sm rounded-2xl bg-white">
                                 <CardContent className="pt-6 space-y-6">
                                     {history.length === 0 ? (
                                         <p className="text-center text-gray-500 py-8">No history recorded.</p>
@@ -655,7 +655,7 @@ export default function ReviewPage() {
 
             {/* Action Dialog - Premium Polish */}
             <Dialog open={actionDialog.isOpen} onOpenChange={(open) => !open && setActionDialog(prev => ({ ...prev, isOpen: false }))}>
-                <DialogContent className="rounded-3xl max-w-md overflow-hidden p-0 border-0 bg-white shadow-2xl">
+                <DialogContent className="rounded-2xl max-w-md overflow-hidden p-0 border-0 bg-white shadow-2xl">
                     <div className="p-8 pb-0">
                         <div className={cn(
                             "w-16 h-16 rounded-full flex items-center justify-center mb-6 mx-auto transition-colors",

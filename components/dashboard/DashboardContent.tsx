@@ -29,20 +29,22 @@ export function DashboardContent({ children }: DashboardContentProps) {
   const isChat = pathname?.startsWith("/dashboard/chat");
   const isChatDetail = isChat && !!chatId; // Chat + ID param means detail view
 
-  // Top Bar (pt-16) is hidden on ALL chat pages (list and detail)
-  // So pt-0 for chat. pt-16 for others.
-  const showTopPadding = !isChat;
+  // Top Bar (pt-16) is hidden on ALL chat pages (list and detail) and Onboarding.
+  // So pt-0 for chat/onboarding. pt-16 for others.
+  const profile = dash?.data?.profile;
+  const hasAcceptedPolicies = !!(profile?.policies as any)?.all_policies_accepted;
+  const needsOnboarding = !profile?.user_type || 
+    !hasAcceptedPolicies ||
+    ((profile.user_type === 'professional' || profile.user_type === 'ngo') && !profile.professional_title);
+
+  const showTopPadding = !isChat && !needsOnboarding;
 
   // Bottom Nav (pb-24) is hidden on chat DETAIL (but shown on list)
   // and Appointment detail
   const isApptDetail = pathname?.includes("/appointment/");
   const showBottomPadding = !isChatDetail && !isApptDetail;
 
-  const profile = dash?.data?.profile;
-  const hasAcceptedPolicies = !!(profile?.policies as any)?.all_policies_accepted;
-  const needsOnboarding = !profile?.user_type || 
-    !hasAcceptedPolicies ||
-    ((profile.user_type === 'professional' || profile.user_type === 'ngo') && !profile.professional_title);
+
 
   return (
     <>
@@ -59,10 +61,10 @@ export function DashboardContent({ children }: DashboardContentProps) {
                 showTopPadding ? "pt-16" : "", // 64px top bar
                 showBottomPadding ? "pb-24" : "" // Bottom nav spacing
             )}>
-                {!isChat && (
+                {!isChat && !needsOnboarding && (
                     <DesktopHeader 
-                        showSearch={!needsOnboarding} 
-                        showNotifications={!needsOnboarding}
+                        showSearch={true} 
+                        showNotifications={true}
                     />
                 )}
                 {children}

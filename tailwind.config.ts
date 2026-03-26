@@ -201,12 +201,12 @@ const config = {
     			lg: 'var(--radius)',
     			md: 'calc(var(--radius) - 2px)',
     			sm: 'calc(var(--radius) - 4px)',
-    			// Extra premium rounded corners
-    			'xl': '1rem',
-    			'2xl': '1.5rem', // Default for cards
-    			'3xl': '2rem',
-          '4xl': '2.5rem',
-          '5xl': '3rem',
+    			// Refined premium rounded corners (less overdone)
+    			'xl': '0.75rem',
+    			'2xl': '1rem', // Default for cards
+    			'3xl': '1.25rem',
+          '4xl': '1.5rem',
+          '5xl': '2rem',
     		},
     		// Premium spacing scale for consistent layouts
     		spacing: {

@@ -64,7 +64,7 @@ export default function AccessibilityFAB() {
 	return (
 		<div className="fixed bottom-6 left-6 z-[100]">
 			{open && (
-				<div className="mb-4 w-[calc(100vw-3rem)] sm:w-80 rounded-[32px] border-2 border-gray-100 bg-white/95 backdrop-blur-xl shadow-2xl p-6 space-y-4 animate-in slide-in-from-bottom-4 duration-300">
+				<div className="mb-4 w-[calc(100vw-3rem)] sm:w-80 rounded-2xl border-2 border-gray-100 bg-white/95 backdrop-blur-xl shadow-2xl p-6 space-y-4 animate-in slide-in-from-bottom-4 duration-300">
 					<div className="flex items-center justify-between mb-2">
                         <div className="flex items-center gap-2 text-sauti-dark font-black uppercase tracking-widest text-xs">
 						    <Contrast className="h-4 w-4 text-sauti-teal" /> Accessibility Tools

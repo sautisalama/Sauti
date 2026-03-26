@@ -741,7 +741,7 @@ export default function CasesMasterDetail({ userId }: { userId: string }) {
 							</>
 						) : filtered.length === 0 ? (
 							<div className="text-center py-24 px-6">
-								<div className="w-20 h-20 mx-auto mb-6 rounded-3xl bg-gradient-to-br from-sauti-teal/10 to-serene-blue-100 flex items-center justify-center shadow-sm">
+								<div className="w-20 h-20 mx-auto mb-6 rounded-2xl bg-gradient-to-br from-sauti-teal/10 to-serene-blue-100 flex items-center justify-center shadow-sm">
 									<Shield className="h-10 w-10 text-sauti-teal" />
 								</div>
 								<h3 className="text-xl font-bold text-sauti-dark mb-3">

@@ -227,7 +227,7 @@ function ReviewCard({ title, subtitle, status, date, docsCount, statusColor, loc
 
 function EmptyState({ type }: { type: 'users' | 'services' }) {
     return (
-        <div className="flex flex-col items-center justify-center py-16 text-center bg-gray-50/50 rounded-3xl border border-dashed border-gray-200">
+        <div className="flex flex-col items-center justify-center py-16 text-center bg-gray-50/50 rounded-2xl border border-dashed border-gray-200">
             <div className="h-16 w-16 bg-white rounded-full flex items-center justify-center shadow-sm mb-4">
                 <CheckCircle className="h-8 w-8 text-green-500 opacity-80" />
             </div>

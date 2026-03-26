@@ -22,7 +22,7 @@ export default function LearnPage() {
                         </div>
 
                         {/* Recent AI Course Featured */}
-                        <div className="bg-sauti-dark rounded-[32px] md:rounded-[60px] p-6 md:p-12 lg:p-16 text-white mb-12 md:mb-24 relative overflow-hidden group shadow-3xl">
+                        <div className="bg-sauti-dark rounded-2xl md:rounded-[60px] p-6 md:p-12 lg:p-16 text-white mb-12 md:mb-24 relative overflow-hidden group shadow-3xl">
                             <div className="absolute top-0 right-0 w-1/2 h-full bg-sauti-yellow/5 -skew-x-12 translate-x-1/2" />
                             <div className="grid lg:grid-cols-2 gap-8 md:gap-16 items-center relative z-10">
                                 <div className="order-2 lg:order-1">
@@ -41,7 +41,7 @@ export default function LearnPage() {
                                     </Link>
                                 </div>
                                 <div className="order-1 lg:order-2">
-                                    <div className="rounded-[24px] md:rounded-[40px] overflow-hidden aspect-[4/3] bg-white/10 relative shadow-2xl border-4 border-white/10">
+                                    <div className="rounded-xl md:rounded-2xl overflow-hidden aspect-[4/3] bg-white/10 relative shadow-2xl border-4 border-white/10">
                                         <Image 
                                             src="/events/programs/AI course.png" 
                                             alt="Visual representation of AI for Impact course modules" 
@@ -91,7 +91,7 @@ function LearnCard({ image, date, category, title, description, href }: { image:
     return (
         <Link href={href} className="group">
             <article className="h-full">
-                <div className="aspect-[16/10] relative rounded-[24px] md:rounded-[40px] overflow-hidden mb-4 md:mb-8 bg-white shadow-xl border-2 border-gray-50 group-hover:shadow-2xl transition-all duration-500">
+                <div className="aspect-[16/10] relative rounded-xl md:rounded-2xl overflow-hidden mb-4 md:mb-8 bg-white shadow-xl border-2 border-gray-50 group-hover:shadow-2xl transition-all duration-500">
                     <Image src={image} alt={title} fill className="object-cover transition-transform duration-700 group-hover:scale-105" />
                     <div className="absolute top-4 md:top-6 left-4 md:left-6 px-3 md:px-4 py-1.5 md:py-2 rounded-full bg-white/95 backdrop-blur-sm text-sauti-dark text-[10px] md:text-sm font-black uppercase tracking-widest shadow-sm">
                         {category}

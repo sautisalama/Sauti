@@ -400,7 +400,7 @@ export function AdminServicesTable({ onRefresh }: AdminServicesTableProps) {
             </div>
 
 			{/* Services Table */}
-			<Card className="border-none shadow-card rounded-[2rem] overflow-hidden bg-white">
+			<Card className="border-none shadow-card rounded-2xl overflow-hidden bg-white">
 				<CardContent className="p-0">
                     <div className="hidden md:block">
 					    <Table>
@@ -679,7 +679,7 @@ export function AdminServicesTable({ onRefresh }: AdminServicesTableProps) {
 
             {/* Custom Ban Dialog */}
             <Dialog open={banDialog.isOpen} onOpenChange={(open) => setBanDialog(prev => ({ ...prev, isOpen: open }))}>
-                <DialogContent className="rounded-3xl max-w-md overflow-hidden p-0 border-0 bg-white shadow-2xl">
+                <DialogContent className="rounded-2xl max-w-md overflow-hidden p-0 border-0 bg-white shadow-2xl">
                     <div className="p-8 pb-0">
                         <div className={cn(
                             "w-16 h-16 rounded-full flex items-center justify-center mb-6 mx-auto transition-colors",

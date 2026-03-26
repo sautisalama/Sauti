@@ -445,7 +445,7 @@ export function MobileVerificationSection({
 											placeholder="e.g. Psychology License" 
 											value={certForm.title}
 											onChange={e => setCertForm({...certForm, title: e.target.value})}
-											className="h-13 text-base rounded-[16px] border-serene-neutral-200 bg-serene-neutral-50 focus:bg-white transition-all shadow-sm text-serene-neutral-900 placeholder:text-serene-neutral-400"
+											className="h-13 text-base rounded-lg border-serene-neutral-200 bg-serene-neutral-50 focus:bg-white transition-all shadow-sm text-serene-neutral-900 placeholder:text-serene-neutral-400"
 										/>
 									</div>
 									<div className="space-y-2">
@@ -454,7 +454,7 @@ export function MobileVerificationSection({
 											placeholder="e.g. Ministry of Health" 
 											value={certForm.issuer}
 											onChange={e => setCertForm({...certForm, issuer: e.target.value})}
-											className="h-13 text-base rounded-[16px] border-serene-neutral-200 bg-serene-neutral-50 focus:bg-white transition-all shadow-sm text-serene-neutral-900 placeholder:text-serene-neutral-400"
+											className="h-13 text-base rounded-lg border-serene-neutral-200 bg-serene-neutral-50 focus:bg-white transition-all shadow-sm text-serene-neutral-900 placeholder:text-serene-neutral-400"
 										/>
 									</div>
 									<div className="space-y-2">
@@ -463,7 +463,7 @@ export function MobileVerificationSection({
 											placeholder="e.g. LIC-123456" 
 											value={certForm.number}
 											onChange={e => setCertForm({...certForm, number: e.target.value})}
-											className="h-13 text-base rounded-[16px] border-serene-neutral-200 bg-serene-neutral-50 focus:bg-white transition-all shadow-sm text-serene-neutral-900 placeholder:text-serene-neutral-400"
+											className="h-13 text-base rounded-lg border-serene-neutral-200 bg-serene-neutral-50 focus:bg-white transition-all shadow-sm text-serene-neutral-900 placeholder:text-serene-neutral-400"
 										/>
 									</div>
 								</div>
@@ -533,7 +533,7 @@ function MobileFileUploadZone({
 	return (
 		<div
 			className={cn(
-				"relative border-2 border-dashed rounded-[20px] p-8 text-center transition-all bg-serene-neutral-50/50",
+				"relative border-2 border-dashed rounded-xl p-8 text-center transition-all bg-serene-neutral-50/50",
 				file ? "border-sauti-teal/30 bg-sauti-teal/[0.02]" : "border-serene-neutral-200"
 			)}
 			onClick={() => document.getElementById("mobile-file-upload-input")?.click()}

@@ -69,7 +69,7 @@ export default function Cop30Page() {
                         </div>
 
                          {/* 2. Overview of Participation */}
-                        <div className="bg-gray-50 rounded-[40px] p-10 md:p-14">
+                        <div className="bg-gray-50 rounded-2xl p-10 md:p-14">
                             <h2 className="text-2xl font-bold text-sauti-dark mb-6">2. Overview of Participation</h2>
                             <ul className="space-y-3 mb-6">
                                 {[
@@ -94,7 +94,7 @@ export default function Cop30Page() {
                         </div>
 
                          {/* Image Break */}
-                        <div className="my-12 relative aspect-video rounded-[32px] overflow-hidden shadow-2xl">
+                        <div className="my-12 relative aspect-video rounded-2xl overflow-hidden shadow-2xl">
                               <Image 
                                     src="/events/impact/cop 30 panel review.png" 
                                     alt="Sauti Salama Panel" 

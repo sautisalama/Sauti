@@ -61,7 +61,7 @@ export default function CapacityBuildingPage() {
                                 </p>
                                 
                                 <div className="space-y-8 mt-10">
-                                    <div className="bg-gray-50 p-8 rounded-[32px] border border-gray-100">
+                                    <div className="bg-gray-50 p-8 rounded-2xl border border-gray-100">
                                         <div className="flex items-center gap-4 mb-4">
                                             <div className="w-12 h-12 bg-sauti-teal text-white rounded-full flex items-center justify-center">
                                                 <Laptop className="w-6 h-6" />
@@ -73,7 +73,7 @@ export default function CapacityBuildingPage() {
                                         </p>
                                     </div>
 
-                                    <div className="bg-gray-50 p-8 rounded-[32px] border border-gray-100">
+                                    <div className="bg-gray-50 p-8 rounded-2xl border border-gray-100">
                                         <div className="flex items-center gap-4 mb-4">
                                             <div className="w-12 h-12 bg-sauti-red text-white rounded-full flex items-center justify-center">
                                                 <GraduationCap className="w-6 h-6" />
@@ -87,7 +87,7 @@ export default function CapacityBuildingPage() {
                                 </div>
                              </div>
                              
-                             <div className="relative h-full min-h-[500px] rounded-[40px] overflow-hidden shadow-2xl">
+                             <div className="relative h-full min-h-[500px] rounded-2xl overflow-hidden shadow-2xl">
                                   <Image 
                                     src="/events/impact/oliver-teaching-tech.jpg" 
                                     alt="Tech Training" 

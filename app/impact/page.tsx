@@ -154,21 +154,21 @@ export default function ImpactPage() {
                             Every initiative is rooted in survivor-led evidence, community ownership, and systems-level advocacy. We don't just respond to harm—we build the infrastructure for prevention, justice, and healing.
                         </p>
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8">
-                            <div className="bg-gradient-to-br from-sauti-teal/5 to-sauti-teal/10 p-6 md:p-8 rounded-2xl md:rounded-3xl border-2 border-sauti-teal/20 hover:border-sauti-teal/40 transition-all hover:shadow-xl group">
+                            <div className="bg-gradient-to-br from-sauti-teal/5 to-sauti-teal/10 p-6 md:p-8 rounded-2xl md:rounded-2xl border-2 border-sauti-teal/20 hover:border-sauti-teal/40 transition-all hover:shadow-xl group">
                                 <div className="w-12 h-12 md:w-14 md:h-14 bg-sauti-teal rounded-xl md:rounded-2xl flex items-center justify-center mb-3 md:mb-4 mx-auto group-hover:scale-110 transition-transform">
                                     <CheckCircle2 className="w-6 h-6 md:w-7 md:h-7 text-white" />
                                 </div>
                                 <div className="font-black text-sauti-dark mb-2 md:mb-3 text-lg md:text-xl">Survivor-Led</div>
                                 <p className="text-gray-600 leading-relaxed text-sm md:text-base">Lived experience guides every decision. Survivors aren't just beneficiaries—they're architects of change.</p>
                             </div>
-                            <div className="bg-gradient-to-br from-sauti-yellow/5 to-sauti-yellow/10 p-6 md:p-8 rounded-2xl md:rounded-3xl border-2 border-sauti-yellow/30 hover:border-sauti-yellow/50 transition-all hover:shadow-xl group">
+                            <div className="bg-gradient-to-br from-sauti-yellow/5 to-sauti-yellow/10 p-6 md:p-8 rounded-2xl md:rounded-2xl border-2 border-sauti-yellow/30 hover:border-sauti-yellow/50 transition-all hover:shadow-xl group">
                                 <div className="w-12 h-12 md:w-14 md:h-14 bg-sauti-yellow rounded-xl md:rounded-2xl flex items-center justify-center mb-3 md:mb-4 mx-auto group-hover:scale-110 transition-transform">
                                     <CheckCircle2 className="w-6 h-6 md:w-7 md:h-7 text-sauti-dark" />
                                 </div>
                                 <div className="font-black text-sauti-dark mb-2 md:mb-3 text-lg md:text-xl">Data-Driven</div>
                                 <p className="text-gray-600 leading-relaxed text-sm md:text-base">We track outcomes, not just outputs. Real-time dashboards ensure transparency and accountability.</p>
                             </div>
-                            <div className="bg-gradient-to-br from-sauti-red/5 to-sauti-red/10 p-6 md:p-8 rounded-2xl md:rounded-3xl border-2 border-sauti-red/20 hover:border-sauti-red/40 transition-all hover:shadow-xl group">
+                            <div className="bg-gradient-to-br from-sauti-red/5 to-sauti-red/10 p-6 md:p-8 rounded-2xl md:rounded-2xl border-2 border-sauti-red/20 hover:border-sauti-red/40 transition-all hover:shadow-xl group">
                                 <div className="w-12 h-12 md:w-14 md:h-14 bg-sauti-red rounded-xl md:rounded-2xl flex items-center justify-center mb-3 md:mb-4 mx-auto group-hover:scale-110 transition-transform">
                                     <CheckCircle2 className="w-6 h-6 md:w-7 md:h-7 text-white" />
                                 </div>
@@ -205,7 +205,7 @@ function ImpactCard({ title, category, image, link, className, largeTitle, descr
     };
 
     return (
-        <Link href={link} className={`group block overflow-hidden rounded-[24px] md:rounded-[32px] ${className}`}>
+        <Link href={link} className={`group block overflow-hidden rounded-xl md:rounded-2xl ${className}`}>
             <div className="bg-white h-full relative overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-500">
                 {/* Image fills the card */}
                 <Image 

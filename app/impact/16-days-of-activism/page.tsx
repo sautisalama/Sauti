@@ -78,7 +78,7 @@ export default function ActivismPage() {
 
                         {/* Gallery Grid */}
                         <div className="grid md:grid-cols-2 gap-8 mb-16">
-                            <div className="rounded-[32px] overflow-hidden shadow-lg aspect-square relative group">
+                            <div className="rounded-2xl overflow-hidden shadow-lg aspect-square relative group">
                                 <Image 
                                     src="/events/programs/16 days of activism.png" 
                                     alt="Community Dialogue" 
@@ -86,7 +86,7 @@ export default function ActivismPage() {
                                     className="object-cover group-hover:scale-105 transition-transform duration-700" 
                                 />
                             </div>
-                            <div className="rounded-[32px] overflow-hidden shadow-lg aspect-square relative group bg-sauti-dark flex items-center justify-center p-8">
+                            <div className="rounded-2xl overflow-hidden shadow-lg aspect-square relative group bg-sauti-dark flex items-center justify-center p-8">
                                 <div className="text-center">
                                     <h3 className="text-4xl font-bold text-sauti-yellow mb-4">Investment</h3>
                                     <p className="text-white/80">

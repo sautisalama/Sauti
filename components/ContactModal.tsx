@@ -21,7 +21,7 @@ export default function ContactModal({ trigger, title, description }: ContactMod
             <DialogTrigger asChild>
                 {trigger}
             </DialogTrigger>
-            <DialogContent className="max-w-4xl p-0 overflow-hidden rounded-[32px]">
+            <DialogContent className="max-w-4xl p-0 overflow-hidden rounded-2xl">
                 <ContactForm title={title} description={description} />
             </DialogContent>
         </Dialog>

@@ -70,7 +70,7 @@ export default function EndFemicidePage() {
                             </div>
                             
                             <div className="space-y-8">
-                                <div className="bg-white border border-gray-100 p-8 rounded-[32px] shadow-xl">
+                                <div className="bg-white border border-gray-100 p-8 rounded-2xl shadow-xl">
                                     <div className="flex items-center gap-4 mb-6">
                                         <TrendingUp className="w-10 h-10 text-sauti-red" />
                                         <h3 className="text-2xl font-bold text-sauti-dark">Timeline of Action</h3>

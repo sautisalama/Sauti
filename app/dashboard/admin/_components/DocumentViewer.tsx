@@ -27,7 +27,7 @@ export function DocumentViewer({ isOpen, onClose, document, onSaveReview }: {
 
     return (
         <Dialog open={isOpen} onOpenChange={onClose}>
-            <DialogContent className="max-w-6xl h-[90vh] flex p-0 overflow-hidden gap-0 border-0 rounded-3xl shadow-2xl bg-serene-neutral-50/50 backdrop-blur-sm">
+            <DialogContent className="max-w-6xl h-[90vh] flex p-0 overflow-hidden gap-0 border-0 rounded-2xl shadow-2xl bg-serene-neutral-50/50 backdrop-blur-sm">
                 <DialogTitle className="sr-only">Review {document.name}</DialogTitle>
                 {/* Document View Area */}
                 <div className="flex-1 bg-serene-neutral-100/50 relative flex flex-col p-2">
@@ -61,7 +61,7 @@ export function DocumentViewer({ isOpen, onClose, document, onSaveReview }: {
                                 title={document.name}
                             />
                         ) : (
-                            <div className="text-center p-12 bg-white rounded-3xl shadow-sm border border-serene-neutral-100">
+                            <div className="text-center p-12 bg-white rounded-2xl shadow-sm border border-serene-neutral-100">
                                 <div className="h-20 w-20 mx-auto bg-serene-neutral-50 rounded-full flex items-center justify-center mb-6">
                                     <FileText className="h-10 w-10 text-serene-neutral-300" />
                                 </div>

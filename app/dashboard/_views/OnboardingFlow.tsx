@@ -260,8 +260,18 @@ export default function OnboardingFlow() {
 	const relevantPolicies = getRelevantPolicies();
 	const allPoliciesAccepted = relevantPolicies.every(p => profile.accepted_policies.includes(p.id));
 
+	const StepProgressTopBorder = (
+		<div className="h-2 w-full bg-serene-neutral-100 shrink-0 z-10">
+			<div 
+				className="h-full bg-gradient-to-r from-serene-blue-400 to-serene-blue-600 transition-all duration-700 ease-out" 
+				style={{ width: `${((safeStepIndex + 1) / filteredSteps.length) * 100}%` }}
+			/>
+		</div>
+	);
+
 	const PoliciesStep = (
-		<Card className="bg-white border-serene-neutral-100 shadow-premium rounded-[2.5rem] overflow-hidden max-h-full flex flex-col">
+		<Card className="bg-white border-serene-neutral-100 shadow-premium rounded-2xl overflow-hidden max-h-full flex flex-col">
+			{StepProgressTopBorder}
 			<CardHeader className="text-center pt-5 pb-2 bg-serene-blue-50/20 shrink-0">
 				<div className="mx-auto w-12 h-12 bg-serene-blue-100 rounded-full flex items-center justify-center mb-2">
 					<Shield className="h-6 w-6 text-serene-blue-600" />
@@ -369,7 +379,8 @@ export default function OnboardingFlow() {
 	);
 
 	const Role = (
-		<Card className="bg-white border-serene-neutral-100 shadow-premium rounded-[2.5rem] overflow-hidden max-h-full flex flex-col">
+		<Card className="bg-white border-serene-neutral-100 shadow-premium rounded-2xl overflow-hidden max-h-full flex flex-col">
+			{StepProgressTopBorder}
 			<CardHeader className="text-center pt-5 pb-2 bg-serene-blue-50/20 shrink-0">
 				<CardTitle className="text-lg md:text-2xl font-bold text-serene-neutral-900 tracking-tight">
 					Choose Your Role
@@ -382,7 +393,7 @@ export default function OnboardingFlow() {
 				<div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-6">
 					{/* Survivor Tile */}
 					<div
-						className={`cursor-pointer rounded-[1.5rem] border-2 p-3 md:p-6 text-center transition-all duration-300 group relative overflow-hidden bg-white h-full flex flex-col justify-center ${
+						className={`cursor-pointer rounded-xl border-2 p-3 md:p-6 text-center transition-all duration-300 group relative overflow-hidden bg-white h-full flex flex-col justify-center ${
 							profile.user_type === "survivor"
 								? "border-serene-blue-500 shadow-xl ring-2 ring-serene-blue-500/10"
 								: "border-serene-neutral-100 hover:border-serene-blue-200"
@@ -390,7 +401,7 @@ export default function OnboardingFlow() {
 						onClick={() => setProfile(p => ({ ...p, user_type: "survivor" }))}
 					>
 						<div className="flex flex-row sm:flex-col items-center gap-3 sm:gap-4 relative z-10">
-							<div className="w-12 sm:w-16 aspect-square relative flex justify-center items-center bg-serene-blue-50 rounded-[1rem] shadow-sm border border-serene-blue-100 transition-all duration-500 group-hover:bg-serene-blue-100/50">
+							<div className="w-12 sm:w-16 aspect-square relative flex justify-center items-center bg-serene-blue-50 rounded-lg shadow-sm border border-serene-blue-100 transition-all duration-500 group-hover:bg-serene-blue-100/50">
 								<Image
 									src="/icons/survivor-light.png"
 									alt="Survivor"
@@ -412,7 +423,7 @@ export default function OnboardingFlow() {
 
 					{/* Professional Tile */}
 					<div
-						className={`cursor-pointer rounded-[2.5rem] border-2 p-8 text-center transition-all duration-300 group relative overflow-hidden bg-white h-full flex flex-col justify-center ${
+						className={`cursor-pointer rounded-2xl border-2 p-8 text-center transition-all duration-300 group relative overflow-hidden bg-white h-full flex flex-col justify-center ${
 							profile.user_type === "professional"
 								? "border-serene-blue-500 shadow-xl ring-2 ring-serene-blue-500/10"
 								: "border-serene-neutral-100 hover:border-serene-blue-200 hover:shadow-lg"
@@ -420,7 +431,7 @@ export default function OnboardingFlow() {
 						onClick={() => setProfile(p => ({ ...p, user_type: "professional" }))}
 					>
 						<div className="flex flex-row sm:flex-col items-center gap-4 sm:gap-6 relative z-10">
-							<div className="w-16 sm:w-24 aspect-square relative flex justify-center items-center bg-serene-blue-50 rounded-[1.5rem] shadow-sm border border-serene-blue-100 transition-all duration-500 group-hover:bg-serene-blue-100/50">
+							<div className="w-16 sm:w-24 aspect-square relative flex justify-center items-center bg-serene-blue-50 rounded-xl shadow-sm border border-serene-blue-100 transition-all duration-500 group-hover:bg-serene-blue-100/50">
 								<Image
 									src="/icons/professional-light.png"
 									alt="Service Provider"
@@ -442,7 +453,7 @@ export default function OnboardingFlow() {
 
 					{/* NGO Tile */}
 					<div
-						className={`cursor-pointer rounded-[1.5rem] border-2 p-3 md:p-6 text-center transition-all duration-300 group relative overflow-hidden bg-white h-full flex flex-col justify-center ${
+						className={`cursor-pointer rounded-xl border-2 p-3 md:p-6 text-center transition-all duration-300 group relative overflow-hidden bg-white h-full flex flex-col justify-center ${
 							profile.user_type === "ngo"
 								? "border-serene-blue-500 shadow-xl ring-2 ring-serene-blue-500/10"
 								: "border-serene-neutral-100 hover:border-serene-blue-200"
@@ -450,7 +461,7 @@ export default function OnboardingFlow() {
 						onClick={() => setProfile(p => ({ ...p, user_type: "ngo" }))}
 					>
 						<div className="flex flex-row sm:flex-col items-center gap-3 sm:gap-4 relative z-10">
-							<div className="w-12 sm:w-16 aspect-square relative flex justify-center items-center bg-serene-blue-50 rounded-[1rem] shadow-sm border border-serene-blue-100 transition-all duration-500 group-hover:bg-serene-blue-100/50">
+							<div className="w-12 sm:w-16 aspect-square relative flex justify-center items-center bg-serene-blue-50 rounded-lg shadow-sm border border-serene-blue-100 transition-all duration-500 group-hover:bg-serene-blue-100/50">
 								<Image
 									src="/icons/ngo-light.png"
 									alt="NGO"
@@ -475,7 +486,8 @@ export default function OnboardingFlow() {
 	);
 
 	const About = (
-		<Card className="bg-white border-serene-neutral-100 shadow-premium rounded-[2.5rem] overflow-hidden max-h-full flex flex-col">
+		<Card className="bg-white border-serene-neutral-100 shadow-premium rounded-2xl overflow-hidden max-h-full flex flex-col">
+			{StepProgressTopBorder}
 			<CardHeader className="pb-3 text-center pt-6 bg-serene-blue-50/20 shrink-0">
 				<CardTitle className="text-xl font-bold text-serene-neutral-900 tracking-tight leading-none">Your Identity</CardTitle>
 				<p className="text-xs font-medium text-serene-neutral-500 mt-1">This helps us introduce you</p>
@@ -551,7 +563,7 @@ export default function OnboardingFlow() {
 					<div className="space-y-4 pt-2">
 						<div className="space-y-2">
 							<Label className="text-[10px] font-black text-serene-neutral-600 uppercase tracking-widest px-1">Your Gender</Label>
-							<div className="grid grid-cols-3 gap-2">
+							<div className="grid grid-cols-3 gap-2 text-white">
 								{['female', 'male', 'non_binary'].map((g) => (
 									<Button
 										key={g}
@@ -561,7 +573,7 @@ export default function OnboardingFlow() {
 										onClick={() => setProfile(p => ({ ...p, gender: g }))}
 										className={cn(
 											"rounded-xl font-bold capitalize h-10 transition-all",
-											profile.gender === g ? "bg-serene-blue-600 border-transparent shadow-md" : "bg-white border-serene-neutral-100 text-serene-neutral-600"
+											profile.gender === g ? "bg-serene-blue-600 border-transparent shadow-md hover:text-white" : "hover:bg-serene-blue-600/20 hover:border-serene-blue-600 hover:text-serene-blue-600  bg-white border-serene-neutral-100 text-serene-neutral-600"
 										)}
 									>
 										{g.replace('_', ' ')}
@@ -608,7 +620,8 @@ export default function OnboardingFlow() {
 	/* Required steps defined above */
 
 	const Services = (
-		<Card className="bg-white border-serene-neutral-100 shadow-premium rounded-[2.5rem] overflow-hidden">
+		<Card className="bg-white border-serene-neutral-100 shadow-premium rounded-2xl overflow-hidden">
+			{StepProgressTopBorder}
 			<CardHeader className="pb-4 text-center pt-8 bg-serene-blue-50/20">
 				<CardTitle className="text-2xl font-bold text-serene-neutral-900 tracking-tight">Professional Profile</CardTitle>
 				<p className="text-sm font-medium text-serene-neutral-500 mt-1">List your core services for the community</p>
@@ -633,20 +646,14 @@ export default function OnboardingFlow() {
 
 	return (
 		<div className="max-w-4xl mx-auto h-[100dvh] flex flex-col p-3 md:p-8 space-y-2 md:space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500 overflow-hidden relative">
-			<div className="space-y-2 shrink-0 px-1 sm:px-0">
-				<div className="flex items-center justify-between">
+			<div className="shrink-0 px-1 sm:px-0">
+				<div className="flex items-center justify-between pb-1">
 					<h2 className="text-sm font-semibold text-serene-blue-600">
 						Setup Step {safeStepIndex + 1} of {filteredSteps.length}
 					</h2>
 					<Badge variant="outline" className="rounded-full border-serene-blue-200 text-serene-blue-700 bg-white font-black text-[10px] uppercase">
 						{filteredSteps[safeStepIndex]?.title || '...'}
 					</Badge>
-				</div>
-				<div className="h-1.5 w-full bg-serene-neutral-100 rounded-full overflow-hidden shadow-inner">
-					<div 
-						className="h-full bg-gradient-to-r from-serene-blue-400 to-serene-blue-600 transition-all duration-700 ease-out" 
-						style={{ width: `${((safeStepIndex + 1) / filteredSteps.length) * 100}%` }}
-					/>
 				</div>
 			</div>
 

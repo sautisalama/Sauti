@@ -700,7 +700,7 @@ export default function ReportsMasterDetail({ userId }: { userId: string }) {
 							</>
 						) : filtered.length === 0 ? (
 							<div className="text-center py-24 px-6">
-								<div className="w-20 h-20 mx-auto mb-6 rounded-3xl bg-gradient-to-br from-sauti-teal/10 to-serene-blue-100 flex items-center justify-center shadow-sm">
+								<div className="w-20 h-20 mx-auto mb-6 rounded-2xl bg-gradient-to-br from-sauti-teal/10 to-serene-blue-100 flex items-center justify-center shadow-sm">
 									<FileText className="h-10 w-10 text-sauti-teal" />
 								</div>
 								<h3 className="text-xl font-bold text-sauti-dark mb-3">
@@ -1340,7 +1340,7 @@ export default function ReportsMasterDetail({ userId }: { userId: string }) {
 
 				{/* Edit Report Dialog */}
 				<Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
-					<DialogContent className="sm:max-w-lg bg-white rounded-3xl p-0 overflow-hidden">
+					<DialogContent className="sm:max-w-lg bg-white rounded-2xl p-0 overflow-hidden">
 						<div className="p-6 pb-0">
 							<DialogHeader>
 								<DialogTitle className="text-xl font-bold text-serene-neutral-900">Update Report Details</DialogTitle>

@@ -20,7 +20,7 @@ export default function FAQ() {
 
 					<div className="space-y-4 md:space-y-6">
 						<Accordion type="single" collapsible className="w-full space-y-4">
-							<AccordionItem value="item-1" className="border border-gray-100 rounded-[24px] md:rounded-[32px] px-6 md:px-8 bg-gray-50 shadow-sm overflow-hidden">
+							<AccordionItem value="item-1" className="border border-gray-100 rounded-xl md:rounded-2xl px-6 md:px-8 bg-gray-50 shadow-sm overflow-hidden">
 								<AccordionTrigger className="text-lg md:text-2xl font-bold text-sauti-blue hover:no-underline hover:text-sauti-orange transition-colors text-left py-6">
 									What is Sauti and how does it work?
 								</AccordionTrigger>
@@ -29,7 +29,7 @@ export default function FAQ() {
 								</AccordionContent>
 							</AccordionItem>
 
-							<AccordionItem value="item-2" className="border border-gray-100 rounded-[24px] md:rounded-[32px] px-6 md:px-8 bg-gray-50 shadow-sm overflow-hidden">
+							<AccordionItem value="item-2" className="border border-gray-100 rounded-xl md:rounded-2xl px-6 md:px-8 bg-gray-50 shadow-sm overflow-hidden">
 								<AccordionTrigger className="text-lg md:text-2xl font-bold text-sauti-blue hover:no-underline hover:text-sauti-orange transition-colors text-left py-6">
 									Is my information safe and private?
 								</AccordionTrigger>
@@ -38,7 +38,7 @@ export default function FAQ() {
 								</AccordionContent>
 							</AccordionItem>
 
-							<AccordionItem value="item-3" className="border border-gray-100 rounded-[24px] md:rounded-[32px] px-6 md:px-8 bg-gray-50 shadow-sm overflow-hidden">
+							<AccordionItem value="item-3" className="border border-gray-100 rounded-xl md:rounded-2xl px-6 md:px-8 bg-gray-50 shadow-sm overflow-hidden">
 								<AccordionTrigger className="text-lg md:text-2xl font-bold text-sauti-blue hover:no-underline hover:text-sauti-orange transition-colors text-left py-6">
 									How do I get started?
 								</AccordionTrigger>
@@ -47,7 +47,7 @@ export default function FAQ() {
 								</AccordionContent>
 							</AccordionItem>
 
-							<AccordionItem value="item-7" className="border border-red-100 rounded-[24px] md:rounded-[32px] px-6 md:px-8 bg-red-50/50 shadow-sm overflow-hidden">
+							<AccordionItem value="item-7" className="border border-red-100 rounded-xl md:rounded-2xl px-6 md:px-8 bg-red-50/50 shadow-sm overflow-hidden">
 								<AccordionTrigger className="text-lg md:text-2xl font-bold text-red-900 hover:no-underline transition-colors text-left py-6">
 									What if I need emergency help?
 								</AccordionTrigger>
@@ -64,7 +64,7 @@ export default function FAQ() {
 						</Accordion>
 					</div>
 
-					<div className="mt-12 md:mt-24 bg-sauti-blue rounded-[32px] md:rounded-[48px] p-8 md:p-12 text-white">
+					<div className="mt-12 md:mt-24 bg-sauti-blue rounded-2xl md:rounded-[48px] p-8 md:p-12 text-white">
 						<h3 className="text-2xl md:text-4xl font-bold mb-6">Still have questions?</h3>
 						<p className="text-lg md:text-xl text-white/70 mb-8 leading-relaxed">
 							If you don't see your question answered here, please don't hesitate to contact us.

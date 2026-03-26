@@ -376,7 +376,7 @@ export default function ProfessionalView({
 
 							return (
 								<Alert className={cn(
-									"border-0 shadow-sm rounded-[2rem] p-5 sm:p-6 transition-all duration-300",
+									"border-0 shadow-sm rounded-2xl p-5 sm:p-6 transition-all duration-300",
 									bannerVariant === "destructive" ? "bg-red-50 text-red-900 shadow-red-100/50" : 
 									bannerVariant === "warning" ? "bg-amber-50 text-amber-900 shadow-amber-100/50" : 
 									"bg-serene-blue-50 text-serene-blue-900 shadow-serene-blue-100/50"
@@ -788,7 +788,7 @@ export default function ProfessionalView({
 										</Link>
 									))
 								) : (
-									<div className="text-center py-12 bg-white rounded-3xl border border-dashed border-serene-neutral-200">
+									<div className="text-center py-12 bg-white rounded-2xl border border-dashed border-serene-neutral-200">
 										<div className="h-12 w-12 bg-serene-neutral-100 rounded-full flex items-center justify-center mx-auto mb-3">
 											<Users className="h-6 w-6 text-serene-neutral-400" />
 										</div>

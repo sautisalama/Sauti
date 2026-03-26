@@ -266,7 +266,7 @@ export function Nav() {
 								<Megaphone className="h-5 w-5" /> Report Abuse
 							</Button>
 						</DialogTrigger>
-						<DialogContent className="max-w-4xl p-0 overflow-hidden rounded-[32px] h-[90vh] min-h-[600px]">
+						<DialogContent className="max-w-4xl p-0 overflow-hidden rounded-2xl h-[90vh] min-h-[600px]">
 							<DialogTitle className="sr-only">Report Abuse</DialogTitle>
 							<DialogDescription className="sr-only">
 								Submit a report about an incident. Your information is secure and encrypted.

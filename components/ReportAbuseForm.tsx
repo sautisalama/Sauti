@@ -362,7 +362,7 @@ export default function ReportAbuseForm({ onClose }: { onClose?: () => void }) {
 			<div className="flex-1 overflow-y-auto p-3 sm:p-8 bg-neutral-50/30">
 				<form onSubmit={handleSubmit} className="space-y-8 sm:space-y-10 max-w-2xl mx-auto pb-12">
 					<div className="space-y-4 sm:space-y-6">
-						<div className="bg-white border-2 border-neutral-200 rounded-xl sm:rounded-3xl p-4 sm:p-6 shadow-sm hover:border-sauti-teal/30 transition-all">
+						<div className="bg-white border-2 border-neutral-200 rounded-xl sm:rounded-2xl p-4 sm:p-6 shadow-sm hover:border-sauti-teal/30 transition-all">
 							<p className="text-sm font-black text-sauti-dark uppercase tracking-wider mb-4">Who are you reporting for?</p>
 							<div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
 								<button

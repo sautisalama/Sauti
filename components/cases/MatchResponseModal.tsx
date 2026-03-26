@@ -123,7 +123,7 @@ export function MatchResponseModal({ isOpen, onClose, match, onSuccess }: MatchR
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-lg rounded-[24px] bg-white shadow-2xl border-none p-0 overflow-hidden">
+      <DialogContent className="max-w-lg rounded-xl bg-white shadow-2xl border-none p-0 overflow-hidden">
         {step === 'decision' && (
           <>
             {/* Header with gradient */}

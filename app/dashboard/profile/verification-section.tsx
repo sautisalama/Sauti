@@ -621,7 +621,7 @@ export function VerificationSection({
 
 			{/* ID Upload Modal */}
 			<Dialog open={showIdModal} onOpenChange={setShowIdModal}>
-				<DialogContent className="max-w-md rounded-[24px] bg-white shadow-2xl border-none p-0 overflow-hidden">
+				<DialogContent className="max-w-md rounded-xl bg-white shadow-2xl border-none p-0 overflow-hidden">
 					<div className="bg-gradient-to-br from-serene-neutral-50 to-white p-6 pb-0">
 						<DialogHeader className="space-y-3">
 							<div className="h-12 w-12 rounded-2xl bg-sauti-teal/10 flex items-center justify-center text-sauti-teal">
@@ -887,7 +887,7 @@ export function VerificationSection({
 
 			{/* Delete Confirmation Dialog */}
 			<Dialog open={!!docToDelete} onOpenChange={(open) => !open && setDocToDelete(null)}>
-				<DialogContent className="max-w-[400px] rounded-[24px] bg-white shadow-2xl border-none p-0 overflow-hidden">
+				<DialogContent className="max-w-[400px] rounded-xl bg-white shadow-2xl border-none p-0 overflow-hidden">
 					<div className="bg-red-50/50 p-6 pb-0">
 						<DialogHeader className="space-y-3">
 							<div className="h-12 w-12 rounded-2xl bg-red-100 flex items-center justify-center text-red-600">
@@ -966,7 +966,7 @@ function FileUploadZone({
 			
 			{file ? (
 				<div className="flex flex-col items-center animate-in fade-in zoom-in duration-300">
-					<div className="h-16 w-16 rounded-[20px] bg-white shadow-md border border-neutral-100 flex items-center justify-center mb-4 relative">
+					<div className="h-16 w-16 rounded-xl bg-white shadow-md border border-neutral-100 flex items-center justify-center mb-4 relative">
 						<FileText className="h-8 w-8 text-sauti-teal" />
 						<div className="absolute -top-1.5 -right-1.5 h-5 w-5 rounded-full bg-sauti-teal text-white flex items-center justify-center">
 							<CheckCircle className="h-3 w-3" />

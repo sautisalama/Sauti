@@ -56,7 +56,7 @@ export function SereneWelcomeHeader({ name, timeOfDay = "morning", className, co
 
   return (
     <div className={cn(
-      "p-6 md:p-8 bg-gradient-to-br from-serene-blue-50 to-white rounded-3xl mb-8 relative overflow-hidden shadow-sm border border-serene-blue-100 transition-all duration-500",
+      "w-full p-6 md:p-8 bg-gradient-to-br from-serene-blue-50 to-white rounded-2xl mb-8 relative overflow-hidden shadow-sm border border-serene-blue-100 transition-all duration-500",
       className
     )}>
       {/* Soft decorative blur */}
@@ -338,7 +338,7 @@ interface SereneProviderCardProps {
 
 export function SereneProviderCard({ provider, onBook, onChat, className }: SereneProviderCardProps) {
   return (
-    <Card className={cn("overflow-hidden border-serene-neutral-200 rounded-3xl shadow-sm hover:shadow-md transition-all", className)}>
+    <Card className={cn("overflow-hidden border-serene-neutral-200 rounded-2xl shadow-sm hover:shadow-md transition-all", className)}>
       <CardContent className="p-5">
         <div className="flex items-start justify-between gap-4">
           <div className="flex items-center gap-3">
@@ -553,7 +553,7 @@ export function SereneAppointmentCard({ date, title, providerName, status, onAct
   const isUpcoming = status === 'upcoming';
   
   return (
-    <Card className={cn("overflow-hidden border-serene-neutral-200 rounded-3xl shadow-sm hover:shadow-md transition-all", className)}>
+    <Card className={cn("overflow-hidden border-serene-neutral-200 rounded-2xl shadow-sm hover:shadow-md transition-all", className)}>
       <CardContent className="p-0 flex flex-col sm:flex-row">
          {/* Calendar Date Block */}
          <div className={cn(

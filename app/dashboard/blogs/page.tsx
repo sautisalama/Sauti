@@ -20,7 +20,7 @@ export default function BlogsComingSoon() {
         <div className="max-w-lg w-full text-center">
           {/* Icon */}
           <div className="relative mx-auto mb-8">
-            <div className="w-24 h-24 mx-auto rounded-3xl bg-gradient-to-br from-sauti-teal/10 to-serene-blue-100 flex items-center justify-center shadow-lg">
+            <div className="w-24 h-24 mx-auto rounded-2xl bg-gradient-to-br from-sauti-teal/10 to-serene-blue-100 flex items-center justify-center shadow-lg">
               <FileText className="h-12 w-12 text-sauti-teal" />
             </div>
             <div className="absolute -top-2 -right-2 w-10 h-10 rounded-full bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center shadow-md animate-pulse">

@@ -288,7 +288,7 @@ export default function SurvivorView({
                                         </Link>
                                     ))
                                 ) : (
-                                    <div className="text-center py-12 bg-white rounded-3xl border border-dashed border-serene-neutral-200">
+                                    <div className="text-center py-12 bg-white rounded-2xl border border-dashed border-serene-neutral-200">
                                         <p className="text-serene-neutral-400 mb-2">No active cases found</p>
                                         <Button className="text-serene-blue-600 font-semibold" variant="link" asChild>
                                             <Link href="/report-abuse">Start a new report</Link>

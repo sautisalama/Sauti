@@ -117,7 +117,7 @@ export default function MatchesPage() {
 
           {loading ? (
              <div className="space-y-4">
-               {[1,2].map(i => <Skeleton key={i} className="h-48 w-full rounded-3xl" />)}
+               {[1,2].map(i => <Skeleton key={i} className="h-48 w-full rounded-2xl" />)}
              </div>
           ) : filteredMatches.length > 0 ? (
              <div className="grid gap-6">
@@ -144,7 +144,7 @@ export default function MatchesPage() {
                 ))}
              </div>
           ) : (
-             <div className="text-center py-12 px-6 bg-white rounded-3xl border border-dashed border-serene-neutral-200">
+             <div className="text-center py-12 px-6 bg-white rounded-2xl border border-dashed border-serene-neutral-200">
                 <div className="bg-serene-blue-50 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
                    <Heart className="h-6 w-6 text-serene-blue-400" />
                 </div>

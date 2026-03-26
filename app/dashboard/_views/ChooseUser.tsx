@@ -66,7 +66,7 @@ export default function ChooseUser() {
 				<div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
 					{/* Survivor Tile */}
 					<div
-						className={`cursor-pointer rounded-[2rem] border-2 p-6 text-center transition-all duration-300 group relative overflow-hidden ${
+						className={`cursor-pointer rounded-2xl border-2 p-6 text-center transition-all duration-300 group relative overflow-hidden ${
 							selectedType === "survivor"
 								? "border-sauti-teal bg-sauti-teal/5 shadow-premium ring-4 ring-sauti-teal/10"
 								: "border-neutral-100 hover:border-sauti-teal/30 hover:bg-neutral-50 shadow-sm"
@@ -96,7 +96,7 @@ export default function ChooseUser() {
 
 					{/* Professional Tile */}
 					<div
-						className={`cursor-pointer rounded-[2rem] border-2 p-6 text-center transition-all duration-300 group relative overflow-hidden ${
+						className={`cursor-pointer rounded-2xl border-2 p-6 text-center transition-all duration-300 group relative overflow-hidden ${
 							selectedType === "professional"
 								? "border-sauti-teal bg-sauti-teal/5 shadow-premium ring-4 ring-sauti-teal/10"
 								: "border-neutral-100 hover:border-sauti-teal/30 hover:bg-neutral-50 shadow-sm"
@@ -126,7 +126,7 @@ export default function ChooseUser() {
 
 					{/* NGO Tile */}
 					<div
-						className={`cursor-pointer rounded-[2rem] border-2 p-6 text-center transition-all duration-300 group relative overflow-hidden ${
+						className={`cursor-pointer rounded-2xl border-2 p-6 text-center transition-all duration-300 group relative overflow-hidden ${
 							selectedType === "ngo"
 								? "border-sauti-teal bg-sauti-teal/5 shadow-premium ring-4 ring-sauti-teal/10"
 								: "border-neutral-100 hover:border-sauti-teal/30 hover:bg-neutral-50 shadow-sm"
