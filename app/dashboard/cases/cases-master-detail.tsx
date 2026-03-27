@@ -47,6 +47,7 @@ import { Chat } from "@/types/chat";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { Calendar } from "lucide-react";
+import { matchProfessionalWithUnmatchedReports } from "@/app/actions/match-services";
 
 
 interface MatchedServiceItem {
@@ -212,68 +213,82 @@ export default function CasesMasterDetail({ userId }: { userId: string }) {
 	}, [dash?.data, userId]);
 
 	// Load matched services and appointments in parallel (skip if already seeded)
-	useEffect(() => {
-		const load = async () => {
-			if (seededFromProviderRef.current) return;
-			setLoading(true);
-			try {
-				// Get the user's services
-				const { data: services } = await supabase
-					.from("support_services")
-					.select("id")
-					.eq("user_id", userId);
-				const ids = (services || []).map((s) => s.id);
-				if (ids.length === 0) {
-					setCases([]);
-					setLoading(false);
-					return;
-				}
-
-				const [{ data: matches }, { data: appts }] = await Promise.all([
-					supabase
-						.from("matched_services")
-						.select(`*, report:reports(*), service_details:support_services(*)`)
-						.in("service_id", ids)
-						.order("match_date", { ascending: false }),
-					supabase
-						.from("appointments")
-						.select("*, matched_services")
-						.in(
-							"matched_services",
-							ids.length
-								? (
-										await supabase
-											.from("matched_services")
-											.select("id")
-											.in("service_id", ids)
-								  ).data?.map((m: any) => m.id) || []
-								: []
-						),
-				]);
-
-				const apptByMatchId = new Map<string, any[]>();
-				(appts || []).forEach((a: any) => {
-					const k = a.matched_services as string;
-					const arr = apptByMatchId.get(k) || [];
-					arr.push(a);
-					apptByMatchId.set(k, arr);
-				});
-
-				const normalized: MatchedServiceItem[] = (matches || []).map((m: any) => ({
-					...m,
-					notes: m.notes || null,
-					appointments: apptByMatchId.get(m.id) || [],
-				}));
-
-				setCases(normalized);
-			} catch (error) {
-				console.error("Failed to load cases:", error);
-			} finally {
+	const loadCases = useMemo(() => async (forceRefresh: boolean = false) => {
+		if (seededFromProviderRef.current && !forceRefresh) return;
+		setLoading(true);
+		try {
+			// Get the user's services
+			const { data: services } = await supabase
+				.from("support_services")
+				.select("id")
+				.eq("user_id", userId);
+			const ids = (services || []).map((s) => s.id);
+			if (ids.length === 0) {
+				setCases([]);
 				setLoading(false);
+				return;
 			}
-		};
-		load();
-	}, [userId, supabase]);
+
+			const [{ data: matches }, { data: appts }] = await Promise.all([
+				supabase
+					.from("matched_services")
+					.select(`*, report:reports(*), service_details:support_services(*)`)
+					.in("service_id", ids)
+					.order("match_date", { ascending: false }),
+				supabase
+					.from("appointments")
+					.select("*, matched_services")
+					.in(
+						"matched_services",
+						ids.length
+							? (
+									await supabase
+										.from("matched_services")
+										.select("id")
+										.in("service_id", ids)
+							  ).data?.map((m: any) => m.id) || []
+							: []
+					),
+			]);
+
+			const apptByMatchId = new Map<string, any[]>();
+			(appts || []).forEach((a: any) => {
+				const k = a.matched_services as string;
+				const arr = apptByMatchId.get(k) || [];
+				arr.push(a);
+				apptByMatchId.set(k, arr);
+			});
+
+			const normalized: MatchedServiceItem[] = (matches || []).map((m: any) => ({
+				...m,
+				notes: m.notes || null,
+				appointments: apptByMatchId.get(m.id) || [],
+			}));
+
+			setCases(normalized);
+			
+			// PROACTIVE MATCHING: If after loading we still have NO cases, 
+			// trigger the proactive matching engine once per session.
+			if (normalized.length === 0 && !seededFromProviderRef.current) {
+				console.log("[Cases] No cases found. Triggering proactive matching engine...");
+				const res = await matchProfessionalWithUnmatchedReports(userId);
+				if (res && (res as any).matched > 0) {
+					console.log(`[Cases] Success! Matched ${res.matched} reports. Refreshing...`);
+					// Re-run the load to pick up new matches
+					seededFromProviderRef.current = false; // allow re-fetch
+					loadCases(true); 
+				}
+			}
+		} catch (error) {
+			console.error("Failed to load cases:", error);
+		} finally {
+			setLoading(false);
+		}
+	}, [userId, supabase, seededFromProviderRef]);
+
+	useEffect(() => {
+		loadCases();
+	}, [loadCases]);
 
 	// Track unread messages for each case - load after cases are loaded
 	// This prevents delays and freezing during initial case loading
@@ -766,7 +781,15 @@ export default function CasesMasterDetail({ userId }: { userId: string }) {
 										<CaseCard
 											data={c as any}
 											active={isActive}
-											onClick={() => router.push(`/dashboard/reports/${c.report.report_id}`)}
+											onClick={() => {
+												setSelectedId(c.id);
+												setActiveTab('details');
+											}}
+											onChat={(e) => {
+												e.stopPropagation();
+												setSelectedId(c.id);
+												setActiveTab('chat');
+											}}
 											isLoadingMessages={isLoadingMessages}
 										/>
 									</div>

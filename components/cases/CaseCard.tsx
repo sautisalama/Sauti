@@ -57,6 +57,7 @@ export interface CaseCardData {
 interface CaseCardProps {
 	data: CaseCardData;
 	onClick?: () => void;
+	onChat?: (e: React.MouseEvent) => void;
 	active?: boolean;
 	actions?: React.ReactNode;
 	className?: string;
@@ -76,6 +77,7 @@ function formatDate(d?: string | null) {
 export function CaseCard({
 	data,
 	onClick,
+	onChat,
 	active,
 	actions,
 	className,
@@ -160,6 +162,16 @@ export function CaseCard({
 								{formatDate(appointment.appointment_date)}
 							</span>
 						)}
+
+						{/* Chat button for active cases */}
+						{onChat && matchStatus !== 'pending' && (
+							<button
+								onClick={(e) => { e.preventDefault(); e.stopPropagation(); onChat(e); }}
+								className="flex items-center gap-1 px-2.5 py-1 rounded-md bg-sauti-teal/10 text-sauti-teal border border-sauti-teal/20 text-[10px] font-bold uppercase tracking-wider hover:bg-sauti-teal/20 transition-colors"
+							>
+								<MessageCircle className="h-3 w-3" /> Chat
+							</button>
+						)}
 					</div>
 					
 					{actions || (
@@ -172,3 +184,4 @@ export function CaseCard({
 		</div>
 	);
 }
+

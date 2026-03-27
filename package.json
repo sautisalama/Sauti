@@ -32,6 +32,8 @@
 		"@radix-ui/react-toast": "^1.2.2",
 		"@radix-ui/react-tooltip": "^1.2.8",
 		"@react-google-maps/api": "^2.20.8",
+		"@xyflow/react": "^12.4.2",
+		"dagre": "^0.8.5",
 		"@supabase/auth-helpers-nextjs": "^0.10.0",
 		"@supabase/ssr": "^0.7.0",
 		"@supabase/supabase-js": "^2.81.1",
@@ -76,6 +78,7 @@
 	},
 	"devDependencies": {
 		"@tailwindcss/postcss": "^4",
+		"@types/dagre": "^0.7.52",
 		"@types/node": "^20",
 		"@types/react": "^19",
 		"@types/react-dom": "^19",

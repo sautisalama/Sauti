@@ -186,6 +186,10 @@ export async function matchReportWithServices(reportId: string, customClient?: S
 			}))
 		];
 
+		// Check if report is "old" (more than 24h) or force matching
+		const reportAgeHours = (new Date().getTime() - new Date(report.submission_timestamp!).getTime()) / (1000 * 60 * 60);
+		const isOldReport = reportAgeHours > 24;
+
 		// 3. Scoring
 		const results = await Promise.all(candidates.map(async (cand) => {
 			let score = 0;
@@ -195,6 +199,17 @@ export async function matchReportWithServices(reportId: string, customClient?: S
 			const requiredBySurvivor = (report.required_services as string[]) || [];
 			const mapping = INCIDENT_SPECIALTY_MAP[report.type_of_incident || 'other'];
 			
+			const matchedTypes = cand.serviceTypes.filter(t => 
+				mapping?.primary.includes(t) || 
+				mapping?.secondary.includes(t) || 
+				requiredBySurvivor.includes(t)
+			);
+
+			if (matchedTypes.length === 0 && report.type_of_incident !== 'other') {
+				// Hard filter: MUST provide at least one relevant service
+				return { cand, score: -100, reasons: [] };
+			}
+
 			const isPrimary = cand.serviceTypes.some(t => mapping?.primary.includes(t));
 			const isSecondary = cand.serviceTypes.some(t => mapping?.secondary.includes(t));
 			const isExplicitlyRequested = cand.serviceTypes.some(t => requiredBySurvivor.includes(t));
@@ -212,16 +227,26 @@ export async function matchReportWithServices(reportId: string, customClient?: S
 				matchReasons.push("Requested by survivor");
 			}
 
-			// B. Distance Scoring
+			// B. Distance Scoring & Relaxation
 			if (report.latitude && report.longitude && cand.lat && cand.lon && !cand.isRemote) {
 				const dist = calculateDistance(report.latitude, report.longitude, cand.lat, cand.lon);
-				if (cand.radius === null || dist <= cand.radius) {
-					const radius = cand.radius || 50;
+				const radius = cand.radius || 50;
+
+				if (dist <= radius) {
 					const distScore = Math.max(0, 20 * (1 - dist / radius));
 					score += distScore;
 					if (distScore > 15) matchReasons.push("Very close proximity");
+				} else if (isOldReport) {
+					// Relaxed distance for old reports: don't penalize, just don't give bonus
+					matchReasons.push(`Available (Distance: ${Math.round(dist)}km)`);
+					score += 5; // Small consolation bonus for being available even if far
+				} else {
+					// Far away: small penalty if not old
+					score -= 10;
+					matchReasons.push("Outside regular service area");
 				}
 			} else if (cand.isRemote) {
+				score += 15;
 				matchReasons.push("Remote service available");
 			}
 
@@ -265,29 +290,48 @@ export async function matchReportWithServices(reportId: string, customClient?: S
 
 			// G. Consent
 			if (report.consent === 'no' && !isChildCase && (cand.profTitle === 'Lawyer' || cand.profTitle === 'Law firm')) {
-				score -= 50; 
+				score -= 100; // Hard filter for no legal consent
 			}
 
-			// G. Load Balancing
+			// H. Load Balancing & Freshness
 			if (cand.userId) {
 				const { data: caseCount } = await supabase.rpc('get_active_case_count', { provider_user_id: cand.userId });
-				if (typeof caseCount === 'number' && caseCount > 0) {
-					score -= (caseCount * 5);
+				if (typeof caseCount === 'number') {
+					if (caseCount > 0) {
+						score -= (caseCount * 5);
+					} else {
+						// NEW: Bonus for professionals with NO cases (Lone service/Fresh service)
+						score += 20;
+						matchReasons.push("High capacity available");
+					}
 				}
 			}
 
-			// H. Urgency Multiplier
-			if (urgency === 'high') score *= 1.15;
-			else if (urgency === 'medium') score *= 1.05;
+			// I. Urgency Multiplier
+			if (urgency === 'high') score *= 1.2;
+			else if (urgency === 'medium') score *= 1.1;
 
 			return { cand, score, reasons: matchReasons };
 		}));
 
 		// 4. Filter & Select Top Matches
-		const finalMatches = results
-			.filter(r => r.score > 10)
+		let finalMatches = results
+			.filter(r => r.score >= 10)
 			.sort((a, b) => b.score - a.score)
 			.slice(0, 5);
+
+		// FALLBACK: If no matches above threshold, but we have candidates with score > 0
+		if (finalMatches.length === 0 && results.some(r => r.score > 0)) {
+			console.log(`Report ${reportId}: No high-scoring matches. Falling back to best available candidate.`);
+			finalMatches = results
+				.filter(r => r.score > -50) // Allow some slightly lower scores if they match specialty
+				.sort((a, b) => b.score - a.score)
+				.slice(0, 3);
+			
+			if (finalMatches.length > 0) {
+				finalMatches[0].reasons.push("Matched as best available provider");
+			}
+		}
 
 		if (finalMatches.length > 0) {
 			await supabase.from("reports").update({
@@ -347,6 +391,7 @@ export async function matchReportWithServices(reportId: string, customClient?: S
 		}
 
 
+
 		return finalMatches;
 
 	} catch (error) {
@@ -392,3 +437,73 @@ export async function backfillUnmatchedReports() {
 		throw error;
 	}
 }
+
+/**
+ * REVERSE MATCHING (Proactive matching for a professional)
+ * Triggered when a professional who has no cases refreshes their dashboard.
+ * This finds reports that match this professional's specific services.
+ */
+export async function matchProfessionalWithUnmatchedReports(professionalUserId: string) {
+	const supabase = await createClient();
+
+	try {
+		// 1. Check if the professional has verified services
+		const { data: services } = await supabase
+			.from("support_services")
+			.select("id, verification_status")
+			.eq("user_id", professionalUserId)
+			.eq("verification_status", "verified");
+
+		// Only proceed if professional has verified services
+		if (!services || services.length === 0) return { matched: 0 };
+
+		const serviceIds = services.map(s => s.id);
+
+		// 2. Check current active matches (excluding completed ones)
+		const { count: activeMatchCount } = await supabase
+			.from("matched_services")
+			.select("id", { count: 'exact', head: true })
+			.in("service_id", serviceIds)
+			.not("match_status_type", "eq", "completed");
+
+		// Rule: Only proactive match if they have NO cases yet.
+		// This is the "Fresh Provider" boost.
+		if ((activeMatchCount || 0) > 0) return { status: "has_cases", count: activeMatchCount };
+
+		// 3. Find unmatched reports that are not record-only
+		const { data: unmatchedReports } = await supabase
+			.from("reports")
+			.select("report_id")
+			.eq("ismatched", false)
+			.eq("record_only", false)
+			.order("submission_timestamp", { ascending: false })
+			.limit(15); 
+
+		if (!unmatchedReports || unmatchedReports.length === 0) return { status: "no_unmatched_reports" };
+
+		console.log(`[Proactive Matching] Checking ${unmatchedReports.length} reports for professional ${professionalUserId}...`);
+
+		let newlyMatchedCount = 0;
+		
+		// 4. Run standard matching for each unmatched report
+		// The matching engine automatically considers this professional as a candidate
+		// and gives them the "High capacity available" bonus we added earlier.
+		for (const report of unmatchedReports) {
+			try {
+				const matches = await matchReportWithServices(report.report_id, supabase);
+				// Check if this professional's service was among the final matches
+				if (matches && matches.some(m => serviceIds.includes(m.cand.id))) {
+					newlyMatchedCount++;
+				}
+			} catch (err) {
+				console.error(`Proactive match failed for report ${report.report_id}:`, err);
+			}
+		}
+
+		return { status: "success", matched: newlyMatchedCount };
+	} catch (error) {
+		console.error("Proactive matching critical error:", error);
+		throw error;
+	}
+}
+

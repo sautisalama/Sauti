@@ -25,7 +25,8 @@ import {
 	Megaphone,
 	Shield,
 	BookOpen, 
-	Building2
+	Building2,
+    Network
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -265,6 +266,13 @@ export function EnhancedSidebar({
 					label: "Blogs & Events",
 					icon: BookOpen,
 					href: "/dashboard/admin/blogs",
+					section: "main",
+				},
+				{
+					id: "matching",
+					label: "Matching Engine",
+					icon: Network,
+					href: "/dashboard/admin/matching",
 					section: "main",
 				},
 				{
