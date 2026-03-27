@@ -11,11 +11,11 @@ import {
 	Underline as UnderlineIcon, 
 	List, 
 	ListOrdered,
-	Save,
+	Check,
 	Loader2
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 
 interface RichTextEditorProps {
 	content?: string;
@@ -23,10 +23,12 @@ interface RichTextEditorProps {
 	placeholder?: string;
 	className?: string;
 	readOnly?: boolean;
+	/** Debounce delay in ms before autosave triggers (default: 1500) */
+	autosaveDelay?: number;
 }
 
 /**
- * Calming WYSIWYG editor for private notes
+ * Calming WYSIWYG editor with debounced autosave
  * Uses Tiptap with minimal toolbar and Sauti Salama theme
  */
 export function RichTextEditor({ 
@@ -34,12 +36,39 @@ export function RichTextEditor({
 	onSave, 
 	placeholder = "Write your private notes here...",
 	className,
-	readOnly = false
+	readOnly = false,
+	autosaveDelay = 1500
 }: RichTextEditorProps) {
-	const [isSaving, setIsSaving] = useState(false);
-	const [hasChanges, setHasChanges] = useState(false);
+	const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'unsaved'>('idle');
+	const debounceRef = useRef<NodeJS.Timeout | null>(null);
+	const isMountedRef = useRef(true);
+
+	useEffect(() => {
+		isMountedRef.current = true;
+		return () => { isMountedRef.current = false; };
+	}, []);
+
+	const doSave = useCallback(async (html: string) => {
+		if (!onSave) return;
+		setSaveStatus('saving');
+		try {
+			await onSave(html);
+			if (isMountedRef.current) setSaveStatus('saved');
+		} catch {
+			if (isMountedRef.current) setSaveStatus('unsaved');
+		}
+	}, [onSave]);
+
+	const scheduleSave = useCallback((html: string) => {
+		setSaveStatus('unsaved');
+		if (debounceRef.current) clearTimeout(debounceRef.current);
+		debounceRef.current = setTimeout(() => {
+			doSave(html);
+		}, autosaveDelay);
+	}, [doSave, autosaveDelay]);
 
 	const editor = useEditor({
+		immediatelyRender: false,
 		extensions: [
 			StarterKit.configure({
 				heading: false,
@@ -55,13 +84,20 @@ export function RichTextEditor({
 		],
 		content,
 		editable: !readOnly,
-		onUpdate: () => {
-			setHasChanges(true);
+		onUpdate: ({ editor }) => {
+			if (onSave) scheduleSave(editor.getHTML());
+		},
+		onBlur: ({ editor }) => {
+			// Immediately save on blur if there are pending changes
+			if (onSave && saveStatus === 'unsaved') {
+				if (debounceRef.current) clearTimeout(debounceRef.current);
+				doSave(editor.getHTML());
+			}
 		},
 		editorProps: {
 			attributes: {
 				class: cn(
-					"prose prose-sm max-w-none min-h-[150px] p-4 focus:outline-none",
+					"prose prose-sm max-w-none min-h-[120px] p-4 focus:outline-none",
 					"text-sauti-dark font-medium leading-relaxed",
 					"[&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5",
 					"[&_p]:my-2 first:[&_p]:mt-0 last:[&_p]:mb-0"
@@ -72,26 +108,36 @@ export function RichTextEditor({
 
 	// Sync external content changes
 	useEffect(() => {
-		if (editor && content !== editor.getHTML() && !hasChanges) {
+		if (editor && content !== editor.getHTML() && saveStatus !== 'unsaved') {
 			editor.commands.setContent(content);
 		}
-	}, [content, editor, hasChanges]);
+	}, [content, editor]);
 
-	const handleSave = async () => {
-		if (!editor || !onSave) return;
-		
-		setIsSaving(true);
-		try {
-			await onSave(editor.getHTML());
-			setHasChanges(false);
-		} finally {
-			setIsSaving(false);
-		}
-	};
+	// Ctrl/Cmd+S keyboard shortcut
+	useEffect(() => {
+		const onKeyDown = (e: KeyboardEvent) => {
+			if ((e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'S')) {
+				e.preventDefault();
+				if (editor && onSave) {
+					if (debounceRef.current) clearTimeout(debounceRef.current);
+					doSave(editor.getHTML());
+				}
+			}
+		};
+		window.addEventListener('keydown', onKeyDown);
+		return () => window.removeEventListener('keydown', onKeyDown);
+	}, [editor, onSave, doSave]);
+
+	// Cleanup debounce on unmount
+	useEffect(() => {
+		return () => {
+			if (debounceRef.current) clearTimeout(debounceRef.current);
+		};
+	}, []);
 
 	if (!editor) {
 		return (
-			<div className={cn("animate-pulse bg-serene-neutral-100 rounded-2xl h-48", className)} />
+			<div className={cn("animate-pulse bg-serene-neutral-100 rounded-xl h-48", className)} />
 		);
 	}
 
@@ -113,7 +159,7 @@ export function RichTextEditor({
 			onClick={onClick}
 			disabled={disabled}
 			className={cn(
-				"h-8 w-8 p-0 rounded-lg transition-colors",
+				"h-7 w-7 p-0 rounded-lg transition-colors",
 				active 
 					? "bg-sauti-teal/10 text-sauti-teal" 
 					: "text-serene-neutral-500 hover:text-sauti-teal hover:bg-sauti-teal/5"
@@ -125,72 +171,69 @@ export function RichTextEditor({
 
 	return (
 		<div className={cn(
-			"rounded-2xl border border-serene-neutral-200 bg-white overflow-hidden",
+			"rounded-xl border border-serene-neutral-200 bg-white overflow-hidden",
 			"transition-all duration-300 focus-within:border-sauti-teal/50 focus-within:ring-2 focus-within:ring-sauti-teal/10",
 			className
 		)}>
 			{/* Toolbar */}
 			{!readOnly && (
-				<div className="flex items-center gap-1 px-3 py-2 border-b border-serene-neutral-100 bg-serene-neutral-50">
+				<div className="flex items-center gap-1 px-3 py-1.5 border-b border-serene-neutral-100 bg-serene-neutral-50/80">
 					<ToolbarButton
 						active={editor.isActive("bold")}
 						onClick={() => editor.chain().focus().toggleBold().run()}
 					>
-						<Bold className="h-4 w-4" />
+						<Bold className="h-3.5 w-3.5" />
 					</ToolbarButton>
 					
 					<ToolbarButton
 						active={editor.isActive("italic")}
 						onClick={() => editor.chain().focus().toggleItalic().run()}
 					>
-						<Italic className="h-4 w-4" />
+						<Italic className="h-3.5 w-3.5" />
 					</ToolbarButton>
 					
 					<ToolbarButton
 						active={editor.isActive("underline")}
 						onClick={() => editor.chain().focus().toggleUnderline().run()}
 					>
-						<UnderlineIcon className="h-4 w-4" />
+						<UnderlineIcon className="h-3.5 w-3.5" />
 					</ToolbarButton>
 
-					<div className="w-px h-5 bg-serene-neutral-200 mx-1" />
+					<div className="w-px h-4 bg-serene-neutral-200 mx-0.5" />
 
 					<ToolbarButton
 						active={editor.isActive("bulletList")}
 						onClick={() => editor.chain().focus().toggleBulletList().run()}
 					>
-						<List className="h-4 w-4" />
+						<List className="h-3.5 w-3.5" />
 					</ToolbarButton>
 					
 					<ToolbarButton
 						active={editor.isActive("orderedList")}
 						onClick={() => editor.chain().focus().toggleOrderedList().run()}
 					>
-						<ListOrdered className="h-4 w-4" />
+						<ListOrdered className="h-3.5 w-3.5" />
 					</ToolbarButton>
 
+					{/* Autosave status indicator */}
 					{onSave && (
-						<>
-							<div className="flex-1" />
-							<Button
-								size="sm"
-								onClick={handleSave}
-								disabled={isSaving || !hasChanges}
-								className={cn(
-									"h-8 px-3 rounded-lg font-semibold text-xs transition-all",
-									hasChanges 
-										? "bg-sauti-teal hover:bg-sauti-teal/90 text-white" 
-										: "bg-serene-neutral-100 text-serene-neutral-400"
+						<div className="ml-auto flex items-center gap-1.5">
+							<span className="text-[10px] font-medium text-serene-neutral-400">
+								{saveStatus === 'saving' && (
+									<span className="flex items-center gap-1 text-sauti-teal">
+										<Loader2 className="h-3 w-3 animate-spin" /> Saving…
+									</span>
 								)}
-							>
-								{isSaving ? (
-									<Loader2 className="h-3.5 w-3.5 animate-spin mr-1" />
-								) : (
-									<Save className="h-3.5 w-3.5 mr-1" />
+								{saveStatus === 'saved' && (
+									<span className="flex items-center gap-1 text-serene-green-600">
+										<Check className="h-3 w-3" /> Saved
+									</span>
 								)}
-								{isSaving ? "Saving..." : "Save"}
-							</Button>
-						</>
+								{saveStatus === 'unsaved' && (
+									<span className="text-amber-500">Unsaved</span>
+								)}
+							</span>
+						</div>
 					)}
 				</div>
 			)}

@@ -21,6 +21,11 @@ import {
 	Underline,
 	Undo2,
 	Quote,
+	Check,
+	Loader2,
+	Heading2,
+	Heading3,
+	MinusSquare,
 } from "lucide-react";
 import { Tables } from "@/types/db-schema";
 import { createClient } from "@/utils/supabase/client";
@@ -28,16 +33,14 @@ import { useToast } from "@/hooks/use-toast";
 
 // Tiptap imports
 import { useEditor, EditorContent } from "@tiptap/react";
+import { BubbleMenu } from "@tiptap/react/menus";
 import StarterKit from "@tiptap/starter-kit";
 import UnderlineExt from "@tiptap/extension-underline";
 import LinkExt from "@tiptap/extension-link";
 import ImageExt from "@tiptap/extension-image";
 import TextAlign from "@tiptap/extension-text-align";
 import Placeholder from "@tiptap/extension-placeholder";
-import TextStyle from "@tiptap/extension-text-style";
-import OrderedList from "@tiptap/extension-ordered-list";
-import BulletList from "@tiptap/extension-bullet-list";
-import ListItem from "@tiptap/extension-list-item";
+import { TextStyle } from "@tiptap/extension-text-style";
 
 export default function ReportNotesEditor({
 	userId,
@@ -54,18 +57,25 @@ export default function ReportNotesEditor({
 	const [dirty, setDirty] = useState(false);
 	const [lastSavedAt, setLastSavedAt] = useState<string | null>(null);
 	const fileInputRef = useRef<HTMLInputElement | null>(null);
+	const autosaveTimerRef = useRef<NodeJS.Timeout | null>(null);
+	const isMountedRef = useRef(true);
 
-	const initialHtml = useMemo(() => report.notes || "", [report.notes]);
+	// Track report ID to detect report switching
+	const currentReportIdRef = useRef(report.report_id);
 
-const editor = useEditor({
+	const initialHtml = useMemo(() => report.notes || "", [report.report_id, report.notes]);
+
+	const editor = useEditor({
+		immediatelyRender: false,
 		extensions: [
 			StarterKit.configure({
-				heading: false,
+				// StarterKit already includes: bulletList, orderedList, listItem,
+				// blockquote, codeBlock, heading, horizontalRule, etc.
+				// We configure what we need here:
+				heading: {
+					levels: [2, 3],
+				},
 			}),
-			// Explicit list extensions to ensure list behavior works reliably
-			BulletList,
-			OrderedList,
-			ListItem,
 			UnderlineExt,
 			TextStyle,
 			LinkExt.configure({
@@ -76,7 +86,7 @@ const editor = useEditor({
 			}),
 			ImageExt.configure({ allowBase64: true }),
 			TextAlign.configure({
-				types: ["paragraph"],
+				types: ["heading", "paragraph"],
 				alignments: ["left", "center", "right", "justify"],
 			}),
 			Placeholder.configure({
@@ -87,6 +97,18 @@ const editor = useEditor({
 		editable: true,
 		onUpdate: ({ editor }) => {
 			setDirty(true);
+			// Debounced autosave: 2s after last keystroke (industry best practice)
+			if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current);
+			autosaveTimerRef.current = setTimeout(() => {
+				void save(editor.getHTML(), { autosave: true });
+			}, 2000);
+		},
+		onBlur: ({ editor }) => {
+			// Immediately save on blur if dirty
+			if (dirty) {
+				if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current);
+				void save(editor.getHTML(), { autosave: true });
+			}
 		},
 		editorProps: {
 			handlePaste: (view: any, e: ClipboardEvent) => {
@@ -117,10 +139,15 @@ const editor = useEditor({
 			},
 			attributes: {
 				class:
-					"tiptap prose-sm max-w-none focus:outline-none break-words whitespace-pre-wrap min-h-[300px] p-4",
+					"tiptap-editor prose prose-sm max-w-none focus:outline-none break-words whitespace-pre-wrap min-h-[300px] p-4",
 			},
 		},
 	});
+
+	useEffect(() => {
+		isMountedRef.current = true;
+		return () => { isMountedRef.current = false; };
+	}, []);
 
 	const save = useCallback(
 		async (html?: string, opts?: { autosave?: boolean }) => {
@@ -136,8 +163,10 @@ const editor = useEditor({
 					.select()
 					.single();
 				if (error) throw error;
-				setDirty(false);
-				setLastSavedAt(new Date().toLocaleTimeString());
+				if (isMountedRef.current) {
+					setDirty(false);
+					setLastSavedAt(new Date().toLocaleTimeString());
+				}
 				onSaved(data as any);
 				if (!autosave) {
 					toast({
@@ -154,19 +183,26 @@ const editor = useEditor({
 					});
 				}
 			} finally {
-				setSaving(false);
+				if (isMountedRef.current) setSaving(false);
 			}
 		},
 		[editor, report.report_id, supabase, toast, onSaved]
 	);
 
-	// Keep editor content in sync if the selected report changes
+	// Sync editor when the selected report changes
 	useEffect(() => {
-		if (editor && initialHtml !== editor.getHTML()) {
-			editor.commands.setContent(initialHtml || "", false);
+		if (!editor) return;
+		
+		// Only replace content when the report actually changes
+		if (currentReportIdRef.current !== report.report_id) {
+			currentReportIdRef.current = report.report_id;
+			// Cancel any pending autosave for the old report
+			if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current);
+			editor.commands.setContent(initialHtml || "", { emitUpdate: false });
 			setDirty(false);
+			setLastSavedAt(null);
 		}
-	}, [editor, initialHtml]);
+	}, [editor, initialHtml, report.report_id]);
 
 	// Save on Ctrl/Cmd+S
 	useEffect(() => {
@@ -181,13 +217,12 @@ const editor = useEditor({
 		return () => window.removeEventListener("keydown", onKeyDown);
 	}, [save]);
 
-	// 30-second autosave interval (only when there are unsaved changes)
+	// Cleanup autosave timer on unmount
 	useEffect(() => {
-		const id = window.setInterval(() => {
-			if (dirty) void save(undefined, { autosave: true });
-		}, 30000);
-		return () => window.clearInterval(id);
-	}, [dirty, save]);
+		return () => {
+			if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current);
+		};
+	}, []);
 
 	const insertOrEditLink = useCallback(() => {
 		if (!editor || !editor.chain) return;
@@ -257,17 +292,47 @@ const editor = useEditor({
 
 	if (!editor || !editor.chain) return null;
 
+	const ToolbarBtn = ({
+		active,
+		onClick,
+		children,
+		title,
+		disabled = false,
+	}: {
+		active?: boolean;
+		onClick: () => void;
+		children: React.ReactNode;
+		title: string;
+		disabled?: boolean;
+	}) => (
+		<Button
+			type="button"
+			variant="ghost"
+			size="icon"
+			disabled={disabled}
+			className={`h-8 w-8 transition-all duration-150 ${
+				active
+					? "bg-sauti-teal/10 text-sauti-teal border border-sauti-teal/20 shadow-sm"
+					: "hover:bg-serene-neutral-50 text-serene-neutral-600"
+			}`}
+			onClick={onClick}
+			title={title}
+		>
+			{children}
+		</Button>
+	);
+
 	return (
 		<div className="flex flex-col h-full bg-white rounded-2xl border border-serene-neutral-200 shadow-sm overflow-hidden">
-			<style jsx>{`
-				/* Tiptap premium styles */
-				.tiptap :global(.ProseMirror) {
+			{/* Tiptap editor styles */}
+			<style>{`
+				.tiptap-editor {
 					outline: none;
 					color: #1f2937;
 					font-size: 0.9375rem;
 					line-height: 1.7;
 				}
-				.tiptap :global(.ProseMirror p.is-editor-empty:first-child::before) {
+				.tiptap-editor p.is-editor-empty:first-child::before {
 					content: attr(data-placeholder);
 					color: #9ca3af;
 					float: left;
@@ -275,20 +340,20 @@ const editor = useEditor({
 					pointer-events: none;
 					font-style: italic;
 				}
-				.tiptap :global(img) {
+				.tiptap-editor img {
 					max-width: 100%;
 					height: auto;
+					border-radius: 0.5rem;
 				}
-				.tiptap :global(blockquote) {
+				.tiptap-editor blockquote {
 					border-left: 3px solid #1A3434;
 					margin: 1rem 0;
-					padding-left: 1rem;
+					padding: 0.75rem 1rem;
 					color: #4b5563;
 					background: linear-gradient(90deg, rgba(26, 52, 52, 0.05) 0%, transparent 100%);
 					border-radius: 0 0.5rem 0.5rem 0;
-					padding: 0.75rem 1rem;
 				}
-				.tiptap :global(pre) {
+				.tiptap-editor pre {
 					background: #f8fafc;
 					border-radius: 0.75rem;
 					border: 1px solid #e2e8f0;
@@ -299,250 +364,146 @@ const editor = useEditor({
 					line-height: 1.6;
 					overflow-x: auto;
 				}
-				/* Ensure lists render with styles even without typography plugin */
-				.tiptap :global(ul) {
+				.tiptap-editor ul {
 					list-style: disc;
 					padding-left: 1.5rem;
 					margin: 0.5rem 0;
 				}
-				.tiptap :global(ol) {
+				.tiptap-editor ol {
 					list-style: decimal;
 					padding-left: 1.5rem;
 					margin: 0.5rem 0;
 				}
-				.tiptap :global(li) {
+				.tiptap-editor li {
 					margin: 0.25rem 0;
 				}
-				.tiptap :global(ul ul) {
+				.tiptap-editor li p {
+					margin: 0;
+				}
+				.tiptap-editor ul ul {
 					list-style: circle;
 				}
-				.tiptap :global(ol ol) {
+				.tiptap-editor ol ol {
 					list-style: lower-alpha;
+				}
+				.tiptap-editor h2 {
+					font-size: 1.25rem;
+					font-weight: 700;
+					margin: 1.5rem 0 0.5rem;
+					color: #111827;
+				}
+				.tiptap-editor h3 {
+					font-size: 1.1rem;
+					font-weight: 600;
+					margin: 1.25rem 0 0.5rem;
+					color: #1f2937;
+				}
+				.tiptap-editor a {
+					color: #1A3434;
+					text-decoration: underline;
+					cursor: pointer;
+				}
+				.tiptap-editor hr {
+					border: none;
+					border-top: 2px solid #e5e7eb;
+					margin: 1.5rem 0;
+				}
+				/* Bubble menu styling */
+				.tiptap-bubble-menu {
+					display: flex;
+					gap: 2px;
+					padding: 4px;
+					background: white;
+					border-radius: 0.75rem;
+					border: 1px solid #e5e7eb;
+					box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
 				}
 			`}</style>
 
+			{/* Floating Bubble Menu — appears on text selection for quick formatting */}
+			{editor && (
+				<BubbleMenu editor={editor} className="tiptap-bubble-menu">
+					<ToolbarBtn active={editor.isActive("bold")} onClick={() => editor.chain().focus().toggleBold().run()} title="Bold">
+						<Bold className="h-3.5 w-3.5" />
+					</ToolbarBtn>
+					<ToolbarBtn active={editor.isActive("italic")} onClick={() => editor.chain().focus().toggleItalic().run()} title="Italic">
+						<Italic className="h-3.5 w-3.5" />
+					</ToolbarBtn>
+					<ToolbarBtn active={editor.isActive("underline")} onClick={() => editor.chain().focus().toggleUnderline().run()} title="Underline">
+						<Underline className="h-3.5 w-3.5" />
+					</ToolbarBtn>
+					<ToolbarBtn active={editor.isActive("strike")} onClick={() => editor.chain().focus().toggleStrike().run()} title="Strikethrough">
+						<Strikethrough className="h-3.5 w-3.5" />
+					</ToolbarBtn>
+					<ToolbarBtn active={editor.isActive("link")} onClick={insertOrEditLink} title="Link">
+						<LinkIcon className="h-3.5 w-3.5" />
+					</ToolbarBtn>
+				</BubbleMenu>
+			)}
+
 			{/* Premium Toolbar */}
-			<div className="flex flex-col gap-3 p-4 bg-gradient-to-b from-serene-neutral-50 to-white border-b border-serene-neutral-100">
-				<div className="flex items-center gap-1.5 flex-wrap" onMouseDown={prevent}>
-					<span className="text-xs font-bold text-serene-neutral-500 uppercase tracking-wider mr-2">Format</span>
-					<Button
-						type="button"
-						variant="ghost"
-						size="icon"
-						className="h-8 w-8"
-						onClick={() => editor.chain().focus().undo().run()}
-						title="Undo"
-					>
+			<div className="flex flex-col gap-2 p-3 bg-gradient-to-b from-serene-neutral-50 to-white border-b border-serene-neutral-100">
+				<div className="flex items-center gap-1 flex-wrap" onMouseDown={prevent}>
+					<ToolbarBtn onClick={() => editor.chain().focus().undo().run()} title="Undo" disabled={!editor.can().undo()}>
 						<Undo2 className="h-4 w-4" />
-					</Button>
-					<Button
-						type="button"
-						variant="ghost"
-						size="icon"
-						className="h-8 w-8"
-						onClick={() => editor.chain().focus().redo().run()}
-						title="Redo"
-					>
+					</ToolbarBtn>
+					<ToolbarBtn onClick={() => editor.chain().focus().redo().run()} title="Redo" disabled={!editor.can().redo()}>
 						<Redo2 className="h-4 w-4" />
-					</Button>
-					<Separator orientation="vertical" className="h-4" />
-					<Button
-						type="button"
-						variant={editor.isActive("bold") ? "secondary" : "ghost"}
-						size="icon"
-						className={`h-8 w-8 ${
-							editor.isActive("bold")
-								? "bg-sauti-teal/10 text-sauti-teal border border-sauti-teal/20 shadow-sm"
-								: "hover:bg-serene-neutral-50"
-						}`}
-						onClick={() => editor.chain().focus().toggleBold().run()}
-						title="Bold"
-					>
-						<Bold
-							className={`h-4 w-4 ${editor.isActive("bold") ? "font-bold" : ""}`}
-						/>
-					</Button>
-					<Button
-						type="button"
-						variant={editor.isActive("italic") ? "secondary" : "ghost"}
-						size="icon"
-						className={`h-8 w-8 ${
-							editor.isActive("italic")
-								? "bg-sauti-teal/10 text-sauti-teal border border-sauti-teal/20 shadow-sm"
-								: "hover:bg-serene-neutral-50"
-						}`}
-						onClick={() => editor.chain().focus().toggleItalic().run()}
-						title="Italic"
-					>
-						<Italic
-							className={`h-4 w-4 ${editor.isActive("italic") ? "italic" : ""}`}
-						/>
-					</Button>
-					<Button
-						type="button"
-						variant={editor.isActive("underline") ? "secondary" : "ghost"}
-						size="icon"
-						className={`h-8 w-8 ${
-							editor.isActive("underline")
-								? "bg-sauti-teal/10 text-sauti-teal border border-sauti-teal/20 shadow-sm"
-								: "hover:bg-serene-neutral-50"
-						}`}
-						onClick={() => editor.chain().focus().toggleUnderline().run()}
-						title="Underline"
-					>
-						<Underline
-							className={`h-4 w-4 ${editor.isActive("underline") ? "underline" : ""}`}
-						/>
-					</Button>
-					<Button
-						type="button"
-						variant={editor.isActive("strike") ? "secondary" : "ghost"}
-						size="icon"
-						className={`h-8 w-8 ${
-							editor.isActive("strike")
-								? "bg-sauti-teal/10 text-sauti-teal border border-sauti-teal/20 shadow-sm"
-								: "hover:bg-serene-neutral-50"
-						}`}
-						onClick={() => editor.chain().focus().toggleStrike().run()}
-						title="Strikethrough"
-					>
-						<Strikethrough
-							className={`h-4 w-4 ${editor.isActive("strike") ? "line-through" : ""}`}
-						/>
-					</Button>
-					<Separator orientation="vertical" className="h-4" />
-					<Button
-						type="button"
-						variant={editor.isActive("bulletList") ? "secondary" : "ghost"}
-						size="icon"
-						className={`h-8 w-8 ${
-							editor.isActive("bulletList")
-								? "bg-sauti-teal/10 text-sauti-teal border border-sauti-teal/20 shadow-sm"
-								: "hover:bg-serene-neutral-50"
-						}`}
-						onClick={() => editor.chain().focus().toggleBulletList().run()}
-						title="Bullet List"
-					>
+					</ToolbarBtn>
+					<Separator orientation="vertical" className="h-4 mx-1" />
+					<ToolbarBtn active={editor.isActive("heading", { level: 2 })} onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()} title="Heading 2">
+						<Heading2 className="h-4 w-4" />
+					</ToolbarBtn>
+					<ToolbarBtn active={editor.isActive("heading", { level: 3 })} onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()} title="Heading 3">
+						<Heading3 className="h-4 w-4" />
+					</ToolbarBtn>
+					<Separator orientation="vertical" className="h-4 mx-1" />
+					<ToolbarBtn active={editor.isActive("bold")} onClick={() => editor.chain().focus().toggleBold().run()} title="Bold (Ctrl+B)">
+						<Bold className="h-4 w-4" />
+					</ToolbarBtn>
+					<ToolbarBtn active={editor.isActive("italic")} onClick={() => editor.chain().focus().toggleItalic().run()} title="Italic (Ctrl+I)">
+						<Italic className="h-4 w-4" />
+					</ToolbarBtn>
+					<ToolbarBtn active={editor.isActive("underline")} onClick={() => editor.chain().focus().toggleUnderline().run()} title="Underline (Ctrl+U)">
+						<Underline className="h-4 w-4" />
+					</ToolbarBtn>
+					<ToolbarBtn active={editor.isActive("strike")} onClick={() => editor.chain().focus().toggleStrike().run()} title="Strikethrough">
+						<Strikethrough className="h-4 w-4" />
+					</ToolbarBtn>
+					<Separator orientation="vertical" className="h-4 mx-1" />
+					<ToolbarBtn active={editor.isActive("bulletList")} onClick={() => editor.chain().focus().toggleBulletList().run()} title="Bullet List">
 						<List className="h-4 w-4" />
-					</Button>
-					<Button
-						type="button"
-						variant={editor.isActive("orderedList") ? "secondary" : "ghost"}
-						size="icon"
-						className={`h-8 w-8 ${
-							editor.isActive("orderedList")
-								? "bg-sauti-teal/10 text-sauti-teal border border-sauti-teal/20 shadow-sm"
-								: "hover:bg-serene-neutral-50"
-						}`}
-						onClick={() => editor.chain().focus().toggleOrderedList().run()}
-						title="Numbered List"
-					>
+					</ToolbarBtn>
+					<ToolbarBtn active={editor.isActive("orderedList")} onClick={() => editor.chain().focus().toggleOrderedList().run()} title="Numbered List">
 						<ListOrdered className="h-4 w-4" />
-					</Button>
-					<Button
-						type="button"
-						variant={editor.isActive("blockquote") ? "secondary" : "ghost"}
-						size="icon"
-						className={`h-8 w-8 ${
-							editor.isActive("blockquote")
-								? "bg-sauti-teal/10 text-sauti-teal border border-sauti-teal/20 shadow-sm"
-								: "hover:bg-serene-neutral-50"
-						}`}
-						onClick={() => editor.chain().focus().toggleBlockquote().run()}
-						title="Blockquote"
-					>
+					</ToolbarBtn>
+					<ToolbarBtn active={editor.isActive("blockquote")} onClick={() => editor.chain().focus().toggleBlockquote().run()} title="Blockquote">
 						<Quote className="h-4 w-4" />
-					</Button>
-					<Button
-						type="button"
-						variant={editor.isActive("codeBlock") ? "secondary" : "ghost"}
-						size="icon"
-						className={`h-8 w-8 ${
-							editor.isActive("codeBlock")
-								? "bg-sauti-teal/10 text-sauti-teal border border-sauti-teal/20 shadow-sm"
-								: "hover:bg-serene-neutral-50"
-						}`}
-						onClick={() => editor.chain().focus().toggleCodeBlock().run()}
-						title="Code Block"
-					>
+					</ToolbarBtn>
+					<ToolbarBtn active={editor.isActive("codeBlock")} onClick={() => editor.chain().focus().toggleCodeBlock().run()} title="Code Block">
 						<Code className="h-4 w-4" />
-					</Button>
+					</ToolbarBtn>
+					<ToolbarBtn onClick={() => editor.chain().focus().setHorizontalRule().run()} title="Horizontal Rule">
+						<MinusSquare className="h-4 w-4" />
+					</ToolbarBtn>
 				</div>
-				<div className="flex items-center gap-1.5 flex-wrap" onMouseDown={prevent}>
-					<span className="text-xs font-bold text-serene-neutral-500 uppercase tracking-wider mr-2">Align</span>
-					<Button
-						type="button"
-						variant={editor.isActive({ textAlign: "left" }) ? "secondary" : "ghost"}
-						size="icon"
-						className={`h-8 w-8 ${
-							editor.isActive({ textAlign: "left" })
-								? "bg-sauti-teal/10 text-sauti-teal border border-sauti-teal/20 shadow-sm"
-								: "hover:bg-serene-neutral-50"
-						}`}
-						onClick={() => editor.chain().focus().setTextAlign("left").run()}
-						title="Align Left"
-					>
+				<div className="flex items-center gap-1 flex-wrap" onMouseDown={prevent}>
+					<ToolbarBtn active={editor.isActive({ textAlign: "left" })} onClick={() => editor.chain().focus().setTextAlign("left").run()} title="Align Left">
 						<AlignLeft className="h-4 w-4" />
-					</Button>
-					<Button
-						type="button"
-						variant={editor.isActive({ textAlign: "center" }) ? "secondary" : "ghost"}
-						size="icon"
-						className={`h-8 w-8 ${
-							editor.isActive({ textAlign: "center" })
-								? "bg-sauti-teal/10 text-sauti-teal border border-sauti-teal/20 shadow-sm"
-								: "hover:bg-serene-neutral-50"
-						}`}
-						onClick={() => editor.chain().focus().setTextAlign("center").run()}
-						title="Align Center"
-					>
+					</ToolbarBtn>
+					<ToolbarBtn active={editor.isActive({ textAlign: "center" })} onClick={() => editor.chain().focus().setTextAlign("center").run()} title="Align Center">
 						<AlignCenter className="h-4 w-4" />
-					</Button>
-					<Button
-						type="button"
-						variant={editor.isActive({ textAlign: "right" }) ? "secondary" : "ghost"}
-						size="icon"
-						className={`h-8 w-8 ${
-							editor.isActive({ textAlign: "right" })
-								? "bg-sauti-teal/10 text-sauti-teal border border-sauti-teal/20 shadow-sm"
-								: "hover:bg-serene-neutral-50"
-						}`}
-						onClick={() => editor.chain().focus().setTextAlign("right").run()}
-						title="Align Right"
-					>
+					</ToolbarBtn>
+					<ToolbarBtn active={editor.isActive({ textAlign: "right" })} onClick={() => editor.chain().focus().setTextAlign("right").run()} title="Align Right">
 						<AlignRight className="h-4 w-4" />
-					</Button>
-					<Button
-						type="button"
-						variant={
-							editor.isActive({ textAlign: "justify" }) ? "secondary" : "ghost"
-						}
-						size="icon"
-						className={`h-8 w-8 ${
-							editor.isActive({ textAlign: "justify" })
-								? "bg-sauti-teal/10 text-sauti-teal border border-sauti-teal/20 shadow-sm"
-								: "hover:bg-serene-neutral-50"
-						}`}
-						onClick={() => editor.chain().focus().setTextAlign("justify").run()}
-						title="Justify"
-					>
+					</ToolbarBtn>
+					<ToolbarBtn active={editor.isActive({ textAlign: "justify" })} onClick={() => editor.chain().focus().setTextAlign("justify").run()} title="Justify">
 						<AlignJustify className="h-4 w-4" />
-					</Button>
-					<Separator orientation="vertical" className="h-4" />
-					<Button
-						type="button"
-						variant={editor.isActive("link") ? "secondary" : "ghost"}
-						size="icon"
-						className={`h-8 w-8 ${
-							editor.isActive("link")
-								? "bg-sauti-teal/10 text-sauti-teal border border-sauti-teal/20 shadow-sm"
-								: "hover:bg-serene-neutral-50"
-						}`}
-						onClick={insertOrEditLink}
-						title="Insert/Edit Link"
-					>
+					</ToolbarBtn>
+					<Separator orientation="vertical" className="h-4 mx-1" />
+					<ToolbarBtn active={editor.isActive("link")} onClick={insertOrEditLink} title="Insert/Edit Link">
 						<LinkIcon className="h-4 w-4" />
-					</Button>
+					</ToolbarBtn>
 					<input
 						ref={fileInputRef}
 						type="file"
@@ -551,41 +512,35 @@ const editor = useEditor({
 						onChange={(e) => {
 							const file = e.target.files?.[0];
 							if (file) void uploadImage(file);
-							// reset input so the same file can be picked again
 							if (fileInputRef.current) fileInputRef.current.value = "";
 						}}
 					/>
-					<Button
-						type="button"
-						variant="ghost"
-						size="icon"
-						className="h-8 w-8 hover:bg-serene-neutral-50"
-						onClick={onPickImage}
-						title="Insert Image"
-					>
+					<ToolbarBtn onClick={onPickImage} title="Insert Image">
 						<ImageIcon className="h-4 w-4" />
-					</Button>
-					<div className="ml-auto flex items-center gap-4">
+					</ToolbarBtn>
+					<div className="ml-auto flex items-center gap-3">
 						<span className="text-xs font-medium text-serene-neutral-400">
 							{saving ? (
-								<span className="flex items-center gap-1.5">
-									<span className="h-2 w-2 bg-sauti-teal rounded-full animate-pulse" />
+								<span className="flex items-center gap-1.5 text-sauti-teal">
+									<Loader2 className="h-3 w-3 animate-spin" />
 									Saving…
 								</span>
 							) : dirty ? (
 								<span className="text-amber-600">Unsaved changes</span>
 							) : lastSavedAt ? (
-								<span className="text-serene-green-600">Saved {lastSavedAt}</span>
+								<span className="flex items-center gap-1 text-serene-green-600">
+									<Check className="h-3 w-3" /> Saved {lastSavedAt}
+								</span>
 							) : null}
 						</span>
 						<Button
 							type="button"
 							size="sm"
 							onClick={() => save()}
-							disabled={saving}
-							className="h-9 px-4 bg-sauti-teal hover:bg-sauti-dark text-white font-semibold rounded-xl shadow-sm transition-all duration-200"
+							disabled={saving || !dirty}
+							className="h-8 px-3.5 bg-sauti-teal hover:bg-sauti-dark text-white font-semibold rounded-xl shadow-sm transition-all duration-200 text-xs"
 						>
-							<Save className="h-4 w-4 mr-1.5" /> Save Notes
+							<Save className="h-3.5 w-3.5 mr-1.5" /> Save
 						</Button>
 					</div>
 				</div>
@@ -593,7 +548,7 @@ const editor = useEditor({
 
 			{/* Premium Editor Area */}
 			<div className="flex-1 overflow-hidden bg-white">
-				<EditorContent editor={editor} className="h-full overflow-y-auto p-6" />
+				<EditorContent editor={editor} className="h-full overflow-y-auto" />
 			</div>
 		</div>
 	);

@@ -394,6 +394,8 @@ interface SereneReportCardProps {
   matchesCount?: number;
   unreadMessages?: number;
   onClick?: () => void;
+  onQuickView?: (e: React.MouseEvent) => void;
+  onChat?: (e: React.MouseEvent) => void;
   className?: string;
   active?: boolean;
 }
@@ -407,6 +409,8 @@ export function SereneReportCard({
   matchesCount = 0,
   unreadMessages = 0,
   onClick, 
+  onQuickView,
+  onChat,
   className, 
   active 
 }: SereneReportCardProps) {
@@ -485,11 +489,35 @@ export function SereneReportCard({
                   {unreadMessages}
                </span>
             )}
+
+            {/* Chat button for matched cases */}
+            {onChat && matchesCount > 0 && (
+              <button
+                onClick={(e) => { e.preventDefault(); e.stopPropagation(); onChat(e); }}
+                className="flex items-center gap-1 px-2.5 py-1 rounded-md bg-sauti-teal/10 text-sauti-teal border border-sauti-teal/20 text-[10px] font-bold uppercase tracking-wider hover:bg-sauti-teal/20 transition-colors"
+              >
+                <MessageCircle className="h-3 w-3" /> Chat
+              </button>
+            )}
           </div>
           
-          <div className="w-8 h-8 rounded-full flex items-center justify-center text-serene-neutral-300 group-hover:text-serene-blue-600 group-hover:bg-serene-blue-50 transition-all">
-             <ChevronRight className="h-5 w-5" />
-          </div>
+          {/* Quick view arrow with tooltip */}
+          {onQuickView ? (
+            <button
+              onClick={(e) => { e.preventDefault(); e.stopPropagation(); onQuickView(e); }}
+              className="group/qv relative w-8 h-8 rounded-full flex items-center justify-center text-serene-neutral-300 hover:text-serene-blue-600 hover:bg-serene-blue-50 transition-all"
+              title="Quick view"
+            >
+              <ChevronRight className="h-5 w-5" />
+              <span className="absolute -top-8 right-0 px-2 py-1 rounded-md bg-sauti-dark text-white text-[10px] font-medium whitespace-nowrap opacity-0 group-hover/qv:opacity-100 transition-opacity pointer-events-none shadow-lg">
+                Quick view
+              </span>
+            </button>
+          ) : (
+            <div className="w-8 h-8 rounded-full flex items-center justify-center text-serene-neutral-300 group-hover:text-serene-blue-600 group-hover:bg-serene-blue-50 transition-all">
+              <ChevronRight className="h-5 w-5" />
+            </div>
+          )}
         </div>
       </div>
     </div>

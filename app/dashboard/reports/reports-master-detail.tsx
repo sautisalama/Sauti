@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { createClient } from "@/utils/supabase/client";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -11,6 +11,9 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from "@/components/ui/dialog";
+import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { SereneReportCard } from "@/app/dashboard/_components/SurvivorDashboardComponents";
 import { ReportCardSkeleton } from "@/components/reports/ReportCardSkeleton";
@@ -33,7 +36,10 @@ import {
 	Search,
 	MessageCircle,
 	Calendar,
-	Plus
+	Plus,
+	CheckSquare,
+	Trash2,
+	PenLine
 } from "lucide-react";
 import { Tables } from "@/types/db-schema";
 import RichTextNotesEditor from "./rich-text-notes-editor";
@@ -44,6 +50,8 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { CalendarConnectionStatus } from "../_components/CalendarConnectionStatus";
 import { SereneBreadcrumb } from "@/components/ui/SereneBreadcrumb";
 import { Separator } from "@/components/ui/separator";
+import { useRouter } from "next/navigation";
+import { FloatingChatManager, FloatingChat } from "@/components/chat/FloatingChatManager";
 
 interface AppointmentLite {
 	id: string;
@@ -51,6 +59,7 @@ interface AppointmentLite {
 	appointment_date: string;
 	status: string;
 	professional?: {
+		id: string;
 		first_name?: string | null;
 		last_name?: string | null;
 		email?: string | null;
@@ -71,9 +80,213 @@ interface ReportItem extends Tables<"reports"> {
 	}>;
 }
 
+/** Inline Accountability Tracker for the sidepanel */
+function SidepanelChecklist({
+	report,
+	supabase,
+	onUpdate,
+}: {
+	report: ReportItem;
+	supabase: any;
+	onUpdate: (updated: ReportItem) => void;
+}) {
+	const admin = (report as any)?.administrative || {};
+	// Support both 'checklist' (singular) and legacy 'checklists' (plural) keys
+	const rawChecklist = admin.checklist || admin.checklists || [];
+	// Normalize: accept both 'done' and 'completed' fields
+	const initialChecklist = rawChecklist.map((c: any) => ({ ...c, done: c.done ?? c.completed ?? false }));
+	const [checklist, setChecklist] = useState<Array<{ id: string; title: string; done: boolean; notes: string }>>(initialChecklist);
+	const [newItem, setNewItem] = useState("");
+	const [editingId, setEditingId] = useState<string | null>(null);
+	const [editTitle, setEditTitle] = useState("");
+	const debounceRef = useRef<NodeJS.Timeout | null>(null);
+
+	// Sync from external changes
+	useEffect(() => {
+		const admin = (report as any)?.administrative || {};
+		// Support both keys
+		const raw = admin.checklist || admin.checklists || [];
+		setChecklist(raw.map((c: any) => ({ ...c, done: c.done ?? c.completed ?? false })));
+	}, [report.report_id, (report as any)?.administrative?.checklist?.length, (report as any)?.administrative?.checklists?.length]);
+
+	const persistChecklist = useCallback(async (items: typeof checklist) => {
+		const newAdmin = { ...((report as any)?.administrative || {}), checklist: items };
+		// Remove legacy plural key if present
+		delete (newAdmin as any).checklists;
+		const { data } = await supabase
+			.from("reports")
+			.update({ administrative: newAdmin })
+			.eq("report_id", report.report_id)
+			.select()
+			.single();
+		if (data) onUpdate(data as any);
+	}, [report, supabase, onUpdate]);
+
+	const toggleItem = (id: string) => {
+		const next = checklist.map(i => i.id === id ? { ...i, done: !i.done } : i);
+		setChecklist(next);
+		void persistChecklist(next);
+	};
+
+	const addItem = () => {
+		if (!newItem.trim()) return;
+		const next = [...checklist, { id: crypto.randomUUID(), title: newItem.trim(), done: false, notes: "" }];
+		setChecklist(next);
+		setNewItem("");
+		void persistChecklist(next);
+	};
+
+	const deleteItem = (id: string) => {
+		const next = checklist.filter(i => i.id !== id);
+		setChecklist(next);
+		void persistChecklist(next);
+	};
+
+	const startEdit = (id: string, title: string) => {
+		setEditingId(id);
+		setEditTitle(title);
+	};
+
+	const commitEdit = (id: string) => {
+		if (!editTitle.trim()) { setEditingId(null); return; }
+		const next = checklist.map(i => i.id === id ? { ...i, title: editTitle.trim() } : i);
+		setChecklist(next);
+		setEditingId(null);
+		void persistChecklist(next);
+	};
+
+	const updateNotes = (id: string, notes: string) => {
+		const next = checklist.map(i => i.id === id ? { ...i, notes } : i);
+		setChecklist(next);
+		if (debounceRef.current) clearTimeout(debounceRef.current);
+		debounceRef.current = setTimeout(() => void persistChecklist(next), 1500);
+	};
+
+	useEffect(() => () => { if (debounceRef.current) clearTimeout(debounceRef.current); }, []);
+
+	return (
+		<div className="space-y-3">
+			{checklist.length === 0 && (
+				<p className="text-xs text-serene-neutral-400 text-center py-3">No items yet. Add your first accountability step.</p>
+			)}
+			{checklist.map((item, index) => {
+				const isEditing = editingId === item.id;
+				return (
+				<div key={item.id} className={cn("group relative rounded-lg border p-3 transition-all", isEditing ? "border-sauti-teal/30 bg-white shadow-sm" : "border-serene-neutral-100 bg-serene-neutral-50/50 hover:bg-white")}>
+					<div className="flex items-start gap-3">
+						<Checkbox
+							checked={item.done}
+							onCheckedChange={() => toggleItem(item.id)}
+							className="mt-0.5 border-serene-neutral-300 data-[state=checked]:bg-sauti-teal data-[state=checked]:border-sauti-teal"
+						/>
+						<div className="flex-1 min-w-0" onClick={() => !isEditing && startEdit(item.id, item.title)}>
+							{isEditing ? (
+								<div className="space-y-2">
+									<Input
+										value={editTitle}
+										onChange={(e) => setEditTitle(e.target.value)}
+										onBlur={() => commitEdit(item.id)}
+										onKeyDown={(e) => {
+											if (e.key === 'Enter') commitEdit(item.id);
+											if (e.key === 'Escape') setEditingId(null);
+											if (e.key === 'ArrowUp') {
+												e.preventDefault();
+												commitEdit(item.id);
+												if (index > 0) {
+													const prev = checklist[index - 1];
+													setTimeout(() => startEdit(prev.id, prev.title), 0);
+												}
+											}
+											if (e.key === 'ArrowDown') {
+												e.preventDefault();
+												commitEdit(item.id);
+												if (index < checklist.length - 1) {
+													const next = checklist[index + 1];
+													setTimeout(() => startEdit(next.id, next.title), 0);
+												}
+											}
+										}}
+										className="h-7 text-sm border-sauti-teal/30 bg-white"
+										placeholder="Item title..."
+										autoFocus
+									/>
+									<Textarea
+										value={item.notes || ""}
+										onChange={(e) => updateNotes(item.id, e.target.value)}
+										placeholder="Add notes... (Click outside to save)"
+										className="grid w-full min-h-[60px] text-xs resize-none border-serene-neutral-200 bg-white focus:ring-sauti-teal/20"
+										onKeyDown={(e) => {
+											if (e.key === 'Escape') setEditingId(null);
+											if (e.key === 'ArrowUp') {
+												// Only navigate if cursor is at the beginning of the textarea
+												if (e.currentTarget.selectionStart === 0) {
+													e.preventDefault();
+													commitEdit(item.id);
+													if (index > 0) {
+														const prev = checklist[index - 1];
+														setTimeout(() => startEdit(prev.id, prev.title), 0);
+													}
+												}
+											}
+											if (e.key === 'ArrowDown') {
+												// Only navigate if cursor is at the end of the textarea
+												if (e.currentTarget.selectionStart === e.currentTarget.value.length) {
+													e.preventDefault();
+													commitEdit(item.id);
+													if (index < checklist.length - 1) {
+														const next = checklist[index + 1];
+														setTimeout(() => startEdit(next.id, next.title), 0);
+													}
+												}
+											}
+										}}
+									/>
+								</div>
+							) : (
+								<div className="cursor-pointer">
+									<p
+										className={cn("text-sm font-medium", item.done ? "line-through text-serene-neutral-400" : "text-sauti-dark")}
+									>
+										{item.title}
+									</p>
+									{item.notes && (
+										<p className="mt-1 text-xs text-serene-neutral-500 line-clamp-1">
+											{item.notes}
+										</p>
+									)}
+								</div>
+							)}
+						</div>
+						<button
+							onClick={() => deleteItem(item.id)}
+							className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-rose-50 hover:text-rose-500 text-serene-neutral-300 transition-all ml-1"
+							title="Delete item"
+						>
+							<Trash2 className="h-3.5 w-3.5" />
+						</button>
+					</div>
+				</div>
+			)})}
+			<div className="flex items-center gap-2">
+				<Input
+					value={newItem}
+					onChange={(e) => setNewItem(e.target.value)}
+					placeholder="Add new item..."
+					className="h-8 text-sm border-serene-neutral-200 bg-white flex-1"
+					onKeyDown={(e) => { if (e.key === 'Enter') addItem(); }}
+				/>
+				<Button size="icon" onClick={addItem} disabled={!newItem.trim()} className="h-8 w-8 shrink-0 bg-sauti-teal hover:bg-sauti-teal/90 rounded-lg text-white">
+					<Plus className="h-3.5 w-3.5" />
+				</Button>
+			</div>
+		</div>
+	);
+}
+
 export default function ReportsMasterDetail({ userId }: { userId: string }) {
 	const { toast } = useToast();
 	const dash = useDashboardData();
+	const router = useRouter();
 	const seededFromProviderRef = useRef(false);
 	const supabase = useMemo(() => createClient(), []);
 	const [reports, setReports] = useState<ReportItem[]>([]);
@@ -91,6 +304,28 @@ export default function ReportsMasterDetail({ userId }: { userId: string }) {
 	const [editDialogOpen, setEditDialogOpen] = useState(false);
 	const [editDescription, setEditDescription] = useState("");
     const [isRecording, setIsRecording] = useState(false);
+
+	// Floating chats (LinkedIn-style)
+	const [floatingChats, setFloatingChats] = useState<FloatingChat[]>([]);
+
+	const openFloatingChat = useCallback((report: ReportItem) => {
+		const match = report.matched_services?.[0];
+		if (!match) return;
+		// Avoid duplicate
+		if (floatingChats.find(c => c.matchId === match.id)) return;
+		setFloatingChats(prev => [...prev, {
+			id: match.id,
+			matchId: match.id,
+			survivorId: userId,
+			professionalId: match.appointments?.[0]?.professional?.id || "",
+			professionalName: match.support_services?.name || "Support Professional",
+			survivorName: "You",
+		}]);
+	}, [floatingChats, userId]);
+
+	const closeFloatingChat = useCallback((id: string) => {
+		setFloatingChats(prev => prev.filter(c => c.id !== id));
+	}, []);
 
 	// Calendar State
 	const [calendarViewMode, setCalendarViewMode] = useState<'week' | 'month'>('week');
@@ -227,6 +462,7 @@ export default function ReportsMasterDetail({ userId }: { userId: string }) {
 									appointment_date,
 									status,
 									professional:profiles!appointments_professional_id_fkey (
+										id,
 										first_name,
 										last_name,
 										email
@@ -528,6 +764,7 @@ export default function ReportsMasterDetail({ userId }: { userId: string }) {
 	};
 
 	return (
+		<>
 		<div className="relative min-h-screen bg-serene-neutral-50">
 				<div className="h-[calc(100vh-120px)] overflow-hidden flex flex-col lg:flex-row gap-4 lg:gap-8">
 				{/* Mobile toggle */}
@@ -731,7 +968,9 @@ export default function ReportsMasterDetail({ userId }: { userId: string }) {
 											urgency={(r.urgency as any) || "low"}
 											matchesCount={r.matched_services?.length || 0}
 											active={isActive}
-											onClick={() => setSelectedId(r.report_id)}
+											onClick={() => router.push(`/dashboard/reports/${r.report_id}`)}
+											onQuickView={(e) => { e.stopPropagation(); setSelectedId(r.report_id); }}
+											onChat={r.matched_services && r.matched_services.length > 0 ? (e) => { e.stopPropagation(); openFloatingChat(r); } : undefined}
 										/>
 									</div>
 								);
@@ -1021,6 +1260,15 @@ export default function ReportsMasterDetail({ userId }: { userId: string }) {
 					</Card>
 				</div>
 
+				{/* Overlay Backdrop to close sidepanel on outside click */}
+				{selected && (
+					<div 
+						className="fixed inset-0 z-40 bg-black/40 transition-opacity" 
+						aria-hidden="true"
+						onClick={() => setSelectedId(null)}
+					/>
+				)}
+
 				{/* Overlay Detail Panel with animation */}
 			<div
 					className={`fixed inset-0 sm:inset-y-0 sm:right-0 sm:left-auto w-full sm:w-[600px] lg:w-[800px] bg-white shadow-2xl border-l border-serene-neutral-200 z-50 transform transition-transform duration-300 ease-out ${
@@ -1074,215 +1322,277 @@ export default function ReportsMasterDetail({ userId }: { userId: string }) {
 									</div>
 								</div>
 
-								<Button
-									variant="ghost"
-									size="icon"
-									className="rounded-full hover:bg-red-50 hover:text-red-600 transition-colors h-10 w-10"
-									onClick={() => setSelectedId(null)}
-								>
-									<X className="h-5 w-5" />
-								</Button>
+								<div className="flex items-center gap-1">
+									<Button
+										variant="ghost"
+										size="sm"
+										className="hidden sm:flex text-sauti-teal hover:text-sauti-dark hover:bg-sauti-teal/10 text-xs font-semibold px-3 h-8 rounded-full transition-colors"
+										onClick={() => router.push(`/dashboard/reports/${selected.report_id}`)}
+										title="View Full Report"
+									>
+										View Full Details <ChevronRight className="h-3 w-3 ml-1" />
+									</Button>
+									<Button
+										variant="ghost"
+										size="icon"
+										className="rounded-full hover:bg-red-50 hover:text-red-600 transition-colors h-10 w-10"
+										onClick={() => setSelectedId(null)}
+									>
+										<X className="h-5 w-5" />
+									</Button>
+								</div>
 							</div>
+						<div className="flex-1 overflow-y-auto">
+							<div className="p-4 space-y-4">
+								{/* Mobile only full report link */}
+								<Button
+									variant="outline"
+									className="sm:hidden w-full h-10 rounded-xl border-sauti-teal/30 text-sauti-teal hover:bg-sauti-teal/5 font-semibold text-sm"
+									onClick={() => router.push(`/dashboard/reports/${selected.report_id}`)}
+								>
+									View Full Report <ChevronRight className="h-4 w-4 ml-1" />
+								</Button>
 
-							{/* Body */}
-							<div className="flex-1 overflow-y-auto">
-								<div className="p-4 space-y-4">
-									{/* Matched Service & Appointment - Combined */}
-									{selected?.matched_services && selected.matched_services.length > 0 ? (
-										<div className="bg-white rounded-2xl border border-serene-neutral-200 p-5 shadow-sm">
-											<div className="flex items-center justify-between mb-4">
-												<h3 className="text-base font-bold text-serene-neutral-900 flex items-center gap-2">
-													<User className="h-5 w-5 text-serene-blue-600" />
-													Matched Professional
-												</h3>
-												<Badge className="bg-serene-green-50 text-serene-green-700 border-serene-green-200 uppercase text-[10px] tracking-wider">
-													{selected.matched_services[0].match_status_type}
-												</Badge>
-											</div>
-											
-											<div className="flex items-start gap-4 mb-6">
-												<Avatar className="h-12 w-12 border-2 border-white shadow-sm">
-													<AvatarFallback className="bg-serene-blue-100 text-serene-blue-700 font-bold">
-														{selected.matched_services[0].support_services?.name?.charAt(0) || "P"}
-													</AvatarFallback>
-												</Avatar>
-												<div>
-													<p className="text-base font-bold text-serene-neutral-900">
-														{selected.matched_services[0].support_services?.name || "Service Provider"}
-													</p>
-													<p className="text-sm text-serene-neutral-500">
-														Verified Support Professional
-													</p>
-												</div>
-											</div>
-
-											{/* Appointment Info */}
-											{selected?.matched_services?.[0]?.appointments?.[0] ? (
-												<div className="bg-serene-blue-50/50 rounded-xl border border-serene-blue-100 p-4 mb-4">
-													<div className="flex items-center gap-2 mb-2">
-														<CalendarDays className="h-4 w-4 text-serene-blue-600" />
-														<span className="text-sm font-bold text-serene-blue-900">
-															Upcoming Appointment
-														</span>
-													</div>
-													<div className="text-sm text-serene-neutral-700 font-medium">
-														{new Date(selected.matched_services[0].appointments[0].appointment_date).toLocaleDateString(undefined, {
-															weekday: 'long',
-															month: 'long',
-															day: 'numeric',
-															hour: '2-digit',
-															minute: '2-digit'
-														})}
-													</div>
-													<div className="mt-2 flex gap-2">
-														<Badge variant="outline" className="bg-white/80 capitalize">
-															{selected.matched_services[0].appointments[0].status}
-														</Badge>
-													</div>
-												</div>
-											) : (
-												<div className="bg-serene-neutral-50 rounded-xl border border-serene-neutral-100 p-4 mb-4 text-center">
-													<p className="text-sm text-serene-neutral-500">No appointment scheduled yet.</p>
-												</div>
-											)}
-
-											<div className="grid grid-cols-2 gap-3">
-												<Button 
-													className="bg-sauti-teal hover:bg-sauti-dark text-white shadow-sm"
-													onClick={() => window.location.href = `/dashboard/chat?id=${selected.matched_services![0].appointments?.[0]?.appointment_id || 'new'}`} // Mock chat link
-												>
-													<MessageCircle className="h-4 w-4 mr-2" /> Message
-												</Button>
-												<Button 
-													variant="outline"
-													className="border-sauti-teal/30 text-sauti-dark hover:bg-sauti-teal/5"
-													onClick={() => setShowProfile(true)}
-												>
-													View Profile
-												</Button>
-											</div>
-										</div>
-									) : (
-										<div className="bg-serene-neutral-50 rounded-2xl border border-serene-neutral-200 p-6 text-center">
-											<div className="w-12 h-12 rounded-full bg-serene-neutral-100 flex items-center justify-center mx-auto mb-3">
-												<Search className="h-6 w-6 text-serene-neutral-400" />
-											</div>
-											<h3 className="text-sm font-bold text-serene-neutral-900 mb-1">
-												Finding a Match
-											</h3>
-											<p className="text-xs text-serene-neutral-500 max-w-[200px] mx-auto">
-												We are currently looking for the best professional to support you.
-											</p>
-										</div>
-									)}
-
-									{/* Description with Audio - Update Details Primary */}
+								{/* Matched Service & Appointment - Always visible */}
+								{selected?.matched_services && selected.matched_services.length > 0 ? (
 									<div className="bg-white rounded-2xl border border-serene-neutral-200 p-5 shadow-sm">
 										<div className="flex items-center justify-between mb-4">
 											<h3 className="text-base font-bold text-serene-neutral-900 flex items-center gap-2">
-												<FileText className="h-5 w-5 text-serene-blue-600" />
-												Report Details
+												<User className="h-5 w-5 text-serene-blue-600" />
+												Matched Professional
 											</h3>
-											<Button 
-												variant="ghost" 
-												size="sm" 
-												className="text-serene-blue-600 hover:text-serene-blue-700 hover:bg-serene-blue-50"
-												onClick={() => {
-													setEditDescription(selected.incident_description || "");
-													setEditDialogOpen(true);
-												}}
-											>
-												Edit
-											</Button>
+											<Badge className="bg-serene-green-50 text-serene-green-700 border-serene-green-200 uppercase text-[10px] tracking-wider">
+												{selected.matched_services[0].match_status_type}
+											</Badge>
 										</div>
-										<div className="space-y-4">
-											{selected.incident_description ? (
-												<p className="text-sm text-serene-neutral-700 leading-relaxed whitespace-pre-wrap">
-													{selected.incident_description}
+										
+										<div className="flex items-start gap-4 mb-6">
+											<Avatar className="h-12 w-12 border-2 border-white shadow-sm">
+												<AvatarFallback className="bg-serene-blue-100 text-serene-blue-700 font-bold">
+													{selected.matched_services[0].support_services?.name?.charAt(0) || "P"}
+												</AvatarFallback>
+											</Avatar>
+											<div>
+												<p className="text-base font-bold text-serene-neutral-900">
+													{selected.matched_services[0].support_services?.name || "Service Provider"}
 												</p>
-											) : (
-												<p className="text-sm text-serene-neutral-400 italic">No description provided.</p>
-											)}
-											
-											{(selected.media as any)?.url && (
-												<div className="mt-4 pt-4 border-t border-serene-neutral-100">
-													<AudioPlayer
-														src={(selected.media as any).url}
-														type={(selected.media as any).type}
-													/>
+												<p className="text-sm text-serene-neutral-500">
+													Verified Support Professional
+												</p>
+											</div>
+										</div>
+
+										{/* Appointment Info */}
+										{selected?.matched_services?.[0]?.appointments?.[0] ? (
+											<div className="bg-serene-blue-50/50 rounded-xl border border-serene-blue-100 p-4 mb-4">
+												<div className="flex items-center gap-2 mb-2">
+													<CalendarDays className="h-4 w-4 text-serene-blue-600" />
+													<span className="text-sm font-bold text-serene-blue-900">
+														Upcoming Appointment
+													</span>
 												</div>
-											)}
-										</div>
-									</div>
-
-									{/* Notes (WYSIWYG) - Full Height */}
-									<div className="flex flex-col h-[80vh] sm:h-[500px] mb-4">
-										<div className="p-4 border-b border-gray-200">
-											<h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-												<FileText className="h-5 w-5 text-gray-600" />
-												Notes & Updates
-											</h3>
-										</div>
-										<div className="flex-1 overflow-hidden">
-											<RichTextNotesEditor
-												userId={userId}
-												report={selected}
-												onSaved={(updated: any) => {
-													const next = reports.map((r) =>
-														r.report_id === updated.report_id ? (updated as any) : r
-													);
-													setReports(next);
-													try {
-														localStorage.setItem(
-															`reports-cache-${userId}`,
-															JSON.stringify(next)
-														);
-													} catch {
-														// Ignore localStorage errors
-													}
-												}}
-											/>
-										</div>
-									</div>
-
-									{/* Attachments (if any in administrative JSON) */}
-									{(() => {
-										const attachments = (selected as any)?.administrative?.attachments as
-											| Array<{ name: string; url: string }>
-											| undefined;
-										if (!attachments || attachments.length === 0) return null;
-										return (
-											<div className="bg-white rounded-lg border border-gray-200 p-4">
-												<h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
-													<Paperclip className="h-4 w-4 text-gray-600" />
-													Attachments
-												</h3>
-												<div className="space-y-2">
-													{attachments.map((a, idx) => (
-														<div
-															key={idx}
-															className="flex items-center justify-between p-2 bg-gray-50 rounded-md border border-gray-200"
-														>
-															<div className="flex items-center gap-2 min-w-0 flex-1">
-																<FileText className="h-4 w-4 text-gray-500 flex-shrink-0" />
-																<span className="text-sm font-medium text-gray-900 truncate">
-																	{a.name}
-																</span>
-															</div>
-															<a
-																href={a.url}
-																target="_blank"
-																rel="noreferrer"
-																className="ml-2 px-2 py-1 text-xs font-medium text-[#1A3434] bg-[#1A3434]/10 rounded-md hover:bg-[#1A3434]/20 transition-colors"
-															>
-																Open
-															</a>
-														</div>
-													))}
+												<div className="text-sm text-serene-neutral-700 font-medium">
+													{new Date(selected.matched_services[0].appointments[0].appointment_date).toLocaleDateString(undefined, {
+														weekday: 'long',
+														month: 'long',
+														day: 'numeric',
+														hour: '2-digit',
+														minute: '2-digit'
+													})}
+												</div>
+												<div className="mt-2 flex gap-2">
+													<Badge variant="outline" className="bg-white/80 capitalize">
+														{selected.matched_services[0].appointments[0].status}
+													</Badge>
 												</div>
 											</div>
-										);
-									})()}
+										) : (
+											<div className="bg-serene-neutral-50 rounded-xl border border-serene-neutral-100 p-4 mb-4 text-center">
+												<p className="text-sm text-serene-neutral-500">No appointment scheduled yet.</p>
+											</div>
+										)}
+
+										<div className="grid grid-cols-2 gap-3">
+											<Button 
+												className="bg-sauti-teal hover:bg-sauti-dark text-white shadow-sm"
+												onClick={() => window.location.href = `/dashboard/chat?id=${selected.matched_services![0].appointments?.[0]?.appointment_id || 'new'}`}
+											>
+												<MessageCircle className="h-4 w-4 mr-2" /> Message
+											</Button>
+											<Button 
+												variant="outline"
+												className="border-sauti-teal/30 text-sauti-dark hover:bg-sauti-teal/5"
+												onClick={() => setShowProfile(true)}
+											>
+												View Profile
+											</Button>
+										</div>
+									</div>
+								) : (
+									<div className="bg-serene-neutral-50 rounded-2xl border border-serene-neutral-200 p-6 text-center">
+										<div className="w-12 h-12 rounded-full bg-serene-neutral-100 flex items-center justify-center mx-auto mb-3">
+											<Search className="h-6 w-6 text-serene-neutral-400" />
+										</div>
+										<h3 className="text-sm font-bold text-serene-neutral-900 mb-1">
+											Finding a Match
+										</h3>
+										<p className="text-xs text-serene-neutral-500 max-w-[200px] mx-auto">
+											We are currently looking for the best professional to support you.
+										</p>
+									</div>
+								)}
+
+								{/* Collapsible Accordion sections */}
+								<Accordion type="multiple" defaultValue={["details"]} className="space-y-3">
+									{/* Report Details */}
+									<AccordionItem value="details" className="bg-white rounded-xl border border-serene-neutral-200 shadow-sm overflow-hidden">
+										<AccordionTrigger className="px-5 py-4 hover:no-underline [&[data-state=open]>svg]:rotate-180">
+											<div className="flex items-center gap-2 text-sm font-bold text-serene-neutral-900">
+												<FileText className="h-4 w-4 text-serene-blue-600" />
+												Report Details
+											</div>
+										</AccordionTrigger>
+										<AccordionContent className="px-5 pb-5">
+											<div className="space-y-4">
+												<div className="flex items-center justify-between">
+													<p className="text-xs text-serene-neutral-400 font-medium">
+														<Clock className="h-3 w-3 inline mr-1" />
+														{formatDate(selected.submission_timestamp)}
+													</p>
+													<Button 
+														variant="ghost" 
+														size="sm" 
+														className="text-serene-blue-600 hover:text-serene-blue-700 hover:bg-serene-blue-50 h-7 text-xs"
+														onClick={() => {
+															setEditDescription(selected.incident_description || "");
+															setEditDialogOpen(true);
+														}}
+													>
+														<PenLine className="h-3 w-3 mr-1" /> Edit
+													</Button>
+												</div>
+												{selected.incident_description ? (
+													<p className="text-sm text-serene-neutral-700 leading-relaxed whitespace-pre-wrap">
+														{selected.incident_description}
+													</p>
+												) : (
+													<p className="text-sm text-serene-neutral-400 italic">No description provided.</p>
+												)}
+
+												{(selected.media as any)?.url && (
+													<div className="pt-4 border-t border-serene-neutral-100">
+														<AudioPlayer
+															src={(selected.media as any).url}
+															type={(selected.media as any).type}
+														/>
+													</div>
+												)}
+											</div>
+										</AccordionContent>
+									</AccordionItem>
+
+									{/* Accountability Tracker */}
+									<AccordionItem value="checklist" className="bg-white rounded-xl border border-serene-neutral-200 shadow-sm overflow-hidden">
+										<AccordionTrigger className="px-5 py-4 hover:no-underline [&[data-state=open]>svg]:rotate-180">
+											<div className="flex items-center gap-2 text-sm font-bold text-serene-neutral-900">
+												<CheckSquare className="h-4 w-4 text-sauti-teal" />
+												Accountability Tracker
+												{(() => {
+													const admin = (selected as any)?.administrative;
+													const items = admin?.checklist || admin?.checklists || [];
+													const done = items.filter((i: any) => i.done || i.completed).length;
+													return items.length > 0 ? (
+														<Badge className="bg-sauti-teal/10 text-sauti-teal border-0 text-[10px] ml-2">{done}/{items.length}</Badge>
+													) : null;
+												})()}
+											</div>
+										</AccordionTrigger>
+										<AccordionContent className="px-5 pb-5">
+											<SidepanelChecklist
+												report={selected}
+												supabase={supabase}
+												onUpdate={(updated) => {
+													const next = reports.map((r) =>
+														r.report_id === updated.report_id ? { ...r, administrative: (updated as any).administrative } : r
+													);
+													setReports(next as any);
+													try {
+														localStorage.setItem(`reports-cache-${userId}`, JSON.stringify(next));
+													} catch {}
+												}}
+											/>
+										</AccordionContent>
+									</AccordionItem>
+
+									{/* Notes & Updates */}
+									<AccordionItem value="notes" className="bg-white rounded-xl border border-serene-neutral-200 shadow-sm overflow-hidden">
+										<AccordionTrigger className="px-5 py-4 hover:no-underline [&[data-state=open]>svg]:rotate-180">
+											<div className="flex items-center gap-2 text-sm font-bold text-serene-neutral-900">
+												<PenLine className="h-4 w-4 text-amber-500" />
+												Notes & Updates
+											</div>
+										</AccordionTrigger>
+										<AccordionContent className="p-0">
+											<div className="h-[400px]">
+												<RichTextNotesEditor
+													userId={userId}
+													report={selected}
+													onSaved={(updated: any) => {
+														const next = reports.map((r) =>
+															r.report_id === updated.report_id ? (updated as any) : r
+														);
+														setReports(next);
+														try {
+															localStorage.setItem(
+																`reports-cache-${userId}`,
+																JSON.stringify(next)
+															);
+														} catch {}
+													}}
+												/>
+											</div>
+										</AccordionContent>
+									</AccordionItem>
+								</Accordion>
+
+								{/* Attachments (if any in administrative JSON) */}
+								{(() => {
+									const attachments = (selected as any)?.administrative?.attachments as
+										| Array<{ name: string; url: string }>
+										| undefined;
+									if (!attachments || attachments.length === 0) return null;
+									return (
+										<div className="bg-white rounded-xl border border-serene-neutral-200 p-4 shadow-sm">
+											<h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
+												<Paperclip className="h-4 w-4 text-gray-600" />
+												Attachments
+											</h3>
+											<div className="space-y-2">
+												{attachments.map((a, idx) => (
+													<div
+														key={idx}
+														className="flex items-center justify-between p-2 bg-gray-50 rounded-md border border-gray-200"
+													>
+														<div className="flex items-center gap-2 min-w-0 flex-1">
+															<FileText className="h-4 w-4 text-gray-500 flex-shrink-0" />
+															<span className="text-sm font-medium text-gray-900 truncate">
+																{a.name}
+															</span>
+														</div>
+														<a
+															href={a.url}
+															target="_blank"
+															rel="noreferrer"
+															className="ml-2 px-2 py-1 text-xs font-medium text-[#1A3434] bg-[#1A3434]/10 rounded-md hover:bg-[#1A3434]/20 transition-colors"
+														>
+															Open
+														</a>
+													</div>
+												))}
+											</div>
+										</div>
+									);
+								})()}
 								</div>
 							</div>
 						</div>
@@ -1441,5 +1751,8 @@ export default function ReportsMasterDetail({ userId }: { userId: string }) {
 				</Dialog>
 			</div>
 		</div>
+
+		<FloatingChatManager chats={floatingChats} onClose={closeFloatingChat} />
+		</>
 	);
 }

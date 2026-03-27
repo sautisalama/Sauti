@@ -464,7 +464,7 @@ export default function ProfessionalView({
 									title="Services"
 									description={`${supportServices.length} Active`}
 									icon={<Briefcase className="h-5 w-5 text-sauti-yellow" />}
-									href="/dashboard/profile?tab=services"
+									href="/dashboard/profile?section=services"
 									variant="custom"
                                     className="bg-sauti-yellow-light border-sauti-yellow/10 shadow-sm hover:shadow-md transition-all"
 								/>

@@ -33,9 +33,10 @@ export function DashboardContent({ children }: DashboardContentProps) {
   // So pt-0 for chat/onboarding. pt-16 for others.
   const profile = dash?.data?.profile;
   const hasAcceptedPolicies = !!(profile?.policies as any)?.all_policies_accepted;
-  const needsOnboarding = !profile?.user_type || 
+  const isOnboardingRoute = pathname === "/dashboard/onboarding" || pathname?.startsWith("/dashboard/onboarding");
+  const needsOnboarding = isOnboardingRoute || (!profile?.user_type || 
     !hasAcceptedPolicies ||
-    ((profile.user_type === 'professional' || profile.user_type === 'ngo') && !profile.professional_title);
+    ((profile.user_type === 'professional' || profile.user_type === 'ngo') && !profile.professional_title));
 
   const showTopPadding = !isChat && !needsOnboarding;
 

@@ -38,7 +38,7 @@ import LinkExt from "@tiptap/extension-link";
 import ImageExt from "@tiptap/extension-image";
 import TextAlign from "@tiptap/extension-text-align";
 import Placeholder from "@tiptap/extension-placeholder";
-import TextStyle from "@tiptap/extension-text-style";
+import { TextStyle } from "@tiptap/extension-text-style";
 
 export default function CaseNotesEditor({
 	matchId,
@@ -118,7 +118,7 @@ export default function CaseNotesEditor({
 	useEffect(() => {
 		if (!editor || !editor.commands) return;
 		if (initialContent !== editor.getHTML()) {
-			editor.commands.setContent(initialContent, false);
+			editor.commands.setContent(initialContent, { emitUpdate: false });
 		}
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [initialContent]);
