@@ -343,6 +343,10 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
 		toast({ title: "Support Connection Active", description: `You can now securely coordinate with ${provider.name}.` });
 	};
 
+	const nextMatch = () => {
+		setMatchIndex((prev) => (prev + 1) % allMatches.length);
+	};
+
 	const handleEscalate = async () => {
 		if (!report) return;
 		setEscalating(true);

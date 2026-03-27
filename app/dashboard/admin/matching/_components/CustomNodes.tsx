@@ -15,7 +15,7 @@ const getIncidentIcon = (incident: string) => {
 
 export function CaseNode({ data }: { data: any }) {
     return (
-        <div className="w-72 bg-white border border-serene-neutral-100 rounded-xl shadow-sm p-5 font-sans relative transition-all duration-300 hover:border-serene-blue-200">
+        <div className="w-72 bg-white border border-serene-neutral-100 rounded-xl shadow-sm p-5 font-sans relative transition-all duration-300 hover:border-serene-blue-200 node-slide-in">
             <div className="flex items-center gap-3 mb-4 border-b border-serene-neutral-50 pb-3">
                 <div className="h-8 w-8 rounded-lg bg-serene-blue-50/50 flex items-center justify-center text-serene-blue-600">
                     <ShieldAlert className="h-4 w-4" />
@@ -47,7 +47,7 @@ export function CaseNode({ data }: { data: any }) {
 
 export function StepNode({ data }: { data: any }) {
     return (
-        <div className="w-[200px] bg-white border border-serene-neutral-100 rounded-xl shadow-sm p-3 font-sans relative group hover:border-serene-blue-400 transition-all duration-200">
+        <div className="w-[200px] bg-white border border-serene-neutral-100 rounded-xl shadow-sm p-3 font-sans relative group hover:border-serene-blue-400 transition-all duration-200 node-slide-in">
             <Handle type="target" position={Position.Left} className="w-2 h-2 rounded-full border border-white bg-serene-neutral-300 group-hover:bg-serene-blue-500" />
             <div className="flex items-center gap-3">
                 <div className="h-8 w-8 rounded-lg bg-serene-neutral-50 border border-serene-neutral-50 flex items-center justify-center text-serene-neutral-400 group-hover:text-serene-blue-500 group-hover:bg-serene-blue-50">
@@ -69,7 +69,7 @@ export function ServiceNode({ data }: { data: any }) {
     const proColor = data.proColor || { border: "border-serene-neutral-200", bg: "bg-white", text: "text-serene-neutral-600 bg-serene-neutral-50" };
     
     return (
-        <div className={`w-[260px] bg-white border ${isBounced ? 'border-red-100' : 'border-serene-neutral-100'} rounded-xl shadow-sm p-4 font-sans relative transition-all duration-300 hover:border-serene-blue-300 group`}>
+        <div className={`w-[260px] bg-white border ${isBounced ? 'border-red-100' : 'border-serene-neutral-100'} rounded-xl shadow-sm p-4 font-sans relative transition-all duration-300 hover:border-serene-blue-300 group node-slide-in`}>
             <div className={`absolute -top-3 right-4 px-2 py-0.5 text-[8px] font-black uppercase tracking-[0.2em] rounded border border-serene-neutral-50 bg-white shadow-sm ${proColor.text.split(' ')[0]}`}>
                 OWNER: {data.proName?.split(' ')[0]}
             </div>
@@ -116,7 +116,7 @@ export function EvaluationLogicNode({ data }: { data: any }) {
     const isBounced = data.bounced;
     
     return (
-        <div className="w-[180px] bg-white border border-serene-neutral-100 rounded-xl shadow-sm font-sans relative overflow-hidden group hover:border-serene-blue-400 transition-all duration-200">
+        <div className="w-[180px] bg-white border border-serene-neutral-100 rounded-xl shadow-sm font-sans relative overflow-hidden group hover:border-serene-blue-400 transition-all duration-200 node-slide-in">
             <Handle type="target" position={Position.Left} className="w-2 h-2 rounded-full border border-white bg-serene-neutral-300 group-hover:bg-serene-blue-500" />
             
             <div className="px-3 py-2 bg-serene-neutral-50/20 border-b border-serene-neutral-50 flex items-center justify-between">
@@ -145,33 +145,34 @@ export function EvaluationLogicNode({ data }: { data: any }) {
 export function ScoringMatrixNode({ data }: { data: any }) {
     const isBounced = data.bounced;
     const isHighlighting = data.isHighlighting;
-    const isAccepted = data.matchStatus === 'ACCEPTED';
+    const isExiting = data.isExiting;
+    const isAccepted = data.matchStatus === 'accepted' || data.matchStatus === 'scheduled';
     const headerColor = isBounced ? 'bg-red-50' : (isAccepted ? 'bg-emerald-50' : 'bg-serene-blue-50');
     const borderColor = isBounced ? 'border-red-100' : (isAccepted ? 'border-emerald-100' : 'border-serene-blue-100');
     const accentColor = isBounced ? 'text-red-500' : (isAccepted ? 'text-emerald-500' : 'text-serene-blue-600');
 
     return (
-        <div className={`w-[280px] bg-white border ${isHighlighting ? 'border-serene-blue-500 ring-4 ring-serene-blue-50' : borderColor} rounded-xl font-sans relative overflow-hidden group/matrix transition-all duration-500 ${isHighlighting ? 'animate-pulse' : 'shadow-sm'}`}>
-            <div className={`${headerColor} px-4 py-2.5 border-b ${borderColor} flex items-center justify-between`}>
-                <h4 className={`font-black ${accentColor} text-[9px] uppercase tracking-[0.1em] flex items-center gap-1.5`}>
-                    <Activity className="w-3 h-3" /> Matrix Components
+        <div className={`w-[190px] bg-white border ${isHighlighting ? 'border-serene-blue-500 ring-4 ring-serene-blue-50' : borderColor} rounded-2xl font-sans relative overflow-hidden group/matrix transition-all duration-500 ${isHighlighting ? 'animate-pulse scale-105 shadow-xl' : 'shadow-sm'} ${isExiting ? 'node-slide-out' : 'node-slide-in'}`}>
+            {/* Mesh Gradient Header */}
+            <div className={`${headerColor} px-3 py-3 border-b ${borderColor} flex items-center justify-between relative`}>
+                <div className="absolute inset-0 opacity-20 bg-[radial-gradient(circle_at_1px_1px,_rgba(0,0,0,0.05)_1px,_transparent_0)] bg-[size:10px_10px]" />
+                <h4 className={`font-black ${accentColor} text-[10px] uppercase tracking-[0.2em] flex items-center gap-2 relative z-10`}>
+                     Scoring 
                 </h4>
-                <div className="flex items-center gap-1.5">
-                    <div className={`text-[9px] font-black ${accentColor} bg-white px-2 py-0.5 rounded border ${borderColor}`}>
+<div className={`font-black ${accentColor} text-[8px] `}>
                         {data.score} PTS
                     </div>
                     <button 
                         onClick={(e) => { e.stopPropagation(); data.onUnpin?.(); }}
-                        className="p-1 text-serene-neutral-300 hover:text-red-500 transition-colors"
+                        className="p-1 text-serene-neutral-400 hover:text-rose-500 hover:bg-rose-50 rounded-md transition-all active:scale-90"
                     >
                         <X className="w-3.5 h-3.5" />
                     </button>
-                </div>
             </div>
 
             <Handle type="target" position={Position.Left} className={`w-2 h-2 rounded-full border border-white ${accentColor.replace('text-', 'bg-')}`} />
 
-            <div className="p-2 relative bg-[#FAFAFA]/50">
+            <div className="p-2 relative bg-white">
                 <table className="w-full text-left border-separate border-spacing-0">
                     <tbody className="divide-y divide-serene-neutral-100">
                         {data.reasons?.map((r: string, idx: number) => {
@@ -181,10 +182,10 @@ export function ScoringMatrixNode({ data }: { data: any }) {
 
                             return (
                                 <tr key={idx} className="group/row">
-                                    <td className="py-2 text-[9px] font-bold text-serene-neutral-600 capitalize leading-none pr-4">
+                                    <td className="py-1.5 text-[8px] font-bold text-serene-neutral-600 capitalize leading-none pr-2">
                                         {text}
                                     </td>
-                                    <td className={`py-2 text-[9px] font-black ${accentColor} text-right tabular-nums`}>
+                                    <td className={`py-1.5 text-[8px] font-black ${accentColor} text-right tabular-nums`}>
                                         {points}
                                     </td>
                                 </tr>

@@ -20,8 +20,8 @@ const MatchingVisualizer = dynamic(
             </div>
           </div>
           <div className="text-center px-8 py-6 bg-white rounded-2xl shadow-[0_15px_50px_-12px_rgba(0,0,0,0.06)] border border-serene-neutral-100 max-w-[280px]">
-            <h3 className="text-lg font-black text-serene-blue-950 tracking-tight leading-none mb-1.5">Vectural Engine</h3>
-            <p className="text-[9px] font-black text-serene-neutral-400 uppercase tracking-[0.2em]">Initializing Workflow</p>
+            <h3 className="text-lg font-black text-serene-blue-950 tracking-tight leading-none mb-1.5 uppercase">Matching Engine</h3>
+            <p className="text-[9px] font-black text-serene-neutral-400 uppercase tracking-[0.2em]">Initializing Dashboard</p>
           </div>
         </div>
       </div>

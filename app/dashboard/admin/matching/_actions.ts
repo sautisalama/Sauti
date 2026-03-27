@@ -2,6 +2,27 @@
 
 import { createClient } from "@/utils/supabase/server";
 import { Database } from "@/types/db-schema";
+import { createClient as createAdminClient } from "@supabase/supabase-js";
+
+let _supabaseAdmin: any = null;
+
+function getSupabaseAdmin() {
+    if (_supabaseAdmin) return _supabaseAdmin;
+    
+    _supabaseAdmin = createAdminClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SERVICE_ROLE_KEY!,
+        {
+            auth: {
+                persistSession: false,
+                autoRefreshToken: false,
+                detectSessionInUrl: false
+            }
+        }
+    );
+    return _supabaseAdmin;
+}
+
 
 const INCIDENT_SPECIALTY_MAP: Record<string, { primary: string[]; secondary: string[] }> = {
 	physical: { primary: ["medical", "legal"], secondary: ["mental_health", "shelter"] },
@@ -54,22 +75,29 @@ function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: numbe
 }
 
 export async function getReportedCases() {
-    const supabase = await createClient();
-    const { data, error } = await supabase
-        .from("reports")
-        .select("report_id, type_of_incident, submission_timestamp, urgency, ismatched, record_only")
-        .order("submission_timestamp", { ascending: false })
-        .limit(20);
+    try {
+        const { data, error } = await getSupabaseAdmin()
+            .from("reports")
+            .select("report_id, type_of_incident, submission_timestamp, urgency, ismatched, record_only, first_name, last_name")
+            .order("submission_timestamp", { ascending: false })
+            .limit(50);
 
-    if (error) throw new Error(error.message);
-    return data;
+        if (error) {
+            console.error("Failed to fetch reports:", error);
+            throw new Error(error.message);
+        }
+        
+        return data || [];
+    } catch (err) {
+        console.error("Error in getReportedCases:", err);
+        throw err;
+    }
 }
 
-export async function simulateMatch(reportId: string) {
-    const supabase = await createClient();
 
+export async function simulateMatch(reportId: string) {
     // 1. Fetch Report Data
-    const { data: report, error: reportError } = await supabase
+    const { data: report, error: reportError } = await getSupabaseAdmin()
         .from("reports")
         .select("*")
         .eq("report_id", reportId)
@@ -85,28 +113,28 @@ export async function simulateMatch(reportId: string) {
     }
 
     // 2. Fetch Candidates
-    const { data: services } = await supabase
+    const { data: services } = await getSupabaseAdmin()
         .from("support_services")
         .select("*, profile:profiles!support_services_user_id_fkey(*)")
         .eq("is_active", true)
         .eq("is_banned", false)
         .eq("is_permanently_suspended", false);
 
-    const { data: standaloneProfiles } = await supabase
+    const { data: standaloneProfiles } = await getSupabaseAdmin()
         .from("profiles")
         .select("*")
         .in("professional_title", ["Human rights defender", "Paralegal"]);
 
-    const providerUserIds = new Set((services || []).filter(s => s.verification_status === "verified").map(s => s.user_id).filter(Boolean));
-    const activeStandaloneProfiles = (standaloneProfiles || []).filter(p => p.verification_status === "verified" && !providerUserIds.has(p.id));
+    const providerUserIds = new Set((services || []).filter((s: any) => s.verification_status === "verified").map((s: any) => s.user_id).filter(Boolean));
+    const activeStandaloneProfiles = (standaloneProfiles || []).filter((p: any) => p.verification_status === "verified" && !providerUserIds.has(p.id));
 
     // Also get unverified for visualization bounce
-    const unverifiedServices = (services || []).filter(s => s.verification_status !== "verified");
+    const unverifiedServices = (services || []).filter((s: any) => s.verification_status !== "verified");
     
-    const verifiedServices = (services || []).filter(s => s.verification_status === "verified");
+    const verifiedServices = (services || []).filter((s: any) => s.verification_status === "verified");
 
     const candidates = [
-        ...verifiedServices.map(s => ({
+        ...verifiedServices.map((s: any) => ({
             type: 'service' as const,
             id: s.id,
             name: s.name,
@@ -126,7 +154,7 @@ export async function simulateMatch(reportId: string) {
             owner_last_name: (s as any).profile?.last_name,
             verified: true
         })),
-        ...activeStandaloneProfiles.map(p => ({
+        ...activeStandaloneProfiles.map((p: any) => ({
             type: 'profile' as const,
             id: p.id,
             name: `${p.first_name || ''} ${p.last_name || ''}`.trim() || p.professional_title || 'Expert',
@@ -146,7 +174,7 @@ export async function simulateMatch(reportId: string) {
             owner_last_name: p.last_name,
             verified: true
         })),
-        ...unverifiedServices.map(s => ({
+        ...unverifiedServices.map((s: any) => ({
             type: 'unverified' as const,
             id: s.id,
             name: s.name,
@@ -173,13 +201,13 @@ export async function simulateMatch(reportId: string) {
     const isOldReport = reportAgeHours > 24;
 
     // Simulate existing matched services to visualize connected accepted ones
-    const { data: existingMatches } = await supabase
+    const { data: existingMatches } = await getSupabaseAdmin()
         .from("matched_services")
         .select("service_id, hrd_profile_id, match_status_type")
         .eq("report_id", reportId);
 
     const matchedServiceIds = new Map();
-    existingMatches?.forEach(m => {
+    existingMatches?.forEach((m: any) => {
         const id = m.service_id || m.hrd_profile_id;
         if (id) matchedServiceIds.set(id, m.match_status_type);
     });
@@ -199,7 +227,7 @@ export async function simulateMatch(reportId: string) {
         const requiredBySurvivor = (report.required_services as string[]) || [];
         const mapping = INCIDENT_SPECIALTY_MAP[report.type_of_incident || 'other'];
         
-        const matchedTypes = cand.serviceTypes.filter(t => 
+        const matchedTypes = cand.serviceTypes.filter((t: any) => 
             mapping?.primary.includes(t) || 
             mapping?.secondary.includes(t) || 
             requiredBySurvivor.includes(t)
@@ -211,13 +239,13 @@ export async function simulateMatch(reportId: string) {
             return { cand, score: -100, reasons, bounced, bounceReason, matchStatus: null };
         }
 
-        if (cand.serviceTypes.some(t => mapping?.primary.includes(t))) {
+        if (cand.serviceTypes.some((t: any) => mapping?.primary.includes(t))) {
             score += 25; reasons.push("Primary specialty rules (+25)");
-        } else if (cand.serviceTypes.some(t => mapping?.secondary.includes(t))) {
+        } else if (cand.serviceTypes.some((t: any) => mapping?.secondary.includes(t))) {
             score += 15; reasons.push("Secondary specialty (+15)");
         }
         
-        if (cand.serviceTypes.some(t => requiredBySurvivor.includes(t))) {
+        if (cand.serviceTypes.some((t: any) => requiredBySurvivor.includes(t))) {
             score += 20; reasons.push("Requested by survivor (+20)");
         }
 
