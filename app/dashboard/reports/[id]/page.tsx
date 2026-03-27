@@ -12,7 +12,8 @@ import {
 	LogOut,
 	BookOpen, HandHeart,
 	Mic, FileText, PenLine, VideoIcon, CheckSquare,
-	Trash2
+	Trash2, MessageCircle, ChevronLeft, Sparkles, Activity, ArrowRight,
+    Shield
 } from "lucide-react";
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -20,8 +21,16 @@ import { Input } from "@/components/ui/input";
 import { useState, useEffect, useCallback, use, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
+import Link from "next/link";
+import { Badge } from "@/components/ui/badge";
+import { AudioPlayer } from "../../_components/AudioPlayer";
+import { RichTextEditor } from "@/components/RichTextEditor";
+import { VoiceRecorderInline } from "@/components/VoiceRecorderInline";
+import { CaseChatPanel } from "@/components/chat/CaseChatPanel";
+import { useDashboardData } from "@/components/providers/DashboardDataProvider";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 
 interface ProviderMatch {
     id: string;
@@ -43,14 +52,6 @@ interface AppointmentData {
 	location?: string;
 	link?: string;
 }
-
-import Link from "next/link";
-import { Badge } from "@/components/ui/badge";
-import { AudioPlayer } from "../../_components/AudioPlayer";
-import { RichTextEditor } from "@/components/RichTextEditor";
-import { VoiceRecorderInline } from "@/components/VoiceRecorderInline";
-import { CaseChatPanel } from "@/components/chat/CaseChatPanel";
-import { useDashboardData } from "@/components/providers/DashboardDataProvider";
 
 // Type for media stored in reports
 interface MediaFile {
@@ -87,15 +88,9 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
 
 	// Debounce timer for checklist notes
 	const notesTimerRef = useRef<NodeJS.Timeout | null>(null);
-
-	const needsOnboarding = useMemo(() => {
-		const profile = dash?.data?.profile;
-		if (!profile) return false;
-		const hasAcceptedPolicies = !!(profile.policies as any)?.all_policies_accepted;
-		return !profile.user_type || 
-			!hasAcceptedPolicies ||
-			((profile.user_type === 'professional' || profile.user_type === 'ngo') && !profile.professional_title);
-	}, [dash?.data?.profile]);
+    const supabase = useMemo(() => createClient(), []);
+	const { toast } = useToast();
+	const router = useRouter();
 
 	useEffect(() => {
 		const getUser = async () => {
@@ -103,11 +98,7 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
 			if (user) setCurrentUserId(user.id);
 		};
 		getUser();
-	}, []);
-	
-	const { toast } = useToast();
-	const router = useRouter();
-	const supabase = createClient();
+	}, [supabase]);
 
 	const currentMatch = allMatches[matchIndex];
 
@@ -210,9 +201,7 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
 
 				setAllMatches(matches);
 				if (data.administrative && ((data.administrative as any).checklist || (data.administrative as any).checklists)) {
-					// Support both old 'checklists' (plural) key and new 'checklist' (singular) key
 					const rawItems = (data.administrative as any).checklist || (data.administrative as any).checklists || [];
-					// Normalize: map 'completed' -> 'done' for backward compatibility
 					setChecklists(rawItems.map((c: any) => ({ ...c, completed: c.done ?? c.completed ?? false })));
 				} else {
 					setChecklists([
@@ -221,7 +210,6 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
 					]);
 				}
 
-				// Fetch real appointments for matched services
 				const matchIds = (data.matched_services as any[] || []).map((m: any) => m.id);
 				if (matchIds.length > 0) {
 					const { data: apptData } = await supabase
@@ -273,16 +261,9 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
 			.eq("report_id", reportId);
 
 		if (error) {
-			toast({
-				title: "Unable to save",
-				description: error.message,
-				variant: "destructive",
-			});
+			toast({ title: "Unable to save", description: error.message, variant: "destructive" });
 		} else {
-			toast({
-				title: "Shared successfully",
-				description: "Your additional details have been safely added.",
-			});
+			toast({ title: "Shared successfully", description: "Your additional details have been safely added." });
 			setNewDetail("");
 			setShowAddDetails(false);
 			fetchReport();
@@ -292,23 +273,11 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
 
 	const handleSaveNotes = async (content: string) => {
 		if (!report) return;
-		
-		const { error } = await supabase
-			.from("reports")
-			.update({ notes: content })
-			.eq("report_id", reportId);
-
+		const { error } = await supabase.from("reports").update({ notes: content }).eq("report_id", reportId);
 		if (error) {
-			toast({
-				title: "Unable to save notes",
-				description: error.message,
-				variant: "destructive",
-			});
+			toast({ title: "Unable to save notes", description: error.message, variant: "destructive" });
 		} else {
-			toast({
-				title: "Notes saved",
-				description: "Your private notes have been saved securely.",
-			});
+			toast({ title: "Notes saved", description: "Your private notes have been saved securely." });
 			fetchReport();
 		}
 	};
@@ -316,10 +285,8 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
 	const handleSaveChecklist = async (newLists: any[]) => {
 		setChecklists(newLists);
 		if (!report) return;
-		// Save under 'checklist' (singular) to match sidepanel format and use 'done' property
 		const normalizedLists = newLists.map(c => ({ id: c.id, title: c.title, notes: c.notes || '', done: c.completed ?? c.done ?? false }));
 		const adminData = { ...(report.administrative as any || {}), checklist: normalizedLists };
-		// Clean up legacy plural key if present
 		delete adminData.checklists;
 		await supabase.from('reports').update({ administrative: adminData }).eq('report_id', reportId);
 	};
@@ -330,9 +297,7 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
 	};
 
 	const updateChecklistNotes = (id: string, notes: string) => {
-		// Update local state immediately
 		setChecklists(prev => prev.map(c => c.id === id ? { ...c, notes } : c));
-		// Debounce the save
 		if (notesTimerRef.current) clearTimeout(notesTimerRef.current);
 		notesTimerRef.current = setTimeout(() => {
 			const updated = checklists.map(c => c.id === id ? { ...c, notes } : c);
@@ -369,572 +334,463 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
 	};
 
 	const handleVoiceRecorded = async (blob: Blob) => {
-		toast({
-			title: "Voice note received",
-			description: "Uploading your recording...",
-		});
+		toast({ title: "Voice note received", description: "Uploading your recording..." });
 		setShowVoiceRecorder(false);
-	};
-
-	const nextMatch = () => {
-		if (matchIndex < allMatches.length - 1) {
-			setMatchIndex(prev => prev + 1);
-		} else {
-			setMatchIndex(0);
-		}
 	};
 
 	const acceptMatch = (provider: ProviderMatch) => {
 		setAcceptedMatch(provider);
-		toast({
-			title: "Support Connection Active",
-			description: `You can now securely coordinate with ${provider.name}.`,
-		});
+		toast({ title: "Support Connection Active", description: `You can now securely coordinate with ${provider.name}.` });
 	};
 
 	const handleEscalate = async () => {
 		if (!report) return;
 		setEscalating(true);
 		try {
-			const response = await fetch(`/api/reports/${reportId}/escalate`, {
-				method: "POST",
-			});
+			const response = await fetch(`/api/reports/${reportId}/escalate`, { method: "POST" });
 			if (!response.ok) throw new Error("Escalation failed");
-			
-			toast({
-				title: "Help is on the way",
-				description: "Your report has been escalated for matching support.",
-			});
+			toast({ title: "Help is on the way", description: "Your report has been escalated for matching support." });
 			fetchReport();
 		} catch (err: any) {
-			toast({
-				title: "Error",
-				description: err.message,
-				variant: "destructive",
-			});
+			toast({ title: "Error", description: err.message, variant: "destructive" });
 		} finally {
 			setEscalating(false);
 		}
 	};
 
-	const exitSafely = () => {
-		window.location.href = "https://www.google.com";
-	};
+	const exitSafely = () => { window.location.href = "https://www.google.com"; };
 
-	// Format date nicely
 	const formatDate = (date: string | null) => {
 		if (!date) return "";
-		return new Date(date).toLocaleDateString("en-US", {
-			weekday: "short",
-			year: "numeric",
-			month: "short",
-			day: "numeric"
-		});
+		return new Date(date).toLocaleDateString("en-US", { weekday: "short", year: "numeric", month: "short", day: "numeric" });
 	};
 
 	const formatTime = (date: string | null) => {
 		if (!date) return "";
-		return new Date(date).toLocaleTimeString("en-US", {
-			hour: "2-digit",
-			minute: "2-digit"
-		});
+		return new Date(date).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
 	};
 
-	// Loading state
+	const getStatusStyles = (status: string | null) => {
+		switch (status?.toLowerCase()) {
+			case 'matched': return 'bg-teal-50 text-teal-700 border-teal-100';
+			case 'pending': return 'bg-sky-50 text-sky-700 border-sky-100';
+			case 'confirmed': return 'bg-emerald-50 text-emerald-700 border-emerald-100';
+			default: return 'bg-slate-50 text-slate-500 border-slate-100';
+		}
+	};
+
 	if (loading) {
 		return (
-			<div className="flex items-center justify-center min-h-screen bg-serene-neutral-50">
+			<div className="flex items-center justify-center min-h-screen bg-slate-50">
 				<div className="flex flex-col items-center gap-6">
 					<div className="relative">
-						<div className="w-16 h-16 border-4 border-sauti-teal/20 border-t-sauti-teal rounded-full animate-spin" />
-						<Heart className="h-6 w-6 text-sauti-teal absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
+						<div className="w-16 h-16 border-4 border-teal-100 border-t-teal-600 rounded-full animate-spin" />
+						<Heart className="h-6 w-6 text-teal-600 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
 					</div>
-					<div className="text-center space-y-1">
-						<p className="text-lg font-semibold text-sauti-dark">Safely loading your space</p>
-						<p className="text-sm text-serene-neutral-500 font-medium">Your privacy is our priority</p>
+					<div className="text-center">
+						<p className="text-xl font-bold text-slate-900">Entering Secure Space</p>
+						<p className="text-slate-400 font-medium">Preparing your toolkit...</p>
 					</div>
 				</div>
 			</div>
 		);
 	}
 
-	// Error state
-	if (errorState) {
-		return (
-			<div className="flex items-center justify-center min-h-screen bg-serene-neutral-50 p-6">
-				<Card className="max-w-md w-full border-serene-neutral-200 rounded-xl p-8 md:p-10 text-center shadow-sm">
-					<div className="w-16 h-16 bg-serene-neutral-100 rounded-full flex items-center justify-center mx-auto mb-6">
-						<FileText className="h-8 w-8 text-serene-neutral-400" />
+	if (errorState || !report) {
+	    return (
+			<div className="flex items-center justify-center min-h-screen bg-slate-50 p-6">
+				<Card className="max-w-md w-full border-slate-200 rounded-3xl p-10 text-center shadow-xl bg-white">
+					<div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-8">
+						<Lock className="h-10 w-10 text-slate-300" />
 					</div>
-					<h2 className="text-xl font-bold text-sauti-dark mb-3">Connection Issue</h2>
-					<p className="text-serene-neutral-500 mb-8 leading-relaxed">{errorState}</p>
-					<div className="space-y-3">
-						<Button onClick={() => window.location.reload()} className="w-full bg-sauti-teal hover:bg-sauti-teal/90 text-white rounded-xl h-12 font-semibold shadow-sm">
-							Try again
-						</Button>
-						<Button asChild variant="ghost" className="w-full text-serene-neutral-500">
-							<Link href="/dashboard">Return to dashboard</Link>
-						</Button>
-					</div>
+					<h2 className="text-2xl font-bold text-slate-900 mb-4">Secure Access Only</h2>
+					<p className="text-slate-500 mb-10 leading-relaxed font-medium">{errorState || "Record not found."}</p>
+					<Button asChild className="w-full bg-teal-600 hover:bg-teal-700 text-white font-bold rounded-2xl h-14 shadow-lg">
+						<Link href="/dashboard">Return to Dashboard</Link>
+					</Button>
 				</Card>
 			</div>
 		);
 	}
 
-	if (!report) return null;
-
-	const upcomingAppointments = appointments.filter(a => {
-		if (!a.appointment_date) return false;
-		return new Date(a.appointment_date) >= new Date();
-	});
-	const pastAppointments = appointments.filter(a => {
-		if (!a.appointment_date) return false;
-		return new Date(a.appointment_date) < new Date();
-	});
+	const upcomingAppointments = appointments.filter(a => a.appointment_date && new Date(a.appointment_date) >= new Date());
 
 	return (
-		<div className="min-h-screen bg-serene-neutral-50 text-sauti-dark selection:bg-sauti-teal/20 pb-24 lg:pb-8">
-			
-			{/* Breadcrumb + Status Pills Row */}
-			<nav className="sticky top-0 z-40 bg-white/80 backdrop-blur-lg border-b border-serene-neutral-200/60 transition-all duration-200">
-				<div className="max-w-7xl mx-auto px-4 h-12 flex items-center justify-between gap-4">
-					{/* Left: Breadcrumb path */}
-					<div className="flex items-center gap-1.5 text-sm min-w-0">
-						<Link href="/dashboard" className="text-serene-neutral-400 hover:text-sauti-teal transition-colors shrink-0">
-							<svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+		<div className="min-h-screen bg-slate-50/50 pb-32 lg:pb-12 text-slate-900 selection:bg-teal-100">
+			{/* Focused Header Navigation */}
+			<nav className="sticky top-0 z-50 bg-white/80 backdrop-blur-xl border-b border-slate-100 transition-all duration-300">
+				<div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between gap-6">
+					<div className="flex items-center gap-4">
+						<Link href="/dashboard/reports" className="w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center hover:bg-slate-100 transition-all text-slate-600">
+							<ChevronLeft className="h-5 w-5" />
 						</Link>
-						<span className="text-serene-neutral-300">/</span>
-						<Link href="/dashboard/reports" className="text-serene-neutral-500 hover:text-sauti-teal transition-colors font-medium truncate">
-							Reports
-						</Link>
-						<span className="text-serene-neutral-300">/</span>
-						<span className="font-bold text-sauti-dark truncate">
-							{reportId.slice(0, 8).toUpperCase()}
-						</span>
+						<div className="hidden sm:block">
+							<div className="flex items-center gap-2 text-teal-600 font-extrabold uppercase tracking-[0.2em] text-[10px] mb-0.5">
+								<ShieldCheck className="h-3.5 w-3.5" />
+								Secure Private Session
+							</div>
+							<h2 className="text-slate-900 font-bold tracking-tight">Report Journey SS-{reportId.slice(0, 8).toUpperCase()}</h2>
+						</div>
 					</div>
 
-					{/* Right: Status pills */}
-					<div className="flex items-center gap-2 shrink-0">
-						<Badge className="bg-sauti-teal/10 text-sauti-teal border-sauti-teal/20 font-bold text-[10px] uppercase tracking-wider">
-							{report.type_of_incident?.replace(/_/g, " ") || "Report"}
+					<div className="flex items-center gap-3">
+						<Badge className={cn("px-4 py-1.5 rounded-full text-[10px] font-bold border uppercase tracking-[0.2em]", getStatusStyles(report.match_status))}>
+							{report.match_status || 'Under Review'}
 						</Badge>
-						{report.urgency && (
-							<Badge className={cn(
-								"font-bold text-[10px] uppercase tracking-wider",
-								report.urgency === 'high' 
-									? 'bg-rose-50 text-rose-600 border-rose-200' 
-									: report.urgency === 'medium'
-										? 'bg-amber-50 text-amber-600 border-amber-200'
-										: 'bg-serene-neutral-100 text-serene-neutral-500 border-serene-neutral-200'
-							)}>
-								{report.urgency} Priority
-							</Badge>
-						)}
-						{acceptedMatch && (
-							<Badge className="bg-serene-green-100 text-serene-green-700 border-serene-green-100 font-bold text-[10px] uppercase tracking-wider">
-								<CheckCircle2 className="h-3 w-3 mr-1" /> Matched
-							</Badge>
-						)}
+						<Button onClick={exitSafely} className="bg-rose-50 hover:bg-rose-100 text-rose-600 font-bold rounded-xl px-4 h-10 border border-rose-100 transition-all text-xs gap-2">
+							<LogOut className="h-4 w-4" /> Quick Exit
+						</Button>
 					</div>
 				</div>
 			</nav>
 
-			<main className="max-w-7xl mx-auto px-4 py-6 md:py-8 min-w-0">
-				<div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 min-w-0">
+			<main className="max-w-7xl mx-auto px-6 py-12">
+				<div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-start">
 					
-					{/* ===== LEFT COLUMN ===== */}
-					<div className="lg:col-span-7 xl:col-span-8 flex flex-col gap-6 min-w-0">
+					{/* Main Content: Story & Recovery */}
+					<div className="lg:col-span-8 space-y-12">
 						
-						{/* SECTION 1: Case Summary Header */}
-						<section className="space-y-4">
-							<h1 className="text-2xl md:text-3xl font-bold text-sauti-dark tracking-tight">
-								Your Support Journey
-							</h1>
-							
-							<div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-								<Card className="border-serene-neutral-100 rounded-xl overflow-hidden">
-									<CardContent className="p-3">
-										<p className="text-[10px] font-bold text-serene-neutral-400 uppercase tracking-wider mb-1">Type</p>
-										<p className="text-sm font-semibold text-sauti-dark capitalize truncate">
-											{report.type_of_incident?.replace(/_/g, " ") || "Not specified"}
-										</p>
-									</CardContent>
-								</Card>
-								<Card className="border-serene-neutral-100 rounded-xl overflow-hidden">
-									<CardContent className="p-3">
-										<p className="text-[10px] font-bold text-serene-neutral-400 uppercase tracking-wider mb-1">Submitted</p>
-										<p className="text-sm font-semibold text-sauti-dark truncate">
-											{report.submission_timestamp ? new Date(report.submission_timestamp).toLocaleDateString() : "—"}
-										</p>
-									</CardContent>
-								</Card>
-								<Card className="border-serene-neutral-100 rounded-xl overflow-hidden">
-									<CardContent className="p-3">
-										<p className="text-[10px] font-bold text-serene-neutral-400 uppercase tracking-wider mb-1">Location</p>
-										<p className="text-sm font-semibold text-sauti-dark truncate">
-											{report.city || report.country || "Private"}
-										</p>
-									</CardContent>
-								</Card>
-								<Card className="border-serene-neutral-100 rounded-xl overflow-hidden">
-									<CardContent className="p-3">
-										<p className="text-[10px] font-bold text-serene-neutral-400 uppercase tracking-wider mb-1">Consent</p>
-										<p className="text-sm font-semibold text-sauti-dark capitalize truncate">
-											{report.consent || "Private"}
-										</p>
-									</CardContent>
-								</Card>
+                        {/* Summary Section */}
+						<div className="space-y-6">
+							<div className="flex items-center gap-3">
+								<Activity className="h-6 w-6 text-teal-600" />
+								<h1 className="text-4xl font-bold tracking-tight text-slate-900">Healing Journey</h1>
 							</div>
-						</section>
+							<p className="text-lg text-slate-500 font-medium leading-relaxed max-w-2xl">
+                                This is your private sanctuary. Share more about your experience when you're ready, track your healing steps, and record your private thoughts.
+                            </p>
+						</div>
 
-						{/* SECTION: My Story */}
-						<section className="space-y-4">
-							<div className="flex items-center justify-between">
-								<div className="flex items-center gap-2">
-									<BookOpen className="h-5 w-5 text-sauti-teal" />
-									<h2 className="text-lg font-bold text-sauti-dark">My Story</h2>
+						{/* My Story Card */}
+						<Card className="border-0 bg-white shadow-xl shadow-slate-200/50 rounded-[2.5rem] overflow-hidden group">
+							<CardHeader className="p-10 pb-0 border-0 bg-transparent flex flex-row items-center justify-between">
+								<div className="flex items-center gap-4">
+									<div className="w-12 h-12 bg-teal-50 rounded-2xl flex items-center justify-center text-teal-600">
+										<BookOpen className="h-6 w-6" />
+									</div>
+									<div>
+										<CardTitle className="text-2xl font-bold">Your Story</CardTitle>
+										<p className="text-sm font-medium text-slate-400 mt-1">Shared with caring professionals</p>
+									</div>
 								</div>
-								<Button variant="ghost" size="sm" onClick={() => setShowAddDetails(!showAddDetails)} className="text-sauti-teal hover:bg-sauti-teal/10 font-semibold text-xs">
-									<Plus className="h-4 w-4 mr-1" /> Add More
+								<Button variant="ghost" onClick={() => setShowAddDetails(!showAddDetails)} className="text-teal-600 hover:bg-teal-50 font-bold rounded-xl gap-2 transition-all">
+									<Plus className="h-5 w-5" /> {showAddDetails ? "Cancel" : "Add Detail"}
 								</Button>
-							</div>
+							</CardHeader>
+							<CardContent className="p-10 space-y-8">
+								<div className="bg-slate-50/50 rounded-3xl p-8 border border-slate-50 leading-relaxed text-slate-600 font-medium text-lg italic relative">
+                                    <div className="absolute top-4 left-4 text-teal-200/50 select-none"><span className="text-6xl font-serif">"</span></div>
+									{report.incident_description || "Every story matters. You can start sharing yours whenever you're ready."}
+                                    <div className="absolute bottom-4 right-4 text-teal-200/50 select-none"><span className="text-6xl font-serif">"</span></div>
+								</div>
 
-							<Card className="border-serene-neutral-100 rounded-xl overflow-hidden">
-								<CardContent className="p-5 md:p-6">
-									{report.incident_description ? (
-										<p className="text-serene-neutral-600 leading-relaxed whitespace-pre-wrap text-sm">{report.incident_description}</p>
-									) : (
-										<p className="text-serene-neutral-400 italic text-sm">You haven't shared your story yet. That's okay — you can add details whenever you feel ready.</p>
-									)}
-								</CardContent>
-							</Card>
-
-							{showAddDetails && (
-								<Card className="border-sauti-teal/20 bg-sauti-teal/5 rounded-xl overflow-hidden animate-in slide-in-from-top-2 duration-300">
-									<CardContent className="p-5 space-y-4">
+								{showAddDetails && (
+									<div className="space-y-4 animate-in slide-in-from-top-4 fade-in duration-500">
 										<Textarea 
 											value={newDetail} onChange={(e) => setNewDetail(e.target.value)}
-											placeholder="Tell us more about what's happening or what you need..."
-											className="min-h-[100px] rounded-xl border-serene-neutral-200 focus:border-sauti-teal focus:ring-2 focus:ring-sauti-teal/10 p-4 text-sm resize-none"
+											placeholder="Add more details to your story (e.g., feelings, timelines, needs)..."
+											className="min-h-[160px] rounded-[2rem] border-slate-100 bg-white focus:border-teal-400 focus:ring-0 p-8 text-lg font-medium shadow-inner"
 										/>
-										<div className="flex flex-col sm:flex-row gap-3">
-											<Button variant="outline" onClick={() => setShowVoiceRecorder(!showVoiceRecorder)} className="h-10 rounded-xl border-serene-neutral-200 text-serene-neutral-600 font-semibold text-sm">
-												<Mic className="h-4 w-4 mr-2" /> {showVoiceRecorder ? "Hide Recorder" : "Add Voice Note"}
+										<div className="flex flex-col sm:flex-row gap-4">
+											<Button variant="outline" onClick={() => setShowVoiceRecorder(!showVoiceRecorder)} className="h-14 rounded-2xl border-slate-100 text-slate-600 font-bold text-base px-8 hover:bg-slate-50">
+												<Mic className="h-5 w-5 mr-3" /> {showVoiceRecorder ? "Hide Recorder" : "Voice Note"}
 											</Button>
 											<div className="flex-1" />
-											<Button onClick={handleAddDetail} disabled={updating || !newDetail.trim()} className="h-10 bg-sauti-teal hover:bg-sauti-teal/90 text-white font-semibold rounded-xl text-sm">
-												{updating ? "Saving..." : "Add to Story"}
+											<Button onClick={handleAddDetail} disabled={updating || !newDetail.trim()} className="h-14 bg-teal-600 hover:bg-teal-700 text-white font-bold rounded-2xl px-12 text-base shadow-xl shadow-teal-600/20 transition-all hover:scale-[1.02]">
+												{updating ? "Saving..." : "Update Story"}
 											</Button>
 										</div>
-										{showVoiceRecorder && <VoiceRecorderInline onRecorded={handleVoiceRecorded} onClose={() => setShowVoiceRecorder(false)} />}
-									</CardContent>
-								</Card>
-							)}
-						</section>
+										{showVoiceRecorder && <div className="mt-4"><VoiceRecorderInline onRecorded={handleVoiceRecorded} onClose={() => setShowVoiceRecorder(false)} /></div>}
+									</div>
+								)}
 
-						{/* SECTION: Voice Recordings */}
-						{audioFiles.length > 0 && (
-							<section className="space-y-4">
-								<div className="flex items-center gap-2">
-									<Mic className="h-5 w-5 text-sauti-teal" />
-									<h2 className="text-lg font-bold text-sauti-dark">Voice Recordings</h2>
-								</div>
-								<div className="space-y-3">
-									{audioFiles.map((audio, index) => (
-										<AudioPlayer key={index} src={audio.url} title={audio.title || `Recording ${index + 1}`} />
-									))}
-								</div>
-							</section>
-						)}
+								{audioFiles.length > 0 && (
+									<div className="space-y-4 pt-4">
+										<h4 className="font-bold text-slate-900 flex items-center gap-2 mb-4">
+											<Mic className="h-5 w-5 text-teal-500" />
+											Voice Records
+										</h4>
+										<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+											{audioFiles.map((audio, index) => (
+												<div key={index} className="bg-slate-50 border border-slate-100 rounded-2xl transition-all hover:shadow-md">
+													<AudioPlayer src={audio.url} title={audio.title || `Recording ${index + 1}`} />
+												</div>
+											))}
+										</div>
+									</div>
+								)}
+							</CardContent>
+						</Card>
 
-						{/* SECTION: Accountability Checklist (Fully Editable) */}
-						<section className="space-y-3">
-							<div className="flex items-center justify-between">
-								<div className="flex items-center gap-2">
-									<CheckSquare className="h-5 w-5 text-sauti-teal" />
-									<h2 className="text-lg font-bold text-sauti-dark">Accountability Tracker</h2>
+						{/* Accountability Recovery Tracker */}
+						<div className="space-y-6">
+							<div className="flex items-center justify-between px-2">
+								<div className="flex items-center gap-4">
+									<div className="w-10 h-10 bg-teal-50 rounded-xl flex items-center justify-center text-teal-600">
+										<CheckSquare className="h-5 w-5" />
+									</div>
+									<h2 className="text-2xl font-bold tracking-tight">Recovery Tracker</h2>
 								</div>
-								<span className="text-xs text-serene-neutral-400 font-medium">
-									{checklists.filter(c => c.completed).length}/{checklists.length} done
+								<span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest bg-white border border-slate-100 px-4 py-1.5 rounded-full shadow-sm">
+									{checklists.filter(c => c.completed).length}/{checklists.length} Steps Taken
 								</span>
 							</div>
-							<p className="text-xs text-serene-neutral-500">Track important steps in your journey. Click a title to edit it.</p>
-							
-							<Card className="border-serene-neutral-100 rounded-xl overflow-hidden">
+
+							<Card className="border-0 bg-white shadow-xl shadow-slate-200/50 rounded-[2.5rem] overflow-hidden">
 								<CardContent className="p-0">
-									{checklists.length > 0 ? (
-										<Accordion type="multiple" className="w-full">
-											{checklists.map((item) => (
-												<AccordionItem key={item.id} value={item.id} className="border-b border-serene-neutral-100 last:border-0 px-4">
-													<div className="flex items-center gap-3 w-full group">
-														<Checkbox 
-															checked={item.completed} 
-															onCheckedChange={() => toggleChecklist(item.id)} 
-															className="rounded-md border-serene-neutral-300 data-[state=checked]:bg-sauti-teal data-[state=checked]:border-sauti-teal h-4 w-4 flex-shrink-0"
-														/>
-														{editingItemId === item.id ? (
-															<div className="flex-1 flex items-center gap-2 py-3">
+									{checklists.map((item, idx) => (
+										<div key={item.id} className={cn("group transition-all duration-300", idx < checklists.length - 1 && "border-b border-slate-50")}>
+											<div className="p-8 hover:bg-teal-50/10 transition-colors">
+												<div className="flex items-start gap-6">
+													<Checkbox 
+														checked={item.completed} 
+														onCheckedChange={() => toggleChecklist(item.id)} 
+														className="h-6 w-6 rounded-lg border-2 border-slate-200 data-[state=checked]:bg-teal-600 data-[state=checked]:border-teal-600 transition-all mt-1"
+													/>
+													<div className="flex-1 min-w-0">
+														<div className="flex items-center justify-between gap-4 mb-2">
+															{editingItemId === item.id ? (
 																<Input
 																	value={editingTitle}
 																	onChange={(e) => setEditingTitle(e.target.value)}
 																	onKeyDown={(e) => { if (e.key === 'Enter') saveEditingTitle(); if (e.key === 'Escape') setEditingItemId(null); }}
-																	onBlur={saveEditingTitle}
-																	autoFocus
-																	className="h-8 text-sm border-serene-neutral-200 rounded-lg focus-visible:ring-sauti-teal/20"
+																	onBlur={saveEditingTitle} autoFocus
+																	className="h-9 text-lg font-bold border-teal-200 rounded-xl focus-visible:ring-0 focus-visible:border-teal-400 bg-white shadow-sm"
 																/>
-															</div>
-														) : (
-															<AccordionTrigger className={cn("hover:no-underline flex-1 text-left py-3 text-sm", item.completed && "text-serene-neutral-400 line-through")}>
-																<span 
-																	className="cursor-text hover:text-sauti-teal transition-colors"
-																	onClick={(e) => { e.stopPropagation(); startEditingTitle(item.id, item.title); }}
-																>
+															) : (
+																<h4 className={cn("text-xl font-bold transition-all cursor-text hover:text-teal-600", item.completed ? "text-slate-300 line-through" : "text-slate-800")}
+																	onClick={() => startEditingTitle(item.id, item.title)}>
 																	{item.title}
-																</span>
-															</AccordionTrigger>
-														)}
-														<button 
-															onClick={() => deleteChecklistItem(item.id)} 
-															className="opacity-0 group-hover:opacity-100 transition-opacity p-1 text-serene-neutral-300 hover:text-rose-500"
-															title="Delete item"
-														>
-															<Trash2 className="h-3.5 w-3.5" />
-														</button>
-													</div>
-													<AccordionContent className="pb-4 pl-7">
+																</h4>
+															)}
+															<button onClick={() => deleteChecklistItem(item.id)} className="opacity-0 group-hover:opacity-100 p-2 text-slate-300 hover:text-rose-500 transition-all">
+																<Trash2 className="h-4 w-4" />
+															</button>
+														</div>
 														<Textarea
 															value={item.notes || ""}
 															onChange={(e) => updateChecklistNotes(item.id, e.target.value)}
-															placeholder="Add private notes for this item..."
-															className="text-sm rounded-lg border-serene-neutral-200 resize-none min-h-[70px] focus:ring-sauti-teal/20"
+															placeholder="Private recovery notes for this step..."
+															className="text-base text-slate-400 font-medium bg-transparent border-0 focus-visible:ring-0 p-0 resize-none min-h-[40px] focus:text-slate-600"
 														/>
-													</AccordionContent>
-												</AccordionItem>
-											))}
-										</Accordion>
-									) : (
-										<div className="p-6 text-center text-sm text-serene-neutral-500 italic">
-											No checklist items yet. Add one below.
+													</div>
+												</div>
+											</div>
 										</div>
-									)}
-									
-									<div className="p-3 border-t border-serene-neutral-100 bg-serene-neutral-50/50 flex gap-2">
+									))}
+									<div className="p-8 bg-slate-50/50 flex gap-4 border-t border-slate-100">
 										<Input 
 											value={newChecklistItem}
 											onChange={(e) => setNewChecklistItem(e.target.value)}
-											placeholder="Add a new checklist item..."
-											className="h-9 border-serene-neutral-200 rounded-lg bg-white shadow-sm flex-1 focus-visible:ring-sauti-teal/20 text-sm"
+											placeholder="Add a new healing milestone..."
+											className="h-14 border-slate-100 rounded-2xl bg-white shadow-sm flex-1 focus-visible:ring-teal-400/20 text-lg font-medium px-6"
 											onKeyDown={(e) => { if (e.key === 'Enter') addChecklistItem(); }}
 										/>
-										<Button size="icon" onClick={addChecklistItem} disabled={!newChecklistItem.trim()} className="h-9 w-9 shrink-0 bg-sauti-teal hover:bg-sauti-teal/90 rounded-lg text-white">
-											<Plus className="h-4 w-4" />
+										<Button size="icon" onClick={addChecklistItem} disabled={!newChecklistItem.trim()} className="h-14 w-14 shrink-0 bg-teal-600 hover:bg-teal-700 rounded-2xl text-white shadow-xl shadow-teal-600/20 transition-all active:scale-95">
+											<Plus className="h-6 w-6" />
 										</Button>
 									</div>
 								</CardContent>
 							</Card>
-						</section>
+						</div>
 
-						{/* SECTION: Private Journal — Always shown */}
-						<section className="space-y-3">
-							<div className="flex items-center gap-2">
-								<PenLine className="h-5 w-5 text-sauti-teal" />
-								<h2 className="text-lg font-bold text-sauti-dark">Private Journal</h2>
-							</div>
-							<p className="text-xs text-serene-neutral-500">Only you can see these notes. Use this space to reflect, plan, or record anything private.</p>
-							<RichTextEditor content={report.notes || ""} onSave={handleSaveNotes} placeholder="Write your private notes here..." />
-						</section>
-
-						{/* Privacy Notice */}
-						<Card className="bg-sauti-dark rounded-xl overflow-hidden">
-							<CardContent className="p-5 text-white relative">
-								<div className="absolute bottom-0 right-0 opacity-5 p-6"><Lock className="h-20 w-20" /></div>
-								<div className="relative z-10 space-y-3">
-									<h3 className="text-base font-bold flex items-center gap-2">
-										<ShieldCheck className="h-5 w-5 text-sauti-teal" /> Your Safe Space
-									</h3>
-									<p className="text-serene-neutral-300 text-sm leading-relaxed">
-										We only share your story with providers you choose to connect with. Your true identity stays hidden.
-									</p>
+						{/* Healing Journal */}
+						<div className="space-y-6">
+							<div className="flex items-center gap-4 px-2">
+								<div className="w-10 h-10 bg-violet-50 rounded-xl flex items-center justify-center text-violet-600">
+									<PenLine className="h-5 w-5" />
 								</div>
+								<h2 className="text-2xl font-bold tracking-tight">Healing Journal</h2>
+							</div>
+							<p className="text-base text-slate-400 font-medium leading-relaxed px-2">Only you can access this journal. Capture your private reflections, progress, and goals.</p>
+							<div className="bg-white rounded-[2.5rem] shadow-xl shadow-slate-200/50 border-0 p-2 overflow-hidden">
+								<RichTextEditor content={report.notes || ""} onSave={handleSaveNotes} placeholder="Reflect on your progress here..." />
+							</div>
+						</div>
+					</div>
+
+					{/* Sidebar: Coordination & Support */}
+					<div className="lg:col-span-4 space-y-10 lg:sticky lg:top-32">
+						
+                        {/* Status Card */}
+                        <Card className="border-0 bg-teal-600 shadow-2xl shadow-teal-600/30 rounded-[2.5rem] overflow-hidden group">
+							<CardContent className="p-10 relative">
+                                <Sparkles className="absolute -top-4 -right-4 h-24 w-24 text-white/5 group-hover:rotate-12 transition-transform duration-700" />
+                                <div className="space-y-6 relative">
+                                    <div className="flex items-center gap-3 text-white/80 font-bold uppercase tracking-[0.2em] text-[10px]">
+                                        <Shield className="h-4 w-4" />
+                                        Safety Indicator
+                                    </div>
+                                    <h3 className="text-3xl font-bold text-white tracking-tight">Private Space</h3>
+                                    <p className="text-teal-50/80 font-medium text-base leading-relaxed">
+                                        Your identity is fully protected. Profiles are only shared when you choose to connect.
+                                    </p>
+                                    <div className="pt-4 border-t border-white/10 flex items-center gap-4">
+                                        <div className="w-12 h-12 bg-white/10 rounded-2xl flex items-center justify-center backdrop-blur-md">
+                                            <Lock className="text-white h-5 w-5" />
+                                        </div>
+                                        <div className="text-[11px] font-bold text-teal-100 uppercase tracking-widest leading-tight">
+                                            End-to-End<br />Encrypted Journey
+                                        </div>
+                                    </div>
+                                </div>
 							</CardContent>
 						</Card>
 
-					</div>
-
-					{/* ===== RIGHT COLUMN ===== */}
-					<div className="lg:col-span-5 xl:col-span-4 flex flex-col gap-5 min-w-0 h-full">
-						
-						{/* Support Team Header */}
-						{!acceptedMatch && (
-							<div className="flex items-center gap-2">
-								<HandHeart className="h-5 w-5 text-sauti-teal" />
-								<h2 className="text-lg font-bold text-sauti-dark">Your Support Team</h2>
-							</div>
-						)}
-
-						{/* Provider Match Content */}
+						{/* Support Connection Card */}
 						{report.record_only ? (
-							<Card className="border-amber-200 bg-amber-50 rounded-xl shadow-sm">
-								<CardContent className="p-5 flex flex-col items-center text-center space-y-4">
-									<ShieldCheck className="h-8 w-8 text-amber-600" />
-									<div className="space-y-2">
-										<h3 className="text-base font-bold text-amber-900">Record-Only Space</h3>
-										<p className="text-sm text-amber-800 leading-relaxed">Stored safely but not shared. Escalate to start matching.</p>
+							<Card className="border-0 bg-white shadow-xl shadow-slate-200/50 rounded-[2.5rem] overflow-hidden">
+								<CardContent className="p-10 text-center space-y-6">
+									<div className="w-20 h-20 bg-amber-50 rounded-[2rem] flex items-center justify-center mx-auto mb-2 text-amber-600">
+										<Sparkles className="h-10 w-10" />
 									</div>
-									<Button onClick={handleEscalate} disabled={escalating} className="w-full h-10 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl shadow-md text-sm">
-										{escalating ? "Requesting..." : "Request Match Now"}
+									<div className="space-y-3">
+										<h3 className="text-xl font-bold text-slate-900 tracking-tight">Record-Only Space</h3>
+										<p className="text-slate-400 font-medium leading-relaxed">Your story is saved safely. Toggle escalation to find professional matches.</p>
+									</div>
+									<Button onClick={handleEscalate} disabled={escalating} className="w-full h-14 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-2xl shadow-lg shadow-amber-500/20 text-base transition-all hover:scale-[1.02]">
+										{escalating ? "Requesting Connection..." : "Find Support Matches"}
 									</Button>
 								</CardContent>
 							</Card>
 						) : !acceptedMatch && currentMatch ? (
-							<Card className="border-serene-neutral-100 rounded-xl hover:shadow-md transition-shadow">
-								<CardContent className="p-5 space-y-4">
-									<div className="flex flex-wrap gap-2">
-										<Badge className="bg-serene-neutral-100 text-serene-neutral-600 border-0 font-bold text-[10px] uppercase">
-											{currentMatch.type}
-										</Badge>
-										{currentMatch.focus_groups.map(fg => (
-											<Badge key={fg} className="bg-sauti-teal/10 text-sauti-teal border-sauti-teal/20 font-bold text-[10px] uppercase">
-												{fg}
-											</Badge>
-										))}
+							<Card className="border-0 bg-white shadow-xl shadow-slate-200/50 rounded-[2.5rem] overflow-hidden animate-in fade-in zoom-in-95 duration-500">
+                                <CardHeader className="p-10 pb-0 flex flex-row items-center justify-between">
+                                    <div className="flex items-center gap-2">
+                                        <HandHeart className="h-5 w-5 text-teal-600" />
+                                        <h3 className="text-xl font-bold tracking-tight">Partner Ready</h3>
+                                    </div>
+                                    <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Match {matchIndex + 1}/{allMatches.length}</div>
+                                </CardHeader>
+								<CardContent className="p-10 space-y-6">
+									<div className="flex flex-wrap gap-2 mb-2">
+										<Badge className="bg-slate-50 text-slate-500 border-0 font-bold text-[10px] uppercase tracking-widest px-4 py-1.5">{currentMatch.type}</Badge>
+										{currentMatch.focus_groups.map(fg => <Badge key={fg} className="bg-teal-50 text-teal-700 border-0 font-bold text-[10px] uppercase tracking-widest px-4 py-1.5">{fg}</Badge>)}
 									</div>
-									<div>
-										<h3 className="text-lg font-bold text-sauti-dark mb-1">{currentMatch.name}</h3>
-										<p className="text-sm text-serene-neutral-500 leading-relaxed">{currentMatch.description}</p>
+									<div className="space-y-3">
+										<h3 className="text-2xl font-bold text-slate-900 tracking-tight">{currentMatch.name}</h3>
+										<p className="text-base text-slate-500 font-medium leading-relaxed">{currentMatch.description}</p>
 									</div>
-									<div className="grid grid-cols-2 gap-2">
-										<div className="flex items-center gap-2 p-2.5 bg-serene-neutral-50 rounded-lg">
-											<MapPin className="h-3.5 w-3.5 text-serene-neutral-400 shrink-0" />
-											<p className="text-xs font-semibold text-serene-neutral-600 truncate">{currentMatch.address}</p>
+									<div className="grid grid-cols-1 gap-3">
+										<div className="flex items-center gap-4 p-5 bg-slate-50 rounded-2xl border border-slate-50">
+											<MapPin className="h-5 w-5 text-slate-400 shrink-0" />
+											<p className="text-sm font-bold text-slate-600 truncate">{currentMatch.address || "Location Private"}</p>
 										</div>
-										<div className="flex items-center gap-2 p-2.5 bg-serene-neutral-50 rounded-lg">
-											<Clock className="h-3.5 w-3.5 text-serene-neutral-400 shrink-0" />
-											<p className="text-xs font-semibold text-serene-neutral-600 truncate">{currentMatch.availability}</p>
+										<div className="flex items-center gap-4 p-5 bg-slate-50 rounded-2xl border border-slate-50">
+											<Clock className="h-5 w-5 text-slate-400 shrink-0" />
+											<p className="text-sm font-bold text-slate-600 truncate">{currentMatch.availability}</p>
 										</div>
 									</div>
-									<div className="flex gap-3">
-										<Button onClick={() => acceptMatch(currentMatch)} className="flex-1 h-11 bg-sauti-teal hover:bg-sauti-teal/90 text-white font-bold rounded-xl shadow-md">
-											<HandHeart className="h-4 w-4 mr-2" /> Connect
+									<div className="flex gap-4 pt-4">
+										<Button onClick={() => acceptMatch(currentMatch)} className="flex-1 h-14 bg-teal-600 hover:bg-teal-700 text-white font-bold rounded-2xl shadow-xl shadow-teal-600/20 text-base transition-all hover:scale-[1.02]">
+											Connect Now
 										</Button>
-										<Button variant="outline" onClick={nextMatch} className="h-11 w-14 border-serene-neutral-200 font-bold rounded-xl">
-											Next
-										</Button>
+										{allMatches.length > 1 && (
+                                            <Button variant="outline" onClick={nextMatch} className="h-14 w-14 border-slate-100 rounded-2xl text-slate-400 hover:text-teal-600 hover:bg-slate-50 shadow-sm transition-all active:scale-95">
+                                                <ArrowRight className="h-6 w-6" />
+                                            </Button>
+                                        )}
 									</div>
 								</CardContent>
 							</Card>
 						) : acceptedMatch ? (
-							<>
-								{/* Accepted Match Card */}
-								<Card className="border-2 border-sauti-teal bg-white rounded-xl overflow-hidden shadow-sm">
-									<CardContent className="p-4 flex flex-col gap-4">
-										<div className="flex items-center gap-3">
-											<div className="w-10 h-10 bg-sauti-teal rounded-lg flex items-center justify-center text-white shrink-0">
-												<CheckCircle2 className="h-5 w-5" />
-											</div>
+							<div className="space-y-8 animate-in fade-in slide-in-from-right-8 duration-500">
+								<Card className="border-0 bg-white shadow-xl shadow-slate-200/50 rounded-[2.5rem] overflow-hidden">
+									<CardContent className="p-10 flex flex-col gap-8">
+										<div className="flex items-center gap-6">
+											<Avatar className="h-20 w-20 rounded-3xl border-4 border-white shadow-xl">
+												<AvatarFallback className="bg-teal-50 text-teal-600 text-2xl font-bold">
+													{acceptedMatch.name.charAt(0)}
+												</AvatarFallback>
+											</Avatar>
 											<div className="flex-1 min-w-0">
-												<p className="text-[10px] font-bold text-sauti-teal uppercase tracking-widest mb-0.5">Matched Team</p>
-												<h3 className="text-sm font-bold text-sauti-dark truncate">{acceptedMatch.name}</h3>
-												<p className="text-xs text-serene-neutral-500 truncate">{acceptedMatch.type}</p>
+												<div className="flex items-center gap-2 text-teal-600 font-bold uppercase tracking-[0.2em] text-[9px] mb-1">
+                                                    <CheckCircle2 className="h-3 w-3" /> Partner Active
+                                                </div>
+												<h3 className="text-2xl font-bold text-slate-900 truncate tracking-tight">{acceptedMatch.name}</h3>
+												<p className="text-sm font-bold text-slate-400 uppercase tracking-widest">{acceptedMatch.type}</p>
 											</div>
 										</div>
-										<div className="flex gap-2">
-											<Button size="sm" className="flex-1 rounded-lg bg-sauti-teal/10 text-sauti-teal hover:bg-sauti-teal hover:text-white shadow-none gap-1.5 h-9 font-bold hover:shadow-md transition-all text-xs">
-												<Calendar className="h-3.5 w-3.5" /> Schedule
+                                        
+                                        {upcomingAppointments.length > 0 ? (
+                                            <div className="bg-teal-50/50 rounded-3xl border border-teal-50 p-6 space-y-4">
+                                                <div className="flex items-center gap-3 text-teal-900 font-bold text-sm">
+                                                    <Calendar className="h-5 w-5 text-teal-600" />
+                                                    Session Scheduled
+                                                </div>
+                                                <div className="space-y-1">
+                                                    <p className="text-2xl font-bold text-teal-900 tracking-tight">{formatDate(upcomingAppointments[0].appointment_date)}</p>
+                                                    <p className="text-base text-teal-700/80 font-bold tracking-widest uppercase">{formatTime(upcomingAppointments[0].appointment_date)}</p>
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <div className="bg-slate-50/50 rounded-3xl border border-slate-50 p-6 lg:p-8 text-center space-y-3">
+                                                <Calendar className="h-8 w-8 text-slate-200 mx-auto" />
+                                                <p className="text-sm font-bold text-slate-400">Ready to Schedule</p>
+                                            </div>
+                                        )}
+
+										<div className="grid grid-cols-2 gap-4">
+											<Button className="h-14 bg-teal-600 hover:bg-teal-700 text-white font-bold rounded-2xl shadow-xl shadow-teal-600/20 text-sm transition-all hover:scale-[1.02]">
+												Coordination
 											</Button>
-											<Button size="sm" variant="outline" className="flex-1 rounded-lg gap-1.5 h-9 border-serene-neutral-200 font-bold text-serene-neutral-600 hover:bg-serene-neutral-50 text-xs">
-												<Phone className="h-3.5 w-3.5" /> Call Now
+											<Button variant="outline" className="h-14 border-slate-100 rounded-2xl font-bold text-slate-600 hover:bg-slate-50 text-sm shadow-sm">
+												Contact
 											</Button>
 										</div>
-										<button onClick={() => setAcceptedMatch(null)} className="text-[10px] font-bold text-serene-neutral-400 hover:text-rose-500 uppercase tracking-wider">
-											Change provider
-										</button>
+                                        <button onClick={() => setAcceptedMatch(null)} className="text-[10px] font-bold text-slate-300 hover:text-rose-500 uppercase tracking-[0.25em] transition-colors text-center w-full">
+                                            Switch Coordination Partner
+                                        </button>
 									</CardContent>
 								</Card>
 
-								{/* Appointments Card — Real Data */}
-								<Card className="border-serene-neutral-100 rounded-xl shadow-sm">
-									<CardContent className="p-4">
-										<div className="flex items-center justify-between mb-3">
-											<div className="flex items-center gap-2">
-												<Calendar className="h-4 w-4 text-sauti-teal" />
-												<h3 className="text-sm font-bold text-sauti-dark">Appointments</h3>
-											</div>
-											{appointments.length > 0 && (
-												<span className="text-[10px] font-bold text-serene-neutral-400 uppercase">
-													{upcomingAppointments.length} upcoming
-												</span>
-											)}
-										</div>
-										{appointments.length === 0 ? (
-											<div className="text-center py-6">
-												<Calendar className="h-8 w-8 text-serene-neutral-200 mx-auto mb-2" />
-												<p className="text-xs text-serene-neutral-400 font-medium">No appointments yet</p>
-												<p className="text-xs text-serene-neutral-400 mt-1">Schedule your first session above</p>
-											</div>
-										) : (
-											<div className="space-y-2">
-												{[...upcomingAppointments, ...pastAppointments].slice(0, 4).map(appt => {
-													const isUpcoming = appt.appointment_date ? new Date(appt.appointment_date) >= new Date() : false;
-													return (
-														<div key={appt.id} className="flex gap-3 p-2.5 rounded-lg border border-serene-neutral-100 bg-serene-neutral-50/50 hover:border-serene-neutral-200 transition-colors">
-															<div className={cn("w-9 h-9 rounded-lg flex items-center justify-center shrink-0", isUpcoming ? "bg-sauti-teal/10 text-sauti-teal" : "bg-serene-neutral-200 text-serene-neutral-500")}>
-																{appt.type === 'in-person' ? <MapPin className="h-4 w-4" /> : <VideoIcon className="h-4 w-4" />}
-															</div>
-															<div className="flex-1 min-w-0 flex flex-col justify-center">
-																<p className="text-xs font-semibold text-sauti-dark">{isUpcoming ? 'Upcoming Session' : 'Past Session'}</p>
-																<p className="text-[10px] text-serene-neutral-500 truncate mt-0.5">
-																	{appt.appointment_date ? `${formatDate(appt.appointment_date)} · ${formatTime(appt.appointment_date)}` : "Date TBD"}
-																</p>
-															</div>
-															{isUpcoming && (
-																<Badge className="bg-sauti-teal/10 text-sauti-teal border-0 text-[9px] font-bold self-center h-5">
-																	{appt.status || "Confirmed"}
-																</Badge>
-															)}
-														</div>
-													);
-												})}
-											</div>
-										)}
-									</CardContent>
-								</Card>
-
-								{/* Embedded Chat Interface */}
 								{currentUserId && (
-									<div className="flex-1 min-h-[450px] md:min-h-[500px] lg:sticky lg:top-20 rounded-xl border border-serene-neutral-200 shadow-lg overflow-hidden bg-white flex flex-col">
-										<CaseChatPanel
-											matchId={acceptedMatch.id}
-											survivorId={currentUserId}
-											professionalId={acceptedMatch.professionalId || ''}
-											professionalName={acceptedMatch.name}
-											survivorName={(report as any)?.first_name || "Myself"}
-											className="h-full w-full rounded-none border-0 shadow-none !min-h-0"
-										/>
+									<div className="h-[600px] rounded-[2.5rem] border-0 shadow-2xl shadow-slate-200/50 overflow-hidden bg-white flex flex-col group">
+										<div className="p-6 border-b border-slate-50 bg-white flex items-center gap-3">
+                                            <div className="w-8 h-8 rounded-full bg-serene-green-400 shadow-[0_0_12px_rgba(72,187,120,0.4)] animate-pulse" />
+                                            <span className="text-sm font-bold text-slate-900">Secure Channel Open</span>
+                                        </div>
+                                        <div className="flex-1">
+                                            <CaseChatPanel
+                                                matchId={acceptedMatch.id}
+                                                survivorId={currentUserId}
+                                                professionalId={acceptedMatch.professionalId || ''}
+                                                professionalName={acceptedMatch.name}
+                                                survivorName={(report as any)?.first_name || "Myself"}
+                                                className="h-full w-full rounded-none border-0 shadow-none !min-h-0"
+                                            />
+                                        </div>
 									</div>
 								)}
-							</>
+							</div>
 						) : (
-							<Card className="border-dashed border-2 border-serene-neutral-200 rounded-xl bg-serene-neutral-50/50">
-								<CardContent className="p-8 text-center">
-									<div className="w-14 h-14 bg-serene-neutral-100 rounded-full flex items-center justify-center mx-auto mb-4">
-										<HandHeart className="h-7 w-7 text-serene-neutral-400" />
-									</div>
-									<p className="text-serene-neutral-500 font-medium text-sm">Finding the right support for you...</p>
-								</CardContent>
+							<Card className="border-2 border-dashed border-slate-200 rounded-[2.5rem] bg-slate-50/30 p-16 text-center space-y-6">
+								<div className="w-20 h-20 bg-white rounded-[2rem] flex items-center justify-center mx-auto shadow-sm">
+									<HandHeart className="h-8 w-8 text-slate-200" />
+								</div>
+								<div className="space-y-2">
+                                    <h3 className="text-xl font-bold text-slate-400 tracking-tight">Support Search Active</h3>
+                                    <p className="text-sm text-slate-400 font-medium leading-relaxed italic">Searching for matched professionals...</p>
+                                </div>
 							</Card>
 						)}
+
+                        {/* Trauma Informed Tips */}
+                        <div className="p-10 bg-white border border-slate-100 rounded-[2.5rem] shadow-xl shadow-slate-100/50 space-y-6">
+                            <div className="flex items-center gap-4 text-teal-600">
+                                <div className="w-10 h-10 bg-teal-50 rounded-xl flex items-center justify-center">
+                                    <Sparkles className="h-5 w-5" />
+                                </div>
+                                <h4 className="font-bold text-xl tracking-tight text-slate-800">Supportive Hint</h4>
+                            </div>
+                            <p className="text-base text-slate-500 leading-relaxed font-medium">
+                                Sharing more details helps partners prepare better for your session. Feel free to use the voice recorder if typing is difficult.
+                            </p>
+                        </div>
 					</div>
+
 				</div>
 			</main>
-
-			{/* Quick Exit — Fixed FAB */}
-			<Button 
-				onClick={exitSafely} 
-				className="fixed bottom-20 right-4 lg:bottom-6 lg:right-6 z-50 bg-violet-350 hover:bg-red-600 text-white rounded-full h-10 px-4 shadow-lg font-bold text-xs gap-1.5"
-			>
-				<LogOut className="h-3.5 w-3.5" /> Quick Exit
-			</Button>
 		</div>
 	);
 }
