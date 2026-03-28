@@ -24,7 +24,8 @@ export async function POST(request: Request) {
 			return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 		}
 
-		const { targetType, targetId, action, reason } = await request.json();
+		const { targetType, targetId, action, reason } = (await request.json()) as BanRequest;
+
 
 		if (!targetType || !targetId || !action) {
 			return NextResponse.json(
@@ -37,12 +38,13 @@ export async function POST(request: Request) {
 		const ban = action === "ban";
 
 		// Update ban status
-		const updateData: any = {
+		const updateData: Record<string, unknown> = {
 			is_banned: ban,
 			banned_at: ban ? new Date().toISOString() : null,
 			banned_by: ban ? user.id : null,
 			ban_reason: ban ? reason || "Banned by admin" : null,
 		};
+
 
 		if (targetType === "service") {
 			updateData.is_active = !ban;

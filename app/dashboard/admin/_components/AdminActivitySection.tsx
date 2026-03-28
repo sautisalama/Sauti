@@ -18,18 +18,23 @@ import Link from "next/link";
 import { formatDistanceToNow } from "date-fns";
 import { cn } from "@/lib/utils";
 import { useUser } from "@/hooks/useUser";
+import { Tables } from "@/types/db-schema";
+import { ReviewAuditLog } from "@/types/admin-types";
+
 
 type ActivityItem = {
     id: string;
     type: "professional" | "service";
     name: string;
     submittedAt: string;
-    updatedAt?: string;
+    updatedAt?: string | null;
+
     avatarUrl?: string | null;
     status: string;
     details?: string;
     hasDocuments: boolean;
-    reviewerId?: string;
+    reviewerId?: string | null;
+
 };
 
 export function AdminActivitySection() {
@@ -66,15 +71,17 @@ export function AdminActivitySection() {
             // Fetch services
             const { data: services } = await supabase
                 .from("support_services")
-                .select("id, name, created_at, updated_at, verification_updated_at, service_types, verification_status, accreditation_files_metadata, reviewed_by")
-                .order("updated_at", { ascending: false })
+                .select("id, name, created_at, verification_updated_at, service_types, verification_status, accreditation_files_metadata, reviewed_by")
+                .order("verification_updated_at", { ascending: false })
                 .limit(20);
+
 
             const combinedItems: ActivityItem[] = [
                 ...(professionals?.map(p => {
                     const hasDocs = Array.isArray(p.accreditation_files_metadata) && p.accreditation_files_metadata.length > 0;
                     // Check if reviewed_by is object or string and extract ID
-                    const reviewerId = typeof p.reviewed_by === 'object' && p.reviewed_by !== null ? (p.reviewed_by as any).reviewer_id : null;
+                    const reviewerId = typeof p.reviewed_by === 'object' && p.reviewed_by !== null ? (p.reviewed_by as unknown as ReviewAuditLog).reviewer_id : null;
+
                     
                     return {
                         id: p.id,
@@ -91,14 +98,16 @@ export function AdminActivitySection() {
                 }) || []),
                 ...(services?.map(s => {
                     const hasDocs = Array.isArray(s.accreditation_files_metadata) && s.accreditation_files_metadata.length > 0;
-                    const reviewerId = typeof s.reviewed_by === 'object' && s.reviewed_by !== null ? (s.reviewed_by as any).reviewer_id : null;
+                    const reviewerId = typeof s.reviewed_by === 'object' && s.reviewed_by !== null ? (s.reviewed_by as unknown as ReviewAuditLog).reviewer_id : null;
+
 
                     return {
                         id: s.id,
                         type: "service" as const,
                         name: s.name,
                         submittedAt: s.verification_updated_at || s.created_at || new Date().toISOString(),
-                        updatedAt: s.updated_at || s.created_at,
+                        updatedAt: s.verification_updated_at || s.created_at,
+
                         avatarUrl: null,
                         status: s.verification_status || 'pending',
                         details: Array.isArray(s.service_types) ? s.service_types[0] : s.service_types,

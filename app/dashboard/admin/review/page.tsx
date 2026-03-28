@@ -20,16 +20,19 @@ import {
 	Clock,
 	FileText,
 	MapPin,
-    ArrowRight
+    ArrowRight,
+    ClipboardList
 } from "lucide-react";
 import Link from "next/link";
 import { SereneBreadcrumb } from "@/components/ui/SereneBreadcrumb";
 import { PendingUser, PendingService } from "@/types/admin-types";
 import { formatDistanceToNow } from "date-fns";
+import { AdminCasesTable } from "../_components/AdminCasesTable";
 
 export default function ReviewDashboardPage() {
 	const [pendingUsers, setPendingUsers] = useState<PendingUser[]>([]);
 	const [pendingServices, setPendingServices] = useState<PendingService[]>([]);
+    const [matchedCount, setMatchedCount] = useState(0);
 	const [isLoading, setIsLoading] = useState(true);
 	const supabase = createClient();
 
@@ -57,6 +60,12 @@ export default function ReviewDashboardPage() {
 					.in("verification_status", ["pending", "under_review"])
 					.order("created_at", { ascending: false });
 
+                // Load matched cases count
+                const { count: casesCount } = await supabase
+                    .from("reports")
+                    .select("report_id", { count: 'exact', head: true })
+                    .eq("ismatched", true);
+
 				setPendingUsers((users || []).filter(u => 
 					(Array.isArray(u.accreditation_files_metadata) && u.accreditation_files_metadata.length > 0) ||
 					(Array.isArray(u.accreditation_files) && u.accreditation_files.length > 0)
@@ -65,6 +74,7 @@ export default function ReviewDashboardPage() {
 					(Array.isArray(s.accreditation_files_metadata) && s.accreditation_files_metadata.length > 0) ||
 					(Array.isArray(s.accreditation_files) && s.accreditation_files.length > 0)
 				));
+                setMatchedCount(casesCount || 0);
 			} catch (error) {
 				console.error("Error loading pending verifications:", error);
 			} finally {
@@ -117,6 +127,9 @@ export default function ReviewDashboardPage() {
                      <Badge variant="outline" className="px-3 py-1 bg-white shadow-sm border-gray-200 text-gray-700">
                         {pendingServices.length} Services
                     </Badge>
+                     <Badge variant="outline" className="px-3 py-1 bg-white shadow-sm border-blue-100 text-blue-700 bg-blue-50/50">
+                        {matchedCount} Matched Cases
+                    </Badge>
                 </div>
 			</div>
 
@@ -129,6 +142,10 @@ export default function ReviewDashboardPage() {
 					<TabsTrigger value="services" className="rounded-none border-b-2 border-transparent data-[state=active]:border-blue-600 data-[state=active]:bg-transparent data-[state=active]:shadow-none py-3 px-1 data-[state=active]:text-blue-700 font-medium">
 						<Building2 className="h-4 w-4 mr-2" />
 						Support Services
+					</TabsTrigger>
+                    <TabsTrigger value="cases" className="rounded-none border-b-2 border-transparent data-[state=active]:border-blue-600 data-[state=active]:bg-transparent data-[state=active]:shadow-none py-3 px-1 data-[state=active]:text-blue-700 font-medium">
+						<ClipboardList className="h-4 w-4 mr-2" />
+						Incident Cases
 					</TabsTrigger>
 				</TabsList>
 
@@ -174,6 +191,10 @@ export default function ReviewDashboardPage() {
 						</div>
 					)}
 				</TabsContent>
+
+                <TabsContent value="cases" className="space-y-4 animate-in slide-in-from-bottom-2 duration-300">
+                    <AdminCasesTable />
+                </TabsContent>
 			</Tabs>
 		</div>
 	);

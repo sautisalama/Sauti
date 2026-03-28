@@ -1,7 +1,8 @@
 "use client";
 
 import { createClient } from "@/utils/supabase/client";
-import { Tables } from "@/types/db-schema";
+import { Tables, Json } from "@/types/db-schema";
+
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { 
@@ -41,8 +42,9 @@ interface ProviderMatch {
     description: string;
     availability: string;
     focus_groups: string[];
-    professionalId?: string;
+    professionalId?: string | null;
 }
+
 
 interface AppointmentData {
 	id: string;
@@ -62,6 +64,15 @@ interface MediaFile {
 	uploadedAt?: string;
 }
 
+interface ChecklistItem {
+	id: string;
+	title: string;
+	notes?: string;
+	completed: boolean;
+	done?: boolean;
+}
+
+
 export default function ReportDetailPage({ params }: { params: Promise<{ id: string }> }) {
 	const resolvedParams = use(params);
 	const reportId = resolvedParams.id;
@@ -80,7 +91,8 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
 	const [showVoiceRecorder, setShowVoiceRecorder] = useState(false);
 	const [escalating, setEscalating] = useState(false);
 	const [currentUserId, setCurrentUserId] = useState<string | null>(null);
-	const [checklists, setChecklists] = useState<any[]>([]);
+	const [checklists, setChecklists] = useState<ChecklistItem[]>([]);
+
 	const [newChecklistItem, setNewChecklistItem] = useState("");
 	const [editingItemId, setEditingItemId] = useState<string | null>(null);
 	const [editingTitle, setEditingTitle] = useState("");
@@ -162,18 +174,39 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
 			}
 
 			if (data) {
-				setReport(data as any);
+				setReport(data as Tables<"reports">);
+
 				
 				// Map real matches to our UI structure
-				const matches: ProviderMatch[] = (data.matched_services as any[] || []).map(m => {
+				const matchedServices = data.matched_services || [];
+				const matches: ProviderMatch[] = (matchedServices as unknown[]).map(rawM => {
+					const m = rawM as { 
+						id: string; 
+						match_status_type: string | null; 
+						match_reason: string | null; 
+						description: string | null; 
+						notes: string | null; 
+						support_service: string | null;
+						service_details: Tables<"support_services"> | null;
+						hrd_details: { 
+							id: string; 
+							first_name: string | null; 
+							last_name: string | null; 
+							phone: string | null; 
+							email: string | null; 
+							professional_title: string | null; 
+							bio: string | null; 
+						} | null;
+					};
+
 					const isService = !!m.service_details;
-					const name = isService 
+					const name = isService && m.service_details
 						? m.service_details.name 
 						: `${m.hrd_details?.first_name || ''} ${m.hrd_details?.last_name || ''}`.trim() || 'Specialist';
 					
-					const type = isService ? m.support_service : m.hrd_details?.professional_title || 'Expert';
-					const phone = isService ? m.service_details.phone_number : m.hrd_details?.phone;
-					const availability = isService ? m.service_details.availability : 'Flexible';
+					const type = isService && m.service_details ? m.support_service : m.hrd_details?.professional_title || 'Expert';
+					const phone = isService && m.service_details ? m.service_details.phone_number : m.hrd_details?.phone;
+					const availability = isService && m.service_details ? m.service_details.availability : 'Flexible';
 					
 					const focus_groups: string[] = [];
 					if (isService && m.service_details) {
@@ -184,7 +217,8 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
 						focus_groups.push("Human Rights");
 					}
 					
-					const professionalId = isService ? m.service_details?.user_id : m.hrd_details?.id;
+					const professionalId = isService && m.service_details ? m.service_details.user_id : m.hrd_details?.id;
+
 
 					return {
 						id: m.id,
@@ -200,9 +234,11 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
 				});
 
 				setAllMatches(matches);
-				if (data.administrative && ((data.administrative as any).checklist || (data.administrative as any).checklists)) {
-					const rawItems = (data.administrative as any).checklist || (data.administrative as any).checklists || [];
-					setChecklists(rawItems.map((c: any) => ({ ...c, completed: c.done ?? c.completed ?? false })));
+				if (data.administrative && typeof data.administrative === 'object') {
+					const admin = data.administrative as Record<string, unknown>;
+					const rawItems = (admin.checklist as ChecklistItem[]) || (admin.checklists as ChecklistItem[]) || [];
+					setChecklists(rawItems.map((c) => ({ ...c, completed: c.done ?? c.completed ?? false })));
+
 				} else {
 					setChecklists([
 						{ id: "1", title: "Gather documentation", notes: "Collect any relevant emails or messages", completed: false },
@@ -210,7 +246,8 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
 					]);
 				}
 
-				const matchIds = (data.matched_services as any[] || []).map((m: any) => m.id);
+				const matchIds = (data.matched_services as { id: string }[] || []).map((m) => m.id);
+
 				if (matchIds.length > 0) {
 					const { data: apptData } = await supabase
 						.from("appointments")
@@ -219,21 +256,25 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
 						.order("appointment_date", { ascending: true });
 					
 					if (apptData) {
-						setAppointments(apptData.map((a: any) => ({
-							id: a.id,
+						setAppointments(apptData.map((a: Tables<"appointments">) => ({
+							id: a.appointment_id,
 							appointment_date: a.appointment_date,
 							status: a.status,
-							type: a.type || 'virtual',
-							location: a.location,
-							link: a.link
+							type: a.appointment_type || 'virtual',
+							location: a.notes || '',
+							link: ''
 						})));
 					}
+
+
 				}
 			} else {
 				setErrorState("Journey details not found. Please verify the link.");
 			}
-		} catch (err: any) {
+		} catch (err: unknown) {
+			const error = err as Error;
 			setErrorState("A connection issue occurred. Your data remains safe.");
+
 		} finally {
 			setLoading(false);
 		}
@@ -282,14 +323,19 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
 		}
 	};
 
-	const handleSaveChecklist = async (newLists: any[]) => {
+	const handleSaveChecklist = async (newLists: ChecklistItem[]) => {
 		setChecklists(newLists);
 		if (!report) return;
 		const normalizedLists = newLists.map(c => ({ id: c.id, title: c.title, notes: c.notes || '', done: c.completed ?? c.done ?? false }));
-		const adminData = { ...(report.administrative as any || {}), checklist: normalizedLists };
-		delete adminData.checklists;
-		await supabase.from('reports').update({ administrative: adminData }).eq('report_id', reportId);
+		const adminData: Record<string, unknown> = { ...(report.administrative as Record<string, unknown> || {}), checklist: normalizedLists };
+		if ('checklists' in adminData) {
+			delete adminData['checklists'];
+		}
+		await supabase.from('reports').update({ administrative: adminData as unknown as Json }).eq('report_id', reportId);
 	};
+
+
+
 
 	const toggleChecklist = (id: string) => {
 		const updated = checklists.map(c => c.id === id ? { ...c, completed: !c.completed, done: !(c.completed ?? c.done) } : c);
@@ -355,8 +401,10 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
 			if (!response.ok) throw new Error("Escalation failed");
 			toast({ title: "Help is on the way", description: "Your report has been escalated for matching support." });
 			fetchReport();
-		} catch (err: any) {
-			toast({ title: "Error", description: err.message, variant: "destructive" });
+		} catch (err: unknown) {
+			const error = err as Error;
+			toast({ title: "Error", description: error.message, variant: "destructive" });
+
 		} finally {
 			setEscalating(false);
 		}
@@ -760,7 +808,8 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
                                                 survivorId={currentUserId}
                                                 professionalId={acceptedMatch.professionalId || ''}
                                                 professionalName={acceptedMatch.name}
-                                                survivorName={(report as any)?.first_name || "Myself"}
+                                                survivorName={report.first_name || "Myself"}
+
                                                 className="h-full w-full rounded-none border-0 shadow-none !min-h-0"
                                             />
                                         </div>

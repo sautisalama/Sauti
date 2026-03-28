@@ -44,8 +44,9 @@ export interface UserSettings {
 	push_notifications?: boolean;
 
 	// Extensible — allows future additions without schema changes
-	[key: string]: any;
+	[key: string]: unknown;
 }
+
 
 // ── Defaults ───────────────────────────────────────────────────────────
 
@@ -74,7 +75,8 @@ export function parseSettings(raw: unknown): UserSettings {
 	if (!raw || typeof raw !== "object") {
 		return { ...DEFAULT_SETTINGS };
 	}
-	return { ...DEFAULT_SETTINGS, ...(raw as Record<string, any>) };
+	return { ...DEFAULT_SETTINGS, ...(raw as Record<string, unknown>) } as UserSettings;
+
 }
 
 /**
@@ -96,12 +98,14 @@ export function parsePolicies(raw: unknown): UserPolicies {
 	if (!raw || typeof raw !== "object") {
 		return { ...DEFAULT_POLICIES };
 	}
-	const parsed = raw as Record<string, any>;
+	const parsed = raw as Record<string, unknown>;
+
 	return {
 		accepted_policies: Array.isArray(parsed.accepted_policies) ? parsed.accepted_policies : [],
 		all_policies_accepted: !!parsed.all_policies_accepted,
-		policies_accepted_at: parsed.policies_accepted_at,
+		policies_accepted_at: typeof parsed.policies_accepted_at === "string" ? parsed.policies_accepted_at : undefined,
 	};
+
 }
 
 /**

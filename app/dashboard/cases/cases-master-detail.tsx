@@ -2,6 +2,9 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/utils/supabase/client";
+import { Tables } from "@/types/db-schema";
+
+import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -57,13 +60,16 @@ interface MatchedServiceItem {
 	match_score: number | null;
 	completed_at?: string | null;
 	unread_messages?: number;
-	report: any;
-	service_details: any;
+	survivor_id?: string | null;
+	report: Tables<"reports">;
+	service_details: Tables<"support_services">;
 	notes?: string | null;
 	support_service?: {
-		name?: string;
-		category?: string;
-		organization_name?: string;
+		name?: string | null;
+		phone_number?: string | null;
+		email?: string | null;
+		category?: string | null;
+		organization_name?: string | null;
 	} | null;
 	appointments?: Array<{
 		id: string;
@@ -73,7 +79,9 @@ interface MatchedServiceItem {
 	}>;
 }
 
+
 export default function CasesMasterDetail({ userId }: { userId: string }) {
+	const { toast } = useToast();
 	const router = useRouter();
 	const supabase = useMemo(() => createClient(), []);
 	const dash = useDashboardData();
@@ -135,7 +143,7 @@ export default function CasesMasterDetail({ userId }: { userId: string }) {
 	const monthDays = useMemo(() => getMonthDays(calendarSelectedDate), [calendarSelectedDate]);
 
 	const getAllAppointments = (casesData: MatchedServiceItem[]) => {
-		const all: any[] = [];
+		const all: (NonNullable<MatchedServiceItem["appointments"]>[number] & { case: MatchedServiceItem })[] = [];
 		casesData.forEach(c => {
 			 c.appointments?.forEach(a => {
 				 all.push({ ...a, case: c });
@@ -143,6 +151,7 @@ export default function CasesMasterDetail({ userId }: { userId: string }) {
 		});
 		return all;
 	};
+
 
 	const getAppointmentsForDay = (date: Date, items: MatchedServiceItem[]) => {
 		const all = getAllAppointments(items);
@@ -155,15 +164,16 @@ export default function CasesMasterDetail({ userId }: { userId: string }) {
 	useEffect(() => {
 		if (selectedId) {
 			const selectedCase = cases.find(c => c.id === selectedId);
-			if (selectedCase && selectedCase.report?.survivor_id) {
+			if (selectedCase && (selectedCase.survivor_id || selectedCase.report?.user_id)) {
 				setIsChatLoading(true);
-				const survId = selectedCase.report.survivor_id;
+				const survId = (selectedCase.survivor_id || selectedCase.report?.user_id) as string;
 				getCaseChat(selectedId, survId)
 					.then(chat => setActiveChat(chat))
 					.catch(err => console.error("Failed to load chat", err))
 					.finally(() => setIsChatLoading(false));
 			}
 		} else {
+
 			setActiveChat(null);
 			setActiveTab('details');
 		}
@@ -178,33 +188,36 @@ export default function CasesMasterDetail({ userId }: { userId: string }) {
 				seededFromProviderRef.current
 			)
 				return;
-			const apptByMatchId = new Map<string, any[]>();
-			(dash.data.appointments || []).forEach((a: any) => {
+			const apptByMatchId = new Map<string, NonNullable<MatchedServiceItem["appointments"]>>();
+			(dash.data.appointments || []).forEach((a) => {
 				const mid = a?.matched_service?.id;
 				if (!mid) return;
 				const arr = apptByMatchId.get(mid) || [];
 				arr.push({
-					id: a.id,
+					id: a.appointment_id || a.id,
 					appointment_id: a.appointment_id,
 					appointment_date: a.appointment_date,
 					status: a.status,
 				});
 				apptByMatchId.set(mid, arr);
 			});
+
+
 			const seeded: MatchedServiceItem[] = (dash.data.matchedServices || []).map(
-				(m: any) => ({
+				(m) => ({
 					id: m.id,
 					match_date: m.match_date || null,
 					match_status_type: m.match_status_type || null,
-					match_score: (m as any).match_score ?? null,
-					completed_at: (m as any).completed_at ?? null,
+					match_score: m.match_score ?? null,
+					completed_at: m.completed_at ?? null,
 					unread_messages: 0,
 					report: m.report,
 					service_details: m.service_details,
-					notes: (m as any).notes || null,
+					notes: m.notes || null,
 					appointments: apptByMatchId.get(m.id) || [],
 				})
 			);
+
 			setCases(seeded);
 			setLoading(false);
 			seededFromProviderRef.current = true;
@@ -223,47 +236,57 @@ export default function CasesMasterDetail({ userId }: { userId: string }) {
 				.select("id")
 				.eq("user_id", userId);
 			const ids = (services || []).map((s) => s.id);
-			if (ids.length === 0) {
-				setCases([]);
-				setLoading(false);
-				return;
-			}
+			
+            // Fetch matches (service-based OR hrd-based)
+            let matchesQuery = supabase
+                .from("matched_services")
+                .select(`*, report:reports(*), service_details:support_services(*)`);
+            
+            if (ids.length > 0) {
+                matchesQuery = matchesQuery.or(`service_id.in.("${ids.join('","')}"),hrd_profile_id.eq."${userId}"`);
+            } else {
+                matchesQuery = matchesQuery.eq("hrd_profile_id", userId);
+            }
 
-			const [{ data: matches }, { data: appts }] = await Promise.all([
-				supabase
-					.from("matched_services")
-					.select(`*, report:reports(*), service_details:support_services(*)`)
-					.in("service_id", ids)
-					.order("match_date", { ascending: false }),
-				supabase
+            // Fetch appointments for these matches
+            // We need the match IDs first, or we can just fetch all for these services/profile
+            const { data: matchesData } = await matchesQuery.order("match_date", { ascending: false });
+            const matchIds = (matchesData || []).map((m) => m.id);
+
+
+			const { data: appts } = await supabase
 					.from("appointments")
 					.select("*, matched_services")
 					.in(
 						"matched_services",
-						ids.length
-							? (
-									await supabase
-										.from("matched_services")
-										.select("id")
-										.in("service_id", ids)
-							  ).data?.map((m: any) => m.id) || []
-							: []
-					),
-			]);
+						matchIds
+					);
+            
+            const matches = matchesData;
 
-			const apptByMatchId = new Map<string, any[]>();
-			(appts || []).forEach((a: any) => {
+			const apptByMatchId = new Map<string, NonNullable<MatchedServiceItem["appointments"]>>();
+			(appts || []).forEach((a) => {
 				const k = a.matched_services as string;
 				const arr = apptByMatchId.get(k) || [];
-				arr.push(a);
+				arr.push({
+					id: a.appointment_id,
+					appointment_id: a.appointment_id,
+					appointment_date: a.appointment_date || '',
+					status: a.status || 'pending',
+				});
+
 				apptByMatchId.set(k, arr);
 			});
 
-			const normalized: MatchedServiceItem[] = (matches || []).map((m: any) => ({
+
+
+			const normalized: MatchedServiceItem[] = (matches || []).map((m) => ({
 				...m,
 				notes: m.notes || null,
 				appointments: apptByMatchId.get(m.id) || [],
-			}));
+			} as MatchedServiceItem));
+
+
 
 			setCases(normalized);
 			
@@ -272,8 +295,9 @@ export default function CasesMasterDetail({ userId }: { userId: string }) {
 			if (normalized.length === 0 && !seededFromProviderRef.current) {
 				console.log("[Cases] No cases found. Triggering proactive matching engine...");
 				const res = await matchProfessionalWithUnmatchedReports(userId);
-				if (res && (res as any).matched > 0) {
+				if (res && typeof res === 'object' && 'matched' in res && (res as { matched: number }).matched > 0) {
 					console.log(`[Cases] Success! Matched ${res.matched} reports. Refreshing...`);
+
 					// Re-run the load to pick up new matches
 					seededFromProviderRef.current = false; // allow re-fetch
 					loadCases(true); 
@@ -470,6 +494,53 @@ export default function CasesMasterDetail({ userId }: { userId: string }) {
 			setIsUpdatingStatus(false);
 		}
 	};
+
+    // Handle case acceptance
+    const handleAcceptCase = async (caseId: string) => {
+        try {
+            setIsUpdatingStatus(true);
+            const { error } = await supabase
+                .from("matched_services")
+                .update({
+                    match_status_type: "accepted", // Use 'accepted' instead of 'matched' to follow enum
+                    updated_at: new Date().toISOString(),
+                })
+                .eq("id", caseId);
+
+
+            if (error) throw error;
+
+            // Update local state
+            setCases((prev) =>
+                prev.map((c) =>
+                    c.id === caseId
+                        ? {
+                                ...c,
+                                match_status_type: "accepted",
+                          }
+                        : c
+                )
+            );
+
+
+            // Also update the report status if this is the first acceptance?
+            // For now, just the match status is fine as per engine logic
+            
+            toast({
+                title: "Case Accepted",
+                description: "You have successfully accepted this case match.",
+            });
+        } catch (error) {
+            console.error("Error accepting case:", error);
+            toast({
+                title: "Error",
+                description: "Failed to accept case match.",
+                variant: "destructive"
+            });
+        } finally {
+            setIsUpdatingStatus(false);
+        }
+    };
 
 	// Enhanced Audio Player Component with seek controls
 	const AudioPlayer = ({ src, type }: { src: string; type?: string }) => {
@@ -779,7 +850,9 @@ export default function CasesMasterDetail({ userId }: { userId: string }) {
 								return (
 									<div key={c.id} className="transition-all duration-200 min-w-0">
 										<CaseCard
-											data={c as any}
+											data={c as any} // Cast to any to satisfy the specific CaseCardData interface for now, or match it exactly
+
+
 											active={isActive}
 											onClick={() => {
 												setSelectedId(c.id);
@@ -1121,6 +1194,7 @@ export default function CasesMasterDetail({ userId }: { userId: string }) {
 											<h2 className="text-xl font-bold text-gray-900 truncate">
 												{selected.report?.type_of_incident || "Unknown Incident"}
 											</h2>
+
 											<span
 												className={`px-2.5 py-1 rounded-lg text-xs font-bold uppercase tracking-wider ${urgencyColor(
 													selected.report?.urgency
@@ -1136,9 +1210,25 @@ export default function CasesMasterDetail({ userId }: { userId: string }) {
 									</div>
 								</div>
 
+
+
 								<div className="flex items-center gap-2">
-									{/* Complete Case Button (if not completed) */}
-									{!selected.completed_at && (
+									{/* Accept/Complete Buttons */}
+									{selected.match_status_type === 'pending' ? (
+                                        <Button 
+                                            size="sm"
+                                            className="bg-blue-600 hover:bg-blue-700 text-white shadow-sm border border-blue-700 font-semibold"
+                                            onClick={() => handleAcceptCase(selected.id)}
+                                            disabled={isUpdatingStatus}
+                                        >
+                                            {isUpdatingStatus ? (
+                                                <div className="h-4 w-4 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2" />
+                                            ) : (
+                                                <Briefcase className="h-4 w-4 mr-1.5" />
+                                            )}
+                                            Accept Match
+                                        </Button>
+                                    ) : !selected.completed_at && (
 										<Button 
 											size="sm"
 											className="bg-serene-green-600 hover:bg-serene-green-700 text-white shadow-sm border border-serene-green-700 font-semibold"
@@ -1227,7 +1317,22 @@ export default function CasesMasterDetail({ userId }: { userId: string }) {
 														<CheckCircle2 className="h-3 w-3 mr-1" />
 														Completed
 													</Badge>
-												) : (
+												) : selected.match_status_type === "pending" ? (
+                                                    <Button
+														variant="outline"
+														size="sm"
+														onClick={() => handleAcceptCase(selected.id)}
+														disabled={isUpdatingStatus}
+														className="h-8 text-xs border-blue-200 text-blue-700 hover:bg-blue-50 hover:text-blue-800"
+													>
+														{isUpdatingStatus ? (
+															<Clock className="h-3 h-3 mr-1 animate-spin" />
+														) : (
+															<Briefcase className="h-3 w-3 mr-1" />
+														)}
+														Accept This Match
+													</Button>
+                                                ) : (
 													<Button
 														variant="outline"
 														size="sm"
@@ -1267,7 +1372,7 @@ export default function CasesMasterDetail({ userId }: { userId: string }) {
 										</Card>
 
 										{/* Quick Chat Preview - Inline Panel */}
-										{selected.match_status_type === 'matched' && selected.report?.survivor_id && (
+										{selected.match_status_type === 'accepted' && (selected.survivor_id || selected.report?.user_id) && (
 											<Card className="overflow-hidden border-serene-neutral-200 shadow-sm bg-white">
 												<div className="p-4 border-b border-gray-100 bg-gray-50/30 flex justify-between items-center">
 													<h3 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
@@ -1286,16 +1391,17 @@ export default function CasesMasterDetail({ userId }: { userId: string }) {
 												</div>
 												<CaseChatPanel
 													matchId={selected.id}
-													survivorId={selected.report.survivor_id}
+													survivorId={(selected.survivor_id || selected.report?.user_id) as string}
 													professionalId={userId}
 													professionalName="You"
-													survivorName={selected.report.first_name || 'Survivor'}
+													survivorName={selected.report?.first_name || 'Survivor'}
 													existingChatId={activeChat?.id}
 													className="border-0 rounded-none shadow-none"
 													isExpanded={false}
 												/>
 											</Card>
 										)}
+
 
 										{/* Survivor & Incident Card */}
 										<Card className="overflow-hidden border-serene-neutral-200 shadow-sm bg-white">
@@ -1316,6 +1422,18 @@ export default function CasesMasterDetail({ userId }: { userId: string }) {
 														</span>
 													</div>
 												</div>
+												{/* Survivor Name */}
+												<div>
+													<p className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1.5">Survivor Name</p>
+													<div className="flex items-center gap-2">
+														<User className="h-4 w-4 text-gray-400" />
+														<span className="text-sm font-medium text-gray-900">
+															{(selected.report?.first_name as string) || 'Survivor'} {(selected.report?.last_name as string) || ''}
+														</span>
+													</div>
+												</div>
+
+
 
 												{/* Urgency */}
 												<div>
@@ -1342,14 +1460,16 @@ export default function CasesMasterDetail({ userId }: { userId: string }) {
 													<div className="flex items-center gap-2">
 														<User className="h-4 w-4 text-gray-400" />
 														<span className="text-sm text-gray-900 capitalize">
-															{selected.report?.reporting_on_behalf ? "On Behalf" : "Direct Report"}
+															{selected.report?.is_onBehalf ? "On Behalf" : "Direct Report"}
 														</span>
 													</div>
 												</div>
+
 											</div>
 										</Card>
 
-										{/* Matched Service Card */}Welcome back, you're safe here.
+										{/* Matched Service Card */}
+
 										<Card className="overflow-hidden border-serene-neutral-200 shadow-sm bg-white">
 											<div className="p-5 border-b border-gray-100 bg-gray-50/30 flex justify-between items-center">
 												<h3 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
@@ -1410,7 +1530,8 @@ export default function CasesMasterDetail({ userId }: { userId: string }) {
 										</Card>
 
 										{/* Description & Media */}
-										{(selected.report?.incident_description || selected.report?.media?.url) && (
+										{(selected.report?.incident_description || (selected.report?.media && typeof selected.report.media === 'object' && !!(selected.report.media as Record<string, unknown>).url)) && (
+
 											<Card className="border-serene-neutral-200 shadow-sm bg-white overflow-hidden">
 												<div className="p-5 border-b border-gray-100 bg-gray-50/30">
 													<h3 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
@@ -1427,18 +1548,21 @@ export default function CasesMasterDetail({ userId }: { userId: string }) {
 														</div>
 													)}
 													
-													{selected.report?.media?.url && (
+													{selected.report?.media && typeof selected.report.media === 'object' && !!(selected.report.media as Record<string, unknown>).url && (
+
 														<div className="bg-gray-50 rounded-xl p-3 border border-gray-100">
 															<p className="text-xs font-medium text-gray-500 mb-2 uppercase tracking-wide">Attached Media</p>
 															<AudioPlayer
-																src={selected.report.media.url}
-																type={selected.report.media.type}
+																src={(selected.report.media as Record<string, unknown>).url as string}
+																type={(selected.report.media as Record<string, unknown>).type as string}
 															/>
 														</div>
 													)}
 												</div>
 											</Card>
 										)}
+
+
 
 										{/* Notes Editor */}
 										<Card className="overflow-hidden flex flex-col h-[500px]">

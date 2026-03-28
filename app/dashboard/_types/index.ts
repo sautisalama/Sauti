@@ -2,11 +2,17 @@ import { Tables } from "@/types/db-schema";
 
 export interface MatchedServiceWithRelations {
 	id: string;
-	match_date: string;
-	match_status_type: string;
+	match_date: string | null;
+	match_status_type: string | null;
+	match_score?: number | null;
+	completed_at?: string | null;
+	notes?: string | null;
+	survivor_id?: string | null;
 	report: Tables<"reports">;
 	service_details: Tables<"support_services">;
 }
+
+
 
 export interface ReportWithRelations extends Tables<"reports"> {
 	matched_services?: {
@@ -30,8 +36,10 @@ export interface AppointmentWithDetails {
 	survivor?: Tables<"profiles">;
 	notes?: string;
 	matched_service: {
+		id: string;
 		service_details: Tables<"support_services">;
 		report: Tables<"reports">;
 	};
+
 	meeting_link?: string;
 }

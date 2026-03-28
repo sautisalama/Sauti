@@ -30,9 +30,10 @@ export async function PATCH(
 		const body = await request.json();
 		const { accreditation_files_metadata, ...otherUpdates } = body;
 
-		const updateData: any = {
+		const updateData: Record<string, unknown> = {
 			...otherUpdates,
 		};
+
 
 		if (accreditation_files_metadata !== undefined) {
 			updateData.accreditation_files_metadata = accreditation_files_metadata;

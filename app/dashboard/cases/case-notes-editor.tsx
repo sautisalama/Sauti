@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, MouseEvent, TouchEvent } from "react";
+
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
@@ -59,6 +60,8 @@ export default function CaseNotesEditor({
 	const initialContent = useMemo(() => initialHtml || "", [initialHtml]);
 
 	const editor = useEditor({
+		immediatelyRender: false,
+
 		extensions: [
 			StarterKit.configure({ heading: { levels: [1, 2, 3, 4] } }),
 			UnderlineExt,
@@ -82,7 +85,8 @@ export default function CaseNotesEditor({
 			setDirty(true);
 		},
 		editorProps: {
-			handlePaste: (view: any, e: ClipboardEvent) => {
+			handlePaste: (view, e: ClipboardEvent) => {
+
 				const items = (e.clipboardData?.items ||
 					[]) as unknown as DataTransferItem[];
 				const imageItems = Array.from(items).filter(
@@ -98,7 +102,8 @@ export default function CaseNotesEditor({
 				}
 				return false;
 			},
-			handleDrop: (view: any, e: DragEvent) => {
+			handleDrop: (view, e: DragEvent) => {
+
 				const files = Array.from(e.dataTransfer?.files || []);
 				const imageFiles = files.filter((f) => f.type.startsWith("image/"));
 				if (imageFiles.length > 0) {
@@ -143,13 +148,15 @@ export default function CaseNotesEditor({
 						title: "Notes saved",
 						description: "Your case notes have been saved.",
 					});
-			} catch (e: any) {
+			} catch (e: unknown) {
+
 				if (!autosave)
 					toast({
 						title: "Failed to save",
-						description: e?.message || "Please try again.",
+						description: (e as Error)?.message || "Please try again.",
 						variant: "destructive",
 					});
+
 			} finally {
 				setSaving(false);
 			}
@@ -237,7 +244,9 @@ export default function CaseNotesEditor({
 	const onPickImage = useCallback(() => fileInputRef.current?.click(), []);
 
 	// Prevent editor losing selection when toolbar is clicked
-	const prevent = useCallback((e: any) => e.preventDefault(), []);
+	const prevent = useCallback((e: MouseEvent | TouchEvent) => e.preventDefault(), []);
+
+
 
 	if (!editor || !editor.chain)
 		return (

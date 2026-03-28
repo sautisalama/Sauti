@@ -17,7 +17,7 @@ export async function createClient() {
 		throw new Error("Supabase configuration missing");
 	}
 
-	return createServerClient(supabaseUrl, supabaseAnonKey, {
+	return createServerClient<Database>(supabaseUrl, supabaseAnonKey, {
 		cookies: {
 			getAll() {
 				return cookieStore.getAll();
@@ -35,6 +35,7 @@ export async function createClient() {
 			},
 		},
 	});
+
 }
 
 export async function getSession(): Promise<Session | null> {
@@ -74,10 +75,10 @@ export async function getUser(): Promise<Tables<"profiles"> | null> {
 			// Check if the current device is authorized if tracking is enabled
 			const cookieStore = await cookies();
 			const deviceId = cookieStore.get("ss_device_id")?.value;
-			const settings = data.settings as any;
+			const settings = data.settings as NonNullable<Tables<"profiles">["settings"]>;
 
-			if (settings?.device_tracking_enabled && deviceId) {
-				const activeDevices = (data.devices || []) as any[];
+			if (settings && typeof settings === 'object' && 'device_tracking_enabled' in settings && settings.device_tracking_enabled && deviceId) {
+				const activeDevices = (data.devices || []) as { id: string }[];
 				const isAuthorized = activeDevices.some((d) => d.id === deviceId);
 
 				if (!isAuthorized) {

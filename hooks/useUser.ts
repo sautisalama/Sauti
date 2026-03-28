@@ -6,8 +6,9 @@ import { Tables } from "@/types/db-schema";
 
 // Create a type that combines auth User with profile data
 type UserWithProfile = User & {
-	profile?: Tables<"profiles">;
+	profile?: Tables<"profiles"> | null;
 };
+
 
 export function useUser() {
 	const [user, setUser] = useState<UserWithProfile | null>(null);
@@ -73,12 +74,14 @@ export function useUser() {
 				} else {
 					if (!cancelled) setUser(null);
 				}
-			} catch (error: any) {
+			} catch (err: unknown) {
+				const error = err as { name?: string; message?: string };
 				if (cancelled) return;
 				// Ignore abort errors
 				if (error.name === 'AbortError' || error.message?.includes('aborted')) return;
 				console.error("Error loading user:", error);
 			}
+
 		};
 
 		getUser();

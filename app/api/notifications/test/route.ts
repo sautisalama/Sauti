@@ -74,8 +74,9 @@ export async function POST(request: Request) {
         await sendEmail(email, subject, html);
         return NextResponse.json({ success: true, message: `Sent '${type}' to ${email}` });
 
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error("Test Notification Error:", error);
-        return NextResponse.json({ error: error.message }, { status: 500 });
+        return NextResponse.json({ error: (error as Error).message }, { status: 500 });
     }
+
 }

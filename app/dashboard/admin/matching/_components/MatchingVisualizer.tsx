@@ -65,7 +65,7 @@ const getLayoutedElements = (nodes: Node[], edges: Edge[]) => {
             width = 260;
             height = 160;
         } else if (node.type === 'scoringMatrixNode') {
-            width = 180;
+            width = 190;
             height = 200;
         }
 
@@ -311,14 +311,18 @@ function VisualizerContent({ initialCases }: { initialCases: ReportedCase[] }) {
             // Target position: horizontally next to the parent card
             const targetX = logicNode.position.x + 220; 
             const targetY = logicNode.position.y; 
+            const matrixHeight = 200;
+            const gap = 20;
 
-            // Symmetrical Push: Shift nodes BOTH ways to avoid erratic placements
+            // Symmetrical Push: Shift ALL nodes in column recursively to ensure no overlaps
             const shiftedNodes = nds.map(n => {
-                const isInMatrixColumn = n.position.x > targetX - 60 && n.position.x < targetX + 60;
-                const isCloseVertically = Math.abs(n.position.y - targetY) < 180;
-                
-                if (isInMatrixColumn && isCloseVertically && n.id !== logicNode.id) {
-                    const shiftY = n.position.y < targetY ? -180 : 180;
+                const isInMatrixColumn = Math.abs(n.position.x - targetX) < 100;
+                if (!isInMatrixColumn || n.id === logicNode.id) return n;
+
+                const verticalOverlap = Math.abs(n.position.y - targetY) < (matrixHeight + gap);
+                if (verticalOverlap) {
+                    // Push away from the new node symmetrically
+                    const shiftY = n.position.y < targetY ? -(matrixHeight + gap) : (matrixHeight + gap);
                     return { ...n, position: { ...n.position, y: n.position.y + shiftY } };
                 }
                 return n;
@@ -329,6 +333,7 @@ function VisualizerContent({ initialCases }: { initialCases: ReportedCase[] }) {
                 type: 'scoringMatrixNode',
                 position: { x: targetX, y: targetY },
                 data: { ...data, onUnpin: () => onUnpinMatrix(data.id) },
+                style: { zIndex: 50 }
             };
 
             const finalNodes = [...shiftedNodes, newNode];

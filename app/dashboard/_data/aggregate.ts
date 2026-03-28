@@ -72,18 +72,20 @@ export async function fetchDashboardData(): Promise<AggregatedDashboardData | nu
 				.select("id")
 				.eq("user_id", userId);
 			const ids = (services || []).map((s: any) => s.id);
-			if (ids.length === 0) return [] as MatchedServiceWithRelations[];
-			const { data } = await supabase
-				.from("matched_services")
-				.select(
-					`
-        *,
-        report:reports(*),
-        support_service:support_services(*)
-      `
-				)
-				.in("service_id", ids)
-				.order("match_date", { ascending: false });
+
+            let query = supabase.from("matched_services").select(`
+                *,
+                report:reports(*),
+                service_details:support_services(*)
+            `);
+
+            if (ids.length > 0) {
+                query = query.or(`service_id.in.("${ids.join('","')}"),hrd_profile_id.eq."${userId}"`);
+            } else {
+                query = query.eq("hrd_profile_id", userId);
+            }
+
+			const { data } = await query.order("match_date", { ascending: false });
 			return (data as any) || [];
 		})();
 
@@ -117,11 +119,16 @@ export async function fetchDashboardData(): Promise<AggregatedDashboardData | nu
 				.select("id")
 				.eq("user_id", userId);
 			const ids = (services || []).map((s: any) => s.id);
-			if (ids.length === 0) return 0;
-			const { count } = await supabase
-				.from("matched_services")
-				.select("id", { count: "exact", head: true })
-				.in("service_id", ids);
+
+            let query = supabase.from("matched_services").select("id", { count: "exact", head: true });
+            
+            if (ids.length > 0) {
+                query = query.or(`service_id.in.("${ids.join('","')}"),hrd_profile_id.eq."${userId}"`);
+            } else {
+                query = query.eq("hrd_profile_id", userId);
+            }
+
+			const { count } = await query;
 			return count || 0;
 		})();
 

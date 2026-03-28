@@ -5,15 +5,21 @@ export async function fetchMatchedServices(userId: string) {
 	const supabase = createClient();
 	const serviceIds = await getServiceIdsByUserId(userId);
 
-	const { data, error } = await supabase
+    let query = supabase
 		.from("matched_services")
 		.select(`
 			*,
 			report:reports(*),
 			service_details:support_services(*)
-		`)
-		.in("service_id", serviceIds)
-		.order("match_date", { ascending: false });
+		`);
+    
+    if (serviceIds.length > 0) {
+        query = query.or(`service_id.in.("${serviceIds.join('","')}"),hrd_profile_id.eq."${userId}"`);
+    } else {
+        query = query.eq("hrd_profile_id", userId);
+    }
+
+	const { data, error } = await query.order("match_date", { ascending: false });
 
 	if (error) throw error;
 	return data || [];
@@ -145,5 +151,5 @@ export async function getServiceIdsByUserId(userId: string) {
 		.eq("user_id", userId);
 
 	if (error) throw error;
-	return data?.map(service => service.id) || [];
+	return data?.map((service: any) => service.id) || [];
 }

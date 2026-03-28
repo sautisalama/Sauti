@@ -68,6 +68,7 @@ import { fetchUserReports, deleteReport } from "./actions/reports";
 import { fetchUserSupportServices, deleteSupportService } from "./actions/support-services";
 import { fetchMatchedServices } from "./actions/matched-services";
 import { fetchUserAppointments } from "./actions/appointments";
+import { matchProfessionalWithUnmatchedReports } from "@/app/actions/match-services";
 import AuthenticatedReportAbuseForm from "@/components/AuthenticatedReportAbuseForm";
 import { OutOfOfficeBanner } from "@/components/dashboard/OutOfOfficeBanner";
 
@@ -141,6 +142,20 @@ export default function ProfessionalView({
 			setSupportServices(dash.data.supportServices || []);
 			setMatchedServices((dash.data.matchedServices as any) || []);
 			setAppointments(dash.data.appointments || []);
+            
+            // Proactive matching if NO cases!
+            if ((dash.data.matchedServices?.length || 0) === 0 && supportServices.length > 0) {
+                matchProfessionalWithUnmatchedReports(userId).then(res => {
+                    if (res && (res as any).matched > 0) {
+                        toast({
+                            title: "New matches found!",
+                            description: `We've found ${ (res as any).matched } potential cases for your services.`,
+                        });
+                        // Reload matches
+                        fetchMatchedServices(userId).then(setMatchedServices);
+                    }
+                });
+            }
 			return;
 		}
 		loadData();
@@ -771,11 +786,11 @@ export default function ProfessionalView({
 															</h4>
 															<Badge variant="outline" className={cn(
 																"text-[10px] font-bold uppercase border-0 px-1.5 py-0.5",
-																match.match_status_type === 'active' ? "bg-serene-green-50 text-serene-green-700" :
-																match.match_status_type === 'pending' ? "bg-amber-50 text-amber-700" :
-																"bg-serene-neutral-50 text-serene-neutral-600"
+																match.match_status_type === 'active' ? "bg-serene-green-50 text-serene-green-700 font-black" :
+																match.match_status_type === 'pending' ? "bg-amber-100 text-amber-700 animate-pulse border-amber-200" :
+																"bg-serene-neutral-100 text-serene-neutral-600"
 															)}>
-																{match.match_status_type || 'pending'}
+																{match.match_status_type === 'pending' ? 'Needs Review' : (match.match_status_type || 'pending')}
 															</Badge>
 														</div>
 														<p className="text-sm text-serene-neutral-500 truncate">

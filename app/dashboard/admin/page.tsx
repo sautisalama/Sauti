@@ -16,7 +16,8 @@ import {
 } from "../_components/SurvivorDashboardComponents";
 import { AdminActivitySection } from "./_components/AdminActivitySection";
 
-import { Database } from "@/types/db-schema";
+import { Database, Tables } from "@/types/db-schema";
+
 
 export default function AdminDashboard() {
 	const [stats, setStats] = useState<{
@@ -30,7 +31,8 @@ export default function AdminDashboard() {
     } | null>(null);
 	const [isLoading, setIsLoading] = useState(true);
 	const [isAdmin, setIsAdmin] = useState(false);
-    const [adminProfile, setAdminProfile] = useState<any>(null);
+    const [adminProfile, setAdminProfile] = useState<Tables<"profiles"> | null>(null);
+
 	const supabase = createClient();
     
 	useEffect(() => {
@@ -56,7 +58,8 @@ export default function AdminDashboard() {
 		}
 	};
 
-    const calculateGrowth = async (table: keyof Database['public']['Tables'], filter?: any): Promise<{ value: string; trend: 'up' | 'down' | 'neutral' }> => {
+    const calculateGrowth = async (table: keyof Database['public']['Tables'], filter?: Record<string, unknown>): Promise<{ value: string; trend: 'up' | 'down' | 'neutral' }> => {
+
         const thirtyDaysAgo = new Date();
         thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
         const dateStr = thirtyDaysAgo.toISOString();
@@ -64,28 +67,30 @@ export default function AdminDashboard() {
         // Current Total
         let currentQuery = supabase.from(table).select("*", { count: 'exact', head: true });
         if (filter) {
-            Object.entries(filter).forEach(([key, value]) => {
+            Object.entries(filter as Record<string, unknown>).forEach(([key, value]) => {
                 if (Array.isArray(value)) { 
                     currentQuery = currentQuery.in(key, value); 
-                } else {
-                    currentQuery = currentQuery.eq(key, value);
+                } else if (value !== null && value !== undefined) {
+                    currentQuery = currentQuery.eq(key, value as string | number | boolean);
                 }
             });
         }
+
         const { count: currentTotal } = await currentQuery;
 
         // Count 30 Days Ago (Total at that time)
         // Which is basically: Count of all items where created_at <= 30 days ago
         let prevQuery = supabase.from(table).select("*", { count: 'exact', head: true }).lte('created_at', dateStr);
         if (filter) {
-             Object.entries(filter).forEach(([key, value]) => {
+             Object.entries(filter as Record<string, unknown>).forEach(([key, value]) => {
                 if (Array.isArray(value)) { 
                     prevQuery = prevQuery.in(key, value); 
-                } else {
-                    prevQuery = prevQuery.eq(key, value);
+                } else if (value !== null && value !== undefined) {
+                    prevQuery = prevQuery.eq(key, value as string | number | boolean);
                 }
             });
         }
+
         const { count: prevTotal } = await prevQuery;
 
         const current = currentTotal || 0;

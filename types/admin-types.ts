@@ -1,4 +1,15 @@
 // Admin system type definitions with enum types
+import { Json } from "./db-schema";
+
+export interface FileMetadata {
+	url: string;
+	name: string;
+	type?: string;
+	size?: number;
+	serviceId?: string;
+	uploaded_at?: string;
+}
+
 
 export type VerificationStatus =
 	| "pending"
@@ -61,7 +72,8 @@ export interface PendingUser {
 	user_type: "professional" | "ngo" | "survivor";
 	verification_status: VerificationStatus;
 	verification_notes?: string;
-	accreditation_files_metadata?: any[];
+	accreditation_files_metadata?: FileMetadata[];
+
 	created_at: string;
 	verification_updated_at: string;
 }
@@ -72,7 +84,8 @@ export interface PendingService {
 	service_types: string;
 	verification_status: VerificationStatus;
 	verification_notes?: string;
-	accreditation_files_metadata?: any[];
+	accreditation_files_metadata?: FileMetadata[];
+
 	created_at: string;
 	verification_updated_at: string;
 	latitude?: number;
@@ -121,7 +134,8 @@ export interface Service {
 	};
 
 	// Added via migration - standardized to metadata
-	accreditation_files_metadata?: any[]; // JSONB
+	accreditation_files_metadata?: FileMetadata[]; // JSONB
+
 	reviewed_by?: ReviewAuditLog;
 }
 
@@ -149,7 +163,8 @@ export interface AdminAction {
 	action_type: AdminActionType;
 	target_type: TargetType;
 	target_id: string;
-	details: any;
+	details: Json;
+
 	created_at: string;
 }
 

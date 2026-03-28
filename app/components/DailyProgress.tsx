@@ -30,6 +30,7 @@ export function DailyProgress() {
 				)
 				.eq("user_id", user.id);
 
+
 			if (!reports || reports.length === 0) {
 				setProgress(0);
 				return;

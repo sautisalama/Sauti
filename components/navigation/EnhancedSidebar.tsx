@@ -165,14 +165,16 @@ export function EnhancedSidebar({
 					.select("id")
 					.eq("user_id", uid);
 				const ids = (services || []).map((s: any) => s.id);
-				if (ids.length === 0) {
-					if (!cancelled) setCasesCount(0);
-					return;
-				}
-				const { count } = await supabase
-					.from("matched_services")
-					.select("id", { count: "exact", head: true })
-					.in("service_id", ids);
+
+                let query = supabase.from("matched_services").select("id", { count: "exact", head: true });
+                
+                if (ids.length > 0) {
+                    query = query.or(`service_id.in.(${ids.join(',')}),hrd_profile_id.eq.${uid}`);
+                } else {
+                    query = query.eq("hrd_profile_id", uid);
+                }
+
+				const { count } = await query;
 				if (!cancelled) setCasesCount(count || 0);
 			} catch {
 				// ignore

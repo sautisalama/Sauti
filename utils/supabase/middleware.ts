@@ -1,4 +1,6 @@
+import { Database, Tables } from "@/types/db-schema";
 import { createServerClient } from "@supabase/ssr";
+
 import { NextResponse, type NextRequest } from "next/server";
 
 export async function updateSession(request: NextRequest) {
@@ -15,7 +17,7 @@ export async function updateSession(request: NextRequest) {
 		return supabaseResponse;
 	}
 
-	const supabase = createServerClient(
+	const supabase = createServerClient<Database>(
 		supabaseUrl,
 		supabaseAnonKey,
 		{
@@ -37,6 +39,7 @@ export async function updateSession(request: NextRequest) {
 			},
 		}
 	);
+
 
 	// Do not run code between createServerClient and
 	// supabase.auth.getUser(). A simple mistake could make it very hard to debug
@@ -81,16 +84,19 @@ export async function updateSession(request: NextRequest) {
 			.eq("id", user.id)
 			.single();
 
-		const settings = profile?.settings as any;
+		const settings = profile?.settings as NonNullable<Tables<"profiles">["settings"]>;
 		const deviceId = request.cookies.get("ss_device_id")?.value;
-		const activeDevices = (profile?.devices || []) as any[];
+		const activeDevices = (profile?.devices || []) as { id: string }[];
 		
 		// Registration happens in sign-in actions/callbacks.
 		// If tracking is enabled, the device MUST be in the activeDevices list IF deviceId is present.
 		// If deviceId is missing, we don't nuke the session here to avoid logout loops on cookie desync,
 		// but we still deny if deviceId is present and NOT in the list.
 		const isAuthorized =
-			!settings?.device_tracking_enabled ||
+			!settings ||
+			typeof settings !== 'object' ||
+			!('device_tracking_enabled' in settings) ||
+			!settings.device_tracking_enabled ||
 			!deviceId || // Lenient if cookie is missing (client-side heartbeat will re-sync)
 			activeDevices.some((d) => d.id === deviceId);
 
