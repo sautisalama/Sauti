@@ -217,15 +217,12 @@ export async function getCaseChat(caseId: string, survivorId: string) {
         user:profiles(*)
       )
     `)
-    // We use granular metadata query if possible, or filter in code if contains is tricky with partial JSON
-    // .contains('metadata', { case_id: caseId }) // This works if metadata is JSONB and indexed
-    .textSearch('metadata', `${caseId}`) // Alternative or just fetch and filter
-    .limit(5); // Fetch a few and filter in JS to be safe
+    .or(`match_id.eq.${caseId},metadata->>case_id.eq.${caseId}`)
+    .limit(1);
 
   if (searchError) throw searchError;
 
-  // Filter precisely for case_id in metadata
-  const foundChat = existingChats?.find((c: any) => c.metadata?.case_id === caseId);
+  const foundChat = existingChats?.[0];
 
   if (foundChat) {
     return foundChat as Chat;
@@ -237,7 +234,8 @@ export async function getCaseChat(caseId: string, survivorId: string) {
     .insert({
       type: 'support_match',
       created_by: user.id,
-      metadata: { case_id: caseId }
+      match_id: caseId, // Use the direct column we added
+      metadata: { case_id: caseId } // Keep metadata for backward compatibility
     })
     .select()
     .single();

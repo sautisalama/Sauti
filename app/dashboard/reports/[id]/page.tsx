@@ -32,6 +32,8 @@ import { VoiceRecorderInline } from "@/components/VoiceRecorderInline";
 import { CaseChatPanel } from "@/components/chat/CaseChatPanel";
 import { useDashboardData } from "@/components/providers/DashboardDataProvider";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { confirmAppointment, rescheduleAppointment } from "../../_views/actions/appointments";
+import { EnhancedAppointmentScheduler } from "../../_components/EnhancedAppointmentScheduler";
 
 interface ProviderMatch {
     id: string;
@@ -427,6 +429,7 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
 			case 'matched': return 'bg-teal-50 text-teal-700 border-teal-100';
 			case 'pending': return 'bg-sky-50 text-sky-700 border-sky-100';
 			case 'confirmed': return 'bg-emerald-50 text-emerald-700 border-emerald-100';
+            case 'requested': return 'bg-amber-50 text-amber-700 border-amber-100 animate-pulse';
 			default: return 'bg-slate-50 text-slate-500 border-slate-100';
 		}
 	};
@@ -765,15 +768,87 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
 										</div>
                                         
                                         {upcomingAppointments.length > 0 ? (
-                                            <div className="bg-teal-50/50 rounded-3xl border border-teal-50 p-6 space-y-4">
-                                                <div className="flex items-center gap-3 text-teal-900 font-bold text-sm">
-                                                    <Calendar className="h-5 w-5 text-teal-600" />
-                                                    Session Scheduled
-                                                </div>
-                                                <div className="space-y-1">
-                                                    <p className="text-2xl font-bold text-teal-900 tracking-tight">{formatDate(upcomingAppointments[0].appointment_date)}</p>
-                                                    <p className="text-base text-teal-700/80 font-bold tracking-widest uppercase">{formatTime(upcomingAppointments[0].appointment_date)}</p>
-                                                </div>
+                                            <div className="space-y-4">
+                                                {upcomingAppointments.map((appt) => (
+                                                    <div key={appt.id} className={cn(
+                                                        "rounded-3xl border p-6 space-y-4 transition-all duration-300",
+                                                        appt.status === 'requested' 
+                                                            ? "bg-amber-50 border-amber-200 shadow-lg shadow-amber-200/20" 
+                                                            : "bg-teal-50/50 border-teal-50"
+                                                    )}>
+                                                        <div className="flex items-center justify-between">
+                                                            <div className="flex items-center gap-3 text-slate-900 font-bold text-sm">
+                                                                <Calendar className={cn("h-5 w-5", appt.status === 'requested' ? "text-amber-600" : "text-teal-600")} />
+                                                                {appt.status === 'requested' ? "Proposed Session" : "Session Scheduled"}
+                                                            </div>
+                                                            {appt.status === 'requested' && (
+                                                                <Badge className="bg-amber-100 text-amber-700 border-0 text-[9px] uppercase tracking-widest px-2">Action Needed</Badge>
+                                                            )}
+                                                        </div>
+                                                        <div className="space-y-1">
+                                                            <p className="text-2xl font-bold text-slate-900 tracking-tight">{formatDate(appt.appointment_date)}</p>
+                                                            <p className="text-base text-slate-500 font-bold tracking-widest uppercase">{formatTime(appt.appointment_date)}</p>
+                                                        </div>
+
+                                                        {appt.status === 'requested' && (
+                                                            <div className="flex gap-2 pt-2">
+                                                                <Button 
+                                                                    className="flex-1 bg-amber-600 hover:bg-amber-700 text-white rounded-xl h-10 text-xs font-bold shadow-md shadow-amber-600/20"
+                                                                    onClick={async () => {
+                                                                        try {
+                                                                            setUpdating(true);
+                                                                            await confirmAppointment(appt.id);
+                                                                            toast({ title: "Appointment confirmed", description: "Your support session is locked in." });
+                                                                            fetchReport();
+                                                                        } catch {
+                                                                            toast({ title: "Error", description: "Failed to confirm session.", variant: "destructive" });
+                                                                        } finally {
+                                                                            setUpdating(false);
+                                                                        }
+                                                                    }}
+                                                                >
+                                                                    Confirm
+                                                                </Button>
+                                                                <Dialog>
+                                                                    <DialogTrigger asChild>
+                                                                        <Button variant="outline" className="flex-1 border-amber-200 text-amber-700 hover:bg-amber-100 rounded-xl h-10 text-xs font-bold">
+                                                                            Reschedule
+                                                                        </Button>
+                                                                    </DialogTrigger>
+                                                                    <DialogContent className="sm:max-w-md rounded-[2rem] border-0 shadow-2xl overflow-hidden p-0">
+                                                                        <div className="p-8">
+                                                                            <DialogHeader className="mb-6">
+                                                                                <DialogTitle className="text-2xl font-bold text-slate-900">Choose New Time</DialogTitle>
+                                                                                <DialogDescription className="text-slate-500 font-medium">
+                                                                                    Select a new slot that works for you. 
+                                                                                    {currentMatch?.availability && ` Available: ${currentMatch.availability}`}
+                                                                                </DialogDescription>
+                                                                            </DialogHeader>
+                                                                            
+                                                                            <EnhancedAppointmentScheduler
+                                                                                userId={userId}
+                                                                                providerId={currentMatch?.professionalId || ""}
+                                                                                onSchedule={async (data) => {
+                                                                                    try {
+                                                                                        setUpdating(true);
+                                                                                        await rescheduleAppointment(appt.id, data.date.toISOString(), data.notes);
+                                                                                        toast({ title: "Reschedule requested", description: "We've sent your request to the professional." });
+                                                                                        fetchReport();
+                                                                                    } catch {
+                                                                                        toast({ title: "Error", description: "Failed to request reschedule.", variant: "destructive" });
+                                                                                    } finally {
+                                                                                        setUpdating(false);
+                                                                                    }
+                                                                                }}
+                                                                                defaultAvailability={currentMatch?.availability || "24/7"}
+                                                                            />
+                                                                        </div>
+                                                                    </DialogContent>
+                                                                </Dialog>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                ))}
                                             </div>
                                         ) : (
                                             <div className="bg-slate-50/50 rounded-3xl border border-slate-50 p-6 lg:p-8 text-center space-y-3">

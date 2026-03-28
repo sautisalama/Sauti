@@ -124,10 +124,31 @@ export default function ProfessionalView({
 					fetchMatchedServices(userId),
 					fetchUserAppointments(userId, "professional", true),
 				]);
-				setReports(userReports as ReportWithRelations[]);
+
+                const reports = (userReports as ReportWithRelations[]) || [];
+                const matches = (userMatches as MatchedServiceWithRelations[]) || [];
+
+				setReports(reports);
 				setSupportServices(userServices);
-				setMatchedServices(userMatches);
+				setMatchedServices(matches);
 				setAppointments(userAppointments || []);
+
+                // Determine active tab based on latest activity
+                const latestReport = reports.length > 0 
+                    ? Math.max(...reports.map(r => new Date(r.updated_at || r.submission_timestamp).getTime())) 
+                    : 0;
+                const latestMatch = matches.length > 0 
+                    ? Math.max(...matches.map(m => new Date(m.updated_at || m.match_date || 0).getTime())) 
+                    : 0;
+                
+                if (latestReport > latestMatch && reports.length > 0) {
+                    setDashboardTab('reports');
+                } else if (matches.length > 0) {
+                    setDashboardTab('cases');
+                } else {
+                    setDashboardTab('cases'); // Default if empty
+                }
+
 			} catch {
 				toast({
 					title: "Error",
@@ -138,20 +159,36 @@ export default function ProfessionalView({
 		};
 
 		if (dash?.data && dash.data.userId === userId) {
-			setReports((dash.data.reports as ReportWithRelations[]) || []);
+            const reports = (dash.data.reports as ReportWithRelations[]) || [];
+            const matches = (dash.data.matchedServices as any) || [];
+
+			setReports(reports);
 			setSupportServices(dash.data.supportServices || []);
-			setMatchedServices((dash.data.matchedServices as any) || []);
+			setMatchedServices(matches);
 			setAppointments(dash.data.appointments || []);
+
+            // Activity-based tab selection from cached data
+            const latestReport = reports.length > 0 
+                ? Math.max(...reports.map(r => new Date(r.updated_at || r.submission_timestamp).getTime())) 
+                : 0;
+            const latestMatch = matches.length > 0 
+                ? Math.max(...matches.map(m => new Date(m.updated_at || m.match_date || 0).getTime())) 
+                : 0;
+
+            if (latestReport > latestMatch && reports.length > 0) {
+                setDashboardTab('reports');
+            } else if (matches.length > 0) {
+                setDashboardTab('cases');
+            }
             
             // Proactive matching if NO cases!
-            if ((dash.data.matchedServices?.length || 0) === 0 && supportServices.length > 0) {
+            if (matches.length === 0 && (dash.data.supportServices?.length || 0) > 0) {
                 matchProfessionalWithUnmatchedReports(userId).then(res => {
                     if (res && (res as any).matched > 0) {
                         toast({
                             title: "New matches found!",
                             description: `We've found ${ (res as any).matched } potential cases for your services.`,
                         });
-                        // Reload matches
                         fetchMatchedServices(userId).then(setMatchedServices);
                     }
                 });

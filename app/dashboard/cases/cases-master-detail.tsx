@@ -51,6 +51,17 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { Calendar } from "lucide-react";
 import { matchProfessionalWithUnmatchedReports } from "@/app/actions/match-services";
+import { CaseDetailView } from "./_components/CaseDetailView";
+import { EnhancedAppointmentScheduler } from "../_components/EnhancedAppointmentScheduler";
+import { createAppointment } from "../_views/actions/appointments";
+import {
+	Dialog,
+	DialogContent,
+	DialogHeader,
+	DialogTitle,
+	DialogDescription,
+} from "@/components/ui/dialog";
+import { Zap } from "lucide-react";
 
 
 interface MatchedServiceItem {
@@ -59,6 +70,7 @@ interface MatchedServiceItem {
 	match_status_type: string | null;
 	match_score: number | null;
 	completed_at?: string | null;
+    feedback?: string | null;
 	unread_messages?: number;
 	survivor_id?: string | null;
 	report: Tables<"reports">;
@@ -98,6 +110,11 @@ export default function CasesMasterDetail({ userId }: { userId: string }) {
 	const [showFilters, setShowFilters] = useState(false);
 	const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
 	const [isLoadingMessages, setIsLoadingMessages] = useState(false);
+	
+	// Acceptance Flow State
+	const [isAcceptanceDialogOpen, setIsAcceptanceDialogOpen] = useState(false);
+	const [isSchedulerOpen, setIsSchedulerOpen] = useState(false);
+	const [caseIdToAccept, setCaseIdToAccept] = useState<string | null>(null);
 
 	// Chat State
 	const [activeTab, setActiveTab] = useState<'details' | 'chat'>('details');
@@ -461,20 +478,49 @@ export default function CasesMasterDetail({ userId }: { userId: string }) {
 	const formatDate = (d?: string | null) =>
 		d ? new Date(d).toLocaleString() : "";
 
-	// Handle case completion
+	// Handle case completion (Professional side)
 	const handleCompleteCase = async (caseId: string) => {
 		try {
 			setIsUpdatingStatus(true);
+            const selectedCase = cases.find(c => c.id === caseId);
+            if (!selectedCase) return;
+
+            // Use feedback field to track dual completion status
+            let completionStatus = { is_prof_complete: false, is_surv_complete: false };
+            try {
+                if (selectedCase.feedback && selectedCase.feedback.startsWith('{')) {
+                    completionStatus = JSON.parse(selectedCase.feedback);
+                }
+            } catch (e) {
+                console.warn("Failed to parse completion status from feedback:", e);
+            }
+
+            completionStatus.is_prof_complete = true;
+            const isFullyComplete = completionStatus.is_surv_complete === true;
+
+            const updateData: any = {
+                feedback: JSON.stringify(completionStatus),
+                updated_at: new Date().toISOString(),
+            };
+
+            if (isFullyComplete) {
+                updateData.match_status_type = "completed";
+                updateData.completed_at = new Date().toISOString();
+            }
+
 			const { error } = await supabase
 				.from("matched_services")
-				.update({
-					match_status_type: "completed",
-					completed_at: new Date().toISOString(),
-					updated_at: new Date().toISOString(),
-				})
+				.update(updateData)
 				.eq("id", caseId);
 
 			if (error) throw error;
+
+            toast({
+                title: isFullyComplete ? "Case Fully Completed" : "Case Marked as Complete",
+                description: isFullyComplete 
+                    ? "Both parties have confirmed. Case is now archived." 
+                    : "Waiting for survivor to confirm completion. You are now available for new matches.",
+            });
 
 			// Update local state
 			setCases((prev) =>
@@ -482,63 +528,190 @@ export default function CasesMasterDetail({ userId }: { userId: string }) {
 					c.id === caseId
 						? {
 								...c,
-								match_status_type: "completed",
-								completed_at: new Date().toISOString(),
+								match_status_type: isFullyComplete ? "completed" : c.match_status_type,
+                                feedback: JSON.stringify(completionStatus),
+								completed_at: isFullyComplete ? new Date().toISOString() : c.completed_at,
 						  }
 						: c
 				)
 			);
 		} catch (error) {
 			console.error("Error completing case:", error);
+            toast({
+                title: "Error",
+                description: "Failed to update completion status.",
+                variant: "destructive"
+            });
 		} finally {
 			setIsUpdatingStatus(false);
 		}
 	};
 
-    // Handle case acceptance
-    const handleAcceptCase = async (caseId: string) => {
+    // Handle case acceptance trigger
+    const handleAcceptCase = (caseId: string) => {
+        setCaseIdToAccept(caseId);
+        setIsAcceptanceDialogOpen(true);
+    };
+
+    // Immediate "Meet Now" Acceptance
+    const handleMeetNow = async () => {
+        if (!caseIdToAccept) return;
+        
         try {
             setIsUpdatingStatus(true);
-            const { error } = await supabase
+            setIsAcceptanceDialogOpen(false);
+            
+            const selectedCase = cases.find(c => c.id === caseIdToAccept);
+            if (!selectedCase) return;
+
+            const survId = (selectedCase.survivor_id || selectedCase.report?.user_id) as string;
+
+            // 1. Update Match Status
+            const { error: matchError } = await supabase
                 .from("matched_services")
                 .update({
-                    match_status_type: "accepted", // Use 'accepted' instead of 'matched' to follow enum
+                    match_status_type: "accepted",
+                    professional_accepted_at: new Date().toISOString(),
+                    survivor_accepted_at: new Date().toISOString(), // Instant acceptance
                     updated_at: new Date().toISOString(),
                 })
-                .eq("id", caseId);
+                .eq("id", caseIdToAccept);
 
+            if (matchError) throw matchError;
 
-            if (error) throw error;
+            // 2. Create Instant Appointment
+            await createAppointment({
+                professional_id: userId,
+                survivor_id: survId,
+                matched_services: caseIdToAccept,
+                appointment_date: new Date().toISOString(),
+                duration_minutes: 60,
+                status: 'confirmed',
+                appointment_type: 'Immediate Consultation',
+                created_via: 'meet_now'
+            });
 
-            // Update local state
+            // 3. Update Local State
             setCases((prev) =>
                 prev.map((c) =>
-                    c.id === caseId
+                    c.id === caseIdToAccept
                         ? {
                                 ...c,
                                 match_status_type: "accepted",
+                                appointments: [
+                                    ...(c.appointments || []),
+                                    {
+                                        id: 'new-instant',
+                                        appointment_id: 'new-instant',
+                                        appointment_date: new Date().toISOString(),
+                                        status: 'confirmed'
+                                    }
+                                ]
                           }
                         : c
                 )
             );
 
-
-            // Also update the report status if this is the first acceptance?
-            // For now, just the match status is fine as per engine logic
-            
             toast({
-                title: "Case Accepted",
-                description: "You have successfully accepted this case match.",
+                title: "Case Accepted & Meeting Started",
+                description: "The case is now active. Switching to chat...",
             });
+
+            // 4. Switch to Chat
+            setActiveTab('chat');
+            setSelectedId(caseIdToAccept);
+
         } catch (error) {
-            console.error("Error accepting case:", error);
+            console.error("Error in Meet Now:", error);
             toast({
                 title: "Error",
-                description: "Failed to accept case match.",
+                description: "Failed to start immediate meeting.",
                 variant: "destructive"
             });
         } finally {
             setIsUpdatingStatus(false);
+            setCaseIdToAccept(null);
+        }
+    };
+
+    // Scheduled Acceptance
+    const handleScheduleAndAccept = async (apptData: {
+        date: Date;
+        duration: number;
+        type: string;
+        notes?: string;
+    }) => {
+        if (!caseIdToAccept) return;
+
+        try {
+            setIsUpdatingStatus(true);
+            const selectedCase = cases.find(c => c.id === caseIdToAccept);
+            if (!selectedCase) return;
+
+            const survId = (selectedCase.survivor_id || selectedCase.report?.user_id) as string;
+
+            // 1. Update Match Status
+            const { error: matchError } = await supabase
+                .from("matched_services")
+                .update({
+                    match_status_type: "accepted",
+                    professional_accepted_at: new Date().toISOString(),
+                    updated_at: new Date().toISOString(),
+                })
+                .eq("id", caseIdToAccept);
+
+            if (matchError) throw matchError;
+
+            // 2. Create Scheduled Appointment (as a suggestion)
+            await createAppointment({
+                professional_id: userId,
+                survivor_id: survId,
+                matched_services: caseIdToAccept,
+                appointment_date: apptData.date.toISOString(),
+                duration_minutes: apptData.duration,
+                status: 'requested', // Changed from 'confirmed'
+                appointment_type: apptData.type,
+                notes: apptData.notes,
+                created_via: 'scheduled_acceptance'
+            });
+
+            // 3. Update Local State
+            setCases((prev) =>
+                prev.map((c) =>
+                    c.id === caseIdToAccept
+                        ? {
+                                ...c,
+                                match_status_type: "accepted",
+                                appointments: [
+                                    ...(c.appointments || []),
+                                    {
+                                        id: 'new-suggested',
+                                        appointment_id: 'new-suggested',
+                                        appointment_date: apptData.date.toISOString(),
+                                        status: 'requested'
+                                    }
+                                ]
+                          }
+                        : c
+                )
+            );
+
+            toast({
+                title: "Schedule Suggested",
+                description: `We've sent your suggested time (${apptData.date.toLocaleString()}) to the survivor for confirmation.`,
+            });
+
+        } catch (error) {
+            console.error("Error in Scheduled Acceptance:", error);
+            toast({
+                title: "Error",
+                description: "Failed to schedule and accept case.",
+                variant: "destructive"
+            });
+        } finally {
+            setIsUpdatingStatus(false);
+            setIsSchedulerOpen(false);
+            setCaseIdToAccept(null);
         }
     };
 
@@ -872,729 +1045,364 @@ export default function CasesMasterDetail({ userId }: { userId: string }) {
 					</div>
 				</div>
 
-				{/* Right column: Calendar by default */}
+				{/* Right column: Detail Panel or Calendar */}
 				<div
 					className={`flex-1 lg:flex-[5] xl:flex-[5] min-w-0 h-full overflow-y-auto overflow-x-hidden ${
-						mobileView !== "calendar" ? "hidden lg:block" : ""
+						mobileView !== "calendar" && !selected ? "hidden lg:block" : ""
 					}`}
 				>
-					<Card className="p-5 shadow-sm border-serene-neutral-200 rounded-2xl bg-white">
-						<div className="flex items-center justify-between mb-5">
-							<div>
-								<div className="flex items-center gap-2 mb-1">
-									<h3 className="text-base font-semibold text-gray-900">
-										Appointments Calendar
-									</h3>
-									{filtered.length > 0 && (
-										<span className="px-2 py-1 bg-blue-100 text-blue-700 text-xs font-medium rounded-full">
-											{filtered.length} case{filtered.length === 1 ? "" : "s"}
-										</span>
-									)}
-								</div>
-								<p className="text-xs text-gray-500">
-									Click on a date to view related cases
-								</p>
-							</div>
-							{selectedId && (
-								<Button
-									variant="outline"
-									size="sm"
-									onClick={() => setSelectedId(null)}
-									className="h-8 text-xs border-gray-200 hover:bg-gray-50"
-								>
-									Clear selection
-								</Button>
-							)}
-						</div>
-
-						{/* Calendar Connection Status */}
-						<CalendarConnectionStatus
-							userId={userId}
-							variant="inline"
-							className="mb-3"
-						/>
-
-						{/* Custom Calendar UI */}
-						<div className="bg-white rounded-lg overflow-hidden">
-							{/* View Mode Toggle + Navigation */}
-							<div className="flex items-center justify-between mb-4">
-								<div className="flex bg-gray-100 rounded-lg p-0.5">
-									<button
-										onClick={() => setCalendarViewMode('week')}
-										className={cn(
-											"px-3 py-1.5 text-xs font-medium rounded-md transition-all",
-											calendarViewMode === 'week' 
-												? "bg-white text-blue-700 shadow-sm"
-												: "text-gray-600 hover:text-gray-900"
-										)}
-									>
-										Week
-									</button>
-									<button
-										onClick={() => setCalendarViewMode('month')}
-										className={cn(
-											"px-3 py-1.5 text-xs font-medium rounded-md transition-all",
-											calendarViewMode === 'month' 
-												? "bg-white text-blue-700 shadow-sm"
-												: "text-gray-600 hover:text-gray-900"
-										)}
-									>
-										Month
-									</button>
-								</div>
-								
-								<p className="text-sm font-medium text-gray-700">
-									{calendarViewMode === 'week' 
-										? `${weekDays[0].toLocaleDateString('default', { month: 'short', day: 'numeric' })} - ${weekDays[6].toLocaleDateString('default', { month: 'short', day: 'numeric' })}`
-										: calendarSelectedDate.toLocaleDateString('default', { month: 'long', year: 'numeric' })
-									}
-								</p>
-								
-								<div className="flex gap-1">
-									<Button
-										variant="ghost"
-										size="sm"
-										className="h-8 w-8 p-0"
-										onClick={() => {
-											const prev = new Date(calendarSelectedDate);
-											prev.setDate(prev.getDate() - (calendarViewMode === 'week' ? 7 : 30));
-											setCalendarSelectedDate(prev);
-										}}
-									>
-										←
-									</Button>
-									<Button
-										variant="ghost"
-										size="sm"
-										className="h-8 w-8 p-0"
-										onClick={() => {
-											const next = new Date(calendarSelectedDate);
-											next.setDate(next.getDate() + (calendarViewMode === 'week' ? 7 : 30));
-											setCalendarSelectedDate(next);
-										}}
-									>
-										→
-									</Button>
-								</div>
-							</div>
-
-							{/* Days Grid */}
-							<div className="grid grid-cols-7 gap-1 mb-4">
-								{['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map(day => (
-									<div key={day} className="text-center text-xs font-medium text-gray-400 py-1">
-										{day}
-									</div>
-								))}
-								{calendarViewMode === 'week' ? (
-									weekDays.map((day, idx) => {
-										const dayAppointments = getAppointmentsForDay(day, filtered);
-										const isToday = day.toDateString() === new Date().toDateString();
-										const isSelected = day.toDateString() === calendarSelectedDate.toDateString();
-										
-										return (
-											<button
-												key={idx}
-												onClick={() => {
-													setCalendarSelectedDate(day);
-													// If has appointments, allow selection logic if needed
-													if (dayAppointments.length > 0) {
-														// Example: select first case? Or list below?
-														// The list below shows appointments. Clicking here just updates `calendarSelectedDate`.
-														// The user can then click the appointment list item below to open the case.
-													}
-												}}
-												className={cn(
-													"relative aspect-square rounded-xl flex flex-col items-center justify-center transition-all",
-													isSelected 
-														? "bg-blue-600 text-white" 
-														: isToday 
-															? "bg-blue-50 text-blue-700" 
-															: "hover:bg-gray-50 text-gray-700"
-												)}
-											>
-												<span className="text-sm font-semibold">{day.getDate()}</span>
-												{dayAppointments.length > 0 && (
-													<div className="flex gap-0.5 mt-0.5">
-														{Array.from({ length: Math.min(dayAppointments.length, 3) }).map((_, i) => (
-															<div 
-																key={i} 
-																className={cn(
-																	"h-1 w-1 rounded-full",
-																	isSelected ? "bg-white/80" : "bg-blue-500"
-																)} 
-															/>
-														))}
-													</div>
-												)}
-											</button>
-										);
-									})
-								) : (
-									monthDays.map((dayInfo, idx) => {
-										const { date: day, isCurrentMonth } = dayInfo;
-										const dayAppointments = getAppointmentsForDay(day, filtered);
-										const isToday = day.toDateString() === new Date().toDateString();
-										const isSelected = day.toDateString() === calendarSelectedDate.toDateString();
-										
-										return (
-											<button
-												key={idx}
-												onClick={() => setCalendarSelectedDate(day)}
-												className={cn(
-													"relative h-9 rounded-lg flex flex-col items-center justify-center transition-all text-xs",
-													!isCurrentMonth && "opacity-40",
-													isSelected 
-														? "bg-blue-600 text-white" 
-														: isToday 
-															? "bg-blue-50 text-blue-700 font-bold" 
-															: "hover:bg-gray-50 text-gray-700"
-												)}
-											>
-												<span className="font-medium">{day.getDate()}</span>
-												{dayAppointments.length > 0 && isCurrentMonth && (
-													<div className={cn(
-														"h-1 w-1 rounded-full mt-0.5",
-														isSelected ? "bg-white/80" : "bg-blue-500"
-													)} />
-												)}
-											</button>
-										);
-									})
-								)}
-							</div>
-
-							{/* Selected Date Details */}
-							<div className="pt-4 border-t border-gray-100">
-								<h4 className="text-sm font-semibold text-gray-900 mb-3 block">
-									{calendarSelectedDate.toDateString() === new Date().toDateString() ? "Today" : calendarSelectedDate.toLocaleDateString('default', { weekday: 'long', month: 'long', day: 'numeric' })}
-								</h4>
-								
-								{(() => {
-									const appointments = getAppointmentsForDay(calendarSelectedDate, filtered);
-									const isToday = calendarSelectedDate.toDateString() === new Date().toDateString();
-									
-									if (appointments.length > 0) {
-										return (
-											<div className="space-y-2">
-												{appointments.map((appt, i) => (
-													<div 
-														key={i} 
-														className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl cursor-pointer hover:bg-gray-100 transition-colors"
-														onClick={() => setSelectedId(appt.case.id)}
-													>
-														<div className="h-10 w-10 bg-blue-100 rounded-lg flex items-center justify-center text-blue-700 shrink-0">
-															<Clock className="h-4 w-4" />
-														</div>
-														<div className="flex-1 min-w-0">
-															<p className="font-medium text-gray-900 text-sm truncate">
-																{appt.case?.support_service?.name || "Appointment"}
-															</p>
-															<p className="text-xs text-gray-500">
-																{new Date(appt.appointment_date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-															</p>
-														</div>
-														<Badge className="bg-blue-50 text-blue-700 border-0 text-xs shrink-0">
-															{appt.status || 'Scheduled'}
-														</Badge>
-													</div>
-												))}
-											</div>
-										);
-									} else if (isToday) {
-										// Show upcoming for week logic
-										const allAppts = getAllAppointments(filtered);
-										const today = new Date();
-										const nextWeek = new Date(today);
-										nextWeek.setDate(today.getDate() + 7);
-										
-										const upcoming = allAppts
-											.filter(a => {
-												if (!a.appointment_date) return false;
-												const d = new Date(a.appointment_date);
-												return d > today && d <= nextWeek;
-											})
-											.sort((a, b) => new Date(a.appointment_date).getTime() - new Date(b.appointment_date).getTime())
-											.slice(0, 3); // Top 3
-
-										if (upcoming.length > 0) {
-											return (
-												<div>
-													<p className="text-xs font-medium text-gray-500 mb-2 uppercase tracking-wide">Upcoming This Week</p>
-													<div className="space-y-2">
-														{upcoming.map((appt, i) => (
-															<div 
-																key={i} 
-																className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl cursor-pointer hover:bg-gray-100 transition-colors"
-																onClick={() => setSelectedId(appt.case.id)}
-															>
-																<div className="h-10 w-10 bg-green-100 rounded-lg flex items-center justify-center text-green-700 shrink-0">
-																	<Calendar className="h-4 w-4" />
-																</div>
-																<div className="flex-1 min-w-0">
-																	<p className="font-medium text-gray-900 text-sm truncate">
-																		{appt.case?.support_service?.name || "Appointment"}
-																	</p>
-																	<div className="flex items-center gap-2 text-xs text-gray-500">
-																		<span>{new Date(appt.appointment_date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</span>
-																		<span>•</span>
-																		<span>{new Date(appt.appointment_date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-																	</div>
-																</div>
-															</div>
-														))}
-													</div>
-												</div>
-											);
-										}
-									}
-									
-									return (
-										<div className="text-center py-6 bg-gray-50 rounded-xl border border-dashed border-gray-200">
-											<p className="text-sm text-gray-500">No appointments scheduled</p>
-										</div>
-									);
-								})()}
-							</div>
-						</div>
-					</Card>
-				</div>
-
-				{/* Overlay Detail Panel with animation */}
-			{/* Backdrop for mobile */}
-			{selected && (
-				<div 
-					className="fixed inset-0 bg-black/20 z-40 sm:hidden"
-					onClick={() => setSelectedId(null)}
-				/>
-			)}
-				<div
-					className={`fixed inset-0 sm:inset-y-0 sm:right-0 sm:left-auto w-full sm:w-[600px] lg:w-[800px] bg-white shadow-2xl border-l border-serene-neutral-200 z-50 transform transition-transform duration-300 ease-out ${
-						selected
-							? "translate-y-0 sm:translate-x-0"
-							: "translate-y-full sm:translate-x-full"
-					}`}
-					aria-hidden={!selected}
-				>
-					{selected && (
-						<div className="h-full flex flex-col bg-gray-50/50">
-							{/* Header */}
-							<div className="p-6 border-b border-serene-neutral-200 bg-white flex items-center justify-between gap-4 shadow-sm sticky top-0 z-20">
-								<div className="absolute left-1/2 -translate-x-1/2 -top-2 sm:hidden w-12 h-1.5 rounded-full bg-gray-300" />
-
-								<div className="flex items-center gap-3 min-w-0 flex-1">
-									<button
-										onClick={() => setSelectedId(null)}
-										className="sm:hidden -ml-2 p-2 rounded-full hover:bg-gray-100 transition-colors"
-									>
-										<ChevronLeft className="h-5 w-5 text-gray-600" />
-									</button>
-									
-									<div className="flex-1 min-w-0">
-										<div className="flex items-center gap-3 mb-1">
-											<h2 className="text-xl font-bold text-gray-900 truncate">
-												{selected.report?.type_of_incident || "Unknown Incident"}
-											</h2>
-
-											<span
-												className={`px-2.5 py-1 rounded-lg text-xs font-bold uppercase tracking-wider ${urgencyColor(
-													selected.report?.urgency
-												)}`}
-											>
-												{selected.report?.urgency || "low"}
-											</span>
-										</div>
-										<p className="text-xs font-medium text-gray-500 flex items-center gap-2">
-											<Clock className="h-3.5 w-3.5" />
-											Submitted {formatDate(selected.report?.submission_timestamp)}
-										</p>
-									</div>
-								</div>
-
-
-
-								<div className="flex items-center gap-2">
-									{/* Accept/Complete Buttons */}
-									{selected.match_status_type === 'pending' ? (
-                                        <Button 
-                                            size="sm"
-                                            className="bg-blue-600 hover:bg-blue-700 text-white shadow-sm border border-blue-700 font-semibold"
-                                            onClick={() => handleAcceptCase(selected.id)}
-                                            disabled={isUpdatingStatus}
-                                        >
-                                            {isUpdatingStatus ? (
-                                                <div className="h-4 w-4 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2" />
-                                            ) : (
-                                                <Briefcase className="h-4 w-4 mr-1.5" />
+                    {selected ? (
+                        <div className="h-full animate-in fade-in slide-in-from-right-4 duration-300">
+                             <CaseDetailView 
+                                caseItem={selected}
+                                userId={userId}
+                                onCompleteCase={handleCompleteCase}
+                                onAcceptCase={handleAcceptCase}
+                                isUpdatingStatus={isUpdatingStatus}
+                                onClose={() => setSelectedId(null)}
+                                activeTab={activeTab}
+                                onTabChange={(tab) => setActiveTab(tab as any)}
+                                activeChat={activeChat}
+                                isChatLoading={isChatLoading}
+                            />
+                        </div>
+                    ) : (
+                        <div className="h-full pb-8">
+                            <Card className="p-5 shadow-sm border-serene-neutral-200 rounded-2xl bg-white h-full flex flex-col">
+                                <div className="flex items-center justify-between mb-5">
+                                    <div>
+                                        <div className="flex items-center gap-2 mb-1">
+                                            <h3 className="text-base font-bold text-gray-900">
+                                                Appointments & Schedule
+                                            </h3>
+                                            {filtered.length > 0 && (
+                                                <span className="px-2 py-1 bg-teal-50 text-teal-700 text-[10px] font-bold uppercase tracking-widest rounded-full border border-teal-100">
+                                                    {filtered.length} active case{filtered.length === 1 ? "" : "s"}
+                                                </span>
                                             )}
-                                            Accept Match
-                                        </Button>
-                                    ) : !selected.completed_at && (
-										<Button 
-											size="sm"
-											className="bg-serene-green-600 hover:bg-serene-green-700 text-white shadow-sm border border-serene-green-700 font-semibold"
-											onClick={() => handleCompleteCase(selected.id)}
-											disabled={isUpdatingStatus}
-										>
-											{isUpdatingStatus ? (
-												<div className="h-4 w-4 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2" />
-											) : (
-												<CheckCircle2 className="h-4 w-4 mr-1.5" />
-											)}
-											Complete Case
-										</Button>
-									)}
-									
-									<Button
-										variant="ghost"
-										size="icon"
-										className="rounded-full hover:bg-red-50 hover:text-red-600 transition-colors h-10 w-10"
-										onClick={() => setSelectedId(null)}
-									>
-										<X className="h-5 w-5" />
-									</Button>
-								</div>
-							</div>
+                                        </div>
+                                        <p className="text-xs font-medium text-gray-400">
+                                           Manage your upcoming sessions and availability
+                                        </p>
+                                    </div>
+                                </div>
 
-							{/* Tabs */}
-							<div className="flex border-b border-gray-200 px-4 gap-6 bg-white shrink-0">
-								<button
-									onClick={() => setActiveTab('details')}
-									className={`py-3 text-sm font-medium border-b-2 transition-colors ${
-										activeTab === 'details'
-											? 'border-blue-600 text-blue-600'
-											: 'border-transparent text-gray-500 hover:text-gray-700'
-									}`}
-								>
-									Case Details
-								</button>
-								<button
-									onClick={() => setActiveTab('chat')}
-									className={`py-3 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 ${
-										activeTab === 'chat'
-											? 'border-blue-600 text-blue-600'
-											: 'border-transparent text-gray-500 hover:text-gray-700'
-									}`}
-								>
-									<MessageSquare className="h-4 w-4" />
-									Chat
-								</button>
-							</div>
+                                {/* Calendar Connection Status */}
+                                <CalendarConnectionStatus
+                                    userId={userId}
+                                    variant="inline"
+                                    className="mb-6"
+                                />
 
-							{activeTab === 'chat' ? (
-								<div className="flex-1 overflow-hidden flex flex-col relative h-full">
-									{isChatLoading ? (
-										<div className="flex items-center justify-center h-full text-gray-500">
-											<div className="animate-spin h-6 w-6 border-2 border-blue-600 border-t-transparent rounded-full mr-2"></div>
-											Loading chat...
-										</div>
-									) : activeChat ? (
-										<ChatWindow 
-											chat={activeChat} 
-											onBack={() => setActiveTab('details')} 
-										/>
-									) : (
-										<div className="flex items-center justify-center h-full text-gray-500 p-8 text-center">
-											<p>Unable to load chat or no survivor associated.</p>
-										</div>
-									)}
-								</div>
-							) : (
-								/* Premium Case Details Body */
-								<div className="flex-1 overflow-y-auto bg-gray-50/50">
-									<div className="p-6 space-y-6">
+                                {/* Custom Calendar UI */}
+                                <div className="bg-white rounded-3xl overflow-hidden flex-1 flex flex-col">
+                                    {/* View Mode Toggle + Navigation */}
+                                    <div className="flex items-center justify-between mb-6">
+                                        <div className="flex bg-slate-50 rounded-xl p-1 border border-slate-100">
+                                            <button
+                                                onClick={() => setCalendarViewMode('week')}
+                                                className={cn(
+                                                    "px-4 py-1.5 text-xs font-bold rounded-lg transition-all",
+                                                    calendarViewMode === 'week' 
+                                                        ? "bg-white text-teal-600 shadow-sm"
+                                                        : "text-slate-400 hover:text-slate-600"
+                                                )}
+                                            >
+                                                Week
+                                            </button>
+                                            <button
+                                                onClick={() => setCalendarViewMode('month')}
+                                                className={cn(
+                                                    "px-4 py-1.5 text-xs font-bold rounded-lg transition-all",
+                                                    calendarViewMode === 'month' 
+                                                        ? "bg-white text-teal-600 shadow-sm"
+                                                        : "text-slate-400 hover:text-slate-600"
+                                                )}
+                                            >
+                                                Month
+                                            </button>
+                                        </div>
+                                        
+                                        <div className="flex items-center gap-3">
+                                            <p className="text-sm font-bold text-slate-700">
+                                                {calendarViewMode === 'week' 
+                                                    ? `${weekDays[0].toLocaleDateString('default', { month: 'short', day: 'numeric' })} - ${weekDays[6].toLocaleDateString('default', { month: 'short', day: 'numeric' })}`
+                                                    : calendarSelectedDate.toLocaleDateString('default', { month: 'long', year: 'numeric' })
+                                                }
+                                            </p>
+                                            
+                                            <div className="flex gap-1">
+                                                <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    className="h-8 w-8 p-0 hover:bg-slate-100 rounded-lg"
+                                                    onClick={() => {
+                                                        const prev = new Date(calendarSelectedDate);
+                                                        prev.setDate(prev.getDate() - (calendarViewMode === 'week' ? 7 : 30));
+                                                        setCalendarSelectedDate(prev);
+                                                    }}
+                                                >
+                                                    <ChevronLeft className="h-4 w-4" />
+                                                </Button>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    className="h-8 w-8 p-0 hover:bg-slate-100 rounded-lg"
+                                                    onClick={() => {
+                                                        const next = new Date(calendarSelectedDate);
+                                                        next.setDate(next.getDate() + (calendarViewMode === 'week' ? 7 : 30));
+                                                        setCalendarSelectedDate(next);
+                                                    }}
+                                                >
+                                                    <ChevronRight className="h-4 w-4" />
+                                                </Button>
+                                            </div>
+                                        </div>
+                                    </div>
 
-										{/* Status Card */}
-										<Card className="p-5 border-serene-neutral-200 shadow-sm bg-white">
-											<div className="flex items-center justify-between mb-4">
-												<div className="flex items-center gap-2">
-													<div className="h-8 w-8 rounded-full bg-blue-50 flex items-center justify-center">
-														<TrendingUp className="h-4 w-4 text-blue-600" />
-													</div>
-													<span className="text-sm font-semibold text-gray-900">Case Status</span>
-												</div>
-												{selected.match_status_type === "completed" ? (
-													<Badge className="bg-green-50 text-green-700 border-green-200 hover:bg-green-100">
-														<CheckCircle2 className="h-3 w-3 mr-1" />
-														Completed
-													</Badge>
-												) : selected.match_status_type === "pending" ? (
-                                                    <Button
-														variant="outline"
-														size="sm"
-														onClick={() => handleAcceptCase(selected.id)}
-														disabled={isUpdatingStatus}
-														className="h-8 text-xs border-blue-200 text-blue-700 hover:bg-blue-50 hover:text-blue-800"
-													>
-														{isUpdatingStatus ? (
-															<Clock className="h-3 h-3 mr-1 animate-spin" />
-														) : (
-															<Briefcase className="h-3 w-3 mr-1" />
-														)}
-														Accept This Match
-													</Button>
-                                                ) : (
-													<Button
-														variant="outline"
-														size="sm"
-														onClick={() => handleCompleteCase(selected.id)}
-														disabled={isUpdatingStatus}
-														className="h-8 text-xs border-green-200 text-green-700 hover:bg-green-50 hover:text-green-800"
-													>
-														{isUpdatingStatus ? (
-															<Clock className="h-3 w-3 mr-1 animate-spin" />
-														) : (
-															<CheckCircle2 className="h-3 w-3 mr-1" />
-														)}
-														Mark Complete
-													</Button>
-												)}
-											</div>
-											
-											{selected.unread_messages && selected.unread_messages > 0 && (
-												<div className="flex items-center gap-3 p-3 bg-blue-50/50 rounded-lg border border-blue-100">
-													<div className="relative">
-														<MessageCircle className="h-5 w-5 text-blue-600" />
-														<span className="absolute -top-1 -right-1 h-2.5 w-2.5 bg-red-500 rounded-full border-2 border-white" />
-													</div>
-													<div className="flex-1">
-														<p className="text-sm font-medium text-blue-900">New Messages</p>
-														<p className="text-xs text-blue-600">You have {selected.unread_messages} unread message(s)</p>
-													</div>
-													<Button
-														size="sm"
-														className="h-8 bg-blue-600 text-white hover:bg-blue-700 shadow-sm"
-														onClick={() => window.open(`/dashboard/chats?caseId=${selected.id}`, "_blank")}
-													>
-														View Chat
-													</Button>
-												</div>
-											)}
-										</Card>
+                                    {/* Days Grid */}
+                                    <div className="grid grid-cols-7 gap-2 mb-6">
+                                        {['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map(day => (
+                                            <div key={day} className="text-center text-[10px] font-bold text-slate-300 uppercase tracking-[0.2em]">
+                                                {day}
+                                            </div>
+                                        ))}
+                                        {calendarViewMode === 'week' ? (
+                                            weekDays.map((day, idx) => {
+                                                const dayAppointments = getAppointmentsForDay(day, filtered);
+                                                const isToday = day.toDateString() === new Date().toDateString();
+                                                const isSelected = day.toDateString() === calendarSelectedDate.toDateString();
+                                                
+                                                return (
+                                                    <button
+                                                        key={idx}
+                                                        onClick={() => setCalendarSelectedDate(day)}
+                                                        className={cn(
+                                                            "relative aspect-square rounded-2xl flex flex-col items-center justify-center transition-all duration-300",
+                                                            isSelected 
+                                                                ? "bg-teal-600 text-white shadow-lg shadow-teal-600/20" 
+                                                                : isToday 
+                                                                    ? "bg-teal-50 text-teal-700 border border-teal-100" 
+                                                                    : "hover:bg-slate-50 text-slate-600"
+                                                        )}
+                                                    >
+                                                        <span className="text-sm font-bold">{day.getDate()}</span>
+                                                        {dayAppointments.length > 0 && (
+                                                            <div className="flex gap-0.5 mt-1">
+                                                                {Array.from({ length: Math.min(dayAppointments.length, 3) }).map((_, i) => (
+                                                                    <div 
+                                                                        key={i} 
+                                                                        className={cn(
+                                                                            "h-1 w-1 rounded-full",
+                                                                            isSelected ? "bg-white/60" : "bg-teal-500"
+                                                                        )} 
+                                                                    />
+                                                                ))}
+                                                            </div>
+                                                        )}
+                                                    </button>
+                                                );
+                                            })
+                                        ) : (
+                                            monthDays.map((dayInfo, idx) => {
+                                                const { date: day, isCurrentMonth } = dayInfo;
+                                                const dayAppointments = getAppointmentsForDay(day, filtered);
+                                                const isToday = day.toDateString() === new Date().toDateString();
+                                                const isSelected = day.toDateString() === calendarSelectedDate.toDateString();
+                                                
+                                                return (
+                                                    <button
+                                                        key={idx}
+                                                        onClick={() => setCalendarSelectedDate(day)}
+                                                        className={cn(
+                                                            "relative h-10 rounded-xl flex flex-col items-center justify-center transition-all duration-300 text-xs font-bold",
+                                                            !isCurrentMonth && "opacity-20",
+                                                            isSelected 
+                                                                ? "bg-teal-600 text-white shadow-md shadow-teal-600/20" 
+                                                                : isToday 
+                                                                    ? "bg-teal-50 text-teal-700 border border-teal-100" 
+                                                                    : "hover:bg-slate-50 text-slate-500"
+                                                        )}
+                                                    >
+                                                        <span>{day.getDate()}</span>
+                                                        {dayAppointments.length > 0 && isCurrentMonth && (
+                                                            <div className={cn(
+                                                                "h-1 w-1 rounded-full mt-0.5",
+                                                                isSelected ? "bg-white/60" : "bg-teal-500"
+                                                            )} />
+                                                        )}
+                                                    </button>
+                                                );
+                                            })
+                                        )}
+                                    </div>
 
-										{/* Quick Chat Preview - Inline Panel */}
-										{selected.match_status_type === 'accepted' && (selected.survivor_id || selected.report?.user_id) && (
-											<Card className="overflow-hidden border-serene-neutral-200 shadow-sm bg-white">
-												<div className="p-4 border-b border-gray-100 bg-gray-50/30 flex justify-between items-center">
-													<h3 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
-														<MessageSquare className="h-4 w-4 text-gray-500" />
-														Case Chat
-													</h3>
-													<Button
-														variant="ghost"
-														size="sm"
-														className="h-7 text-xs text-serene-blue-600 hover:text-serene-blue-700 hover:bg-serene-blue-50"
-														onClick={() => setActiveTab('chat')}
-													>
-														Full Screen
-														<ChevronRight className="h-3 w-3 ml-1" />
-													</Button>
-												</div>
-												<CaseChatPanel
-													matchId={selected.id}
-													survivorId={(selected.survivor_id || selected.report?.user_id) as string}
-													professionalId={userId}
-													professionalName="You"
-													survivorName={selected.report?.first_name || 'Survivor'}
-													existingChatId={activeChat?.id}
-													className="border-0 rounded-none shadow-none"
-													isExpanded={false}
-												/>
-											</Card>
-										)}
+                                    {/* Selected Date Details */}
+                                    <div className="pt-6 border-t border-slate-50 overflow-y-auto">
+                                        <h4 className="text-sm font-bold text-slate-900 mb-4 flex items-center justify-between">
+                                            <span>
+                                                {calendarSelectedDate.toDateString() === new Date().toDateString() 
+                                                    ? "Today's Schedule" 
+                                                    : calendarSelectedDate.toLocaleDateString('default', { weekday: 'long', month: 'short', day: 'numeric' })
+                                                }
+                                            </span>
+                                            <Calendar className="h-4 w-4 text-slate-300" />
+                                        </h4>
+                                        
+                                        {(() => {
+                                            const appointments = getAppointmentsForDay(calendarSelectedDate, filtered);
+                                            const isToday = calendarSelectedDate.toDateString() === new Date().toDateString();
+                                            
+                                            if (appointments.length > 0) {
+                                                return (
+                                                    <div className="space-y-3">
+                                                        {appointments.map((appt, i) => (
+                                                            <div 
+                                                                key={i} 
+                                                                className="group flex items-center gap-4 p-4 bg-slate-50/50 hover:bg-white hover:shadow-xl hover:shadow-slate-200/50 rounded-2xl cursor-pointer transition-all duration-300 border border-transparent hover:border-slate-100"
+                                                                onClick={() => setSelectedId(appt.case.id)}
+                                                            >
+                                                                <div className="h-12 w-12 bg-white rounded-xl flex items-center justify-center text-teal-600 shadow-sm group-hover:bg-teal-600 group-hover:text-white transition-colors duration-300">
+                                                                    <Clock className="h-5 w-5" />
+                                                                </div>
+                                                                <div className="flex-1 min-w-0">
+                                                                    <p className="font-bold text-slate-900 text-sm truncate">
+                                                                        {appt.case?.report?.first_name ? `${appt.case.report.first_name} ${appt.case.report.last_name || ''}` : "Secret Consultation"}
+                                                                    </p>
+                                                                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">
+                                                                        {new Date(appt.appointment_date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                                    </p>
+                                                                </div>
+                                                                <Badge className={cn(
+                                                                    "text-[10px] font-bold uppercase tracking-widest border-0 px-3 py-1",
+                                                                    appt.status === 'confirmed' ? "bg-emerald-50 text-emerald-600" : "bg-amber-50 text-amber-600"
+                                                                )}>
+                                                                    {appt.status}
+                                                                </Badge>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                );
+                                            } else if (isToday) {
+                                                const allAppts = getAllAppointments(filtered);
+                                                const today = new Date();
+                                                const nextWeek = new Date(today);
+                                                nextWeek.setDate(today.getDate() + 7);
+                                                
+                                                const upcoming = allAppts
+                                                    .filter(a => {
+                                                        if (!a.appointment_date) return false;
+                                                        const d = new Date(a.appointment_date);
+                                                        return d > today && d <= nextWeek;
+                                                    })
+                                                    .sort((a, b) => new Date(a.appointment_date).getTime() - new Date(b.appointment_date).getTime())
+                                                    .slice(0, 3);
 
-
-										{/* Survivor & Incident Card */}
-										<Card className="overflow-hidden border-serene-neutral-200 shadow-sm bg-white">
-											<div className="p-5 border-b border-gray-100 bg-gray-50/30">
-												<h3 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
-													<User className="h-4 w-4 text-gray-500" />
-													Survivor & Incident Details
-												</h3>
-											</div>
-											<div className="p-5 grid grid-cols-1 sm:grid-cols-2 gap-6">
-												{/* Incident Type */}
-												<div>
-													<p className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1.5">Incident Type</p>
-													<div className="flex items-center gap-2">
-														<Shield className="h-4 w-4 text-gray-400" />
-														<span className="text-sm font-medium text-gray-900">
-															{selected.report?.type_of_incident || "Not specified"}
-														</span>
-													</div>
-												</div>
-												{/* Survivor Name */}
-												<div>
-													<p className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1.5">Survivor Name</p>
-													<div className="flex items-center gap-2">
-														<User className="h-4 w-4 text-gray-400" />
-														<span className="text-sm font-medium text-gray-900">
-															{(selected.report?.first_name as string) || 'Survivor'} {(selected.report?.last_name as string) || ''}
-														</span>
-													</div>
-												</div>
-
-
-
-												{/* Urgency */}
-												<div>
-													<p className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1.5">Urgency Level</p>
-													<Badge variant="outline" className={cn("capitalize font-medium", urgencyColor(selected.report?.urgency))}>
-														{selected.report?.urgency || "Low"} Priority
-													</Badge>
-												</div>
-
-												{/* Date */}
-												<div>
-													<p className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1.5">Reported On</p>
-													<div className="flex items-center gap-2">
-														<Calendar className="h-4 w-4 text-gray-400" />
-														<span className="text-sm text-gray-900">
-															{formatDate(selected.report?.submission_timestamp)}
-														</span>
-													</div>
-												</div>
-
-												{/* Connection */}
-												<div>
-													<p className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1.5">Connection Type</p>
-													<div className="flex items-center gap-2">
-														<User className="h-4 w-4 text-gray-400" />
-														<span className="text-sm text-gray-900 capitalize">
-															{selected.report?.is_onBehalf ? "On Behalf" : "Direct Report"}
-														</span>
-													</div>
-												</div>
-
-											</div>
-										</Card>
-
-										{/* Matched Service Card */}
-
-										<Card className="overflow-hidden border-serene-neutral-200 shadow-sm bg-white">
-											<div className="p-5 border-b border-gray-100 bg-gray-50/30 flex justify-between items-center">
-												<h3 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
-													<Briefcase className="h-4 w-4 text-gray-500" />
-													Matched Service
-												</h3>
-												<Badge variant="secondary" className="bg-gray-100 text-gray-600 font-normal">
-													{selected.match_status_type === 'matched' ? 'Active Match' : 'Pending'}
-												</Badge>
-											</div>
-											<div className="p-5">
-												<div className="flex items-start gap-4 mb-6">
-													<div className="h-12 w-12 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center shrink-0">
-														<span className="text-lg font-bold text-blue-600">
-															{selected.support_service?.name?.charAt(0) || "S"}
-														</span>
-													</div>
-													<div>
-														<h4 className="text-base font-bold text-gray-900">
-															{selected.support_service?.name || "Pending Service Allocation"}
-														</h4>
-														<p className="text-sm text-gray-500 mt-0.5">
-															{selected.support_service?.category || "Support Service"} • {selected.support_service?.organization_name || "Sauti Salama Network"}
-														</p>
-													</div>
-												</div>
-
-												{selected.appointments?.[0] ? (
-													<div className="bg-green-50/50 rounded-xl border border-green-100 p-4">
-														<div className="flex items-center gap-2 mb-3">
-															<CalendarDays className="h-4 w-4 text-green-600" />
-															<span className="text-sm font-bold text-green-900">Upcoming Appointment</span>
-														</div>
-														<div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-															<div>
-																<p className="text-sm font-medium text-gray-900">
-																	{new Date(selected.appointments[0].appointment_date).toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}
-																</p>
-																<p className="text-sm text-gray-500">
-																	{new Date(selected.appointments[0].appointment_date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-																</p>
-															</div>
-															<Badge className={cn(
-																"self-start sm:self-center capitalize",
-																selected.appointments[0].status === 'confirmed' ? "bg-green-100 text-green-700 hover:bg-green-200" : "bg-gray-100 text-gray-700"
-															)}>
-																{selected.appointments[0].status}
-															</Badge>
-														</div>
-													</div>
-												) : (
-													<div className="text-center py-6 bg-gray-50 rounded-xl border border-dashed border-gray-200">
-														<CalendarDays className="h-8 w-8 text-gray-300 mx-auto mb-2" />
-														<p className="text-sm text-gray-500">No appointments scheduled yet</p>
-													</div>
-												)}
-											</div>
-										</Card>
-
-										{/* Description & Media */}
-										{(selected.report?.incident_description || (selected.report?.media && typeof selected.report.media === 'object' && !!(selected.report.media as Record<string, unknown>).url)) && (
-
-											<Card className="border-serene-neutral-200 shadow-sm bg-white overflow-hidden">
-												<div className="p-5 border-b border-gray-100 bg-gray-50/30">
-													<h3 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
-														<FileText className="h-4 w-4 text-gray-500" />
-														Incident Description
-													</h3>
-												</div>
-												<div className="p-5 space-y-4">
-													{selected.report?.incident_description && (
-														<div className="prose prose-sm max-w-none text-gray-600">
-															<p className="whitespace-pre-wrap leading-relaxed">
-																{selected.report.incident_description}
-															</p>
-														</div>
-													)}
-													
-													{selected.report?.media && typeof selected.report.media === 'object' && !!(selected.report.media as Record<string, unknown>).url && (
-
-														<div className="bg-gray-50 rounded-xl p-3 border border-gray-100">
-															<p className="text-xs font-medium text-gray-500 mb-2 uppercase tracking-wide">Attached Media</p>
-															<AudioPlayer
-																src={(selected.report.media as Record<string, unknown>).url as string}
-																type={(selected.report.media as Record<string, unknown>).type as string}
-															/>
-														</div>
-													)}
-												</div>
-											</Card>
-										)}
-
-
-
-										{/* Notes Editor */}
-										<Card className="overflow-hidden flex flex-col h-[500px]">
-											<div className="p-4 flex items-center justify-between">
-												<h3 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
-													<FileText className="h-4 w-4 text-gray-500" />
-													Case Notes
-												</h3>
-												<span className="text-xs text-gray-400">Private & Secure</span>
-											</div>
-											<div className="flex-1 overflow-hidden bg-gray-50/20">
-												<CaseNotesEditor
-													matchId={selected.id}
-													initialHtml={selected.notes || ""}
-													onSaved={(html) => {
-														setCases((prev) =>
-															prev.map((c) =>
-																c.id === selected?.id ? { ...c, notes: html } : c
-															)
-														);
-													}}
-												/>
-											</div>
-										</Card>
-
-									</div>
-								</div>
-							)}
-						</div>
-					)}
+                                                if (upcoming.length > 0) {
+                                                    return (
+                                                        <div className="space-y-4">
+                                                            <p className="text-[10px] font-bold text-slate-300 uppercase tracking-[0.2em] mb-2">Upcoming This Week</p>
+                                                            <div className="space-y-2">
+                                                                {upcoming.map((appt, i) => (
+                                                                    <div 
+                                                                        key={i} 
+                                                                        className="flex items-center gap-4 p-4 bg-slate-50/50 hover:bg-white hover:shadow-lg rounded-2xl cursor-pointer transition-all duration-300"
+                                                                        onClick={() => setSelectedId(appt.case.id)}
+                                                                    >
+                                                                        <div className="h-10 w-10 bg-white rounded-lg flex items-center justify-center text-teal-600 shadow-sm">
+                                                                            <Calendar className="h-4 w-4" />
+                                                                        </div>
+                                                                        <div className="flex-1 min-w-0">
+                                                                            <p className="font-bold text-slate-800 text-sm truncate">
+                                                                                {appt.case?.report?.first_name || "Secret Consultation"}
+                                                                            </p>
+                                                                            <div className="flex items-center gap-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">
+                                                                                <span>{new Date(appt.appointment_date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</span>
+                                                                                <span>•</span>
+                                                                                <span>{new Date(appt.appointment_date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                }
+                                            }
+                                            
+                                            return (
+                                                <div className="text-center py-10 bg-slate-50/50 rounded-3xl border border-dashed border-slate-100">
+                                                    <Clock className="h-8 w-8 text-slate-200 mx-auto mb-3" />
+                                                    <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">No sessions scheduled</p>
+                                                </div>
+                                            );
+                                        })()}
+                                    </div>
+                                </div>
+                            </Card>
+                        </div>
+                    )}
 				</div>
 			</div>
+
+            {/* Acceptance Choice Dialog */}
+            <Dialog open={isAcceptanceDialogOpen} onOpenChange={setIsAcceptanceDialogOpen}>
+                <DialogContent className="sm:max-w-[400px] p-0 overflow-hidden rounded-3xl border-none shadow-2xl">
+                    <div className="bg-gradient-to-br from-teal-500 to-teal-600 p-8 text-white relative">
+                        <Zap className="absolute -top-4 -right-4 h-24 w-24 text-white/10" />
+                        <DialogHeader className="relative">
+                            <DialogTitle className="text-2xl font-bold tracking-tight">Accept Case Match</DialogTitle>
+                            <DialogDescription className="text-teal-100 font-medium">
+                                How would you like to proceed with this survivor?
+                            </DialogDescription>
+                        </DialogHeader>
+                    </div>
+                    <div className="p-6 grid gap-4">
+                        <Button 
+                            onClick={handleMeetNow}
+                            disabled={isUpdatingStatus}
+                            className="h-16 rounded-2xl bg-teal-600 hover:bg-teal-700 text-white shadow-lg shadow-teal-600/20 flex flex-col items-center justify-center gap-1 group transition-all active:scale-95"
+                        >
+                            <div className="flex items-center gap-2 font-bold text-lg">
+                                <Zap className="h-5 w-5 group-hover:animate-pulse" />
+                                Meet Now
+                            </div>
+                            <span className="text-[10px] opacity-80 font-medium uppercase tracking-widest">Immediate consultation & chat</span>
+                        </Button>
+                        
+                        <div className="relative py-2">
+                            <div className="absolute inset-0 flex items-center"><span className="w-full border-t border-slate-100" /></div>
+                            <div className="relative flex justify-center text-[10px] uppercase font-bold text-slate-400"><span className="bg-white px-2">or</span></div>
+                        </div>
+
+                        <Button 
+                            variant="outline"
+                            onClick={() => {
+                                setIsAcceptanceDialogOpen(false);
+                                setIsSchedulerOpen(true);
+                            }}
+                            disabled={isUpdatingStatus}
+                            className="h-16 rounded-2xl border-2 border-slate-100 hover:border-teal-200 hover:bg-teal-50/30 text-slate-600 flex flex-col items-center justify-center gap-1 transition-all active:scale-95"
+                        >
+                            <div className="flex items-center gap-2 font-bold text-lg">
+                                <Calendar className="h-5 w-5" />
+                                Schedule Later
+                            </div>
+                            <span className="text-[10px] opacity-80 font-medium uppercase tracking-widest">Pick a future date & time</span>
+                        </Button>
+                    </div>
+                </DialogContent>
+            </Dialog>
+
+            {/* Scheduler Modal */}
+            <EnhancedAppointmentScheduler 
+                isOpen={isSchedulerOpen}
+                onClose={() => setIsSchedulerOpen(false)}
+                onSchedule={handleScheduleAndAccept}
+                userId={userId}
+                professionalName="You"
+                serviceName={selected?.service_details?.name || "Support Service"}
+            />
 		</div>
 	);
 }

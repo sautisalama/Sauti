@@ -125,3 +125,41 @@ export async function updateAppointmentNotes(
 		throw error;
 	}
 }
+
+// Confirm a suggested appointment
+export async function confirmAppointment(appointmentId: string) {
+	const supabase = createClient();
+
+	const { error } = await supabase
+		.from("appointments")
+		.update({ status: "confirmed" })
+		.eq("appointment_id", appointmentId);
+
+	if (error) {
+		console.error("Error confirming appointment:", error);
+		throw error;
+	}
+}
+
+// Reschedule an appointment
+export async function rescheduleAppointment(
+	appointmentId: string,
+	newDate: string,
+	notes?: string
+) {
+	const supabase = createClient();
+
+	const { error } = await supabase
+		.from("appointments")
+		.update({
+			appointment_date: newDate,
+			status: "requested", // Survivor suggested a new time, professional must confirm
+			notes: notes || "Rescheduled by survivor",
+		})
+		.eq("appointment_id", appointmentId);
+
+	if (error) {
+		console.error("Error rescheduling appointment:", error);
+		throw error;
+	}
+}

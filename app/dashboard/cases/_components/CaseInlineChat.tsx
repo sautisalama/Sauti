@@ -159,17 +159,7 @@ export function CaseInlineChat({
       await supabase
         .from('chats')
         .update({ 
-          last_message_at: new Date().toISOString(),
-          metadata: supabase.rpc('jsonb_set_nested', {
-            target: 'metadata',
-            path: '{last_message_preview}',
-            value: JSON.stringify({
-              content: inputText.substring(0, 100),
-              sender_id: currentUserId,
-              type: 'text',
-              created_at: new Date().toISOString()
-            })
-          }) as any
+          last_message_at: new Date().toISOString()
         })
         .eq('id', chatId);
 

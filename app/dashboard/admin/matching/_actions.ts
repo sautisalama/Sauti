@@ -94,6 +94,65 @@ export async function getReportedCases() {
     }
 }
 
+export async function getProfessionalMatchStatus() {
+    try {
+        // 1. Fetch all professional profiles
+        const { data: profiles, error: profileError } = await getSupabaseAdmin()
+            .from("profiles")
+            .select("id, first_name, last_name, professional_title, verification_status, out_of_office")
+            .eq("user_type", "professional")
+            .order("first_name", { ascending: true });
+
+        if (profileError) throw profileError;
+
+        // 2. Fetch all services for these professionals
+        const { data: services, error: serviceError } = await getSupabaseAdmin()
+            .from("support_services")
+            .select("id, user_id, name, service_types, verification_status")
+            .in("user_id", profiles.map((p: any) => p.id));
+
+        if (serviceError) throw serviceError;
+
+        // 3. Fetch all active matches
+        const { data: matches, error: matchError } = await getSupabaseAdmin()
+            .from("matched_services")
+            .select("id, service_id, hrd_profile_id, match_status_type, report_id")
+            .not("match_status_type", "in", "(declined,completed,cancelled)");
+
+        if (matchError) throw matchError;
+
+        // 4. Combine data
+        const professionalStatus = profiles.map((profile: any) => {
+            const profServices = services.filter((s: any) => s.user_id === profile.id);
+            const profMatches = matches.filter((m: any) => 
+                profServices.some((s: any) => s.id === m.service_id) || 
+                m.hrd_profile_id === profile.id
+            );
+
+            return {
+                id: profile.id,
+                name: `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || 'Anonymous',
+                title: profile.professional_title,
+                verification: profile.verification_status,
+                outOfOffice: profile.out_of_office,
+                services: profServices.map((s: any) => ({
+                    id: s.id,
+                    name: s.name,
+                    types: [s.service_types],
+                    verification: s.verification_status
+                })),
+                matchCount: profMatches.length,
+                hasActiveMatch: profMatches.length > 0
+            };
+        });
+
+        return professionalStatus;
+    } catch (err) {
+        console.error("Error in getProfessionalMatchStatus:", err);
+        throw err;
+    }
+}
+
 
 export async function simulateMatch(reportId: string) {
     // 1. Fetch Report Data

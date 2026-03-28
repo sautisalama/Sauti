@@ -42,6 +42,7 @@ interface EnhancedAppointmentSchedulerProps {
   availableSlots?: TimeSlot[];
   userId?: string;
   serviceName?: string;
+  defaultAvailability?: string; // '24/7' or '8-5'
 }
 
 export function EnhancedAppointmentScheduler({
@@ -52,6 +53,7 @@ export function EnhancedAppointmentScheduler({
   availableSlots = [],
   userId,
   serviceName,
+  defaultAvailability = "8-5",
 }: EnhancedAppointmentSchedulerProps) {
   const [selectedDate, setSelectedDate] = useState<Date>();
   const [selectedTime, setSelectedTime] = useState<string>();
@@ -72,14 +74,24 @@ export function EnhancedAppointmentScheduler({
   useEffect(() => {
     if (!selectedDate) return;
 
-    // Generate slots from 8 AM to 6 PM
+    // Generate slots based on default availability
     const slots: TimeSlot[] = [];
-    for (let hour = 8; hour < 18; hour++) {
+    const isAlwaysAvailable = defaultAvailability === '24/7';
+    
+    // For 24/7, we show all hours. For 8-5, we show 8 AM to 8 PM (extended a bit for flexibility)
+    const startHour = isAlwaysAvailable ? 0 : 8;
+    const endHour = isAlwaysAvailable ? 24 : 19;
+
+    for (let hour = startHour; hour < endHour; hour++) {
       for (let minutes = 0; minutes < 60; minutes += 30) {
         const time = `${hour.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}`;
         
-        // Check if slot is available (mock logic - replace with real availability check)
-        const available = !isWeekend(selectedDate) && hour >= 9 && hour < 17;
+        // Slot is available if it's 24/7 OR if it's a weekday 8-6 (standard)
+        // We allow 24/7 to work on weekends
+        const isWorkDay = !isWeekend(selectedDate);
+        const isStandardHours = hour >= 8 && hour < 18;
+        
+        const available = isAlwaysAvailable || (isWorkDay && isStandardHours);
         
         slots.push({
           time,
@@ -209,7 +221,7 @@ export function EnhancedAppointmentScheduler({
               className="rounded-md border"
               disabled={(date) => 
                 date < new Date() || 
-                isWeekend(date) ||
+                (defaultAvailability !== '24/7' && isWeekend(date)) ||
                 date > new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // 30 days from now
               }
             />

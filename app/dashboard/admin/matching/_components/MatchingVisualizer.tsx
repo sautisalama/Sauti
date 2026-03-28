@@ -102,7 +102,7 @@ interface ReportedCase {
 }
 
 
-function VisualizerContent({ initialCases }: { initialCases: ReportedCase[] }) {
+function VisualizerContent({ initialCases, initialProStatus }: { initialCases: ReportedCase[], initialProStatus?: any[] }) {
     const dash = useDashboardData();
     const { fitView: flowFitView } = useReactFlow();
     const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
@@ -403,6 +403,9 @@ function VisualizerContent({ initialCases }: { initialCases: ReportedCase[] }) {
         }
     }, []);
 
+    const [activeTab, setActiveTab] = useState<'cases' | 'professionals'>('cases');
+    const proStatus = initialProStatus || [];
+
     return (
         <div className="flex w-full h-full relative text-serene-neutral-900 overflow-hidden text-sm antialiased">
             <style jsx global>{`
@@ -426,36 +429,86 @@ function VisualizerContent({ initialCases }: { initialCases: ReportedCase[] }) {
             `}</style>
 
             <div className={`absolute left-0 top-0 bottom-0 bg-white border-r border-serene-neutral-100 flex flex-col h-full shrink-0 transition-transform duration-500 ease-in-out z-[60] w-80 ${isSidebarCollapsed ? '-translate-x-full shadow-none' : 'translate-x-0 shadow-2xl'}`}>
-                <div className="p-5 border-b border-serene-neutral-100 bg-white/50 shrink-0 flex items-center justify-between">
-                    <h2 className="text-sm font-black text-serene-blue-950 uppercase tracking-[0.2em] flex items-center gap-2">Case Pool <span className="text-[10px] font-bold text-serene-neutral-400 bg-serene-neutral-50 px-2 py-0.5 rounded-md">{(cases).length}</span></h2>
+                <div className="p-5 border-b border-serene-neutral-100 bg-white/50 shrink-0">
+                    <div className="flex bg-serene-neutral-50 p-1 rounded-xl mb-4">
+                        <button 
+                            onClick={() => setActiveTab('cases')}
+                            className={`flex-1 py-2 px-3 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'cases' ? 'bg-white shadow-sm text-serene-blue-600' : 'text-serene-neutral-400 hover:text-serene-neutral-600'}`}
+                        >
+                            Case Pool
+                        </button>
+                        <button 
+                            onClick={() => setActiveTab('professionals')}
+                            className={`flex-1 py-2 px-3 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'professionals' ? 'bg-white shadow-sm text-serene-blue-600' : 'text-serene-neutral-400 hover:text-serene-neutral-600'}`}
+                        >
+                            Professional Pool
+                        </button>
+                    </div>
                 </div>
                 <div className="flex-1 overflow-y-auto p-3 space-y-3 pb-20 custom-scrollbar">
-                    {cases.length > 0 ? cases.map(c => (
-                        <div key={c.report_id} onClick={() => { setSelectedCase(c.report_id); runSimulation(c.report_id); }} className={`p-5 rounded-2xl border transition-all duration-300 cursor-pointer group ${selectedCase === c.report_id ? 'border-serene-blue-500 bg-serene-blue-50/40 shadow-sm ring-1 ring-serene-blue-100' : 'border-serene-neutral-50 bg-white hover:border-serene-neutral-200 hover:bg-serene-neutral-50 shadow-sm'}`}>
-                            <div className="flex justify-between items-start mb-3">
-                                <span className={`text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded-lg ${selectedCase === c.report_id ? 'bg-serene-blue-600 text-white' : 'bg-serene-neutral-100 text-serene-neutral-500'}`}>#{c.report_id.slice(0, 8)}</span>
-                                <div className={`px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-widest ${
-                                    c.urgency === 'high' ? 'bg-rose-50 text-rose-500 border border-rose-100' :
-                                    c.urgency === 'medium' ? 'bg-amber-50 text-amber-500 border border-amber-100' :
-                                    'bg-emerald-50 text-emerald-500 border border-emerald-100'
-                                }`}>
-                                    {c.urgency || 'Normal'}
+                    {activeTab === 'cases' ? (
+                        cases.length > 0 ? cases.map(c => (
+                            <div key={c.report_id} onClick={() => { setSelectedCase(c.report_id); runSimulation(c.report_id); }} className={`p-5 rounded-2xl border transition-all duration-300 cursor-pointer group ${selectedCase === c.report_id ? 'border-serene-blue-500 bg-serene-blue-50/40 shadow-sm ring-1 ring-serene-blue-100' : 'border-serene-neutral-50 bg-white hover:border-serene-neutral-200 hover:bg-serene-neutral-50 shadow-sm'}`}>
+                                <div className="flex justify-between items-start mb-3">
+                                    <span className={`text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded-lg ${selectedCase === c.report_id ? 'bg-serene-blue-600 text-white' : 'bg-serene-neutral-100 text-serene-neutral-500'}`}>#{c.report_id.slice(0, 8)}</span>
+                                    <div className={`px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-widest ${
+                                        c.urgency === 'high' ? 'bg-rose-50 text-rose-500 border border-rose-100' :
+                                        c.urgency === 'medium' ? 'bg-amber-50 text-amber-500 border border-amber-100' :
+                                        'bg-emerald-50 text-emerald-500 border border-emerald-100'
+                                    }`}>
+                                        {c.urgency || 'Normal'}
+                                    </div>
+                                </div>
+                                <div className={`font-black text-[14px] tracking-tight leading-tight mb-1 uppercase ${selectedCase === c.report_id ? 'text-serene-blue-950' : 'text-serene-neutral-900'}`}>Case #{c.report_id.slice(0, 8)}</div>
+                                <div className={`text-[11px] font-medium capitalize mb-3 line-clamp-1 ${selectedCase === c.report_id ? 'text-serene-blue-600' : 'text-serene-neutral-500'}`}>{c.type_of_incident ? c.type_of_incident.replace(/_/g, " ") : "Unknown"}</div>
+                                <div className={`flex justify-between items-center text-[9px] ${selectedCase === c.report_id ? 'text-serene-blue-600' : 'text-serene-neutral-400'}`}>
+                                    <span className="flex items-center gap-1.5 font-bold"><Activity className="w-3 h-3 opacity-50" /> {c.ismatched ? 'Matched' : 'Unmatched'}</span>
+                                    <span className="font-medium opacity-60 uppercase">{c.submission_timestamp ? format(new Date(c.submission_timestamp), 'PP') : "No Date"}</span>
                                 </div>
                             </div>
-                            <div className={`font-black text-[14px] tracking-tight leading-tight mb-1 uppercase ${selectedCase === c.report_id ? 'text-serene-blue-950' : 'text-serene-neutral-900'}`}>Case #{c.report_id.slice(0, 8)}</div>
-                            <div className={`text-[11px] font-medium capitalize mb-3 line-clamp-1 ${selectedCase === c.report_id ? 'text-serene-blue-600' : 'text-serene-neutral-500'}`}>{c.type_of_incident ? c.type_of_incident.replace(/_/g, " ") : "Unknown"}</div>
-                            <div className={`flex justify-between items-center text-[9px] ${selectedCase === c.report_id ? 'text-serene-blue-600' : 'text-serene-neutral-400'}`}>
-                                <span className="flex items-center gap-1.5 font-bold"><Activity className="w-3 h-3 opacity-50" /> {c.ismatched ? 'Matched' : 'Unmatched'}</span>
-                                <span className="font-medium opacity-60 uppercase">{c.submission_timestamp ? format(new Date(c.submission_timestamp), 'PP') : "No Date"}</span>
+                        )) : (
+                            <div className="flex flex-col items-center justify-center p-12 text-center opacity-60 bg-serene-neutral-50/50 rounded-3xl border-2 border-dashed border-serene-neutral-100 m-3">
+                                <ShieldAlert className="w-10 h-10 mb-4 text-serene-neutral-300" />
+                                <p className="text-[10px] font-black text-serene-neutral-400 uppercase tracking-widest leading-loose">No active incident reports discovered in the database pool</p>
                             </div>
-                        </div>
-                    )) : (
-                        <div className="flex flex-col items-center justify-center p-12 text-center opacity-60 bg-serene-neutral-50/50 rounded-3xl border-2 border-dashed border-serene-neutral-100 m-3">
-                            <ShieldAlert className="w-10 h-10 mb-4 text-serene-neutral-300" />
-                            <p className="text-[10px] font-black text-serene-neutral-400 uppercase tracking-widest leading-loose">No active incident reports discovered in the database pool</p>
-                        </div>
+                        )
+                    ) : (
+                        proStatus.length > 0 ? proStatus.map((pro: any) => (
+                            <div key={pro.id} className={`p-4 rounded-2xl border transition-all duration-300 border-serene-neutral-50 bg-white shadow-sm`}>
+                                <div className="flex justify-between items-start mb-2">
+                                    <div className="flex items-center gap-2">
+                                        <div className={`w-2 h-2 rounded-full ${pro.outOfOffice ? 'bg-rose-500' : 'bg-emerald-500'}`} title={pro.outOfOffice ? 'Out of Office' : 'Active'} />
+                                        <span className={`text-[10px] font-black text-serene-blue-950 uppercase tracking-wider truncate max-w-[150px]`}>{pro.name}</span>
+                                    </div>
+                                    <div className={`px-1.5 py-0.5 rounded-lg text-[8px] font-black uppercase tracking-widest ${
+                                        pro.matchCount === 0 ? 'bg-rose-50 text-rose-500 border border-rose-100' : 'bg-emerald-50 text-emerald-500 border border-emerald-100'
+                                    }`}>
+                                        {pro.matchCount === 0 ? 'No Match' : `${pro.matchCount} Matches`}
+                                    </div>
+                                </div>
+                                <div className={`text-[9px] font-black text-serene-neutral-400 uppercase tracking-widest mb-2 line-clamp-1`}>{pro.title || 'Professional'}</div>
+                                
+                                <div className="space-y-1.5 mt-3 border-t border-serene-neutral-50 pt-3">
+                                    {pro.services.length > 0 ? pro.services.map((s: any) => (
+                                        <div key={s.id} className="flex justify-between items-center text-[9px] bg-serene-neutral-50/50 p-2 rounded-lg group hover:bg-serene-neutral-100/50 transition-colors">
+                                            <div className="flex flex-col">
+                                                <span className="font-bold text-serene-neutral-700 truncate max-w-[140px] uppercase tracking-wider">{s.name}</span>
+                                                <span className="text-[7px] text-serene-neutral-400 font-medium lowercase italic leading-none">{Array.isArray(s.types) ? s.types.join(", ") : s.types || 'unspecified'}</span>
+                                            </div>
+                                            <Star className={`w-3 h-3 ${s.verification === 'verified' ? 'text-amber-400 fill-amber-400' : 'text-serene-neutral-200'}`} />
+                                        </div>
+                                    )) : (
+                                        <p className="text-[8px] text-serene-neutral-400 font-medium italic text-center py-2 uppercase tracking-widest opacity-60">No service profiles defined</p>
+                                    )}
+                                </div>
+                            </div>
+                        )) : (
+                            <div className="flex flex-col items-center justify-center p-12 text-center opacity-60 bg-serene-neutral-50/50 rounded-3xl border-2 border-dashed border-serene-neutral-100 m-3">
+                                <Building2 className="w-10 h-10 mb-4 text-serene-neutral-300" />
+                                <p className="text-[10px] font-black text-serene-neutral-400 uppercase tracking-widest leading-loose">No professionals identified in the registered directory pool</p>
+                            </div>
+                        )
                     )}
-
                 </div>
             </div>
 
@@ -594,7 +647,7 @@ function VisualizerContent({ initialCases }: { initialCases: ReportedCase[] }) {
 }
 
 
-export default function MatchingVisualizer(props: { initialCases: ReportedCase[] }) {
+export default function MatchingVisualizer(props: { initialCases: ReportedCase[], initialProStatus?: any[] }) {
     return (
         <ReactFlowProvider>
             <VisualizerContent {...props} />

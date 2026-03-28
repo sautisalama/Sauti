@@ -296,15 +296,34 @@ export async function matchReportWithServices(reportId: string, customClient?: S
 
 			// H. Load Balancing & Freshness
 			if (cand.userId) {
-				const { data: caseCount } = await supabase.rpc('get_active_case_count', { provider_user_id: cand.userId });
-				if (typeof caseCount === 'number') {
-					if (caseCount > 0) {
-						score -= (caseCount * 5);
-					} else {
-						// NEW: Bonus for professionals with NO cases (Lone service/Fresh service)
-						score += 20;
-						matchReasons.push("High capacity available");
-					}
+				// Get active cases, but EXCLUDE those where the professional has already marked completion
+				const { data: activeCases } = await supabase
+					.from("matched_services")
+					.select("id, feedback, match_status_type")
+					.or(`service_id.eq.${cand.id},hrd_profile_id.eq.${cand.id}`)
+					.not("match_status_type", "eq", "declined")
+					.not("match_status_type", "eq", "completed");
+				
+				const trulyActiveCount = (activeCases || []).filter(m => {
+					try {
+						if (m.feedback && typeof m.feedback === 'string' && m.feedback.startsWith('{')) {
+							const status = JSON.parse(m.feedback);
+							return !status.is_prof_complete;
+						} else if (m.feedback && typeof m.feedback === 'object') {
+							return !(m.feedback as any).is_prof_complete;
+						}
+					} catch (e) {}
+					return true;
+				}).length;
+
+				if (trulyActiveCount > 0) {
+					// Penalty for multiple active cases to balance load
+					score -= (trulyActiveCount * 8);
+				} else {
+					// NEW: Major bonus for professionals with NO currently active cases
+					// This pulls professionals who just finished a case to the front
+					score += 30;
+					matchReasons.push("High immediate capacity");
 				}
 			}
 
@@ -460,16 +479,27 @@ export async function matchProfessionalWithUnmatchedReports(professionalUserId: 
 
 		const serviceIds = services.map(s => s.id);
 
-		// 2. Check current active matches (excluding completed ones)
-		const { count: activeMatchCount } = await supabase
+		// 2. Check current active matches
+		const { data: activeMatches } = await supabase
 			.from("matched_services")
-			.select("id", { count: 'exact', head: true })
+			.select("id, feedback, match_status_type")
 			.in("service_id", serviceIds)
-			.not("match_status_type", "eq", "completed");
+			.not("match_status_type", "eq", "completed")
+            .not("match_status_type", "eq", "declined");
 
-		// Rule: Only proactive match if they have NO cases yet.
-		// This is the "Fresh Provider" boost.
-		if ((activeMatchCount || 0) > 0) return { status: "has_cases", count: activeMatchCount };
+        // Filter out cases where the professional has already marked completion
+        const trulyActiveMatches = (activeMatches || []).filter(m => {
+            try {
+                if (m.feedback && m.feedback.startsWith('{')) {
+                    const status = JSON.parse(m.feedback);
+                    return !status.is_prof_complete;
+                }
+            } catch (e) {}
+            return true;
+        });
+
+		// Rule: Only proactive match if they have NO truly active cases yet.
+		if (trulyActiveMatches.length > 0) return { status: "has_cases", count: trulyActiveMatches.length };
 
 		// 3. Find unmatched reports that are not record-only
 		const { data: unmatchedReports } = await supabase

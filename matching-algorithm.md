@@ -91,7 +91,9 @@ A static matrix boosts specifically qualified titles. A **Lawyer** matching a **
 
 ### Step 7: Load Balancing (Dynamic Penalty)
 
-The engine calls `get_active_case_count`. For every active case a professional is currently handling, their score for the new match is reduced by **5 points**. This prevents "super-providers" from being overwhelmed and ensures survivors get matched with responsive professionals.
+The engine calls `get_active_case_count`. For every active case a professional is currently handling, their score for the new match is reduced by **5 points**. 
+
+**Enhancement**: Cases where the professional has marked completion (via `is_prof_complete` in the feedback field) are EXCLUDED from this count, even if the survivor hasn't archived it yet. This ensures professionals who have finished their work are immediately eligible for new matches.
 
 ### Step 8: Urgency Scaling & Selection
 
@@ -101,26 +103,25 @@ The final raw score is multiplied by the urgency factor (1.15x or 1.05x). Only t
 
 ## 4. Nuances & Recent Enhancements (Walkthrough)
 
-### Remote vs. Local Heuristics
+### Mandatory Scheduling for Acceptance
 
-One of the most significant recent changes is the removal of the explicit `is_remote` column in favor of an **Implicit Heuristic**.
+Acceptance is no longer a "single click" event.
+- **The Rule**: A professional cannot accept a match without committing to a meeting time. 
+- **The Flow**: Clicking "Begin Support" presents the professional with "Meet Now" (immediate appointment) or "Schedule Later" (using the Enhanced Scheduler). The match status only transitions to `accepted` once the appointment record is created and linked.
 
-- **The Nuance**: We now treat `coverage_area_radius === null` as the single source of truth for remote services. This simplifies the DB schema and allows the UI to dynamically toggle proximity logic based on a single numeric field.
+### Privacy-First Case Exposure (Data Masking)
 
-### HRD Merging Logic
+To protect survivors, sensitive data is masked until the professional officially accepts the case.
+- **Before Acceptance**: Professionals see only high-level metadata (Gender, Age Category, Incident Type). Contact details and the full incident description are locked.
+- **After Acceptance**: Full profile details are unlocked, as a professional/survivor relationship has been established via a scheduled meeting.
 
-Standalone Human Rights Defenders (HRDs) often operate without a fixed "Service" address but are vital for protection.
+### Dual-Completion Case Lifecycle
 
-- **The Change**: The algorithm now performs a `LEFT JOIN` or separate query to find verified profiles with the title "Human rights defender" who **do not** have a linked `support_service`. It synthesizes a candidate object for them so they are weighted identically to formal organizations.
+Cases are no longer closed by one party.
+- **The Rule**: Both the Professional and Survivor must mark the case as complete.
+- **The Benefit**: This prevents unilateral closures and ensures both parties agree that the support goal has been met.
+- **Visual Feedback**: If one party completes the case, a "Completion Pending" banner appears for the other party with a prompt to confirm.
 
-### The "Address Snapshot" (Privacy & Speed)
+---
 
-When a match is found, we store the provider's Bio and Location (City/Country) in the `matched_services.description` and `matched_services.notes` columns.
-
-- **Why?**: This creates a "snapshot" of the provider's status at the time of the match. If the provider later edits their profile, the survivor's match record retains the context that led to the connection, and it avoids complex triple-joins when loading the survivor's dashboard list.
-
-### Real-time Escalation Flow
-
-Matching isn't just a one-time event.
-
-- **The Flow**: If a survivor initially submits a "Record Only" report (no match), they can later click "Request Help". This triggers the `/api/reports/[id]/escalate` route, which flips the `record_only` bit and **reruns the entire matching engine**. This ensures help is available exactly when the survivor is ready for it.
+## 5. Metadata Snapshotting
