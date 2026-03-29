@@ -1396,6 +1396,10 @@ export type Database = {
       }
     }
     Functions: {
+      check_user_is_chat_participant: {
+        Args: { _chat_id: string; _user_id?: string }
+        Returns: boolean
+      }
       cleanup_expired_calendar_tokens: { Args: never; Returns: undefined }
       cleanup_orphaned_files: { Args: never; Returns: number }
       get_active_case_count: {
