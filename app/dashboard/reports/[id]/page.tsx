@@ -30,6 +30,8 @@ import { AudioPlayer } from "../../_components/AudioPlayer";
 import { RichTextEditor } from "@/components/RichTextEditor";
 import { VoiceRecorderInline } from "@/components/VoiceRecorderInline";
 import { CaseChatPanel } from "@/components/chat/CaseChatPanel";
+import { Chat } from "@/types/chat";
+import { getCaseChat } from "@/app/actions/chat";
 import { useDashboardData } from "@/components/providers/DashboardDataProvider";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { confirmAppointment, rescheduleAppointment } from "../../_views/actions/appointments";
@@ -109,6 +111,11 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
 	const [editingItemId, setEditingItemId] = useState<string | null>(null);
 	const [editingTitle, setEditingTitle] = useState("");
 	const [appointments, setAppointments] = useState<AppointmentData[]>([]);
+	const [activeChat, setActiveChat] = useState<Chat | null>(null);
+	const [isChatLoading, setIsChatLoading] = useState(false);
+	const [completing, setCompleting] = useState(false);
+	const [showResponseModal, setShowResponseModal] = useState(false);
+	const [respondingTo, setRespondingTo] = useState<AppointmentData | null>(null);
 
 	// Debounce timer for checklist notes
 	const notesTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -116,30 +123,8 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
 	const { toast } = useToast();
 	const router = useRouter();
 
-	useEffect(() => {
-		const getUser = async () => {
-			const { data: { user } } = await supabase.auth.getUser();
-			if (user) setCurrentUserId(user.id);
-		};
-		getUser();
-	}, [supabase]);
 
-	const currentMatch = allMatches[matchIndex];
 
-	// Parse media from report
-	const getMediaFiles = (): MediaFile[] => {
-		if (!report?.media) return [];
-		try {
-			const mediaData = typeof report.media === 'string' 
-				? JSON.parse(report.media) 
-				: report.media;
-			return Array.isArray(mediaData) ? mediaData : [mediaData];
-		} catch {
-			return [];
-		}
-	};
-
-	const audioFiles = getMediaFiles().filter(m => m.type?.startsWith('audio'));
 
 	const fetchReport = useCallback(async () => {
 		try {
@@ -253,6 +238,16 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
 				const accepted = matches.find(m => m.status === 'accepted' || m.status === 'completed');
 				if (accepted) {
 					setAcceptedMatch(accepted);
+					
+					// Fetch chat for the accepted match
+					const { data: { user } } = await supabase.auth.getUser();
+					if (user) {
+						setIsChatLoading(true);
+						getCaseChat(accepted.id, user.id)
+							.then(chat => setActiveChat(chat))
+							.catch(err => console.error("Chat load failed", err))
+							.finally(() => setIsChatLoading(false));
+					}
 				}
 
 				if (data.administrative && typeof data.administrative === 'object') {
@@ -290,24 +285,84 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
 
 				}
 			} else {
-				setErrorState("Journey details not found. Please verify the link.");
+				setErrorState("Report not found.");
 			}
 		} catch (err: unknown) {
-			const error = err as Error;
-			setErrorState("A connection issue occurred. Your data remains safe.");
-
+			setErrorState("A connection issue occurred.");
 		} finally {
 			setLoading(false);
 		}
 	}, [reportId, supabase]);
 
-	useEffect(() => {
+
+
+
+    useEffect(() => {
+		const getUser = async () => {
+			const { data: { user } } = await supabase.auth.getUser();
+			if (user) setCurrentUserId(user.id);
+		};
+		getUser();
 		fetchReport();
-		const timer = setTimeout(() => {
-			if (loading) setLoading(false);
-		}, 6000);
-		return () => clearTimeout(timer);
-	}, [fetchReport, loading]);
+
+        // Subscribe to real-time updates for this report
+        const reportChannel = supabase
+            .channel(`report-main-${reportId}`)
+            .on(
+                'postgres_changes',
+                {
+                    event: 'UPDATE',
+                    schema: 'public',
+                    table: 'reports',
+                    filter: `report_id=eq.${reportId}`
+                },
+                () => {
+                    console.log("Report table changed, refetching...");
+                    fetchReport();
+                }
+            )
+            .subscribe();
+
+        // Subscribe to real-time updates for this report's matches
+        const channel = supabase
+            .channel(`report-matches-${reportId}`)
+            .on(
+                'postgres_changes',
+                {
+                    event: '*',
+                    schema: 'public',
+                    table: 'matched_services',
+                    filter: `report_id=eq.${reportId}`
+                },
+                () => {
+                    fetchReport();
+                }
+            )
+            .subscribe();
+
+        // Subscribe to real-time updates for appointments linked to this report's matches
+        const appointmentChannel = supabase
+            .channel(`report-appointments-${reportId}`)
+            .on(
+                'postgres_changes',
+                {
+                    event: '*',
+                    schema: 'public',
+                    table: 'appointments'
+                },
+                () => {
+                    fetchReport();
+                }
+            )
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(reportChannel);
+            supabase.removeChannel(channel);
+            supabase.removeChannel(appointmentChannel);
+        };
+	}, [supabase, reportId, fetchReport]);
+
 
 	const handleAddDetail = async () => {
 		if (!newDetail.trim() || !report) return;
@@ -344,15 +399,82 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
 		}
 	};
 
+	const handleComplete = async () => {
+		if (!acceptedMatch || !report) return;
+		setCompleting(true);
+		try {
+			const { error } = await supabase
+				.from("matched_services")
+				.update({ match_status_type: "completed", completed_at: new Date().toISOString() })
+				.eq("id", acceptedMatch.id);
+			if (error) throw error;
+            
+            // Sync report status
+            await supabase
+                .from("reports")
+                .update({ match_status: "completed" })
+                .eq("report_id", reportId);
+
+			toast({ title: "Case Completed", description: "You have finalized this healing journey." });
+			fetchReport();
+		} catch (err: any) {
+			toast({ title: "Update failed", description: err.message, variant: "destructive" });
+		} finally {
+			setCompleting(false);
+		}
+	};
+
+	const currentMatch = allMatches[matchIndex];
+
+	// Parse media from report
+	const getMediaFiles = (): MediaFile[] => {
+		if (!report?.media) return [];
+		try {
+			const mediaData = typeof report.media === "string" 
+				? JSON.parse(report.media) 
+				: report.media;
+			return Array.isArray(mediaData) ? mediaData : [mediaData];
+		} catch {
+			return [];
+		}
+	};
+
+	const audioFiles = getMediaFiles().filter((m) => m.type?.startsWith("audio"));
+
+
 	const handleSaveChecklist = async (newLists: ChecklistItem[]) => {
-		setChecklists(newLists);
+		// UI is updated before this call (optimistic)
 		if (!report) return;
-		const normalizedLists = newLists.map(c => ({ id: c.id, title: c.title, notes: c.notes || '', done: c.completed ?? c.done ?? false }));
-		const adminData: Record<string, unknown> = { ...(report.administrative as Record<string, unknown> || {}), checklist: normalizedLists };
+		const normalizedLists = newLists.map(c => ({ 
+            id: c.id, 
+            title: c.title, 
+            notes: c.notes || '', 
+            done: c.completed ?? c.done ?? false 
+        }));
+        
+		const adminData: Record<string, unknown> = { 
+            ...(report.administrative as Record<string, unknown> || {}), 
+            checklist: normalizedLists 
+        };
+        
 		if ('checklists' in adminData) {
 			delete adminData['checklists'];
 		}
-		await supabase.from('reports').update({ administrative: adminData as unknown as Json }).eq('report_id', reportId);
+        
+		const { error } = await supabase
+            .from('reports')
+            .update({ administrative: adminData as unknown as Json })
+            .eq('report_id', reportId);
+            
+        if (error) {
+            toast({ 
+                title: "Sync failed", 
+                description: "Your checklist changes could not be saved to the cloud.",
+                variant: "destructive"
+            });
+            // Re-fetch to sync back to server state
+            fetchReport();
+        }
 	};
 
 
@@ -449,6 +571,8 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
 			case 'pending': return 'bg-sky-50 text-sky-700 border-sky-100';
 			case 'confirmed': return 'bg-emerald-50 text-emerald-700 border-emerald-100';
             case 'requested': return 'bg-amber-50 text-amber-700 border-amber-100 animate-pulse';
+            case 'accepted': return 'bg-teal-50 text-teal-700 border-teal-100';
+            case 'completed': return 'bg-emerald-50 text-emerald-700 border-emerald-100';
 			default: return 'bg-slate-50 text-slate-500 border-slate-100';
 		}
 	};
@@ -492,31 +616,83 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
 	return (
 		<div className="min-h-screen bg-slate-50/50 pb-32 lg:pb-12 text-slate-900 selection:bg-teal-100">
 			{/* Focused Header Navigation */}
-			<nav className="sticky top-0 z-50 bg-white/80 backdrop-blur-xl border-b border-slate-100 transition-all duration-300">
-				<div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between gap-6">
-					<div className="flex items-center gap-4">
-						<Link href="/dashboard/reports" className="w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center hover:bg-slate-100 transition-all text-slate-600">
-							<ChevronLeft className="h-5 w-5" />
-						</Link>
-						<div className="hidden sm:block">
-							<div className="flex items-center gap-2 text-teal-600 font-extrabold uppercase tracking-[0.2em] text-[10px] mb-0.5">
-								<ShieldCheck className="h-3.5 w-3.5" />
-								Secure Private Session
-							</div>
-							<h2 className="text-slate-900 font-bold tracking-tight">Report Journey SS-{reportId.slice(0, 8).toUpperCase()}</h2>
-						</div>
-					</div>
+            <nav className="sticky top-0 z-50 bg-white border-b border-slate-100 px-8 py-6 shadow-sm overflow-hidden">
+                <div className="max-w-7xl mx-auto flex items-center justify-between gap-8 h-12">
+                    <div className="flex items-center gap-6 min-w-0">
+                        <Link href="/dashboard/reports" className="rounded-xl hover:bg-slate-50 text-slate-400 h-10 w-10 flex items-center justify-center transition-all bg-white border border-slate-100 shadow-sm">
+                            <ChevronLeft className="h-5 w-5" />
+                        </Link>
+                        
+                        <div className="flex items-center gap-6">
+                            <div className="space-y-0.5">
+                                <div className="flex items-center gap-2 text-teal-600 font-extrabold uppercase tracking-[0.2em] text-[10px] leading-none mb-1">
+                                    <ShieldCheck className="h-3.5 w-3.5" /> Secure Journey
+                                </div>
+                                <h1 className="text-xl font-black text-slate-900 tracking-tight leading-none uppercase">
+                                    {report?.type_of_incident?.replace(/_/g, " ") || "Incident Report"}
+                                </h1>
+                            </div>
 
-					<div className="flex items-center gap-3">
-						<Badge className={cn("px-4 py-1.5 rounded-full text-[10px] font-bold border uppercase tracking-[0.2em]", getStatusStyles(report.match_status))}>
-							{report.match_status || 'Under Review'}
-						</Badge>
-						<Button onClick={exitSafely} className="bg-rose-50 hover:bg-rose-100 text-rose-600 font-bold rounded-xl px-4 h-10 border border-rose-100 transition-all text-xs gap-2">
-							<LogOut className="h-4 w-4" /> Quick Exit
-						</Button>
-					</div>
-				</div>
-			</nav>
+                            <div className="h-10 w-px bg-slate-100 mx-2 hidden lg:block" />
+
+                            <div className="hidden lg:flex items-center gap-8">
+                                <div className="flex items-center gap-3 group">
+                                    <div className="w-9 h-9 bg-slate-50 rounded-xl flex items-center justify-center text-slate-400 group-hover:bg-teal-50 group-hover:text-teal-600 transition-all shrink-0">
+                                        <Heart className="h-4 w-4" />
+                                    </div>
+                                    <div className="space-y-0.5">
+                                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest leading-none">Survivor</p>
+                                        <p className="text-xs font-bold text-slate-700 tracking-tight whitespace-nowrap">{(report?.first_name || 'Anonymous').toUpperCase()}</p>
+                                    </div>
+                                </div>
+
+                                <div className="flex items-center gap-3 group">
+                                    <div className="w-9 h-9 bg-slate-50 rounded-xl flex items-center justify-center text-slate-400 group-hover:bg-sky-50 group-hover:text-sky-600 transition-all shrink-0">
+                                        <Calendar className="h-4 w-4" />
+                                    </div>
+                                    <div className="space-y-0.5">
+                                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest leading-none">Reported</p>
+                                        <p className="text-xs font-bold text-slate-700 tracking-tight whitespace-nowrap">{formatDate(report?.submission_timestamp)}</p>
+                                    </div>
+                                </div>
+
+                                <div className="flex items-center gap-3 group">
+                                    <div className="w-9 h-9 bg-slate-50 rounded-xl flex items-center justify-center text-slate-400 group-hover:bg-violet-50 group-hover:text-violet-600 transition-all shrink-0">
+                                        <Activity className="h-4 w-4" />
+                                    </div>
+                                    <div className="space-y-0.5">
+                                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest leading-none">Status</p>
+                                        <p className="text-xs font-bold text-slate-700 tracking-tight capitalize whitespace-nowrap">{report.match_status || "Processing"}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="flex items-center gap-4 shrink-0">
+                        {respondingTo && (
+                            <Button 
+                                onClick={() => setShowResponseModal(true)}
+                                className="h-11 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl px-5 shadow-lg shadow-amber-600/20 text-xs gap-2.5 transition-all active:scale-95"
+                            >
+                                <Calendar className="h-4 w-4" /> Confirm & Schedule
+                            </Button>
+                        )}
+
+                        <Badge className={cn("px-4 py-1.5 rounded-full text-[10px] font-bold border uppercase tracking-[0.2em] whitespace-nowrap", getStatusStyles(report.match_status))}>
+                            {report.match_status || 'Under Review'}
+                        </Badge>
+                        
+                        <Button 
+                            variant="outline"
+                            onClick={exitSafely} 
+                            className="bg-rose-50 hover:bg-rose-100/50 text-rose-600 font-bold rounded-xl px-5 h-11 border border-rose-100/50 transition-all text-[10px] gap-2.5 uppercase tracking-widest shadow-sm"
+                        >
+                            <LogOut className="h-4 w-4" /> Quick Exit
+                        </Button>
+                    </div>
+                </div>
+            </nav>
 
 			<main className="max-w-7xl mx-auto px-6 py-12">
 				<div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-start">
@@ -536,23 +712,23 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
 						</div>
 
 						{/* My Story Card */}
-						<Card className="border-0 bg-white shadow-xl shadow-slate-200/50 rounded-[2.5rem] overflow-hidden group">
-							<CardHeader className="p-10 pb-0 border-0 bg-transparent flex flex-row items-center justify-between">
+						<Card className="border-0 bg-white shadow-xl shadow-slate-200/50 rounded-3xl overflow-hidden group">
+							<CardHeader className="p-8 pb-0 border-0 bg-transparent flex flex-row items-center justify-between">
 								<div className="flex items-center gap-4">
 									<div className="w-12 h-12 bg-teal-50 rounded-2xl flex items-center justify-center text-teal-600">
 										<BookOpen className="h-6 w-6" />
 									</div>
 									<div>
 										<CardTitle className="text-2xl font-bold">Your Story</CardTitle>
-										<p className="text-sm font-medium text-slate-400 mt-1">Shared with caring professionals</p>
+										<p className="text-sm font-medium text-slate-400 mt-1">Shared with caring specialists</p>
 									</div>
 								</div>
 								<Button variant="ghost" onClick={() => setShowAddDetails(!showAddDetails)} className="text-teal-600 hover:bg-teal-50 font-bold rounded-xl gap-2 transition-all">
 									<Plus className="h-5 w-5" /> {showAddDetails ? "Cancel" : "Add Detail"}
 								</Button>
 							</CardHeader>
-							<CardContent className="p-10 space-y-8">
-								<div className="bg-slate-50/50 rounded-3xl p-8 border border-slate-50 leading-relaxed text-slate-600 font-medium text-lg italic relative">
+							<CardContent className="p-8 space-y-8">
+								<div className="bg-slate-50/50 rounded-2xl p-8 border border-slate-50 leading-relaxed text-slate-600 font-medium text-lg italic relative">
                                     <div className="absolute top-4 left-4 text-teal-200/50 select-none"><span className="text-6xl font-serif">"</span></div>
 									{report.incident_description || "Every story matters. You can start sharing yours whenever you're ready."}
                                     <div className="absolute bottom-4 right-4 text-teal-200/50 select-none"><span className="text-6xl font-serif">"</span></div>
@@ -562,8 +738,8 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
 									<div className="space-y-4 animate-in slide-in-from-top-4 fade-in duration-500">
 										<Textarea 
 											value={newDetail} onChange={(e) => setNewDetail(e.target.value)}
-											placeholder="Add more details to your story (e.g., feelings, timelines, needs)..."
-											className="min-h-[160px] rounded-[2rem] border-slate-100 bg-white focus:border-teal-400 focus:ring-0 p-8 text-lg font-medium shadow-inner"
+											placeholder="Add more details to your story..."
+											className="min-h-[160px] rounded-2xl border-slate-100 bg-white focus:border-teal-400 focus:ring-0 p-8 text-lg font-medium shadow-inner"
 										/>
 										<div className="flex flex-col sm:flex-row gap-4">
 											<Button variant="outline" onClick={() => setShowVoiceRecorder(!showVoiceRecorder)} className="h-14 rounded-2xl border-slate-100 text-slate-600 font-bold text-base px-8 hover:bg-slate-50">
@@ -610,7 +786,7 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
 								</span>
 							</div>
 
-							<Card className="border-0 bg-white shadow-xl shadow-slate-200/50 rounded-[2.5rem] overflow-hidden">
+							<Card className="border-0 bg-white shadow-xl shadow-slate-200/50 rounded-3xl overflow-hidden">
 								<CardContent className="p-0">
 									{checklists.map((item, idx) => (
 										<div key={item.id} className={cn("group transition-all duration-300", idx < checklists.length - 1 && "border-b border-slate-50")}>
@@ -677,309 +853,402 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
 								<h2 className="text-2xl font-bold tracking-tight">Healing Journal</h2>
 							</div>
 							<p className="text-base text-slate-400 font-medium leading-relaxed px-2">Only you can access this journal. Capture your private reflections, progress, and goals.</p>
-							<div className="bg-white rounded-[2.5rem] shadow-xl shadow-slate-200/50 border-0 p-2 overflow-hidden">
+							<div className="bg-white rounded-3xl shadow-xl shadow-slate-200/50 border-0 p-2 overflow-hidden">
 								<RichTextEditor content={report.notes || ""} onSave={handleSaveNotes} placeholder="Reflect on your progress here..." />
 							</div>
 						</div>
 					</div>
 
-					{/* Sidebar: Coordination & Support */}
-					<div className="lg:col-span-4 space-y-10 lg:sticky lg:top-32">
-						
-                        {/* Status Card */}
-                        <Card className="border-0 bg-teal-600 shadow-2xl shadow-teal-600/30 rounded-[2.5rem] overflow-hidden group">
-							<CardContent className="p-10 relative">
-                                <Sparkles className="absolute -top-4 -right-4 h-24 w-24 text-white/5 group-hover:rotate-12 transition-transform duration-700" />
-                                <div className="space-y-6 relative">
-                                    <div className="flex items-center gap-3 text-white/80 font-bold uppercase tracking-[0.2em] text-[10px]">
-                                        <Shield className="h-4 w-4" />
-                                        Safety Indicator
-                                    </div>
-                                    <h3 className="text-3xl font-bold text-white tracking-tight">Private Space</h3>
-                                    <p className="text-teal-50/80 font-medium text-base leading-relaxed">
-                                        Your identity is fully protected. Profiles are only shared when you choose to connect.
-                                    </p>
-                                    <div className="pt-4 border-t border-white/10 flex items-center gap-4">
-                                        <div className="w-12 h-12 bg-white/10 rounded-2xl flex items-center justify-center backdrop-blur-md">
-                                            <Lock className="text-white h-5 w-5" />
+	                        {/* Sidebar: Coordination & Support */}
+                        <div className="lg:col-span-4 space-y-8 lg:sticky lg:top-32 animate-in fade-in slide-in-from-right-8 duration-700">
+                            
+                            {(() => {
+                                const m = acceptedMatch || allMatches.find(m => m.status && ['accepted', 'completed'].includes(m.status));
+                                if (!m) return null;
+                                return (
+                                    <div id="secure-chat-section" className="space-y-4 animate-in slide-in-from-top-4 duration-700">
+                                        <div className="flex flex-col gap-1 px-2">
+                                            <div className="flex items-center gap-2 text-teal-600 font-bold uppercase tracking-[0.2em] text-[10px]">
+                                                <Shield className="h-3.5 w-3.5" />
+                                                Secure Channel
+                                            </div>
+                                            <h3 className="text-2xl font-bold text-slate-900 tracking-tight">Coordination Line</h3>
                                         </div>
-                                        <div className="text-[11px] font-bold text-teal-100 uppercase tracking-widest leading-tight">
-                                            End-to-End<br />Encrypted Journey
-                                        </div>
-                                    </div>
-                                </div>
-							</CardContent>
-						</Card>
-
-						{/* Support Connection Card */}
-						{report.record_only ? (
-							<Card className="border-0 bg-white shadow-xl shadow-slate-200/50 rounded-[2.5rem] overflow-hidden">
-								<CardContent className="p-10 text-center space-y-6">
-									<div className="w-20 h-20 bg-amber-50 rounded-[2rem] flex items-center justify-center mx-auto mb-2 text-amber-600">
-										<Sparkles className="h-10 w-10" />
-									</div>
-									<div className="space-y-3">
-										<h3 className="text-xl font-bold text-slate-900 tracking-tight">Record-Only Space</h3>
-										<p className="text-slate-400 font-medium leading-relaxed">Your story is saved safely. Toggle escalation to find professional matches.</p>
-									</div>
-									<Button onClick={handleEscalate} disabled={escalating} className="w-full h-14 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-2xl shadow-lg shadow-amber-500/20 text-base transition-all hover:scale-[1.02]">
-										{escalating ? "Requesting Connection..." : "Find Support Matches"}
-									</Button>
-								</CardContent>
-							</Card>
-						) : !acceptedMatch && currentMatch ? (
-							<Card className="border-0 bg-white shadow-xl shadow-slate-200/50 rounded-[2.5rem] overflow-hidden animate-in fade-in zoom-in-95 duration-500">
-                                <CardHeader className="p-10 pb-0 flex flex-row items-center justify-between">
-                                    <div className="flex items-center gap-2">
-                                        <HandHeart className="h-5 w-5 text-teal-600" />
-                                        <h3 className="text-xl font-bold tracking-tight">Partner Ready</h3>
-                                    </div>
-                                    <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Match {matchIndex + 1}/{allMatches.length}</div>
-                                </CardHeader>
-								<CardContent className="p-10 space-y-6">
-									<div className="flex flex-wrap gap-2 mb-2">
-										<Badge className="bg-slate-50 text-slate-500 border-0 font-bold text-[10px] uppercase tracking-widest px-4 py-1.5">{currentMatch.type}</Badge>
-										{currentMatch.focus_groups.map(fg => <Badge key={fg} className="bg-teal-50 text-teal-700 border-0 font-bold text-[10px] uppercase tracking-widest px-4 py-1.5">{fg}</Badge>)}
-									</div>
-									<div className="space-y-3">
-										<h3 className="text-2xl font-bold text-slate-900 tracking-tight">{currentMatch.name}</h3>
-										<p className="text-base text-slate-500 font-medium leading-relaxed">{currentMatch.description}</p>
-									</div>
-									<div className="grid grid-cols-1 gap-3">
-										<div className="flex items-center gap-4 p-5 bg-slate-50 rounded-2xl border border-slate-50">
-											<MapPin className="h-5 w-5 text-slate-400 shrink-0" />
-											<p className="text-sm font-bold text-slate-600 truncate">{currentMatch.address || "Location Private"}</p>
-										</div>
-										<div className="flex items-center gap-4 p-5 bg-slate-50 rounded-2xl border border-slate-50">
-											<Clock className="h-5 w-5 text-slate-400 shrink-0" />
-											<p className="text-sm font-bold text-slate-600 truncate">{currentMatch.availability}</p>
-										</div>
-									</div>
-									<div className="flex gap-4 pt-4">
-										<Button onClick={() => acceptMatch(currentMatch)} className="flex-1 h-14 bg-teal-600 hover:bg-teal-700 text-white font-bold rounded-2xl shadow-xl shadow-teal-600/20 text-base transition-all hover:scale-[1.02]">
-											Connect Now
-										</Button>
-										{allMatches.length > 1 && (
-                                            <Button variant="outline" onClick={nextMatch} className="h-14 w-14 border-slate-100 rounded-2xl text-slate-400 hover:text-teal-600 hover:bg-slate-50 shadow-sm transition-all active:scale-95">
-                                                <ArrowRight className="h-6 w-6" />
-                                            </Button>
-                                        )}
-									</div>
-								</CardContent>
-							</Card>
-						) : acceptedMatch ? (
-							<div className="space-y-8 animate-in fade-in slide-in-from-right-8 duration-500">
-								<Card className="border-0 bg-white shadow-xl shadow-slate-200/50 rounded-[2.5rem] overflow-hidden">
-									<CardContent className="p-10 flex flex-col gap-8">
-										<div className="flex items-center gap-6">
-											<Avatar className="h-20 w-20 rounded-3xl border-4 border-white shadow-xl">
-												<AvatarFallback className="bg-teal-50 text-teal-600 text-2xl font-bold">
-													{acceptedMatch.name.charAt(0)}
-												</AvatarFallback>
-											</Avatar>
-											<div className="flex-1 min-w-0">
-												<div className="flex items-center gap-2 text-teal-600 font-bold uppercase tracking-[0.2em] text-[9px] mb-1">
-                                                    <CheckCircle2 className="h-3 w-3" /> Partner Active
-                                                </div>
-												<h3 className="text-2xl font-bold text-slate-900 truncate tracking-tight">{acceptedMatch.name}</h3>
-												<p className="text-sm font-bold text-slate-400 uppercase tracking-widest">{acceptedMatch.type}</p>
-											</div>
-										</div>
                                         
-                                        {(() => {
-                                            let fb = null;
-                                            try {
-                                                fb = acceptedMatch.feedback ? JSON.parse(acceptedMatch.feedback) : null;
-                                            } catch (e) {}
-                                            const isProfComplete = fb?.is_prof_complete === true;
-                                            const isSurvComplete = fb?.is_surv_complete === true;
-                                            if (isProfComplete && !isSurvComplete) {
-                                                return (
-                                                    <div className="bg-amber-50 border border-amber-200 rounded-3xl p-6 shadow-sm animate-in fade-in slide-in-from-top-4 duration-500">
-                                                        <div className="flex items-center gap-3 text-amber-800 font-bold mb-3">
-                                                            <CheckCircle2 className="h-5 w-5" />
-                                                            Completion Requested
-                                                        </div>
-                                                        <p className="text-amber-700 text-sm mb-5 leading-relaxed font-medium">
-                                                            The professional has marked this case as complete. By confirming, the case will be closed.
-                                                        </p>
-                                                        <Button onClick={async () => {
-                                                            try {
-                                                                setUpdating(true);
-                                                                const newFb = { ...fb, is_surv_complete: true };
-                                                                const { error } = await supabase.from('matched_services').update({
-                                                                    feedback: JSON.stringify(newFb),
-                                                                    match_status_type: 'completed',
-                                                                    completed_at: new Date().toISOString()
-                                                                }).eq('id', acceptedMatch.id);
-                                                                if (error) throw error;
-                                                                toast({ title: "Case Completed", description: "You have finalized and closed this case." });
-                                                                fetchReport();
-                                                            } catch (err: unknown) {
-                                                                toast({ title: "Error", description: (err as Error).message || "Failed to complete", variant: "destructive" });
-                                                            } finally {
-                                                                setUpdating(false);
-                                                            }
-                                                        }} disabled={updating} className="bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl text-sm h-11 px-8 w-full sm:w-auto shadow-md shadow-amber-600/20 transition-all hover:scale-[1.02]">
-                                                            {updating ? "Finalizing..." : "Confirm & Close Case"}
-                                                        </Button>
+                                        <div className="h-[500px] sm:h-[600px] rounded-[2rem] border-0 shadow-2xl shadow-teal-500/10 overflow-hidden bg-white flex flex-col group">
+                                            <div className="p-5 border-b border-slate-50 bg-slate-50/30 flex items-center justify-between">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="w-8 h-8 rounded-2xl bg-teal-50 flex items-center justify-center text-teal-600">
+                                                        <MessageCircle className="h-4 w-4" />
                                                     </div>
-                                                );
-                                            }
-                                            return null;
-                                        })()}
+                                                    <div>
+                                                        <span className="text-sm font-bold text-slate-900 leading-none block">{m.name}</span>
+                                                        <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">{m.type}</span>
+                                                    </div>
+                                                </div>
+                                                <Badge className="bg-emerald-50 text-emerald-600 border-emerald-100 font-bold tracking-widest uppercase text-[8px]">Encrypted</Badge>
+                                            </div>
+                                            
+                                            {isChatLoading ? (
+                                                <div className="flex-1 flex flex-col items-center justify-center gap-4 text-slate-400">
+                                                    <div className="w-8 h-8 border-3 border-teal-100 border-t-teal-600 rounded-full animate-spin" />
+                                                    <p className="font-bold text-[9px] uppercase tracking-widest">Securing Connection...</p>
+                                                </div>
+                                            ) : (
+                                                <div className="flex-1 relative">
+                                                    <CaseChatPanel
+                                                        matchId={m.id}
+                                                        survivorId={report.user_id || ''}
+                                                        professionalId={m.professionalId || ''}
+                                                        professionalName={m.name}
+                                                        survivorName={report.first_name || "Myself"}
+                                                        existingChatId={activeChat?.id}
+                                                        className="absolute inset-0 h-full w-full rounded-none border-0 shadow-none !min-h-0"
+                                                    />
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                );
+                            })()}
 
-                                        {upcomingAppointments.length > 0 ? (
-                                            <div className="space-y-4">
-                                                {upcomingAppointments.map((appt) => (
-                                                    <div key={appt.id} className={cn(
-                                                        "rounded-3xl border p-6 space-y-4 transition-all duration-300",
-                                                        appt.status === 'requested' 
-                                                            ? "bg-amber-50 border-amber-200 shadow-lg shadow-amber-200/20" 
-                                                            : "bg-teal-50/50 border-teal-50"
-                                                    )}>
-                                                        <div className="flex items-center justify-between">
-                                                            <div className="flex items-center gap-3 text-slate-900 font-bold text-sm">
-                                                                <Calendar className={cn("h-5 w-5", appt.status === 'requested' ? "text-amber-600" : "text-teal-600")} />
-                                                                {appt.status === 'requested' ? "Proposed Session" : "Session Scheduled"}
+                            {/* 2. ACTIVITY / COORDINATION HUB */}
+                            {acceptedMatch ? (
+                                <div className="space-y-6">
+                                    <div className="flex flex-col gap-1 px-2">
+                                        <div className="flex items-center gap-2 text-teal-600 font-bold uppercase tracking-[0.2em] text-[10px]">
+                                            <Activity className="h-3.5 w-3.5" />
+                                            Active Support
+                                        </div>
+                                        <h3 className="text-2xl font-bold text-slate-900 tracking-tight">Coordination Hub</h3>
+                                    </div>
+
+                                    {/* Action Card */}
+                                    <Card className={cn(
+                                        "border-0 shadow-xl rounded-[2rem] overflow-hidden relative group",
+                                        acceptedMatch.status === 'completed' 
+                                            ? "bg-emerald-600 shadow-emerald-600/20" 
+                                            : "bg-white border border-slate-100"
+                                    )}>
+                                        <CardContent className={cn("p-8 relative", acceptedMatch.status === 'completed' ? "text-white" : "text-slate-900")}>
+                                            <div className="flex items-center justify-between mb-6">
+                                                <div className="flex items-center gap-4">
+                                                    <Avatar className="h-14 w-14 rounded-2xl border-2 border-slate-50 shadow-md">
+                                                        <AvatarFallback className="bg-teal-50 text-teal-600 font-bold">
+                                                            {acceptedMatch.name.charAt(0)}
+                                                        </AvatarFallback>
+                                                    </Avatar>
+                                                    <div className="flex-1 min-w-0">
+                                                        <h4 className="font-bold truncate">{acceptedMatch.name}</h4>
+                                                        <p className={cn("text-[10px] font-bold uppercase tracking-widest", acceptedMatch.status === 'completed' ? "text-emerald-100" : "text-slate-400")}>
+                                                            {acceptedMatch.type}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                                <div className="flex flex-col items-end">
+                                                    <Badge className="bg-teal-50 text-teal-600 border-0 font-bold text-[9px] uppercase tracking-widest">Active Partner</Badge>
+                                                </div>
+                                            </div>
+
+                                            {acceptedMatch.status !== 'completed' ? (
+                                                <Button 
+                                                    onClick={handleComplete}
+                                                    disabled={completing}
+                                                    variant="ghost"
+                                                    className="w-full h-10 text-slate-400 hover:text-teal-600 font-bold rounded-xl transition-all text-xs"
+                                                >
+                                                    {completing ? "Finalizing..." : "Subtly Complete Journey"}
+                                                </Button>
+                                            ) : (
+                                                <div className="flex items-center gap-3 text-emerald-100 font-bold text-sm">
+                                                    <CheckCircle2 className="h-5 w-5" /> Journey Finalized
+                                                </div>
+                                            )}
+                                        </CardContent>
+                                    </Card>
+
+                                    {/* Upcoming Sessions */}
+                                    {upcomingAppointments.length > 0 && (
+                                        <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                                            <div className="flex items-center gap-2 px-2 text-slate-900 font-bold text-sm">
+                                                <Calendar className="h-4 w-4 text-teal-600" />
+                                                Upcoming Sessions
+                                            </div>
+                                            {upcomingAppointments.map((appt) => (
+                                                <Card key={appt.id} className={cn(
+                                                    "border-0 shadow-lg rounded-3xl overflow-hidden",
+                                                    appt.status === 'requested' ? "bg-amber-50 border border-amber-100" : "bg-white border border-slate-100"
+                                                )}>
+                                                    <CardContent className="p-6">
+                                                        <div className="flex items-center justify-between mb-2">
+                                                            <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                                                                {appt.type} Session
                                                             </div>
                                                             {appt.status === 'requested' && (
-                                                                <Badge className="bg-amber-100 text-amber-700 border-0 text-[9px] uppercase tracking-widest px-2">Action Needed</Badge>
+                                                                <Badge className="bg-amber-100 text-amber-700 border-0 text-[8px] uppercase tracking-widest px-2 py-0.5">Pending</Badge>
                                                             )}
                                                         </div>
-                                                        <div className="space-y-1">
-                                                            <p className="text-2xl font-bold text-slate-900 tracking-tight">{formatDate(appt.appointment_date)}</p>
-                                                            <p className="text-base text-slate-500 font-bold tracking-widest uppercase">{formatTime(appt.appointment_date)}</p>
-                                                        </div>
-
+                                                        <p className="text-xl font-bold text-slate-900 tracking-tight">{formatDate(appt.appointment_date)}</p>
+                                                        <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-4">{formatTime(appt.appointment_date)}</p>
+                                                        
                                                         {appt.status === 'requested' && (
-                                                            <div className="flex gap-2 pt-2">
-                                                                <Button 
-                                                                    className="flex-1 bg-amber-600 hover:bg-amber-700 text-white rounded-xl h-10 text-xs font-bold shadow-md shadow-amber-600/20"
-                                                                    onClick={async () => {
-                                                                        try {
-                                                                            setUpdating(true);
-                                                                            await confirmAppointment(appt.id);
-                                                                            toast({ title: "Appointment confirmed", description: "Your support session is locked in." });
-                                                                            fetchReport();
-                                                                        } catch {
-                                                                            toast({ title: "Error", description: "Failed to confirm session.", variant: "destructive" });
-                                                                        } finally {
-                                                                            setUpdating(false);
-                                                                        }
-                                                                    }}
-                                                                >
-                                                                    Confirm
-                                                                </Button>
-                                                                <Dialog>
-                                                                    <DialogTrigger asChild>
-                                                                        <Button variant="outline" className="flex-1 border-amber-200 text-amber-700 hover:bg-amber-100 rounded-xl h-10 text-xs font-bold">
-                                                                            Reschedule
-                                                                        </Button>
-                                                                    </DialogTrigger>
-                                                                    <DialogContent className="sm:max-w-md rounded-[2rem] border-0 shadow-2xl overflow-hidden p-0">
-                                                                        <div className="p-8">
-                                                                            <DialogHeader className="mb-6">
-                                                                                <DialogTitle className="text-2xl font-bold text-slate-900">Choose New Time</DialogTitle>
-                                                                                <DialogDescription className="text-slate-500 font-medium">
-                                                                                    Select a new slot that works for you. 
-                                                                                    {currentMatch?.availability && ` Available: ${currentMatch.availability}`}
-                                                                                </DialogDescription>
-                                                                            </DialogHeader>
-                                                                            
-                                                                            <EnhancedAppointmentScheduler
-                                                                                userId={currentUserId || ""}
-                                                                                providerId={currentMatch?.professionalId || ""}
-                                                                                isOpen={true}
-                                                                                onClose={() => {}}
-                                                                                onSchedule={async (data) => {
-                                                                                    try {
-                                                                                        setUpdating(true);
-                                                                                        await rescheduleAppointment(appt.id, data.date.toISOString(), data.notes);
-                                                                                        toast({ title: "Reschedule requested", description: "We've sent your request to the professional." });
-                                                                                        fetchReport();
-                                                                                    } catch {
-                                                                                        toast({ title: "Error", description: "Failed to request reschedule.", variant: "destructive" });
-                                                                                    } finally {
-                                                                                        setUpdating(false);
-                                                                                    }
-                                                                                }}
-                                                                                defaultAvailability={currentMatch?.availability || "24/7"}
-                                                                            />
-                                                                        </div>
-                                                                    </DialogContent>
-                                                                </Dialog>
-                                                            </div>
+                                                            <Button 
+                                                                onClick={() => {
+                                                                    setRespondingTo(appt);
+                                                                    setShowResponseModal(true);
+                                                                }}
+                                                                className="w-full bg-amber-600 hover:bg-amber-700 text-white rounded-xl h-9 text-xs font-bold transition-all"
+                                                            >
+                                                                Confirm Time
+                                                            </Button>
                                                         )}
-                                                    </div>
-                                                ))}
+                                                    </CardContent>
+                                                </Card>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            ) : (
+                                <div className="space-y-6">
+                                    <Card className="border-0 bg-teal-600 shadow-2xl shadow-teal-600/30 rounded-[2.5rem] overflow-hidden group">
+                                        <CardContent className="p-10 relative">
+                                            <Sparkles className="absolute -top-4 -right-4 h-24 w-24 text-white/5 group-hover:rotate-12 transition-transform duration-700" />
+                                            <div className="space-y-6 relative">
+                                                <div className="flex items-center gap-3 text-white/80 font-bold uppercase tracking-[0.2em] text-[10px]">
+                                                    <Shield className="h-4 w-4" />
+                                                    Safety Indicator
+                                                </div>
+                                                <h3 className="text-3xl font-bold text-white tracking-tight">Private Space</h3>
+                                                <p className="text-teal-50/80 font-medium text-base leading-relaxed">
+                                                    Your identity is fully protected. Profiles are only shared when you choose to connect.
+                                                </p>
                                             </div>
-                                        ) : (
-                                            <div className="bg-slate-50/50 rounded-3xl border border-slate-50 p-6 lg:p-8 text-center space-y-3">
-                                                <Calendar className="h-8 w-8 text-slate-200 mx-auto" />
-                                                <p className="text-sm font-bold text-slate-400">Ready to Schedule</p>
-                                            </div>
-                                        )}
+                                        </CardContent>
+                                    </Card>
 
-										<div className="grid grid-cols-2 gap-4">
-											<Button className="h-14 bg-teal-600 hover:bg-teal-700 text-white font-bold rounded-2xl shadow-xl shadow-teal-600/20 text-sm transition-all hover:scale-[1.02]">
-												Coordination
-											</Button>
-											<Button variant="outline" className="h-14 border-slate-100 rounded-2xl font-bold text-slate-600 hover:bg-slate-50 text-sm shadow-sm">
-												Contact
-											</Button>
+                                    {report.record_only ? (
+                                        <Card className="border-0 bg-white shadow-xl shadow-slate-200/50 rounded-[2.5rem] overflow-hidden">
+                                            <CardContent className="p-10 text-center space-y-6">
+                                                <div className="w-20 h-20 bg-amber-50 rounded-[2rem] flex items-center justify-center mx-auto mb-2 text-amber-600">
+                                                    <Sparkles className="h-10 w-10" />
+                                                </div>
+                                                <div className="space-y-3">
+                                                    <h3 className="text-xl font-bold text-slate-900 tracking-tight">Record-Only Space</h3>
+                                                    <p className="text-slate-400 font-medium leading-relaxed">Your story is saved safely. Toggle escalation to find professional matches.</p>
+                                                </div>
+                                                <Button onClick={handleEscalate} disabled={escalating} className="w-full h-14 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-2xl shadow-lg shadow-amber-500/20 text-base transition-all hover:scale-[1.02]">
+                                                    {escalating ? "Requesting Connection..." : "Find Support Matches"}
+                                                </Button>
+                                            </CardContent>
+                                        </Card>
+									) : (
+										<div className="space-y-6">
+											{/* Matching Phase */}
+											<div className="flex flex-col gap-1 px-2">
+												<div className="flex items-center gap-2 text-teal-600 font-bold uppercase tracking-[0.2em] text-[10px]">
+													<Activity className="h-3.5 w-3.5" />
+													Active Coordination
+												</div>
+												<h3 className="text-2xl font-bold text-slate-900 tracking-tight">Matching Center</h3>
+											</div>
+
+											{(() => {
+												const activeProposal = allMatches.find(m => m.status === 'proposed' || m.status === 'requested');
+												const matchingAppt = activeProposal ? appointments.find(a => a.status === 'pending' || a.status === 'requested') : null;
+												
+												if (activeProposal) {
+													return (
+														<Card className="border-0 shadow-xl rounded-[2rem] bg-white border border-teal-100/50 overflow-hidden animate-in fade-in zoom-in-95 duration-500">
+															<CardHeader className="p-8 pb-4">
+																<div className="flex items-center justify-between">
+																	<Badge className="bg-teal-50 text-teal-600 border-0 font-bold uppercase tracking-widest text-[9px]">Partner Proposal Received</Badge>
+																	<Sparkles className="h-4 w-4 text-teal-400 animate-pulse" />
+																</div>
+															</CardHeader>
+															<CardContent className="p-8 pt-0 space-y-6">
+																<div className="flex items-center gap-4 bg-slate-50 p-4 rounded-2xl border border-slate-100">
+																	<Avatar className="h-12 w-12 rounded-2xl border-2 border-white shadow-sm">
+																		<AvatarFallback className="bg-teal-100 text-teal-700 font-bold">
+																			{activeProposal.name.charAt(0)}
+																		</AvatarFallback>
+																	</Avatar>
+																	<div>
+																		<p className="text-sm font-extrabold text-slate-900">{activeProposal.name}</p>
+																		<p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{activeProposal.type}</p>
+																	</div>
+																</div>
+
+																{matchingAppt ? (
+																	<div className="space-y-4">
+																		<div className="bg-teal-50/50 border border-teal-100 rounded-2xl p-5 space-y-3">
+																			<div className="flex items-center gap-3 text-teal-700">
+																				<Calendar className="h-4 w-4" />
+																				<span className="text-sm font-bold">Proposed Meeting:</span>
+																			</div>
+																			<div className="flex flex-col gap-1 pl-7">
+																				<p className="text-lg font-bold text-slate-900">{formatDate(matchingAppt.appointment_date)}</p>
+																				<p className="text-sm font-medium text-teal-600">{formatTime(matchingAppt.appointment_date)}</p>
+																			</div>
+																		</div>
+																		
+																		<div className="flex flex-col gap-3">
+																			<Button 
+																				onClick={async () => {
+																					await confirmAppointment(matchingAppt.id);
+																					await supabase.from('matched_services').update({ match_status_type: 'accepted' }).eq('id', activeProposal.id);
+																					await supabase.from('reports').update({ match_status: 'accepted' }).eq('report_id', reportId);
+																					toast({ title: "Partner Confirmed", description: "You are now connected." });
+																					fetchReport();
+																				}}
+																				className="w-full h-12 bg-teal-600 hover:bg-teal-700 text-white font-bold rounded-2xl shadow-lg shadow-teal-600/20 transition-all hover:scale-[1.02]"
+																			>
+																				Accept & Connect
+																			</Button>
+																			
+																			<Dialog>
+																				<DialogTrigger asChild>
+																					<Button variant="outline" className="w-full h-12 border-slate-200 text-slate-600 font-bold rounded-2xl hover:bg-slate-50 transition-all text-xs">
+																						Suggest Another Time
+																					</Button>
+																				</DialogTrigger>
+																				<DialogContent className="max-w-2xl bg-white rounded-[2rem] p-0 overflow-hidden border-0 shadow-2xl">
+																					<div className="p-8 border-b border-slate-50">
+																						<DialogTitle className="text-2xl font-bold flex items-center gap-3">
+																							<Calendar className="h-6 w-6 text-teal-600" />
+																							Reschedule Meeting
+																						</DialogTitle>
+																						<DialogDescription className="text-slate-500 font-medium">
+																							Suggest a new time that works better for you.
+																						</DialogDescription>
+																					</div>
+																					<div className="p-8">
+																						<EnhancedAppointmentScheduler 
+																							inline={true}
+																							isOpen={true}
+																							onClose={() => {}}
+																							userId={currentUserId || ''}
+																							professionalName={activeProposal.name}
+																							serviceName={activeProposal.type}
+																							onSchedule={async (data) => {
+																								await rescheduleAppointment(matchingAppt.id, data.date.toISOString(), data.notes);
+																								await supabase.from('matched_services').update({ match_status_type: 'reschedule_requested' }).eq('id', activeProposal.id);
+																								toast({ title: "Request Sent", description: "We'll notify you once confirmed." });
+																								fetchReport();
+																							}}
+																						/>
+																					</div>
+																				</DialogContent>
+																			</Dialog>
+																		</div>
+																	</div>
+																) : (
+																	<div className="bg-slate-50 rounded-2xl p-6 text-center space-y-3">
+																		<p className="text-sm font-bold text-slate-600">Review in progress</p>
+																		<p className="text-xs text-slate-400 italic">Wait until the partner suggests a time.</p>
+																	</div>
+																)}
+															</CardContent>
+														</Card>
+													);
+												}
+												
+												return (
+													<Card className="border-0 shadow-xl rounded-[2rem] bg-white border border-slate-100 overflow-hidden group">
+														<CardContent className="p-12 flex flex-col items-center text-center space-y-6">
+															<div className="relative">
+																<div className="w-20 h-20 bg-teal-50 rounded-full flex items-center justify-center text-teal-600">
+																	<Sparkles className="h-10 w-10 animate-pulse" />
+																</div>
+																<div className="absolute -top-1 -right-1 w-6 h-6 bg-white rounded-full flex items-center justify-center shadow-sm">
+																	<ShieldCheck className="h-4 w-4 text-teal-400" />
+																</div>
+															</div>
+															<div className="space-y-2">
+																<h4 className="text-xl font-bold text-slate-900 tracking-tight">Seeking Specialists</h4>
+																<p className="text-xs font-bold text-slate-400 uppercase tracking-widest tracking-widest">
+																	Evaluating the best match for your needs
+																</p>
+															</div>
+															<div className="w-full max-w-[160px] h-1.5 bg-slate-50 rounded-full overflow-hidden">
+																<div className="w-1/2 h-full bg-teal-400 rounded-full animate-[progress_2s_ease-in-out_infinite]" />
+															</div>
+														</CardContent>
+													</Card>
+												);
+											})()}
+
+											{/* Escalation / Help Card */}
+											<Card className="bg-violet-600 rounded-[2rem] shadow-xl shadow-violet-600/20 border-0 p-8 text-white relative overflow-hidden group">
+												<div className="absolute top-0 right-0 p-4 opacity-10 group-hover:scale-110 transition-transform">
+													<Heart className="h-24 w-24" />
+												</div>
+												<div className="relative z-10 space-y-4">
+													<h4 className="text-xl font-bold tracking-tight">Need urgent help?</h4>
+													<p className="text-violet-100 font-medium text-sm leading-relaxed">
+														Escalate your report to our coordination team if you feel you need more immediate attention.
+													</p>
+													<Button 
+														onClick={handleEscalate}
+														disabled={escalating}
+														className="w-full h-12 bg-white/20 hover:bg-white/30 text-white font-bold rounded-2xl border border-white/20 backdrop-blur-md transition-all active:scale-[0.98]"
+													>
+														{escalating ? "Escalating..." : "Escalate My Report"}
+													</Button>
+												</div>
+											</Card>
 										</div>
-									</CardContent>
-								</Card>
-
-								{currentUserId && (
-									<div className="h-[600px] rounded-[2.5rem] border-0 shadow-2xl shadow-slate-200/50 overflow-hidden bg-white flex flex-col group">
-										<div className="p-6 border-b border-slate-50 bg-white flex items-center gap-3">
-                                            <div className="w-8 h-8 rounded-full bg-serene-green-400 shadow-[0_0_12px_rgba(72,187,120,0.4)] animate-pulse" />
-                                            <span className="text-sm font-bold text-slate-900">Secure Channel Open</span>
-                                        </div>
-                                        <div className="flex-1">
-                                            <CaseChatPanel
-                                                matchId={acceptedMatch.id}
-                                                survivorId={currentUserId}
-                                                professionalId={acceptedMatch.professionalId || ''}
-                                                professionalName={acceptedMatch.name}
-                                                survivorName={report.first_name || "Myself"}
-
-                                                className="h-full w-full rounded-none border-0 shadow-none !min-h-0"
-                                            />
-                                        </div>
-									</div>
-								)}
-							</div>
-						) : (
-							<Card className="border-2 border-dashed border-slate-200 rounded-[2.5rem] bg-slate-50/30 p-16 text-center space-y-6">
-								<div className="w-20 h-20 bg-white rounded-[2rem] flex items-center justify-center mx-auto shadow-sm">
-									<HandHeart className="h-8 w-8 text-slate-200" />
-								</div>
-								<div className="space-y-2">
-                                    <h3 className="text-xl font-bold text-slate-400 tracking-tight">Support Search Active</h3>
-                                    <p className="text-sm text-slate-400 font-medium leading-relaxed italic">Searching for matched professionals...</p>
+                                    )}
                                 </div>
-							</Card>
-						)}
+                            )}
 
-                        {/* Trauma Informed Tips */}
-                        <div className="p-10 bg-white border border-slate-100 rounded-[2.5rem] shadow-xl shadow-slate-100/50 space-y-6">
-                            <div className="flex items-center gap-4 text-teal-600">
-                                <div className="w-10 h-10 bg-teal-50 rounded-xl flex items-center justify-center">
-                                    <Sparkles className="h-5 w-5" />
+                            {/* Trauma Informed Tips */}
+                            <div className="p-10 bg-white border border-slate-100 rounded-[2.5rem] shadow-xl shadow-slate-100/50 space-y-6 mt-10">
+                                <div className="flex items-center gap-4 text-teal-600">
+                                    <div className="w-10 h-10 bg-teal-50 rounded-xl flex items-center justify-center">
+                                        <Sparkles className="h-5 w-5" />
+                                    </div>
+                                    <h4 className="font-bold text-xl tracking-tight text-slate-800">Supportive Hint</h4>
                                 </div>
-                                <h4 className="font-bold text-xl tracking-tight text-slate-800">Supportive Hint</h4>
+                                <p className="text-base text-slate-500 leading-relaxed font-medium">
+                                    Sharing more details helps partners prepare better for your session. Feel free to use the voice recorder if typing is difficult.
+                                </p>
                             </div>
-                            <p className="text-base text-slate-500 leading-relaxed font-medium">
-                                Sharing more details helps partners prepare better for your session. Feel free to use the voice recorder if typing is difficult.
-                            </p>
                         </div>
-					</div>
-
-				</div>
-			</main>
-		</div>
-	);
+                    </div>
+                </main>
+            {/* Appointment Response Modal */}
+            {respondingTo && (
+                <EnhancedAppointmentScheduler
+                    isOpen={showResponseModal}
+                    onClose={() => {
+                        setShowResponseModal(false);
+                        setRespondingTo(null);
+                    }}
+                    onSchedule={async (apptData) => {
+                        try {
+                            if (respondingTo.appointment_date && apptData.date.getTime() === new Date(respondingTo.appointment_date).getTime()) {
+                                // Just confirm if time is unchanged
+                                await confirmAppointment(respondingTo.id);
+                            } else {
+                                // Reschedule if different
+                                await rescheduleAppointment(respondingTo.id, apptData.date.toISOString());
+                            }
+                            toast({ title: "Appointment Finalized" });
+                            fetchReport();
+                        } catch (err) {
+                            toast({ title: "Failed to update appointment", variant: "destructive" });
+                        }
+                    }}
+                    viewMode="respond"
+                    initialAppointment={{
+                        date: respondingTo.appointment_date ? new Date(respondingTo.appointment_date) : new Date(),
+                        duration: 60,
+                        type: respondingTo.type || 'consultation'
+                    }}
+                    professionalName={acceptedMatch?.name}
+                    userId={report?.user_id || undefined}
+                />
+            )}
+        </div>
+    );
 }

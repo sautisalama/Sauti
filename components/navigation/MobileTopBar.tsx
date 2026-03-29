@@ -35,7 +35,10 @@ export function MobileTopBar() {
   // Hide on desktop (lg hidden)
   // Hide on chat pages (both list and detail) as requested
   const isChat = pathname?.startsWith("/dashboard/chat");
-  if (isChat) return null;
+  const isCaseDetail = pathname?.includes("/dashboard/cases/");
+  const isReportDetail = pathname?.includes("/dashboard/reports/");
+  const isMatches = pathname === "/dashboard/matches";
+  if (isChat || isCaseDetail || isReportDetail || isMatches) return null;
 
   const getRoleLabel = (userType: string) => {
     switch (userType) {

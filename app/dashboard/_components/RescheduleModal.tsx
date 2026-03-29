@@ -129,19 +129,20 @@ export function RescheduleModal({
 
 	return (
 		<Dialog open={isOpen} onOpenChange={onClose}>
-			<DialogContent className="sm:max-w-md">
-				<DialogHeader>
-					<DialogTitle className="flex items-center gap-2">
-						<RotateCcw className="h-5 w-5" />
-						Reschedule Appointment
-					</DialogTitle>
-					<DialogDescription>
-						Choose a new date and time for your appointment with{" "}
-						{appointment.matched_service?.service_details?.name ||
-							"the service provider"}
-						.
-					</DialogDescription>
-				</DialogHeader>
+			<DialogContent className="sm:max-w-md bg-white rounded-[2.5rem] p-0 overflow-hidden border-0 shadow-2xl">
+				<div className="p-8 pb-0 border-b border-slate-50">
+					<DialogHeader>
+						<DialogTitle className="text-2xl font-bold flex items-center gap-3 text-slate-900">
+							<RotateCcw className="h-6 w-6 text-teal-600" />
+							Reschedule
+						</DialogTitle>
+						<DialogDescription className="text-slate-500 font-medium">
+							Choose a new time for your appointment.
+						</DialogDescription>
+					</DialogHeader>
+				</div>
+
+				<div className="p-8 space-y-6">
 
 				<div className="space-y-6 py-4">
 					{/* Current Appointment Info */}
@@ -225,18 +226,21 @@ export function RescheduleModal({
 					</div>
 				</div>
 
-				<DialogFooter>
-					<Button variant="outline" onClick={onClose} disabled={isUpdating}>
-						Cancel
-					</Button>
-					<Button
-						onClick={handleReschedule}
-						disabled={!selectedDate || !selectedTime || isUpdating}
-						className="bg-[#1A3434] hover:bg-[#2A4A4A]"
-					>
-						{isUpdating ? "Rescheduling..." : "Reschedule Appointment"}
-					</Button>
-				</DialogFooter>
+				</div>
+				<div className="p-8 pt-0">
+					<DialogFooter className="flex gap-3">
+						<Button variant="outline" onClick={onClose} disabled={isUpdating} className="flex-1 rounded-xl h-12 border-slate-200">
+							Cancel
+						</Button>
+						<Button
+							onClick={handleReschedule}
+							disabled={!selectedDate || !selectedTime || isUpdating}
+							className="flex-1 bg-teal-600 hover:bg-teal-700 text-white rounded-xl h-12 shadow-lg shadow-teal-600/20 font-bold"
+						>
+							{isUpdating ? "Rescheduling..." : "Save Changes"}
+						</Button>
+					</DialogFooter>
+				</div>
 			</DialogContent>
 		</Dialog>
 	);

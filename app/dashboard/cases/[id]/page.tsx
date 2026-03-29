@@ -76,7 +76,42 @@ export default function CaseDetailPage({ params }: { params: Promise<{ id: strin
 
     useEffect(() => {
         fetchCase();
-    }, [fetchCase]);
+
+        // Real-time listener for this case
+        const channel = supabase
+            .channel(`case-updates-${caseId}`)
+            .on(
+                'postgres_changes',
+                {
+                    event: 'UPDATE',
+                    schema: 'public',
+                    table: 'matched_services',
+                    filter: `id=eq.${caseId}`
+                },
+                () => {
+                    console.log("Case updated in real-time by survivor/system");
+                    fetchCase();
+                }
+            )
+			.on(
+				'postgres_changes',
+				{
+					event: 'UPDATE',
+					schema: 'public',
+					table: 'reports',
+					filter: `report_id=eq.${caseData?.report_id}`
+				},
+				() => {
+					console.log("Associated report status changed, refetching case...");
+					fetchCase();
+				}
+			)
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
+    }, [fetchCase, supabase, caseId, caseData?.report_id]);
 
     const handleAcceptCase = async (id: string) => {
         try {
@@ -87,6 +122,19 @@ export default function CaseDetailPage({ params }: { params: Promise<{ id: strin
                 .eq("id", id);
 
             if (error) throw error;
+            
+            // Sync report status - use multiple possible ID locations to be robust
+            const targetReportId = caseData?.report_id || caseData?.report?.report_id;
+            if (targetReportId) {
+                await supabase
+                    .from("reports")
+                    .update({ 
+                        match_status: "accepted",
+                        updated_at: new Date().toISOString()
+                    })
+                    .eq("report_id", targetReportId);
+            }
+
             toast({ title: "Case Accepted" });
             fetchCase();
         } catch (err: any) {
@@ -109,6 +157,19 @@ export default function CaseDetailPage({ params }: { params: Promise<{ id: strin
                 .eq("id", id);
 
             if (error) throw error;
+
+            // Sync report status
+            const targetReportId = caseData?.report_id || caseData?.report?.report_id;
+            if (targetReportId) {
+                await supabase
+                    .from("reports")
+                    .update({ 
+                        match_status: "completed",
+                        updated_at: new Date().toISOString()
+                    })
+                    .eq("report_id", targetReportId);
+            }
+
             toast({ title: "Case Completed" });
             fetchCase();
         } catch (err: any) {

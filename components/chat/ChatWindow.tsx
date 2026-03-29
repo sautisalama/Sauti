@@ -6,12 +6,14 @@ import { createClient } from '@/utils/supabase/client';
 import { MessageBubble } from './MessageBubble';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { Phone, Video, Search, MoreVertical, Smile, Paperclip, Mic, Send, X, Lock, ArrowLeft, Info } from 'lucide-react';
+import { Phone, Video, Search, MoreVertical, Smile, ShieldCheck, Mic, Send, X, Lock, ArrowLeft, FileText  } from 'lucide-react';
 import { ChatMediaDrawer } from './ChatMediaDrawer';
 import { EmojiPicker } from './EmojiPicker';
 import { AttachmentMenu } from './AttachmentMenu';
 import { FilePreviewModal } from './FilePreviewModal';
 import { format } from 'date-fns';
+import { usePathname } from 'next/navigation';
+import Link from 'next/link';
 
 interface ChatWindowProps {
   chat: Chat;
@@ -40,8 +42,10 @@ export function ChatWindow({ chat, onBack }: ChatWindowProps) {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [currentUserName, setCurrentUserName] = useState<string>('there');
   const [isTyping, setIsTyping] = useState(false);
-
-  // ... (User Data and Effect logic remains the same) ...
+  const pathname = usePathname();
+  const isCaseDetailPage = pathname.includes('/dashboard/cases/');
+  const isReportDetailPage = pathname.includes('/dashboard/reports/');
+  
   // Fetch current user ID and Profile
   useEffect(() => {
     const getUserData = async () => {
@@ -362,18 +366,31 @@ export function ChatWindow({ chat, onBack }: ChatWindowProps) {
          </div>
        )}
 
-       {/* Case File Banner */}
-       {chat.metadata?.case_id && (
-         <div className="bg-blue-50 border-b border-blue-100 p-2 flex items-center justify-between z-10 text-sm text-blue-900">
-            <div className="flex items-center gap-2">
-              <span className="font-semibold">📂 Case File</span>
-              <span>- Review case details</span>
-            </div>
-            <Button variant="outline" size="sm" className="h-7 text-xs border-blue-200 hover:bg-blue-100 text-blue-700">
-              View Case
-            </Button>
-         </div>
-       )}
+        {/* Case File Banner - Only show if not already on the case page */}
+        {chat.metadata?.case_id && !isCaseDetailPage && (
+          <div className="bg-blue-50 border-b border-blue-100 p-2 flex items-center justify-between z-10 text-sm text-blue-900 animate-in fade-in slide-in-from-top-1">
+             <div className="flex items-center gap-2 pl-2">
+               <span className="font-semibold flex items-center gap-1.5"><FileText className="h-4 w-4" /> Case File</span>
+               <span className="text-blue-600/70 hidden sm:inline">- Review case details</span>
+             </div>
+             <Button asChild variant="outline" size="sm" className="h-8 text-xs border-blue-200 hover:bg-blue-100 text-blue-700 font-bold px-4 rounded-lg">
+               <Link href={`/dashboard/cases/${chat.metadata.case_id}`}>View Case</Link>
+             </Button>
+          </div>
+        )}
+
+        {/* Report Journey Banner - For survivors, hide if already on report page */}
+        {chat.metadata?.report_id && !isReportDetailPage && (
+          <div className="bg-teal-50 border-b border-teal-100 p-2 flex items-center justify-between z-10 text-sm text-teal-900 animate-in fade-in slide-in-from-top-1">
+             <div className="flex items-center gap-2 pl-2">
+               <span className="font-semibold flex items-center gap-1.5"><ShieldCheck className="h-4 w-4" /> Report Journey</span>
+               <span className="text-teal-600/70 hidden sm:inline">- Tracking your healing</span>
+             </div>
+             <Button asChild variant="outline" size="sm" className="h-8 text-xs border-teal-200 hover:bg-teal-100 text-teal-700 font-bold px-4 rounded-lg">
+               <Link href={`/dashboard/reports/${chat.metadata.report_id}`}>View Journey</Link>
+             </Button>
+          </div>
+        )}
 
        {/* Out of Office Warning */}
        {(otherParticipant?.user as any)?.out_of_office && (

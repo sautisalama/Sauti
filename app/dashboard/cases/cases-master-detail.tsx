@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { format } from "date-fns";
 import { createClient } from "@/utils/supabase/client";
 import { Tables } from "@/types/db-schema";
 
@@ -45,7 +46,7 @@ import { SereneBreadcrumb } from "@/components/ui/SereneBreadcrumb";
 import { useRouter } from "next/navigation";
 import { ChatWindow } from "@/components/chat/ChatWindow";
 import { CaseChatPanel } from "@/components/chat/CaseChatPanel";
-import { getCaseChat } from "@/app/actions/chat";
+import { getCaseChat, sendMessage } from "@/app/actions/chat";
 import { Chat } from "@/types/chat";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -116,11 +117,6 @@ export default function CasesMasterDetail({ userId }: { userId: string }) {
 	const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
 	const [isLoadingMessages, setIsLoadingMessages] = useState(false);
 	
-	// Acceptance Flow State
-	const [isAcceptanceDialogOpen, setIsAcceptanceDialogOpen] = useState(false);
-	const [isSchedulerOpen, setIsSchedulerOpen] = useState(false);
-	const [caseIdToAccept, setCaseIdToAccept] = useState<string | null>(null);
-
 	// Chat State
 	const [activeTab, setActiveTab] = useState<'details' | 'chat'>('details');
 	const [activeChat, setActiveChat] = useState<Chat | null>(null);
@@ -590,110 +586,31 @@ export default function CasesMasterDetail({ userId }: { userId: string }) {
 	};
 
     // Handle case acceptance trigger
-    const handleAcceptCase = (caseId: string) => {
-        setCaseIdToAccept(caseId);
-        setIsAcceptanceDialogOpen(true);
-    };
-
-    // Immediate "Meet Now" Acceptance
-    const handleMeetNow = async () => {
-        if (!caseIdToAccept) return;
-        
-        try {
-            setIsUpdatingStatus(true);
-            setIsAcceptanceDialogOpen(false);
-            
-            const selectedCase = cases.find(c => c.id === caseIdToAccept);
-            if (!selectedCase) return;
-
-            const survId = (selectedCase.survivor_id || selectedCase.report?.user_id) as string;
-
-            // 1. Update Match Status
-            const { error: matchError } = await supabase
-                .from("matched_services")
-                .update({
-                    match_status_type: "accepted",
-                    professional_accepted_at: new Date().toISOString(),
-                    survivor_accepted_at: new Date().toISOString(), // Instant acceptance
-                    updated_at: new Date().toISOString(),
-                })
-                .eq("id", caseIdToAccept);
-
-            if (matchError) throw matchError;
-            
-            // Mark case as exclusive to drop it from other professionals
-            await markCaseAsExclusive(selectedCase.report_id!, caseIdToAccept);
-
-            // 2. Create Instant Appointment
-            await createAppointment({
-                professional_id: userId,
-                survivor_id: survId,
-                matched_services: caseIdToAccept,
-                appointment_date: new Date().toISOString(),
-                duration_minutes: 60,
-                status: 'confirmed',
-                appointment_type: 'Immediate Consultation',
-                created_via: 'meet_now'
-            });
-
-            // 3. Update Local State
-            setCases((prev) =>
-                prev.map((c) =>
-                    c.id === caseIdToAccept
-                        ? {
-                                ...c,
-                                match_status_type: "accepted",
-                                appointments: [
-                                    ...(c.appointments || []),
-                                    {
-                                        id: 'new-instant',
-                                        appointment_id: 'new-instant',
-                                        appointment_date: new Date().toISOString(),
-                                        status: 'confirmed'
-                                    }
-                                ]
-                          }
-                        : c
-                )
-            );
-
-            toast({
-                title: "Case Accepted & Meeting Started",
-                description: "The case is now active. Switching to chat...",
-            });
-
-            // 4. Switch to Chat
-            setActiveTab('chat');
-            setSelectedId(caseIdToAccept);
-
-        } catch (error) {
-            console.error("Error in Meet Now:", error);
-            toast({
-                title: "Error",
-                description: "Failed to start immediate meeting.",
-                variant: "destructive"
-            });
-        } finally {
-            setIsUpdatingStatus(false);
-            setCaseIdToAccept(null);
+    const handleAcceptCase = (caseId: string, apptData?: any) => {
+        if (apptData) {
+            handleScheduleAndAccept(apptData, caseId);
+        } else {
+            setSelectedId(caseId);
         }
     };
 
-    // Scheduled Acceptance
-     const handleScheduleAndAccept = async (apptData: {
+    // Unified Acceptance & Scheduling Handler
+    const handleScheduleAndAccept = async (apptData: {
         date: Date;
         duration: number;
         type: string;
         notes?: string;
-    }) => {
-        if (!caseIdToAccept) return;
+    }, caseIdOverride?: string) => {
+        const targetCaseId = caseIdOverride || selectedId;
+        if (!targetCaseId) return;
 
         try {
             setIsUpdatingStatus(true);
-            const selectedCase = cases.find(c => c.id === caseIdToAccept);
+            const selectedCase = cases.find(c => c.id === targetCaseId);
             if (!selectedCase) return;
 
             const survId = (selectedCase.survivor_id || selectedCase.report?.user_id) as string;
+            const isMeetNow = apptData.type === 'meet-now';
 
             // 1. Update Match Status
             const { error: matchError } = await supabase
@@ -701,42 +618,45 @@ export default function CasesMasterDetail({ userId }: { userId: string }) {
                 .update({
                     match_status_type: "accepted",
                     professional_accepted_at: new Date().toISOString(),
+                    survivor_accepted_at: isMeetNow ? new Date().toISOString() : null,
                     updated_at: new Date().toISOString(),
                 })
-                .eq("id", caseIdToAccept);
+                .eq("id", targetCaseId);
 
             if (matchError) throw matchError;
             
-            // Mark case as exclusive to drop it from other professionals
-            await markCaseAsExclusive(selectedCase.report_id!, caseIdToAccept);
+            // Mark case as exclusive
+            if (selectedCase.report?.id) {
+                await markCaseAsExclusive(selectedCase.report.id, targetCaseId);
+            }
 
-            // 2. Create Scheduled Appointment (as a suggestion)
+            // 2. Create Appointment
             await createAppointment({
                 professional_id: userId,
                 survivor_id: survId,
-                matched_services: caseIdToAccept,
+                matched_services: targetCaseId,
                 appointment_date: apptData.date.toISOString(),
                 duration_minutes: apptData.duration,
-                status: 'requested', // Changed from 'confirmed'
-                appointment_type: apptData.type,
+                status: isMeetNow ? 'confirmed' : 'requested',
+                appointment_type: isMeetNow ? 'Immediate Consultation' : apptData.type,
                 notes: apptData.notes,
-                created_via: 'scheduled_acceptance'
+                created_via: isMeetNow ? 'meet_now' : 'scheduled_acceptance'
             });
 
             // 3. Update Local State
             setCases((prev) =>
                 prev.map((c) =>
-                    c.id === caseIdToAccept
+                    c.id === targetCaseId
                         ? {
                                 ...c,
                                 match_status_type: "accepted",
                                 appointments: [
                                     ...(c.appointments || []),
                                     {
-                                        id: 'new-suggested',
-                                        appointment_id: 'new-suggested',
+                                        id: 'new-' + Date.now(),
+                                        appointment_id: 'new-' + Date.now(),
                                         appointment_date: apptData.date.toISOString(),
-                                        status: 'requested'
+                                        status: isMeetNow ? 'confirmed' : 'requested'
                                     }
                                 ]
                           }
@@ -744,22 +664,40 @@ export default function CasesMasterDetail({ userId }: { userId: string }) {
                 )
             );
 
+            // 3. Send Initial Chat Message
+            try {
+                const chat = await getCaseChat(targetCaseId, survId);
+                const formattedDate = format(apptData.date, "EEEE, MMMM do 'at' h:mm a");
+                const messageContent = apptData.notes 
+                    ? `${apptData.notes}\n\n📅 **Scheduled Session:** ${formattedDate}`
+                    : `I've suggested a session for us on **${formattedDate}**. Looking forward to our coordination.`;
+                
+                await sendMessage(chat.id, messageContent);
+            } catch (chatError) {
+                console.error("Failed to send initial chat message:", chatError);
+                // Don't throw here, as the appointment was already created successfully
+            }
+
             toast({
-                title: "Schedule Suggested",
-                description: `We've sent your suggested time (${apptData.date.toLocaleString()}) to the survivor for confirmation.`,
+                title: isMeetNow ? "Meeting Started" : "Schedule Suggested",
+                description: isMeetNow 
+                    ? "The case is now active. Switching to chat..." 
+                    : `We've sent your suggested time to the survivor.`,
             });
 
+            if (isMeetNow) {
+                setActiveTab('chat');
+            }
+
         } catch (error) {
-            console.error("Error in Scheduled Acceptance:", error);
+            console.error("Error accepting case:", error);
             toast({
                 title: "Error",
-                description: "Failed to schedule and accept case.",
+                description: "Failed to accept case and suggest schedule.",
                 variant: "destructive"
             });
         } finally {
             setIsUpdatingStatus(false);
-            setIsSchedulerOpen(false);
-            setCaseIdToAccept(null);
         }
     };
 
@@ -1096,26 +1034,10 @@ export default function CasesMasterDetail({ userId }: { userId: string }) {
 				{/* Right column: Detail Panel or Calendar */}
 				<div
 					className={`flex-1 lg:flex-[5] xl:flex-[5] min-w-0 h-full overflow-y-auto overflow-x-hidden ${
-						mobileView !== "calendar" && !selected ? "hidden lg:block" : ""
+						mobileView !== "calendar" ? "hidden lg:block" : ""
 					}`}
 				>
-                    {selected ? (
-                        <div className="h-full animate-in fade-in slide-in-from-right-4 duration-300">
-                             <CaseDetailView 
-                                caseItem={selected}
-                                userId={userId}
-                                onCompleteCase={handleCompleteCase}
-                                onAcceptCase={handleAcceptCase}
-                                isUpdatingStatus={isUpdatingStatus}
-                                onClose={() => setSelectedId(null)}
-                                activeTab={activeTab}
-                                onTabChange={(tab) => setActiveTab(tab as any)}
-                                activeChat={activeChat}
-                                isChatLoading={isChatLoading}
-                            />
-                        </div>
-                    ) : (
-                        <div className="h-full pb-8">
+                    <div className="h-full pb-8">
                             <Card className="p-5 shadow-sm border-serene-neutral-200 rounded-2xl bg-white h-full flex flex-col">
                                 <div className="flex items-center justify-between mb-5">
                                     <div>
@@ -1393,68 +1315,30 @@ export default function CasesMasterDetail({ userId }: { userId: string }) {
                                 </div>
                             </Card>
                         </div>
-                    )}
 				</div>
 			</div>
 
-            {/* Acceptance Choice Dialog */}
-            <Dialog open={isAcceptanceDialogOpen} onOpenChange={setIsAcceptanceDialogOpen}>
-                <DialogContent className="sm:max-w-[400px] p-0 overflow-hidden rounded-3xl border-none shadow-2xl">
-                    <div className="bg-gradient-to-br from-teal-500 to-teal-600 p-8 text-white relative">
-                        <Zap className="absolute -top-4 -right-4 h-24 w-24 text-white/10" />
-                        <DialogHeader className="relative">
-                            <DialogTitle className="text-2xl font-bold tracking-tight">Accept Case Match</DialogTitle>
-                            <DialogDescription className="text-teal-100 font-medium">
-                                How would you like to proceed with this survivor?
-                            </DialogDescription>
-                        </DialogHeader>
-                    </div>
-                    <div className="p-6 grid gap-4">
-                        <Button 
-                            onClick={handleMeetNow}
-                            disabled={isUpdatingStatus}
-                            className="h-16 rounded-2xl bg-teal-600 hover:bg-teal-700 text-white shadow-lg shadow-teal-600/20 flex flex-col items-center justify-center gap-1 group transition-all active:scale-95"
-                        >
-                            <div className="flex items-center gap-2 font-bold text-lg">
-                                <Zap className="h-5 w-5 group-hover:animate-pulse" />
-                                Meet Now
-                            </div>
-                            <span className="text-[10px] opacity-80 font-medium uppercase tracking-widest">Immediate consultation & chat</span>
-                        </Button>
-                        
-                        <div className="relative py-2">
-                            <div className="absolute inset-0 flex items-center"><span className="w-full border-t border-slate-100" /></div>
-                            <div className="relative flex justify-center text-[10px] uppercase font-bold text-slate-400"><span className="bg-white px-2">or</span></div>
-                        </div>
-
-                        <Button 
-                            variant="outline"
-                            onClick={() => {
-                                setIsAcceptanceDialogOpen(false);
-                                setIsSchedulerOpen(true);
-                            }}
-                            disabled={isUpdatingStatus}
-                            className="h-16 rounded-2xl border-2 border-slate-100 hover:border-teal-200 hover:bg-teal-50/30 text-slate-600 flex flex-col items-center justify-center gap-1 transition-all active:scale-95"
-                        >
-                            <div className="flex items-center gap-2 font-bold text-lg">
-                                <Calendar className="h-5 w-5" />
-                                Schedule Later
-                            </div>
-                            <span className="text-[10px] opacity-80 font-medium uppercase tracking-widest">Pick a future date & time</span>
-                        </Button>
-                    </div>
-                </DialogContent>
-            </Dialog>
-
-            {/* Scheduler Modal */}
-            <EnhancedAppointmentScheduler 
-                isOpen={isSchedulerOpen}
-                onClose={() => setIsSchedulerOpen(false)}
-                onSchedule={handleScheduleAndAccept}
-                userId={userId}
-                professionalName="You"
-                serviceName={selected?.service_details?.name || "Support Service"}
-            />
+            {/* Overlay Detail Panel with animation */}
+			<div
+					className={`fixed inset-0 sm:inset-y-0 sm:right-0 sm:left-auto w-full sm:w-[600px] lg:w-[800px] bg-white shadow-2xl border-l border-serene-neutral-200 z-50 transform transition-transform duration-300 ease-out ${
+						selected
+							? "translate-y-0 sm:translate-x-0"
+							: "translate-y-full sm:translate-x-full"
+					}`}
+				>
+					{selected && (
+                        <CaseDetailView 
+                            caseItem={selected}
+                            userId={userId}
+                            onCompleteCase={handleCompleteCase}
+                            onAcceptCase={handleAcceptCase}
+                            isUpdatingStatus={isUpdatingStatus}
+                            onClose={() => setSelectedId(null)}
+                            activeChat={activeChat}
+                            isChatLoading={isChatLoading}
+                        />
+					)}
+			</div>
 		</div>
 	);
 }

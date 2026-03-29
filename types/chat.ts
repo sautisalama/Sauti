@@ -22,6 +22,7 @@ export interface ChatMetadata {
   match_id?: string;
   support_service_id?: string;
   pinned_message_ids?: string[];
+  report_id?: string;
   // Community-related fields
   is_community?: boolean;
   community_id?: string;

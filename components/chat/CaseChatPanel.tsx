@@ -139,7 +139,23 @@ export function CaseChatPanel({
         (payload) => {
           const newMsg = payload.new as Message;
           setMessages(prev => {
+            // Already in list?
             if (prev.find(m => m.id === newMsg.id)) return prev;
+
+            // If from current user, check if we can replace a temp message
+            if (newMsg.sender_id === currentUserId) {
+              const tempMessageIndex = prev.findIndex(m => 
+                m.id.startsWith('temp-') && 
+                m.content === newMsg.content
+              );
+              
+              if (tempMessageIndex !== -1) {
+                const updatedMessages = [...prev];
+                updatedMessages[tempMessageIndex] = newMsg;
+                return updatedMessages;
+              }
+            }
+
             return [...prev, newMsg];
           });
           scrollToBottom();
@@ -172,19 +188,40 @@ export function CaseChatPanel({
   };
 
   const handleSend = async () => {
-    if ((!inputText.trim() && !linkPreview) || sending || !chat) return;
-    setSending(true);
+    if ((!inputText.trim() && !linkPreview) || sending || !chat || !currentUserId) return;
+    
+    const tempId = `temp-${Date.now()}`;
+    const newMessage: Message = {
+      id: tempId,
+      chat_id: chat.id,
+      sender_id: currentUserId,
+      content: inputText,
+      type: 'text',
+      metadata: linkPreview ? { link_preview: linkPreview } : {},
+      created_at: new Date().toISOString(),
+      is_read: true
+    };
+
+    // Optimistic update
+    setMessages(prev => [...prev, newMessage]);
+    const previousInput = inputText;
+    const previousPreview = linkPreview;
+    
+    setInputText('');
+    setLinkPreview(null);
+    scrollToBottom();
 
     try {
-      const metadata = linkPreview ? { link_preview: linkPreview } : {};
-      await sendMessage(chat.id, inputText, 'text', metadata);
-      setInputText('');
-      setLinkPreview(null);
-      scrollToBottom();
+      const metadata = previousPreview ? { link_preview: previousPreview } : {};
+      await sendMessage(chat.id, previousInput, 'text', metadata);
     } catch (error) {
       console.error('Failed to send:', error);
+      // Rollback on error
+      setMessages(prev => prev.filter(m => m.id !== tempId));
+      setInputText(previousInput);
+      setLinkPreview(previousPreview);
     } finally {
-      setSending(false);
+      // No need to setSending(false) here as it's optimistic
     }
   };
 

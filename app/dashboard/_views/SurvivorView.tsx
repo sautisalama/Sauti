@@ -115,6 +115,63 @@ export default function SurvivorView({
 		return () => clearTimeout(timer);
 	}, []);
 
+	useEffect(() => {
+		const supabase = createClient();
+		const channel = supabase
+			.channel(`realtime_survivor_reports_${userId}`)
+			.on(
+				'postgres_changes',
+				{ event: '*', schema: 'public', table: 'reports', filter: `user_id=eq.${userId}` },
+				async (payload) => {
+					const targetId = payload.new ? (payload.new as any).report_id : (payload.old as any).report_id;
+					if (!targetId) return;
+					
+					const { data } = await supabase
+						.from('reports')
+						.select(`
+							*,
+							matched_services (
+								id,
+								match_status_type,
+								match_date,
+								match_score,
+								service_details:support_services (
+									id,
+									name,
+									service_types
+								),
+								appointments (
+									id,
+									appointment_date,
+									status,
+									professional_id,
+									survivor_id
+								)
+							)
+						`)
+						.eq('report_id', targetId)
+						.maybeSingle();
+
+					if (data) {
+						setReports((prev) => {
+							const exists = prev.some(r => r.report_id === data.report_id);
+							if (exists) {
+								return prev.map(r => r.report_id === data.report_id ? (data as any) : r);
+							} else {
+								return [data as any, ...prev].sort((a, b) => 
+									new Date(b.submission_timestamp || 0).getTime() - new Date(a.submission_timestamp || 0).getTime()
+								);
+							}
+						});
+					}
+				}
+			)
+			.subscribe();
+		return () => {
+			supabase.removeChannel(channel);
+		};
+	}, [userId]);
+
 	const filteredReports = useMemo(() => {
 		if (!searchQuery) return reports;
 		const q = searchQuery.toLowerCase();

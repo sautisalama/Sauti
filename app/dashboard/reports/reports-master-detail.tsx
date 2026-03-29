@@ -512,6 +512,111 @@ export default function ReportsMasterDetail({ userId }: { userId: string }) {
 		load();
 	}, [userId, supabase, dash?.data]);
 
+	useEffect(() => {
+		const channel = supabase
+			.channel(`realtime_reports_master_${userId}`)
+			.on(
+				'postgres_changes',
+				{ event: '*', schema: 'public', table: 'reports', filter: `user_id=eq.${userId}` },
+				async (payload) => {
+					const targetId = payload.new ? (payload.new as any).report_id : (payload.old as any).report_id;
+					if (!targetId) return;
+					refreshReport(targetId);
+				}
+			)
+			.on(
+				'postgres_changes',
+				{ event: '*', schema: 'public', table: 'matched_services' },
+				async (payload) => {
+					const reportId = (payload.new as any)?.report_id || (payload.old as any)?.report_id;
+					if (reportId) refreshReport(reportId);
+				}
+			)
+			.on(
+				'postgres_changes',
+				{ event: '*', schema: 'public', table: 'appointments' },
+				async (payload) => {
+					const matchedServiceId = (payload.new as any)?.matched_services || (payload.old as any)?.matched_services;
+					if (matchedServiceId) {
+						// Find which report this matched service belongs to
+						const report = reports.find(r => r.matched_services?.some(m => m.id === matchedServiceId));
+						if (report) refreshReport(report.report_id);
+					}
+				}
+			)
+			.subscribe();
+
+		const refreshReport = async (targetId: string) => {
+			const { data } = await supabase
+				.from('reports')
+				.select(`
+					*,
+					matched_services (
+						id,
+						match_status_type,
+						service_details:support_services (
+							id,
+							name,
+							phone_number,
+							email
+						),
+						hrd_details:profiles!matched_services_hrd_profile_id_fkey (
+							id,
+							first_name,
+							last_name,
+							email,
+							phone
+						),
+						appointments (
+							id,
+							appointment_id,
+							appointment_date,
+							status,
+							professional:profiles!appointments_professional_id_fkey (
+								id,
+								first_name,
+								last_name,
+								email
+							)
+						)
+					)
+				`)
+				.eq('report_id', targetId)
+				.maybeSingle();
+
+			if (data) {
+				const normalized = {
+					...data,
+					matched_services:
+						data.matched_services?.map((m: any) => ({
+							...m,
+							support_services: m.service_details || m.support_services || (m.hrd_details ? {
+								id: m.hrd_details.id,
+								name: `${m.hrd_details.first_name || ''} ${m.hrd_details.last_name || ''}`.trim() || 'HRD',
+								phone_number: m.hrd_details.phone,
+								email: m.hrd_details.email
+							} : null),
+						})) || [],
+				};
+
+				setReports((prev) => {
+					const exists = prev.some(r => r.report_id === normalized.report_id);
+					if (exists) {
+						return prev.map(r => r.report_id === normalized.report_id ? (normalized as any) : r);
+					} else {
+						return [normalized as any, ...prev].sort((a, b) => 
+							new Date(b.submission_timestamp || 0).getTime() - new Date(a.submission_timestamp || 0).getTime()
+						);
+					}
+				});
+			}
+		};
+
+		return () => {
+			supabase.removeChannel(channel);
+		};
+	}, [userId, supabase, reports]);
+
 	const filtered = useMemo(() => {
 		let filteredReports = reports;
 
@@ -958,13 +1063,21 @@ export default function ReportsMasterDetail({ userId }: { userId: string }) {
 
 							filtered.map((r) => {
 								const isActive = selected?.report_id === r.report_id;
+								const hasAccepted = r.matched_services?.some(m => m.match_status_type === 'accepted');
+								const hasCompleted = r.matched_services?.some(m => m.match_status_type === 'completed');
+								
+								let displayStatus = "pending";
+								if (hasCompleted) displayStatus = "completed";
+								else if (hasAccepted) displayStatus = "accepted";
+								else if (r.matched_services && r.matched_services.length > 0) displayStatus = "matched";
+
 								return (
 									<div key={r.report_id} className="transition-all duration-200 min-w-0">
 										<SereneReportCard
 											type={r.type_of_incident?.replace(/_/g, " ") || "Incident Report"}
 											date={formatDate(r.submission_timestamp)}
 											description={r.incident_description || ""}
-											status={r.matched_services && r.matched_services.length > 0 ? "matched" : "pending"}
+											status={displayStatus as any}
 											urgency={(r.urgency as any) || "low"}
 											matchesCount={r.matched_services?.length || 0}
 											active={isActive}

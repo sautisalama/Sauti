@@ -38,12 +38,12 @@ export function DashboardContent({ children }: DashboardContentProps) {
     !hasAcceptedPolicies ||
     ((profile.user_type === 'professional' || profile.user_type === 'ngo') && !profile.professional_title));
 
-  const showTopPadding = !isChat && !needsOnboarding;
+  const showTopPadding = !isChat && !needsOnboarding && !pathname?.includes("/dashboard/cases/") && !pathname?.includes("/dashboard/reports/") && !pathname?.includes("/dashboard/matches");
 
   // Bottom Nav (pb-24) is hidden on chat DETAIL (but shown on list)
   // and Appointment detail
   const isApptDetail = pathname?.includes("/appointment/");
-  const showBottomPadding = !isChatDetail && !isApptDetail;
+  const showBottomPadding = !isChatDetail && !isApptDetail && !pathname?.includes("/dashboard/cases/") && !pathname?.includes("/dashboard/reports/") && !pathname?.includes("/dashboard/matches");
 
 
 
@@ -62,7 +62,7 @@ export function DashboardContent({ children }: DashboardContentProps) {
                 showTopPadding ? "pt-16" : "", // 64px top bar
                 showBottomPadding ? "pb-24" : "" // Bottom nav spacing
             )}>
-                {!isChat && !needsOnboarding && (
+                {!isChat && !needsOnboarding && !pathname?.includes("/dashboard/cases/") && !pathname?.includes("/dashboard/reports/") && pathname !== "/dashboard/matches" && (
                     <DesktopHeader 
                         showSearch={true} 
                         showNotifications={true}
