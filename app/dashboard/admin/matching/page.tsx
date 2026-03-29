@@ -1,7 +1,5 @@
 import { getReportedCases, getProfessionalMatchStatus } from "./_actions";
 import VisualizerClientWrapper from "./_components/VisualizerClientWrapper";
-import { ArrowLeft } from "lucide-react";
-import Link from "next/link";
 
 export default async function MatchingVisualizerPage() {
     const cases = await getReportedCases();

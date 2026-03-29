@@ -21,9 +21,9 @@ import {
 
 import '@xyflow/react/dist/style.css';
 import dagre from 'dagre';
-import { simulateMatch } from '../_actions';
+import { simulateMatch, triggerCascadePhase } from '../_actions';
 import { CaseNode, StepNode, ServiceNode, EvaluationLogicNode, ScoringMatrixNode } from './CustomNodes';
-import { ShieldAlert, Activity, Play, X, Building2, Star, Target, Info, ArrowRight, Zap } from 'lucide-react';
+import { ShieldAlert, Activity, Play, X, Building2, Star, Target, Info, ArrowRight, Zap, Layers, AlertOctagon } from 'lucide-react';
 import { format } from 'date-fns';
 import Lottie from "lottie-react";
 import { useDashboardData } from "@/components/providers/DashboardDataProvider";
@@ -100,6 +100,7 @@ interface ReportedCase {
     first_name?: string | null;
     last_name?: string | null;
     label?: string;
+    requires_manual_review?: boolean | null;
 }
 
 
@@ -148,7 +149,8 @@ function VisualizerContent({ initialCases, initialProStatus }: { initialCases: R
                     incident: report.type_of_incident,
                     requiredServices: report.required_services,
                     label: (report as any).label || report.type_of_incident?.replace(/_/g, " ") || 'Survivor Report',
-                    subHeader: 'Report Origin'
+                    subHeader: 'Report Origin',
+                    requiresManualReview: (report as any).requires_manual_review,
                 }
             });
 
@@ -166,14 +168,14 @@ function VisualizerContent({ initialCases, initialProStatus }: { initialCases: R
                     id: logicNodeId,
                     type: 'logicNode',
                     position: { x: 0, y: 0 },
-                    data: { ...cand.cand, ...cand, proColor: color, proName: professionalName }
+                    data: { ...cand.cand, ...cand, proColor: color, proName: professionalName, breakdown: cand.breakdown }
                 });
 
                 initialNodes.push({
                     id: serviceNodeId,
                     type: 'serviceNode',
                     position: { x: 0, y: 0 },
-                    data: { ...cand.cand, ...cand, proColor: color, proName: professionalName }
+                    data: { ...cand.cand, ...cand, proColor: color, proName: professionalName, isFallback: cand.isFallback }
                 });
 
                 const isAccepted = cand.matchStatus === "accepted" || cand.matchStatus === "scheduled";
@@ -463,7 +465,10 @@ function VisualizerContent({ initialCases, initialProStatus }: { initialCases: R
                                 <div className={`font-black text-[14px] tracking-tight leading-tight mb-1 uppercase ${selectedCase === c.report_id ? 'text-serene-blue-950' : 'text-serene-neutral-900'}`}>Case #{c.report_id.slice(0, 8)}</div>
                                 <div className={`text-[11px] font-medium capitalize mb-3 line-clamp-1 ${selectedCase === c.report_id ? 'text-serene-blue-600' : 'text-serene-neutral-500'}`}>{c.type_of_incident ? c.type_of_incident.replace(/_/g, " ") : "Unknown"}</div>
                                 <div className={`flex justify-between items-center text-[9px] ${selectedCase === c.report_id ? 'text-serene-blue-600' : 'text-serene-neutral-400'}`}>
-                                    <span className="flex items-center gap-1.5 font-bold"><Activity className="w-3 h-3 opacity-50" /> {c.ismatched ? 'Matched' : 'Unmatched'}</span>
+                                    <span className="flex items-center gap-1.5 font-bold">
+                                            {c.requires_manual_review ? <AlertOctagon className="w-3 h-3 text-rose-500" /> : <Activity className="w-3 h-3 opacity-50" />}
+                                            {c.requires_manual_review ? <span className="text-rose-500">Needs Review</span> : c.ismatched ? 'Matched' : 'Unmatched'}
+                                        </span>
                                     <span className="font-medium opacity-60 uppercase">{c.submission_timestamp ? format(new Date(c.submission_timestamp), 'PP') : "No Date"}</span>
                                 </div>
                             </div>
@@ -628,6 +633,19 @@ function VisualizerContent({ initialCases, initialProStatus }: { initialCases: R
                     {selectedCase && (
                         <Panel position="top-right" className="flex gap-2">
                             <button onClick={() => runSimulation(selectedCase, true)} className="bg-white border-2 border-serene-neutral-100 hover:border-serene-blue-500 text-serene-blue-700 font-black px-6 py-3 rounded-2xl shadow-xl transition-all flex items-center gap-2 active:scale-95 uppercase tracking-widest text-[10px]"><Play className="w-4 h-4 fill-current" /> Initialize Engine</button>
+                            <button
+                                onClick={async () => {
+                                    try {
+                                        const result = await triggerCascadePhase(selectedCase);
+                                        if (result.status === 'cascade_triggered') {
+                                            runSimulation(selectedCase, true);
+                                        }
+                                    } catch (err) { console.error('Cascade trigger failed:', err); }
+                                }}
+                                className="bg-amber-50 border-2 border-amber-200 hover:border-amber-400 text-amber-700 font-black px-5 py-3 rounded-2xl shadow-xl transition-all flex items-center gap-2 active:scale-95 uppercase tracking-widest text-[10px]"
+                            >
+                                <Layers className="w-4 h-4" /> Trigger Cascade
+                            </button>
                         </Panel>
                     )}
 

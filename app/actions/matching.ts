@@ -2,9 +2,8 @@
 
 import { createClient } from '@/utils/supabase/server'
 import { revalidatePath } from 'next/cache'
-import { redirect } from 'next/navigation'
 import { MatchStatusType, TimeSlot } from '@/types/chat'
-import { Json } from '@/types/db-schema'
+import { matchReportWithServices } from './match-services'
 
 /**
  * Professional accepts a match request
@@ -72,7 +71,7 @@ export async function acceptMatchRequest(matchId: string, proposedTimes?: TimeSl
 /**
  * Professional rejects a match request
  * Transitions match from 'proposed' -> 'declined'
- * Triggers the matching engine to find the next best professional
+ * Automatically triggers re-matching to find the next best professional
  */
 export async function rejectMatchRequest(matchId: string, reason?: string) {
   const supabase = await createClient()
@@ -106,9 +105,16 @@ export async function rejectMatchRequest(matchId: string, reason?: string) {
     throw new Error('Failed to reject match')
   }
 
-  // TODO: Trigger matching engine again for this report to find next candidate
-  // This would be handled by a separate function or edge function
-  // await findNextMatch(match.report_id) 
+  // Trigger re-matching for this report at cascade level 1
+  // This ensures the next best candidate is found immediately
+  try {
+    if (match.report_id) {
+      await matchReportWithServices(match.report_id)
+    }
+  } catch (reMatchError) {
+    console.error(`Re-matching after decline failed for report ${match.report_id}:`, reMatchError)
+    // Don't throw — the decline itself succeeded
+  }
 
   revalidatePath('/dashboard/matches')
   revalidatePath('/dashboard/cases')
@@ -116,9 +122,9 @@ export async function rejectMatchRequest(matchId: string, reason?: string) {
 }
 
 /**
- * Survivor confirms the match and selected time
- * Transitions match from 'pending_survivor' -> 'accepted'
- * Creates the Chat room and Appointment
+ * Survivor confirms the match and selected time.
+ * Transitions match from 'pending_survivor' -> 'accepted'.
+ * Creates the Chat room, adds participants, and optionally creates an Appointment.
  */
 export async function confirmMatch(matchId: string, selectedTime?: TimeSlot) {
   const supabase = await createClient()
@@ -140,7 +146,8 @@ export async function confirmMatch(matchId: string, selectedTime?: TimeSlot) {
     .eq('survivor_id', user.id)
     .select(`
       *,
-      survivor:profiles!matched_services_survivor_id_fkey(id, first_name, last_name, avatar_url, anon_username, is_anonymous)
+      survivor:profiles!matched_services_survivor_id_fkey(id, first_name, last_name, avatar_url, anon_username, is_anonymous),
+      support_services:service_id!matched_services_service_id_fkey(id, name, user_id)
     `)
     .single()
 
@@ -154,6 +161,8 @@ export async function confirmMatch(matchId: string, selectedTime?: TimeSlot) {
     ? (survivorData?.anon_username ?? 'Anonymous') 
     : (survivorData?.first_name ?? 'Survivor');
 
+  const serviceData = match.support_services as unknown as { id: string, name: string | null, user_id: string | null } | null;
+
   const { data: chat, error: chatError } = await supabase
     .from('chats')
     .insert({
@@ -162,7 +171,7 @@ export async function confirmMatch(matchId: string, selectedTime?: TimeSlot) {
       match_id: match.id,
       metadata: {
         match_id: match.id,
-        service_name: (match as any).support_services?.name || 'Service',
+        service_name: serviceData?.name || 'Service',
         survivor_name: survivorName,
         case_id: match.id
       } as any
@@ -176,17 +185,20 @@ export async function confirmMatch(matchId: string, selectedTime?: TimeSlot) {
   }
 
   // 3. Add Participants
-  const participants = [
-    { chat_id: chat.id, user_id: match.survivor_id, status: { role: 'member' } as any },
-    { chat_id: chat.id, user_id: (match as any).support_services?.user_id, status: { role: 'admin' } as any }
-  ]
-  
-  const { error: partError } = await supabase
-    .from('chat_participants')
-    .insert(participants)
+  const professionalId = serviceData?.user_id;
+  if (professionalId) {
+    const participants = [
+      { chat_id: chat.id, user_id: match.survivor_id!, status: { role: 'member' } as any },
+      { chat_id: chat.id, user_id: professionalId!, status: { role: 'admin' } as any }
+    ]
+    
+    const { error: partError } = await supabase
+      .from('chat_participants')
+      .insert(participants)
 
-  if (partError) {
-    console.error('Failed to add participants:', partError)
+    if (partError) {
+      console.error('Failed to add participants:', partError)
+    }
   }
 
   // 4. Update match with chat_id
@@ -196,12 +208,12 @@ export async function confirmMatch(matchId: string, selectedTime?: TimeSlot) {
     .eq('id', matchId)
 
   // 5. Create appointment if time was selected
-  if (selectedTime) {
+  if (selectedTime && professionalId) {
     const { error: apptError } = await supabase
       .from('appointments')
       .insert({
         survivor_id: match.survivor_id,
-        professional_id: (match as any).support_services?.user_id,
+        professional_id: professionalId,
         matched_services: matchId,
         appointment_date: selectedTime.slot_start,
         duration_minutes: 60,
@@ -216,14 +228,16 @@ export async function confirmMatch(matchId: string, selectedTime?: TimeSlot) {
   }
 
   // 6. Notify professional
-  await supabase.from('notifications').insert({
-    user_id: (match as any).support_services?.user_id,
-    title: 'Match Confirmed',
-    message: 'A survivor has confirmed the match. You can now start chatting.',
-    type: 'match_confirmed',
-    link: `/dashboard/chat/${chat.id}`,
-    metadata: { match_id: matchId, chat_id: chat.id }
-  })
+  if (professionalId) {
+    await supabase.from('notifications').insert({
+      user_id: professionalId,
+      title: 'Match Confirmed',
+      message: 'A survivor has confirmed the match. You can now start chatting.',
+      type: 'match_confirmed',
+      link: `/dashboard/chat/${chat.id}`,
+      metadata: { match_id: matchId, chat_id: chat.id }
+    })
+  }
 
   // 7. Send system message to chat
   await supabase.from('messages').insert({
@@ -233,6 +247,103 @@ export async function confirmMatch(matchId: string, selectedTime?: TimeSlot) {
     type: 'system',
     metadata: {}
   })
+
+  revalidatePath('/dashboard')
+  revalidatePath('/dashboard/chat')
+  return { success: true, chatId: chat.id }
+}
+
+/**
+ * Creates a chat room for a match that was accepted via scheduling
+ * but didn't have a chat created yet.
+ * Called when professional accepts and schedules — enables chat immediately.
+ */
+export async function ensureChatForMatch(matchId: string) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('Unauthorized')
+
+  // Check if chat already exists
+  const { data: match } = await supabase
+    .from('matched_services')
+    .select(`
+      id, chat_id, survivor_id,
+      support_services:service_id!matched_services_service_id_fkey(id, name, user_id)
+    `)
+    .eq('id', matchId)
+    .single()
+
+  if (!match) throw new Error('Match not found')
+  if (match.chat_id) return { success: true, chatId: match.chat_id }
+
+  const serviceData = match.support_services as unknown as { id: string, name: string | null, user_id: string | null } | null;
+  const professionalId = serviceData?.user_id;
+
+  if (!professionalId) throw new Error('No professional linked to this match')
+
+  if (!match.survivor_id) throw new Error('No survivor linked to this match')
+
+  // Create the chat
+  const { data: chat, error: chatError } = await supabase
+    .from('chats')
+    .insert({
+      type: 'support_match',
+      created_by: match.survivor_id,
+      match_id: match.id,
+      metadata: {
+        match_id: match.id,
+        service_name: serviceData?.name || 'Service',
+        case_id: match.id,
+      } as any
+    })
+    .select()
+    .single()
+
+  if (chatError) {
+    console.error('Failed to create chat for match:', chatError)
+    throw new Error('Failed to create chat')
+  }
+
+  // Add participants
+  await supabase.from('chat_participants').insert([
+    { chat_id: chat.id, user_id: match.survivor_id!, status: { role: 'member' } as any },
+    { chat_id: chat.id, user_id: professionalId!, status: { role: 'admin' } as any }
+  ])
+
+  // Update match with chat_id
+  await supabase
+    .from('matched_services')
+    .update({ chat_id: chat.id })
+    .eq('id', matchId)
+
+  // System message
+  await supabase.from('messages').insert({
+    chat_id: chat.id,
+    sender_id: null,
+    content: 'This secure chat has been created for your case. All messages are confidential.',
+    type: 'system',
+    metadata: {}
+  })
+
+  // Notify both parties
+  await supabase.from('notifications').insert([
+    {
+      user_id: match.survivor_id,
+      title: 'Chat Available',
+      message: 'A secure chat has been set up with your matched professional.',
+      type: 'chat_created',
+      link: `/dashboard/chat/${chat.id}`,
+      metadata: { match_id: matchId, chat_id: chat.id }
+    },
+    {
+      user_id: professionalId,
+      title: 'Chat Available',
+      message: 'A secure chat has been set up with the matched survivor.',
+      type: 'chat_created',
+      link: `/dashboard/chat/${chat.id}`,
+      metadata: { match_id: matchId, chat_id: chat.id }
+    }
+  ])
 
   revalidatePath('/dashboard')
   revalidatePath('/dashboard/chat')
@@ -331,8 +442,6 @@ export async function respondToReschedule(matchId: string, accept: boolean, newT
       })
     }
   } else {
-    // Can't accommodate - keep as reschedule_requested or handle differently
-    // For now, we'll just update the notes
     await supabase
       .from('matched_services')
       .update({

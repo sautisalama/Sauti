@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import logo from "@/public/logo-small.png";
 import { usePathname, useRouter } from "next/navigation";
 import {
 	LayoutDashboard,
@@ -534,11 +535,10 @@ export function EnhancedSidebar({
 						{!isCollapsed && (
 						<Link href="/dashboard" className="flex items-center gap-3">
 							<Image
-								src="/logo-small.png"
+								src={logo}
 								alt="Sauti Salama"
-								width={32}
-								height={32}
-								className="rounded-lg"
+								priority
+								className="rounded-lg h-8 w-auto object-contain"
 							/>
 							<div>
 								<h2 className="text-lg font-bold text-sauti-blue">Sauti Salama</h2>
@@ -550,11 +550,10 @@ export function EnhancedSidebar({
 						{isCollapsed && (
 						<Link href="/dashboard" className="flex justify-center w-full">
 							<Image
-								src="/logo-small.png"
+								src={logo}
 								alt="Sauti Salama"
-								width={32}
-								height={32}
-								className="rounded-lg"
+								priority
+								className="rounded-lg h-8 w-auto object-contain"
 							/>
 						</Link>
 					)}

@@ -36,7 +36,11 @@ export function useRoleSwitcher() {
 		try {
 			const {
 				data: { user },
+				error: authError,
 			} = await supabase.auth.getUser();
+
+			if (authError) throw authError;
+			
 			if (!user) {
 				setIsLoading(false);
 				return;
@@ -52,8 +56,16 @@ export function useRoleSwitcher() {
 
 			if (error) throw error;
 			setRoleContext(data?.[0] || null);
-		} catch (error) {
-			console.error("Error loading role context:", error);
+		} catch (err: any) {
+			// Ignore abort/lock errors from Supabase which are common in Strict Mode
+			const isAborted = err?.name === 'AbortError' || 
+							 err?.message?.includes('aborted') || 
+							 err?.message?.includes('lock') ||
+							 err?.message?.includes('Lock');
+			
+			if (!isAborted) {
+				console.error("Error loading role context:", err);
+			}
 		} finally {
 			setIsLoading(false);
 		}

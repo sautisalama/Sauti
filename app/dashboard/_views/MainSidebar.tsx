@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
+import logo from "@/public/logo-small.png";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
@@ -108,11 +109,10 @@ export function MainSidebar() {
 				<div className="flex flex-col items-center gap-12 mx-6">
 					<Link href="/dashboard">
 						<Image
-							src="/logo-small.png"
+							src={logo}
 							alt="Sauti Salama"
-							width={30}
-							height={30}
-							className="w-7 h-10"
+							priority
+							className="w-7 h-auto object-contain"
 						/>
 					</Link>
 
@@ -198,11 +198,10 @@ export function MainSidebar() {
 				<div className="flex items-center justify-between px-4 py-3">
 					<Link href="/dashboard" className="flex items-center gap-2">
 						<Image
-							src="/logo-small.png"
+							src={logo}
 							alt="Sauti Salama"
-							width={28}
-							height={28}
-							className="w-7 h-7"
+							priority
+							className="w-7 h-auto object-contain"
 						/>
 						<span className="font-bold text-white text-sm">Sauti Salama</span>
 					</Link>

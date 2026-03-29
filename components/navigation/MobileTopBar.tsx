@@ -16,6 +16,7 @@ import { signOut } from "@/app/(auth)/actions/auth";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import Image from "next/image";
+import logo from "@/public/logo-small.png";
 import { useRoleSwitcher } from "@/hooks/useRoleSwitcher";
 import { Badge } from "@/components/ui/badge";
 import { NotificationDropdown } from "./NotificationDropdown";
@@ -59,11 +60,10 @@ export function MobileTopBar() {
       {/* Brand / Logo */}
       <Link href="/dashboard" className="flex items-center gap-2.5">
             <Image 
-                src="/logo-small.png" 
+                src={logo} 
                 alt="Sauti Salama" 
-                width={32} 
-                height={32} 
-                className="h-8 w-auto" 
+                priority
+                className="h-8 w-auto object-contain" 
             />
          <span className="font-bold text-base text-sauti-dark tracking-tight">Sauti Salama</span>
       </Link>
