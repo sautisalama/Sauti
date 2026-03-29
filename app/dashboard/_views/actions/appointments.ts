@@ -61,7 +61,7 @@ export async function fetchUserAppointments(
 // Update appointment status
 export async function updateAppointmentStatus(
 	appointmentId: string,
-	status: "confirmed" | "cancelled" | "completed"
+	status: "confirmed" | "requested" | "pending"
 ) {
 	const supabase = createClient();
 

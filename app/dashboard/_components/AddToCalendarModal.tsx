@@ -37,6 +37,8 @@ interface AddToCalendarModalProps {
 		professionalName?: string;
 		survivorName?: string;
 		serviceName?: string;
+		match_status_type?: string;
+		professional_accepted_at?: string;
 	};
 }
 

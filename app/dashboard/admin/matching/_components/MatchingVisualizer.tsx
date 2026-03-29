@@ -97,8 +97,9 @@ interface ReportedCase {
     urgency: string | null;
     ismatched: boolean | null;
     record_only: boolean | null;
-    first_name?: string;
-    last_name?: string;
+    first_name?: string | null;
+    last_name?: string | null;
+    label?: string;
 }
 
 
@@ -146,7 +147,7 @@ function VisualizerContent({ initialCases, initialProStatus }: { initialCases: R
                     urgency: report.urgency,
                     incident: report.type_of_incident,
                     requiredServices: report.required_services,
-                    label: report.label || 'Survivor Report',
+                    label: (report as any).label || report.type_of_incident?.replace(/_/g, " ") || 'Survivor Report',
                     subHeader: 'Report Origin'
                 }
             });
@@ -341,7 +342,7 @@ function VisualizerContent({ initialCases, initialProStatus }: { initialCases: R
             // Save new arrangement immediately for persistence
             if (selectedCase) {
                 const key = `ss_matching_positions_${selectedCase}`;
-                const positions = finalNodes.reduce((acc: any, n) => {
+                const positions = finalNodes.reduce<Record<string, { x: number, y: number }>>((acc, n) => {
                     acc[n.id] = n.position;
                     return acc;
                 }, {});
@@ -370,7 +371,7 @@ function VisualizerContent({ initialCases, initialProStatus }: { initialCases: R
         if (!selectedCase) return;
         const key = `ss_matching_positions_${selectedCase}`;
         const saved = localStorage.getItem(key);
-        const positions = saved ? JSON.parse(saved) : {};
+        const positions: Record<string, { x: number, y: number }> = saved ? JSON.parse(saved) : {};
         positions[node.id] = node.position;
         localStorage.setItem(key, JSON.stringify(positions));
     }, [selectedCase]);
@@ -522,7 +523,7 @@ function VisualizerContent({ initialCases, initialProStatus }: { initialCases: R
                     <div className="absolute inset-0 flex items-center justify-center bg-[#FAFAFA]/80 backdrop-blur-md z-[80]">
                         <div className="flex flex-col items-center gap-6 text-center">
                              <div className="h-64 w-64">
-                                <Lottie animationData={simulatingStep > 0 ? loadingHands : sandsOfTime} loop={true} />
+                                <Lottie animationData={(simulatingStep > 0 ? loadingHands : sandsOfTime) as any} loop={true} />
                              </div>
                              <div className="bg-white px-10 py-8 rounded-[40px] border border-serene-neutral-100 max-w-[320px] animate-in zoom-in duration-500">
                                 <h3 className="text-2xl font-black text-serene-blue-950 tracking-tighter leading-none mb-2 uppercase">Engine Processing</h3>
@@ -534,7 +535,7 @@ function VisualizerContent({ initialCases, initialProStatus }: { initialCases: R
                     <div className="absolute inset-0 flex items-center justify-center bg-[#FAFAFA] z-[90]">
                         <div className="flex flex-col items-center gap-8 max-w-md text-center p-12">
                             <div className="h-72 w-72">
-                                <Lottie animationData={errorRobot} loop={true} />
+                                <Lottie animationData={errorRobot as any} loop={true} />
                             </div>
                             <div>
                                 <h2 className="text-3xl font-black text-serene-blue-950 tracking-tight mb-4 uppercase">System Anomaly</h2>

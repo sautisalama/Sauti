@@ -33,8 +33,8 @@ export function AddToCalendarButton({
   const [isCreatingEvent, setIsCreatingEvent] = useState(false);
   const { toast } = useToast();
 
-  const appointmentDate = new Date(appointment.appointment_date);
-  const endDate = new Date(appointmentDate.getTime() + (60 * 60 * 1000)); // 1 hour duration
+  const appointmentDate = new Date(appointment.appointment_date || 0);
+  const endDate = new Date((appointmentDate.getTime() || 0) + (60 * 60 * 1000)); // 1 hour duration
 
   const calendarEvent: CalendarEvent = {
     title: `Appointment - ${appointment.matched_service?.service_details?.name || 'Healthcare Appointment'}`,

@@ -32,8 +32,8 @@ export function MatchCard({ match, onAccept }: MatchCardProps) {
 			await createMatchAppointment(
 				match.id,
 				appointmentDate,
-				match.service_details.user_id!,
-				match.report.user_id!
+				match.service_details?.user_id!,
+				match.report?.user_id!
 			);
 
 			toast({
@@ -57,7 +57,7 @@ export function MatchCard({ match, onAccept }: MatchCardProps) {
 		status: "declined" | "completed" | "cancelled"
 	) => {
 		try {
-			await updateMatchStatus(match.id, match.report.report_id, status);
+			await updateMatchStatus(match.id, match.report?.report_id!, status);
 			toast({
 				title: "Status updated",
 				description: `Match has been ${status}.`,
@@ -89,9 +89,9 @@ export function MatchCard({ match, onAccept }: MatchCardProps) {
           "bg-sauti-dark/10"
         )} />
 				<div className="flex justify-between items-start mb-4">
-					<div>
-						<h3 className="font-black text-lg text-sauti-dark tracking-tight">{match.service_details.name}</h3>
-						{match.service_details.service_types && (
+					<div className="min-w-0 flex-1">
+						<h3 className="font-black text-lg text-sauti-dark tracking-tight truncate">{match.service_details?.name || "Service Unavailable"}</h3>
+						{match.service_details?.service_types && (
 							<p className="text-sm text-gray-500">
 								Service Type: {match.service_details.service_types}
 							</p>
@@ -125,8 +125,8 @@ export function MatchCard({ match, onAccept }: MatchCardProps) {
 						)}
 					</div>
 				</div>
-				<p className="text-sm text-gray-600">
-					{match.report.incident_description || "No description provided"}
+				<p className="text-sm text-gray-600 line-clamp-2">
+					{match.report?.incident_description || "No description provided"}
 				</p>
 				<div className="mt-2 flex items-center justify-between">
 					<span

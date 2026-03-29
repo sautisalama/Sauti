@@ -80,8 +80,8 @@ export function VerificationQueue({ onRefresh }: VerificationQueueProps) {
 
 			if (servicesError) throw servicesError;
 
-			setPendingUsers(users || []);
-			setPendingServices(services || []);
+			setPendingUsers((users as unknown as PendingUser[]) || []);
+			setPendingServices((services as unknown as PendingService[]) || []);
 		} catch (error) {
 			console.error("Error loading pending verifications:", error);
 			toast({
@@ -115,8 +115,8 @@ export function VerificationQueue({ onRefresh }: VerificationQueueProps) {
 			const table = type === "user" ? "profiles" : "support_services";
 
 			// Update verification status
-			const { error: updateError } = await supabase
-				.from(table)
+			const { error: updateError } = await (supabase
+				.from(table as "profiles" | "support_services") as any)
 				.update({
 					verification_status: verificationStatus,
 					verification_notes: verificationNotes,
@@ -197,7 +197,8 @@ export function VerificationQueue({ onRefresh }: VerificationQueueProps) {
 		}
 	};
 
-	const formatDate = (dateString: string) => {
+	const formatDate = (dateString: string | null) => {
+		if (!dateString) return "N/A";
 		return new Date(dateString).toLocaleDateString("en-US", {
 			year: "numeric",
 			month: "short",
@@ -269,8 +270,8 @@ export function VerificationQueue({ onRefresh }: VerificationQueueProps) {
 											<CardTitle className="text-lg font-bold text-serene-neutral-900">
 												{user.first_name} {user.last_name}
 											</CardTitle>
-											<Badge className={getStatusColor(user.verification_status)}>
-												{user.verification_status.replace("_", " ")}
+											<Badge className={getStatusColor(user.verification_status || "pending")}>
+												{(user.verification_status || "pending").replace("_", " ")}
 											</Badge>
 										</div>
 										<CardDescription className="capitalize font-medium text-serene-neutral-500">
@@ -337,8 +338,8 @@ export function VerificationQueue({ onRefresh }: VerificationQueueProps) {
 									<CardHeader className="pb-3 bg-white border-b border-serene-neutral-100">
 										<div className="flex items-center justify-between">
 											<CardTitle className="text-lg font-bold text-serene-neutral-900">{service.name}</CardTitle>
-											<Badge className={getStatusColor(service.verification_status)}>
-												{service.verification_status.replace("_", " ")}
+											<Badge className={getStatusColor(service.verification_status || "pending")}>
+												{(service.verification_status || "pending").replace("_", " ")}
 											</Badge>
 										</div>
 										<CardDescription className="capitalize font-medium text-serene-neutral-500">
@@ -414,8 +415,8 @@ export function VerificationQueue({ onRefresh }: VerificationQueueProps) {
 							<div className="grid grid-cols-2 gap-4 text-sm">
 								<div>
 									<label className="font-medium text-gray-600">Status</label>
-									<Badge className={getStatusColor(selectedUser.verification_status)}>
-										{selectedUser.verification_status.replace("_", " ")}
+									<Badge className={getStatusColor(selectedUser.verification_status || "pending")}>
+										{(selectedUser.verification_status || "pending").replace("_", " ")}
 									</Badge>
 								</div>
 								<div>
@@ -491,8 +492,8 @@ export function VerificationQueue({ onRefresh }: VerificationQueueProps) {
 							<div className="grid grid-cols-2 gap-4 text-sm">
 								<div>
 									<label className="font-medium text-gray-600">Status</label>
-									<Badge className={getStatusColor(selectedService.verification_status)}>
-										{selectedService.verification_status.replace("_", " ")}
+									<Badge className={getStatusColor(selectedService.verification_status || "pending")}>
+										{(selectedService.verification_status || "pending").replace("_", " ")}
 									</Badge>
 								</div>
 								<div>

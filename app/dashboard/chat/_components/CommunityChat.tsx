@@ -8,7 +8,7 @@ import { EmojiPicker } from '@/components/chat/EmojiPicker';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Users, Settings, UserPlus, Send, Smile, Paperclip, Mic, ArrowLeft, Info, MoreVertical } from 'lucide-react';
-import { Message } from '@/types/chat';
+import { Message, transformMessage } from '@/types/chat';
 
 interface CommunityChatProps {
   communityId: string;
@@ -82,7 +82,7 @@ export default function CommunityChat({
           filter: `chat_id=eq.community-${communityId}`
         },
         (payload) => {
-          const newMsg = payload.new as Message;
+          const newMsg = transformMessage(payload.new);
           setMessages(prev => {
             if (prev.find(m => m.id === newMsg.id)) return prev;
             return [...prev, newMsg];
@@ -139,7 +139,7 @@ export default function CommunityChat({
         .limit(100);
       
       if (messagesData) {
-        setMessages(messagesData);
+        setMessages(messagesData.map(m => transformMessage(m)));
       }
     } catch (error) {
       console.error('Error loading community data:', error);

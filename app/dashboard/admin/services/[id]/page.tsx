@@ -52,40 +52,40 @@ import { performAdminAction } from "@/app/actions/admin-actions";
 type ReviewHistoryItem = {
     id: string;
     action_type: string;
-    created_at: string;
-    admin: { first_name: string; last_name: string };
-    details: { notes?: string };
+    created_at: string | null;
+    admin: { first_name: string | null; last_name: string | null } | null;
+    details: any;
     target_type?: string;
 };
 
 type ServiceItem = {
     id: string;
     user_id: string;
-    name: string;
-    service_types: string | string[];
-    verification_status: string;
-    verification_notes?: string;
-    created_at: string;
-    updated_at: string;
-    helpline?: string;
-    website?: string;
-    coverage_area_radius?: number;
-    description?: string;
+    name: string | null;
+    service_types: string | string[] | null;
+    verification_status: string | null;
+    verification_notes?: string | null;
+    created_at: string | null;
+    updated_at: string | null;
+    helpline?: string | null;
+    website?: string | null;
+    coverage_area_radius?: number | null;
+    description?: string | null;
     accreditation_files?: any;
     accreditation_files_metadata?: AccreditationDocument[];
-    latitude?: number;
-    longitude?: number;
+    latitude?: number | null;
+    longitude?: number | null;
 };
 
 type ProfileItem = {
     id: string;
-    first_name: string;
-    last_name: string;
-    email: string;
-    phone: string;
-    user_type: string;
-    professional_title?: string;
-    verification_status: string;
+    first_name: string | null;
+    last_name: string | null;
+    email: string | null;
+    phone: string | null;
+    user_type: string | null;
+    professional_title?: string | null;
+    verification_status: string | null;
 };
 
 export default function ServiceDetailPage() {
@@ -142,7 +142,7 @@ export default function ServiceDetailPage() {
             const { data: profileData, error: profileError } = await supabase
                 .from('profiles')
                 .select('id, first_name, last_name, email, phone, user_type, professional_title, verification_status')
-                .eq('id', serviceData.user_id)
+                .eq('id', serviceData.user_id || '')
                 .single();
 
             if (profileError) {
@@ -167,10 +167,11 @@ export default function ServiceDetailPage() {
                 .order('created_at', { ascending: false });
 
             // Parse Documents
-            const parsedService = {
+            const parsedService: ServiceItem = {
                 ...serviceData,
-                accreditation_files_metadata: parseDocuments(serviceData.accreditation_files, serviceData.accreditation_files_metadata)
-            };
+                updated_at: (serviceData as any).updated_at || (serviceData as any).verification_updated_at || serviceData.created_at,
+                accreditation_files_metadata: parseDocuments((serviceData as any).accreditation_files, serviceData.accreditation_files_metadata as any)
+            } as ServiceItem;
 
             setService(parsedService);
             setOwner(profileData);
@@ -294,13 +295,13 @@ export default function ServiceDetailPage() {
         <div className="max-w-7xl mx-auto p-4 md:p-8 lg:p-10 space-y-8 pb-32 bg-serene-neutral-50/30 min-h-screen">
             {/* Header */}
             <DetailHeader 
-                title={service.name}
-                type={Array.isArray(service.service_types) ? service.service_types[0] : service.service_types}
+                title={service.name || 'Untitled Service'}
+                type={(Array.isArray(service.service_types) ? service.service_types[0] : service.service_types) || 'Service'}
                 backUrl="/dashboard/admin/services"
-                status={service.verification_status}
-                onAction={(action) => openActionDialog(service.id, action, service.name)}
+                status={service.verification_status || 'pending'}
+                onAction={(action) => openActionDialog(service.id, action, service.name || 'Service')}
                 meta={[
-                    <span key="added" className="flex items-center gap-1.5"><Clock className="h-3.5 w-3.5" /> Added {new Date(service.created_at).toLocaleDateString()}</span>,
+                    <span key="added" className="flex items-center gap-1.5"><Clock className="h-3.5 w-3.5" /> Added {service.created_at ? new Date(service.created_at).toLocaleDateString() : "Recently"}</span>,
                     owner && (
                         <div 
                             key="owner"
@@ -308,7 +309,7 @@ export default function ServiceDetailPage() {
                             onClick={() => router.push(`/dashboard/admin/professionals/${owner.id}`)}
                         >
                             <Users className="h-3.5 w-3.5" />
-                            <span>Owned by {owner.first_name} {owner.last_name}</span>
+                            <span>Owned by {owner.first_name || 'Unknown'} {owner.last_name || ''}</span>
                             <ExternalLink className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity" />
                         </div>
                     )
@@ -463,11 +464,11 @@ export default function ServiceDetailPage() {
                                                                 {log.action_type.replace(/_/g, ' ')}
                                                             </p>
                                                             <span className="text-xs text-serene-neutral-400 font-medium whitespace-nowrap ml-4">
-                                                                {new Date(log.created_at).toLocaleString()}
+                                                                {log.created_at ? new Date(log.created_at).toLocaleString() : "Recently"}
                                                             </span>
                                                         </div>
                                                         <p className="text-sm text-serene-neutral-500 mb-3">
-                                                            Performed by <span className="font-semibold text-serene-neutral-700">{log.admin?.first_name} {log.admin?.last_name}</span>
+                                                            Performed by <span className="font-semibold text-serene-neutral-700">{log.admin?.first_name || "Admin"} {log.admin?.last_name || ""}</span>
                                                         </p>
                                                         {log.details?.notes && (
                                                             <div className="text-sm text-serene-neutral-700 bg-white p-3 rounded-xl border border-serene-neutral-100 italic relative">

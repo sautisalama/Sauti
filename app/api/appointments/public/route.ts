@@ -25,8 +25,9 @@ export async function POST(request: Request) {
       const { data: newProfile, error: profileError } = await supabase
         .from('profiles')
         .insert({
-          first_name: clientInfo.firstName,
-          last_name: clientInfo.lastName,
+          id: crypto.randomUUID(),
+          first_name: (clientInfo.firstName || '').substring(0, 100),
+          last_name: (clientInfo.lastName || '').substring(0, 100),
           email: clientInfo.email,
           phone: clientInfo.phone,
           user_type: 'survivor',
@@ -35,8 +36,8 @@ export async function POST(request: Request) {
         .select('id')
         .single();
 
-      if (profileError) {
-        throw profileError;
+      if (profileError || !newProfile) {
+        throw profileError || new Error('Failed to create survivor profile');
       }
 
       survivorId = newProfile.id;
@@ -59,8 +60,8 @@ export async function POST(request: Request) {
       .select()
       .single();
 
-    if (appointmentError) {
-      throw appointmentError;
+    if (appointmentError || !appointment) {
+      throw appointmentError || new Error('Failed to create appointment');
     }
 
     // Send notification email to professional

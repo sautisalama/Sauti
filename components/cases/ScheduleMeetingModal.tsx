@@ -105,10 +105,15 @@ export function ScheduleMeetingModal({
           .in('status', ['pending', 'confirmed']);
 
         if (appointments) {
-          const apptBlocks = appointments.map(apt => ({
-            start: new Date(apt.appointment_date),
-            end: new Date(new Date(apt.appointment_date).getTime() + (apt.duration_minutes || 60) * 60000)
-          }));
+          const apptBlocks = appointments
+            .filter(apt => apt.appointment_date !== null)
+            .map(apt => {
+              const startDate = new Date(apt.appointment_date as string);
+              return {
+                start: startDate,
+                end: new Date(startDate.getTime() + (apt.duration_minutes || 60) * 60000)
+              };
+            });
           setBlockedSlots(prev => [...prev, ...apptBlocks]);
         }
       } catch (error) {

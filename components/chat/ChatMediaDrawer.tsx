@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { X, Image as ImageIcon, FileText, Link as LinkIcon, Download, ExternalLink } from 'lucide-react';
 import { getChatMedia } from '@/app/actions/chat-media';
-import { Message } from '@/types/chat';
+import { Message, transformMessage } from '@/types/chat';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { format } from 'date-fns';
@@ -30,7 +30,7 @@ export function ChatMediaDrawer({ chatId, isOpen, onClose }: ChatMediaDrawerProp
     setLoading(true);
     try {
       const data = await getChatMedia(chatId, activeTab);
-      setItems(data as Message[]);
+      setItems((data || []).map(transformMessage));
     } finally {
       setLoading(false);
     }

@@ -9,6 +9,7 @@ import {
     profileRejectedEmail
 } from "@/lib/notifications/templates";
 import { revalidatePath } from "next/cache";
+import { Database } from "@/types/db-schema";
 
 export type AdminActionParams = {
     targetId: string;
@@ -33,11 +34,6 @@ export async function performAdminAction({ targetId, targetType, action, notes }
         verification_status: status,
         verification_notes: notes,
         verification_updated_at: new Date().toISOString(),
-        ...(action === 'verify' && targetType === 'profile' ? { 
-            isVerified: true,
-            admin_verified_by: user.id,
-            admin_verified_at: new Date().toISOString()
-        } : {}),
         reviewed_by: {
             reviewer_id: user.id,
             reviewed_at: new Date().toISOString(),
@@ -46,33 +42,45 @@ export async function performAdminAction({ targetId, targetType, action, notes }
         }
     };
 
+    if (action === 'verify' && targetType === 'profile') {
+        updatePayload.isVerified = true;
+        updatePayload.admin_verified_by = user.id;
+        updatePayload.admin_verified_at = new Date().toISOString();
+    }
+
     const table = targetType === 'profile' ? 'profiles' : 'support_services';
     const { error: updateError, data: updatedItem } = await supabase
         .from(table)
         .update(updatePayload)
         .eq('id', targetId)
-        .select('*') // Need data for notification
+        .select('*')
         .single();
 
     if (updateError) throw new Error(updateError.message);
 
     // 2. Fetch Owner/User for Notification
-    let ownerId = targetType === 'profile' ? targetId : updatedItem.user_id;
+    let ownerId: string | null = null;
     let ownerName = "";
+    
     if (targetType === 'profile') {
-        ownerName = updatedItem.first_name;
+        const profile = updatedItem as Database["public"]["Tables"]["profiles"]["Row"];
+        ownerId = targetId;
+        ownerName = profile.first_name || "Professional";
     } else {
-        // If service, fetch owner name just in case needed, or rely on service name
-        // Notifications service will fetch user profile for email
+        const service = updatedItem as Database["public"]["Tables"]["support_services"]["Row"];
+        ownerId = service.user_id;
+        ownerName = service.name || "Service";
     }
 
     // 3. Log Action
+    const dbActionType = `${action}_${targetType === 'profile' ? 'user' : 'service'}` as any;
+    
     await supabase.from('admin_actions').insert({
         admin_id: user.id,
-        action_type: `${action}_${targetType}`,
+        action_type: dbActionType,
         target_id: targetId,
         target_type: targetType === 'profile' ? 'user' : 'service',
-        details: { notes, previous_status: 'unknown' } // Simplified logging for now
+        details: { notes, previous_status: 'unknown' } as any
     });
 
     // 4. Send Notification
@@ -83,7 +91,7 @@ export async function performAdminAction({ targetId, targetType, action, notes }
     // Construct simplified message for In-App
     const notificationMessage = targetType === 'profile' 
         ? `Your profile verification status has been updated to ${status}.`
-        : `Your service "${updatedItem.name}" verification status has been updated to ${status}.`;
+        : `Your service "${ownerName}" verification status has been updated to ${status}.`;
 
     const notificationLink = targetType === 'profile' 
         ? '/dashboard/profile?section=account'
@@ -92,11 +100,11 @@ export async function performAdminAction({ targetId, targetType, action, notes }
     // Generate HTML Template
     let htmlContent = "";
     if (targetType === 'profile') {
-        if (action === 'verify') htmlContent = profileVerifiedEmail(updatedItem.first_name || 'Professional');
-        if (action === 'reject') htmlContent = profileRejectedEmail(updatedItem.first_name || 'Professional', notes || 'No specific feedback provided.');
+        if (action === 'verify') htmlContent = profileVerifiedEmail(ownerName);
+        if (action === 'reject') htmlContent = profileRejectedEmail(ownerName, notes || 'No specific feedback provided.');
     } else {
-        if (action === 'verify') htmlContent = serviceVerifiedEmail(updatedItem.name);
-        if (action === 'reject') htmlContent = serviceRejectedEmail(updatedItem.name, notes || 'No specific feedback provided.');
+        if (action === 'verify') htmlContent = serviceVerifiedEmail(ownerName);
+        if (action === 'reject') htmlContent = serviceRejectedEmail(ownerName, notes || 'No specific feedback provided.');
     }
 
     if (ownerId && (action === 'verify' || action === 'reject')) {

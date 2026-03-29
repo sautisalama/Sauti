@@ -19,7 +19,7 @@ interface Professional {
   last_name: string | null;
   avatar_url: string | null;
   professional_title: string | null;
-  user_type: string;
+  user_type: string | null;
 }
 
 interface SupportService {

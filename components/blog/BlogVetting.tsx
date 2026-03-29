@@ -17,7 +17,7 @@ interface Blog {
   excerpt?: string | null;
   cover_image_url?: string | null;
   created_at: string;
-  status: 'pending' | 'published' | 'rejected';
+  status: 'draft' | 'pending_review' | 'approved' | 'rejected' | 'published';
   author: {
     id: string;
     first_name: string | null;
@@ -38,7 +38,7 @@ export function BlogVetting({ reviewerId }: BlogVettingProps) {
   const [showRejectDialog, setShowRejectDialog] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [filterStatus, setFilterStatus] = useState<'pending' | 'all'>('pending');
+  const [filterStatus, setFilterStatus] = useState<'pending_review' | 'all'>('pending_review');
   const [expandedId, setExpandedId] = useState<string | null>(null);
   
   const supabase = createClient();
@@ -54,12 +54,12 @@ export function BlogVetting({ reviewerId }: BlogVettingProps) {
         .from('blogs')
         .select(`
           *,
-          author:profiles(id, first_name, last_name, avatar_url, professional_title)
+          author:profiles!blogs_author_id_fkey(id, first_name, last_name, avatar_url, professional_title)
         `)
         .order('created_at', { ascending: false });
 
-      if (filterStatus === 'pending') {
-        query = query.eq('status', 'pending');
+      if (filterStatus === 'pending_review') {
+        query = query.eq('status', 'pending_review');
       }
 
       const { data, error } = await query;
@@ -129,12 +129,14 @@ export function BlogVetting({ reviewerId }: BlogVettingProps) {
   };
 
   const statusColors = {
-    pending: 'bg-amber-100 text-amber-700 border-amber-200',
+    draft: 'bg-gray-100 text-gray-600 border-gray-200',
+    pending_review: 'bg-amber-100 text-amber-700 border-amber-200',
+    approved: 'bg-blue-100 text-blue-700 border-blue-200',
     published: 'bg-emerald-100 text-emerald-700 border-emerald-200',
     rejected: 'bg-red-100 text-red-700 border-red-200'
   };
 
-  const pendingCount = blogs.filter(b => b.status === 'pending').length;
+  const pendingCount = blogs.filter(b => b.status === 'pending_review').length;
 
   return (
     <div className="space-y-6">
@@ -156,10 +158,10 @@ export function BlogVetting({ reviewerId }: BlogVettingProps) {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => setFilterStatus(filterStatus === 'pending' ? 'all' : 'pending')}
+            onClick={() => setFilterStatus(filterStatus === 'pending_review' ? 'all' : 'pending_review')}
           >
             <Filter className="h-4 w-4 mr-1.5" />
-            {filterStatus === 'pending' ? 'Pending Only' : 'All Posts'}
+            {filterStatus === 'pending_review' ? 'Pending Only' : 'All Posts'}
           </Button>
         </div>
       </div>
@@ -225,7 +227,7 @@ export function BlogVetting({ reviewerId }: BlogVettingProps) {
                   </div>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
-                  {blog.status === 'pending' && (
+                  {blog.status === 'pending_review' && (
                     <>
                       <Button
                         size="sm"

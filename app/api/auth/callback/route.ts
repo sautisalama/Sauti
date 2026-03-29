@@ -2,8 +2,9 @@ import { NextResponse } from "next/server";
 // The client you created from the Server-Side Auth instructions
 import { createClient } from "@/utils/supabase/server";
 import { cookies, headers } from "next/headers";
-import { registerDevice, parseSettings } from "@/lib/user-settings";
+import { registerDevice, parseSettings, TrackedDevice } from "@/lib/user-settings";
 import { revalidatePath } from "next/cache";
+import { Json } from "@/types/db-schema";
 
 export async function GET(request: Request) {
 	const { searchParams, origin } = new URL(request.url);
@@ -58,10 +59,10 @@ export async function GET(request: Request) {
 
 			const settings = parseSettings(profile?.settings);
 			if (deviceId && settings.device_tracking_enabled !== false) {
-				const updatedDevices = registerDevice(profile?.devices, deviceId, userAgent);
+				const updatedDevices = registerDevice(profile?.devices as TrackedDevice[] | null, deviceId, userAgent);
 				await supabase
 					.from("profiles")
-					.update({ devices: updatedDevices })
+					.update({ devices: updatedDevices as unknown as Json })
 					.eq("id", user.id);
 			}
 			

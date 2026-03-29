@@ -47,10 +47,21 @@ import { useToast } from "@/hooks/use-toast";
 import { formatDistanceToNow } from "date-fns";
 import { cn } from "@/lib/utils";
 
+type MatchedCase = {
+	report_id: string;
+	type_of_incident: string | null;
+	urgency: string | null;
+	submission_timestamp: string | null;
+	ismatched: boolean | null;
+	latitude: number | null;
+	longitude: number | null;
+	matched_services?: { id: string; match_status_type: string | null }[];
+};
+
 export function AdminCasesTable() {
 	const router = useRouter();
-	const [cases, setCases] = useState<any[]>([]);
-	const [filteredCases, setFilteredCases] = useState<any[]>([]);
+	const [cases, setCases] = useState<MatchedCase[]>([]);
+	const [filteredCases, setFilteredCases] = useState<MatchedCase[]>([]);
 	const [isLoading, setIsLoading] = useState(true);
 	const [searchTerm, setSearchTerm] = useState("");
 	const [urgencyFilter, setUrgencyFilter] = useState("all");
@@ -110,7 +121,7 @@ export function AdminCasesTable() {
 		// Search filter (Case ID or Incident Type)
 		if (searchTerm) {
 			filtered = filtered.filter((c) =>
-				`${c.report_id} ${c.type_of_incident}`.toLowerCase().includes(searchTerm.toLowerCase())
+				`${c.report_id} ${c.type_of_incident || ''}`.toLowerCase().includes(searchTerm.toLowerCase())
 			);
 		}
 
@@ -127,7 +138,7 @@ export function AdminCasesTable() {
     const startIndex = (currentPage - 1) * itemsPerPage;
     const paginatedCases = filteredCases.slice(startIndex, startIndex + itemsPerPage);
 
-	const getUrgencyColor = (urgency: string) => {
+	const getUrgencyColor = (urgency: string | null) => {
 		switch (urgency?.toLowerCase()) {
 			case "high":
 				return "bg-red-50 text-red-700 border-red-100";
@@ -238,7 +249,7 @@ export function AdminCasesTable() {
 										    <TableCell className="py-4 text-sm text-serene-neutral-500">
 											    <div className="flex items-center gap-1.5">
                                                     <Clock className="w-3.5 h-3.5 opacity-50" />
-                                                    {formatDistanceToNow(new Date(c.submission_timestamp), { addSuffix: true })}
+                                                    {formatDistanceToNow(new Date(c.submission_timestamp || 0), { addSuffix: true })}
                                                 </div>
 										    </TableCell>
 										    <TableCell className="text-right py-4 pr-8">
@@ -302,7 +313,7 @@ export function AdminCasesTable() {
                                     </div>
                                     <div className="flex items-center justify-between mt-4 pt-3 border-t border-serene-neutral-50 text-[10px] text-serene-neutral-400">
                                         <div className="flex items-center gap-1.5 font-medium">
-                                            <Clock className="w-2.5 h-2.5" /> {formatDistanceToNow(new Date(c.submission_timestamp), { addSuffix: true })}
+                                            <Clock className="w-2.5 h-2.5" /> {formatDistanceToNow(new Date(c.submission_timestamp || 0), { addSuffix: true })}
                                         </div>
                                         <Button variant="ghost" size="sm" className="h-7 text-[10px] text-serene-blue-600 px-2 font-bold uppercase tracking-wider">
                                             Visualizer <ArrowRight className="ml-1 h-3 w-3" />

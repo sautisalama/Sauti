@@ -83,11 +83,15 @@ interface MatchedServiceItem {
 		category?: string | null;
 		organization_name?: string | null;
 	} | null;
-	appointments?: Array<{
+ 	appointments?: Array<{
 		id: string;
 		appointment_id: string;
-		appointment_date: string;
-		status: string;
+		appointment_date: string | null;
+		status: string | null;
+		professional?: {
+			first_name: string | null;
+			last_name: string | null;
+		} | null;
 	}>;
 }
 
@@ -211,7 +215,7 @@ export default function CasesMasterDetail({ userId }: { userId: string }) {
 				if (!mid) return;
 				const arr = apptByMatchId.get(mid) || [];
 				arr.push({
-					id: a.appointment_id || a.id,
+					id: a.appointment_id,
 					appointment_id: a.appointment_id,
 					appointment_date: a.appointment_date,
 					status: a.status,
@@ -228,8 +232,8 @@ export default function CasesMasterDetail({ userId }: { userId: string }) {
 					match_score: m.match_score ?? null,
 					completed_at: m.completed_at ?? null,
 					unread_messages: 0,
-					report: m.report,
-					service_details: m.service_details,
+					report: m.report as Tables<"reports">,
+					service_details: m.service_details as Tables<"support_services">,
 					notes: m.notes || null,
 					appointments: apptByMatchId.get(m.id) || [],
 				})
@@ -635,7 +639,7 @@ export default function CasesMasterDetail({ userId }: { userId: string }) {
     };
 
     // Scheduled Acceptance
-    const handleScheduleAndAccept = async (apptData: {
+     const handleScheduleAndAccept = async (apptData: {
         date: Date;
         duration: number;
         type: string;
@@ -1270,7 +1274,7 @@ export default function CasesMasterDetail({ userId }: { userId: string }) {
                                                                         {appt.case?.report?.first_name ? `${appt.case.report.first_name} ${appt.case.report.last_name || ''}` : "Secret Consultation"}
                                                                     </p>
                                                                     <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">
-                                                                        {new Date(appt.appointment_date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                                        {appt.appointment_date ? new Date(appt.appointment_date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "Time not set"}
                                                                     </p>
                                                                 </div>
                                                                 <Badge className={cn(
@@ -1295,7 +1299,11 @@ export default function CasesMasterDetail({ userId }: { userId: string }) {
                                                         const d = new Date(a.appointment_date);
                                                         return d > today && d <= nextWeek;
                                                     })
-                                                    .sort((a, b) => new Date(a.appointment_date).getTime() - new Date(b.appointment_date).getTime())
+                                                    .sort((a, b) => {
+                                                        const dateA = a.appointment_date ? new Date(a.appointment_date).getTime() : 0;
+                                                        const dateB = b.appointment_date ? new Date(b.appointment_date).getTime() : 0;
+                                                        return dateA - dateB;
+                                                    })
                                                     .slice(0, 3);
 
                                                 if (upcoming.length > 0) {
@@ -1317,9 +1325,9 @@ export default function CasesMasterDetail({ userId }: { userId: string }) {
                                                                                 {appt.case?.report?.first_name || "Secret Consultation"}
                                                                             </p>
                                                                             <div className="flex items-center gap-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">
-                                                                                <span>{new Date(appt.appointment_date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</span>
+                                                                                <span>{appt.appointment_date ? new Date(appt.appointment_date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : "Date not set"}</span>
                                                                                 <span>•</span>
-                                                                                <span>{new Date(appt.appointment_date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                                                                <span>{appt.appointment_date ? new Date(appt.appointment_date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "Time not set"}</span>
                                                                             </div>
                                                                         </div>
                                                                     </div>

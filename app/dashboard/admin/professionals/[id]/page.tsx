@@ -52,45 +52,45 @@ import { performAdminAction } from "@/app/actions/admin-actions";
 type ReviewHistoryItem = {
     id: string;
     action_type: string;
-    created_at: string;
-    admin: { first_name: string; last_name: string };
-    details: { notes?: string };
+    created_at: string | null;
+    admin: { first_name: string | null; last_name: string | null } | null;
+    details: any;
     target_type?: string;
 };
 
 type ServiceItem = {
     id: string;
-    name: string;
-    service_types: string | string[];
-    verification_status: string;
-    verification_notes?: string;
-    created_at: string;
-    updated_at: string;
-    helpline?: string;
-    website?: string;
-    coverage_area_radius?: number;
-    description?: string;
+    name: string | null;
+    service_types: string | string[] | null;
+    verification_status: string | null;
+    verification_notes?: string | null;
+    created_at: string | null;
+    updated_at: string | null;
+    helpline?: string | null;
+    website?: string | null;
+    coverage_area_radius?: number | null;
+    description?: string | null;
     accreditation_files?: any;
-    accreditation_files_metadata?: AccreditationDocument[];
-    latitude?: number;
-    longitude?: number;
+    accreditation_files_metadata?: AccreditationDocument[] | null;
+    latitude?: number | null;
+    longitude?: number | null;
 };
 
 type ProfileItem = {
     id: string;
-    first_name: string;
-    last_name: string;
-    email: string;
-    phone: string;
-    user_type: string;
-    professional_title?: string;
-    bio?: string;
-    verification_status: string;
-    verification_notes?: string;
-    created_at: string;
-    updated_at: string;
+    first_name: string | null;
+    last_name: string | null;
+    email: string | null;
+    phone: string | null;
+    user_type: string | null;
+    professional_title?: string | null;
+    bio?: string | null;
+    verification_status: string | null;
+    verification_notes?: string | null;
+    created_at: string | null;
+    updated_at: string | null;
     accreditation_files?: any;
-    accreditation_files_metadata?: AccreditationDocument[];
+    accreditation_files_metadata?: AccreditationDocument[] | null;
 };
 
 export default function ProfessionalDetailPage() {
@@ -176,13 +176,14 @@ export default function ProfessionalDetailPage() {
             // Parse Documents
             const parsedProfile = {
                 ...profileData,
-                accreditation_files_metadata: parseDocuments(profileData.accreditation_files, profileData.accreditation_files_metadata)
+                accreditation_files_metadata: parseDocuments(profileData.accreditation_files as any, profileData.accreditation_files_metadata as any)
             };
 
-            const parsedServices = servicesData?.map(s => ({
+            const parsedServices: ServiceItem[] = (servicesData || []).map(s => ({
                 ...s,
-                accreditation_files_metadata: parseDocuments(s.accreditation_files, s.accreditation_files_metadata)
-            })) || [];
+                updated_at: (s as any).updated_at || (s as any).verification_updated_at || s.created_at,
+                accreditation_files_metadata: parseDocuments((s as any).accreditation_files, s.accreditation_files_metadata as any)
+            })) as ServiceItem[];
 
             setProfile(parsedProfile);
             setServices(parsedServices);
@@ -315,7 +316,7 @@ export default function ProfessionalDetailPage() {
                 status={profile.verification_status}
                 onAction={(action) => openActionDialog(profile.id, 'profile', action, `${profile.first_name} ${profile.last_name}`)}
                 meta={[
-                    <span key="joined" className="flex items-center gap-1.5"><Clock className="h-3.5 w-3.5" /> Joined {new Date(profile.created_at).toLocaleDateString()}</span>
+                    <span key="joined" className="flex items-center gap-1.5"><Clock className="h-3.5 w-3.5" /> Joined {profile.created_at ? new Date(profile.created_at).toLocaleDateString() : "Recently"}</span>
                 ]}
             />
 
@@ -514,7 +515,7 @@ export default function ProfessionalDetailPage() {
                                                             <span className="text-xs font-bold text-serene-neutral-400 uppercase tracking-wider mb-1">Quick Actions</span>
                                                             <ActionButtons 
                                                                 status={service.verification_status}
-                                                                onAction={(action) => openActionDialog(service.id, 'service', action, service.name)}
+                                                                onAction={(action) => openActionDialog(service.id, 'service', action, service.name || 'Service')}
                                                                 size="sm"
                                                                 className="flex-col items-stretch w-full"
                                                             />
@@ -573,11 +574,11 @@ export default function ProfessionalDetailPage() {
                                                                 {log.action_type.replace(/_/g, ' ')}
                                                             </p>
                                                             <span className="text-xs text-serene-neutral-400 font-medium whitespace-nowrap ml-4">
-                                                                {new Date(log.created_at).toLocaleString()}
+                                                                {log.created_at ? new Date(log.created_at).toLocaleString() : "Recently"}
                                                             </span>
                                                         </div>
                                                         <p className="text-sm text-serene-neutral-500 mb-3">
-                                                            Performed by <span className="font-semibold text-serene-neutral-700">{log.admin?.first_name} {log.admin?.last_name}</span>
+                                                            Performed by <span className="font-semibold text-serene-neutral-700">{log.admin?.first_name || "Admin"} {log.admin?.last_name || ""}</span>
                                                         </p>
                                                         {log.details?.notes && (
                                                             <div className="text-sm text-serene-neutral-700 bg-white p-3 rounded-xl border border-serene-neutral-100 italic relative">

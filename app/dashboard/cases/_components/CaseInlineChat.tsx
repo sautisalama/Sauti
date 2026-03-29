@@ -6,7 +6,7 @@ import { MessageBubble } from '@/components/chat/MessageBubble';
 import { EmojiPicker } from '@/components/chat/EmojiPicker';
 import { Button } from '@/components/ui/button';
 import { Send, Smile, Paperclip, ChevronDown, ChevronUp, Loader2 } from 'lucide-react';
-import { Message } from '@/types/chat';
+import { Message, transformMessage } from '@/types/chat';
 
 interface CaseInlineChatProps {
   matchId: string;
@@ -105,7 +105,7 @@ export function CaseInlineChat({
           filter: `chat_id=eq.${chatId}`
         },
         (payload) => {
-          const newMsg = payload.new as Message;
+          const newMsg = transformMessage(payload.new);
           setMessages(prev => {
             if (prev.find(m => m.id === newMsg.id)) return prev;
             return [...prev, newMsg];
@@ -129,7 +129,7 @@ export function CaseInlineChat({
       .limit(50);
 
     if (data) {
-      setMessages(data);
+      setMessages(data.map(m => transformMessage(m)));
       scrollToBottom();
     }
   };

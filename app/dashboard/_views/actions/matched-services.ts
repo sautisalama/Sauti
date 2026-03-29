@@ -1,5 +1,7 @@
 import { createClient } from "@/utils/supabase/client";
-import { Tables } from "@/types/db-schema";
+import { Database, Tables } from "@/types/db-schema";
+
+type MatchStatus = Database["public"]["Enums"]["match_status_type"];
 
 export async function fetchMatchedServices(userId: string) {
 	const supabase = createClient();
@@ -25,7 +27,7 @@ export async function fetchMatchedServices(userId: string) {
 	return data || [];
 }
 
-async function updateReportMatchStatus(reportId: string, status: string) {
+async function updateReportMatchStatus(reportId: string, status: MatchStatus) {
 	const supabase = createClient();
 	
 	const { error } = await supabase

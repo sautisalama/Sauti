@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { Chat, Message, MessageType } from '@/types/chat';
+import { Chat, Message, MessageType, transformChat } from '@/types/chat';
 import { getMessages, sendMessage, markMessagesAsRead, getCaseChat } from '@/app/actions/chat';
 import { fetchLinkMetadata } from '@/app/actions/chat-media';
 import { createClient } from '@/utils/supabase/client';
@@ -97,7 +97,7 @@ export function CaseChatPanel({
             .single();
 
           if (chatData) {
-            setChat(chatData as Chat);
+            setChat(transformChat(chatData));
             const msgs = await getMessages(existingChatId);
             setMessages(msgs);
             markMessagesAsRead(existingChatId);

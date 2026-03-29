@@ -148,7 +148,7 @@ export async function matchReportWithServices(reportId: string, customClient?: S
 			...(services || []).map(s => ({
 				type: 'service' as const,
 				id: s.id,
-				name: s.name,
+				name: s.name || 'Service',
 				userId: s.user_id,
 				serviceTypes: [s.service_types],
 				profTitle: (s as any).profile?.professional_title,
@@ -197,7 +197,7 @@ export async function matchReportWithServices(reportId: string, customClient?: S
 			const matchReasons: string[] = [];
 
 			// A. Service Type Matching
-			const requiredBySurvivor = (report.required_services as string[]) || [];
+			const requiredBySurvivor = (report.required_services as string[] | null) || [];
 			const mapping = INCIDENT_SPECIALTY_MAP[report.type_of_incident || 'other'];
 			
 			const matchedTypes = cand.serviceTypes.filter(t => 
@@ -370,12 +370,12 @@ export async function matchReportWithServices(reportId: string, customClient?: S
 				description: (m.cand as any).bio || null,
 				notes: [(m.cand as any).city, (m.cand as any).country].filter(Boolean).join(", ") || null,
 				escalation_required: isChildCase,
-				support_service: (m.cand as any).serviceTypes[0] as any,
+				support_service: ((m.cand.serviceTypes[0] as string) || 'other') as any, // Cast to any to satisfy enum
 				survivor_id: report.user_id,
 				updated_at: new Date().toISOString(),
 			}));
 
-			const { error: matchError } = await supabase.from("matched_services").insert(matchInserts);
+			const { error: matchError } = await supabase.from("matched_services").insert(matchInserts as any);
 			if (matchError) throw matchError;
 
 			// 5. Notifications
@@ -386,12 +386,12 @@ export async function matchReportWithServices(reportId: string, customClient?: S
 						type: "match_found",
 						title: isChildCase ? "URGENT: Child Case Escalation" : "New Case Assignment",
 						message: isChildCase 
-							? `Mandatory alert: You have been matched with a child-related case (${report.type_of_incident}).`
-							: `You have been matched with a new case requiring ${m.cand.serviceTypes[0]} services.`,
+							? `Mandatory alert: You have been matched with a child-related case (${report.type_of_incident || 'incident'}).`
+							: `You have been matched with a new case requiring ${m.cand.serviceTypes[0] || 'support'} services.`,
 						link: "/dashboard/cases",
 						metadata: { report_id: reportId },
 						sendEmail: true,
-						emailHtml: matchFoundProfessionalEmail(m.cand.serviceTypes[0]),
+						emailHtml: matchFoundProfessionalEmail((m.cand.serviceTypes[0] as string) || 'Support'),
 					});
 				}
 			}
@@ -490,9 +490,11 @@ export async function matchProfessionalWithUnmatchedReports(professionalUserId: 
         // Filter out cases where the professional has already marked completion
         const trulyActiveMatches = (activeMatches || []).filter(m => {
             try {
-                if (m.feedback && m.feedback.startsWith('{')) {
+                if (m.feedback && typeof m.feedback === 'string' && m.feedback.startsWith('{')) {
                     const status = JSON.parse(m.feedback);
                     return !status.is_prof_complete;
+                } else if (m.feedback && typeof m.feedback === 'object') {
+                    return !(m.feedback as any).is_prof_complete;
                 }
             } catch (e) {}
             return true;

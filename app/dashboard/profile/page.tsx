@@ -215,7 +215,7 @@ export default function ProfilePage() {
 			</div>
 
             {/* Profile Verification Banner - Just below header */}
-            {(profile?.verification_status === 'rejected' || (profile as any)?.accreditation_notes) && (
+            {(profile?.verification_status === 'rejected' || (profile as any)?.verification_notes) && (
                  <div className="px-4 md:px-8 pt-4">
                      <div className="max-w-6xl mx-auto w-full">
                         <div className="bg-red-50 border border-red-100 rounded-2xl p-4 flex items-start gap-4 animate-in slide-in-from-top-2">

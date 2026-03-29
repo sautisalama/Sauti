@@ -1,11 +1,11 @@
 import { SupabaseClient } from "@supabase/supabase-js";
 
-export type VerificationStatus = 'pending' | 'verified' | 'rejected' | 'under_review' | 'suspended';
+export type VerificationStatus = 'pending' | 'verified' | 'rejected' | 'under_review' | 'suspended' | null;
 
 export interface VerificationDocument {
     title?: string;
     url: string;
-    status?: 'verified' | 'rejected' | 'pending';
+    status?: 'verified' | 'rejected' | 'pending' | 'under_review';
     notes?: string;
     // For service docs, we might have type/name
     name?: string;
@@ -24,6 +24,8 @@ export interface VerificationDocument {
     sourceId?: string;
     sourceName?: string;
     linked?: boolean;
+    // Index signature for JSON compatibility
+    [key: string]: string | number | boolean | null | undefined | VerificationDocument | VerificationDocument[];
 }
 
 /**

@@ -43,6 +43,7 @@ interface EnhancedAppointmentSchedulerProps {
   userId?: string;
   serviceName?: string;
   defaultAvailability?: string; // '24/7' or '8-5'
+  providerId?: string;
 }
 
 export function EnhancedAppointmentScheduler({
@@ -54,6 +55,7 @@ export function EnhancedAppointmentScheduler({
   userId,
   serviceName,
   defaultAvailability = "8-5",
+  providerId,
 }: EnhancedAppointmentSchedulerProps) {
   const [selectedDate, setSelectedDate] = useState<Date>();
   const [selectedTime, setSelectedTime] = useState<string>();
@@ -220,9 +222,9 @@ export function EnhancedAppointmentScheduler({
               onSelect={setSelectedDate}
               className="rounded-md border"
               disabled={(date) => 
-                date < new Date() || 
+                date.getTime() < new Date().setHours(0, 0, 0, 0) || 
                 (defaultAvailability !== '24/7' && isWeekend(date)) ||
-                date > new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // 30 days from now
+                date.getTime() > Date.now() + 30 * 24 * 60 * 60 * 1000 // 30 days from now
               }
             />
           </div>
@@ -323,6 +325,8 @@ export function EnhancedAppointmentScheduler({
           notes: lastScheduledAppointment.notes,
           professionalName: professionalName,
           serviceName: serviceName,
+          match_status_type: 'pending_survivor',
+          professional_accepted_at: new Date().toISOString(),
         }}
       />
     )}

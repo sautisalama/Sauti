@@ -173,3 +173,31 @@ export interface MatchedService {
     avatar_url?: string;
   };
 }
+// Transformation utilities for Supabase JSONB fields
+export function transformChat(data: any): Chat {
+  return {
+    ...data,
+    metadata: (data.metadata || {}) as ChatMetadata,
+    participants: data.participants?.map((p: any) => ({
+      ...p,
+      status: (p.status || {}) as ParticipantStatus,
+      user: p.user ? {
+        id: p.user.id,
+        first_name: p.user.first_name || '',
+        last_name: p.user.last_name || '',
+        avatar_url: p.user.avatar_url || '',
+        isVerified: p.user.isVerified
+      } : undefined
+    }))
+  };
+}
+
+export function transformMessage(data: any): Message {
+  return {
+    ...data,
+    metadata: (data.metadata || {}) as MessageMetadata,
+    attachments: (data.attachments as unknown as Attachment[]) || null,
+    reactions: (data.reactions || {}) as MessageReactions,
+    read_by: (data.read_by as unknown as ReadReceipt[]) || undefined
+  };
+}

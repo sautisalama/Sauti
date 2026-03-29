@@ -141,10 +141,13 @@ export async function fetchDashboardData(): Promise<AggregatedDashboardData | nu
 					)
 					.eq("id", userId)
 					.single();
-				const docs = data?.accreditation_files_metadata
-					? Array.isArray(data.accreditation_files_metadata)
-						? data.accreditation_files_metadata
-						: JSON.parse(data.accreditation_files_metadata)
+				const metadata = data?.accreditation_files_metadata;
+				const docs = metadata
+					? Array.isArray(metadata)
+						? metadata
+						: typeof metadata === 'string'
+							? JSON.parse(metadata)
+							: metadata
 					: [];
 				return {
 					overallStatus: data?.verification_status || "pending",

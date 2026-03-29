@@ -1,7 +1,7 @@
 'use server';
 
 import { createClient } from '@/utils/supabase/server';
-import { Chat, Message, ChatType, MessageType } from '@/types/chat';
+import { Chat, Message, ChatType, MessageType, transformChat, transformMessage, MessageReactions } from '@/types/chat';
 
 export async function getChats() {
   const supabase = await createClient();
@@ -22,8 +22,7 @@ export async function getChats() {
 
   if (error) throw error;
   
-  // Filter client-side if needed or rely on RLS (RLS is safer)
-  return data as Chat[];
+  return (data || []).map(transformChat);
 }
 
 export async function getMessages(chatId: string, limit = 50, before?: string) {
@@ -46,7 +45,7 @@ export async function getMessages(chatId: string, limit = 50, before?: string) {
   const { data, error } = await query;
   if (error) throw error;
 
-  return (data as Message[]).reverse(); // Return in chronological order for UI
+  return (data || []).map(transformMessage).reverse(); // Return in chronological order for UI
 }
 
 export async function addMessageReaction(messageId: string, emoji: string) {
@@ -63,7 +62,7 @@ export async function addMessageReaction(messageId: string, emoji: string) {
 
   if (fetchError) throw fetchError;
 
-  const currentReactions = message.reactions || {};
+  const currentReactions = (message.reactions as unknown as MessageReactions) || {};
   
   // Toggle reaction: if exists, remove it; if not, add/update it
   if (currentReactions[user.id] === emoji) {
@@ -112,14 +111,14 @@ export async function sendMessage(chatId: string, content: string, type: Message
       sender_id: user.id,
       content,
       type,
-      metadata,
-      attachments
+      metadata: metadata as any,
+      attachments: attachments as any
     })
     .select()
     .single();
 
   if (error) throw error;
-  return data as Message;
+  return transformMessage(data);
 }
 
 export async function createChat(participantIds: string[], type: ChatType = 'dm', initialMessage?: string) {
@@ -225,7 +224,7 @@ export async function getCaseChat(caseId: string, survivorId: string) {
   const foundChat = existingChats?.[0];
 
   if (foundChat) {
-    return foundChat as Chat;
+    return transformChat(foundChat);
   }
 
   // 2. Create new chat if not found
@@ -277,5 +276,5 @@ export async function getCaseChat(caseId: string, survivorId: string) {
 
   if (fetchError) throw fetchError;
 
-  return fullChat as Chat;
+  return transformChat(fullChat);
 }

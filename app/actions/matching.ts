@@ -4,6 +4,7 @@ import { createClient } from '@/utils/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { MatchStatusType, TimeSlot } from '@/types/chat'
+import { Json } from '@/types/db-schema'
 
 /**
  * Professional accepts a match request
@@ -32,7 +33,8 @@ export async function acceptMatchRequest(matchId: string, proposedTimes?: TimeSl
     throw new Error('Match not found')
   }
 
-  if (match.support_services?.user_id !== user.id) {
+  const supportService = match.support_services as unknown as { user_id: string } | null;
+  if (supportService?.user_id !== user.id) {
     throw new Error('Unauthorized - not the service owner')
   }
   
@@ -41,7 +43,7 @@ export async function acceptMatchRequest(matchId: string, proposedTimes?: TimeSl
     .update({ 
       match_status_type: 'pending_survivor',
       professional_accepted_at: new Date().toISOString(),
-      proposed_meeting_times: proposedTimes || [],
+      proposed_meeting_times: (proposedTimes || []) as any,
       updated_at: new Date().toISOString()
     })
     .eq('id', matchId)
@@ -138,8 +140,7 @@ export async function confirmMatch(matchId: string, selectedTime?: TimeSlot) {
     .eq('survivor_id', user.id)
     .select(`
       *,
-      profiles:survivor_id(id, first_name, last_name, avatar_url, anon_username, is_anonymous),
-      support_services:service_id(id, name, user_id, service_types)
+      survivor:profiles!matched_services_survivor_id_fkey(id, first_name, last_name, avatar_url, anon_username, is_anonymous)
     `)
     .single()
 
@@ -148,9 +149,10 @@ export async function confirmMatch(matchId: string, selectedTime?: TimeSlot) {
   }
 
   // 2. Create Chat Room
-  const survivorName = match.profiles?.is_anonymous 
-    ? (match.profiles?.anon_username || 'Anonymous') 
-    : match.profiles?.first_name
+  const survivorData = match.survivor as unknown as { first_name: string | null, last_name: string | null, anon_username: string | null, is_anonymous: boolean | null };
+  const survivorName = survivorData?.is_anonymous 
+    ? (survivorData?.anon_username ?? 'Anonymous') 
+    : (survivorData?.first_name ?? 'Survivor');
 
   const { data: chat, error: chatError } = await supabase
     .from('chats')
@@ -160,10 +162,10 @@ export async function confirmMatch(matchId: string, selectedTime?: TimeSlot) {
       match_id: match.id,
       metadata: {
         match_id: match.id,
-        service_name: match.support_services?.name,
+        service_name: (match as any).support_services?.name || 'Service',
         survivor_name: survivorName,
         case_id: match.id
-      }
+      } as any
     })
     .select()
     .single()
@@ -175,8 +177,8 @@ export async function confirmMatch(matchId: string, selectedTime?: TimeSlot) {
 
   // 3. Add Participants
   const participants = [
-    { chat_id: chat.id, user_id: match.survivor_id, status: { role: 'member' } },
-    { chat_id: chat.id, user_id: match.support_services?.user_id, status: { role: 'admin' } }
+    { chat_id: chat.id, user_id: match.survivor_id, status: { role: 'member' } as any },
+    { chat_id: chat.id, user_id: (match as any).support_services?.user_id, status: { role: 'admin' } as any }
   ]
   
   const { error: partError } = await supabase
@@ -199,7 +201,7 @@ export async function confirmMatch(matchId: string, selectedTime?: TimeSlot) {
       .from('appointments')
       .insert({
         survivor_id: match.survivor_id,
-        professional_id: match.support_services?.user_id,
+        professional_id: (match as any).support_services?.user_id,
         matched_services: matchId,
         appointment_date: selectedTime.slot_start,
         duration_minutes: 60,
@@ -215,7 +217,7 @@ export async function confirmMatch(matchId: string, selectedTime?: TimeSlot) {
 
   // 6. Notify professional
   await supabase.from('notifications').insert({
-    user_id: match.support_services?.user_id,
+    user_id: (match as any).support_services?.user_id,
     title: 'Match Confirmed',
     message: 'A survivor has confirmed the match. You can now start chatting.',
     type: 'match_confirmed',
@@ -253,7 +255,7 @@ export async function requestReschedule(matchId: string, preferredTimes: TimeSlo
     .from('matched_services')
     .update({
       match_status_type: 'reschedule_requested',
-      proposed_meeting_times: preferredTimes,
+      proposed_meeting_times: preferredTimes as any,
       description: reason ? `Reschedule requested: ${reason}` : 'Reschedule requested by survivor',
       updated_at: new Date().toISOString()
     })
@@ -261,7 +263,7 @@ export async function requestReschedule(matchId: string, preferredTimes: TimeSlo
     .eq('survivor_id', user.id)
     .select(`
       id,
-      support_services:service_id(user_id)
+      support_services:service_id!matched_services_service_id_fkey(user_id)
     `)
     .single()
 
@@ -304,7 +306,7 @@ export async function respondToReschedule(matchId: string, accept: boolean, newT
       .from('matched_services')
       .update({
         match_status_type: 'pending_survivor',
-        proposed_meeting_times: [newTime],
+        proposed_meeting_times: [newTime] as any,
         updated_at: new Date().toISOString()
       })
       .eq('id', matchId)
@@ -354,18 +356,18 @@ export async function getMatchDetails(matchId: string) {
     .from('matched_services')
     .select(`
       *,
-      survivor:profiles!survivor_id(id, first_name, last_name, avatar_url, anon_username, is_anonymous),
-      report:reports!report_id(report_id, type_of_incident, urgency, first_name),
-      support_services:service_id(
+      survivor:profiles!matched_services_survivor_id_fkey(id, first_name, last_name, avatar_url, anon_username, is_anonymous),
+      report:reports!matched_services_report_id_fkey(report_id, type_of_incident, urgency, first_name),
+      support_services:service_id!matched_services_service_id_fkey(
         id, 
         name, 
         service_types, 
         user_id,
         email,
         phone_number,
-        professional:profiles!user_id(id, first_name, last_name, avatar_url, professional_title)
+        professional:profiles!support_services_user_id_fkey(id, first_name, last_name, avatar_url, professional_title)
       ),
-      chat:chats!chat_id(id, type, last_message_at),
+      chat:chats!matched_services_chat_id_fkey(id, type, last_message_at),
       appointments(appointment_id, appointment_date, status, duration_minutes)
     `)
     .eq('id', matchId)
@@ -394,9 +396,9 @@ export async function getUserMatches(status?: MatchStatusType) {
     .from('matched_services')
     .select(`
       *,
-      survivor:profiles!survivor_id(id, first_name, last_name, avatar_url, anon_username, is_anonymous),
-      support_services:service_id(id, name, service_types, user_id),
-      report:reports!report_id(type_of_incident, urgency)
+      survivor:profiles!matched_services_survivor_id_fkey(id, first_name, last_name, avatar_url, anon_username, is_anonymous),
+      support_services:service_id!matched_services_service_id_fkey(id, name, service_types, user_id),
+      report:reports!matched_services_report_id_fkey(type_of_incident, urgency)
     `)
     .or(`survivor_id.eq.${user.id},support_services.user_id.eq.${user.id}`)
     .order('match_date', { ascending: false })

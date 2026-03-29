@@ -57,7 +57,13 @@ export function ChatSidebar({ chats, selectedChatId, onSelectChat, isLoading, cu
             .order('created_at', { ascending: false });
           
           if (!error && data) {
-            setCommunities(data);
+            setCommunities(data.map(c => ({
+              ...c,
+              is_public: !!c.is_public,
+              member_count: c.member_count || 0,
+              created_at: c.created_at || new Date().toISOString(),
+              creator_id: c.creator_id || ''
+            })));
           }
         } catch (e) {
           console.error('Error fetching communities:', e);

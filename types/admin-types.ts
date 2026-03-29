@@ -67,30 +67,30 @@ export interface AdminStats {
 
 export interface PendingUser {
 	id: string;
-	first_name: string;
-	last_name: string;
-	user_type: "professional" | "ngo" | "survivor";
-	verification_status: VerificationStatus;
-	verification_notes?: string;
-	accreditation_files_metadata?: FileMetadata[];
+	first_name: string | null;
+	last_name: string | null;
+	user_type: "professional" | "ngo" | "survivor" | null;
+	verification_status: VerificationStatus | null;
+	verification_notes?: string | null;
+	accreditation_files_metadata?: FileMetadata[] | null;
 
-	created_at: string;
-	verification_updated_at: string;
+	created_at: string | null;
+	verification_updated_at: string | null;
 }
 
 export interface PendingService {
 	id: string;
 	name: string;
-	service_types: string;
-	verification_status: VerificationStatus;
-	verification_notes?: string;
-	accreditation_files_metadata?: FileMetadata[];
+	service_types: string | null;
+	verification_status: VerificationStatus | null;
+	verification_notes?: string | null;
+	accreditation_files_metadata?: FileMetadata[] | null;
 
-	created_at: string;
-	verification_updated_at: string;
-	latitude?: number;
-	longitude?: number;
-	coverage_area_radius?: number;
+	created_at: string | null;
+	verification_updated_at: string | null;
+	latitude?: number | null;
+	longitude?: number | null;
+	coverage_area_radius?: number | null;
 }
 
 export interface User {

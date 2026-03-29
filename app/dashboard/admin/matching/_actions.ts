@@ -2,14 +2,15 @@
 
 import { createClient } from "@/utils/supabase/server";
 import { Database } from "@/types/db-schema";
-import { createClient as createAdminClient } from "@supabase/supabase-js";
+import { SupabaseClient, createClient as createAdminClient } from "@supabase/supabase-js";
+import { Tables } from "@/types/db-schema";
 
-let _supabaseAdmin: any = null;
+let _supabaseAdmin: SupabaseClient<Database> | null = null;
 
-function getSupabaseAdmin() {
+function getSupabaseAdmin(): SupabaseClient<Database> {
     if (_supabaseAdmin) return _supabaseAdmin;
     
-    _supabaseAdmin = createAdminClient(
+    _supabaseAdmin = createAdminClient<Database>(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
         process.env.NEXT_PUBLIC_SERVICE_ROLE_KEY!,
         {
@@ -109,7 +110,7 @@ export async function getProfessionalMatchStatus() {
         const { data: services, error: serviceError } = await getSupabaseAdmin()
             .from("support_services")
             .select("id, user_id, name, service_types, verification_status")
-            .in("user_id", profiles.map((p: any) => p.id));
+            .in("user_id", profiles.map(p => p.id));
 
         if (serviceError) throw serviceError;
 
@@ -122,10 +123,10 @@ export async function getProfessionalMatchStatus() {
         if (matchError) throw matchError;
 
         // 4. Combine data
-        const professionalStatus = profiles.map((profile: any) => {
-            const profServices = services.filter((s: any) => s.user_id === profile.id);
-            const profMatches = matches.filter((m: any) => 
-                profServices.some((s: any) => s.id === m.service_id) || 
+        const professionalStatus = profiles.map(profile => {
+            const profServices = (services || []).filter(s => s.user_id === profile.id);
+            const profMatches = (matches || []).filter(m => 
+                profServices.some(s => s.id === m.service_id) || 
                 m.hrd_profile_id === profile.id
             );
 
@@ -135,7 +136,7 @@ export async function getProfessionalMatchStatus() {
                 title: profile.professional_title,
                 verification: profile.verification_status,
                 outOfOffice: profile.out_of_office,
-                services: profServices.map((s: any) => ({
+                services: profServices.map(s => ({
                     id: s.id,
                     name: s.name,
                     types: [s.service_types],
@@ -164,11 +165,11 @@ export async function simulateMatch(reportId: string) {
 
     if (reportError || !report) throw new Error("Failed to fetch report");
 
-    let additionalInfo: any = {};
+    let additionalInfo: Record<string, any> = {};
     if (report.additional_info) {
         additionalInfo = typeof report.additional_info === 'string' 
             ? JSON.parse(report.additional_info) 
-            : report.additional_info;
+            : (report.additional_info as Record<string, any>);
     }
 
     // 2. Fetch Candidates
@@ -184,16 +185,16 @@ export async function simulateMatch(reportId: string) {
         .select("*")
         .in("professional_title", ["Human rights defender", "Paralegal"]);
 
-    const providerUserIds = new Set((services || []).filter((s: any) => s.verification_status === "verified").map((s: any) => s.user_id).filter(Boolean));
-    const activeStandaloneProfiles = (standaloneProfiles || []).filter((p: any) => p.verification_status === "verified" && !providerUserIds.has(p.id));
+    const providerUserIds = new Set((services || []).filter(s => s.verification_status === "verified").map(s => s.user_id).filter(Boolean));
+    const activeStandaloneProfiles = (standaloneProfiles || []).filter(p => p.verification_status === "verified" && !providerUserIds.has(p.id));
 
     // Also get unverified for visualization bounce
-    const unverifiedServices = (services || []).filter((s: any) => s.verification_status !== "verified");
+    const unverifiedServices = (services || []).filter(s => s.verification_status !== "verified");
     
-    const verifiedServices = (services || []).filter((s: any) => s.verification_status === "verified");
+    const verifiedServices = (services || []).filter(s => s.verification_status === "verified");
 
     const candidates = [
-        ...verifiedServices.map((s: any) => ({
+        ...verifiedServices.map(s => ({
             type: 'service' as const,
             id: s.id,
             name: s.name,
@@ -213,7 +214,7 @@ export async function simulateMatch(reportId: string) {
             owner_last_name: (s as any).profile?.last_name,
             verified: true
         })),
-        ...activeStandaloneProfiles.map((p: any) => ({
+        ...activeStandaloneProfiles.map(p => ({
             type: 'profile' as const,
             id: p.id,
             name: `${p.first_name || ''} ${p.last_name || ''}`.trim() || p.professional_title || 'Expert',
@@ -233,7 +234,7 @@ export async function simulateMatch(reportId: string) {
             owner_last_name: p.last_name,
             verified: true
         })),
-        ...unverifiedServices.map((s: any) => ({
+        ...unverifiedServices.map(s => ({
             type: 'unverified' as const,
             id: s.id,
             name: s.name,

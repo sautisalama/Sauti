@@ -63,7 +63,7 @@ import {
 	SereneSectionHeader
 } from "../_components/SurvivorDashboardComponents";
 import { CalendarConnectionStatus } from "../_components/CalendarConnectionStatus";
-import { ReportWithRelations, MatchedServiceWithRelations } from "../_types";
+import { ReportWithRelations, MatchedServiceWithRelations, AppointmentWithDetails } from "../_types";
 import { fetchUserReports, deleteReport } from "./actions/reports";
 import { fetchUserSupportServices, deleteSupportService } from "./actions/support-services";
 import { fetchMatchedServices } from "./actions/matched-services";
@@ -71,6 +71,15 @@ import { fetchUserAppointments } from "./actions/appointments";
 import { matchProfessionalWithUnmatchedReports } from "@/app/actions/match-services";
 import AuthenticatedReportAbuseForm from "@/components/AuthenticatedReportAbuseForm";
 import { OutOfOfficeBanner } from "@/components/dashboard/OutOfOfficeBanner";
+
+interface Recommendation {
+  id: string;
+  content: string;
+  is_shared_with_survivor: boolean;
+  shared_at: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+}
 
 interface ProfessionalViewProps {
 	userId: string;
@@ -99,7 +108,7 @@ export default function ProfessionalView({
 	const [reports, setReports] = useState<ReportWithRelations[]>([]);
 	const [supportServices, setSupportServices] = useState<Tables<"support_services">[]>([]);
 	const [matchedServices, setMatchedServices] = useState<MatchedServiceWithRelations[]>([]);
-	const [appointments, setAppointments] = useState<any[]>([]);
+	const [appointments, setAppointments] = useState<AppointmentWithDetails[]>([]);
 
 	const getTimeOfDay = (): "morning" | "afternoon" | "evening" => {
 		const hour = new Date().getHours();
@@ -135,7 +144,7 @@ export default function ProfessionalView({
 
                 // Determine active tab based on latest activity
                 const latestReport = reports.length > 0 
-                    ? Math.max(...reports.map(r => new Date(r.updated_at || r.submission_timestamp).getTime())) 
+                    ? Math.max(...reports.map(r => new Date(r.submission_timestamp || 0).getTime())) 
                     : 0;
                 const latestMatch = matches.length > 0 
                     ? Math.max(...matches.map(m => new Date(m.updated_at || m.match_date || 0).getTime())) 
@@ -160,7 +169,7 @@ export default function ProfessionalView({
 
 		if (dash?.data && dash.data.userId === userId) {
             const reports = (dash.data.reports as ReportWithRelations[]) || [];
-            const matches = (dash.data.matchedServices as any) || [];
+            const matches = (dash.data.matchedServices as MatchedServiceWithRelations[]) || [];
 
 			setReports(reports);
 			setSupportServices(dash.data.supportServices || []);
@@ -169,10 +178,10 @@ export default function ProfessionalView({
 
             // Activity-based tab selection from cached data
             const latestReport = reports.length > 0 
-                ? Math.max(...reports.map(r => new Date(r.updated_at || r.submission_timestamp).getTime())) 
+                ? Math.max(...reports.map(r => new Date(r.submission_timestamp || 0).getTime())) 
                 : 0;
             const latestMatch = matches.length > 0 
-                ? Math.max(...matches.map(m => new Date(m.updated_at || m.match_date || 0).getTime())) 
+                ? Math.max(...matches.map((m: any) => new Date(m.updated_at || m.match_date || 0).getTime())) 
                 : 0;
 
             if (latestReport > latestMatch && reports.length > 0) {
@@ -215,7 +224,7 @@ export default function ProfessionalView({
 		const verStatus = (dash?.data as any)?.verification?.overallStatus;
 		if (verStatus === "verified") return true;
 		const required = [profileDetails?.first_name, profileDetails?.phone, profileDetails?.professional_title];
-		return required.every(v => v && v.trim() !== "");
+		return required.every(v => v && typeof v === 'string' && v.trim() !== "");
 	}, [dash?.data, profileDetails]);
 
 	// Filter cases by search
@@ -724,7 +733,7 @@ export default function ProfessionalView({
 																	{appt.matched_service?.service_details?.name || 'Appointment'}
 																</p>
 																<p className="text-xs text-serene-neutral-500">
-																	{new Date(appt.appointment_date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+																	{new Date(appt.appointment_date || 0).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
 																</p>
 															</div>
 															<Badge className="bg-serene-blue-50 text-serene-blue-700 border-0 text-xs">
@@ -870,18 +879,18 @@ export default function ProfessionalView({
 												<CardContent className="p-4 flex items-center gap-4">
 													<div className="h-12 w-12 bg-serene-blue-50 rounded-2xl flex flex-col items-center justify-center text-serene-blue-600">
 														<span className="text-xs font-medium uppercase">
-															{new Date(appt.appointment_date).toLocaleString('default', { month: 'short' })}
+															{new Date(appt.appointment_date || 0).toLocaleString('default', { month: 'short' })}
 														</span>
 														<span className="text-lg font-bold leading-none">
-															{new Date(appt.appointment_date).getDate()}
+															{new Date(appt.appointment_date || 0).getDate()}
 														</span>
 													</div>
 													<div className="flex-1 min-w-0">
 														<h4 className="font-semibold text-serene-neutral-900">
-															{appt.matched_service?.support_service?.name || "Appointment"}
+															{appt.matched_service?.service_details?.name || "Appointment"}
 														</h4>
 														<p className="text-sm text-serene-neutral-500">
-															{new Date(appt.appointment_date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+															{new Date(appt.appointment_date || 0).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
 														</p>
 													</div>
 													<Badge className="bg-serene-blue-600 text-white border-0 text-xs">

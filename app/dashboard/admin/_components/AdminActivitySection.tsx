@@ -12,7 +12,8 @@ import {
     Building2,
     FileText,
     History,
-    Inbox
+    Inbox,
+    AlertCircle
 } from "lucide-react";
 import Link from "next/link";
 import { formatDistanceToNow } from "date-fns";
@@ -21,20 +22,18 @@ import { useUser } from "@/hooks/useUser";
 import { Tables } from "@/types/db-schema";
 import { ReviewAuditLog } from "@/types/admin-types";
 
-
 type ActivityItem = {
     id: string;
-    type: "professional" | "service";
+    type: "professional" | "service" | "request";
     name: string;
     submittedAt: string;
     updatedAt?: string | null;
-
     avatarUrl?: string | null;
     status: string;
     details?: string;
     hasDocuments: boolean;
     reviewerId?: string | null;
-
+    reportId?: string | null; // For requests
 };
 
 export function AdminActivitySection() {
@@ -75,20 +74,28 @@ export function AdminActivitySection() {
                 .order("verification_updated_at", { ascending: false })
                 .limit(20);
 
+            // Fetch change requests
+            const { data: requests } = await supabase
+                .from("notifications")
+                .select("*")
+                .eq("type", "provider_change_request")
+                .order("created_at", { ascending: false })
+                .limit(10);
 
-            const combinedItems: ActivityItem[] = [
+
+             const combinedItems: ActivityItem[] = [
                 ...(professionals?.map(p => {
                     const hasDocs = Array.isArray(p.accreditation_files_metadata) && p.accreditation_files_metadata.length > 0;
                     // Check if reviewed_by is object or string and extract ID
-                    const reviewerId = typeof p.reviewed_by === 'object' && p.reviewed_by !== null ? (p.reviewed_by as unknown as ReviewAuditLog).reviewer_id : null;
-
+                    const reviewedByAny = p.reviewed_by as any;
+                    const reviewerId = (typeof reviewedByAny === 'object' && reviewedByAny !== null) ? reviewedByAny.reviewer_id : null;
                     
                     return {
                         id: p.id,
                         type: "professional" as const,
-                        name: `${p.first_name} ${p.last_name}`,
-                        submittedAt: p.verification_updated_at || p.created_at || new Date().toISOString(),
-                        updatedAt: p.updated_at || p.created_at,
+                        name: `${p.first_name || 'Unknown'} ${p.last_name || ''}`.trim(),
+                        submittedAt: (p.verification_updated_at as string) || (p.created_at as string) || new Date().toISOString(),
+                        updatedAt: (p.updated_at as string) || (p.created_at as string),
                         avatarUrl: p.avatar_url,
                         status: p.verification_status || 'pending',
                         details: p.user_type === 'ngo' ? 'NGO Representative' : 'Professional',
@@ -98,21 +105,33 @@ export function AdminActivitySection() {
                 }) || []),
                 ...(services?.map(s => {
                     const hasDocs = Array.isArray(s.accreditation_files_metadata) && s.accreditation_files_metadata.length > 0;
-                    const reviewerId = typeof s.reviewed_by === 'object' && s.reviewed_by !== null ? (s.reviewed_by as unknown as ReviewAuditLog).reviewer_id : null;
-
+                    const reviewedByAny = s.reviewed_by as any;
+                    const reviewerId = (typeof reviewedByAny === 'object' && reviewedByAny !== null) ? reviewedByAny.reviewer_id : null;
 
                     return {
                         id: s.id,
                         type: "service" as const,
-                        name: s.name,
-                        submittedAt: s.verification_updated_at || s.created_at || new Date().toISOString(),
-                        updatedAt: s.verification_updated_at || s.created_at,
-
+                        name: s.name || 'Untitled Service',
+                        submittedAt: (s.verification_updated_at as string) || (s.created_at as string) || new Date().toISOString(),
+                        updatedAt: (s.verification_updated_at as string) || (s.created_at as string),
                         avatarUrl: null,
                         status: s.verification_status || 'pending',
-                        details: Array.isArray(s.service_types) ? s.service_types[0] : s.service_types,
+                        details: Array.isArray(s.service_types) ? (s.service_types[0] as string) : (s.service_types as string),
                         hasDocuments: hasDocs,
                         reviewerId
+                    };
+                }) || []),
+                ...(requests?.map(r => {
+                    const metadata = r.metadata as any;
+                    return {
+                        id: r.id,
+                        type: "request" as const,
+                        name: r.title || 'Change Request',
+                        submittedAt: r.created_at || new Date().toISOString(),
+                        status: metadata?.status || 'pending',
+                        details: r.message || 'Provider Change Request',
+                        hasDocuments: false,
+                        reportId: metadata?.report_id
                     };
                 }) || [])
             ];
@@ -128,7 +147,7 @@ export function AdminActivitySection() {
     // Filter Logic
     const newItems = useMemo(() => {
         return items
-            .filter(i => (i.status === 'pending' || i.status === 'under_review') && i.hasDocuments)
+            .filter(i => (i.status === 'pending' || i.status === 'under_review') && (i.hasDocuments || i.type === 'request'))
             .sort((a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime())
             .slice(0, 3);
     }, [items]);
@@ -210,19 +229,14 @@ export function AdminActivitySection() {
 
 function ActivityCard({ item, isNew }: { item: ActivityItem, isNew: boolean }) {
     // Determine link - always go to profile-centric review
-    // If it's a service, we might want to pass a tab? For now, standard review page.
-    const href = `/dashboard/admin/review/${item.id}`; // Wait, this ID is profile ID or service ID.
-    // If it's a service, we need the OWNER's ID for the profile-centric view. 
-    // Ah, my Implementation Plan says "Clicking a Service... takes you to Professional's review page".
-    // I need to fetch the owner ID for services in the main fetch.
-    
-    // NOTE: For now, the review page [id] handles `type` param correctly to fetch either profile or service.
-    // I will update the [id] page to *redirect* or *handle* this unifying logic. 
-    // For this card, I will pass `?type=${item.type}` so the page knows what ID it is receiving.
+    // If it's a request, go to matching dashboard with reportId
+    const href = item.type === 'request' 
+        ? `/dashboard/admin/matching${item.reportId ? `?reportId=${item.reportId}` : ''}`
+        : `/dashboard/admin/review/${item.id}`; 
     
     return (
         <Link 
-            href={`${href}?type=${item.type}`}
+            href={item.type === 'request' ? href : `${href}?type=${item.type}`}
             className="block group"
         >
             <Card className={cn(
@@ -247,7 +261,7 @@ function ActivityCard({ item, isNew }: { item: ActivityItem, isNew: boolean }) {
                                     {item.name.substring(0, 2).toUpperCase()}
                                 </AvatarFallback>
                             </Avatar>
-                        ) : (
+                        ) : item.type === 'service' ? (
                             <div className={cn(
                                 "h-10 w-10 sm:h-12 sm:w-12 rounded-full flex items-center justify-center border-2 shadow-sm",
                                 isNew 
@@ -255,6 +269,15 @@ function ActivityCard({ item, isNew }: { item: ActivityItem, isNew: boolean }) {
                                     : "bg-gray-100 text-gray-400 border-white"
                             )}>
                                 <Building2 className="h-5 w-5 sm:h-6 sm:w-6" />
+                            </div>
+                        ) : (
+                            <div className={cn(
+                                "h-10 w-10 sm:h-12 sm:w-12 rounded-full flex items-center justify-center border-2 shadow-sm",
+                                isNew 
+                                    ? "bg-rose-50 text-rose-600 border-rose-100" 
+                                    : "bg-gray-100 text-gray-400 border-white"
+                            )}>
+                                <AlertCircle className="h-5 w-5 sm:h-6 sm:w-6" />
                             </div>
                         )}
                     </div>
@@ -279,7 +302,7 @@ function ActivityCard({ item, isNew }: { item: ActivityItem, isNew: boolean }) {
                                 "px-1.5 py-0 h-5 text-[10px] sm:text-xs font-normal border uppercase tracking-tight",
                                 isNew ? "bg-white border-gray-200 text-gray-700" : "bg-gray-100 border-gray-200 text-gray-500"
                             )}>
-                                {item.type === 'professional' ? 'Pro' : 'Service'}
+                                {item.type === 'professional' ? 'Pro' : item.type === 'service' ? 'Service' : 'Request'}
                             </Badge>
                             
                             {!isNew && (
@@ -298,10 +321,16 @@ function ActivityCard({ item, isNew }: { item: ActivityItem, isNew: boolean }) {
                             </span>
                         </div>
                         
-                        {isNew && (
+                        {isNew && item.type !== 'request' && (
                              <div className="flex items-center gap-1 mt-1 text-xs font-medium text-serene-blue-600">
                                 <FileText className="h-3 w-3" />
                                 <span>Documents attached</span>
+                             </div>
+                        )}
+                        {isNew && item.type === 'request' && (
+                             <div className="flex items-center gap-1 mt-1 text-xs font-medium text-rose-600">
+                                <AlertCircle className="h-3 w-3" />
+                                <span>Action required</span>
                              </div>
                         )}
                     </div>

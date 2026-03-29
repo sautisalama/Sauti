@@ -49,7 +49,7 @@ import { updateProfileStatus, VerificationDocument, VerificationStatus } from "@
 interface VerificationSectionProps {
 	userId: string;
 	userType: Database["public"]["Enums"]["user_type"];
-	profile: any;
+	profile: Database["public"]["Tables"]["profiles"]["Row"];
 	onUpdate: () => void;
 	onNavigateToServices: () => void;
 }
@@ -99,9 +99,9 @@ export function VerificationSection({
 				const parsedMeta = safelyParseJsonArray(profile.accreditation_files_metadata);
 				
 				if (Array.isArray(parsedMeta)) {
-					profileDocs = parsedMeta.map((d: any) => ({
+					profileDocs = (parsedMeta as VerificationDocument[]).map((d) => ({
 						...d,
-						title: d.title || d.name || 'Untitled Document', // Backward compat with admin changes
+						title: d.title || d.name || 'Untitled Document',
 						status: d.status || 'pending',
 						notes: d.notes || ''
 					}));
@@ -112,8 +112,8 @@ export function VerificationSection({
 			// 2. Fetch Support Services Docs for "Library"
 			const { data: services, error: servicesError } = await supabase
 				.from("support_services")
-				.select("accreditation_files_metadata, title")
-				.eq("provider_id", userId);
+				.select("accreditation_files_metadata, name")
+				.eq("user_id", userId);
 
 			if (servicesError) {
 				console.warn("Error fetching support services docs:", servicesError);
@@ -121,14 +121,14 @@ export function VerificationSection({
 
 			const serviceDocs: VerificationDocument[] = [];
 			if (services && Array.isArray(services)) {
-				services.forEach((svc: any) => {
+				services.forEach((svc) => {
 					if (!svc.accreditation_files_metadata) return;
 					
 					const rawMeta = svc.accreditation_files_metadata;
-					const docs = typeof rawMeta === 'string' ? safelyParseJsonArray(rawMeta) : rawMeta;
+					const docs = (typeof rawMeta === 'string' ? safelyParseJsonArray(rawMeta) : rawMeta) as VerificationDocument[];
 
 					if (docs && Array.isArray(docs)) {
-						docs.forEach((d: any) => {
+						docs.forEach((d) => {
 							// Avoid duplicates based on URL
 							if (d && d.url && 
 								!serviceDocs.some(existing => existing.url === d.url) && 
@@ -136,7 +136,7 @@ export function VerificationSection({
 								serviceDocs.push({
 									...d,
 									title: d.title || d.name || 'Untitled Document', // Backward compat with admin changes
-									sourceName: svc.title, // Add source info
+									sourceName: svc.name ?? undefined, // Add source info
 									status: d.status || 'pending',
 									notes: d.notes || ''
 								});
@@ -168,6 +168,10 @@ export function VerificationSection({
         ))
     );
 
+    const pendingDocs = allDocs.filter(
+        (doc) => (doc.status as string) === "pending" || (doc.status as string) === "under_review"
+    ).length;
+
     const otherDocs = allDocs.filter(d => {
         if (!d || !d.title) return false;
         const title = d.title.toLowerCase();
@@ -178,7 +182,7 @@ export function VerificationSection({
     });
 
 
-	const handleFileUpload = async (file: File, title: string, type: 'identity' | 'qualification' = 'qualification', metadata: any = {}) => {
+	const handleFileUpload = async (file: File, title: string, type: 'identity' | 'qualification' = 'qualification', metadata: Partial<VerificationDocument> = {}) => {
 		try {
 			// Upload to storage
 			const result = await fileUploadService.uploadFile({
@@ -226,7 +230,7 @@ export function VerificationSection({
             const { error: saveError } = await supabase
                 .from("profiles")
                 .update({ 
-                    accreditation_files_metadata: JSON.parse(JSON.stringify(updatedDocs)),
+                    accreditation_files_metadata: updatedDocs as any,
                     verification_updated_at: new Date().toISOString()
                 })
                 .eq("id", userId);
@@ -235,7 +239,10 @@ export function VerificationSection({
 
 			setDocuments(updatedDocs);
 			onUpdate();
-			toast({ title: "Document Uploaded", description: `${title} has been uploaded. Status: ${newStatus.replace('_', ' ')}` });
+			toast({ 
+				title: "Document Uploaded", 
+				description: `${title} has been uploaded. Status: ${(newStatus || 'pending').replace('_', ' ')}` 
+			});
 			
 			return true;
 		} catch (error) {
@@ -267,7 +274,7 @@ export function VerificationSection({
             const { error: saveError } = await supabase
                 .from("profiles")
                 .update({ 
-                    accreditation_files_metadata: JSON.parse(JSON.stringify(updatedDocs)),
+                    accreditation_files_metadata: updatedDocs as any,
                     verification_updated_at: new Date().toISOString()
                 })
                 .eq("id", userId);

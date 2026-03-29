@@ -34,6 +34,14 @@ import { useDashboardData } from "@/components/providers/DashboardDataProvider";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { confirmAppointment, rescheduleAppointment } from "../../_views/actions/appointments";
 import { EnhancedAppointmentScheduler } from "../../_components/EnhancedAppointmentScheduler";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 
 interface ProviderMatch {
     id: string;
@@ -826,8 +834,10 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
                                                                             </DialogHeader>
                                                                             
                                                                             <EnhancedAppointmentScheduler
-                                                                                userId={userId}
+                                                                                userId={currentUserId || ""}
                                                                                 providerId={currentMatch?.professionalId || ""}
+                                                                                isOpen={true}
+                                                                                onClose={() => {}}
                                                                                 onSchedule={async (data) => {
                                                                                     try {
                                                                                         setUpdating(true);

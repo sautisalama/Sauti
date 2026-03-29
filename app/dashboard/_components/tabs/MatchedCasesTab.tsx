@@ -1,4 +1,4 @@
-import { Tables } from "@/types/db-schema";
+import { MatchedServiceWithRelations } from "../../_types";
 import { MatchCard } from "../../_components/MatchCard";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
@@ -6,14 +6,6 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { updateMatchFeedback } from "@/app/dashboard/_views/actions/matched-services";
-
-interface MatchedServiceWithRelations {
-	id: string;
-	match_date: string;
-	match_status_type: string;
-	report: Tables<"reports">;
-	service_details: Tables<"support_services">;
-}
 
 interface MatchedCasesTabProps {
 	userId: string;

@@ -20,9 +20,8 @@ export async function PATCH(
 
 		const { error } = await supabase
 			.from("matched_services")
-			.update({ status })
-			.eq("id", id)
-			.eq("service_id", user.id);
+			.update({ match_status_type: status })
+			.eq("id", id);
 
 		if (error) throw error;
 

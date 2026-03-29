@@ -244,7 +244,7 @@ export function SupportServicesManager({
 	};
 
 	const getDocumentCount = (service: SupportService) => {
-		return safelyParseJsonArray(service.accreditation_files_metadata).length;
+		return safelyParseJsonArray(service.accreditation_files_metadata as any).length;
 	};
 
 	// Partition shared services
@@ -506,7 +506,7 @@ function ServiceCard({
 	};
 
 	const getDocumentCount = (service: SupportService) => {
-		return safelyParseJsonArray(service.accreditation_files_metadata).length;
+		return safelyParseJsonArray(service.accreditation_files_metadata as any).length;
 	};
 
 	return (
@@ -532,7 +532,9 @@ function ServiceCard({
 								{service.name}
 							</h3>
 							<p className="text-xs text-serene-neutral-500 capitalize">
-								{service.service_types.replace("_", " ")}
+								{Array.isArray(service.service_types) 
+									? service.service_types.join(", ").replace(/_/g, " ") 
+									: (typeof service.service_types === 'string' ? service.service_types.replace("_", " ") : "Service")}
 							</p>
 						</div>
 					</div>

@@ -49,7 +49,17 @@ export function CoverageMap(_props: CoverageMapProps) {
 			const { data, error } = await supabase.rpc("get_coverage_map_data");
 
 			if (error) throw error;
-			setCoverageData(data || []);
+			const mappedData: CoverageData[] = (data || []).map((d: any) => ({
+				service_id: d.service_id,
+				name: d.service_name,
+				service_type: d.service_type,
+				latitude: d.latitude,
+				longitude: d.longitude,
+				coverage_area_radius: d.coverage_radius,
+				verification_status: d.verification_status as any,
+				is_active: d.is_active,
+			}));
+			setCoverageData(mappedData);
 		} catch (error) {
 			console.error("Error loading coverage data:", error);
 			toast({

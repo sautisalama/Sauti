@@ -152,6 +152,7 @@ export function PrivacySecuritySettings() {
 			// Turning off — clear all tracked devices (in dedicated column)
 			await persistSettings({ device_tracking_enabled: false });
 			
+			if (!userId) return;
 			const { error } = await supabase
 				.from("profiles")
 				.update({ devices: [] as any })
@@ -172,6 +173,7 @@ export function PrivacySecuritySettings() {
 			const devices = registerDevice([], getOrCreateDeviceId());
 			await persistSettings({ device_tracking_enabled: true });
 			
+			if (!userId) return;
 			const { error } = await supabase
 				.from("profiles")
 				.update({ devices: devices as any })
