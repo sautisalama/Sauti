@@ -613,6 +613,7 @@ export type Database = {
           cascade_level: number | null
           cascade_phase_triggered_at: string | null
           chat_id: string | null
+          completed_at: string | null
           decline_reason: string | null
           description: string | null
           escalation_required: boolean | null
@@ -644,6 +645,7 @@ export type Database = {
           cascade_level?: number | null
           cascade_phase_triggered_at?: string | null
           chat_id?: string | null
+          completed_at?: string | null
           decline_reason?: string | null
           description?: string | null
           escalation_required?: boolean | null
@@ -675,6 +677,7 @@ export type Database = {
           cascade_level?: number | null
           cascade_phase_triggered_at?: string | null
           chat_id?: string | null
+          completed_at?: string | null
           decline_reason?: string | null
           description?: string | null
           escalation_required?: boolean | null

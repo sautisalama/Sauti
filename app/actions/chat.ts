@@ -233,27 +233,52 @@ export async function getCaseChat(caseId: string, survivorId: string) {
     .insert({
       type: 'support_match',
       created_by: user.id,
-      match_id: caseId, // Use the direct column we added
-      metadata: { case_id: caseId } // Keep metadata for backward compatibility
+      match_id: caseId,
+      metadata: { case_id: caseId }
     })
     .select()
     .single();
 
   if (createError) throw createError;
 
-  // 3. Add Participants (Professional and Survivor)
+  // 3. Resolve true participants from matched_services
+  const { data: matchData } = await supabase
+    .from('matched_services')
+    .select(`
+      survivor_id,
+      hrd_profile_id,
+      support_services ( user_id )
+    `)
+    .eq('id', caseId)
+    .single();
+
+  const actualSurvId = matchData?.survivor_id || survivorId;
+  
+  // The professional is either HRD directly, or the user of the service
+  let profId = matchData?.hrd_profile_id;
+  if (!profId && matchData?.support_services) {
+      profId = (matchData.support_services as unknown as { user_id: string }).user_id;
+  }
+  
+  // Fallback to caller if no professional found (edge case)
+  if (!profId) profId = user.id;
+
   const participants = [
     {
       chat_id: chat.id,
-      user_id: user.id,
+      user_id: profId,
       status: { role: 'admin' }
-    },
-    {
-      chat_id: chat.id,
-      user_id: survivorId,
-      status: { role: 'member' }
     }
   ];
+
+  // Only add survivor if they are a different user to prevent duplicate keys
+  if (actualSurvId && actualSurvId !== profId) {
+    participants.push({
+      chat_id: chat.id,
+      user_id: actualSurvId,
+      status: { role: 'member' }
+    });
+  }
 
   const { error: partError } = await supabase
     .from('chat_participants')

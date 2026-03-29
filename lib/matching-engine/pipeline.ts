@@ -147,7 +147,9 @@ export async function runMatchingPipeline(
 
   // ─── Stage 1: Candidate Aggregation ───────────────────────────────────────
 
-  const { verified: candidates } = await buildCandidatePool(supabase);
+  const { verified: candidates } = await buildCandidatePool(supabase, {
+    reporter_id: report.user_id,
+  });
 
   if (candidates.length === 0) {
     console.log(`[Matching] No candidates available for report ${reportId}`);
@@ -272,6 +274,7 @@ export async function runSimulation(
   // Get ALL candidates (including unverified for viz)
   const { verified, unverified } = await buildCandidatePool(supabase, {
     include_unverified: true,
+    reporter_id: report.user_id,
   });
 
   // Get existing matches for this report

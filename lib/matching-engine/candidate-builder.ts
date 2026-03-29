@@ -30,6 +30,8 @@ export async function buildCandidatePool(
   options?: {
     /** Include unverified candidates for visualization (default: false) */
     include_unverified?: boolean;
+    /** ID of the user submitting the report, to exclude their own services */
+    reporter_id?: string;
   },
 ): Promise<{
   verified: CandidateObject[];
@@ -171,9 +173,10 @@ export async function buildCandidatePool(
       ...activeStandaloneProfiles.map(normalizeProfile),
     ],
     oooLookup,
-  );
+  ).filter(c => c.owner_user_id !== options?.reporter_id);
 
-  const unverified = unverifiedServices.map(s => normalizeService(s, false));
+  const unverified = unverifiedServices.map(s => normalizeService(s, false))
+    .filter(c => c.owner_user_id !== options?.reporter_id);
 
   return { verified, unverified };
 }

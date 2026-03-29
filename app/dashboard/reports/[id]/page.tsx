@@ -53,6 +53,8 @@ interface ProviderMatch {
     availability: string;
     focus_groups: string[];
     professionalId?: string | null;
+    status: string | null;
+    feedback?: string | null;
 }
 
 
@@ -151,6 +153,7 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
 						match_reason,
 						description,
 						notes,
+						feedback,
 						support_service,
 						survivor_id,
 						service_details:support_services (
@@ -196,6 +199,7 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
 						match_reason: string | null; 
 						description: string | null; 
 						notes: string | null; 
+						feedback: string | null;
 						support_service: string | null;
 						service_details: Tables<"support_services"> | null;
 						hrd_details: { 
@@ -239,11 +243,18 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
 						description: m.description || "Verified support provider ready to assist with your case.",
 						availability: availability || "Flexible",
 						focus_groups,
-						professionalId
+						professionalId,
+						status: m.match_status_type,
+						feedback: m.feedback
 					};
 				});
 
 				setAllMatches(matches);
+				const accepted = matches.find(m => m.status === 'accepted' || m.status === 'completed');
+				if (accepted) {
+					setAcceptedMatch(accepted);
+				}
+
 				if (data.administrative && typeof data.administrative === 'object') {
 					const admin = data.administrative as Record<string, unknown>;
 					const rawItems = (admin.checklist as ChecklistItem[]) || (admin.checklists as ChecklistItem[]) || [];
@@ -775,6 +786,49 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
 											</div>
 										</div>
                                         
+                                        {(() => {
+                                            let fb = null;
+                                            try {
+                                                fb = acceptedMatch.feedback ? JSON.parse(acceptedMatch.feedback) : null;
+                                            } catch (e) {}
+                                            const isProfComplete = fb?.is_prof_complete === true;
+                                            const isSurvComplete = fb?.is_surv_complete === true;
+                                            if (isProfComplete && !isSurvComplete) {
+                                                return (
+                                                    <div className="bg-amber-50 border border-amber-200 rounded-3xl p-6 shadow-sm animate-in fade-in slide-in-from-top-4 duration-500">
+                                                        <div className="flex items-center gap-3 text-amber-800 font-bold mb-3">
+                                                            <CheckCircle2 className="h-5 w-5" />
+                                                            Completion Requested
+                                                        </div>
+                                                        <p className="text-amber-700 text-sm mb-5 leading-relaxed font-medium">
+                                                            The professional has marked this case as complete. By confirming, the case will be closed.
+                                                        </p>
+                                                        <Button onClick={async () => {
+                                                            try {
+                                                                setUpdating(true);
+                                                                const newFb = { ...fb, is_surv_complete: true };
+                                                                const { error } = await supabase.from('matched_services').update({
+                                                                    feedback: JSON.stringify(newFb),
+                                                                    match_status_type: 'completed',
+                                                                    completed_at: new Date().toISOString()
+                                                                }).eq('id', acceptedMatch.id);
+                                                                if (error) throw error;
+                                                                toast({ title: "Case Completed", description: "You have finalized and closed this case." });
+                                                                fetchReport();
+                                                            } catch (err: unknown) {
+                                                                toast({ title: "Error", description: (err as Error).message || "Failed to complete", variant: "destructive" });
+                                                            } finally {
+                                                                setUpdating(false);
+                                                            }
+                                                        }} disabled={updating} className="bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl text-sm h-11 px-8 w-full sm:w-auto shadow-md shadow-amber-600/20 transition-all hover:scale-[1.02]">
+                                                            {updating ? "Finalizing..." : "Confirm & Close Case"}
+                                                        </Button>
+                                                    </div>
+                                                );
+                                            }
+                                            return null;
+                                        })()}
+
                                         {upcomingAppointments.length > 0 ? (
                                             <div className="space-y-4">
                                                 {upcomingAppointments.map((appt) => (
@@ -875,9 +929,6 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
 												Contact
 											</Button>
 										</div>
-                                        <button onClick={() => setAcceptedMatch(null)} className="text-[10px] font-bold text-slate-300 hover:text-rose-500 uppercase tracking-[0.25em] transition-colors text-center w-full">
-                                            Switch Coordination Partner
-                                        </button>
 									</CardContent>
 								</Card>
 

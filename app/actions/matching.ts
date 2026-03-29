@@ -525,3 +525,34 @@ export async function getUserMatches(status?: MatchStatusType) {
 
   return data
 }
+
+/**
+ * Marks a case as exclusive by setting all other matches for the same report to declined
+ * Called when a professional accepts and schedules a case.
+ */
+export async function markCaseAsExclusive(reportId: string, acceptedMatchId: string) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+
+  if (!user) throw new Error('Unauthorized')
+
+  const { error } = await supabase
+    .from('matched_services')
+    .update({
+      match_status_type: 'declined', // Use 'declined' so it drops out of pending lists
+      decline_reason: 'Taken by another professional',
+      notes: 'Another professional has accepted and scheduled this case.',
+      updated_at: new Date().toISOString()
+    })
+    .eq('report_id', reportId)
+    .neq('id', acceptedMatchId)
+    .neq('match_status_type', 'accepted')
+    .neq('match_status_type', 'completed')
+
+  if (error) {
+    console.error('Failed to make case exclusive:', error)
+  }
+
+  revalidatePath('/dashboard/cases')
+  return { success: true }
+}

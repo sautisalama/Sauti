@@ -54,6 +54,7 @@ import { matchProfessionalWithUnmatchedReports } from "@/app/actions/match-servi
 import { CaseDetailView } from "./_components/CaseDetailView";
 import { EnhancedAppointmentScheduler } from "../_components/EnhancedAppointmentScheduler";
 import { createAppointment } from "../_views/actions/appointments";
+import { markCaseAsExclusive } from "@/app/actions/matching";
 import {
 	Dialog,
 	DialogContent,
@@ -403,8 +404,45 @@ export default function CasesMasterDetail({ userId }: { userId: string }) {
 		return () => clearTimeout(timeoutId);
 	}, [cases.length, loading]); // Only depend on cases.length and loading state
 
+	// Subscribe to real-time match updates (for exclusivity and new cases)
+	useEffect(() => {
+		if (!userId) return;
+		const channel = supabase.channel('realtime_cases_prof')
+			.on(
+				'postgres_changes',
+				{ event: '*', schema: 'public', table: 'matched_services' },
+				(payload) => {
+					if (payload.eventType === 'UPDATE') {
+						const newRecord = payload.new as Tables<"matched_services">;
+						setCases((prev) => {
+							const exists = prev.find(c => c.id === newRecord.id);
+							if (!exists) return prev;
+							
+							if (selectedId === newRecord.id && newRecord.match_status_type === 'declined') {
+								toast({
+									title: "Case Unavailable",
+									description: "This case has been taken by another professional.",
+									variant: "destructive"
+								});
+							}
+							
+							return prev.map(c => c.id === newRecord.id ? { ...c, match_status_type: newRecord.match_status_type } : c);
+						});
+					} else if (payload.eventType === 'INSERT') {
+						loadCases(true);
+					}
+				}
+			)
+			.subscribe();
+
+		return () => { supabase.removeChannel(channel); };
+	}, [userId, supabase, selectedId, toast, loadCases]);
+
 	const filtered = useMemo(() => {
 		let filteredCases = cases;
+
+		// Default exclusivity filter: hide declined cases unless currently selected
+		filteredCases = filteredCases.filter((c) => c.match_status_type !== 'declined' || c.id === selectedId);
 
 		// Text search filter
 		const term = q.trim().toLowerCase();
@@ -582,6 +620,9 @@ export default function CasesMasterDetail({ userId }: { userId: string }) {
                 .eq("id", caseIdToAccept);
 
             if (matchError) throw matchError;
+            
+            // Mark case as exclusive to drop it from other professionals
+            await markCaseAsExclusive(selectedCase.report_id!, caseIdToAccept);
 
             // 2. Create Instant Appointment
             await createAppointment({
@@ -665,6 +706,9 @@ export default function CasesMasterDetail({ userId }: { userId: string }) {
                 .eq("id", caseIdToAccept);
 
             if (matchError) throw matchError;
+            
+            // Mark case as exclusive to drop it from other professionals
+            await markCaseAsExclusive(selectedCase.report_id!, caseIdToAccept);
 
             // 2. Create Scheduled Appointment (as a suggestion)
             await createAppointment({
