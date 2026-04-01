@@ -857,27 +857,27 @@ export default function CasesMasterDetail({ userId }: { userId: string }) {
 						mobileView !== "list" ? "hidden lg:block" : ""
 					}`}
 				>
-					<div className="mb-8">
+					<div className="mb-6 sm:mb-8">
 						<SereneBreadcrumb items={[{ label: "Cases", active: true }]} className="mb-4" />
-						<div className="flex items-center justify-between">
+						<div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
 							<div>
-								<h1 className="text-2xl lg:text-3xl font-bold text-sauti-dark tracking-tight">Case Management</h1>
-								<p className="text-serene-neutral-500 mt-1 text-sm lg:text-base font-medium">Review your matched cases and track progress.</p>
+								<h1 className="text-xl sm:text-2xl lg:text-3xl font-black text-sauti-dark tracking-tight uppercase">Case Management</h1>
+								<p className="text-serene-neutral-500 mt-1 text-xs sm:text-sm lg:text-base font-medium">Review your matched cases and track progress.</p>
 							</div>
 						</div>
 					</div>
 					{/* Premium Search and Filter Bar */}
-					<div className="mb-6 sticky top-0 z-30 bg-serene-neutral-50/95 backdrop-blur-lg border-b border-serene-neutral-100 pb-4 pt-3 -mx-1 px-1">
-						<div className="flex items-center gap-3">
+					<div className="mb-6 sticky top-0 z-30 bg-serene-neutral-50/95 backdrop-blur-lg border-b border-serene-neutral-100 pb-3 pt-2 -mx-1 px-1">
+						<div className="flex items-center gap-2 sm:gap-3">
 							{/* Search Bar */}
 							<div className="relative flex-1 min-w-0">
 								<Input
 									placeholder="Search cases..."
 									value={q}
 									onChange={(e) => setQ(e.target.value)}
-									className="pl-11 pr-4 py-2.5 text-sm border-serene-neutral-200 rounded-2xl bg-white shadow-sm focus:ring-2 focus:ring-sauti-teal/20 focus:border-sauti-teal transition-all placeholder:text-serene-neutral-400"
+									className="pl-9 sm:pl-11 pr-4 py-2 sm:py-2.5 text-xs sm:text-sm border-serene-neutral-200 rounded-xl sm:rounded-2xl bg-white shadow-sm focus:ring-2 focus:ring-sauti-teal/20 focus:border-sauti-teal transition-all placeholder:text-serene-neutral-400 h-9 sm:h-11"
 								/>
-								<Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-4 w-4 text-serene-neutral-400" />
+								<Search className="absolute left-3 sm:left-4 top-1/2 transform -translate-y-1/2 h-3.5 sm:h-4 w-3.5 sm:w-4 text-serene-neutral-400" />
 							</div>
 
 							{/* Filter Toggle Button */}
@@ -885,7 +885,7 @@ export default function CasesMasterDetail({ userId }: { userId: string }) {
 								variant="outline"
 								size="sm"
 								onClick={() => setShowFilters(!showFilters)}
-								className={`h-10 px-4 rounded-2xl border-serene-neutral-200 hover:bg-white hover:border-sauti-teal/30 shadow-sm transition-all font-semibold ${
+								className={`h-9 sm:h-11 px-3 sm:px-4 rounded-xl sm:rounded-2xl border-serene-neutral-200 hover:bg-white hover:border-sauti-teal/30 shadow-sm transition-all font-bold text-[10px] sm:text-xs shrink-0 ${
 									urgencyFilter !== "all" ||
 									statusFilter !== "all" ||
 									onBehalfFilter !== "all"
@@ -893,65 +893,64 @@ export default function CasesMasterDetail({ userId }: { userId: string }) {
 										: "bg-white text-serene-neutral-600"
 								}`}
 							>
-								<Filter className="h-4 w-4 mr-1.5" />
-								Filters
+								<Filter className="h-3.5 sm:h-4 w-3.5 sm:w-4 sm:mr-1.5" />
+								<span className="hidden sm:inline">Filters</span>
 								{(urgencyFilter !== "all" ||
 									statusFilter !== "all" ||
 									onBehalfFilter !== "all") && (
-									<span className="ml-1.5 h-2 w-2 bg-sauti-teal rounded-full animate-pulse"></span>
+									<span className="ml-1.5 h-1.5 w-1.5 bg-sauti-teal rounded-full animate-pulse"></span>
 								)}
 							</Button>
 						</div>
 
 						{/* Collapsible Filter Panel */}
 						{showFilters && (
-							<div className="mt-3 p-4 bg-gray-50 rounded-lg border border-gray-200">
-								<div className="flex flex-col sm:flex-row sm:items-center gap-4">
-									<div className="flex flex-wrap items-center gap-3">
-										{/* Urgency Filter */}
-										<div className="flex flex-col gap-1">
-											<label className="text-xs font-medium text-gray-600">Urgency</label>
-											<select
-												value={urgencyFilter}
-												onChange={(e) => setUrgencyFilter(e.target.value)}
-												className="px-3 py-1.5 text-sm border border-gray-200 rounded-md bg-white focus:ring-2 focus:ring-[#1A3434]/20 focus:border-[#1A3434] min-w-[100px]"
-											>
-												<option value="all">All</option>
-												<option value="high">High</option>
-												<option value="medium">Medium</option>
-												<option value="low">Low</option>
-											</select>
-										</div>
-
-										{/* Status Filter */}
-										<div className="flex flex-col gap-1">
-											<label className="text-xs font-medium text-gray-600">Status</label>
-											<select
-												value={statusFilter}
-												onChange={(e) => setStatusFilter(e.target.value)}
-												className="px-3 py-1.5 text-sm border border-gray-200 rounded-md bg-white focus:ring-2 focus:ring-[#1A3434]/20 focus:border-[#1A3434] min-w-[120px]"
-											>
-												<option value="all">All</option>
-												<option value="pending">Pending</option>
-												<option value="matched">Matched</option>
-												<option value="appointment">With Appointment</option>
-											</select>
-										</div>
-
-										{/* On Behalf Filter */}
-										<div className="flex flex-col gap-1">
-											<label className="text-xs font-medium text-gray-600">Type</label>
-											<select
-												value={onBehalfFilter}
-												onChange={(e) => setOnBehalfFilter(e.target.value)}
-												className="px-3 py-1.5 text-sm border border-gray-200 rounded-md bg-white focus:ring-2 focus:ring-[#1A3434]/20 focus:border-[#1A3434] min-w-[100px]"
-											>
-												<option value="all">All</option>
-												<option value="yes">On Behalf</option>
-												<option value="no">Personal</option>
-											</select>
-										</div>
+							<div className="mt-2 p-3 bg-white rounded-xl border border-serene-neutral-100 shadow-xl shadow-slate-200/50">
+								<div className="grid grid-cols-2 xs:grid-cols-3 gap-3">
+									{/* Urgency Filter */}
+									<div className="flex flex-col gap-1">
+										<label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest pl-1">Urgency</label>
+										<select
+											value={urgencyFilter}
+											onChange={(e) => setUrgencyFilter(e.target.value)}
+											className="px-2.5 py-1.5 text-xs border border-serene-neutral-100 rounded-lg bg-slate-50 focus:ring-2 focus:ring-sauti-teal/20 focus:border-sauti-teal outline-none font-bold text-slate-700"
+										>
+											<option value="all">All Levels</option>
+											<option value="high">High</option>
+											<option value="medium">Medium</option>
+											<option value="low">Low</option>
+										</select>
 									</div>
+
+									{/* Status Filter */}
+									<div className="flex flex-col gap-1">
+										<label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest pl-1">Status</label>
+										<select
+											value={statusFilter}
+											onChange={(e) => setStatusFilter(e.target.value)}
+											className="px-2.5 py-1.5 text-xs border border-serene-neutral-100 rounded-lg bg-slate-50 focus:ring-2 focus:ring-sauti-teal/20 focus:border-sauti-teal outline-none font-bold text-slate-700"
+										>
+											<option value="all">All Status</option>
+											<option value="pending">Pending</option>
+											<option value="matched">Matched</option>
+											<option value="appointment">With Sessions</option>
+										</select>
+									</div>
+
+									{/* On Behalf Filter */}
+									<div className="flex flex-col gap-1 col-span-2 xs:col-span-1">
+										<label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest pl-1">Type</label>
+										<select
+											value={onBehalfFilter}
+											onChange={(e) => setOnBehalfFilter(e.target.value)}
+											className="px-2.5 py-1.5 text-xs border border-serene-neutral-100 rounded-lg bg-slate-50 focus:ring-2 focus:ring-sauti-teal/20 focus:border-sauti-teal outline-none font-bold text-slate-700"
+										>
+											<option value="all">All Types</option>
+											<option value="yes">On Behalf</option>
+											<option value="no">Personal</option>
+										</select>
+									</div>
+								</div>
 
 									{/* Clear Filters */}
 									{(urgencyFilter !== "all" ||
@@ -971,7 +970,6 @@ export default function CasesMasterDetail({ userId }: { userId: string }) {
 										</Button>
 									)}
 								</div>
-							</div>
 						)}
 					</div>
 
@@ -1038,20 +1036,20 @@ export default function CasesMasterDetail({ userId }: { userId: string }) {
 					}`}
 				>
                     <div className="h-full pb-8">
-                            <Card className="p-5 shadow-sm border-serene-neutral-200 rounded-2xl bg-white h-full flex flex-col">
-                                <div className="flex items-center justify-between mb-5">
+                            <Card className="p-4 sm:p-5 shadow-sm border-serene-neutral-200 rounded-2xl bg-white h-full flex flex-col">
+                                <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-5 gap-3">
                                     <div>
                                         <div className="flex items-center gap-2 mb-1">
-                                            <h3 className="text-base font-bold text-gray-900">
-                                                Appointments & Schedule
+                                            <h3 className="text-sm sm:text-base font-bold text-gray-900 uppercase">
+                                                Appointments
                                             </h3>
                                             {filtered.length > 0 && (
-                                                <span className="px-2 py-1 bg-teal-50 text-teal-700 text-[10px] font-bold uppercase tracking-widest rounded-full border border-teal-100">
-                                                    {filtered.length} active case{filtered.length === 1 ? "" : "s"}
+                                                <span className="px-2 py-0.5 bg-teal-50 text-teal-700 text-[8px] sm:text-[10px] font-bold uppercase tracking-widest rounded-full border border-teal-100">
+                                                    {filtered.length} Active
                                                 </span>
                                             )}
                                         </div>
-                                        <p className="text-xs font-medium text-gray-400">
+                                        <p className="text-[10px] sm:text-xs font-medium text-gray-400">
                                            Manage your upcoming sessions and availability
                                         </p>
                                     </div>
@@ -1067,12 +1065,12 @@ export default function CasesMasterDetail({ userId }: { userId: string }) {
                                 {/* Custom Calendar UI */}
                                 <div className="bg-white rounded-3xl overflow-hidden flex-1 flex flex-col">
                                     {/* View Mode Toggle + Navigation */}
-                                    <div className="flex items-center justify-between mb-6">
-                                        <div className="flex bg-slate-50 rounded-xl p-1 border border-slate-100">
+                                    <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 gap-4">
+                                        <div className="flex bg-slate-50 rounded-xl p-1 border border-slate-100 w-full sm:w-auto">
                                             <button
                                                 onClick={() => setCalendarViewMode('week')}
                                                 className={cn(
-                                                    "px-4 py-1.5 text-xs font-bold rounded-lg transition-all",
+                                                    "flex-1 sm:flex-none px-4 py-1.5 text-[10px] sm:text-xs font-bold rounded-lg transition-all",
                                                     calendarViewMode === 'week' 
                                                         ? "bg-white text-teal-600 shadow-sm"
                                                         : "text-slate-400 hover:text-slate-600"
@@ -1083,7 +1081,7 @@ export default function CasesMasterDetail({ userId }: { userId: string }) {
                                             <button
                                                 onClick={() => setCalendarViewMode('month')}
                                                 className={cn(
-                                                    "px-4 py-1.5 text-xs font-bold rounded-lg transition-all",
+                                                    "flex-1 sm:flex-none px-4 py-1.5 text-[10px] sm:text-xs font-bold rounded-lg transition-all",
                                                     calendarViewMode === 'month' 
                                                         ? "bg-white text-teal-600 shadow-sm"
                                                         : "text-slate-400 hover:text-slate-600"
@@ -1093,11 +1091,11 @@ export default function CasesMasterDetail({ userId }: { userId: string }) {
                                             </button>
                                         </div>
                                         
-                                        <div className="flex items-center gap-3">
-                                            <p className="text-sm font-bold text-slate-700">
+                                        <div className="flex items-center justify-between sm:justify-end gap-3 w-full sm:w-auto">
+                                            <p className="text-xs sm:text-sm font-bold text-slate-700 uppercase tracking-widest">
                                                 {calendarViewMode === 'week' 
                                                     ? `${weekDays[0].toLocaleDateString('default', { month: 'short', day: 'numeric' })} - ${weekDays[6].toLocaleDateString('default', { month: 'short', day: 'numeric' })}`
-                                                    : calendarSelectedDate.toLocaleDateString('default', { month: 'long', year: 'numeric' })
+                                                    : calendarSelectedDate.toLocaleDateString('default', { month: 'short', year: 'numeric' })
                                                 }
                                             </p>
                                             
@@ -1131,7 +1129,7 @@ export default function CasesMasterDetail({ userId }: { userId: string }) {
                                     </div>
 
                                     {/* Days Grid */}
-                                    <div className="grid grid-cols-7 gap-2 mb-6">
+                                    <div className="grid grid-cols-7 gap-1 sm:gap-2 mb-6">
                                         {['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map(day => (
                                             <div key={day} className="text-center text-[10px] font-bold text-slate-300 uppercase tracking-[0.2em]">
                                                 {day}
@@ -1148,7 +1146,7 @@ export default function CasesMasterDetail({ userId }: { userId: string }) {
                                                         key={idx}
                                                         onClick={() => setCalendarSelectedDate(day)}
                                                         className={cn(
-                                                            "relative aspect-square rounded-2xl flex flex-col items-center justify-center transition-all duration-300",
+                                                            "relative aspect-square rounded-xl sm:rounded-2xl flex flex-col items-center justify-center transition-all duration-300",
                                                             isSelected 
                                                                 ? "bg-teal-600 text-white shadow-lg shadow-teal-600/20" 
                                                                 : isToday 
@@ -1156,7 +1154,7 @@ export default function CasesMasterDetail({ userId }: { userId: string }) {
                                                                     : "hover:bg-slate-50 text-slate-600"
                                                         )}
                                                     >
-                                                        <span className="text-sm font-bold">{day.getDate()}</span>
+                                                        <span className="text-xs sm:text-sm font-bold">{day.getDate()}</span>
                                                         {dayAppointments.length > 0 && (
                                                             <div className="flex gap-0.5 mt-1">
                                                                 {Array.from({ length: Math.min(dayAppointments.length, 3) }).map((_, i) => (
@@ -1208,15 +1206,15 @@ export default function CasesMasterDetail({ userId }: { userId: string }) {
                                     </div>
 
                                     {/* Selected Date Details */}
-                                    <div className="pt-6 border-t border-slate-50 overflow-y-auto">
-                                        <h4 className="text-sm font-bold text-slate-900 mb-4 flex items-center justify-between">
+                                    <div className="pt-6 border-t border-slate-50 overflow-y-auto min-h-0 flex-1">
+                                        <h4 className="text-[10px] sm:text-xs font-bold text-slate-400 uppercase tracking-[0.2em] mb-4 flex items-center justify-between">
                                             <span>
                                                 {calendarSelectedDate.toDateString() === new Date().toDateString() 
                                                     ? "Today's Schedule" 
-                                                    : calendarSelectedDate.toLocaleDateString('default', { weekday: 'long', month: 'short', day: 'numeric' })
+                                                    : calendarSelectedDate.toLocaleDateString('default', { weekday: 'short', month: 'short', day: 'numeric' })
                                                 }
                                             </span>
-                                            <Calendar className="h-4 w-4 text-slate-300" />
+                                            <Calendar className="h-4 w-4 text-slate-200" />
                                         </h4>
                                         
                                         {(() => {
@@ -1317,10 +1315,8 @@ export default function CasesMasterDetail({ userId }: { userId: string }) {
                         </div>
 				</div>
 			</div>
-
-            {/* Overlay Detail Panel with animation */}
 			<div
-					className={`fixed inset-0 sm:inset-y-0 sm:right-0 sm:left-auto w-full sm:w-[600px] lg:w-[800px] bg-white shadow-2xl border-l border-serene-neutral-200 z-50 transform transition-transform duration-300 ease-out ${
+					className={`fixed inset-0 sm:inset-y-0 sm:right-0 sm:left-auto w-full sm:w-[600px] lg:w-[800px] bg-white shadow-2xl z-50 transform transition-transform duration-300 ease-out sm:border-l sm:border-serene-neutral-200 ${
 						selected
 							? "translate-y-0 sm:translate-x-0"
 							: "translate-y-full sm:translate-x-full"

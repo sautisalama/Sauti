@@ -101,7 +101,10 @@ export function useDashboard() {
 
   // Derived Stats
   const stats = useMemo(() => {
-    const reports = data?.reports || [];
+    const reports = (data?.reports || []).filter(r => {
+      const admin = (r.administrative as Record<string, any>) || {};
+      return !admin.is_archived;
+    });
     const matches = data?.matchedServices || [];
     const appointments = data?.appointments || [];
 

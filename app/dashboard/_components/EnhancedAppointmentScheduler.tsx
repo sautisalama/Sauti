@@ -86,60 +86,52 @@ interface EnhancedAppointmentSchedulerProps {
 /**
  * Highly Polished Analog Clock Widget with Framer Motion
  */
-function AnalogClockWidget({ hour, minute }: { hour: number; minute: number }) {
+/**
+ * Serene Analog Clock Widget - Ultra minimalist for a calm, professional atmosphere.
+ * Designed to be fully responsive and visually light.
+ */
+function SereneClockWidget({ hour, minute }: { hour: number; minute: number }) {
   const hourDeg = (hour % 12) * 30 + (minute / 60) * 30;
   const minuteDeg = minute * 6;
 
   return (
-    <div className="relative w-48 h-48 rounded-3xl bg-white flex items-center justify-center border-4 border-slate-50 shadow-2xl mx-auto group overflow-hidden">
-      {/* Dynamic Background Pattern */}
-      <div className="absolute inset-0 opacity-[0.03] select-none pointer-events-none">
-        <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_center,_#004A99_1px,_transparent_1px)] bg-[size:12px_12px]" />
+    <div className="relative w-32 h-32 xs:w-40 xs:h-40 sm:w-56 sm:h-56 rounded-full bg-white flex items-center justify-center border-[0.5px] border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.04)] mx-auto group ring-[12px] ring-slate-50/30">
+      {/* Dynamic Background Pattern - Very subtle */}
+      <div className="absolute inset-0 opacity-[0.02] select-none pointer-events-none">
+        <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_center,_#105D5D_0.5px,_transparent_0.5px)] bg-[size:16px_16px]" />
       </div>
 
-      {/* Markers */}
+      {/* Simplified Markers - Minimalist dots */}
       {[...Array(12)].map((_, i) => (
-        <div key={i} className="absolute inset-4 text-center" style={{ transform: `rotate(${i * 30}deg)` }}>
+        <div key={i} className="absolute inset-3 text-center" style={{ transform: `rotate(${i * 30}deg)` }}>
           <div className={cn(
-            "w-0.5 rounded-full mx-auto shadow-sm",
-            i % 3 === 0 ? "h-3.5 bg-slate-300" : "h-2 bg-slate-100"
+            "w-0.5 rounded-full mx-auto",
+            i % 3 === 0 ? "h-1.5 bg-slate-200" : "h-0.5 bg-slate-100"
           )} />
-          {i % 3 === 0 && (
-             <span className="text-[10px] font-black text-slate-200 mt-1 block tracking-tighter" style={{ transform: `rotate(-${i * 30}deg)` }}>
-               {i === 0 ? 12 : i}
-             </span>
-          )}
         </div>
       ))}
       
-      {/* Large Glowing Center Piece */}
-      <div className="absolute w-44 h-44 rounded-full border border-slate-50/50 flex items-center justify-center">
-         <div className="w-[176px] h-[176px] rounded-full border border-slate-100/30" />
-      </div>
-
-      {/* Hour Hand */}
+      {/* Hour Hand - Soft, elegant */}
       <motion.div
         animate={{ rotate: hourDeg }}
-        transition={{ type: "spring", stiffness: 300, damping: 30 }}
-        className="absolute w-2 h-14 bg-slate-800 rounded-full origin-bottom shadow-lg z-10"
+        transition={{ type: "spring", stiffness: 120, damping: 20 }}
+        className="absolute w-1 h-[28%] bg-slate-400 rounded-full origin-bottom z-10"
         style={{ bottom: "50%", x: "0%", transformOrigin: "bottom" }}
       />
       
-      {/* Minute Hand */}
+      {/* Minute Hand - Teal accent, very thin */}
       <motion.div
         animate={{ rotate: minuteDeg }}
-        transition={{ type: "spring", stiffness: 200, damping: 25 }}
-        className="absolute w-1.5 h-16 bg-blue-500 rounded-full origin-bottom shadow-lg z-20"
+        transition={{ type: "spring", stiffness: 100, damping: 25 }}
+        className="absolute w-0.5 h-[38%] bg-teal-500 rounded-full origin-bottom z-20"
         style={{ bottom: "50%", x: "0%", transformOrigin: "bottom" }}
       />
       
-      {/* Floating Center Cap */}
-      <div className="absolute w-4 h-4 bg-[#004A99] rounded-full z-30 ring-4 ring-white shadow-xl flex items-center justify-center">
-         <div className="w-1 h-1 bg-white rounded-full opacity-50" />
-      </div>
+      {/* Minimal Center Cap */}
+      <div className="absolute w-2 h-2 bg-white rounded-full z-30 ring-2 ring-slate-100 shadow-sm" />
       
-      {/* Decorative Outer Rings */}
-      <div className="absolute -top-1 -left-1 -right-1 -bottom-1 border border-slate-50 rounded-3xl pointer-events-none" />
+      {/* Floating Ambient Glow */}
+      <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-teal-50/10 to-transparent pointer-events-none" />
     </div>
   );
 }
@@ -230,7 +222,7 @@ export function EnhancedAppointmentScheduler({
     }
 
     return (
-      <div className={cn("rounded-[1.5rem] p-4 flex-1 border border-slate-100/50", COLORS.teal, "bg-opacity-40")}>
+      <div className={cn("rounded-[2rem] p-4 flex-1 border border-slate-100/30", COLORS.teal, "bg-opacity-30 backdrop-blur-sm shadow-inner")}>
         <div className="flex items-center justify-between mb-4">
           <div className="flex bg-white/40 rounded-lg p-0.5 border border-white/40">
             <button onClick={() => setCalendarViewMode('week')} className={cn("px-2.5 py-1.5 text-[9px] font-bold uppercase tracking-wider rounded-md transition-all", calendarViewMode === 'week' ? "bg-white text-[#105D5D] shadow-sm" : "opacity-50")}>Week</button>
@@ -286,9 +278,9 @@ export function EnhancedAppointmentScheduler({
               <label className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] leading-none">Set Time</label>
             </div>
 
-            <div className={cn("rounded-[1.5rem] p-6 flex-1 flex flex-col items-center justify-center gap-6", COLORS.blue, "bg-opacity-40")}>
-              <div className="opacity-60 transition-opacity hover:opacity-100">
-                <AnalogClockWidget hour={ampm === "PM" ? parseInt(hour) + 12 : parseInt(hour)} minute={parseInt(minute)} />
+            <div className={cn("rounded-[2rem] p-6 flex-1 flex flex-col items-center justify-center gap-6", COLORS.blue, "bg-opacity-30 backdrop-blur-sm shadow-inner")}>
+              <div className="transition-all duration-700 hover:scale-[1.02]">
+                <SereneClockWidget hour={ampm === "PM" ? parseInt(hour) + 12 : parseInt(hour)} minute={parseInt(minute)} />
               </div>
               
               <div className="flex items-center gap-2 justify-center w-full max-w-[240px]">
@@ -366,15 +358,15 @@ export function EnhancedAppointmentScheduler({
         {/* Action Center */}
         <div className="space-y-4">
            {/* Subtle Status Bar */}
-           <div className={cn("flex items-center justify-between p-4 rounded-2xl border border-white/50 relative overflow-hidden", COLORS.muted, "bg-opacity-40 shadow-none")}>
-              <div className="flex items-center gap-3 relative z-10 text-slate-500 font-medium text-xs">
+           <div className={cn("flex items-center justify-between p-5 rounded-[1.5rem] border border-white/50 relative overflow-hidden", COLORS.muted, "bg-opacity-50 shadow-sm")}>
+              <div className="flex flex-col sm:flex-row sm:items-center gap-3 relative z-10 text-slate-500 font-medium text-[11px]">
                  <div className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-teal-600" />
+                    <CheckCircle2 className="h-4 w-4 text-teal-500" />
                     <span>Scheduled for <span className="text-slate-900 font-bold">{format(selectedDateTime, "EEEE do")}</span></span>
                  </div>
-                 <div className="w-1 h-1 rounded-full bg-slate-300" />
+                 <div className="hidden sm:block w-1 h-1 rounded-full bg-slate-200" />
                  <div className="flex items-center gap-2">
-                    <Clock className="h-4 w-4 text-teal-600" />
+                    <Clock className="h-4 w-4 text-teal-500" />
                     <span>at <span className="text-slate-900 font-bold">{format(selectedDateTime, "h:mm a")}</span></span>
                  </div>
               </div>
@@ -409,11 +401,11 @@ export function EnhancedAppointmentScheduler({
           <DialogHeader>
             <div className="flex items-center justify-between">
               <div>
-                <DialogTitle className="text-xl font-bold text-slate-900 tracking-tight leading-none uppercase">Schedule & Accept</DialogTitle>
-                <div className="flex items-center gap-2 mt-1">
+                <DialogTitle className="text-xl font-bold text-slate-900 tracking-tight leading-none uppercase">Coordination Session</DialogTitle>
+                <div className="flex flex-col sm:flex-row sm:items-center gap-2 mt-2">
                   <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.1em]">Coordination Protocol</p>
-                  <span className="w-1 h-1 rounded-full bg-slate-200" />
-                  <p className="text-[10px] font-bold text-teal-600/60 uppercase tracking-[0.1em]">Verification Level 4</p>
+                  <span className="hidden sm:block w-1 h-1 rounded-full bg-slate-200" />
+                  <p className="text-[10px] font-bold text-teal-500/60 uppercase tracking-[0.1em]">Verification Level 4</p>
                 </div>
               </div>
             </div>
@@ -432,7 +424,7 @@ export function EnhancedAppointmentScheduler({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[800px] bg-white rounded-[2rem] p-0 overflow-hidden border-0 shadow-2xl max-h-[92vh] flex flex-col focus:outline-none">
+      <DialogContent className="w-[95vw] sm:max-w-[750px] bg-white rounded-[2.5rem] p-0 overflow-hidden border-0 shadow-2xl max-h-[95vh] flex flex-col focus:outline-none scrollbar-hide">
         {content}
       </DialogContent>
     </Dialog>

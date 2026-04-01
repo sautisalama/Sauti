@@ -206,43 +206,44 @@ export default function AdminDashboard() {
             <AdminActivitySection />
 
             {/* Quick Action Grid */}
-            <div>
-                <SereneSectionHeader title="Management Console" description="Quick access to core administrative functions" />
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            <div className="pb-10">
+                <SereneSectionHeader title="Management Console" description="Core administrative functions" />
+                <div className="grid grid-cols-1 xs:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4 md:gap-6">
                      <SereneQuickActionCard 
                         title="Verifications"
-                        description={stats ? `${stats.pendingVerifications} Pending` : "Manage queue"}
-                        icon={<Shield className="h-6 w-6 text-sauti-red" />}
+                        description={stats ? `${stats.pendingVerifications} Pending` : "Queue"}
+                        icon={<Shield className="h-5 w-5 sm:h-6 sm:w-6 text-sauti-red" />}
                         href="/dashboard/admin/review"
                         variant="custom"
-                        className="bg-sauti-red-light border-sauti-red/10 shadow-sm hover:shadow-md transition-all"
+                        className="bg-sauti-red-light border-sauti-red/10 shadow-sm hover:shadow-md transition-all rounded-2xl p-4 sm:p-5"
                         badge={stats?.pendingVerifications || undefined}
                         badgeClassName="bg-sauti-red text-white"
                      />
                      <SereneQuickActionCard 
                         title="Services"
-                        description={stats ? `${stats.activeServices} Active` : "Manage Directory"}
-                        icon={<Building2 className="h-6 w-6 text-sauti-yellow" />}
+                        description={stats ? `${stats.activeServices} Active` : "Directory"}
+                        icon={<Building2 className="h-5 w-5 sm:h-6 sm:w-6 text-sauti-yellow" />}
                         href="/dashboard/admin/services"
                         variant="custom"
-                        className="bg-sauti-yellow-light border-sauti-yellow/10 shadow-sm hover:shadow-md transition-all"
+                        className="bg-sauti-yellow-light border-sauti-yellow/10 shadow-sm hover:shadow-md transition-all rounded-2xl p-4 sm:p-5"
                         stats={stats?.serviceGrowth}
                      />
                      <SereneQuickActionCard 
-                        title="Service Providers"
-                        description={stats ? `${stats.totalServiceProviders} Registered` : "Userbase"}
-                        icon={<Users className="h-6 w-6 text-sauti-teal" />}
+                        title="Providers"
+                        description={stats ? `${stats.totalServiceProviders} Users` : "Userbase"}
+                        icon={<Users className="h-5 w-5 sm:h-6 sm:w-6 text-sauti-teal" />}
                         href="/dashboard/admin/professionals"
                         variant="custom"
-                        className="bg-sauti-teal-light border-sauti-teal/10 shadow-sm hover:shadow-md transition-all"
+                        className="bg-sauti-teal-light border-sauti-teal/10 shadow-sm hover:shadow-md transition-all rounded-2xl p-4 sm:p-5"
                         stats={stats?.serviceProviderGrowth}
                      />
                      <SereneQuickActionCard 
                         title="Content"
                         description="Blogs & Events"
-                        icon={<BookOpen className="h-5 w-5" />}
+                        icon={<BookOpen className="h-5 w-5 sm:h-6 sm:w-6 text-sauti-dark/60" />}
                         href="/dashboard/admin/blogs"
                         variant="neutral"
+                        className="rounded-2xl p-4 sm:p-5 border-serene-neutral-200"
                         stats={stats?.blogGrowth}
                      />
                 </div>

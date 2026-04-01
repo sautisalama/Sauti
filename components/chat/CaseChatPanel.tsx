@@ -32,6 +32,7 @@ interface CaseChatPanelProps {
   survivorId: string;
   professionalId: string;
   professionalName: string;
+  professionalType?: string;
   survivorName: string;
   existingChatId?: string;
   onClose?: () => void;
@@ -45,6 +46,7 @@ export function CaseChatPanel({
   survivorId,
   professionalId,
   professionalName,
+  professionalType,
   survivorName,
   existingChatId,
   onClose,
@@ -272,6 +274,7 @@ export function CaseChatPanel({
   };
 
   const otherPartyName = currentUserId === professionalId ? survivorName : professionalName;
+  const otherPartyRole = currentUserId === professionalId ? 'Survivor' : (professionalType || 'Support Specialist');
 
   // Render loading state
   if (isLoading) {
@@ -302,32 +305,39 @@ export function CaseChatPanel({
   return (
     <div className={`flex flex-col bg-white rounded-2xl border border-serene-neutral-100 shadow-sm overflow-hidden ${className}`}>
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 bg-gradient-to-r from-serene-blue-50 to-serene-blue-100/30 border-b border-serene-neutral-100">
+      <div className="flex items-center justify-between px-4 py-3 bg-white border-b border-serene-neutral-100">
         <div className="flex items-center gap-3">
           <Avatar className="h-9 w-9 ring-2 ring-white shadow-sm">
-            <AvatarFallback className="bg-serene-blue-100 text-serene-blue-600 font-bold text-sm">
+            <AvatarFallback className="bg-teal-50 text-teal-600 font-bold text-sm">
               {otherPartyName.charAt(0).toUpperCase()}
             </AvatarFallback>
           </Avatar>
           <div>
-            <h4 className="font-semibold text-serene-neutral-900 text-sm leading-tight">{otherPartyName}</h4>
-            <p className="text-xs text-serene-neutral-500">Case Chat</p>
+            <h4 className="font-bold text-slate-900 text-sm leading-tight">{otherPartyName}</h4>
+            <div className="flex items-center gap-1.5 mt-0.5">
+                <span className="text-[10px] text-teal-600/70 font-extrabold uppercase tracking-widest">{otherPartyRole}</span>
+                <div className="w-1 h-1 rounded-full bg-slate-200" />
+                <div className="flex items-center gap-1 text-emerald-500 font-bold">
+                    <Lock className="h-2.5 w-2.5" />
+                    <span className="text-[9px] uppercase tracking-wider">Secure</span>
+                </div>
+            </div>
           </div>
         </div>
         <div className="flex items-center gap-1">
-          <Button variant="ghost" size="icon" className="h-8 w-8 text-serene-neutral-400 hover:text-serene-blue-600" disabled>
+          <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-300 hover:text-teal-600" disabled>
             <Phone className="h-4 w-4" />
           </Button>
-          <Button variant="ghost" size="icon" className="h-8 w-8 text-serene-neutral-400 hover:text-serene-blue-600" disabled>
+          <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-300 hover:text-teal-600" disabled>
             <Video className="h-4 w-4" />
           </Button>
           {onToggleExpand && (
-            <Button variant="ghost" size="icon" className="h-8 w-8 text-serene-neutral-400 hover:text-serene-neutral-600" onClick={onToggleExpand}>
+            <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-slate-600" onClick={onToggleExpand}>
               {isExpanded ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
             </Button>
           )}
           {onClose && (
-            <Button variant="ghost" size="icon" className="h-8 w-8 text-serene-neutral-400 hover:text-red-500" onClick={onClose}>
+            <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-red-500" onClick={onClose}>
               <X className="h-4 w-4" />
             </Button>
           )}
@@ -335,24 +345,8 @@ export function CaseChatPanel({
       </div>
 
       {/* Messages */}
-      <div className={`flex-1 overflow-y-auto p-4 space-y-2 bg-serene-neutral-50/50 ${isExpanded ? 'h-[500px]' : 'h-[300px]'}`}>
-        {/* Security notice */}
-        <div className="flex justify-center mb-4">
-          <div className="bg-white/80 backdrop-blur-sm px-3 py-1.5 rounded-full text-xs text-serene-neutral-500 shadow-sm border border-serene-neutral-100 flex items-center gap-2">
-            <Lock className="h-3 w-3" />
-            Messages are end-to-end encrypted
-          </div>
-        </div>
-
-        {/* Date separator for first message */}
-        {messages.length > 0 && (
-          <div className="flex justify-center mb-4">
-            <span className="text-xs text-serene-neutral-400 bg-white px-3 py-1 rounded-full shadow-sm border border-serene-neutral-100">
-              {format(new Date(messages[0].created_at), 'MMMM d, yyyy')}
-            </span>
-          </div>
-        )}
-
+      <div className={`flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50/20 ${isExpanded ? 'h-[500px]' : 'h-[300px]'}`}>
+        <div ref={messagesEndRef} />
         {messages.map((msg, idx) => {
           const isOwn = msg.sender_id === currentUserId;
           const showTail = idx === 0 || messages[idx - 1].sender_id !== msg.sender_id;
@@ -365,7 +359,6 @@ export function CaseChatPanel({
             />
           );
         })}
-        <div ref={messagesEndRef} />
       </div>
 
       {/* Link Preview */}
