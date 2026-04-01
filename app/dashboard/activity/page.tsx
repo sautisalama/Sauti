@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { createClient } from "@/utils/supabase/client";
 import { useUser } from "@/hooks/useUser";
-import { SereneActivityItem, SereneSectionHeader } from "../_components/SurvivorDashboardComponents";
+import { SereneActivityItem } from "../_components/SereneDashboardUI";
 import { Bell, Calendar, CheckCircle, MessageCircle, Shield } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatDistanceToNow, isSameDay, subDays, parseISO } from "date-fns";
@@ -16,9 +16,6 @@ export default function ActivityPage() {
      const fetchActivity = async () => {
         if (!user?.id) return;
         const supabase = createClient();
-        
-        // We'll simulate a unified stream by fetching notifications, report updates, and appointments
-        // In a real production app, this might be a dedicated 'activity_feed' view or table
         
         const { data: notifications } = await supabase
            .from('notifications')

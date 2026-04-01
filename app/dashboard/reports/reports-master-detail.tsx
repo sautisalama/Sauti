@@ -69,6 +69,7 @@ interface AppointmentLite {
 interface ReportItem extends Tables<"reports"> {
 	matched_services?: Array<{
 		id: string;
+		chat_id?: string | null;
 		match_status_type: any;
 		support_services: {
 			id: string;

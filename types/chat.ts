@@ -108,6 +108,7 @@ export interface Message {
   reactions?: MessageReactions;
   read_by?: ReadReceipt[];
   delivered_at?: string;
+  is_read?: boolean;
   is_deleted?: boolean;
   deleted_at?: string;
   reply_to_id?: string;

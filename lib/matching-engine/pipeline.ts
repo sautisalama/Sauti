@@ -148,7 +148,7 @@ export async function runMatchingPipeline(
   // ─── Stage 1: Candidate Aggregation ───────────────────────────────────────
 
   const { verified: candidates } = await buildCandidatePool(supabase, {
-    reporter_id: report.user_id,
+    reporter_id: report.user_id ?? undefined,
   });
 
   if (candidates.length === 0) {
@@ -274,7 +274,7 @@ export async function runSimulation(
   // Get ALL candidates (including unverified for viz)
   const { verified, unverified } = await buildCandidatePool(supabase, {
     include_unverified: true,
-    reporter_id: report.user_id,
+    reporter_id: report.user_id ?? undefined,
   });
 
   // Get existing matches for this report

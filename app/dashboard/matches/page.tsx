@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useMemo } from "react";
 import { createClient } from "@/utils/supabase/client";
-import { SereneProviderCard, SereneSectionHeader } from "../_components/SurvivorDashboardComponents";
+import { SereneProviderCard, SereneSectionHeader } from "../_components/SereneDashboardUI";
 import { useDashboardData } from "@/components/providers/DashboardDataProvider";
 import { Shield, Heart, Search, MessageCircle, Calendar, CheckCircle2, Clock, AlertTriangle } from "lucide-react";
 import { Input } from "@/components/ui/input";

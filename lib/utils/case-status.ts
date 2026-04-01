@@ -13,7 +13,7 @@ export function getReportStatus(report: ReportWithRelations): string {
     }
     
     // 2. Acceptance / Active state
-    if (report.match_status === 'accepted' || matches.some(m => m.match_status_type === 'accepted' || m.match_status_type === 'active')) {
+    if (report.match_status === 'accepted' || matches.some(m => m.match_status_type === 'accepted')) {
         return 'accepted';
     }
     
@@ -28,8 +28,8 @@ export function getReportStatus(report: ReportWithRelations): string {
     }
 
     // 5. General Matched state (Proposed)
-    if (matches.length > 0 && matches.some(m => m.match_status_type === 'proposed' || m.match_status_type === 'matched')) {
-        return 'matched';
+    if (matches.length > 0 && matches.some(m => m.match_status_type === 'proposed')) {
+        return 'proposed';
     }
     
     // 6. Default to the report's native status or 'pending'
@@ -43,7 +43,7 @@ export function getReportStatus(report: ReportWithRelations): string {
 export function getMatchStatus(match: MatchedServiceWithRelations): string {
     const status = match.match_status_type;
     
-    if (status === 'active' || status === 'accepted') return 'accepted';
+    if (status === 'accepted') return 'accepted';
     return status || 'pending';
 }
 
@@ -56,7 +56,7 @@ export function getStatusTheme(status: string): string {
             return "bg-serene-blue-50 text-serene-blue-700 shadow-serene-blue-100/50";
         case 'accepted':
             return "bg-serene-green-50 text-serene-green-700 shadow-serene-green-100/50";
-        case 'matched':
+        case 'proposed':
             return "bg-serene-blue-50 text-serene-blue-600 shadow-serene-blue-50/50";
         case 'pending_survivor':
             return "bg-amber-50 text-amber-700 shadow-amber-50/50";

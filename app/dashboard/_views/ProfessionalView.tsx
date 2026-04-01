@@ -4,83 +4,33 @@ import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { Tables } from "@/types/db-schema";
-import { createClient } from "@/utils/supabase/client";
-import { useToast } from "@/hooks/use-toast";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import {
-	Dialog,
-	DialogContent,
-	DialogHeader,
-	DialogTitle,
-	DialogDescription,
-} from "@/components/ui/dialog";
-import {
-	AlertDialog,
-	AlertDialogAction,
-	AlertDialogCancel,
-	AlertDialogContent,
-	AlertDialogDescription,
-	AlertDialogFooter,
-	AlertDialogHeader,
-	AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import {
-	Search,
-	ClipboardList,
-	Users,
-	CalendarDays,
-	MessageCircle,
-	BookOpen,
-	Briefcase,
-	ChevronRight,
-	ChevronUp,
-	ChevronDown,
-	SlidersHorizontal,
-	Lock,
-	Clock,
+import { 
+	Users, 
+	MessageCircle, 
+	Briefcase, 
+	BookOpen, 
 	Plus,
-	AlertTriangle,
-	FileText,
-	TrendingUp,
 	Shield,
-	Calendar,
-    AlertCircle, 
-    CheckCircle, 
-    ArrowRight,
-    Loader2, 
-    User, 
-    Sparkles 
+	ChevronRight,
+	FileText
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useDashboardData } from "@/components/providers/DashboardDataProvider";
-import {
-	SereneWelcomeHeader,
-	SereneQuickActionCard,
-	SereneSectionHeader,
-    SereneIncidentActivityCard
-} from "../_components/SurvivorDashboardComponents";
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { useDashboard } from "../use-dashboard";
+import { 
+	SereneWelcomeHeader, 
+	SereneQuickActionCard, 
+	SereneSectionHeader, 
+	SereneActivityCard,
+	VerificationBanner,
+	CalendarWidget,
+	DashboardSearchOverlay,
+	DashboardEmptyState
+} from "../_components/SereneDashboardUI";
 import { CalendarConnectionStatus } from "../_components/CalendarConnectionStatus";
-import { ReportWithRelations, MatchedServiceWithRelations, AppointmentWithDetails } from "../_types";
-import { fetchUserReports, deleteReport } from "./actions/reports";
-import { fetchUserSupportServices, deleteSupportService } from "./actions/support-services";
-import { fetchMatchedServices } from "./actions/matched-services";
-import { fetchUserAppointments } from "./actions/appointments";
-import { matchProfessionalWithUnmatchedReports } from "@/app/actions/match-services";
 import { OutOfOfficeBanner } from "@/components/dashboard/OutOfOfficeBanner";
-import { getReportStatus, getMatchStatus, getStatusTheme } from "@/lib/utils/case-status";
-
-interface Recommendation {
-  id: string;
-  content: string;
-  is_shared_with_survivor: boolean;
-  shared_at: string | null;
-  created_at: string | null;
-  updated_at: string | null;
-}
+import { getMatchStatus, getStatusTheme } from "@/lib/utils/case-status";
 
 interface ProfessionalViewProps {
 	userId: string;
@@ -91,206 +41,38 @@ export default function ProfessionalView({
 	userId,
 	profileDetails,
 }: ProfessionalViewProps) {
-	const dash = useDashboardData();
-	const { toast } = useToast();
+	const { 
+		reports, 
+		matchedServices, 
+		supportServices, 
+		appointments, 
+		stats, 
+		getTimeOfDay, 
+		setIsReportDialogOpen 
+	} = useDashboard();
+
     const searchParams = useSearchParams();
     const router = useRouter(); 
     const pathname = usePathname();
 	const searchQuery = searchParams.get("q") || "";
-	const reportDialogOpen = dash?.isReportDialogOpen || false;
-	const setReportDialogOpen = dash?.setIsReportDialogOpen || (() => {});
+	
 	const [isWelcomeCompact, setIsWelcomeCompact] = useState(false);
-	const [isCalendarExpanded, setIsCalendarExpanded] = useState(false);
-	const [selectedDate, setSelectedDate] = useState(new Date());
-	const [calendarViewMode, setCalendarViewMode] = useState<'week' | 'month'>('week');
 	const [dashboardTab, setDashboardTab] = useState<'cases' | 'reports'>('cases');
 
-	// State
-	const [reports, setReports] = useState<ReportWithRelations[]>(() => {
-		const seeded = (dash?.data?.reports as ReportWithRelations[]) || [];
-		return seeded;
-	});
-	const [supportServices, setSupportServices] = useState<Tables<"support_services">[]>(() => {
-		return (dash?.data?.supportServices as Tables<"support_services">[]) || [];
-	});
-	const [matchedServices, setMatchedServices] = useState<MatchedServiceWithRelations[]>(() => {
-		return (dash?.data?.matchedServices as MatchedServiceWithRelations[]) || [];
-	});
-	const [appointments, setAppointments] = useState<AppointmentWithDetails[]>(() => {
-		return (dash?.data?.appointments as AppointmentWithDetails[]) || [];
-	});
-
-	const getTimeOfDay = (): "morning" | "afternoon" | "evening" => {
-		const hour = new Date().getHours();
-		if (hour < 12) return "morning";
-		if (hour < 18) return "afternoon";
-		return "evening";
-	};
-
-	// Auto-compact welcome after 30s
 	useEffect(() => {
 		const timer = setTimeout(() => setIsWelcomeCompact(true), 30000);
 		return () => clearTimeout(timer);
 	}, []);
 
-	// Load data from provider or fetch
+	// Auto-switch to reports if no cases but has reports
 	useEffect(() => {
-		const loadData = async () => {
-			try {
-				const [userReports, userServices, userMatches, userAppointments] = await Promise.all([
-					fetchUserReports(userId),
-					fetchUserSupportServices(userId),
-					fetchMatchedServices(userId),
-					fetchUserAppointments(userId, "professional", true),
-				]);
-
-                const reports = (userReports as ReportWithRelations[]) || [];
-                const matches = (userMatches as MatchedServiceWithRelations[]) || [];
-
-				setReports(reports);
-				setSupportServices(userServices);
-				setMatchedServices(matches);
-				setAppointments(userAppointments || []);
-
-                // Determine active tab based on latest activity
-                const latestReport = reports.length > 0 
-                    ? Math.max(...reports.map(r => new Date(r.submission_timestamp || 0).getTime())) 
-                    : 0;
-                const latestMatch = matches.length > 0 
-                    ? Math.max(...matches.map(m => new Date(m.updated_at || m.match_date || 0).getTime())) 
-                    : 0;
-                
-                if (latestReport > latestMatch && reports.length > 0) {
-                    setDashboardTab('reports');
-                } else if (matches.length > 0) {
-                    setDashboardTab('cases');
-                } else {
-                    setDashboardTab('cases'); // Default if empty
-                }
-
-			} catch {
-				toast({
-					title: "Error",
-					description: "Failed to load data. Please try again.",
-					variant: "destructive",
-				});
-			}
-		};
-
-		if (dash?.data && dash.data.userId === userId) {
-            const reportsData = (dash.data.reports as ReportWithRelations[]) || [];
-            const matchesData = (dash.data.matchedServices as MatchedServiceWithRelations[]) || [];
-
-			setReports(reportsData);
-			setSupportServices(dash.data.supportServices || []);
-			setMatchedServices(matchesData);
-			setAppointments(dash.data.appointments || []);
-
-            // Activity-based tab selection from cached data
-            const latestReport = reportsData.length > 0 
-                ? Math.max(...reportsData.map(r => new Date(r.submission_timestamp || 0).getTime())) 
-                : 0;
-            const latestMatch = matchesData.length > 0 
-                ? Math.max(...matchesData.map((m: any) => new Date(m.updated_at || m.match_date || 0).getTime())) 
-                : 0;
-
-            if (latestReport > latestMatch && reportsData.length > 0) {
-                setDashboardTab('reports');
-            } else if (matchesData.length > 0) {
-                setDashboardTab('cases');
-            }
-            
-            // Proactive matching if NO cases!
-            if (matchesData.length === 0 && (dash.data.supportServices?.length || 0) > 0) {
-                matchProfessionalWithUnmatchedReports(userId).then(res => {
-                    if (res && (res as any).matched > 0) {
-                        toast({
-                            title: "New matches found!",
-                            description: `We've found ${ (res as any).matched } potential cases for your services.`,
-                        });
-                        fetchMatchedServices(userId).then(setMatchedServices);
-                    }
-                });
-            }
-			return;
+		if (matchedServices.length === 0 && reports.length > 0) {
+			setDashboardTab('reports');
 		}
-		loadData();
-	}, [userId, toast, dash?.data]);
+	}, [matchedServices.length, reports.length]);
 
-	// Realtime reports subscription
-	useEffect(() => {
-		const supabase = createClient();
-		const channel = supabase
-			.channel(`realtime_professional_reports_${userId}`)
-			.on(
-				'postgres_changes',
-				{ event: '*', schema: 'public', table: 'reports', filter: `user_id=eq.${userId}` },
-				async (payload) => {
-					const targetId = payload.new ? (payload.new as any).report_id : (payload.old as any).report_id;
-					if (!targetId) return;
-					
-					const { data } = await supabase
-						.from('reports')
-						.select(`
-							*,
-							matched_services (
-								*,
-								service_details:support_services!matched_services_service_id_fkey (
-									*
-								),
-								appointments (
-									*
-								)
-							)
-						`)
-						.eq('report_id', targetId)
-						.maybeSingle();
-
-					if (data) {
-						setReports((prev) => {
-							const exists = prev.some(r => r.report_id === data.report_id);
-							if (exists) {
-								return prev.map(r => r.report_id === data.report_id ? (data as any) : r);
-							} else {
-								return [data as any, ...prev].sort((a, b) => 
-									new Date(b.submission_timestamp || 0).getTime() - new Date(a.submission_timestamp || 0).getTime()
-								);
-							}
-						});
-					}
-				}
-			)
-			.subscribe();
-		return () => {
-			supabase.removeChannel(channel);
-		};
-	}, [userId]);
-
-	// Computed stats
-	const activeCasesCount = matchedServices.length;
-
-
-	const pendingCasesCount = useMemo(
-		() => matchedServices.filter(m => m.match_status_type?.toLowerCase() === 'pending').length,
-		[matchedServices]
-	);
-	const upcomingAppointments = useMemo(
-		() => appointments.filter(a => a.appointment_date && new Date(a.appointment_date) > new Date()).length,
-		[appointments]
-	);
-
-
-	// Verification status
-	const isVerified = useMemo(() => {
-		const verStatus = (dash?.data as any)?.verification?.overallStatus;
-		if (verStatus === "verified") return true;
-		const required = [profileDetails?.first_name, profileDetails?.phone, profileDetails?.professional_title];
-		return required.every(v => v && typeof v === 'string' && v.trim() !== "");
-	}, [dash?.data, profileDetails]);
-
-	// Filter cases by search
 	const filteredCases = useMemo(() => {
-		if (!searchQuery) return matchedServices.slice(0, 5);
+		if (!searchQuery) return matchedServices;
 		const q = searchQuery.toLowerCase();
 		return matchedServices.filter(m =>
 			(m.report?.type_of_incident || "").toLowerCase().includes(q) ||
@@ -299,278 +81,46 @@ export default function ProfessionalView({
 		);
 	}, [matchedServices, searchQuery]);
 
-	// Get week days for calendar
-	const getWeekDays = (baseDate: Date) => {
-		const start = new Date(baseDate);
-		start.setDate(start.getDate() - start.getDay());
-		return Array.from({ length: 7 }, (_, i) => {
-			const day = new Date(start);
-			day.setDate(start.getDate() + i);
-			return day;
-		});
-	};
-
-	const weekDays = useMemo(() => getWeekDays(selectedDate), [selectedDate]);
-
-	// Get month days for calendar (full grid including prev/next month days)
-	const getMonthDays = (baseDate: Date) => {
-		const year = baseDate.getFullYear();
-		const month = baseDate.getMonth();
-		const firstDay = new Date(year, month, 1);
-		const lastDay = new Date(year, month + 1, 0);
-		const startPadding = firstDay.getDay();
-		const totalDays = lastDay.getDate();
-		const weeks = Math.ceil((startPadding + totalDays) / 7);
-		const days: { date: Date; isCurrentMonth: boolean }[] = [];
-		
-		for (let i = 0; i < weeks * 7; i++) {
-			const day = new Date(year, month, 1 - startPadding + i);
-			days.push({
-				date: day,
-				isCurrentMonth: day.getMonth() === month
-			});
-		}
-		return days;
-	};
-
-	const monthDays = useMemo(() => getMonthDays(selectedDate), [selectedDate]);
-
-	// Get appointments for a specific day
-	const getAppointmentsForDay = (date: Date) => {
-		return appointments.filter(a => {
-			if (!a.appointment_date) return false;
-			const apptDate = new Date(a.appointment_date);
-			return apptDate.toDateString() === date.toDateString();
-		});
-	};
-
-	const selectedDayAppointments = useMemo(
-		() => getAppointmentsForDay(selectedDate),
-		// eslint-disable-next-line react-hooks/exhaustive-deps
-		[selectedDate, appointments]
-	);
-
 	return (
 		<div className="min-h-screen bg-serene-neutral-50 pb-24">
-
-
 			<div className="max-w-4xl mx-auto px-4 lg:px-6 pt-4 lg:pt-8 space-y-8 min-h-[calc(100vh-80px)]">
-				{/* Search Results Mode */}
+				
 				{searchQuery.length > 0 ? (
-					<div className="space-y-6 animate-in fade-in zoom-in-95 duration-200">
-						<div className="flex items-center justify-between pb-2 border-b border-serene-neutral-200">
-							<h3 className="text-lg font-bold text-serene-neutral-900">Search Results</h3>
-							<button
-								onClick={() => router.push(pathname)}
-								className="text-sm font-medium text-serene-neutral-500 hover:text-serene-red-500 transition-colors"
-							>
-								Clear Search
-							</button>
-						</div>
-						<div className="space-y-3">
-							{filteredCases.length > 0 ? (
-								filteredCases.map((match) => (
-									<Link href={`/dashboard/cases/${match.id}`} key={match.id} className="block group">
-										<Card className="overflow-hidden border-serene-neutral-100 hover:border-serene-blue-200 transition-all duration-300 hover:shadow-md cursor-pointer">
-											<CardContent className="p-4 flex items-center gap-4">
-												<div className={cn(
-													"h-12 w-12 rounded-full flex items-center justify-center text-lg font-bold shrink-0",
-													"bg-serene-blue-50 text-serene-blue-600"
-												)}>
-													{match.report?.type_of_incident?.charAt(0).toUpperCase() || "C"}
-												</div>
-												<div className="flex-1 min-w-0">
-													<h4 className="font-semibold text-serene-neutral-900 truncate">
-														{match.report?.type_of_incident?.replace(/_/g, " ") || "Case"}
-													</h4>
-													<p className="text-sm text-serene-neutral-500 truncate">
-														{match.service_details?.name || "Support case"}
-													</p>
-												</div>
-												<ChevronRight className="h-4 w-4 text-serene-neutral-300 group-hover:text-serene-blue-400 transition-colors" />
-											</CardContent>
-										</Card>
-									</Link>
-								))
-							) : (
-								<div className="text-center py-24">
-									<div className="h-16 w-16 bg-serene-neutral-100 rounded-full flex items-center justify-center mx-auto mb-4">
-										<Search className="h-8 w-8 text-serene-neutral-400" />
-									</div>
-									<h3 className="text-lg font-semibold text-serene-neutral-900 mb-1">No results found</h3>
-									<p className="text-serene-neutral-500">
-										We couldn't find any cases matching "{searchQuery}"
-									</p>
-								</div>
-							)}
-						</div>
-					</div>
+					<DashboardSearchOverlay 
+						query={searchQuery} 
+						filteredMatches={filteredCases}
+						onClear={() => router.push(pathname)} 
+					/>
 				) : (
 					<>
-						{/* Welcome Header */}
-						<div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-							<SereneWelcomeHeader
-								name={profileDetails.first_name || "Partner"}
-								timeOfDay={getTimeOfDay()}
-								compact={isWelcomeCompact}
-								welcomeMessage="Welcome back, ready to make a difference?"
-							/>
-						</div>
+						<SereneWelcomeHeader
+							name={profileDetails.first_name || "Partner"}
+							timeOfDay={getTimeOfDay()}
+							compact={isWelcomeCompact}
+							welcomeMessage="Welcome back, ready to make a difference?"
+						/>
 
-						{/* Out of Office Banner */}
 						<OutOfOfficeBanner userId={userId} />
 
-						{/* Verification Banner */}
-						{(() => {
-                            // Aggregated Status Logic
-							const verifiedServices = supportServices.filter(s => s.verification_status === 'verified');
-							const reviewServices = supportServices.filter(s => s.verification_status === 'under_review');
-							const rejectedServices = supportServices.filter(s => s.verification_status === 'rejected');
-							
-                            const verifiedCount = verifiedServices.length;
-							const reviewCount = reviewServices.length;
-							const rejectedCount = rejectedServices.length;
-							const total = supportServices.length;
-                            
-							const isProfileRejected = profileDetails.verification_status === 'rejected';
-                            const isProfilePending = profileDetails.verification_status === 'pending' || !profileDetails.verification_status;
-                            const isProfileUnderReview = profileDetails.verification_status === 'under_review';
+						<VerificationBanner 
+							profileDetails={profileDetails} 
+							supportServices={supportServices} 
+						/>
 
-                            // 1. All Good
-							if (total > 0 && verifiedCount === total && !isProfileRejected && !isProfilePending && !isProfileUnderReview) return null;
-
-							let bannerTitle = "Complete your verification";
-							let bannerDesc = "Verify your profile to be matched with survivors seeking support.";
-							let bannerVariant: "default" | "destructive" | "warning" = "warning";
-							let BannerIcon = AlertTriangle;
-                            
-                            // 2. Rejections (High Priority)
-							if (rejectedCount > 0 || isProfileRejected) {
-								bannerTitle = "Action Required: Documents Rejected";
-								bannerVariant = "destructive";
-                                BannerIcon = AlertCircle;
-								
-								// Construct detailed rejection reason
-                                const reasons: string[] = [];
-                                
-								if (isProfileRejected) {
-                                    // Try to find specific doc notes if available in metadata (requires parsing)
-                                    // For now, generic or specific if notes field used
-									reasons.push(profileDetails.verification_notes ? `Profile: ${profileDetails.verification_notes}` : "Profile documents rejected.");
-								}
-                                
-                                if (rejectedCount > 0) {
-                                    rejectedServices.forEach(s => {
-                                        reasons.push(`Service "${s.name}": ${s.verification_notes || "Documents rejected"}`);
-                                    });
-								}
-                                
-                                if (reasons.length > 0) {
-                                     bannerDesc = reasons.join("\n");
-                                } else {
-                                     bannerDesc = "Please review your documents and resubmit.";
-                                }
-							
-							} 
-                            // 3. Profile Pending (Medium Priority)
-                            else if (isProfilePending) {
-                                bannerTitle = "Verification Pending";
-                                bannerDesc = "Please complete your identity verification to proceed.";
-                                bannerVariant = "warning";
-                            }
-                            // 4. Under Review (Low Priority)
-                            else if (isProfileUnderReview || reviewCount > 0) {
-								bannerTitle = "Verification in Progress";
-                                const parts = [];
-                                if (isProfileUnderReview) parts.push("Profile is under review.");
-                                if (reviewCount > 0) parts.push(`${reviewCount} service(s) under review.`);
-                                
-								bannerDesc = parts.join(" ") || "We are reviewing your documents. This usually takes 24-48 hours.";
-								BannerIcon = Clock;
-                                bannerVariant = "default"; // or a specific info variant
-							} 
-                            // 5. No Services (Onboarding)
-                            else if (total === 0) {
-								bannerTitle = "Register your first service";
-								bannerDesc = "Add a support service to start helping survivors and complete your service provider profile.";
-                                bannerVariant = "warning"; // Encouragement
-							}
-
-							return (
-								<Alert className={cn(
-									"border-0 shadow-sm rounded-2xl p-5 sm:p-6 transition-all duration-300",
-									bannerVariant === "destructive" ? "bg-red-50 text-red-900 shadow-red-100/50" : 
-									bannerVariant === "warning" ? "bg-amber-50 text-amber-900 shadow-amber-100/50" : 
-									"bg-serene-blue-50 text-serene-blue-900 shadow-serene-blue-100/50"
-								)}>
-									<div className="flex flex-col sm:flex-row gap-4 sm:items-center">
-										<div className={cn(
-											"h-12 w-12 rounded-2xl flex items-center justify-center shrink-0 shadow-sm",
-											bannerVariant === "destructive" ? "bg-red-100 text-red-600" :
-											bannerVariant === "warning" ? "bg-amber-100 text-amber-600" :
-											"bg-serene-blue-100 text-serene-blue-600"
-										)}>
-											<BannerIcon className="h-6 w-6" />
-										</div>
-										<div className="flex-1">
-											<AlertTitle className="font-bold text-base sm:text-lg tracking-tight mb-1">{bannerTitle}</AlertTitle>
-											<AlertDescription className="text-sm font-medium opacity-80 leading-relaxed whitespace-pre-line">
-												{bannerDesc}
-												{bannerVariant === 'destructive' && (
-													<div className="flex flex-wrap gap-3 mt-3">
-														{(isProfileRejected || isProfilePending) && (
-															<Link href="/dashboard/profile?section=account" className="inline-flex items-center text-xs font-bold uppercase tracking-wider text-red-700 hover:text-red-900 border-b border-red-300 hover:border-red-600 transition-all pb-0.5">
-																Fix Profile Docs <ArrowRight className="h-3 w-3 ml-1" />
-															</Link>
-														)}
-														{(rejectedCount > 0 || total === 0) && (
-															<Link href="/dashboard/profile?section=services" className="inline-flex items-center text-xs font-bold uppercase tracking-wider text-red-700 hover:text-red-900 border-b border-red-300 hover:border-red-600 transition-all pb-0.5">
-																{rejectedCount > 0 ? "Fix Service Docs" : "Add Service"} <ArrowRight className="h-3 w-3 ml-1" />
-															</Link>
-														)}
-													</div>
-												)}
-												{bannerVariant !== 'destructive' && (
-													<div className="flex flex-wrap gap-3 mt-3">
-                                                        {isProfilePending && (
-                                                            <Link href="/dashboard/profile?section=account" className="inline-flex items-center text-xs font-bold uppercase tracking-wider text-amber-800 hover:text-amber-950 border-b border-amber-300 hover:border-amber-600 transition-all pb-0.5">
-                                                                Complete Profile <ArrowRight className="h-3 w-3 ml-1" />
-                                                            </Link>
-                                                        )}
-                                                        {total === 0 && (
-                                                            <Link href="/dashboard/profile?section=services" className="inline-flex items-center text-xs font-bold uppercase tracking-wider text-amber-800 hover:text-amber-950 border-b border-amber-300 hover:border-amber-600 transition-all pb-0.5">
-                                                                Add Service <ArrowRight className="h-3 w-3 ml-1" />
-                                                            </Link>
-                                                        )}
-                                                        {!isProfilePending && total > 0 && (
-    														<Link href="/dashboard/profile?section=services" className="inline-flex items-center text-xs font-bold uppercase tracking-wider text-inherit hover:opacity-100 opacity-60 transition-all pb-0.5 border-b border-transparent hover:border-current">
-	    													    Manage Services <ArrowRight className="h-3 w-3 ml-1" />
-		    												</Link>
-                                                        )}
-													</div>
-												)}
-											</AlertDescription>
-										</div>
-									</div>
-								</Alert>
-							);
-						})()}
-
-						{/* Quick Actions Grid */}
 						<div className="space-y-4">
 							<h3 className="text-sm font-bold text-serene-neutral-400 uppercase tracking-wider px-1">Dashboard</h3>
-							<div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 md:gap-4">
+							<div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4">
 								<SereneQuickActionCard
 									title="Cases"
-									description={`${activeCasesCount} Active`}
+									description={`${stats.activeCasesCount} Active`}
 									icon={<Users className="h-5 w-5 text-sauti-teal" />}
 									href="/dashboard/cases"
 									variant="custom"
-									className="bg-sauti-teal-light border-sauti-teal/10 shadow-sm hover:shadow-md transition-all"
-									badge={pendingCasesCount > 0 ? pendingCasesCount : undefined}
+									className="bg-sauti-teal-light border-sauti-teal/10"
+									badge={stats.pendingCasesCount > 0 ? stats.pendingCasesCount : undefined}
                                     badgeClassName="bg-sauti-teal text-white"
                                     actionIcon={<Plus className="h-4 w-4" />}
-                                    onActionClick={() => setReportDialogOpen(true)}
+                                    onActionClick={() => setIsReportDialogOpen(true)}
 								/>
 								<SereneQuickActionCard
 									title="Messages"
@@ -578,17 +128,17 @@ export default function ProfessionalView({
 									icon={<MessageCircle className="h-5 w-5 text-serene-blue-600" />}
 									href="/dashboard/chat"
 									variant="custom"
-                                    className="bg-serene-blue-100 border-serene-blue-200 shadow-sm hover:shadow-md transition-all"
-									badge={dash?.data?.unreadChatCount || undefined}
+                                    className="bg-serene-blue-100 border-serene-blue-200"
+									badge={stats.unreadChatCount || undefined}
                                     badgeClassName="bg-serene-blue-600 text-white"
 								/>
 								<SereneQuickActionCard
 									title="Services"
-									description={`${supportServices.length} Active`}
+									description={`${stats.totalServicesCount} Active`}
 									icon={<Briefcase className="h-5 w-5 text-sauti-yellow" />}
 									href="/dashboard/profile?section=services"
 									variant="custom"
-                                    className="bg-sauti-yellow-light border-sauti-yellow/10 shadow-sm hover:shadow-md transition-all"
+                                    className="bg-sauti-yellow-light border-sauti-yellow/10"
 								/>
 								<SereneQuickActionCard
 									title="Blog Posts"
@@ -597,223 +147,17 @@ export default function ProfessionalView({
 									href="/dashboard/blogs"
 									variant="neutral"
 								/>
-								</div>
 							</div>
+						</div>
 
-						{/* Calendar Connection Status Alert (Prominent when not connected) */}
-						<CalendarConnectionStatus 
-							userId={userId} 
-							variant="alert" 
-							className="mb-4" 
+						<CalendarConnectionStatus userId={userId} variant="alert" className="mb-4" />
+
+						<CalendarWidget 
+							appointments={appointments} 
+							upcomingAppointmentsCount={stats.upcomingAppointmentsCount} 
 						/>
 
-						{/* Weekly Schedule Calendar */}
-						<div className="bg-white rounded-2xl border border-serene-neutral-100 overflow-hidden shadow-sm">
-								<button 
-									onClick={() => setIsCalendarExpanded(!isCalendarExpanded)}
-									className="w-full flex items-center justify-between px-5 py-4 hover:bg-serene-neutral-50/50 transition-colors"
-								>
-									<div className="flex items-center gap-3">
-										<div className="h-10 w-10 bg-serene-blue-50 rounded-xl flex items-center justify-center">
-											<Calendar className="h-5 w-5 text-serene-blue-600" />
-										</div>
-										<div className="text-left">
-											<h3 className="font-semibold text-serene-neutral-900">Schedule</h3>
-											<p className="text-sm text-serene-neutral-500">
-												{upcomingAppointments} upcoming appointment{upcomingAppointments !== 1 ? 's' : ''}
-											</p>
-										</div>
-									</div>
-									{isCalendarExpanded ? (
-										<ChevronUp className="h-5 w-5 text-serene-neutral-400" />
-									) : (
-										<ChevronDown className="h-5 w-5 text-serene-neutral-400" />
-									)}
-								</button>
-
-								{isCalendarExpanded && (
-									<div className="border-t border-serene-neutral-100 p-4 space-y-4">
-										{/* View Mode Toggle + Navigation */}
-										<div className="flex items-center justify-between">
-											{/* Week/Month Toggle */}
-											<div className="flex bg-serene-neutral-100 rounded-lg p-0.5">
-												<button
-													onClick={() => setCalendarViewMode('week')}
-													className={cn(
-														"px-3 py-1.5 text-xs font-medium rounded-md transition-all",
-														calendarViewMode === 'week' 
-															? "bg-white text-serene-blue-700 shadow-sm"
-															: "text-serene-neutral-600 hover:text-serene-neutral-900"
-													)}
-												>
-													Week
-												</button>
-												<button
-													onClick={() => setCalendarViewMode('month')}
-													className={cn(
-														"px-3 py-1.5 text-xs font-medium rounded-md transition-all",
-														calendarViewMode === 'month' 
-															? "bg-white text-serene-blue-700 shadow-sm"
-															: "text-serene-neutral-600 hover:text-serene-neutral-900"
-													)}
-												>
-													Month
-												</button>
-											</div>
-											
-											{/* Date range label */}
-											<p className="text-sm font-medium text-serene-neutral-700">
-												{calendarViewMode === 'week' 
-													? `${weekDays[0].toLocaleDateString('default', { month: 'short', day: 'numeric' })} - ${weekDays[6].toLocaleDateString('default', { month: 'short', day: 'numeric' })}`
-													: selectedDate.toLocaleDateString('default', { month: 'long', year: 'numeric' })
-												}
-											</p>
-											
-											{/* Navigation */}
-											<div className="flex gap-1">
-												<Button
-													variant="ghost"
-													size="sm"
-													className="h-8 w-8 p-0"
-													onClick={() => {
-														const prev = new Date(selectedDate);
-														prev.setDate(prev.getDate() - (calendarViewMode === 'week' ? 7 : 30));
-														setSelectedDate(prev);
-													}}
-												>
-													←
-												</Button>
-												<Button
-													variant="ghost"
-													size="sm"
-													className="h-8 w-8 p-0"
-													onClick={() => {
-														const next = new Date(selectedDate);
-														next.setDate(next.getDate() + (calendarViewMode === 'week' ? 7 : 30));
-														setSelectedDate(next);
-													}}
-												>
-													→
-												</Button>
-											</div>
-										</div>
-
-								{/* Days Grid - Week or Month */}
-								<div className="grid grid-cols-7 gap-1">
-									{['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-										<div key={day} className="text-center text-xs font-medium text-serene-neutral-400 py-1">
-											{day}
-										</div>
-									))}
-									{calendarViewMode === 'week' ? (
-										// Week View
-										weekDays.map((day, idx) => {
-											const dayAppointments = getAppointmentsForDay(day);
-											const isToday = day.toDateString() === new Date().toDateString();
-											const isSelected = day.toDateString() === selectedDate.toDateString();
-											
-											return (
-												<button
-													key={idx}
-													onClick={() => setSelectedDate(day)}
-													className={cn(
-														"relative aspect-square rounded-xl flex flex-col items-center justify-center transition-all",
-														isSelected 
-															? "bg-serene-blue-600 text-white" 
-															: isToday 
-																? "bg-serene-blue-50 text-serene-blue-700" 
-																: "hover:bg-serene-neutral-50 text-serene-neutral-700"
-													)}
-												>
-													<span className="text-sm font-semibold">{day.getDate()}</span>
-													{dayAppointments.length > 0 && (
-														<div className="flex gap-0.5 mt-0.5">
-															{Array.from({ length: Math.min(dayAppointments.length, 3) }).map((_, i) => (
-																<div 
-																	key={i} 
-																	className={cn(
-																		"h-1 w-1 rounded-full",
-																		isSelected ? "bg-white/80" : "bg-serene-blue-500"
-																	)} 
-																/>
-															))}
-														</div>
-													)}
-												</button>
-											);
-										})
-									) : (
-										// Month View
-										monthDays.map((dayInfo, idx) => {
-											const { date: day, isCurrentMonth } = dayInfo;
-											const dayAppointments = getAppointmentsForDay(day);
-											const isToday = day.toDateString() === new Date().toDateString();
-											const isSelected = day.toDateString() === selectedDate.toDateString();
-											
-											return (
-												<button
-													key={idx}
-													onClick={() => setSelectedDate(day)}
-													className={cn(
-														"relative h-10 rounded-lg flex flex-col items-center justify-center transition-all text-xs",
-														!isCurrentMonth && "opacity-40",
-														isSelected 
-															? "bg-serene-blue-600 text-white" 
-															: isToday 
-																? "bg-serene-blue-50 text-serene-blue-700 font-bold" 
-																: "hover:bg-serene-neutral-50 text-serene-neutral-700"
-													)}
-												>
-													<span className="font-medium">{day.getDate()}</span>
-													{dayAppointments.length > 0 && isCurrentMonth && (
-														<div className={cn(
-															"h-1 w-1 rounded-full mt-0.5",
-															isSelected ? "bg-white/80" : "bg-serene-blue-500"
-														)} />
-													)}
-												</button>
-											);
-										})
-									)}
-								</div>
-
-										{/* Selected Day Appointments */}
-										<div className="pt-2 border-t border-serene-neutral-100">
-											<p className="text-sm font-semibold text-serene-neutral-700 mb-3">
-												{selectedDate.toLocaleDateString('default', { weekday: 'long', month: 'long', day: 'numeric' })}
-											</p>
-											{selectedDayAppointments.length > 0 ? (
-												<div className="space-y-2">
-													{selectedDayAppointments.map((appt, idx) => (
-														<div key={idx} className="flex items-center gap-3 p-3 bg-serene-neutral-50/80 rounded-xl">
-															<div className="h-10 w-10 bg-serene-blue-100 rounded-lg flex items-center justify-center text-serene-blue-700">
-																<Clock className="h-4 w-4" />
-															</div>
-															<div className="flex-1 min-w-0">
-																<p className="font-medium text-serene-neutral-900 text-sm truncate">
-																	{appt.matched_service?.service_details?.name || 'Appointment'}
-																</p>
-																<p className="text-xs text-serene-neutral-500">
-																	{new Date(appt.appointment_date || 0).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-																</p>
-															</div>
-															<Badge className="bg-serene-blue-50 text-serene-blue-700 border-0 text-xs">
-																{appt.status || 'Scheduled'}
-															</Badge>
-														</div>
-													))}
-												</div>
-											) : (
-												<p className="text-sm text-serene-neutral-400 text-center py-4">
-													No appointments scheduled for this day
-												</p>
-											)}
-										</div>
-									</div>
-								)}
-							</div>
-
-						{/* Cases/Reports Tab Toggle - Only show if user has reports */}
+						{/* Role Switcher Tab Toggle */}
 						{reports.length > 0 && (
 							<div className="bg-white rounded-2xl border border-serene-neutral-100 p-1.5 shadow-sm">
 								<div className="flex gap-1">
@@ -821,18 +165,13 @@ export default function ProfessionalView({
 										onClick={() => setDashboardTab('cases')}
 										className={cn(
 											"flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all",
-											dashboardTab === 'cases'
-												? "bg-serene-blue-600 text-white shadow-sm"
-												: "text-serene-neutral-600 hover:bg-serene-neutral-50"
+											dashboardTab === 'cases' ? "bg-serene-blue-600 text-white shadow-sm" : "text-serene-neutral-600 hover:bg-serene-neutral-50"
 										)}
 									>
 										<Users className="h-4 w-4" />
 										Cases
 										{matchedServices.length > 0 && (
-											<span className={cn(
-												"text-xs px-1.5 py-0.5 rounded-full font-bold",
-												dashboardTab === 'cases' ? "bg-white/20" : "bg-serene-blue-100 text-serene-blue-700"
-											)}>
+											<span className={cn("text-xs px-1.5 py-0.5 rounded-full font-bold ml-1", dashboardTab === 'cases' ? "bg-white/20" : "bg-serene-blue-100 text-serene-blue-700")}>
 												{matchedServices.length}
 											</span>
 										)}
@@ -841,18 +180,13 @@ export default function ProfessionalView({
 										onClick={() => setDashboardTab('reports')}
 										className={cn(
 											"flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all",
-											dashboardTab === 'reports'
-												? "bg-serene-blue-600 text-white shadow-sm"
-												: "text-serene-neutral-600 hover:bg-serene-neutral-50"
+											dashboardTab === 'reports' ? "bg-serene-blue-600 text-white shadow-sm" : "text-serene-neutral-600 hover:bg-serene-neutral-50"
 										)}
 									>
 										<FileText className="h-4 w-4" />
 										My Reports
 										{reports.length > 0 && (
-											<span className={cn(
-												"text-xs px-1.5 py-0.5 rounded-full font-bold",
-												dashboardTab === 'reports' ? "bg-white/20" : "bg-amber-100 text-amber-700"
-											)}>
+											<span className={cn("text-xs px-1.5 py-0.5 rounded-full font-bold ml-1", dashboardTab === 'reports' ? "bg-white/20" : "bg-amber-100 text-amber-700")}>
 												{reports.length}
 											</span>
 										)}
@@ -861,140 +195,72 @@ export default function ProfessionalView({
 							</div>
 						)}
 
-						{/* Content based on selected tab */}
 						{dashboardTab === 'cases' ? (
-							<>
-								{/* Recent Cases */}
-								<div>
-							<SereneSectionHeader
-								title="Recent Cases"
-								description="Your assigned support cases"
-								action={{ label: "View All", href: "/dashboard/cases" }}
-							/>
-
-							<div className="space-y-3">
-								{matchedServices.length > 0 ? (
-									matchedServices.slice(0, 3).map((match) => (
-										<Link href={`/dashboard/cases/${match.id}`} key={match.id} className="block group">
-											<Card className="overflow-hidden border-serene-neutral-100 hover:border-serene-blue-200 transition-all duration-300 hover:shadow-md cursor-pointer">
-												<CardContent className="p-4 flex items-center gap-4">
-													<div className={cn(
-														"h-12 w-12 rounded-2xl flex items-center justify-center shrink-0",
-														match.report?.urgency === 'high' ? "bg-red-50 text-red-600" :
-														match.report?.urgency === 'medium' ? "bg-amber-50 text-amber-600" :
-														"bg-serene-blue-50 text-serene-blue-600"
-													)}>
-														<Shield className="h-5 w-5" />
-													</div>
-													<div className="flex-1 min-w-0">
-														<div className="flex items-center gap-2 mb-1">
-															<h4 className="font-semibold text-serene-neutral-900 truncate">
-																{match.report?.type_of_incident?.replace(/_/g, " ") || "Support Case"}
-															</h4>
-															<Badge variant="outline" className={cn(
-																"text-[10px] font-bold uppercase border-0 px-1.5 py-0.5",
-																getStatusTheme(getMatchStatus(match))
-															)}>
-																{getMatchStatus(match) === 'pending' ? 'Needs Review' : getMatchStatus(match)}
-															</Badge>
-														</div>
-														<p className="text-sm text-serene-neutral-500 truncate">
-															{match.report?.incident_description || "No description available"}
-														</p>
-													</div>
-													<ChevronRight className="h-4 w-4 text-serene-neutral-300 group-hover:text-serene-blue-400 transition-colors" />
-												</CardContent>
-											</Card>
-										</Link>
-									))
-								) : (
-									<div className="text-center py-12 bg-white rounded-2xl border border-dashed border-serene-neutral-200">
-										<div className="h-12 w-12 bg-serene-neutral-100 rounded-full flex items-center justify-center mx-auto mb-3">
-											<Users className="h-6 w-6 text-serene-neutral-400" />
-										</div>
-										<p className="text-serene-neutral-500 mb-1">No cases assigned yet</p>
-										<p className="text-sm text-serene-neutral-400">
-											Complete your verification to start receiving cases
-										</p>
-									</div>
-								)}
-							</div>
-						</div>
-
-						{/* Upcoming Appointments */}
-						{appointments.length > 0 && (
-							<div>
+							<div className="space-y-6">
 								<SereneSectionHeader
-									title="Upcoming Appointments"
-									description="Your scheduled sessions"
+									title="Recent Cases"
+									description="Assigned support cases"
+									action={{ label: "View All", href: "/dashboard/cases" }}
 								/>
 
 								<div className="space-y-3">
-									{appointments
-										.filter(a => a.appointment_date && new Date(a.appointment_date) > new Date())
-										.slice(0, 2)
-										.map((appt, idx) => (
-											<Card key={idx} className="overflow-hidden border-serene-neutral-100 hover:border-serene-blue-200 transition-all duration-300 hover:shadow-md">
-												<CardContent className="p-4 flex items-center gap-4">
-													<div className="h-12 w-12 bg-serene-blue-50 rounded-2xl flex flex-col items-center justify-center text-serene-blue-600">
-														<span className="text-xs font-medium uppercase">
-															{new Date(appt.appointment_date || 0).toLocaleString('default', { month: 'short' })}
-														</span>
-														<span className="text-lg font-bold leading-none">
-															{new Date(appt.appointment_date || 0).getDate()}
-														</span>
-													</div>
-													<div className="flex-1 min-w-0">
-														<h4 className="font-semibold text-serene-neutral-900">
-															{appt.matched_service?.service_details?.name || "Appointment"}
-														</h4>
-														<p className="text-sm text-serene-neutral-500">
-															{new Date(appt.appointment_date || 0).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-														</p>
-													</div>
-													<Badge className="bg-serene-blue-600 text-white border-0 text-xs">
-														Upcoming
-													</Badge>
-												</CardContent>
-											</Card>
-										))}
+									{matchedServices.length > 0 ? (
+										matchedServices.slice(0, 3).map((match) => (
+											<Link href={`/dashboard/cases/${match.id}`} key={match.id} className="block group">
+												<Card className="overflow-hidden border-serene-neutral-100 hover:border-serene-blue-200 transition-all duration-300 hover:shadow-md">
+													<CardContent className="p-4 flex items-center gap-4">
+														<div className={cn(
+															"h-12 w-12 rounded-2xl flex items-center justify-center shrink-0",
+															match.report?.urgency === 'high' ? "bg-red-50 text-red-600" : "bg-serene-blue-50 text-serene-blue-600"
+														)}>
+															<Shield className="h-5 w-5" />
+														</div>
+														<div className="flex-1 min-w-0">
+															<div className="flex items-center gap-2 mb-1">
+																<h4 className="font-semibold text-serene-neutral-900 truncate">
+																	{match.report?.type_of_incident?.replace(/_/g, " ") || "Support Case"}
+																</h4>
+																<Badge variant="outline" className={cn("text-[10px] font-bold uppercase border-0 px-1.5 py-0.5", getStatusTheme(getMatchStatus(match)))}>
+																	{getMatchStatus(match)}
+																</Badge>
+															</div>
+															<p className="text-sm text-serene-neutral-500 truncate">{match.report?.incident_description}</p>
+														</div>
+														<ChevronRight className="h-4 w-4 text-serene-neutral-300 group-hover:text-serene-blue-400" />
+													</CardContent>
+												</Card>
+											</Link>
+										))
+									) : (
+										<DashboardEmptyState 
+											icon={<Users className="h-6 w-6" />}
+											title="No cases assigned yet"
+											description="Matches will appear here as survivors reach out"
+										/>
+									)}
+								</div>
+							</div>
+						) : (
+							<div className="space-y-6">
+								<SereneSectionHeader
+									title="My Personal Reports"
+									description="Incidents you've reported personally"
+									action={{ label: "View All", href: "/dashboard/reports" }}
+								/>
+								<div className="space-y-3">
+									{reports.slice(0, 5).map((report) => (
+										<SereneActivityCard 
+											key={report.report_id}
+											report={report}
+											href={`/dashboard/reports/${report.report_id}`}
+										/>
+									))}
 								</div>
 							</div>
 						)}
 					</>
-				) : (
-					/* My Reports Tab Content */
-					<div>
-						<SereneSectionHeader
-							title="My Reports"
-							description="Reports you've submitted personally"
-							action={{ label: "View All", href: "/dashboard/reports" }}
-						/>
-
-						<div className="space-y-3">
-							{reports.length > 0 ? (
-								reports.slice(0, 5).map((report) => (
-									<SereneIncidentActivityCard 
-                                        key={report.report_id}
-                                        report={report}
-                                        href={`/dashboard/reports/${report.report_id}`}
-                                    />
-								))
-							) : (
-								<Card className="border-dashed border-2 border-serene-neutral-200">
-									<CardContent className="p-8 text-center">
-										<FileText className="h-10 w-10 text-serene-neutral-300 mx-auto mb-3" />
-										<p className="text-serene-neutral-500">You haven't submitted any personal reports</p>
-									</CardContent>
-								</Card>
-							)}
-						</div>
-					</div>
-				)}
-					</>
 				)}
 			</div>
-
 		</div>
 	);
 }

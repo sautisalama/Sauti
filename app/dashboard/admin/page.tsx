@@ -9,11 +9,13 @@ import {
     Users,
     BookOpen,
 } from "lucide-react";
-import { 
-    SereneWelcomeHeader, 
-    SereneQuickActionCard,
-    SereneSectionHeader
-} from "../_components/SurvivorDashboardComponents";
+import {
+	SereneWelcomeHeader,
+	SereneStatsCard,
+	SereneSectionHeader,
+	SereneQuickActionCard,
+	SereneBreadcrumb,
+} from "../_components/SereneDashboardUI";
 import { AdminActivitySection } from "./_components/AdminActivitySection";
 
 import { Database, Tables } from "@/types/db-schema";

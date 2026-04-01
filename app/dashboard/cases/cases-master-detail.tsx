@@ -626,8 +626,8 @@ export default function CasesMasterDetail({ userId }: { userId: string }) {
             if (matchError) throw matchError;
             
             // Mark case as exclusive
-            if (selectedCase.report?.id) {
-                await markCaseAsExclusive(selectedCase.report.id, targetCaseId);
+            if (selectedCase.report?.report_id) {
+                await markCaseAsExclusive(selectedCase.report.report_id, targetCaseId);
             }
 
             // 2. Create Appointment

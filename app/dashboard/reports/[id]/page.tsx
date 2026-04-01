@@ -1009,113 +1009,14 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
 											<div className="flex flex-col gap-1 px-2">
 												<div className="flex items-center gap-2 text-teal-600 font-bold uppercase tracking-[0.2em] text-[10px]">
 													<Activity className="h-3.5 w-3.5" />
-													{acceptedMatch ? "Coordination Hub" : "Matching Center"}
+													Matching Center
 												</div>
 												<h3 className="text-2xl font-bold text-slate-900 tracking-tight">
-													{acceptedMatch ? "Support Active" : "Matching Center"}
+													Matching Center
 												</h3>
 											</div>
 
 											{(() => {
-												if (acceptedMatch) {
-													const activeAppt = appointments.find(a => a.status === 'upcoming' || a.status === 'confirmed') || appointments[0];
-													
-													return (
-														<Card className="border-0 shadow-2xl rounded-[2.5rem] bg-white overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-700">
-															<div className="bg-gradient-to-r from-teal-600 to-teal-500 p-8 text-white">
-																<div className="flex items-center justify-between mb-6">
-																	<Badge className="bg-white/20 text-white border-0 font-bold uppercase tracking-widest text-[9px] backdrop-blur-md">Connection Secured</Badge>
-																	<ShieldCheck className="h-5 w-5 opacity-80" />
-																</div>
-																
-																<div className="flex items-center gap-5">
-																	<Avatar className="h-16 w-16 rounded-3xl border-4 border-white/20 shadow-xl">
-																		<AvatarFallback className="bg-white text-teal-600 font-bold text-xl text-shadow-sm">
-																			{acceptedMatch.name.charAt(0)}
-																		</AvatarFallback>
-																	</Avatar>
-																	<div className="space-y-1">
-																		<h4 className="text-2xl font-bold tracking-tight">{acceptedMatch.name}</h4>
-																		<p className="text-teal-50/80 font-bold text-xs uppercase tracking-widest">{acceptedMatch.type}</p>
-																	</div>
-																</div>
-															</div>
-															
-															<CardContent className="p-8 space-y-8">
-																{activeAppt ? (
-																	<div className="space-y-4">
-																		<div className="flex items-center justify-between px-2">
-																			<div className="flex items-center gap-2 text-slate-400 font-bold uppercase tracking-widest text-[10px]">
-																				<Calendar className="h-3.5 w-3.5" />
-																				Confirmed Session
-																			</div>
-																			<Badge variant="outline" className="text-teal-600 border-teal-100 bg-teal-50/30 font-bold text-[9px] uppercase tracking-wider">
-																				{activeAppt.status}
-																			</Badge>
-																		</div>
-																		
-																		<div className="bg-slate-50/80 rounded-3xl p-6 border border-slate-100/50 flex flex-col sm:flex-row sm:items-center justify-between gap-6 hover:bg-slate-100/50 transition-colors">
-																			<div className="space-y-1">
-																				<p className="text-2xl font-bold text-slate-900 tracking-tight">
-																					{new Date(activeAppt.appointment_date!).toLocaleDateString(undefined, {
-																						weekday: 'long',
-																						month: 'long',
-																						day: 'numeric'
-																					})}
-																				</p>
-																				<p className="text-base font-bold text-teal-600">
-																					{new Date(activeAppt.appointment_date!).toLocaleTimeString([], { 
-																						hour: '2-digit', 
-																						minute: '2-digit' 
-																					})}
-																				</p>
-																			</div>
-																			
-																			<Button 
-																				variant="outline"
-																				onClick={() => {
-																					setRespondingTo(activeAppt);
-																					setShowResponseModal(true);
-																				}}
-																				className="h-12 px-6 rounded-2xl border-slate-200 text-slate-600 font-bold hover:bg-white transition-all text-xs shrink-0"
-																			>
-																				Modify Time
-																			</Button>
-																		</div>
-																	</div>
-																) : (
-																	<div className="bg-slate-50/50 rounded-3xl p-8 text-center border border-dashed border-slate-200">
-																		<Calendar className="h-8 w-8 text-slate-300 mx-auto mb-3" />
-																		<p className="text-sm font-bold text-slate-500">Awaiting session scheduling</p>
-																		<p className="text-xs text-slate-400 mt-1">Your partner will propose a time shortly.</p>
-																	</div>
-																)}
-																
-																<div className="pt-4 flex flex-col sm:flex-row gap-4">
-																	<Button 
-																		onClick={() => router.push(`/dashboard/chat?id=${activeAppt?.id || 'new'}`)}
-																		className="flex-1 h-14 bg-teal-600 hover:bg-teal-700 text-white font-bold rounded-[1.25rem] shadow-xl shadow-teal-600/20 transition-all hover:scale-[1.02] flex items-center justify-center gap-3"
-																	>
-																		<MessageCircle className="h-5 w-5" />
-																		Enter Secure Chat
-																		<ArrowRight className="h-4 w-4 opacity-50" />
-																	</Button>
-																	
-																	<Button 
-																		variant="outline"
-																		onClick={() => {
-																			toast({ title: "Profile", description: "Professional profile details are confidential." });
-																		}}
-																		className="h-14 px-8 rounded-[1.25rem] border-slate-100 bg-white text-slate-600 font-bold hover:bg-slate-50 transition-all text-xs"
-																	>
-																		View Credentials
-																	</Button>
-																</div>
-															</CardContent>
-														</Card>
-													);
-												}
-
 												const activeProposal = allMatches.find(m => m.status === 'proposed' || m.status === 'requested' || m.status === 'confirmed');
 												const matchingAppt = activeProposal ? appointments.find(a => a.status === 'pending' || a.status === 'requested') : null;
 												

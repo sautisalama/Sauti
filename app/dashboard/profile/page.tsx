@@ -35,7 +35,7 @@ import {
 	AlertCircle
 } from "lucide-react";
 import { useSearchParams, useRouter } from "next/navigation";
-import { SereneBreadcrumb, SereneSectionHeader } from "../_components/SurvivorDashboardComponents";
+import { SereneProviderCard, SereneSectionHeader, SereneBreadcrumb } from "../_components/SereneDashboardUI";
 import {Alert, AlertDescription, AlertTitle	} from "@/components/ui/alert"
 
 interface ProfileData {

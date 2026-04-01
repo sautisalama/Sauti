@@ -1,49 +1,29 @@
 "use client";
 
-import { createClient } from "@/utils/supabase/client";
-import { Database, Tables } from "@/types/db-schema";
-import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
-import { Input } from "@/components/ui/input";
-import { useState, useEffect, useMemo, useCallback } from "react";
-import { useSearchParams } from "next/navigation";
-import { useToast } from "@/hooks/use-toast";
-import {
-	Search,
-	MessageCircle,
-	CalendarDays,
-	BookOpen,
-	Shield,
-	Heart,
-    User,
-    ArrowRight,
-	ChevronRight,
-	SlidersHorizontal,
-	Plus
+import { useMemo, useState, useEffect } from "react";
+import { useSearchParams, useRouter, usePathname } from "next/navigation";
+import { 
+	MessageCircle, 
+	Shield, 
+	Heart, 
+	ArrowRight, 
+	Plus,
+    Search,
+    BookOpen
 } from "lucide-react";
 import Link from "next/link";
-import { Card, CardContent } from "@/components/ui/card";
-import { useDashboardData } from "@/components/providers/DashboardDataProvider";
-import {
-	SereneWelcomeHeader,
-	SereneQuickActionCard,
-	SereneStatsCard,
-	SereneSectionHeader,
-    SereneIncidentActivityCard
-} from "../_components/SurvivorDashboardComponents";
-import { Badge } from "@/components/ui/badge";
-import {
-	Sheet,
-	SheetContent,
-	SheetHeader,
-	SheetTitle,
-	SheetTrigger,
-} from "@/components/ui/sheet";
-import AuthenticatedReportAbuseForm from "@/components/AuthenticatedReportAbuseForm";
-import { getReportStatus, getStatusTheme } from "@/lib/utils/case-status";
-import { ReportWithRelations } from "../_types";
-
-
+import { Button } from "@/components/ui/button";
+import { Tables } from "@/types/db-schema";
+import { useDashboard } from "../use-dashboard";
+import { 
+	SereneWelcomeHeader, 
+	SereneQuickActionCard, 
+	SereneSectionHeader, 
+	SereneActivityCard,
+    CalendarWidget,
+    DashboardSearchOverlay,
+    DashboardEmptyState
+} from "../_components/SereneDashboardUI";
 
 interface SurvivorViewProps {
 	userId: string;
@@ -54,100 +34,26 @@ export default function SurvivorView({
 	userId,
 	profileDetails,
 }: SurvivorViewProps) {
-	const dash = useDashboardData();
-	const [reports, setReports] = useState<ReportWithRelations[]>(() => {
-		const seeded = (dash?.data?.reports as any) || [];
-		if (seeded && Array.isArray(seeded) && seeded.length) return seeded as any;
-		return [];
-	});
+	const { 
+        reports, 
+        stats, 
+        appointments, 
+        getTimeOfDay, 
+        isReportDialogOpen, 
+        setIsReportDialogOpen 
+    } = useDashboard();
+    
 	const searchParams = useSearchParams();
+    const router = useRouter();
+    const pathname = usePathname();
 	const searchQuery = searchParams.get("q") || "";
-	const { toast } = useToast();
-
-	// Computed stats
-	const activeCasesCount = useMemo(() => reports.length, [reports]);
-	const matchedCount = useMemo(
-		() => reports.filter((r) => (r.matched_services?.length || 0) > 0).length,
-		[reports]
-	);
-
-
-	const upcomingAppointments = useMemo(() => {
-		// Flatten appointments from matches
-		const apps: any[] = [];
-		reports.forEach(r => {
-			r.matched_services?.forEach(m => {
-				if (m.appointments) apps.push(...m.appointments);
-			});
-		});
-		return apps.filter(a => a.appointment_date && new Date(a.appointment_date) > new Date()).length;
-	}, [reports]);
-
-	const getTimeOfDay = (): "morning" | "afternoon" | "evening" => {
-		const hour = new Date().getHours();
-		if (hour < 12) return "morning";
-		if (hour < 18) return "afternoon";
-		return "evening";
-	};
-	
-	const [isReportSheetOpen, setIsReportSheetOpen] = useState(false);
 
 	const [isWelcomeCompact, setIsWelcomeCompact] = useState(false);
 
 	useEffect(() => {
-		const timer = setTimeout(() => {
-			setIsWelcomeCompact(true);
-		}, 30000);
+		const timer = setTimeout(() => setIsWelcomeCompact(true), 30000);
 		return () => clearTimeout(timer);
 	}, []);
-
-	useEffect(() => {
-		const supabase = createClient();
-		const channel = supabase
-			.channel(`realtime_survivor_reports_${userId}`)
-			.on(
-				'postgres_changes',
-				{ event: '*', schema: 'public', table: 'reports', filter: `user_id=eq.${userId}` },
-				async (payload) => {
-					const targetId = payload.new ? (payload.new as any).report_id : (payload.old as any).report_id;
-					if (!targetId) return;
-					
-					const { data } = await supabase
-						.from('reports')
-						.select(`
-							*,
-							matched_services (
-								*,
-								service_details:support_services!matched_services_service_id_fkey (
-									*
-								),
-								appointments (
-									*
-								)
-							)
-						`)
-						.eq('report_id', targetId)
-						.maybeSingle();
-
-					if (data) {
-						setReports((prev) => {
-							const exists = prev.some(r => r.report_id === data.report_id);
-							if (exists) {
-								return prev.map(r => r.report_id === data.report_id ? (data as any) : r);
-							} else {
-								return [data as any, ...prev].sort((a, b) => 
-									new Date(b.submission_timestamp || 0).getTime() - new Date(a.submission_timestamp || 0).getTime()
-								);
-							}
-						});
-					}
-				}
-			)
-			.subscribe();
-		return () => {
-			supabase.removeChannel(channel);
-		};
-	}, [userId]);
 
 	const filteredReports = useMemo(() => {
 		if (!searchQuery) return reports;
@@ -155,8 +61,7 @@ export default function SurvivorView({
 		return reports.filter(r => 
 			(r.incident_description || "").toLowerCase().includes(q) ||
 			(r.type_of_incident || "").toLowerCase().includes(q) ||
-			(r.city || "").toLowerCase().includes(q) ||
-			(r.match_status || "").toLowerCase().includes(q)
+			(r.city || "").toLowerCase().includes(q)
 		);
 	}, [reports, searchQuery]);
 
@@ -164,40 +69,14 @@ export default function SurvivorView({
 		<div className="min-h-screen bg-serene-neutral-50 pb-24">
 			<div className="max-w-4xl mx-auto px-4 lg:px-6 pt-4 lg:pt-8 space-y-8 min-h-[calc(100vh-80px)] relative">
 				
-                {/* Search Overlay Mode */}
                 {searchQuery.length > 0 ? (
-                    <div className="space-y-6 animate-in fade-in zoom-in-95 duration-200">
-                        <div className="flex items-center justify-between pb-2 border-b border-serene-neutral-200">
-                            <h3 className="text-lg font-bold text-serene-neutral-900">
-                                Search Results
-                            </h3>
-                        </div>
-                        
-                        <div className="space-y-3">
-                            {filteredReports.length > 0 ? (
-                                filteredReports.map((report) => (
-                                    <SereneIncidentActivityCard 
-                                        key={report.report_id}
-                                        report={report}
-                                        href={`/dashboard/reports/${report.report_id}`}
-                                    />
-                                ))
-                            ) : (
-                                <div className="text-center py-24">
-                                    <div className="h-16 w-16 bg-serene-neutral-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                                        <Search className="h-8 w-8 text-serene-neutral-400" />
-                                    </div>
-                                    <h3 className="text-lg font-semibold text-serene-neutral-900 mb-1">No results found</h3>
-                                    <p className="text-serene-neutral-500">
-                                        We couldn't find any reports matching "{searchQuery}"
-                                    </p>
-                                </div>
-                            )}
-                        </div>
-                    </div>
+                    <DashboardSearchOverlay 
+                        query={searchQuery} 
+                        filteredReports={filteredReports} 
+                        onClear={() => router.push(pathname)} 
+                    />
                 ) : (
                     <>
-                        {/* Hero & Greeting */}
                         <SereneWelcomeHeader 
                             name={profileDetails.first_name || "Friend"} 
                             timeOfDay={getTimeOfDay()}
@@ -205,51 +84,48 @@ export default function SurvivorView({
                             welcomeMessage={
                                 (!profileDetails.first_name || profileDetails.first_name === "Anonymous") ? (
                                     <span className="flex flex-col sm:flex-row sm:items-center gap-2">
-                                        <span>Please update your personal details to help us personalize your support.</span>
-                                        <Link href="/dashboard/profile" className="inline-flex items-center font-bold text-serene-blue-600 hover:text-serene-blue-700 hover:underline text-sm">
-                                            Complete Profile <ArrowRight className="ml-1 h-2 w-2" />
+                                        <span>Please update your personal details for personalized support.</span>
+                                        <Link href="/dashboard/profile" className="inline-flex items-center font-bold text-serene-blue-600 hover:underline text-sm">
+                                            Complete Profile <ArrowRight className="ml-1 h-3 w-3" />
                                         </Link>
                                     </span>
                                 ) : "Welcome back, you're safe here."
                             }
                         />
 
-                        {/* Quick Stats Overview */}
-                        {/* Quick Actions Grid with Embedded Stats */}
                         <div className="space-y-4">
                             <h3 className="text-sm font-bold text-serene-neutral-400 uppercase tracking-wider px-1">Dashboard</h3>
-                            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 md:gap-4">
+                            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4">
                                 <SereneQuickActionCard
                                     title="Reports"
-                                    description={`${activeCasesCount} Active`}
+                                    description={`${stats.activeReportsCount} Active`}
                                     icon={<Shield className="h-5 w-5 text-sauti-red" />}
                                     href="/dashboard/reports"
                                     variant="custom"
-                                    className="bg-sauti-red-light border-sauti-red/10 shadow-sm hover:shadow-md transition-all"
-                                    badge={activeCasesCount || undefined}
+                                    className="bg-sauti-red-light border-sauti-red/10"
+                                    badge={stats.activeReportsCount || undefined}
                                     badgeClassName="bg-sauti-red text-white"
                                     actionIcon={<Plus className="h-4 w-4" />}
-                                    onActionClick={() => dash?.setIsReportDialogOpen(true)}
+                                    onActionClick={() => setIsReportDialogOpen(true)}
                                 />
                                 <SereneQuickActionCard
                                     title="Matches"
-                                    description={`${matchedCount} Found`}
+                                    description={`${stats.matchedReportsCount} Found`}
                                     icon={<Heart className="h-5 w-5 text-sauti-yellow" />}
-                                    href="/dashboard/reports" // Should this be matches? User has it as reports in prev code. Leaving as is, but styling as Matches.
+                                    href="/dashboard/reports"
                                     variant="custom"
-                                    className="bg-sauti-yellow-light border-sauti-yellow/10 shadow-sm hover:shadow-md transition-all"
-                                    badge={matchedCount || undefined}
+                                    className="bg-sauti-yellow-light border-sauti-yellow/10"
+                                    badge={stats.matchedReportsCount || undefined}
                                     badgeClassName="bg-sauti-yellow text-white"
                                 />
-                                {/* removed appointments card */}
                                 <SereneQuickActionCard
                                     title="Messages"
                                     description="Support Chat"
                                     icon={<MessageCircle className="h-5 w-5 text-sauti-teal" />}
                                     href="/dashboard/chat"
                                     variant="custom"
-                                    className="bg-sauti-teal-light border-sauti-teal/10 shadow-sm hover:shadow-md transition-all"
-                                    badge={dash?.data?.unreadChatCount || undefined}
+                                    className="bg-sauti-teal-light border-sauti-teal/10"
+                                    badge={stats.unreadChatCount || undefined}
                                     badgeClassName="bg-sauti-teal text-white"
                                 />
                                 <SereneQuickActionCard
@@ -262,7 +138,11 @@ export default function SurvivorView({
                             </div>
                         </div>
 
-                        {/* Recent Activity / Active Cases Preview */}
+                        <CalendarWidget 
+                            appointments={appointments} 
+                            upcomingAppointmentsCount={stats.upcomingAppointmentsCount} 
+                        />
+
                         <div>
                             <SereneSectionHeader 
                                 title="Recent Activity" 
@@ -273,19 +153,19 @@ export default function SurvivorView({
                             <div className="space-y-3">
                                 {reports.length > 0 ? (
                                     reports.slice(0, 3).map((report) => (
-                                        <SereneIncidentActivityCard 
+                                        <SereneActivityCard 
                                             key={report.report_id}
                                             report={report}
                                             href={`/dashboard/reports/${report.report_id}`}
                                         />
                                     ))
                                 ) : (
-                                    <div className="text-center py-12 bg-white rounded-2xl border border-dashed border-serene-neutral-200">
-                                        <p className="text-serene-neutral-400 mb-2">No active cases found</p>
-                                        <Button className="text-serene-blue-600 font-semibold" variant="link" asChild>
-                                            <Link href="/report-abuse">Start a new report</Link>
-                                        </Button>
-                                    </div>
+                                    <DashboardEmptyState 
+                                        icon={<Shield className="h-6 w-6" />}
+                                        title="No active cases found"
+                                        description="Start a new report to get support"
+                                        action={{ label: "Start a new report", href: "/report-abuse" }}
+                                    />
                                 )}
                             </div>
                         </div>
