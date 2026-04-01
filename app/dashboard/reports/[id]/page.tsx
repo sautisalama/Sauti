@@ -108,6 +108,7 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
 	const [showAddDetails, setShowAddDetails] = useState(false);
 	const [showVoiceRecorder, setShowVoiceRecorder] = useState(false);
 	const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+	const isOwner = report?.user_id === currentUserId;
 	const [checklists, setChecklists] = useState<ChecklistItem[]>([]);
 
 	const [newChecklistItem, setNewChecklistItem] = useState("");
@@ -678,13 +679,13 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
 				<div className="bg-amber-600 text-white py-3 px-4 flex items-center justify-center gap-3 animate-in slide-in-from-top duration-500 sticky top-0 z-[60]">
 					<AlertCircle className="h-5 w-5 animate-pulse" />
 					<p className="text-xs sm:text-sm font-bold tracking-tight">
-						The case partner has finalized their portion of the journey. Would you like to archive this report now?
+						The {isOwner ? 'case partner' : 'reporter'} has finalized their portion of the journey. Would you like to archive this {isOwner ? 'report' : 'case'} now?
 					</p>
 					<Button 
 						onClick={() => setShowArchiveConfirm(true)}
 						className="bg-white text-amber-600 hover:bg-amber-50 h-8 px-4 rounded-xl font-bold text-[10px] uppercase tracking-widest ml-4 shadow-sm"
 					>
-						Yes, Archive Case
+						Yes, Archive {isOwner ? 'Report' : 'Case'}
 					</Button>
 				</div>
 			)}
@@ -699,7 +700,7 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
 						<div className="flex-1 min-w-0">
 							<div className="hidden sm:flex items-center gap-2 text-teal-600 font-extrabold uppercase tracking-[0.2em] text-[8px] sm:text-[10px] mb-0.5">
 								<ShieldCheck className="h-3.5 w-3.5" />
-								<span className="truncate">Secure Journey Hub</span>
+								<span className="truncate">{isOwner ? 'Secure Journey Hub' : 'Case Coordination Hub'}</span>
 							</div>
 							<div className="flex flex-col sm:flex-row sm:items-center gap-0 sm:gap-4 shrink-0 min-w-0">
                                 <h2 className="text-slate-900 font-bold tracking-tight uppercase text-[10px] sm:text-base whitespace-nowrap overflow-hidden text-ellipsis">
@@ -730,7 +731,7 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
 							<DialogTrigger asChild>
 								<Button variant="ghost" className="text-slate-400 hover:text-teal-600 font-bold text-[9px] sm:text-[10px] gap-2 uppercase tracking-widest h-8 sm:h-10 px-1 sm:px-2 group">
 									<Archive className="h-3.5 w-3.5 sm:h-4 sm:w-4 group-hover:scale-110 transition-transform" /> 
-									<span className="hidden sm:inline text-slate-500">Close Case</span>
+									<span className="hidden sm:inline text-slate-500">{isOwner ? 'Close Report' : 'Close Case'}</span>
 								</Button>
 							</DialogTrigger>
 							<DialogContent className="sm:max-w-[425px] rounded-[2rem] border-slate-100 p-8 bg-white shadow-2xl">
@@ -758,7 +759,7 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
 										onClick={() => setShowArchiveConfirm(false)}
 										className="h-12 text-slate-400 font-bold rounded-2xl w-full hover:bg-slate-50"
 									>
-										Keep Case Active
+										Keep {isOwner ? 'Report' : 'Case'} Active
 									</Button>
 								</div>
 							</DialogContent>

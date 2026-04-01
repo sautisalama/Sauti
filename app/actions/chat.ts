@@ -1,7 +1,7 @@
 'use server';
 
 import { createClient } from '@/utils/supabase/server';
-import { Chat, Message, ChatType, MessageType, transformChat, transformMessage, MessageReactions } from '@/types/chat';
+import { Chat, Message, ChatType, MessageType, transformChat, transformMessage, MessageReactions, ChatMetadata } from '@/types/chat';
 
 export async function getChats() {
   const supabase = await createClient();
@@ -25,7 +25,7 @@ export async function getChats() {
   return (data || []).map(transformChat);
 }
 
-export async function getMessages(chatId: string, limit = 50, before?: string) {
+export async function getMessages(chatId: string | string[], limit = 50, before?: string) {
   const supabase = await createClient();
   
   let query = supabase
@@ -33,8 +33,15 @@ export async function getMessages(chatId: string, limit = 50, before?: string) {
     .select(`
       *,
       sender:profiles(id, first_name, last_name, avatar_url)
-    `)
-    .eq('chat_id', chatId)
+    `);
+
+  if (Array.isArray(chatId)) {
+    query = query.in('chat_id', chatId);
+  } else {
+    query = query.eq('chat_id', chatId);
+  }
+
+  query = query
     .order('created_at', { ascending: false })
     .limit(limit);
 
@@ -206,62 +213,115 @@ export async function getCaseChat(caseId: string, survivorId: string) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Unauthorized');
 
-  // 1. Try to find existing chat for this case
-  const { data: existingChats, error: searchError } = await supabase
-    .from('chats')
-    .select(`
-      *,
-      participants:chat_participants(
-        *,
-        user:profiles(*)
-      )
-    `)
-    .or(`match_id.eq.${caseId},metadata->>case_id.eq.${caseId}`)
-    .limit(1);
-
-  if (searchError) throw searchError;
-
-  const foundChat = existingChats?.[0];
-
-  if (foundChat) {
-    return transformChat(foundChat);
-  }
-
-  // 2. Create new chat if not found
-  const { data: chat, error: createError } = await supabase
-    .from('chats')
-    .insert({
-      type: 'support_match',
-      created_by: user.id,
-      match_id: caseId,
-      metadata: { case_id: caseId }
-    })
-    .select()
-    .single();
-
-  if (createError) throw createError;
-
-  // 3. Resolve true participants from matched_services
+  // 1. Resolve true participants from matched_services
   const { data: matchData } = await supabase
     .from('matched_services')
     .select(`
       survivor_id,
       hrd_profile_id,
+      report_id,
+      chat_id,
       support_services ( user_id )
     `)
     .eq('id', caseId)
     .single();
+
+  // 1.2. If match already has a linked chat, return it immediately
+  if (matchData?.chat_id) {
+    const { data: linkedChat } = await supabase
+      .from('chats')
+      .select('*, participants:chat_participants(*, user:profiles(*))')
+      .eq('id', matchData.chat_id)
+      .single();
+    
+    if (linkedChat) return transformChat(linkedChat);
+  }
 
   const actualSurvId = matchData?.survivor_id || survivorId;
   
   // The professional is either HRD directly, or the user of the service
   let profId = matchData?.hrd_profile_id;
   if (!profId && matchData?.support_services) {
-      profId = (matchData.support_services as unknown as { user_id: string }).user_id;
+      // Support services might be returned as an object or a single-item array
+      const ss = Array.isArray(matchData.support_services) 
+        ? matchData.support_services[0] 
+        : matchData.support_services;
+      profId = (ss as any)?.user_id;
   }
   
   // Fallback to caller if no professional found (edge case)
   if (!profId) profId = user.id;
+
+  // 1.5. Safety: Don't create DM with self if we can avoid it by resolving correctly
+  // If I am the professional, the "other" must be the survivor.
+  // If I am the survivor, the "other" must be the professional.
+  const targetOtherId = user.id === profId ? actualSurvId : profId;
+
+  // 2. Try to find existing chat between these two people
+  const { data: allParticipants } = await supabase
+    .from('chat_participants')
+    .select('chat_id, user_id')
+    .in('user_id', [actualSurvId, profId]);
+
+  if (allParticipants && allParticipants.length > 0) {
+    // Robust Share Detection: Find ANY chat ID that contains BOTH users
+    const myChatIds = new Set(allParticipants.filter(p => p.user_id === user.id).map(p => p.chat_id));
+    const targetChatIds = allParticipants.filter(p => p.user_id === targetOtherId).map(p => p.chat_id);
+    
+    const sharedChatId = targetChatIds.find(cid => myChatIds.has(cid));
+
+    if (sharedChatId) {
+      // If we found a shared chat, link it to the match for future direct access
+      if (matchData && !matchData.chat_id) {
+          await supabase.from('matched_services').update({ chat_id: sharedChatId }).eq('id', caseId);
+      }
+      const { data: fullChat } = await supabase
+        .from('chats')
+        .select(`
+          *,
+          participants:chat_participants(
+            *,
+            user:profiles(*)
+          )
+        `)
+        .eq('id', sharedChatId)
+        .single();
+
+      if (fullChat) {
+        // Update metadata with latest case context
+        const meta = (fullChat.metadata || {}) as ChatMetadata;
+        await supabase
+          .from('chats')
+          .update({ 
+            metadata: { 
+              ...meta, 
+              case_id: caseId, 
+              report_id: matchData?.report_id 
+            } 
+          })
+          .eq('id', sharedChatId);
+          
+        return transformChat(fullChat);
+      }
+    }
+  }
+
+  // 3. Create new chat if not found
+  const { data: chat, error: createError } = await supabase
+    .from('chats')
+    .insert({
+      type: 'support_match',
+      created_by: user.id,
+      match_id: caseId,
+      metadata: { 
+        case_id: caseId,
+        report_id: matchData?.report_id
+      }
+    })
+    .select()
+    .single();
+
+  if (createError) throw createError;
 
   const participants = [
     {
@@ -271,7 +331,6 @@ export async function getCaseChat(caseId: string, survivorId: string) {
     }
   ];
 
-  // Only add survivor if they are a different user to prevent duplicate keys
   if (actualSurvId && actualSurvId !== profId) {
     participants.push({
       chat_id: chat.id,

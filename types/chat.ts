@@ -27,6 +27,7 @@ export interface ChatMetadata {
   is_community?: boolean;
   community_id?: string;
   member_count?: number;
+  all_chat_ids?: string[];
   last_message_preview?: {
     content: string;
     sender_id: string;

@@ -131,6 +131,22 @@ export function MessageBubble({ message, isOwn, showTail = true, currentUserId }
     );
   };
 
+  if (message.type === 'system') {
+    return (
+      <div className="flex justify-center my-4 px-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
+        <div className="bg-serene-neutral-100/50 backdrop-blur-sm px-4 py-2 rounded-2xl text-center shadow-sm border border-serene-neutral-200/50 max-w-[85%]">
+          <div className="flex items-center justify-center gap-2 mb-1">
+            <Lock className="h-3 w-3 text-serene-neutral-400" />
+            <span className="text-[10px] font-bold text-serene-neutral-400 uppercase tracking-widest">Secure Coordination</span>
+          </div>
+          <p className="text-xs font-medium text-serene-neutral-600 leading-relaxed whitespace-pre-wrap">
+            {message.content}
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <ContextMenu>
       <ContextMenuTrigger>
