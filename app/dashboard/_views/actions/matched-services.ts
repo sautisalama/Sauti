@@ -12,7 +12,8 @@ export async function fetchMatchedServices(userId: string) {
 		.select(`
 			*,
 			report:reports(*),
-			service_details:support_services(*)
+			service_details:support_services(*),
+            appointments:appointments(*)
 		`);
     
     if (serviceIds.length > 0) {
@@ -22,9 +23,22 @@ export async function fetchMatchedServices(userId: string) {
     }
 
 	const { data, error } = await query.order("match_date", { ascending: false });
-
 	if (error) throw error;
-	return data || [];
+
+	// Backfill matched_service into nested appointments for type compatibility with AppointmentWithDetails
+	const transformedData = data?.map((match: any) => ({
+		...match,
+		appointments: match.appointments?.map((appt: any) => ({
+			...appt,
+			matched_service: {
+				id: match.id,
+				service_details: match.service_details,
+				report: match.report,
+			},
+		})),
+	}));
+
+	return (transformedData as any[]) || [];
 }
 
 async function updateReportMatchStatus(reportId: string, status: MatchStatus) {

@@ -28,7 +28,8 @@ import {
 	SereneWelcomeHeader,
 	SereneQuickActionCard,
 	SereneStatsCard,
-	SereneSectionHeader
+	SereneSectionHeader,
+    SereneIncidentActivityCard
 } from "../_components/SurvivorDashboardComponents";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -39,27 +40,10 @@ import {
 	SheetTrigger,
 } from "@/components/ui/sheet";
 import AuthenticatedReportAbuseForm from "@/components/AuthenticatedReportAbuseForm";
+import { getReportStatus, getStatusTheme } from "@/lib/utils/case-status";
+import { ReportWithRelations } from "../_types";
 
-interface ReportWithRelations extends Tables<"reports"> {
-	matched_services?: Array<{
-		id: string;
-		match_status_type: Database["public"]["Enums"]["match_status_type"];
-		match_date: string | null;
-		match_score: number | null;
-		service_details: {
-			id: string;
-			name: string;
-			service_types: Database["public"]["Enums"]["support_service_type"];
-		};
-		appointments?: Array<{
-			id: string;
-			date: string;
-			status: Database["public"]["Enums"]["appointment_status_type"] | null;
-			professional_id: string | null;
-			survivor_id: string | null;
-		}>;
-	}>;
-}
+
 
 interface SurvivorViewProps {
 	userId: string;
@@ -86,6 +70,8 @@ export default function SurvivorView({
 		() => reports.filter((r) => (r.matched_services?.length || 0) > 0).length,
 		[reports]
 	);
+
+
 	const upcomingAppointments = useMemo(() => {
 		// Flatten appointments from matches
 		const apps: any[] = [];
@@ -94,7 +80,7 @@ export default function SurvivorView({
 				if (m.appointments) apps.push(...m.appointments);
 			});
 		});
-		return apps.filter(a => new Date(a.date) > new Date()).length;
+		return apps.filter(a => a.appointment_date && new Date(a.appointment_date) > new Date()).length;
 	}, [reports]);
 
 	const getTimeOfDay = (): "morning" | "afternoon" | "evening" => {
@@ -131,21 +117,12 @@ export default function SurvivorView({
 						.select(`
 							*,
 							matched_services (
-								id,
-								match_status_type,
-								match_date,
-								match_score,
-								service_details:support_services (
-									id,
-									name,
-									service_types
+								*,
+								service_details:support_services!matched_services_service_id_fkey (
+									*
 								),
 								appointments (
-									id,
-									appointment_date,
-									status,
-									professional_id,
-									survivor_id
+									*
 								)
 							)
 						`)
@@ -199,32 +176,11 @@ export default function SurvivorView({
                         <div className="space-y-3">
                             {filteredReports.length > 0 ? (
                                 filteredReports.map((report) => (
-                                    <Link href={`/dashboard/reports/${report.report_id}`} key={report.report_id} className="block group">
-                                        <Card className="overflow-hidden border-serene-neutral-100 hover:border-serene-blue-200 transition-all duration-300 hover:shadow-md cursor-pointer">
-                                            <CardContent className="p-4 flex items-center gap-4">
-                                                <div className={cn(
-                                                    "h-12 w-12 rounded-full flex items-center justify-center text-lg font-bold shrink-0",
-                                                    "bg-serene-blue-50 text-serene-blue-600"
-                                                )}>
-                                                    {report.type_of_incident?.charAt(0).toUpperCase() || "R"}
-                                                </div>
-                                                <div className="flex-1 min-w-0">
-                                                    <div className="flex items-center justify-between mb-1">
-                                                        <h4 className="font-semibold text-serene-neutral-900 truncate">
-                                                            {report.type_of_incident?.replace(/_/g, " ") || "Incident Report"}
-                                                        </h4>
-                                                        <span className="text-xs text-serene-neutral-400 font-medium">
-                                                            {report.submission_timestamp ? new Date(report.submission_timestamp).toLocaleDateString() : ""}
-                                                        </span>
-                                                    </div>
-                                                    <p className="text-sm text-serene-neutral-500 truncate">
-                                                        {report.incident_description || "No description provided."}
-                                                    </p>
-                                                </div>
-                                                <ChevronRight className="h-4 w-4 text-serene-neutral-300 group-hover:text-serene-blue-400 transition-colors" />
-                                            </CardContent>
-                                        </Card>
-                                    </Link>
+                                    <SereneIncidentActivityCard 
+                                        key={report.report_id}
+                                        report={report}
+                                        href={`/dashboard/reports/${report.report_id}`}
+                                    />
                                 ))
                             ) : (
                                 <div className="text-center py-24">
@@ -317,32 +273,11 @@ export default function SurvivorView({
                             <div className="space-y-3">
                                 {reports.length > 0 ? (
                                     reports.slice(0, 3).map((report) => (
-                                        <Link href={`/dashboard/reports/${report.report_id}`} key={report.report_id} className="block group">
-                                            <Card className="overflow-hidden border-serene-neutral-100 hover:border-serene-blue-200 transition-all duration-300 hover:shadow-md cursor-pointer">
-                                                <CardContent className="p-4 flex items-center gap-4">
-                                                    <div className={cn(
-                                                        "h-12 w-12 rounded-full flex items-center justify-center text-lg font-bold shrink-0",
-                                                        "bg-serene-blue-50 text-serene-blue-600"
-                                                    )}>
-                                                        {report.type_of_incident?.charAt(0).toUpperCase() || "R"}
-                                                    </div>
-                                                    <div className="flex-1 min-w-0">
-                                                        <div className="flex items-center justify-between mb-1">
-                                                            <h4 className="font-semibold text-serene-neutral-900 truncate">
-                                                                {report.type_of_incident?.replace(/_/g, " ") || "Incident Report"}
-                                                            </h4>
-                                                            <span className="text-xs text-serene-neutral-400 font-medium">
-                                                                {report.submission_timestamp ? new Date(report.submission_timestamp).toLocaleDateString() : ""}
-                                                            </span>
-                                                        </div>
-                                                        <p className="text-sm text-serene-neutral-500 truncate">
-                                                            {report.incident_description || "No description provided."}
-                                                        </p>
-                                                    </div>
-                                                    <ChevronRight className="h-4 w-4 text-serene-neutral-300 group-hover:text-serene-blue-400 transition-colors" />
-                                                </CardContent>
-                                            </Card>
-                                        </Link>
+                                        <SereneIncidentActivityCard 
+                                            key={report.report_id}
+                                            report={report}
+                                            href={`/dashboard/reports/${report.report_id}`}
+                                        />
                                     ))
                                 ) : (
                                     <div className="text-center py-12 bg-white rounded-2xl border border-dashed border-serene-neutral-200">

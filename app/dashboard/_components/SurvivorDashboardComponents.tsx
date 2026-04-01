@@ -21,6 +21,8 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { ReportWithRelations } from "../_types";
+import { getReportStatus, getStatusTheme } from "@/lib/utils/case-status";
 
 // Serene Welcome Header
 interface SereneWelcomeHeaderProps {
@@ -389,7 +391,7 @@ interface SereneReportCardProps {
   type: string;
   date: string;
   description: string;
-  status: 'pending' | 'matched' | 'resolved';
+  status: 'pending' | 'matched' | 'accepted' | 'completed' | 'resolved';
   urgency: 'high' | 'medium' | 'low';
   matchesCount?: number;
   unreadMessages?: number;
@@ -421,9 +423,11 @@ export function SereneReportCard({
   };
 
   const statusColors = {
-    pending: "text-gray-500",
+    pending: "text-serene-neutral-500",
     matched: "text-serene-green-600",
-    resolved: "text-serene-blue-600"
+    accepted: "text-serene-blue-600",
+    completed: "text-indigo-600",
+    resolved: "text-serene-neutral-600"
   };
 
   return (
@@ -475,6 +479,16 @@ export function SereneReportCard({
                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-serene-green-50 text-serene-green-700 border border-serene-green-100 text-[10px] font-bold uppercase tracking-wider">
                   <div className="w-1.5 h-1.5 rounded-full bg-serene-green-500" />
                   {matchesCount} Match{matchesCount !== 1 ? 'es' : ''}
+               </div>
+            ) : status === 'accepted' ? (
+               <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-serene-blue-50 text-serene-blue-700 border border-serene-blue-100 text-[10px] font-bold uppercase tracking-wider">
+                  <div className="w-1.5 h-1.5 rounded-full bg-serene-blue-500" />
+                  Accepted
+               </div>
+            ) : status === 'completed' ? (
+               <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-100 text-[10px] font-bold uppercase tracking-wider">
+                  <div className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
+                  Completed
                </div>
             ) : status === 'pending' ? (
                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-serene-neutral-50 text-serene-neutral-500 border border-serene-neutral-100 text-[10px] font-bold uppercase tracking-wider">
@@ -626,4 +640,52 @@ export function SereneAppointmentCard({ date, title, providerName, status, onAct
       </CardContent>
     </Card>
   )
+}
+// Serene Incident Activity Card (used in Recent Activity and Search)
+interface SereneIncidentActivityCardProps {
+  report: ReportWithRelations;
+  href: string;
+  className?: string;
+}
+
+export function SereneIncidentActivityCard({ report, href, className }: SereneIncidentActivityCardProps) {
+  const status = getReportStatus(report);
+  const statusTheme = getStatusTheme(status);
+
+  return (
+    <Link href={href} className={cn("block group", className)}>
+      <Card className="overflow-hidden border-serene-neutral-100 hover:border-serene-blue-200 transition-all duration-300 hover:shadow-md cursor-pointer">
+        <CardContent className="p-4 flex items-center gap-4">
+          <div className={cn(
+            "h-12 w-12 rounded-full flex items-center justify-center text-lg font-bold shrink-0",
+            "bg-serene-blue-50 text-serene-blue-600"
+          )}>
+            {report.type_of_incident?.charAt(0).toUpperCase() || "R"}
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center justify-between mb-1">
+              <div className="flex items-center gap-2 min-w-0">
+                <h4 className="font-semibold text-serene-neutral-900 truncate">
+                  {report.type_of_incident?.replace(/_/g, " ") || "Incident Report"}
+                </h4>
+                <Badge variant="outline" className={cn(
+                  "text-[10px] font-bold uppercase border-0 px-1.5 py-0.5 whitespace-nowrap",
+                  statusTheme
+                )}>
+                  {status}
+                </Badge>
+              </div>
+              <span className="text-xs text-serene-neutral-400 font-medium whitespace-nowrap ml-2">
+                {report.submission_timestamp ? new Date(report.submission_timestamp).toLocaleDateString() : ""}
+              </span>
+            </div>
+            <p className="text-sm text-serene-neutral-500 truncate">
+              {report.incident_description || "No description provided."}
+            </p>
+          </div>
+          <ChevronRight className="h-4 w-4 text-serene-neutral-300 group-hover:text-serene-blue-400 transition-colors" />
+        </CardContent>
+      </Card>
+    </Link>
+  );
 }

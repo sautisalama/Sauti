@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { getCaseChat } from "@/app/actions/chat";
+import { acceptAndScheduleCase } from "@/app/actions/matching";
 import { Chat } from "@/types/chat";
 import { Card } from "@/components/ui/card";
 
@@ -113,31 +114,22 @@ export default function CaseDetailPage({ params }: { params: Promise<{ id: strin
         };
     }, [fetchCase, supabase, caseId, caseData?.report_id]);
 
-    const handleAcceptCase = async (id: string) => {
+    const handleAcceptCase = async (id: string, appointment?: any) => {
         try {
             setIsUpdatingStatus(true);
-            const { error } = await supabase
-                .from("matched_services")
-                .update({ match_status_type: "accepted", updated_at: new Date().toISOString() })
-                .eq("id", id);
-
-            if (error) throw error;
             
-            // Sync report status - use multiple possible ID locations to be robust
-            const targetReportId = caseData?.report_id || caseData?.report?.report_id;
-            if (targetReportId) {
-                await supabase
-                    .from("reports")
-                    .update({ 
-                        match_status: "accepted",
-                        updated_at: new Date().toISOString()
-                    })
-                    .eq("report_id", targetReportId);
-            }
+            // Call the consolidated server action
+            const result = await acceptAndScheduleCase(id, appointment);
 
-            toast({ title: "Case Accepted" });
-            fetchCase();
+            if (result.success) {
+                toast({ 
+                    title: "Case Accepted & Scheduled", 
+                    description: "The survivor has been notified and a secure chat is now active." 
+                });
+                fetchCase();
+            }
         } catch (err: any) {
+            console.error("Acceptance failed:", err);
             toast({ title: "Error", description: err.message, variant: "destructive" });
         } finally {
             setIsUpdatingStatus(false);

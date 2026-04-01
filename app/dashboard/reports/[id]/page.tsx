@@ -35,6 +35,7 @@ import { getCaseChat } from "@/app/actions/chat";
 import { useDashboardData } from "@/components/providers/DashboardDataProvider";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { confirmAppointment, rescheduleAppointment } from "../../_views/actions/appointments";
+import { syncReportStatus } from "@/app/actions/matching";
 import { EnhancedAppointmentScheduler } from "../../_components/EnhancedAppointmentScheduler";
 import {
   Dialog,
@@ -44,6 +45,8 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { getReportStatus, getStatusTheme } from "@/lib/utils/case-status";
+import { ReportWithRelations } from "../../_types";
 
 interface ProviderMatch {
     id: string;
@@ -133,33 +136,15 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
 				.select(`
 					*,
 					matched_services (
-						id,
-						match_status_type,
-						match_reason,
-						description,
-						notes,
-						feedback,
-						support_service,
-						survivor_id,
-						service_details:support_services (
-							id,
-							user_id,
-							name,
-							phone_number,
-							email,
-							availability,
-							specialises_in_children,
-							specialises_in_disability,
-							specialises_in_queer_support
+						*,
+						service_details:support_services!matched_services_service_id_fkey (
+							*
+						),
+						appointments:appointments!appointments_matched_services_fkey (
+							*
 						),
 						hrd_details:profiles!matched_services_hrd_profile_id_fkey (
-							id,
-							first_name,
-							last_name,
-							phone,
-							email,
-							professional_title,
-							bio
+							*
 						)
 					)
 				`)
@@ -172,7 +157,7 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
 			}
 
 			if (data) {
-				setReport(data as Tables<"reports">);
+				setReport(data as ReportWithRelations);
 
 				
 				// Map real matches to our UI structure
@@ -565,17 +550,6 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
 		return new Date(date).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
 	};
 
-	const getStatusStyles = (status: string | null) => {
-		switch (status?.toLowerCase()) {
-			case 'matched': return 'bg-teal-50 text-teal-700 border-teal-100';
-			case 'pending': return 'bg-sky-50 text-sky-700 border-sky-100';
-			case 'confirmed': return 'bg-emerald-50 text-emerald-700 border-emerald-100';
-            case 'requested': return 'bg-amber-50 text-amber-700 border-amber-100 animate-pulse';
-            case 'accepted': return 'bg-teal-50 text-teal-700 border-teal-100';
-            case 'completed': return 'bg-emerald-50 text-emerald-700 border-emerald-100';
-			default: return 'bg-slate-50 text-slate-500 border-slate-100';
-		}
-	};
 
 	if (loading) {
 		return (
@@ -612,87 +586,39 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
 	}
 
 	const upcomingAppointments = appointments.filter(a => a.appointment_date && new Date(a.appointment_date) >= new Date());
+    const displayStatus = getReportStatus(report as ReportWithRelations);
 
 	return (
 		<div className="min-h-screen bg-slate-50/50 pb-32 lg:pb-12 text-slate-900 selection:bg-teal-100">
-			{/* Focused Header Navigation */}
-            <nav className="sticky top-0 z-50 bg-white border-b border-slate-100 px-8 py-6 shadow-sm overflow-hidden">
-                <div className="max-w-7xl mx-auto flex items-center justify-between gap-8 h-12">
-                    <div className="flex items-center gap-6 min-w-0">
-                        <Link href="/dashboard/reports" className="rounded-xl hover:bg-slate-50 text-slate-400 h-10 w-10 flex items-center justify-center transition-all bg-white border border-slate-100 shadow-sm">
-                            <ChevronLeft className="h-5 w-5" />
-                        </Link>
-                        
-                        <div className="flex items-center gap-6">
-                            <div className="space-y-0.5">
-                                <div className="flex items-center gap-2 text-teal-600 font-extrabold uppercase tracking-[0.2em] text-[10px] leading-none mb-1">
-                                    <ShieldCheck className="h-3.5 w-3.5" /> Secure Journey
-                                </div>
-                                <h1 className="text-xl font-black text-slate-900 tracking-tight leading-none uppercase">
-                                    {report?.type_of_incident?.replace(/_/g, " ") || "Incident Report"}
-                                </h1>
-                            </div>
+			{/* Focused Header Navigation - Unified with Case View */}
+			<nav className="sticky top-0 z-50 bg-white/80 backdrop-blur-xl border-b border-slate-100 transition-all duration-300">
+				<div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between gap-6">
+					<div className="flex items-center gap-4">
+						<Link href="/dashboard/reports" className="w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center hover:bg-slate-100 transition-all text-slate-600">
+							<ChevronLeft className="h-5 w-5" />
+						</Link>
+						<div className="hidden sm:block">
+							<div className="flex items-center gap-2 text-teal-600 font-extrabold uppercase tracking-[0.2em] text-[10px] mb-0.5">
+								<ShieldCheck className="h-3.5 w-3.5" />
+								Secure Journey Hub
+							</div>
+							<h2 className="text-slate-900 font-bold tracking-tight uppercase">
+                                {report?.type_of_incident?.replace(/_/g, " ") || "Incident Report"}
+                            </h2>
+						</div>
+					</div>
 
-                            <div className="h-10 w-px bg-slate-100 mx-2 hidden lg:block" />
-
-                            <div className="hidden lg:flex items-center gap-8">
-                                <div className="flex items-center gap-3 group">
-                                    <div className="w-9 h-9 bg-slate-50 rounded-xl flex items-center justify-center text-slate-400 group-hover:bg-teal-50 group-hover:text-teal-600 transition-all shrink-0">
-                                        <Heart className="h-4 w-4" />
-                                    </div>
-                                    <div className="space-y-0.5">
-                                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest leading-none">Survivor</p>
-                                        <p className="text-xs font-bold text-slate-700 tracking-tight whitespace-nowrap">{(report?.first_name || 'Anonymous').toUpperCase()}</p>
-                                    </div>
-                                </div>
-
-                                <div className="flex items-center gap-3 group">
-                                    <div className="w-9 h-9 bg-slate-50 rounded-xl flex items-center justify-center text-slate-400 group-hover:bg-sky-50 group-hover:text-sky-600 transition-all shrink-0">
-                                        <Calendar className="h-4 w-4" />
-                                    </div>
-                                    <div className="space-y-0.5">
-                                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest leading-none">Reported</p>
-                                        <p className="text-xs font-bold text-slate-700 tracking-tight whitespace-nowrap">{formatDate(report?.submission_timestamp)}</p>
-                                    </div>
-                                </div>
-
-                                <div className="flex items-center gap-3 group">
-                                    <div className="w-9 h-9 bg-slate-50 rounded-xl flex items-center justify-center text-slate-400 group-hover:bg-violet-50 group-hover:text-violet-600 transition-all shrink-0">
-                                        <Activity className="h-4 w-4" />
-                                    </div>
-                                    <div className="space-y-0.5">
-                                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest leading-none">Status</p>
-                                        <p className="text-xs font-bold text-slate-700 tracking-tight capitalize whitespace-nowrap">{report.match_status || "Processing"}</p>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="flex items-center gap-4 shrink-0">
-                        {respondingTo && (
-                            <Button 
-                                onClick={() => setShowResponseModal(true)}
-                                className="h-11 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl px-5 shadow-lg shadow-amber-600/20 text-xs gap-2.5 transition-all active:scale-95"
-                            >
-                                <Calendar className="h-4 w-4" /> Confirm & Schedule
-                            </Button>
-                        )}
-
-                        <Badge className={cn("px-4 py-1.5 rounded-full text-[10px] font-bold border uppercase tracking-[0.2em] whitespace-nowrap", getStatusStyles(report.match_status))}>
-                            {report.match_status || 'Under Review'}
+					<div className="flex items-center gap-3">
+                        <Badge className={cn("px-4 py-1.5 rounded-full text-[10px] font-bold border uppercase tracking-[0.2em] whitespace-nowrap shadow-sm", getStatusTheme(displayStatus))}>
+                            {displayStatus}
                         </Badge>
-                        
-                        <Button 
-                            variant="outline"
-                            onClick={exitSafely} 
-                            className="bg-rose-50 hover:bg-rose-100/50 text-rose-600 font-bold rounded-xl px-5 h-11 border border-rose-100/50 transition-all text-[10px] gap-2.5 uppercase tracking-widest shadow-sm"
-                        >
-                            <LogOut className="h-4 w-4" /> Quick Exit
-                        </Button>
-                    </div>
-                </div>
-            </nav>
+                        <div className="h-6 w-px bg-slate-100 mx-2 hidden lg:block" />
+						<Button onClick={exitSafely} variant="ghost" className="text-slate-400 hover:text-rose-500 font-bold text-[10px] gap-2 uppercase tracking-widest">
+							<LogOut className="h-4 w-4" /> Quick Exit
+						</Button>
+					</div>
+				</div>
+			</nav>
 
 			<main className="max-w-7xl mx-auto px-6 py-12">
 				<div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-start">
@@ -700,13 +626,49 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
 					{/* Main Content: Story & Recovery */}
 					<div className="lg:col-span-8 space-y-12">
 						
-                        {/* Summary Section */}
-						<div className="space-y-6">
+                        <div className="space-y-6">
 							<div className="flex items-center gap-3">
 								<Activity className="h-6 w-6 text-teal-600" />
-								<h1 className="text-4xl font-bold tracking-tight text-slate-900">Healing Journey</h1>
+								<h1 className="text-4xl font-black tracking-tight text-slate-900 uppercase">Healing Journey</h1>
 							</div>
-							<p className="text-lg text-slate-500 font-medium leading-relaxed max-w-2xl">
+
+                            <div className="flex flex-wrap items-center gap-8 py-4 px-6 bg-white border border-slate-100 rounded-3xl shadow-sm">
+                                <div className="flex items-center gap-3 group">
+                                    <div className="w-10 h-10 bg-teal-50 rounded-2xl flex items-center justify-center text-teal-600 shadow-sm shrink-0">
+                                        <Heart className="h-5 w-5" />
+                                    </div>
+                                    <div className="space-y-0.5">
+                                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none">Journal Profile</p>
+                                        <p className="text-sm font-bold text-slate-700 tracking-tight">{(report?.first_name || 'Anonymous').toUpperCase()}</p>
+                                    </div>
+                                </div>
+
+                                <div className="h-8 w-px bg-slate-100 hidden sm:block" />
+
+                                <div className="flex items-center gap-3 group">
+                                    <div className="w-10 h-10 bg-sky-50 rounded-2xl flex items-center justify-center text-sky-600 shadow-sm shrink-0">
+                                        <Calendar className="h-5 w-5" />
+                                    </div>
+                                    <div className="space-y-0.5">
+                                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none">Record Date</p>
+                                        <p className="text-sm font-bold text-slate-700 tracking-tight">{formatDate(report?.submission_timestamp)}</p>
+                                    </div>
+                                </div>
+
+                                <div className="h-8 w-px bg-slate-100 hidden sm:block" />
+
+                                <div className="flex items-center gap-3 group">
+                                    <div className="w-10 h-10 bg-violet-50 rounded-2xl flex items-center justify-center text-violet-600 shadow-sm shrink-0">
+                                        <Activity className="h-5 w-5" />
+                                    </div>
+                                    <div className="space-y-0.5">
+                                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none">Current Phase</p>
+                                        <p className="text-sm font-bold text-slate-700 tracking-tight capitalize">{displayStatus}</p>
+                                    </div>
+                                </div>
+                            </div>
+
+							<p className="text-lg text-slate-400 font-medium leading-relaxed max-w-2xl">
                                 This is your private sanctuary. Share more about your experience when you're ready, track your healing steps, and record your private thoughts.
                             </p>
 						</div>
@@ -875,7 +837,7 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
                                             <h3 className="text-2xl font-bold text-slate-900 tracking-tight">Coordination Line</h3>
                                         </div>
                                         
-                                        <div className="h-[500px] sm:h-[600px] rounded-[2rem] border-0 shadow-2xl shadow-teal-500/10 overflow-hidden bg-white flex flex-col group">
+                                        <div className="h-[500px] sm:h-[600px] rounded-[2.5rem] border border-white shadow-2xl shadow-teal-500/10 overflow-hidden bg-white/70 backdrop-blur-2xl flex flex-col group">
                                             <div className="p-5 border-b border-slate-50 bg-slate-50/30 flex items-center justify-between">
                                                 <div className="flex items-center gap-3">
                                                     <div className="w-8 h-8 rounded-2xl bg-teal-50 flex items-center justify-center text-teal-600">
@@ -925,10 +887,10 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
 
                                     {/* Action Card */}
                                     <Card className={cn(
-                                        "border-0 shadow-xl rounded-[2rem] overflow-hidden relative group",
+                                        "border border-white shadow-2xl rounded-[2.5rem] overflow-hidden relative group",
                                         acceptedMatch.status === 'completed' 
-                                            ? "bg-emerald-600 shadow-emerald-600/20" 
-                                            : "bg-white border border-slate-100"
+                                            ? "bg-emerald-600 shadow-emerald-600/20 text-white" 
+                                            : "bg-white/70 backdrop-blur-2xl border-slate-100 shadow-slate-200/50"
                                     )}>
                                         <CardContent className={cn("p-8 relative", acceptedMatch.status === 'completed' ? "text-white" : "text-slate-900")}>
                                             <div className="flex items-center justify-between mb-6">
@@ -1047,18 +1009,119 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
 											<div className="flex flex-col gap-1 px-2">
 												<div className="flex items-center gap-2 text-teal-600 font-bold uppercase tracking-[0.2em] text-[10px]">
 													<Activity className="h-3.5 w-3.5" />
-													Active Coordination
+													{acceptedMatch ? "Coordination Hub" : "Matching Center"}
 												</div>
-												<h3 className="text-2xl font-bold text-slate-900 tracking-tight">Matching Center</h3>
+												<h3 className="text-2xl font-bold text-slate-900 tracking-tight">
+													{acceptedMatch ? "Support Active" : "Matching Center"}
+												</h3>
 											</div>
 
 											{(() => {
-												const activeProposal = allMatches.find(m => m.status === 'proposed' || m.status === 'requested');
+												if (acceptedMatch) {
+													const activeAppt = appointments.find(a => a.status === 'upcoming' || a.status === 'confirmed') || appointments[0];
+													
+													return (
+														<Card className="border-0 shadow-2xl rounded-[2.5rem] bg-white overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-700">
+															<div className="bg-gradient-to-r from-teal-600 to-teal-500 p-8 text-white">
+																<div className="flex items-center justify-between mb-6">
+																	<Badge className="bg-white/20 text-white border-0 font-bold uppercase tracking-widest text-[9px] backdrop-blur-md">Connection Secured</Badge>
+																	<ShieldCheck className="h-5 w-5 opacity-80" />
+																</div>
+																
+																<div className="flex items-center gap-5">
+																	<Avatar className="h-16 w-16 rounded-3xl border-4 border-white/20 shadow-xl">
+																		<AvatarFallback className="bg-white text-teal-600 font-bold text-xl text-shadow-sm">
+																			{acceptedMatch.name.charAt(0)}
+																		</AvatarFallback>
+																	</Avatar>
+																	<div className="space-y-1">
+																		<h4 className="text-2xl font-bold tracking-tight">{acceptedMatch.name}</h4>
+																		<p className="text-teal-50/80 font-bold text-xs uppercase tracking-widest">{acceptedMatch.type}</p>
+																	</div>
+																</div>
+															</div>
+															
+															<CardContent className="p-8 space-y-8">
+																{activeAppt ? (
+																	<div className="space-y-4">
+																		<div className="flex items-center justify-between px-2">
+																			<div className="flex items-center gap-2 text-slate-400 font-bold uppercase tracking-widest text-[10px]">
+																				<Calendar className="h-3.5 w-3.5" />
+																				Confirmed Session
+																			</div>
+																			<Badge variant="outline" className="text-teal-600 border-teal-100 bg-teal-50/30 font-bold text-[9px] uppercase tracking-wider">
+																				{activeAppt.status}
+																			</Badge>
+																		</div>
+																		
+																		<div className="bg-slate-50/80 rounded-3xl p-6 border border-slate-100/50 flex flex-col sm:flex-row sm:items-center justify-between gap-6 hover:bg-slate-100/50 transition-colors">
+																			<div className="space-y-1">
+																				<p className="text-2xl font-bold text-slate-900 tracking-tight">
+																					{new Date(activeAppt.appointment_date!).toLocaleDateString(undefined, {
+																						weekday: 'long',
+																						month: 'long',
+																						day: 'numeric'
+																					})}
+																				</p>
+																				<p className="text-base font-bold text-teal-600">
+																					{new Date(activeAppt.appointment_date!).toLocaleTimeString([], { 
+																						hour: '2-digit', 
+																						minute: '2-digit' 
+																					})}
+																				</p>
+																			</div>
+																			
+																			<Button 
+																				variant="outline"
+																				onClick={() => {
+																					setRespondingTo(activeAppt);
+																					setShowResponseModal(true);
+																				}}
+																				className="h-12 px-6 rounded-2xl border-slate-200 text-slate-600 font-bold hover:bg-white transition-all text-xs shrink-0"
+																			>
+																				Modify Time
+																			</Button>
+																		</div>
+																	</div>
+																) : (
+																	<div className="bg-slate-50/50 rounded-3xl p-8 text-center border border-dashed border-slate-200">
+																		<Calendar className="h-8 w-8 text-slate-300 mx-auto mb-3" />
+																		<p className="text-sm font-bold text-slate-500">Awaiting session scheduling</p>
+																		<p className="text-xs text-slate-400 mt-1">Your partner will propose a time shortly.</p>
+																	</div>
+																)}
+																
+																<div className="pt-4 flex flex-col sm:flex-row gap-4">
+																	<Button 
+																		onClick={() => router.push(`/dashboard/chat?id=${activeAppt?.id || 'new'}`)}
+																		className="flex-1 h-14 bg-teal-600 hover:bg-teal-700 text-white font-bold rounded-[1.25rem] shadow-xl shadow-teal-600/20 transition-all hover:scale-[1.02] flex items-center justify-center gap-3"
+																	>
+																		<MessageCircle className="h-5 w-5" />
+																		Enter Secure Chat
+																		<ArrowRight className="h-4 w-4 opacity-50" />
+																	</Button>
+																	
+																	<Button 
+																		variant="outline"
+																		onClick={() => {
+																			toast({ title: "Profile", description: "Professional profile details are confidential." });
+																		}}
+																		className="h-14 px-8 rounded-[1.25rem] border-slate-100 bg-white text-slate-600 font-bold hover:bg-slate-50 transition-all text-xs"
+																	>
+																		View Credentials
+																	</Button>
+																</div>
+															</CardContent>
+														</Card>
+													);
+												}
+
+												const activeProposal = allMatches.find(m => m.status === 'proposed' || m.status === 'requested' || m.status === 'confirmed');
 												const matchingAppt = activeProposal ? appointments.find(a => a.status === 'pending' || a.status === 'requested') : null;
 												
 												if (activeProposal) {
 													return (
-														<Card className="border-0 shadow-xl rounded-[2rem] bg-white border border-teal-100/50 overflow-hidden animate-in fade-in zoom-in-95 duration-500">
+														<Card className="border border-white shadow-2xl rounded-[2.5rem] bg-white/70 backdrop-blur-2xl border-teal-100/50 overflow-hidden animate-in fade-in zoom-in-95 duration-500">
 															<CardHeader className="p-8 pb-4">
 																<div className="flex items-center justify-between">
 																	<Badge className="bg-teal-50 text-teal-600 border-0 font-bold uppercase tracking-widest text-[9px]">Partner Proposal Received</Badge>
@@ -1095,8 +1158,7 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
 																			<Button 
 																				onClick={async () => {
 																					await confirmAppointment(matchingAppt.id);
-																					await supabase.from('matched_services').update({ match_status_type: 'accepted' }).eq('id', activeProposal.id);
-																					await supabase.from('reports').update({ match_status: 'accepted' }).eq('report_id', reportId);
+																					await syncReportStatus(reportId, activeProposal.id, 'accepted');
 																					toast({ title: "Partner Confirmed", description: "You are now connected." });
 																					fetchReport();
 																				}}
@@ -1153,7 +1215,7 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
 												}
 												
 												return (
-													<Card className="border-0 shadow-xl rounded-[2rem] bg-white border border-slate-100 overflow-hidden group">
+													<Card className="border border-white shadow-2xl rounded-[2.5rem] bg-white/70 backdrop-blur-2xl border-slate-100 overflow-hidden group">
 														<CardContent className="p-12 flex flex-col items-center text-center space-y-6">
 															<div className="relative">
 																<div className="w-20 h-20 bg-teal-50 rounded-full flex items-center justify-center text-teal-600">

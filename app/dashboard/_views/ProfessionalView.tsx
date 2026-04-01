@@ -60,7 +60,8 @@ import { useDashboardData } from "@/components/providers/DashboardDataProvider";
 import {
 	SereneWelcomeHeader,
 	SereneQuickActionCard,
-	SereneSectionHeader
+	SereneSectionHeader,
+    SereneIncidentActivityCard
 } from "../_components/SurvivorDashboardComponents";
 import { CalendarConnectionStatus } from "../_components/CalendarConnectionStatus";
 import { ReportWithRelations, MatchedServiceWithRelations, AppointmentWithDetails } from "../_types";
@@ -69,8 +70,8 @@ import { fetchUserSupportServices, deleteSupportService } from "./actions/suppor
 import { fetchMatchedServices } from "./actions/matched-services";
 import { fetchUserAppointments } from "./actions/appointments";
 import { matchProfessionalWithUnmatchedReports } from "@/app/actions/match-services";
-import AuthenticatedReportAbuseForm from "@/components/AuthenticatedReportAbuseForm";
 import { OutOfOfficeBanner } from "@/components/dashboard/OutOfOfficeBanner";
+import { getReportStatus, getMatchStatus, getStatusTheme } from "@/lib/utils/case-status";
 
 interface Recommendation {
   id: string;
@@ -105,10 +106,19 @@ export default function ProfessionalView({
 	const [dashboardTab, setDashboardTab] = useState<'cases' | 'reports'>('cases');
 
 	// State
-	const [reports, setReports] = useState<ReportWithRelations[]>([]);
-	const [supportServices, setSupportServices] = useState<Tables<"support_services">[]>([]);
-	const [matchedServices, setMatchedServices] = useState<MatchedServiceWithRelations[]>([]);
-	const [appointments, setAppointments] = useState<AppointmentWithDetails[]>([]);
+	const [reports, setReports] = useState<ReportWithRelations[]>(() => {
+		const seeded = (dash?.data?.reports as ReportWithRelations[]) || [];
+		return seeded;
+	});
+	const [supportServices, setSupportServices] = useState<Tables<"support_services">[]>(() => {
+		return (dash?.data?.supportServices as Tables<"support_services">[]) || [];
+	});
+	const [matchedServices, setMatchedServices] = useState<MatchedServiceWithRelations[]>(() => {
+		return (dash?.data?.matchedServices as MatchedServiceWithRelations[]) || [];
+	});
+	const [appointments, setAppointments] = useState<AppointmentWithDetails[]>(() => {
+		return (dash?.data?.appointments as AppointmentWithDetails[]) || [];
+	});
 
 	const getTimeOfDay = (): "morning" | "afternoon" | "evening" => {
 		const hour = new Date().getHours();
@@ -168,30 +178,30 @@ export default function ProfessionalView({
 		};
 
 		if (dash?.data && dash.data.userId === userId) {
-            const reports = (dash.data.reports as ReportWithRelations[]) || [];
-            const matches = (dash.data.matchedServices as MatchedServiceWithRelations[]) || [];
+            const reportsData = (dash.data.reports as ReportWithRelations[]) || [];
+            const matchesData = (dash.data.matchedServices as MatchedServiceWithRelations[]) || [];
 
-			setReports(reports);
+			setReports(reportsData);
 			setSupportServices(dash.data.supportServices || []);
-			setMatchedServices(matches);
+			setMatchedServices(matchesData);
 			setAppointments(dash.data.appointments || []);
 
             // Activity-based tab selection from cached data
-            const latestReport = reports.length > 0 
-                ? Math.max(...reports.map(r => new Date(r.submission_timestamp || 0).getTime())) 
+            const latestReport = reportsData.length > 0 
+                ? Math.max(...reportsData.map(r => new Date(r.submission_timestamp || 0).getTime())) 
                 : 0;
-            const latestMatch = matches.length > 0 
-                ? Math.max(...matches.map((m: any) => new Date(m.updated_at || m.match_date || 0).getTime())) 
+            const latestMatch = matchesData.length > 0 
+                ? Math.max(...matchesData.map((m: any) => new Date(m.updated_at || m.match_date || 0).getTime())) 
                 : 0;
 
-            if (latestReport > latestMatch && reports.length > 0) {
+            if (latestReport > latestMatch && reportsData.length > 0) {
                 setDashboardTab('reports');
-            } else if (matches.length > 0) {
+            } else if (matchesData.length > 0) {
                 setDashboardTab('cases');
             }
             
             // Proactive matching if NO cases!
-            if (matches.length === 0 && (dash.data.supportServices?.length || 0) > 0) {
+            if (matchesData.length === 0 && (dash.data.supportServices?.length || 0) > 0) {
                 matchProfessionalWithUnmatchedReports(userId).then(res => {
                     if (res && (res as any).matched > 0) {
                         toast({
@@ -207,8 +217,59 @@ export default function ProfessionalView({
 		loadData();
 	}, [userId, toast, dash?.data]);
 
+	// Realtime reports subscription
+	useEffect(() => {
+		const supabase = createClient();
+		const channel = supabase
+			.channel(`realtime_professional_reports_${userId}`)
+			.on(
+				'postgres_changes',
+				{ event: '*', schema: 'public', table: 'reports', filter: `user_id=eq.${userId}` },
+				async (payload) => {
+					const targetId = payload.new ? (payload.new as any).report_id : (payload.old as any).report_id;
+					if (!targetId) return;
+					
+					const { data } = await supabase
+						.from('reports')
+						.select(`
+							*,
+							matched_services (
+								*,
+								service_details:support_services!matched_services_service_id_fkey (
+									*
+								),
+								appointments (
+									*
+								)
+							)
+						`)
+						.eq('report_id', targetId)
+						.maybeSingle();
+
+					if (data) {
+						setReports((prev) => {
+							const exists = prev.some(r => r.report_id === data.report_id);
+							if (exists) {
+								return prev.map(r => r.report_id === data.report_id ? (data as any) : r);
+							} else {
+								return [data as any, ...prev].sort((a, b) => 
+									new Date(b.submission_timestamp || 0).getTime() - new Date(a.submission_timestamp || 0).getTime()
+								);
+							}
+						});
+					}
+				}
+			)
+			.subscribe();
+		return () => {
+			supabase.removeChannel(channel);
+		};
+	}, [userId]);
+
 	// Computed stats
 	const activeCasesCount = matchedServices.length;
+
+
 	const pendingCasesCount = useMemo(
 		() => matchedServices.filter(m => m.match_status_type?.toLowerCase() === 'pending').length,
 		[matchedServices]
@@ -832,11 +893,9 @@ export default function ProfessionalView({
 															</h4>
 															<Badge variant="outline" className={cn(
 																"text-[10px] font-bold uppercase border-0 px-1.5 py-0.5",
-																match.match_status_type === 'active' ? "bg-serene-green-50 text-serene-green-700 font-black" :
-																match.match_status_type === 'pending' ? "bg-amber-100 text-amber-700 animate-pulse border-amber-200" :
-																"bg-serene-neutral-100 text-serene-neutral-600"
+																getStatusTheme(getMatchStatus(match))
 															)}>
-																{match.match_status_type === 'pending' ? 'Needs Review' : (match.match_status_type || 'pending')}
+																{getMatchStatus(match) === 'pending' ? 'Needs Review' : getMatchStatus(match)}
 															</Badge>
 														</div>
 														<p className="text-sm text-serene-neutral-500 truncate">
@@ -915,39 +974,11 @@ export default function ProfessionalView({
 						<div className="space-y-3">
 							{reports.length > 0 ? (
 								reports.slice(0, 5).map((report) => (
-									<Link href={`/dashboard/reports/${report.report_id}`} key={report.report_id} className="block group">
-										<Card className="overflow-hidden border-serene-neutral-100 hover:border-amber-200 transition-all duration-300 hover:shadow-md cursor-pointer">
-											<CardContent className="p-4 flex items-center gap-4">
-												<div className={cn(
-													"h-12 w-12 rounded-2xl flex items-center justify-center shrink-0",
-													report.urgency === 'high' ? "bg-red-50 text-red-600" :
-													report.urgency === 'medium' ? "bg-amber-50 text-amber-600" :
-													"bg-serene-blue-50 text-serene-blue-600"
-												)}>
-													<FileText className="h-5 w-5" />
-												</div>
-												<div className="flex-1 min-w-0">
-													<div className="flex items-center gap-2 mb-1">
-														<h4 className="font-semibold text-serene-neutral-900 truncate">
-															{report.type_of_incident?.replace(/_/g, " ") || "Report"}
-														</h4>
-														<Badge variant="outline" className={cn(
-															"text-[10px] font-bold uppercase border-0 px-1.5 py-0.5",
-															report.match_status === 'accepted' ? "bg-serene-green-50 text-serene-green-700" :
-															report.match_status === 'pending' ? "bg-amber-50 text-amber-700" :
-															"bg-serene-neutral-50 text-serene-neutral-600"
-														)}>
-															{report.match_status || 'pending'}
-														</Badge>
-													</div>
-													<p className="text-sm text-serene-neutral-500 truncate">
-														{report.incident_description || "No description available"}
-													</p>
-												</div>
-												<ChevronRight className="h-5 w-5 text-serene-neutral-300 group-hover:text-serene-neutral-500 transition-colors" />
-											</CardContent>
-										</Card>
-									</Link>
+									<SereneIncidentActivityCard 
+                                        key={report.report_id}
+                                        report={report}
+                                        href={`/dashboard/reports/${report.report_id}`}
+                                    />
 								))
 							) : (
 								<Card className="border-dashed border-2 border-serene-neutral-200">

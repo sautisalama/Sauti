@@ -76,7 +76,8 @@ export async function fetchDashboardData(): Promise<AggregatedDashboardData | nu
             let query = supabase.from("matched_services").select(`
                 *,
                 report:reports(*),
-                service_details:support_services(*)
+                service_details:support_services(*),
+                appointments:appointments(*)
             `);
 
             if (ids.length > 0) {
@@ -86,7 +87,21 @@ export async function fetchDashboardData(): Promise<AggregatedDashboardData | nu
             }
 
 			const { data } = await query.order("match_date", { ascending: false });
-			return (data as any) || [];
+			
+			// Backfill matched_service into nested appointments for type compatibility
+			const transformedData = data?.map((match: any) => ({
+				...match,
+				appointments: match.appointments?.map((appt: any) => ({
+					...appt,
+					matched_service: {
+						id: match.id,
+						service_details: match.service_details,
+						report: match.report,
+					},
+				})),
+			}));
+
+			return (transformedData as MatchedServiceWithRelations[]) || [];
 		})();
 
 		const appointmentsPromise = (async (): Promise<AppointmentWithDetails[]> => {
@@ -95,7 +110,7 @@ export async function fetchDashboardData(): Promise<AggregatedDashboardData | nu
       *,
       matched_service:matched_services (
         *,
-        support_service:support_services (*),
+        service_details:support_services (*),
         report:reports (*)
       ),
       professional:profiles!appointments_professional_id_fkey (*),

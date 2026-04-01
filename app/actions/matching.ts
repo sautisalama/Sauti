@@ -4,6 +4,7 @@ import { createClient } from '@/utils/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { MatchStatusType, TimeSlot } from '@/types/chat'
 import { matchReportWithServices } from './match-services'
+import { createAppointment } from '../dashboard/_views/actions/appointments'
 
 /**
  * Professional accepts a match request
@@ -55,7 +56,7 @@ export async function acceptMatchRequest(matchId: string, proposedTimes?: TimeSl
 
   // Create notification for survivor
   await supabase.from('notifications').insert({
-    user_id: match.survivor_id,
+    user_id: match.survivor_id!,
     title: 'Match Accepted',
     message: 'A professional has accepted your case and proposed meeting times.',
     type: 'match_accepted',
@@ -167,7 +168,7 @@ export async function confirmMatch(matchId: string, selectedTime?: TimeSlot) {
     .from('chats')
     .insert({
       type: 'support_match',
-      created_by: match.survivor_id,
+      created_by: match.survivor_id!,
       match_id: match.id,
       metadata: {
         match_id: match.id,
@@ -212,7 +213,7 @@ export async function confirmMatch(matchId: string, selectedTime?: TimeSlot) {
     const { error: apptError } = await supabase
       .from('appointments')
       .insert({
-        survivor_id: match.survivor_id,
+        survivor_id: match.survivor_id!,
         professional_id: professionalId,
         matched_services: matchId,
         appointment_date: selectedTime.slot_start,
@@ -254,6 +255,111 @@ export async function confirmMatch(matchId: string, selectedTime?: TimeSlot) {
 }
 
 /**
+ * Consolidates the entire Professional "Accept & Schedule" flow.
+ * Ensures atomicity and avoids "Match not found" errors by performing all ops on the server.
+ */
+export async function acceptAndScheduleCase(
+  matchId: string, 
+  appointmentData?: { 
+    date: Date; 
+    duration: number; 
+    type: string; 
+    notes?: string; 
+  }
+) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('Unauthorized')
+
+  // 1. Fetch match and verify ownership
+  const { data: match, error: fetchError } = await supabase
+    .from('matched_services')
+    .select(`
+      *,
+      support_services:service_id(id, name, user_id),
+      report:reports(report_id, user_id)
+    `)
+    .eq('id', matchId)
+    .single()
+
+  if (fetchError || !match) {
+    console.error(`acceptAndScheduleCase: Match fetch failed [${matchId}]:`, fetchError)
+    throw new Error('Match record not found')
+  }
+
+  const serviceData = match.support_services as unknown as { id: string, name: string | null, user_id: string | null } | null;
+  if (serviceData?.user_id !== user.id) {
+    throw new Error('Unauthorized - you do not own the service for this case')
+  }
+
+  // 2. Update Match Status
+  const { error: matchUpdateError } = await supabase
+    .from('matched_services')
+    .update({ 
+      match_status_type: 'accepted',
+      professional_accepted_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    })
+    .eq('id', matchId)
+
+  if (matchUpdateError) throw new Error(`Failed to update match status: ${matchUpdateError.message}`)
+
+  // 3. Create Appointment if provided
+  if (appointmentData) {
+    const { error: apptError } = await supabase
+      .from('appointments')
+      .insert({
+        survivor_id: match.survivor_id || (match.report as any)?.user_id || user.id, // Fallback to avoid null
+        professional_id: user.id,
+        matched_services: matchId,
+        appointment_date: appointmentData.date.toISOString(),
+        duration_minutes: appointmentData.duration || 60,
+        status: 'confirmed',
+        appointment_type: appointmentData.type || 'consultation',
+        notes: appointmentData.notes || 'Initial consultation'
+      })
+
+    if (apptError) {
+      console.error('acceptAndScheduleCase: Appointment creation failed:', apptError)
+      // We continue since the match was already updated
+    }
+  }
+
+  // 4. Ensure Chat Room
+  let chatId = match.chat_id;
+  if (!chatId) {
+    try {
+      const chatResult = await ensureChatForMatch(matchId)
+      chatId = chatResult.chatId || null;
+    } catch (chatErr) {
+      console.error('acceptAndScheduleCase: Chat creation failed:', chatErr)
+    }
+  }
+
+  // 5. Case Exclusivity (Decline others)
+  const reportId = match.report_id || (match.report as any)?.report_id;
+  if (reportId) {
+    await markCaseAsExclusive(reportId, matchId)
+    
+    // 6. Sync Report Status
+    await supabase
+      .from('reports')
+      .update({ 
+        match_status: 'accepted',
+        ismatched: true,
+        updated_at: new Date().toISOString()
+      })
+      .eq('report_id', reportId)
+  }
+
+  revalidatePath('/dashboard/cases')
+  revalidatePath('/dashboard/reports')
+  revalidatePath('/dashboard/chat')
+  
+  return { success: true, chatId }
+}
+
+/**
  * Creates a chat room for a match that was accepted via scheduling
  * but didn't have a chat created yet.
  * Called when professional accepts and schedules — enables chat immediately.
@@ -264,22 +370,38 @@ export async function ensureChatForMatch(matchId: string) {
   if (!user) throw new Error('Unauthorized')
 
   // Check if chat already exists
-  const { data: match } = await supabase
+  const { data: match, error: fetchError } = await supabase
     .from('matched_services')
-    .select(`
-      id, chat_id, survivor_id,
-      support_services:service_id!matched_services_service_id_fkey(id, name, user_id)
-    `)
+    .select('id, chat_id, survivor_id, service_id')
     .eq('id', matchId)
     .single()
 
-  if (!match) throw new Error('Match not found')
+  if (fetchError || !match) {
+    console.error(`ensureChatForMatch: Match fetch failed for ID [${matchId}]:`, fetchError)
+    throw new Error(`Match not found: ${matchId}`)
+  }
+  
   if (match.chat_id) return { success: true, chatId: match.chat_id }
 
-  const serviceData = match.support_services as unknown as { id: string, name: string | null, user_id: string | null } | null;
-  const professionalId = serviceData?.user_id;
+  if (!match.service_id) {
+    throw new Error('Match record is missing a service ID')
+  }
 
-  if (!professionalId) throw new Error('No professional linked to this match')
+  // Fetch service details for professional ID
+  const { data: service, error: serviceError } = await supabase
+    .from('support_services')
+    .select('id, name, user_id')
+    .eq('id', match.service_id)
+    .single()
+
+  if (serviceError || !service) {
+    console.error(`ensureChatForMatch: Service fetch failed for ID [${match.service_id}]:`, serviceError)
+    throw new Error('No professional service linked to this match')
+  }
+
+  const professionalId = service.user_id;
+
+  if (!professionalId) throw new Error('No professional user linked to this service')
 
   if (!match.survivor_id) throw new Error('No survivor linked to this match')
 
@@ -288,11 +410,11 @@ export async function ensureChatForMatch(matchId: string) {
     .from('chats')
     .insert({
       type: 'support_match',
-      created_by: match.survivor_id,
+      created_by: match.survivor_id!,
       match_id: match.id,
       metadata: {
         match_id: match.id,
-        service_name: serviceData?.name || 'Service',
+        service_name: service.name || 'Service',
         case_id: match.id,
       } as any
     })
@@ -554,5 +676,42 @@ export async function markCaseAsExclusive(reportId: string, acceptedMatchId: str
   }
 
   revalidatePath('/dashboard/cases')
+  revalidatePath('/dashboard/reports') // Ensure survivor view also updates
+  return { success: true }
+}
+
+/**
+ * Consolidated function to ensure a report and its active match are perfectly synchronized.
+ * Used when a survivor accepts a match or when a professional schedules.
+ */
+export async function syncReportStatus(reportId: string, matchId: string, status: MatchStatusType = 'accepted') {
+  const supabase = await createClient()
+  
+  // 1. Update the report table
+  await supabase
+    .from('reports')
+    .update({ 
+      match_status: status,
+      ismatched: status === 'accepted' || status === 'completed',
+      updated_at: new Date().toISOString()
+    })
+    .eq('report_id', reportId)
+
+  // 2. Update the winning match
+  await supabase
+    .from('matched_services')
+    .update({ 
+      match_status_type: status,
+      updated_at: new Date().toISOString()
+    })
+    .eq('id', matchId)
+
+  // 3. Mark case as exclusive (decline others)
+  if (status === 'accepted') {
+    await markCaseAsExclusive(reportId, matchId)
+  }
+
+  revalidatePath('/dashboard')
+  revalidatePath(`/dashboard/reports/${reportId}`)
   return { success: true }
 }

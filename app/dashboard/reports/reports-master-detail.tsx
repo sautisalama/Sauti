@@ -641,14 +641,12 @@ export default function ReportsMasterDetail({ userId }: { userId: string }) {
 		// Status filter (based on match status)
 		if (statusFilter !== "all") {
 			filteredReports = filteredReports.filter((r) => {
-				const matchStatus = r.matched_services?.[0]?.match_status_type;
 				if (statusFilter === "matched") {
-					return (
-						matchStatus &&
-						["matched", "confirmed", "accepted"].includes(matchStatus.toLowerCase())
+					return r.matched_services?.some(m => 
+						["matched", "confirmed", "accepted", "completed"].includes((m.match_status_type || "").toLowerCase())
 					);
 				} else if (statusFilter === "pending") {
-					return !matchStatus || matchStatus.toLowerCase() === "pending";
+					return !r.matched_services || r.matched_services.length === 0 || r.matched_services.every(m => (m.match_status_type || "").toLowerCase() === "pending");
 				} else if (statusFilter === "appointment") {
 					return r.matched_services?.some(
 						(m) => m.appointments && m.appointments.length > 0
@@ -1065,10 +1063,12 @@ export default function ReportsMasterDetail({ userId }: { userId: string }) {
 								const isActive = selected?.report_id === r.report_id;
 								const hasAccepted = r.matched_services?.some(m => m.match_status_type === 'accepted');
 								const hasCompleted = r.matched_services?.some(m => m.match_status_type === 'completed');
+								const hasProposed = r.matched_services?.some(m => m.match_status_type === 'proposed');
 								
-								let displayStatus = "pending";
+								let displayStatus: 'pending' | 'matched' | 'accepted' | 'completed' | 'resolved' = "pending";
 								if (hasCompleted) displayStatus = "completed";
 								else if (hasAccepted) displayStatus = "accepted";
+								else if (hasProposed) displayStatus = "matched";
 								else if (r.matched_services && r.matched_services.length > 0) displayStatus = "matched";
 
 								return (
@@ -1467,93 +1467,111 @@ export default function ReportsMasterDetail({ userId }: { userId: string }) {
 								</Button>
 
 								{/* Matched Service & Appointment - Always visible */}
-								{selected?.matched_services && selected.matched_services.length > 0 ? (
-									<div className="bg-white rounded-2xl border border-serene-neutral-200 p-5 shadow-sm">
-										<div className="flex items-center justify-between mb-4">
-											<h3 className="text-base font-bold text-serene-neutral-900 flex items-center gap-2">
-												<User className="h-5 w-5 text-serene-blue-600" />
-												Matched Professional
+								{(() => {
+									// Prioritize accepted match, then proposed, then first available
+									const activeMatch = selected.matched_services?.find(m => m.match_status_type === 'accepted') || 
+													   selected.matched_services?.find(m => m.match_status_type === 'completed') ||
+													   selected.matched_services?.find(m => m.match_status_type === 'proposed') ||
+													   selected.matched_services?.[0];
+
+									if (!activeMatch) return (
+										<div className="bg-serene-neutral-50 rounded-2xl border border-serene-neutral-200 p-6 text-center">
+											<div className="w-12 h-12 rounded-full bg-serene-neutral-100 flex items-center justify-center mx-auto mb-3">
+												<Search className="h-6 w-6 text-serene-neutral-400" />
+											</div>
+											<h3 className="text-sm font-bold text-serene-neutral-900 mb-1">
+												Finding a Match
 											</h3>
-											<Badge className="bg-serene-green-50 text-serene-green-700 border-serene-green-200 uppercase text-[10px] tracking-wider">
-												{selected.matched_services[0].match_status_type}
-											</Badge>
+											<p className="text-xs text-serene-neutral-500 max-w-[200px] mx-auto">
+												We are currently looking for the best professional to support you.
+											</p>
 										</div>
-										
-										<div className="flex items-start gap-4 mb-6">
-											<Avatar className="h-12 w-12 border-2 border-white shadow-sm">
-												<AvatarFallback className="bg-serene-blue-100 text-serene-blue-700 font-bold">
-													{selected.matched_services[0].support_services?.name?.charAt(0) || "P"}
-												</AvatarFallback>
-											</Avatar>
-											<div>
-												<p className="text-base font-bold text-serene-neutral-900">
-													{selected.matched_services[0].support_services?.name || "Service Provider"}
-												</p>
-												<p className="text-sm text-serene-neutral-500">
-													Verified Support Professional
-												</p>
-											</div>
-										</div>
+									);
 
-										{/* Appointment Info */}
-										{selected?.matched_services?.[0]?.appointments?.[0] ? (
-											<div className="bg-serene-blue-50/50 rounded-xl border border-serene-blue-100 p-4 mb-4">
-												<div className="flex items-center gap-2 mb-2">
-													<CalendarDays className="h-4 w-4 text-serene-blue-600" />
-													<span className="text-sm font-bold text-serene-blue-900">
-														Upcoming Appointment
-													</span>
-												</div>
-												<div className="text-sm text-serene-neutral-700 font-medium">
-													{new Date(selected.matched_services[0].appointments[0].appointment_date).toLocaleDateString(undefined, {
-														weekday: 'long',
-														month: 'long',
-														day: 'numeric',
-														hour: '2-digit',
-														minute: '2-digit'
-													})}
-												</div>
-												<div className="mt-2 flex gap-2">
-													<Badge variant="outline" className="bg-white/80 capitalize">
-														{selected.matched_services[0].appointments[0].status}
-													</Badge>
+									return (
+										<div className="bg-white rounded-2xl border border-serene-neutral-200 p-5 shadow-sm">
+											<div className="flex items-center justify-between mb-4">
+												<h3 className="text-base font-bold text-serene-neutral-900 flex items-center gap-2">
+													<User className="h-5 w-5 text-serene-blue-600" />
+													{activeMatch.match_status_type === 'accepted' ? 'Connected Professional' : 'Matched Professional'}
+												</h3>
+												<Badge className={cn(
+													"uppercase text-[10px] tracking-wider border-0",
+													activeMatch.match_status_type === 'accepted' ? "bg-serene-blue-50 text-serene-blue-700" :
+													activeMatch.match_status_type === 'completed' ? "bg-indigo-50 text-indigo-700" :
+													"bg-serene-green-50 text-serene-green-700"
+												)}>
+													{activeMatch.match_status_type}
+												</Badge>
+											</div>
+											
+											<div className="flex items-start gap-4 mb-6">
+												<Avatar className="h-12 w-12 border-2 border-white shadow-sm">
+													<AvatarFallback className="bg-serene-blue-100 text-serene-blue-700 font-bold">
+														{activeMatch.support_services?.name?.charAt(0) || "P"}
+													</AvatarFallback>
+												</Avatar>
+												<div>
+													<p className="text-base font-bold text-serene-neutral-900">
+														{activeMatch.support_services?.name || "Service Provider"}
+													</p>
+													<p className="text-sm text-serene-neutral-500">
+														Verified Support Professional
+													</p>
 												</div>
 											</div>
-										) : (
-											<div className="bg-serene-neutral-50 rounded-xl border border-serene-neutral-100 p-4 mb-4 text-center">
-												<p className="text-sm text-serene-neutral-500">No appointment scheduled yet.</p>
-											</div>
-										)}
 
-										<div className="grid grid-cols-2 gap-3">
-											<Button 
-												className="bg-sauti-teal hover:bg-sauti-dark text-white shadow-sm"
-												onClick={() => window.location.href = `/dashboard/chat?id=${selected.matched_services![0].appointments?.[0]?.appointment_id || 'new'}`}
-											>
-												<MessageCircle className="h-4 w-4 mr-2" /> Message
-											</Button>
-											<Button 
-												variant="outline"
-												className="border-sauti-teal/30 text-sauti-dark hover:bg-sauti-teal/5"
-												onClick={() => setShowProfile(true)}
-											>
-												View Profile
-											</Button>
+											{/* Appointment Info */}
+											{activeMatch.appointments?.[0] ? (
+												<div className="bg-serene-blue-50/50 rounded-xl border border-serene-blue-100 p-4 mb-4">
+													<div className="flex items-center gap-2 mb-2">
+														<CalendarDays className="h-4 w-4 text-serene-blue-600" />
+														<span className="text-sm font-bold text-serene-blue-900">
+															{activeMatch.appointments[0].status === 'upcoming' ? 'Upcoming Appointment' : 'Appointment Details'}
+														</span>
+													</div>
+													<div className="text-sm text-serene-neutral-700 font-medium">
+														{new Date(activeMatch.appointments[0].appointment_date).toLocaleDateString(undefined, {
+															weekday: 'long',
+															month: 'long',
+															day: 'numeric',
+															hour: '2-digit',
+															minute: '2-digit'
+														})}
+													</div>
+													<div className="mt-2 flex gap-2">
+														<Badge variant="outline" className="bg-white/80 capitalize">
+															{activeMatch.appointments[0].status}
+														</Badge>
+													</div>
+												</div>
+											) : (
+												<div className="bg-serene-neutral-50 rounded-xl border border-serene-neutral-100 p-4 mb-4 text-center">
+													<p className="text-sm text-serene-neutral-500">No appointment scheduled yet.</p>
+												</div>
+											)}
+
+											<div className="grid grid-cols-2 gap-3">
+												<Button 
+													className="bg-sauti-teal hover:bg-sauti-dark text-white shadow-sm"
+													onClick={() => window.location.href = `/dashboard/chat?id=${activeMatch.appointments?.[0]?.appointment_id || activeMatch.chat_id || 'new'}`}
+												>
+													<MessageCircle className="h-4 w-4 mr-2" /> Message
+												</Button>
+												<Button 
+													variant="outline"
+													className="border-sauti-teal/30 text-sauti-dark hover:bg-sauti-teal/5"
+													onClick={() => {
+														// Handle showing profile for this specific match
+														setShowProfile(true);
+													}}
+												>
+													View Profile
+												</Button>
+											</div>
 										</div>
-									</div>
-								) : (
-									<div className="bg-serene-neutral-50 rounded-2xl border border-serene-neutral-200 p-6 text-center">
-										<div className="w-12 h-12 rounded-full bg-serene-neutral-100 flex items-center justify-center mx-auto mb-3">
-											<Search className="h-6 w-6 text-serene-neutral-400" />
-										</div>
-										<h3 className="text-sm font-bold text-serene-neutral-900 mb-1">
-											Finding a Match
-										</h3>
-										<p className="text-xs text-serene-neutral-500 max-w-[200px] mx-auto">
-											We are currently looking for the best professional to support you.
-										</p>
-									</div>
-								)}
+									);
+								})()}
 
 								{/* Collapsible Accordion sections */}
 								<Accordion type="multiple" defaultValue={["details"]} className="space-y-3">
