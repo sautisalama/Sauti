@@ -582,7 +582,7 @@ export function CaseDetailView({
                             <div className="lg:col-span-8">
                                 {mainContent}
                             </div>
-                            <div className="lg:col-span-4 lg:sticky lg:top-32 h-full">
+                            <div className="lg:col-span-4 lg:sticky lg:top-24 self-start">
                                 {sidebarContent}
                             </div>
                         </div>

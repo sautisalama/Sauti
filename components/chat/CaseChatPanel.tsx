@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, useOptimistic } from 'react';
+import { useState, useEffect, useRef, useOptimistic, startTransition } from 'react';
 import { Chat, Message, MessageType, transformChat } from '@/types/chat';
 import { getMessages, sendMessage, markMessagesAsRead, getCaseChat } from '@/app/actions/chat';
 import { fetchLinkMetadata } from '@/app/actions/chat-media';
@@ -218,17 +218,19 @@ export function CaseChatPanel({
     setInputText('');
     setLinkPreview(null);
     scrollToBottom();
-    addOptimisticMessage(newMessage);
-
-    try {
-      const metadata = previousPreview ? { link_preview: previousPreview } : {};
-      await sendMessage(chat.id, previousInput, 'text', metadata);
-    } catch (error) {
-      console.error('Failed to send:', error);
-      // Rollback inputs
-      setInputText(previousInput);
-      setLinkPreview(previousPreview);
-    }
+    
+    startTransition(async () => {
+      addOptimisticMessage(newMessage);
+      try {
+        const metadata = previousPreview ? { link_preview: previousPreview } : {};
+        await sendMessage(chat.id, previousInput, 'text', metadata);
+      } catch (error) {
+        console.error('Failed to send:', error);
+        // Rollback inputs
+        setInputText(previousInput);
+        setLinkPreview(previousPreview);
+      }
+    });
   };
 
   const handleFileSelect = (file: File, type: 'image' | 'video' | 'document') => {

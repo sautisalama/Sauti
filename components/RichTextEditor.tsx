@@ -15,7 +15,7 @@ import {
 	Loader2
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useState, useEffect, useRef, useCallback, useOptimistic } from "react";
+import { useState, useEffect, useRef, useCallback, useOptimistic, startTransition } from "react";
 
 interface RichTextEditorProps {
 	content?: string;
@@ -65,7 +65,9 @@ export function RichTextEditor({
 	}, [onSave]);
 
 	const scheduleSave = useCallback((html: string) => {
-		setOptimisticStatus('saving');
+		startTransition(() => {
+			setOptimisticStatus('saving');
+		});
 		setSaveStatus('unsaved');
 		if (debounceRef.current) clearTimeout(debounceRef.current);
 		debounceRef.current = setTimeout(() => {

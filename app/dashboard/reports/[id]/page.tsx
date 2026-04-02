@@ -37,6 +37,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { confirmAppointment, rescheduleAppointment } from "../../_views/actions/appointments";
 import { syncReportStatus } from "@/app/actions/matching";
 import { escalateReport } from "@/app/actions/escalate-report";
+import { deleteReportDev } from "@/app/actions/reports";
 import { EnhancedAppointmentScheduler } from "../../_components/EnhancedAppointmentScheduler";
 import {
   Dialog,
@@ -119,6 +120,8 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
 	const [activeChat, setActiveChat] = useState<Chat | null>(null);
 	const [isArchiving, setIsArchiving] = useState(false);
 	const [showArchiveConfirm, setShowArchiveConfirm] = useState(false);
+	const [isDeleting, setIsDeleting] = useState(false);
+	const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
 	const handleArchiveReport = async () => {
 		if (!report) return;
@@ -140,6 +143,25 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
 		}
 		setIsArchiving(false);
 		setShowArchiveConfirm(false);
+	};
+
+	const handleDeleteReport = async () => {
+		if (!report) return;
+		setIsDeleting(true);
+		try {
+			const res = await deleteReportDev(reportId);
+			if (res.success) {
+				toast({ title: "Record Deleted", description: "This report and all related data have been removed." });
+				router.push("/dashboard/reports");
+			} else {
+				toast({ title: "Deletion failed", description: res.error, variant: "destructive" });
+			}
+		} catch (err: any) {
+			toast({ title: "Error", description: err.message, variant: "destructive" });
+		} finally {
+			setIsDeleting(false);
+			setShowDeleteConfirm(false);
+		}
 	};
 
 	const handleEscalate = async () => {
@@ -791,16 +813,52 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
 								</div>
 							</DialogContent>
 						</Dialog>
+
+						{/* Dev-only Delete Button */}
+						{process.env.NODE_ENV === 'development' && (
+							<Dialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+								<DialogTrigger asChild>
+									<Button variant="ghost" className="text-rose-400 hover:text-rose-600 font-bold text-[9px] sm:text-[10px] gap-2 uppercase tracking-widest h-8 sm:h-10 px-1 sm:px-2 group">
+										<Trash2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 group-hover:scale-110 transition-transform" /> 
+										<span className="hidden sm:inline">Delete Record (Dev Only)</span>
+									</Button>
+								</DialogTrigger>
+								<DialogContent className="sm:max-w-[425px] rounded-[2rem] border-rose-100 p-8 bg-white shadow-2xl">
+									<DialogHeader className="space-y-4">
+										<div className="w-14 h-14 bg-rose-50 rounded-2xl flex items-center justify-center text-rose-500 mx-auto">
+											<AlertCircle className="h-7 w-7" />
+										</div>
+										<div className="text-center space-y-2">
+											<DialogTitle className="text-xl font-bold tracking-tight text-rose-900 uppercase tracking-widest">Hard Delete Report?</DialogTitle>
+											<DialogDescription className="text-rose-500 font-medium leading-relaxed">
+												This action is permanent and will cascade to all matches, chats, and notifications associated with this report. This button is only visible in development.
+											</DialogDescription>
+										</div>
+									</DialogHeader>
+									<div className="flex flex-col gap-3 mt-6">
+										<Button 
+											onClick={handleDeleteReport} 
+											disabled={isDeleting}
+											className="h-12 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-2xl w-full shadow-lg transition-all"
+										>
+											{isDeleting ? "Deleting..." : "PERMANENTLY DELETE"}
+										</Button>
+										<Button 
+											variant="ghost" 
+											onClick={() => setShowDeleteConfirm(false)}
+											className="h-12 text-slate-400 font-bold rounded-2xl w-full hover:bg-slate-50"
+										>
+											Cancel
+										</Button>
+									</div>
+								</DialogContent>
+							</Dialog>
+						)}
+
 					</div>
 				</div>
 			</nav>
 
-			<SereneBreadcrumb 
-				items={[
-					{ label: "Reports", href: "/dashboard/reports" },
-					{ label: "Report Detail", active: true }
-				]} 
-			/>
 
 			<main className="max-w-7xl mx-auto px-6 py-6 transition-all duration-700 animate-in fade-in slide-in-from-bottom-4">
 				<div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-start">
@@ -1028,7 +1086,7 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
 					</div>
 
 					{/* Sidebar: Coordination & Support */}
-					<div className="lg:col-span-4 space-y-8 lg:sticky lg:top-32 animate-in fade-in slide-in-from-right-8 duration-700">
+					<div className="lg:col-span-4 space-y-8 lg:sticky lg:top-24 self-start animate-in fade-in slide-in-from-right-8 duration-700">
 						
 						{/* COORDINATION FLOW */}
 						{acceptedMatch ? (

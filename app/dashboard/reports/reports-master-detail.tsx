@@ -903,14 +903,6 @@ export default function ReportsMasterDetail({ userId }: { userId: string }) {
 					</div>
 				</div>
 
-				<div className="mt-8 pt-6 pb-4 text-center border-t border-serene-neutral-100/50">
-					<button 
-						onClick={() => setShowArchived(!showArchived)}
-						className="text-[10px] font-bold text-serene-neutral-400 uppercase tracking-widest hover:text-sauti-teal transition-colors"
-					>
-						{showArchived ? "← Return to active reports" : "View archived reports"}
-					</button>
-				</div>
 
 			{/* Main Detail Side */}
 				<div
@@ -919,8 +911,7 @@ export default function ReportsMasterDetail({ userId }: { userId: string }) {
 					}`}
 				>
 					<div className="mb-6 sm:mb-8">
-						<SereneBreadcrumb items={[{ label: "Reports", active: true }]} className="mb-4" />
-						<div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+						<div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
 							<div>
 								<h1 className="text-xl sm:text-2xl lg:text-3xl font-black text-sauti-dark tracking-tight uppercase">My Reports</h1>
 								<p className="text-serene-neutral-500 mt-1 text-xs sm:text-sm lg:text-base font-medium">View your reports and check their status.</p>
@@ -934,6 +925,30 @@ export default function ReportsMasterDetail({ userId }: { userId: string }) {
 									Report Abuse
 								</Button>
 							)}
+						</div>
+
+						{/* Subtle Archive Tabs */}
+						<div className="flex items-center gap-8 border-b border-serene-neutral-100/60">
+							<button 
+								onClick={() => setShowArchived(false)}
+								className={cn(
+									"pb-4 text-[10px] sm:text-xs font-bold uppercase tracking-widest transition-all relative",
+									!showArchived ? "text-sauti-teal" : "text-serene-neutral-400 hover:text-serene-neutral-600"
+								)}
+							>
+								Active Folders
+								{!showArchived && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-sauti-teal rounded-full animate-in fade-in zoom-in duration-300" />}
+							</button>
+							<button 
+								onClick={() => setShowArchived(true)}
+								className={cn(
+									"pb-4 text-[10px] sm:text-xs font-bold uppercase tracking-widest transition-all relative",
+									showArchived ? "text-sauti-teal" : "text-serene-neutral-400 hover:text-serene-neutral-600"
+								)}
+							>
+								Archived
+								{showArchived && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-sauti-teal rounded-full animate-in fade-in zoom-in duration-300" />}
+							</button>
 						</div>
 					</div>
 					{/* Premium Search and Filter Bar */}

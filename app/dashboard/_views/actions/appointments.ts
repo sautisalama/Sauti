@@ -1,3 +1,5 @@
+"use server";
+
 import { createClient } from "@/utils/supabase/server";
 import { Tables, TablesInsert } from "@/types/db-schema";
 import { AppointmentWithDetails } from "@/app/dashboard/_types";

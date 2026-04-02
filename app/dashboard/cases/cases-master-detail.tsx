@@ -116,6 +116,7 @@ export default function CasesMasterDetail({ userId }: { userId: string }) {
 	const [showFilters, setShowFilters] = useState(false);
 	const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
 	const [isLoadingMessages, setIsLoadingMessages] = useState(false);
+    const [showArchived, setShowArchived] = useState(false);
 	
 	// Chat State
 	const [activeTab, setActiveTab] = useState<'details' | 'chat'>('details');
@@ -435,7 +436,10 @@ export default function CasesMasterDetail({ userId }: { userId: string }) {
 	}, [userId, supabase, selectedId, toast, loadCases]);
 
 	const filtered = useMemo(() => {
-		let filteredCases = cases;
+		let filteredCases = cases.filter(c => {
+            const isCompleted = (c.match_status_type || "").toLowerCase() === 'completed';
+            return showArchived ? isCompleted : !isCompleted;
+        });
 
 		// Default exclusivity filter: hide declined cases unless currently selected
 		filteredCases = filteredCases.filter((c) => c.match_status_type !== 'declined' || c.id === selectedId);
@@ -858,12 +862,35 @@ export default function CasesMasterDetail({ userId }: { userId: string }) {
 					}`}
 				>
 					<div className="mb-6 sm:mb-8">
-						<SereneBreadcrumb items={[{ label: "Cases", active: true }]} className="mb-4" />
-						<div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+						<div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
 							<div>
 								<h1 className="text-xl sm:text-2xl lg:text-3xl font-black text-sauti-dark tracking-tight uppercase">Case Management</h1>
 								<p className="text-serene-neutral-500 mt-1 text-xs sm:text-sm lg:text-base font-medium">Review your matched cases and track progress.</p>
 							</div>
+						</div>
+
+						{/* Subtle Archive Tabs */}
+						<div className="flex items-center gap-8 border-b border-serene-neutral-100/60">
+							<button 
+								onClick={() => setShowArchived(false)}
+								className={cn(
+									"pb-4 text-[10px] sm:text-xs font-bold uppercase tracking-widest transition-all relative",
+									!showArchived ? "text-sauti-teal" : "text-serene-neutral-400 hover:text-serene-neutral-600"
+								)}
+							>
+								Active Cases
+								{!showArchived && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-sauti-teal rounded-full animate-in fade-in zoom-in duration-300" />}
+							</button>
+							<button 
+								onClick={() => setShowArchived(true)}
+								className={cn(
+									"pb-4 text-[10px] sm:text-xs font-bold uppercase tracking-widest transition-all relative",
+									showArchived ? "text-sauti-teal" : "text-serene-neutral-400 hover:text-serene-neutral-600"
+								)}
+							>
+								Archived
+								{showArchived && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-sauti-teal rounded-full animate-in fade-in zoom-in duration-300" />}
+							</button>
 						</div>
 					</div>
 					{/* Premium Search and Filter Bar */}

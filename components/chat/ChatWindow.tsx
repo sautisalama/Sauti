@@ -1,7 +1,7 @@
 import { Chat, Message } from '@/types/chat';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
-import { useState, useEffect, useRef, useOptimistic } from 'react';
+import { useState, useEffect, useRef, useOptimistic, startTransition } from 'react';
 import { getMessages, sendMessage, markMessagesAsRead } from '@/app/actions/chat';
 import { fetchLinkMetadata } from '@/app/actions/chat-media';
 import { createClient } from '@/utils/supabase/client';
@@ -284,7 +284,9 @@ export function ChatWindow({ chat, onBack }: ChatWindowProps) {
     try {
       if (chat.id === 'salama-ai-bot') {
           // AI Bot logic
-          addOptimisticMessage(pendingMsg);
+          startTransition(() => {
+            addOptimisticMessage(pendingMsg);
+          });
           
           setTimeout(async () => {
               setIsTyping(true);
@@ -306,9 +308,11 @@ export function ChatWindow({ chat, onBack }: ChatWindowProps) {
           }, 500);
 
       } else {
-        addOptimisticMessage(pendingMsg);
-        const metadata = previousPreview ? { link_preview: previousPreview } : {};
-        await sendMessage(chat.id, previousInput, 'text', metadata);
+        startTransition(async () => {
+          addOptimisticMessage(pendingMsg);
+          const metadata = previousPreview ? { link_preview: previousPreview } : {};
+          await sendMessage(chat.id, previousInput, 'text', metadata);
+        });
       }
     } catch (error) {
       console.error('Failed to send', error);

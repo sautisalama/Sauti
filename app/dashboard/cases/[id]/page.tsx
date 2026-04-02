@@ -228,12 +228,6 @@ export default function CaseDetailPage({ params }: { params: Promise<{ id: strin
 				</div>
 			</nav>
 
-            <SereneBreadcrumb 
-				items={[
-					{ label: "Cases", href: "/dashboard/cases" },
-					{ label: "Case Detail", active: true }
-				]} 
-			/>
 
             <main className="max-w-7xl mx-auto py-6 px-6 transition-all duration-700 animate-in fade-in slide-in-from-bottom-4">
                 <CaseDetailView 
