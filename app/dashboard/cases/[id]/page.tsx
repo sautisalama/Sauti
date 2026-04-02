@@ -15,6 +15,7 @@ import { getCaseChat } from "@/app/actions/chat";
 import { acceptAndScheduleCase } from "@/app/actions/matching";
 import { Chat } from "@/types/chat";
 import { Card } from "@/components/ui/card";
+import { SereneBreadcrumb } from "@/components/ui/SereneBreadcrumb";
 
 export default function CaseDetailPage({ params }: { params: Promise<{ id: string }> }) {
     const resolvedParams = use(params);
@@ -54,16 +55,6 @@ export default function CaseDetailPage({ params }: { params: Promise<{ id: strin
             if (error) throw error;
             if (data) {
                 setCaseData(data);
-                
-                // Fetch chat if survivor/user_id exists
-                const survId = (data.survivor_id || data.report?.user_id) as string;
-                if (survId) {
-                    setIsChatLoading(true);
-                    getCaseChat(data.id, survId)
-                        .then(chat => setActiveChat(chat))
-                        .catch(err => console.error("Chat load failed", err))
-                        .finally(() => setIsChatLoading(false));
-                }
             } else {
                 toast({ title: "Case not found", variant: "destructive" });
                 router.push("/dashboard/cases");
@@ -113,6 +104,24 @@ export default function CaseDetailPage({ params }: { params: Promise<{ id: strin
             supabase.removeChannel(channel);
         };
     }, [fetchCase, supabase, caseId, caseData?.report_id]);
+
+    // CHAT WARMUP: Parallel chat loading
+    useEffect(() => {
+        const warmupChat = async () => {
+            if (!userId) return;
+            setIsChatLoading(true);
+            try {
+                // For cases, the ID in URL is the match ID itself
+                const chat = await getCaseChat(caseId, userId);
+                if (chat) setActiveChat(chat);
+            } catch (err) {
+                console.error("Chat warmup failed:", err);
+            } finally {
+                setIsChatLoading(false);
+            }
+        };
+        warmupChat();
+    }, [caseId, userId]);
 
     const handleAcceptCase = async (id: string, appointment?: any) => {
         try {
@@ -175,15 +184,15 @@ export default function CaseDetailPage({ params }: { params: Promise<{ id: strin
 
     if (loading || !userId) {
         return (
-            <div className="flex items-center justify-center min-h-screen bg-slate-50">
-				<div className="flex flex-col items-center gap-6">
+            <div className="flex items-center justify-center min-h-screen bg-white">
+				<div className="flex flex-col items-center gap-8">
 					<div className="relative">
-						<div className="w-16 h-16 border-4 border-teal-100 border-t-teal-600 rounded-full animate-spin" />
-						<Heart className="h-6 w-6 text-teal-600 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
+						<div className="w-20 h-20 border-[3px] border-serene-neutral-100 border-t-sauti-teal rounded-full animate-[spin_1.5s_linear_infinite]" />
+						<Heart className="h-7 w-7 text-sauti-teal absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 animate-pulse" />
 					</div>
-					<div className="text-center">
-						<p className="text-xl font-bold text-slate-900">Accessing Case Securely</p>
-						<p className="text-slate-400 font-medium">Loading details...</p>
+					<div className="text-center space-y-2 animate-in fade-in slide-in-from-bottom-4 duration-700">
+						<p className="text-2xl font-bold text-sauti-dark tracking-tight">Accessing Case Securely</p>
+						<p className="text-serene-neutral-400 font-medium">Loading details...</p>
 					</div>
 				</div>
 			</div>
@@ -193,30 +202,40 @@ export default function CaseDetailPage({ params }: { params: Promise<{ id: strin
     return (
         <div className="min-h-screen bg-slate-50/50 pb-32 lg:pb-12 text-slate-900 selection:bg-teal-100">
             {/* Focused Header Navigation */}
-			<nav className="sticky top-0 z-50 bg-white/80 backdrop-blur-xl border-b border-slate-100 transition-all duration-300">
-				<div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between gap-6">
-					<div className="flex items-center gap-4">
-						<Link href="/dashboard/cases" className="w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center hover:bg-slate-100 transition-all text-slate-600">
-							<ChevronLeft className="h-5 w-5" />
+			<nav className="sticky top-0 z-50 bg-white/80 backdrop-blur-xl border-b border-serene-neutral-100/50 transition-all duration-300 min-h-[64px] sm:min-h-[72px] flex items-center">
+				<div className="max-w-7xl mx-auto px-4 sm:px-6 w-full flex items-center justify-between gap-4 py-2 sm:py-0">
+					<div className="flex items-center gap-2 sm:gap-4 flex-1 min-w-0">
+						<Link href="/dashboard/cases" className="shrink-0 w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-serene-neutral-50 flex items-center justify-center hover:bg-serene-neutral-100 transition-all text-serene-neutral-600">
+							<ChevronLeft className="h-4 w-4 sm:h-5 sm:w-5" />
 						</Link>
-						<div className="hidden sm:block">
-							<div className="flex items-center gap-2 text-teal-600 font-extrabold uppercase tracking-[0.2em] text-[10px] mb-0.5">
+						<div className="flex-1 min-w-0">
+							<div className="hidden sm:flex items-center gap-2 text-sauti-teal font-extrabold uppercase tracking-[0.2em] text-[8px] sm:text-[10px] mb-0.5">
 								<ShieldCheck className="h-3.5 w-3.5" />
-								Professional Support Mode
+								<span className="truncate">Professional Support Mode</span>
 							</div>
-							<h2 className="text-slate-900 font-bold tracking-tight">Case Journey SS-{caseId.slice(0, 8).toUpperCase()}</h2>
+							<h2 className="text-sauti-dark font-bold tracking-tight uppercase text-[10px] sm:text-base whitespace-nowrap overflow-hidden text-ellipsis">
+                                Case Journey SS-{caseId.slice(0, 8).toUpperCase()}
+                            </h2>
 						</div>
 					</div>
 
-					<div className="flex items-center gap-3">
-						<Button onClick={exitSafely} variant="ghost" className="text-slate-400 hover:text-rose-500 font-bold text-xs gap-2">
-							<LogOut className="h-4 w-4" /> Quick Exit
+					<div className="flex items-center gap-2 sm:gap-3 shrink-0">
+						<Button onClick={exitSafely} variant="ghost" className="text-serene-neutral-400 hover:text-rose-500 font-bold text-[9px] sm:text-[10px] gap-2 uppercase tracking-widest h-8 sm:h-10 px-1 sm:px-2 group">
+							<LogOut className="h-3.5 w-3.5 sm:h-4 sm:w-4 group-hover:scale-110 transition-transform" /> 
+							<span className="hidden sm:inline text-serene-neutral-500">Quick Exit</span>
 						</Button>
 					</div>
 				</div>
 			</nav>
 
-            <main className="max-w-7xl mx-auto py-12">
+            <SereneBreadcrumb 
+				items={[
+					{ label: "Cases", href: "/dashboard/cases" },
+					{ label: "Case Detail", active: true }
+				]} 
+			/>
+
+            <main className="max-w-7xl mx-auto py-6 px-6 transition-all duration-700 animate-in fade-in slide-in-from-bottom-4">
                 <CaseDetailView 
                     caseItem={caseData}
                     userId={userId}

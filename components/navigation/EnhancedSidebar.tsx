@@ -73,6 +73,7 @@ interface SidebarItem {
 	separator?: boolean;
 	survivorOnly?: boolean;
 	professionalOnly?: boolean;
+	showDot?: boolean;
 }
 
 interface EnhancedSidebarProps {
@@ -290,7 +291,14 @@ export function EnhancedSidebar({
 							: undefined,
 					section: "main",
 				},
-
+				{
+					id: "calendar",
+					label: "Calendar",
+					icon: Calendar,
+					href: "/dashboard/profile?section=calendar", // Link to calendar settings for now
+					section: "main",
+					showDot: !dash?.data?.profile?.google_calendar_token,
+				},
 				{
 					id: "report",
 					label: "Report Abuse",
@@ -341,6 +349,14 @@ export function EnhancedSidebar({
 					href: "/dashboard/resources",
 					section: "main",
 				},
+				{
+					id: "calendar",
+					label: "Calendar",
+					icon: Calendar,
+					href: "/dashboard/profile?section=calendar",
+					section: "main",
+					showDot: !dash?.data?.profile?.google_calendar_token,
+				},
 			];
 			return [
 				...survivorMain,
@@ -384,6 +400,14 @@ export function EnhancedSidebar({
 					icon: FileText,
 					href: "/dashboard/resources",
 					section: "main",
+				},
+				{
+					id: "calendar",
+					label: "Calendar",
+					icon: Calendar,
+					href: "/dashboard/profile?section=calendar",
+					section: "main",
+					showDot: !dash?.data?.profile?.google_calendar_token,
 				},
 				{
 					id: "services",
@@ -463,6 +487,9 @@ export function EnhancedSidebar({
 						>
 							{item.badge > 99 ? "99" : item.badge}
 						</Badge>
+					)}
+					{item.showDot && (
+						<div className="absolute -top-0.5 -right-0.5 h-2.5 w-2.5 bg-serene-blue-500 rounded-full border-2 border-white dark:border-neutral-900 animate-pulse" />
 					)}
 				</div>
 

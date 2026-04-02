@@ -18,29 +18,36 @@ export function SereneBreadcrumb({ items, className }: SereneBreadcrumbProps) {
     <nav 
       aria-label="Breadcrumb" 
       className={cn(
-        "flex items-center space-x-2 text-sm text-serene-neutral-500 sticky top-0 z-40 bg-serene-neutral-50/90 backdrop-blur-md py-3 -mx-4 px-4 md:-mx-6 md:px-6 border-b border-serene-neutral-200/50 mb-4 transition-all duration-300", 
+        "flex items-center space-x-2 text-sm text-serene-neutral-500",
+        "sticky top-0 z-40 bg-white/70 backdrop-blur-xl",
+        "py-4 -mx-4 px-4 md:-mx-6 md:px-6",
+        "border-b border-serene-neutral-100/80 mb-6",
+        "transition-all duration-500 ease-in-out antialiased", 
         className
       )}
     >
       <Link 
         href="/dashboard" 
-        className="flex items-center hover:text-sauti-dark transition-colors"
+        className="flex items-center text-serene-neutral-400 hover:text-sauti-teal transition-all duration-300 transform hover:scale-105 active:scale-95"
       >
         <Home className="h-4 w-4" />
       </Link>
       
       {items.map((item, index) => (
-        <div key={index} className="flex items-center space-x-2">
-          <ChevronRight className="h-4 w-4 text-serene-neutral-300" />
+        <div key={index} className="flex items-center space-x-2 animate-in fade-in slide-in-from-left-2 duration-500" style={{ animationDelay: `${(index + 1) * 100}ms` }}>
+          <ChevronRight className="h-4 w-4 text-serene-neutral-200" />
           {item.href && !item.active ? (
             <Link 
               href={item.href}
-              className="hover:text-sauti-dark transition-colors font-medium hover:underline decoration-serene-neutral-300 underline-offset-4"
+              className="hover:text-sauti-teal transition-colors font-medium hover:underline decoration-sauti-teal/30 underline-offset-4"
             >
               {item.label}
             </Link>
           ) : (
-            <span className={cn("font-bold text-sauti-dark", item.active && "cursor-default")}>
+            <span className={cn(
+              "font-semibold text-sauti-dark/90 tracking-tight", 
+              item.active && "cursor-default"
+            )}>
               {item.label}
             </span>
           )}

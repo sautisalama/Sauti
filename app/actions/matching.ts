@@ -7,6 +7,9 @@ import { matchReportWithServices } from './match-services'
 import { createAppointment } from '../dashboard/_views/actions/appointments'
 import { getCaseChat, sendMessage } from './chat'
 import { format } from 'date-fns'
+import { sendEmail } from '@/lib/notifications/email'
+import { getAppointmentScheduledTemplate, getAppointmentConfirmedTemplate } from '@/lib/notifications/templates'
+import { syncAppointmentToGoogleCalendar } from '@/lib/notifications/calendar-sync'
 
 /**
  * Professional accepts a match request
@@ -62,9 +65,36 @@ export async function acceptMatchRequest(matchId: string, proposedTimes?: TimeSl
     title: 'Match Accepted',
     message: 'A professional has accepted your case and proposed meeting times.',
     type: 'match_accepted',
-    link: '/dashboard/matches',
-    metadata: { match_id: matchId }
+    link: `/dashboard/reports/${match.report_id}`,
+    metadata: { 
+      match_id: matchId,
+      actions: [
+        { label: 'View Times', link: `/dashboard/reports/${match.report_id}` }
+      ]
+    }
   })
+
+  // Send Email to Survivor
+  try {
+    const { data: survivor } = await supabase.from('profiles').select('email, first_name, anon_username, is_anonymous').eq('id', match.survivor_id!).single();
+    if (survivor?.email) {
+      const firstTime = proposedTimes?.[0];
+      await sendEmail(
+        survivor.email,
+        'Support Connection: New Times Proposed',
+        getAppointmentScheduledTemplate({
+          userName: survivor.is_anonymous ? (survivor.anon_username || 'Survivor') : (survivor.first_name || 'Survivor'),
+          professionalName: 'Your Sauti Specialist',
+          date: firstTime ? format(new Date(firstTime.slot_start), 'PPPP') : 'Flexible',
+          time: firstTime ? format(new Date(firstTime.slot_start), 'p') : 'Discuss in chat',
+          type: 'Virtual Consultation',
+          actionUrl: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard/reports/${match.report_id}`
+        })
+      );
+    }
+  } catch (emailErr) {
+    console.error('Email notification failed:', emailErr);
+  }
   
   revalidatePath('/dashboard/matches')
   revalidatePath('/dashboard/cases')
@@ -201,6 +231,53 @@ export async function confirmMatch(matchId: string, selectedTime?: TimeSlot) {
 
     if (apptError) {
       console.error('Failed to create appointment:', apptError)
+    } else {
+        // Sync to Google Calendar for both parties
+        const { data: appt } = await supabase.from('appointments').select('appointment_id').eq('matched_services', matchId).single();
+        if (appt) {
+            syncAppointmentToGoogleCalendar(appt.appointment_id, match.survivor_id!).catch(e => console.error('Survivor calendar sync failed:', e));
+            syncAppointmentToGoogleCalendar(appt.appointment_id, professionalId!).catch(e => console.error('Professional calendar sync failed:', e));
+        }
+    }
+  }
+
+  // 4. Notify Survivor
+  const survivorId = match.survivor_id || (match.report as any)?.user_id;
+  if (survivorId) {
+    await supabase.from('notifications').insert({
+      user_id: survivorId,
+      title: 'Match Accepted & Scheduled',
+      message: `A professional has accepted your case and scheduled a session.`,
+      type: 'match_confirmed',
+      link: `/dashboard/reports/${match.report_id}`,
+      metadata: { 
+        match_id: matchId,
+        actions: [
+          { label: 'View Schedule', link: `/dashboard/reports/${match.report_id}` },
+          { label: 'Reschedule', variant: 'outline', action: 'reschedule', match_id: matchId }
+        ]
+      }
+    });
+
+    // Send Email to Survivor
+    try {
+      const { data: survivor } = await supabase.from('profiles').select('email, first_name, anon_username, is_anonymous').eq('id', survivorId).single();
+      if (survivor?.email) {
+        await sendEmail(
+          survivor.email,
+          'Support Session Scheduled',
+          getAppointmentConfirmedTemplate({
+            userName: survivor.is_anonymous ? (survivor.anon_username || 'Survivor') : (survivor.first_name || 'Survivor'),
+            professionalName: (match.support_services as any)?.name || 'Sauti Specialist',
+            date: selectedTime ? format(new Date(selectedTime.slot_start), 'PPPP') : 'TBD',
+            time: selectedTime ? format(new Date(selectedTime.slot_start), 'p') : 'TBD',
+            type: 'Virtual Consultation',
+            actionUrl: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard/reports/${match.report_id}`
+          })
+        );
+      }
+    } catch (emailErr) {
+      console.error('Survivor email failed:', emailErr);
     }
   }
 
@@ -212,8 +289,36 @@ export async function confirmMatch(matchId: string, selectedTime?: TimeSlot) {
       message: 'A survivor has confirmed the match. You can now start chatting.',
       type: 'match_confirmed',
       link: `/dashboard/chat/${chat.id}`,
-      metadata: { match_id: matchId, chat_id: chat.id }
+      metadata: { 
+        match_id: matchId, 
+        chat_id: chat.id,
+        actions: [
+          { label: 'Open Chat', link: `/dashboard/chat/${chat.id}` },
+          { label: 'View Case', link: `/dashboard/cases/${matchId}` }
+        ]
+      }
     })
+
+    // Send Email to Professional
+    try {
+      const { data: prof } = await supabase.from('profiles').select('email, first_name').eq('id', professionalId).single();
+      if (prof?.email) {
+        await sendEmail(
+          prof.email,
+          'Case Confirmed: New Support Session',
+          getAppointmentConfirmedTemplate({
+            userName: prof.first_name || 'Professional',
+            professionalName: survivorName,
+            date: selectedTime ? format(new Date(selectedTime.slot_start), 'PPPP') : 'TBD',
+            time: selectedTime ? format(new Date(selectedTime.slot_start), 'p') : 'TBD',
+            type: 'Initial Session',
+            actionUrl: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard/cases/${matchId}`
+          })
+        );
+      }
+    } catch (emailErr) {
+      console.error('Professional email failed:', emailErr);
+    }
   }
 
   // 7. Send automated match summary message
@@ -284,11 +389,12 @@ export async function acceptAndScheduleCase(
   if (matchUpdateError) throw new Error(`Failed to update match status: ${matchUpdateError.message}`)
 
   // 3. Create Appointment if provided
+  const survivorId = match.survivor_id || (match.report as any)?.user_id;
   if (appointmentData) {
-    const { error: apptError } = await supabase
+    const { data: newAppt, error: apptError } = await supabase
       .from('appointments')
       .insert({
-        survivor_id: match.survivor_id || (match.report as any)?.user_id || user.id, // Fallback to avoid null
+        survivor_id: survivorId!,
         professional_id: user.id,
         matched_services: matchId,
         appointment_date: appointmentData.date.toISOString(),
@@ -297,10 +403,15 @@ export async function acceptAndScheduleCase(
         appointment_type: appointmentData.type || 'consultation',
         notes: appointmentData.notes || 'Initial consultation'
       })
+      .select('appointment_id')
+      .single()
 
     if (apptError) {
       console.error('acceptAndScheduleCase: Appointment creation failed:', apptError)
-      // We continue since the match was already updated
+    } else if (newAppt) {
+        // Sync to Google Calendar for both
+        syncAppointmentToGoogleCalendar(newAppt.appointment_id, survivorId!).catch(e => console.error('Survivor calendar sync failed:', e));
+        syncAppointmentToGoogleCalendar(newAppt.appointment_id, user.id).catch(e => console.error('Professional calendar sync failed:', e));
     }
   }
 

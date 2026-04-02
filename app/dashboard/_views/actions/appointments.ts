@@ -1,11 +1,15 @@
-import { createClient } from "@/utils/supabase/client";
+import { createClient } from "@/utils/supabase/server";
 import { Tables, TablesInsert } from "@/types/db-schema";
 import { AppointmentWithDetails } from "@/app/dashboard/_types";
+import { syncAppointmentToGoogleCalendar } from "@/lib/notifications/calendar-sync";
+import { sendEmail } from "@/lib/notifications/email";
+import { getAppointmentConfirmedTemplate, getAppointmentScheduledTemplate } from "@/lib/notifications/templates";
+import { format } from "date-fns";
 
 export async function createAppointment(
 	appointment: TablesInsert<"appointments">
 ) {
-	const supabase = createClient();
+	const supabase = await createClient();
 
 	const { error } = await supabase.from("appointments").insert([appointment]);
 
@@ -15,13 +19,12 @@ export async function createAppointment(
 	}
 }
 
-// Fetch appointments for a user (either as professional or survivor)
 export async function fetchUserAppointments(
 	userId: string,
 	userType: "professional" | "survivor",
 	includeBothRoles = false
 ) {
-	const supabase = createClient();
+	const supabase = await createClient();
 
 	let query = supabase.from("appointments").select(`
 			*,
@@ -63,7 +66,7 @@ export async function updateAppointmentStatus(
 	appointmentId: string,
 	status: "confirmed" | "requested" | "pending"
 ) {
-	const supabase = createClient();
+	const supabase = await createClient();
 
 	const { error } = await supabase
 		.from("appointments")
@@ -78,7 +81,7 @@ export async function updateAppointmentStatus(
 
 // Add this new function
 export async function fetchAppointmentById(appointmentId: string) {
-	const supabase = createClient();
+	const supabase = await createClient();
 
 	const { data, error } = await supabase
 		.from("appointments")
@@ -113,7 +116,7 @@ export async function updateAppointmentNotes(
 	appointmentId: string,
 	notes: string
 ) {
-	const supabase = createClient();
+	const supabase = await createClient();
 
 	const { error } = await supabase
 		.from("appointments")
@@ -128,7 +131,7 @@ export async function updateAppointmentNotes(
 
 // Confirm a suggested appointment
 export async function confirmAppointment(appointmentId: string) {
-	const supabase = createClient();
+	const supabase = await createClient();
 
 	const { error } = await supabase
 		.from("appointments")
@@ -139,22 +142,52 @@ export async function confirmAppointment(appointmentId: string) {
 		console.error("Error confirming appointment:", error);
 		throw error;
 	}
+
+	const appt = await fetchAppointmentById(appointmentId);
+	if (appt) {
+		const survivorId = appt.survivor_id;
+		const profId = appt.professional_id;
+		if (survivorId) await syncAppointmentToGoogleCalendar(appointmentId, survivorId);
+		if (profId) await syncAppointmentToGoogleCalendar(appointmentId, profId);
+		
+		const survivor = appt.survivor as any;
+		const prof = appt.professional as any;
+		if (survivor?.email && prof) {
+			const survivorName = survivor.is_anonymous ? (survivor.anon_username || "Survivor") : (survivor.first_name || "Survivor");
+			const profName = prof.first_name || "Professional";
+			try {
+				await sendEmail(
+					survivor.email,
+					"Support Session Confirmed",
+					getAppointmentConfirmedTemplate({
+						userName: survivorName,
+						professionalName: profName,
+						date: appt.appointment_date ? format(new Date(appt.appointment_date), "PPPP") : "TBD",
+						time: appt.appointment_date ? format(new Date(appt.appointment_date), "p") : "TBD",
+						type: appt.appointment_type || "Virtual Session",
+						actionUrl: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard`
+					})
+				);
+			} catch (err) {}
+		}
+	}
 }
 
 // Reschedule an appointment
 export async function rescheduleAppointment(
 	appointmentId: string,
 	newDate: string,
-	notes?: string
+	notes?: string,
+	status: "confirmed" | "requested" = "confirmed"
 ) {
-	const supabase = createClient();
+	const supabase = await createClient();
 
 	const { error } = await supabase
 		.from("appointments")
 		.update({
 			appointment_date: newDate,
-			status: "requested", // Survivor suggested a new time, professional must confirm
-			notes: notes || "Rescheduled by survivor",
+			status: status,
+			notes: notes || "Rescheduled",
 		})
 		.eq("appointment_id", appointmentId);
 
@@ -162,4 +195,108 @@ export async function rescheduleAppointment(
 		console.error("Error rescheduling appointment:", error);
 		throw error;
 	}
+
+	const appt = await fetchAppointmentById(appointmentId);
+	if (appt) {
+		const survivorId = appt.survivor_id;
+		const profId = appt.professional_id;
+		if (survivorId) await syncAppointmentToGoogleCalendar(appointmentId, survivorId);
+		if (profId) await syncAppointmentToGoogleCalendar(appointmentId, profId);
+
+		const survivor = appt.survivor as any;
+		const prof = appt.professional as any;
+		
+		// Send notification emails
+		try {
+			const dateStr = format(new Date(newDate), "PPPP");
+			const timeStr = format(new Date(newDate), "p");
+			
+			if (survivor?.email && prof) {
+				const survivorName = survivor.is_anonymous ? (survivor.anon_username || "Survivor") : (survivor.first_name || "Survivor");
+				const profName = prof.first_name || "Professional";
+				
+				await sendEmail(
+					survivor.email,
+					"Support Session Rescheduled",
+					getAppointmentScheduledTemplate({
+						userName: survivorName,
+						professionalName: profName,
+						date: dateStr,
+						time: timeStr,
+						type: appt.appointment_type || "Virtual Session",
+						actionUrl: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard`
+					})
+				);
+				
+				if (prof.email) {
+					await sendEmail(
+						prof.email,
+						"Case Session Rescheduled",
+						getAppointmentScheduledTemplate({
+							userName: profName,
+							professionalName: survivorName,
+							date: dateStr,
+							time: timeStr,
+							type: appt.appointment_type || "Virtual Session",
+							actionUrl: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard`
+						})
+					);
+				}
+			}
+		} catch (err) {}
+	}
 }
+
+// Confirm a reschedule request
+export async function confirmReschedule(appointmentId: string, matchId: string) {
+	const supabase = await createClient();
+
+	const { error: apptError } = await supabase
+		.from("appointments")
+		.update({ status: "confirmed" })
+		.eq("appointment_id", appointmentId);
+
+	if (apptError) throw apptError;
+
+	const { error: matchError } = await supabase
+		.from("matched_services")
+		.update({ match_status_type: "accepted", updated_at: new Date().toISOString() })
+		.eq("id", matchId);
+
+	if (matchError) throw matchError;
+
+	const appt = await fetchAppointmentById(appointmentId);
+	if (appt) {
+		const survivorId = appt.survivor_id;
+		const profId = appt.professional_id;
+		if (survivorId) await syncAppointmentToGoogleCalendar(appointmentId, survivorId);
+		if (profId) await syncAppointmentToGoogleCalendar(appointmentId, profId);
+
+		const survivor = appt.survivor as any;
+		const prof = appt.professional as any;
+		
+		if (survivor?.email && prof) {
+			const survivorName = survivor.is_anonymous ? (survivor.anon_username || "Survivor") : (survivor.first_name || "Survivor");
+			const profName = prof.first_name || "Professional";
+			try {
+				const dateStr = appt.appointment_date ? format(new Date(appt.appointment_date), "PPPP") : "TBD";
+				const timeStr = appt.appointment_date ? format(new Date(appt.appointment_date), "p") : "TBD";
+
+				await sendEmail(
+					survivor.email,
+					"Support Session Confirmed",
+					getAppointmentConfirmedTemplate({
+						userName: survivorName,
+						professionalName: profName,
+						date: dateStr,
+						time: timeStr,
+						type: appt.appointment_type || "Virtual Session",
+						actionUrl: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard`
+					})
+				);
+			} catch (err) {}
+		}
+	}
+    return { success: true };
+}
+

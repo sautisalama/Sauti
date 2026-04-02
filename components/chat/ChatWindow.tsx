@@ -1,7 +1,7 @@
 import { Chat, Message } from '@/types/chat';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useOptimistic } from 'react';
 import { getMessages, sendMessage, markMessagesAsRead } from '@/app/actions/chat';
 import { fetchLinkMetadata } from '@/app/actions/chat-media';
 import { createClient } from '@/utils/supabase/client';
@@ -33,6 +33,15 @@ interface ChatWindowProps {
 
 export function ChatWindow({ chat, onBack }: ChatWindowProps) {
   const [messages, setMessages] = useState<Message[]>([]);
+  const [optimisticMessages, addOptimisticMessage] = useOptimistic(
+    messages,
+    (state: Message[], newMessage: Message) => {
+        // Check for duplicates in optimistic state (e.g. if real-time update arrived simultaneously)
+        if (state.find(m => m.id === newMessage.id)) return state;
+        return [...state, newMessage];
+    }
+  );
+  
   const [inputText, setInputText] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [sending, setSending] = useState(false);
@@ -250,54 +259,62 @@ export function ChatWindow({ chat, onBack }: ChatWindowProps) {
 
   const handleSend = async () => {
     if ((!inputText.trim() && !linkPreview) || sending) return;
-    setSending(true);
+    
+    const tempId = `temp-${Date.now()}`;
+    const pendingMsg: Message = {
+        id: tempId,
+        chat_id: chat.id,
+        sender_id: currentUserId || 'user',
+        content: inputText,
+        type: 'text',
+        created_at: new Date().toISOString(),
+        metadata: linkPreview ? { link_preview: linkPreview } : {},
+        is_read: true
+    };
+
+    // Store state for rollback if needed (though useOptimistic handles this by nature of re-renders)
+    const previousInput = inputText;
+    const previousPreview = linkPreview;
+
+    // Reset inputs immediately
+    setInputText('');
+    setLinkPreview(null);
+    scrollToBottom();
     
     try {
       if (chat.id === 'salama-ai-bot') {
-          // Fake Send preserved
-          const userMsg: Message = {
-              id: Date.now().toString(),
-              chat_id: chat.id,
-              sender_id: currentUserId || 'user',
-              content: inputText,
-              type: 'text',
-              created_at: new Date().toISOString(),
-              metadata: {}
-          };
-          setMessages(prev => [...prev, userMsg]);
-          setInputText('');
-          scrollToBottom();
-
+          // AI Bot logic
+          addOptimisticMessage(pendingMsg);
+          
           setTimeout(async () => {
               setIsTyping(true);
               scrollToBottom();
               await new Promise(r => setTimeout(r, 2000));
               
               const replyMsg: Message = {
-                 id: Date.now().toString() + '-reply',
-                 chat_id: 'salama-ai-bot',
-                 sender_id: 'system',
-                 content: `This feature is under development and is coming soon.`,
-                 type: 'text',
-                 created_at: new Date().toISOString(),
-                 metadata: {}
-             };
-             setMessages(prev => [...prev, replyMsg]);
-             setIsTyping(false);
-             scrollToBottom();
+                  id: Date.now().toString() + '-reply',
+                  chat_id: 'salama-ai-bot',
+                  sender_id: 'system',
+                  content: `This feature is under development and is coming soon.`,
+                  type: 'text',
+                  created_at: new Date().toISOString(),
+                  metadata: {}
+              };
+              setMessages(prev => [...prev, pendingMsg, replyMsg]); // Commit both
+              setIsTyping(false);
+              scrollToBottom();
           }, 500);
 
       } else {
-        const metadata = linkPreview ? { link_preview: linkPreview } : {};
-        await sendMessage(chat.id, inputText, 'text', metadata);
-        setInputText('');
-        setLinkPreview(null);
-        // height reset logic handled by state change usually, but explicit reset in ref if needed
+        addOptimisticMessage(pendingMsg);
+        const metadata = previousPreview ? { link_preview: previousPreview } : {};
+        await sendMessage(chat.id, previousInput, 'text', metadata);
       }
     } catch (error) {
       console.error('Failed to send', error);
-    } finally {
-      setSending(false);
+      // Rollback inputs so user doesn't lose text
+      setInputText(previousInput);
+      setLinkPreview(previousPreview);
     }
   };
 
@@ -507,9 +524,9 @@ export function ChatWindow({ chat, onBack }: ChatWindowProps) {
                  </div>
              </div>
          )}
-         {messages.map((msg, idx) => {
+         {optimisticMessages.map((msg, idx) => {
            const isOwn = msg.sender_id === currentUserId;
-           const showTail = idx === 0 || messages[idx - 1].sender_id !== msg.sender_id;
+           const showTail = idx === 0 || optimisticMessages[idx - 1].sender_id !== msg.sender_id;
            return (
              <MessageBubble 
                key={msg.id} 

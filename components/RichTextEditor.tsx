@@ -15,7 +15,7 @@ import {
 	Loader2
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useOptimistic } from "react";
 
 interface RichTextEditorProps {
 	content?: string;
@@ -40,6 +40,11 @@ export function RichTextEditor({
 	autosaveDelay = 1500
 }: RichTextEditorProps) {
 	const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'unsaved'>('idle');
+	const [optimisticStatus, setOptimisticStatus] = useOptimistic(
+		saveStatus,
+		(state: string, newStatus: 'idle' | 'saving' | 'saved' | 'unsaved') => newStatus
+	);
+
 	const debounceRef = useRef<NodeJS.Timeout | null>(null);
 	const isMountedRef = useRef(true);
 
@@ -60,12 +65,13 @@ export function RichTextEditor({
 	}, [onSave]);
 
 	const scheduleSave = useCallback((html: string) => {
+		setOptimisticStatus('saving');
 		setSaveStatus('unsaved');
 		if (debounceRef.current) clearTimeout(debounceRef.current);
 		debounceRef.current = setTimeout(() => {
 			doSave(html);
 		}, autosaveDelay);
-	}, [doSave, autosaveDelay]);
+	}, [doSave, autosaveDelay, setOptimisticStatus]);
 
 	const editor = useEditor({
 		immediatelyRender: false,
@@ -217,22 +223,26 @@ export function RichTextEditor({
 
 					{/* Autosave status indicator */}
 					{onSave && (
-						<div className="ml-auto flex items-center gap-1.5">
-							<span className="text-[10px] font-medium text-serene-neutral-400">
-								{saveStatus === 'saving' && (
-									<span className="flex items-center gap-1 text-sauti-teal">
-										<Loader2 className="h-3 w-3 animate-spin" /> Saving…
+						<div className="ml-auto flex items-center gap-1.5 h-6">
+							<div className="flex items-center gap-1.5 min-w-[70px] justify-end">
+								{optimisticStatus === 'saving' && (
+									<span className="flex items-center gap-1.5 text-sauti-teal animate-in fade-in duration-300">
+										<Loader2 className="h-3 w-3 animate-spin" /> 
+										<span className="text-[10px] font-bold uppercase tracking-wider">Saving</span>
 									</span>
 								)}
-								{saveStatus === 'saved' && (
-									<span className="flex items-center gap-1 text-serene-green-600">
-										<Check className="h-3 w-3" /> Saved
+								{optimisticStatus === 'saved' && (
+									<span className="flex items-center gap-1.5 text-serene-green-600 animate-in fade-in zoom-in-95 duration-500">
+										<Check className="h-3 w-3 transition-transform duration-500 hover:scale-125" /> 
+										<span className="text-[10px] font-bold uppercase tracking-wider">Saved</span>
 									</span>
 								)}
-								{saveStatus === 'unsaved' && (
-									<span className="text-amber-500">Unsaved</span>
+								{optimisticStatus === 'unsaved' && (
+									<span className="text-amber-500 text-[10px] font-bold uppercase tracking-wider animate-in fade-in duration-300">
+										Changes Pending
+									</span>
 								)}
-							</span>
+							</div>
 						</div>
 					)}
 				</div>

@@ -26,6 +26,7 @@ interface NavItem {
   icon: React.ComponentType<{ className?: string }>;
   href: string;
   badge?: number;
+  showDot?: boolean;
 }
 
 interface EnhancedBottomNavProps {
@@ -138,11 +139,8 @@ export function EnhancedBottomNav({ forceShow = false, className }: EnhancedBott
     // Survivor: Home, Reports, Chats, Resources
     
     return [
-      { id: "home", label: "Home", icon: LayoutDashboard, href: "/dashboard" },
-      isProfessional 
-        ? { id: "cases", label: "Cases", icon: ClipboardList, href: "/dashboard/cases", badge: casesCount > 0 ? casesCount : undefined }
-        : { id: "reports", label: "Reports", icon: ClipboardList, href: "/dashboard/reports" },
       { id: "chat", label: "Chats", icon: MessageCircle, href: "/dashboard/chat", badge: unreadMessages > 0 ? unreadMessages : undefined },
+      { id: "calendar", label: "Calendar", icon: Calendar, href: "/dashboard/profile?section=calendar", showDot: !dash?.data?.profile?.google_calendar_token },
       { id: "learn", label: "Learn", icon: FileText, href: "/dashboard/resources" },
     ];
   };
@@ -179,6 +177,9 @@ export function EnhancedBottomNav({ forceShow = false, className }: EnhancedBott
             >
               {item.badge > 99 ? "99+" : item.badge}
             </Badge>
+          )}
+          {item.showDot && (
+            <div className="absolute -top-0.5 -right-0.5 h-2.5 w-2.5 bg-serene-blue-500 rounded-full border-2 border-white animate-pulse" />
           )}
         </div>
         <span className={cn(

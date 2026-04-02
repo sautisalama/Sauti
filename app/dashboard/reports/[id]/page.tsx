@@ -48,6 +48,7 @@ import {
 } from "@/components/ui/dialog";
 import { getReportStatus, getStatusTheme } from "@/lib/utils/case-status";
 import { ReportWithRelations } from "../../_types";
+import { SereneBreadcrumb } from "@/components/ui/SereneBreadcrumb";
 
 interface ProviderMatch {
     id: string;
@@ -318,7 +319,33 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
 		}
 	}, [reportId, supabase, router]);
 
-	// Preload chat as soon as we have an accepted match
+	// IMMEDIATE CHAT WARMUP: Fetch active match ID and initialize chat in parallel with main report data
+	useEffect(() => {
+		const warmupChat = async () => {
+			try {
+				const { data: match } = await supabase
+					.from('matched_services')
+					.select('id')
+					.eq('report_id', reportId)
+					.or('match_status_type.eq.accepted,match_status_type.eq.completed')
+					.maybeSingle();
+				
+				if (match) {
+					const { data: { user } } = await supabase.auth.getUser();
+					if (user) {
+						setCurrentUserId(user.id);
+						const chat = await getCaseChat(match.id, user.id);
+						if (chat) setActiveChat(chat);
+					}
+				}
+			} catch (err) {
+				console.error("Chat warmup failed:", err);
+			}
+		};
+		warmupChat();
+	}, [reportId, supabase]);
+
+	// Keep existing sync logic for when match is accepted in-page
 	useEffect(() => {
 		const preloadChat = async () => {
 			if (!acceptedMatch) return;
@@ -635,15 +662,15 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
 
 	if (loading) {
 		return (
-			<div className="flex items-center justify-center min-h-screen bg-slate-50">
-				<div className="flex flex-col items-center gap-6">
+			<div className="flex items-center justify-center min-h-screen bg-white">
+				<div className="flex flex-col items-center gap-8">
 					<div className="relative">
-						<div className="w-16 h-16 border-4 border-teal-100 border-t-teal-600 rounded-full animate-spin" />
-						<Heart className="h-6 w-6 text-teal-600 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
+						<div className="w-20 h-20 border-[3px] border-serene-neutral-100 border-t-sauti-teal rounded-full animate-[spin_1.5s_linear_infinite]" />
+						<Heart className="h-7 w-7 text-sauti-teal absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 animate-pulse" />
 					</div>
-					<div className="text-center">
-						<p className="text-xl font-bold text-slate-900">Entering Secure Space</p>
-						<p className="text-slate-400 font-medium">Preparing your toolkit...</p>
+					<div className="text-center space-y-2 animate-in fade-in slide-in-from-bottom-4 duration-700">
+						<p className="text-2xl font-bold text-sauti-dark tracking-tight">Entering Secure Space</p>
+						<p className="text-serene-neutral-400 font-medium">Preparing your toolkit...</p>
 					</div>
 				</div>
 			</div>
@@ -691,30 +718,30 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
 			)}
 			
 			{/* Focused Header Navigation - Unified with Case View */}
-			<nav className="sticky top-0 z-50 bg-white/80 backdrop-blur-xl border-b border-slate-100 transition-all duration-300 min-h-[64px] sm:min-h-[72px] flex items-center">
+			<nav className="sticky top-0 z-50 bg-white/80 backdrop-blur-xl border-b border-serene-neutral-100/50 transition-all duration-300 min-h-[64px] sm:min-h-[72px] flex items-center">
 				<div className="max-w-7xl mx-auto px-4 sm:px-6 w-full flex items-center justify-between gap-4 py-2 sm:py-0">
 					<div className="flex items-center gap-2 sm:gap-4 flex-1 min-w-0">
-						<Link href="/dashboard/reports" className="shrink-0 w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-slate-50 flex items-center justify-center hover:bg-slate-100 transition-all text-slate-600">
+						<Link href="/dashboard/reports" className="shrink-0 w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-serene-neutral-50 flex items-center justify-center hover:bg-serene-neutral-100 transition-all text-serene-neutral-600">
 							<ChevronLeft className="h-4 w-4 sm:h-5 sm:w-5" />
 						</Link>
 						<div className="flex-1 min-w-0">
-							<div className="hidden sm:flex items-center gap-2 text-teal-600 font-extrabold uppercase tracking-[0.2em] text-[8px] sm:text-[10px] mb-0.5">
+							<div className="hidden sm:flex items-center gap-2 text-sauti-teal font-extrabold uppercase tracking-[0.2em] text-[8px] sm:text-[10px] mb-0.5">
 								<ShieldCheck className="h-3.5 w-3.5" />
 								<span className="truncate">{isOwner ? 'Secure Journey Hub' : 'Case Coordination Hub'}</span>
 							</div>
 							<div className="flex flex-col sm:flex-row sm:items-center gap-0 sm:gap-4 shrink-0 min-w-0">
-                                <h2 className="text-slate-900 font-bold tracking-tight uppercase text-[10px] sm:text-base whitespace-nowrap overflow-hidden text-ellipsis">
+                                <h2 className="text-sauti-dark font-bold tracking-tight uppercase text-[10px] sm:text-base whitespace-nowrap overflow-hidden text-ellipsis">
                                     {(() => {
                                         const type = report?.type_of_incident?.replace(/_/g, " ") || "Incident";
                                         return type.toLowerCase().includes("abuse") ? type : `${type} Abuse`;
                                     })()}
                                 </h2>
-                                <div className="hidden sm:block h-3 w-px bg-slate-200" />
+                                <div className="hidden sm:block h-3 w-px bg-serene-neutral-200" />
                                 <div className="flex items-center gap-2">
-                                    <Badge variant="outline" className="bg-slate-50/50 border-slate-100 text-[8px] sm:text-[9px] font-bold text-slate-500 uppercase tracking-widest px-1.5 py-0">
+                                    <Badge variant="outline" className="bg-serene-neutral-50/50 border-serene-neutral-100 text-[8px] sm:text-[9px] font-bold text-serene-neutral-500 uppercase tracking-widest px-1.5 py-0">
                                         {report?.is_onBehalf ? "Child" : "Personal"}
                                     </Badge>
-                                    <span className="text-[8px] sm:text-[9px] font-bold text-slate-400 uppercase tracking-widest hidden lg:block">
+                                    <span className="text-[8px] sm:text-[9px] font-bold text-serene-neutral-400 uppercase tracking-widest hidden lg:block">
                                         {report?.submission_timestamp ? new Date(report.submission_timestamp).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }) : ""}
                                     </span>
                                 </div>
@@ -729,19 +756,19 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
 						
 						<Dialog open={showArchiveConfirm} onOpenChange={setShowArchiveConfirm}>
 							<DialogTrigger asChild>
-								<Button variant="ghost" className="text-slate-400 hover:text-teal-600 font-bold text-[9px] sm:text-[10px] gap-2 uppercase tracking-widest h-8 sm:h-10 px-1 sm:px-2 group">
+								<Button variant="ghost" className="text-serene-neutral-400 hover:text-sauti-teal font-bold text-[9px] sm:text-[10px] gap-2 uppercase tracking-widest h-8 sm:h-10 px-1 sm:px-2 group">
 									<Archive className="h-3.5 w-3.5 sm:h-4 sm:w-4 group-hover:scale-110 transition-transform" /> 
-									<span className="hidden sm:inline text-slate-500">{isOwner ? 'Close Report' : 'Close Case'}</span>
+									<span className="hidden sm:inline text-serene-neutral-500">{isOwner ? 'Close Report' : 'Close Case'}</span>
 								</Button>
 							</DialogTrigger>
-							<DialogContent className="sm:max-w-[425px] rounded-[2rem] border-slate-100 p-8 bg-white shadow-2xl">
+							<DialogContent className="sm:max-w-[425px] rounded-[2rem] border-serene-neutral-100 p-8 bg-white shadow-2xl">
 								<DialogHeader className="space-y-4">
 									<div className="w-14 h-14 bg-amber-50 rounded-2xl flex items-center justify-center text-amber-500 mx-auto">
 										<AlertCircle className="h-7 w-7" />
 									</div>
 									<div className="text-center space-y-2">
-										<DialogTitle className="text-xl font-bold tracking-tight text-slate-900">Archive this report?</DialogTitle>
-										<DialogDescription className="text-slate-500 font-medium leading-relaxed">
+										<DialogTitle className="text-xl font-bold tracking-tight text-sauti-dark">Archive this report?</DialogTitle>
+										<DialogDescription className="text-serene-neutral-500 font-medium leading-relaxed">
 											Archiving will move this report to your history. You will still be able to access it later from the archived reports section.
 										</DialogDescription>
 									</div>
@@ -750,14 +777,14 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
 									<Button 
 										onClick={handleArchiveReport} 
 										disabled={isArchiving}
-										className="h-12 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-2xl w-full shadow-lg transition-all"
+										className="h-12 bg-sauti-dark hover:bg-sauti-dark/90 text-white font-bold rounded-2xl w-full shadow-lg transition-all"
 									>
 										{isArchiving ? "Archiving..." : "Yes, Archive Report"}
 									</Button>
 									<Button 
 										variant="ghost" 
 										onClick={() => setShowArchiveConfirm(false)}
-										className="h-12 text-slate-400 font-bold rounded-2xl w-full hover:bg-slate-50"
+										className="h-12 text-serene-neutral-400 font-bold rounded-2xl w-full hover:bg-serene-neutral-50"
 									>
 										Keep {isOwner ? 'Report' : 'Case'} Active
 									</Button>
@@ -768,7 +795,14 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
 				</div>
 			</nav>
 
-			<main className="max-w-7xl mx-auto px-6 py-12">
+			<SereneBreadcrumb 
+				items={[
+					{ label: "Reports", href: "/dashboard/reports" },
+					{ label: "Report Detail", active: true }
+				]} 
+			/>
+
+			<main className="max-w-7xl mx-auto px-6 py-6 transition-all duration-700 animate-in fade-in slide-in-from-bottom-4">
 				<div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-start">
 					
 					{/* Main Content: Story & Recovery */}
@@ -1243,9 +1277,10 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
 																						onClose={() => {}}
 																						userId={currentUserId || ''}
 																						professionalName={activeProposal.name}
+																						professionalId={activeProposal.professionalId || undefined}
 																						serviceName={activeProposal.type}
 																						onSchedule={async (data) => {
-																							await rescheduleAppointment(matchingAppt.id, data.date.toISOString(), data.notes);
+																							await rescheduleAppointment(matchingAppt.id, data.date.toISOString(), data.notes, 'requested');
 																							await supabase.from('matched_services').update({ match_status_type: 'reschedule_requested' }).eq('id', activeProposal.id);
 																							toast({ title: "Request Sent", description: "We'll notify you once confirmed." });
 																							fetchReport();
@@ -1345,9 +1380,10 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
 							if (respondingTo.appointment_date && apptData.date.getTime() === new Date(respondingTo.appointment_date).getTime()) {
 								await confirmAppointment(respondingTo.id);
 							} else {
-								await rescheduleAppointment(respondingTo.id, apptData.date.toISOString());
+								await rescheduleAppointment(respondingTo.id, apptData.date.toISOString(), apptData.notes, 'requested');
+                                await supabase.from('matched_services').update({ match_status_type: 'reschedule_requested' }).eq('report_id', reportId);
 							}
-							toast({ title: "Appointment Finalized" });
+							toast({ title: "Request Sent", description: "We'll notify you once the partner confirms." });
 							fetchReport();
 						} catch (err) {
 							toast({ title: "Failed to update appointment", variant: "destructive" });
@@ -1360,6 +1396,7 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
 						type: respondingTo.type || 'consultation'
 					}}
 					professionalName={acceptedMatch?.name}
+					professionalId={acceptedMatch?.professionalId || undefined}
 					userId={report?.user_id || undefined}
 				/>
 			)}

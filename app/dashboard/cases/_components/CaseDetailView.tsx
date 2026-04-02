@@ -37,6 +37,7 @@ import {
     DialogFooter,
     DialogDescription
 } from "@/components/ui/dialog";
+import { confirmAppointment, rescheduleAppointment, confirmReschedule } from "../../_views/actions/appointments";
 import { EnhancedAppointmentScheduler } from "../../_components/EnhancedAppointmentScheduler";
 
 interface ChecklistItem {
@@ -252,6 +253,49 @@ export function CaseDetailView({
                         <p className="text-xs text-serene-blue-700 leading-relaxed">
                             Survivor details are protected. Full contact information and incident history will be visible once you accept the case and schedule a meeting.
                         </p>
+                    </div>
+                </div>
+            )}
+
+            {caseItem.match_status_type === 'reschedule_requested' && (
+                <div className="bg-amber-600 shadow-xl shadow-amber-600/20 rounded-[2rem] p-8 text-white relative overflow-hidden group">
+                    <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:rotate-12 transition-transform duration-700">
+                        <Calendar className="h-24 w-24" />
+                    </div>
+                    <div className="relative z-10 space-y-6">
+                        <div className="flex items-center gap-3">
+                            <div className="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center backdrop-blur-md">
+                                <Clock className="h-6 w-6" />
+                            </div>
+                            <div>
+                                <h4 className="text-xl font-bold tracking-tight">Reschedule Requested</h4>
+                                <p className="text-amber-100 font-medium text-sm">The survivor has proposed a new meeting time.</p>
+                            </div>
+                        </div>
+                        
+                        <div className="flex flex-col sm:flex-row gap-3">
+                            <Button 
+                                onClick={async () => {
+                                    // Logic to confirm the pending appointment
+                                    const { data: appt } = await supabase.from('appointments').select('*').eq('matched_services', matchId).eq('status', 'requested').maybeSingle();
+                                    if (appt) {
+                                        await confirmReschedule(appt.appointment_id, matchId);
+                                        toast({ title: "Appointment Confirmed" });
+                                        // fetchCase is called via real-time subscription or we could trigger it manually
+                                    }
+                                }}
+                                className="h-12 bg-white text-amber-600 hover:bg-amber-50 font-bold rounded-2xl px-8 shadow-lg transition-all"
+                            >
+                                Confirm New Time
+                            </Button>
+                            <Button 
+                                variant="ghost"
+                                onClick={() => setIsSchedulerOpen(true)}
+                                className="h-12 bg-white/10 hover:bg-white/20 text-white border border-white/20 font-bold rounded-2xl px-8 backdrop-blur-md transition-all"
+                            >
+                                Suggest Different Time
+                            </Button>
+                        </div>
                     </div>
                 </div>
             )}
@@ -482,7 +526,7 @@ export function CaseDetailView({
                                 <Button onClick={() => setIsSchedulerOpen(true)} className="h-9 sm:h-11 bg-teal-600 hover:bg-teal-700 text-white font-bold rounded-lg sm:rounded-xl px-4 sm:px-5 shadow-lg shadow-teal-600/20 text-[10px] sm:text-xs gap-2 transition-all active:scale-95 whitespace-nowrap">
                                     <Calendar className="h-3.5 w-3.5" /> Accept & Schedule
                                 </Button>
-                                <EnhancedAppointmentScheduler isOpen={isSchedulerOpen} onClose={() => setIsSchedulerOpen(false)} userId={userId} professionalName="You" serviceName={caseItem.service_details?.name} onSchedule={async (appt) => { if (onAcceptCase) { onAcceptCase(matchId, appt); setIsSchedulerOpen(false); } }} />
+                                <EnhancedAppointmentScheduler isOpen={isSchedulerOpen} onClose={() => setIsSchedulerOpen(false)} userId={userId} professionalName="You" serviceName={caseItem.service_details?.name} onSchedule={async (appt: any) => { if (onAcceptCase) { onAcceptCase(matchId, appt); setIsSchedulerOpen(false); } }} />
                             </div>
                         )}
 

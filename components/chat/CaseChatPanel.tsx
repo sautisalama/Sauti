@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useOptimistic } from 'react';
 import { Chat, Message, MessageType, transformChat } from '@/types/chat';
 import { getMessages, sendMessage, markMessagesAsRead, getCaseChat } from '@/app/actions/chat';
 import { fetchLinkMetadata } from '@/app/actions/chat-media';
@@ -56,6 +56,13 @@ export function CaseChatPanel({
 }: CaseChatPanelProps) {
   const [chat, setChat] = useState<Chat | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
+  const [optimisticMessages, addOptimisticMessage] = useOptimistic(
+    messages,
+    (state: Message[], newMessage: Message) => {
+      if (state.find(m => m.id === newMessage.id)) return state;
+      return [...state, newMessage];
+    }
+  );
   const [inputText, setInputText] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [sending, setSending] = useState(false);
@@ -204,26 +211,23 @@ export function CaseChatPanel({
       is_read: true
     };
 
-    // Optimistic update
-    setMessages(prev => [...prev, newMessage]);
+    // Store state for rollback
     const previousInput = inputText;
     const previousPreview = linkPreview;
     
     setInputText('');
     setLinkPreview(null);
     scrollToBottom();
+    addOptimisticMessage(newMessage);
 
     try {
       const metadata = previousPreview ? { link_preview: previousPreview } : {};
       await sendMessage(chat.id, previousInput, 'text', metadata);
     } catch (error) {
       console.error('Failed to send:', error);
-      // Rollback on error
-      setMessages(prev => prev.filter(m => m.id !== tempId));
+      // Rollback inputs
       setInputText(previousInput);
       setLinkPreview(previousPreview);
-    } finally {
-      // No need to setSending(false) here as it's optimistic
     }
   };
 
@@ -347,9 +351,9 @@ export function CaseChatPanel({
       {/* Messages */}
       <div className={`flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50/20 ${isExpanded ? 'h-[500px]' : 'h-[300px]'}`}>
         <div ref={messagesEndRef} />
-        {messages.map((msg, idx) => {
+        {optimisticMessages.map((msg, idx) => {
           const isOwn = msg.sender_id === currentUserId;
-          const showTail = idx === 0 || messages[idx - 1].sender_id !== msg.sender_id;
+          const showTail = idx === 0 || optimisticMessages[idx - 1].sender_id !== msg.sender_id;
           return (
             <MessageBubble
               key={msg.id}

@@ -41,6 +41,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { getAvailableSlotsForDate, getAvailabilityCalendar } from "@/app/actions/availability";
+import { TimeSlot } from "@/types/chat";
 
 /**
  * Design Tokens based on the shared system image.
@@ -78,6 +80,7 @@ interface EnhancedAppointmentSchedulerProps {
     type: string;
   };
   inline?: boolean;
+  professionalId?: string;
 }
 
 /**
@@ -146,6 +149,7 @@ export function EnhancedAppointmentScheduler({
   viewMode = 'propose',
   initialAppointment,
   inline = false,
+  professionalId,
 }: EnhancedAppointmentSchedulerProps) {
   const [selectedDate, setSelectedDate] = useState<Date>(initialAppointment?.date || new Date());
   
@@ -168,6 +172,10 @@ export function EnhancedAppointmentScheduler({
     notes?: string;
   } | null>(null);
   const [notes, setNotes] = useState("");
+  const [availableSlots, setAvailableSlots] = useState<TimeSlot[]>([]);
+  const [availableDates, setAvailableDates] = useState<{ date: string; hasSlots: boolean }[]>([]);
+  const [isLoadingSlots, setIsLoadingSlots] = useState(false);
+  const [selectedSlot, setSelectedSlot] = useState<TimeSlot | null>(null);
 
   const selectedDateTime = useMemo(() => {
     let h = parseInt(hour);
@@ -188,6 +196,59 @@ export function EnhancedAppointmentScheduler({
     };
     loadExisting();
   }, [userId, isOpen]);
+  
+  // Fetch availability calendar
+  useEffect(() => {
+    if (!professionalId || !isOpen) return;
+    
+    const loadAvailabilityCalendar = async () => {
+      try {
+        const start = startOfMonth(selectedDate);
+        const end = endOfMonth(selectedDate);
+        const calendar = await getAvailabilityCalendar(professionalId, start, end);
+        setAvailableDates(calendar);
+      } catch (err) {
+        console.error("Failed to load availability calendar", err);
+      }
+    };
+    
+    loadAvailabilityCalendar();
+  }, [professionalId, selectedDate.getMonth(), isOpen]);
+
+  // Fetch slots for selected date
+  useEffect(() => {
+    if (!professionalId || !isOpen) return;
+    
+    const loadSlots = async () => {
+      setIsLoadingSlots(true);
+      try {
+        const slots = await getAvailableSlotsForDate(professionalId, selectedDate);
+        setAvailableSlots(slots);
+        
+        // Auto-select initial slot if matches
+        if (initialAppointment?.date) {
+            const initialIso = initialAppointment.date.toISOString();
+            const matchingSlot = slots.find(s => s.slot_start === initialIso);
+            if (matchingSlot) setSelectedSlot(matchingSlot);
+        }
+      } catch (err) {
+        console.error("Failed to load slots", err);
+      } finally {
+        setIsLoadingSlots(false);
+      }
+    };
+    
+    loadSlots();
+  }, [professionalId, selectedDate, isOpen]);
+
+  useEffect(() => {
+    if (selectedSlot) {
+        const date = new Date(selectedSlot.slot_start);
+        setHour((date.getHours() % 12 || 12).toString().padStart(2, "0"));
+        setMinute(date.getMinutes().toString().padStart(2, "0"));
+        setAmpm(date.getHours() >= 12 ? "PM" : "AM");
+    }
+  }, [selectedSlot]);
 
   const handleSchedule = async (isMeetNow: boolean = false) => {
     const apptDate = isMeetNow ? new Date() : selectedDateTime;
@@ -242,6 +303,8 @@ export function EnhancedAppointmentScheduler({
             const isSelected = isSameDay(day, selectedDate);
             const isTodayDate = isToday(day);
             const isTargetMonth = calendarViewMode === 'month' ? monthDays[idx]?.isCurrentMonth : true;
+            const hasAvailability = availableDates.find(d => d.date === format(day, 'yyyy-MM-dd'))?.hasSlots;
+            
             return (
               <button key={idx} disabled={!isTargetMonth} onClick={() => setSelectedDate(day)}
                 className={cn("relative aspect-square rounded-[1.2rem] flex flex-col items-center justify-center transition-all",
@@ -252,6 +315,7 @@ export function EnhancedAppointmentScheduler({
                 )}>
                 <span className="text-sm">{day.getDate()}</span>
                 {existingAppointments.some(appt => appt.appointment_date && isSameDay(new Date(appt.appointment_date), day)) && <div className={cn("absolute bottom-2 h-1 w-1 rounded-full", isSelected ? "bg-white" : "bg-[#105D5D]")} />}
+                {professionalId && hasAvailability && !isSelected && <div className="absolute top-2 right-2 h-1.5 w-1.5 rounded-full bg-teal-400 animate-pulse" />}
               </button>
             );
           })}
@@ -278,56 +342,97 @@ export function EnhancedAppointmentScheduler({
               <label className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] leading-none">Set Time</label>
             </div>
 
-            <div className={cn("rounded-[2rem] p-6 flex-1 flex flex-col items-center justify-center gap-6", COLORS.blue, "bg-opacity-30 backdrop-blur-sm shadow-inner")}>
-              <div className="transition-all duration-700 hover:scale-[1.02]">
-                <SereneClockWidget hour={ampm === "PM" ? parseInt(hour) + 12 : parseInt(hour)} minute={parseInt(minute)} />
-              </div>
-              
-              <div className="flex items-center gap-2 justify-center w-full max-w-[240px]">
-                <div className="flex flex-col gap-1.5 flex-1">
-                  <Select value={hour} onValueChange={setHour}>
-                    <SelectTrigger className="h-9 rounded-xl border-white/50 bg-white/80 font-bold text-xs text-[#004A99] shadow-none">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent className="rounded-xl border-slate-100 bg-white shadow-xl">
-                      {[...Array(12)].map((_, i) => (
-                        <SelectItem key={i} value={(i + 1).toString().padStart(2, "0")} className="font-bold">
-                          {(i + 1).toString().padStart(2, "0")}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+            <div className={cn("rounded-[2rem] p-6 flex-1 flex flex-col items-center justify-center gap-6", COLORS.blue, "bg-opacity-30 backdrop-blur-sm shadow-inner overflow-hidden")}>
+              {professionalId ? (
+                <div className="w-full space-y-4">
+                  <p className="text-[10px] font-black text-[#004A99] uppercase tracking-widest text-center mb-2">Available Slots</p>
+                  {isLoadingSlots ? (
+                    <div className="flex flex-col items-center justify-center py-12 gap-4">
+                        <div className="h-8 w-8 animate-spin rounded-full border-2 border-[#004A99]/20 border-t-[#004A99]" />
+                        <p className="text-[10px] font-bold text-[#004A99]/40 uppercase tracking-widest">Checking Availability...</p>
+                    </div>
+                  ) : availableSlots.length > 0 ? (
+                    <div className="grid grid-cols-2 gap-2 max-h-[180px] overflow-y-auto pr-2 scrollbar-hide">
+                      {availableSlots.map((slot, i) => {
+                        const slotDate = new Date(slot.slot_start);
+                        const isSelected = selectedSlot?.slot_start === slot.slot_start;
+                        return (
+                          <button
+                            key={i}
+                            onClick={() => setSelectedSlot(slot)}
+                            className={cn(
+                                "py-3 px-4 rounded-xl text-xs font-bold transition-all border",
+                                isSelected 
+                                    ? "bg-[#004A99] text-white border-[#004A99] shadow-md scale-[1.02]" 
+                                    : "bg-white/60 text-[#004A99] border-white/40 hover:bg-white/90"
+                            )}
+                          >
+                            {format(slotDate, 'h:mm a')}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="text-center py-12 bg-white/40 rounded-2xl border border-dashed border-white/60">
+                        <Clock className="h-6 w-6 text-[#004A99]/20 mx-auto mb-2" />
+                        <p className="text-[10px] font-bold text-[#004A99]/60 uppercase tracking-widest">No slots available</p>
+                        <p className="text-[9px] font-medium text-[#004A99]/40 mt-1 uppercase">Try another date</p>
+                    </div>
+                  )}
                 </div>
+              ) : (
+                <>
+                  <div className="transition-all duration-700 hover:scale-[1.02]">
+                    <SereneClockWidget hour={ampm === "PM" ? parseInt(hour) + 12 : parseInt(hour)} minute={parseInt(minute)} />
+                  </div>
+                  
+                  <div className="flex items-center gap-2 justify-center w-full max-w-[240px]">
+                    <div className="flex flex-col gap-1.5 flex-1">
+                      <Select value={hour} onValueChange={setHour}>
+                        <SelectTrigger className="h-9 rounded-xl border-white/50 bg-white/80 font-bold text-xs text-[#004A99] shadow-none">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent className="rounded-xl border-slate-100 bg-white shadow-xl">
+                          {[...Array(12)].map((_, i) => (
+                            <SelectItem key={i} value={(i + 1).toString().padStart(2, "0")} className="font-bold">
+                              {(i + 1).toString().padStart(2, "0")}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
 
-                <div className="text-xs font-black text-[#004A99]/20 self-center">:</div>
+                    <div className="text-xs font-black text-[#004A99]/20 self-center">:</div>
 
-                <div className="flex flex-col gap-1.5 flex-1">
-                  <Select value={minute} onValueChange={setMinute}>
-                    <SelectTrigger className="h-9 rounded-xl border-white/50 bg-white/80 font-bold text-xs text-[#004A99] shadow-none">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent className="rounded-xl border-slate-100 bg-white shadow-xl">
-                      {[...Array(12)].map((_, i) => (
-                        <SelectItem key={i} value={(i * 5).toString().padStart(2, "0")} className="font-bold">
-                          {(i * 5).toString().padStart(2, "0")}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+                    <div className="flex flex-col gap-1.5 flex-1">
+                      <Select value={minute} onValueChange={setMinute}>
+                        <SelectTrigger className="h-9 rounded-xl border-white/50 bg-white/80 font-bold text-xs text-[#004A99] shadow-none">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent className="rounded-xl border-slate-100 bg-white shadow-xl">
+                          {[...Array(12)].map((_, i) => (
+                            <SelectItem key={i} value={(i * 5).toString().padStart(2, "0")} className="font-bold">
+                              {(i * 5).toString().padStart(2, "0")}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
 
-                <div className="flex flex-col gap-1.5 flex-1">
-                  <Select value={ampm} onValueChange={setAmpm}>
-                    <SelectTrigger className="h-9 rounded-xl border-0 bg-[#004A99] text-white font-bold text-xs shadow-none">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent className="rounded-xl border-slate-100 bg-white shadow-xl">
-                      <SelectItem value="AM" className="font-bold">AM</SelectItem>
-                      <SelectItem value="PM" className="font-bold">PM</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
+                    <div className="flex flex-col gap-1.5 flex-1">
+                      <Select value={ampm} onValueChange={setAmpm}>
+                        <SelectTrigger className="h-9 rounded-xl border-0 bg-[#004A99] text-white font-bold text-xs shadow-none">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent className="rounded-xl border-slate-100 bg-white shadow-xl">
+                          <SelectItem value="AM" className="font-bold">AM</SelectItem>
+                          <SelectItem value="PM" className="font-bold">PM</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </div>
