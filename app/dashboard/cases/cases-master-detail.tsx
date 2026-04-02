@@ -862,10 +862,10 @@ export default function CasesMasterDetail({ userId }: { userId: string }) {
 					}`}
 				>
 					<div className="mb-6 sm:mb-8">
-						<div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
-							<div>
+						<div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-10">
+							<div className="space-y-1">
 								<h1 className="text-xl sm:text-2xl lg:text-3xl font-black text-sauti-dark tracking-tight uppercase">Case Management</h1>
-								<p className="text-serene-neutral-500 mt-1 text-xs sm:text-sm lg:text-base font-medium">Review your matched cases and track progress.</p>
+								<p className="text-serene-neutral-400 text-xs sm:text-sm font-medium">Coordinate care and track progress for your assigned cases.</p>
 							</div>
 						</div>
 
@@ -894,7 +894,7 @@ export default function CasesMasterDetail({ userId }: { userId: string }) {
 						</div>
 					</div>
 					{/* Premium Search and Filter Bar */}
-					<div className="mb-6 sticky top-0 z-30 bg-serene-neutral-50/95 backdrop-blur-lg border-b border-serene-neutral-100 pb-3 pt-2 -mx-1 px-1">
+					<div className="mb-8 sticky top-0 z-30 bg-serene-neutral-50/80 backdrop-blur-xl border-b border-serene-neutral-100/50 pb-5 pt-2 -mx-1 px-1 transition-all">
 						<div className="flex items-center gap-2 sm:gap-3">
 							{/* Search Bar */}
 							<div className="relative flex-1 min-w-0">
@@ -1063,7 +1063,7 @@ export default function CasesMasterDetail({ userId }: { userId: string }) {
 					}`}
 				>
                     <div className="h-full pb-8">
-                            <Card className="p-4 sm:p-5 shadow-sm border-serene-neutral-200 rounded-2xl bg-white h-full flex flex-col">
+                            <Card className="p-6 sm:p-8 shadow-2xl shadow-slate-200/40 border-serene-neutral-100/50 rounded-[2.5rem] bg-white h-full flex flex-col">
                                 <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-5 gap-3">
                                     <div>
                                         <div className="flex items-center gap-2 mb-1">

@@ -749,7 +749,9 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
 						<div className="flex-1 min-w-0">
 							<div className="hidden sm:flex items-center gap-2 text-sauti-teal font-extrabold uppercase tracking-[0.2em] text-[8px] sm:text-[10px] mb-0.5">
 								<ShieldCheck className="h-3.5 w-3.5" />
-								<span className="truncate">{isOwner ? 'Secure Journey Hub' : 'Case Coordination Hub'}</span>
+								<span className="truncate">
+									{!currentUserId ? 'Secure Anonymous Session' : (isOwner ? 'Secure Journey Hub' : 'Case Coordination Hub')}
+								</span>
 							</div>
 							<div className="flex flex-col sm:flex-row sm:items-center gap-0 sm:gap-4 shrink-0 min-w-0">
                                 <h2 className="text-sauti-dark font-bold tracking-tight uppercase text-[10px] sm:text-base whitespace-nowrap overflow-hidden text-ellipsis">
@@ -892,7 +894,7 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
 								</span>
 							</div>
 
-							<Card className="border-0 bg-white/40 backdrop-blur-sm shadow-xl shadow-slate-200/30 rounded-2xl sm:rounded-3xl overflow-hidden border border-white/50">
+							<Card className="border-0 bg-white shadow-xl shadow-slate-200/50 rounded-[2.5rem] overflow-hidden">
 								<CardContent className="p-0">
 									{checklists.map((item, idx) => (
 										<div key={item.id} className={cn("group transition-all duration-300", idx < checklists.length - 1 && "border-b border-slate-100/50")}>
@@ -956,7 +958,7 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
 						<div className="max-w-2xl">
 							<Accordion type="single" collapsible className="w-full">
 								<AccordionItem value="report-details" className="border-0">
-									<Card className="border border-slate-100 bg-white shadow-sm rounded-3xl overflow-hidden group/statement transition-all duration-300">
+									<Card className="border border-serene-neutral-100 bg-white shadow-sm rounded-[2.5rem] overflow-hidden group/statement transition-all duration-300">
 										<AccordionTrigger className="w-full text-left p-4 sm:p-6 hover:no-underline group/trigger">
 											<div className="flex items-center gap-4 w-full">
 												<div className="w-10 h-10 bg-slate-50 rounded-2xl flex items-center justify-center text-slate-400 group-data-[state=open]/trigger:bg-teal-50 group-data-[state=open]/trigger:text-teal-600 transition-all duration-300">
@@ -1101,7 +1103,7 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
 										<h3 className="text-2xl font-bold text-slate-900 tracking-tight">Coordination Line</h3>
 									</div>
 									
-									<div className="h-[600px] rounded-3xl border border-slate-100 shadow-2xl shadow-slate-200/50 overflow-hidden bg-white flex flex-col group">
+									<div className="h-[600px] rounded-[2.5rem] border border-serene-neutral-100 shadow-2xl shadow-slate-200/50 overflow-hidden bg-white flex flex-col group">
 										{isChatLoading ? (
 											<div className="flex-1 flex flex-col items-center justify-center p-12 text-center space-y-4">
 												<div className="w-12 h-12 rounded-2xl bg-teal-50 flex items-center justify-center animate-spin">
@@ -1135,7 +1137,7 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
 									</div>
 
 									{/* Sauti Salama Tips Card */}
-									<Card className="border-0 bg-gradient-to-br from-teal-600 to-emerald-700 shadow-xl shadow-teal-600/20 rounded-3xl overflow-hidden group">
+									<Card className="border-0 bg-gradient-to-br from-teal-600 to-emerald-700 shadow-xl shadow-teal-600/20 rounded-[2.5rem] overflow-hidden group">
 										<CardContent className="p-8 relative">
 											<div className="absolute top-0 right-0 p-4 opacity-10">
 												<ShieldCheck className="h-20 w-20 text-white" />
@@ -1144,7 +1146,7 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
 												<h3 className="text-xl font-bold tracking-tight">How Sauti Salama Works</h3>
 												<div className="space-y-3 opacity-90">
 													<p className="text-sm font-medium leading-relaxed">
-														• <strong>100% Confidential</strong>: Your identity is masked until you choose to reveal it.
+														• <strong>100% Confidential</strong>: Your identity is masked until you reveal it.
 													</p>
 													<p className="text-sm font-medium leading-relaxed">
 														• <strong>Verified Experts</strong>: Every partner is strictly vetted by our human rights team.
@@ -1158,7 +1160,7 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
 									</Card>
 
 									{/* Supportive Hint Card */}
-									<Card className="border border-slate-100 bg-white/50 backdrop-blur-sm shadow-sm rounded-3xl overflow-hidden">
+									<Card className="border border-slate-100 bg-white shadow-sm rounded-[2.5rem] overflow-hidden">
 										<CardContent className="p-8 space-y-6">
 											<div className="flex items-center gap-3">
 												<div className="w-10 h-10 rounded-xl bg-teal-50 flex items-center justify-center text-teal-600">
@@ -1182,7 +1184,7 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
 										</div>
 										{upcomingAppointments.map((appt) => (
 											<Card key={appt.id} className={cn(
-												"border-0 shadow-lg rounded-3xl overflow-hidden",
+												"border-0 shadow-lg rounded-[2.5rem] overflow-hidden",
 												appt.status === 'requested' ? "bg-amber-50 border border-amber-100" : "bg-white border border-slate-100"
 											)}>
 												<CardContent className="p-6">
@@ -1256,7 +1258,7 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
 												Matching Center
 											</div>
 											<h3 className="text-2xl font-bold text-slate-900 tracking-tight">
-												Matching Center
+												Matching Hub
 											</h3>
 										</div>
 
@@ -1266,7 +1268,7 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
 											
 											if (activeProposal) {
 												return (
-													<Card className="border border-white shadow-2xl rounded-[2.5rem] bg-white/70 backdrop-blur-2xl border-teal-100/50 overflow-hidden animate-in fade-in zoom-in-95 duration-500">
+													<Card className="border border-white shadow-2xl rounded-[2.5rem] bg-white border-serene-neutral-100 overflow-hidden animate-in fade-in zoom-in-95 duration-500">
 														<CardHeader className="p-8 pb-4">
 															<div className="flex items-center justify-between">
 																<Badge className="bg-teal-50 text-teal-600 border-0 font-bold uppercase tracking-widest text-[9px]">Partner Proposal Received</Badge>
@@ -1318,7 +1320,7 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
 																					Suggest Another Time
 																				</Button>
 																			</DialogTrigger>
-																			<DialogContent className="max-w-2xl bg-white rounded-[2rem] p-0 overflow-hidden border-0 shadow-2xl">
+																			<DialogContent className="max-w-2xl bg-white rounded-[2.5rem] p-0 overflow-hidden border-0 shadow-2xl">
 																				<div className="p-8 border-b border-slate-50">
 																					<DialogTitle className="text-2xl font-bold flex items-center gap-3">
 																						<Calendar className="h-6 w-6 text-teal-600" />
@@ -1361,7 +1363,7 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
 											}
 											
 											return (
-												<Card className="border border-white shadow-2xl rounded-[2.5rem] bg-white/70 backdrop-blur-2xl border-slate-100 overflow-hidden group">
+												<Card className="border border-serene-neutral-100 shadow-2xl rounded-[2.5rem] bg-white overflow-hidden group">
 													<CardContent className="p-12 flex flex-col items-center text-center space-y-6">
 														<div className="relative">
 															<div className="w-20 h-20 bg-teal-50 rounded-full flex items-center justify-center text-teal-600">
@@ -1386,7 +1388,7 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
 										})()}
 
 										{/* Escalation / Help Card */}
-										<Card className="bg-violet-600 rounded-[2rem] shadow-xl shadow-violet-600/20 border-0 p-8 text-white relative overflow-hidden group">
+										<Card className="bg-violet-600 rounded-[2.5rem] shadow-xl shadow-violet-600/20 border-0 p-8 text-white relative overflow-hidden group">
 											<div className="absolute top-0 right-0 p-4 opacity-10 group-hover:scale-110 transition-transform">
 												<Heart className="h-24 w-24" />
 											</div>
@@ -1408,7 +1410,7 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
 								)}
 
 								{/* Supportive Tips - Always visible in sidebar */}
-								<div className="p-8 bg-white/40 backdrop-blur-sm border border-white shadow-xl rounded-[2.5rem] space-y-4">
+								<div className="p-8 bg-white border border-serene-neutral-100 shadow-xl rounded-[2.5rem] space-y-4">
 									<div className="flex items-center gap-3 text-teal-600">
 										<div className="w-8 h-8 bg-teal-50 rounded-xl flex items-center justify-center">
 											<Heart className="h-4 w-4" />

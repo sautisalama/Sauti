@@ -301,7 +301,7 @@ export function CaseDetailView({
             )}
 
 
-            <Card className="border-0 bg-white shadow-xl shadow-slate-200/50 rounded-[1.5rem] sm:rounded-[2.5rem] overflow-hidden">
+            <Card className="border-0 bg-white shadow-xl shadow-slate-200/50 rounded-[2.5rem] overflow-hidden">
                 <CardHeader className="p-6 sm:p-10 pb-0 flex flex-row items-center justify-between">
                     <div className="flex items-center gap-4">
                         <div className="w-10 h-10 sm:w-12 sm:h-12 bg-slate-50 rounded-xl sm:rounded-2xl flex items-center justify-center text-slate-400">
@@ -365,7 +365,7 @@ export function CaseDetailView({
                     </span>
                 </div>
 
-                <Card className="border-0 bg-white shadow-xl shadow-slate-200/50 rounded-[1.5rem] sm:rounded-[2.5rem] overflow-hidden">
+                <Card className="border-0 bg-white shadow-xl shadow-slate-200/50 rounded-[2.5rem] overflow-hidden">
                     <CardContent className="p-0">
                         {checklists.map((item, idx) => (
                             <div key={item.id} className={cn("group transition-all duration-300", idx < checklists.length - 1 && "border-b border-slate-50")}>
@@ -418,7 +418,7 @@ export function CaseDetailView({
     const sidebarContent = (
         <div className="space-y-6">
             {isAccepted && (
-                <div className="h-[400px] sm:h-[600px] rounded-[1.5rem] sm:rounded-[2.5rem] border border-white shadow-2xl shadow-teal-500/10 overflow-hidden bg-white/70 backdrop-blur-2xl flex flex-col group mt-0">
+                <div className="h-[400px] sm:h-[600px] rounded-[2.5rem] border border-white shadow-2xl shadow-teal-500/10 overflow-hidden bg-white/70 backdrop-blur-2xl flex flex-col group mt-0">
 
                     {isChatLoading ? (
                         <div className="flex-1 flex flex-col items-center justify-center gap-4 text-slate-400">
@@ -442,7 +442,7 @@ export function CaseDetailView({
             )}
 
             <Accordion type="single" collapsible className="w-full">
-                <AccordionItem value="notes" className="bg-white rounded-[1.5rem] sm:rounded-[2.5rem] border border-slate-100 shadow-xl shadow-slate-200/50 overflow-hidden">
+                <AccordionItem value="notes" className="bg-white rounded-[2.5rem] border border-slate-100 shadow-xl shadow-slate-200/50 overflow-hidden">
                     <AccordionTrigger className="px-8 py-6 hover:no-underline [&[data-state=open]>svg]:rotate-180">
                         <div className="flex items-center gap-4">
                             <div className="w-10 h-10 bg-violet-50 rounded-xl flex items-center justify-center text-violet-600">
@@ -471,54 +471,43 @@ export function CaseDetailView({
             "flex flex-col h-full bg-slate-50/30 overflow-hidden",
             isFullPage ? "min-h-screen" : "w-full"
         )}>
-            <header className="sticky top-0 z-40 bg-white border-b border-slate-100 px-4 sm:px-8 py-4 sm:py-6 shadow-sm overflow-hidden min-h-[80px] sm:min-h-0 flex items-center">
-                <div className="max-w-7xl mx-auto flex flex-col sm:flex-row sm:items-center justify-between gap-4 w-full">
-                    <div className="flex items-center gap-3 sm:gap-6 min-w-0">
-                        {!isFullPage && onClose && (
-                            <Button variant="ghost" size="icon" onClick={onClose} className="rounded-xl hover:bg-slate-50 text-slate-400 h-9 w-9 sm:h-10 sm:w-10">
-                                <ChevronLeft className="h-5 w-5" />
-                            </Button>
-                        )}
-                        
-                        <div className="flex items-center gap-3 sm:gap-6">
-                            <div className="space-y-0.5">
-                                <div className="flex items-center gap-2 text-teal-600 font-extrabold uppercase tracking-[0.2em] text-[9px] sm:text-[10px] leading-none mb-1">
-                                    <ShieldCheck className="h-3.5 w-3.5" /> Case Profile
-                                </div>
-                                <h1 className="text-base sm:text-xl font-black text-slate-900 tracking-tight leading-none uppercase truncate max-w-[150px] sm:max-w-none">
+			<nav className="sticky top-0 z-50 bg-white/80 backdrop-blur-xl border-b border-serene-neutral-100/50 transition-all duration-300 min-h-[64px] sm:min-h-[72px] flex items-center">
+				<div className="max-w-7xl mx-auto px-4 sm:px-6 w-full flex items-center justify-between gap-4 py-2 sm:py-0">
+					<div className="flex items-center gap-2 sm:gap-4 flex-1 min-w-0">
+						{!isFullPage && onClose ? (
+							<Button variant="ghost" size="icon" onClick={onClose} className="shrink-0 w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-serene-neutral-50 flex items-center justify-center hover:bg-serene-neutral-100 transition-all text-serene-neutral-600">
+								<ChevronLeft className="h-4 w-4 sm:h-5 sm:w-5" />
+							</Button>
+						) : (
+							<div className="shrink-0 w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-serene-neutral-50 flex items-center justify-center text-serene-neutral-600">
+								<Briefcase className="h-4 w-4 sm:h-5 sm:w-5" />
+							</div>
+						)}
+						<div className="flex-1 min-w-0">
+							<div className="hidden sm:flex items-center gap-2 text-sauti-teal font-extrabold uppercase tracking-[0.2em] text-[8px] sm:text-[10px] mb-0.5">
+								<ShieldCheck className="h-3.5 w-3.5" />
+								<span className="truncate">Professional Support Mode</span>
+							</div>
+							<div className="flex flex-col sm:flex-row sm:items-center gap-0 sm:gap-4 shrink-0 min-w-0">
+                                <h2 className="text-sauti-dark font-bold tracking-tight uppercase text-[10px] sm:text-base whitespace-nowrap overflow-hidden text-ellipsis">
                                     {report?.type_of_incident?.replace(/_/g, " ") || "Incident Report"}
-                                </h1>
-                            </div>
-
-                            <div className="h-8 sm:h-10 w-px bg-slate-100 mx-1 sm:mx-2 hidden md:block" />
-
-                            <div className="hidden md:flex items-center gap-4 lg:gap-8 min-w-0">
-                                <div className="flex items-center gap-2 lg:gap-3 group shrink-0">
-                                    <div className="w-8 h-8 lg:w-9 lg:h-9 bg-slate-50 rounded-lg lg:rounded-xl flex items-center justify-center text-slate-400 group-hover:bg-teal-50 group-hover:text-teal-600 transition-all">
-                                        <User className="h-3.5 w-3.5" />
-                                    </div>
-                                    <div className="space-y-0.5">
-                                        <p className="text-[8px] lg:text-[9px] font-bold text-slate-400 uppercase tracking-widest leading-none">Survivor</p>
-                                        <p className="text-[10px] lg:text-xs font-bold text-slate-700 tracking-tight whitespace-nowrap">{displaySurvivorName}</p>
-                                    </div>
-                                </div>
-
-                                <div className="flex items-center gap-2 lg:gap-3 group shrink-0">
-                                    <div className="w-8 h-8 lg:w-9 lg:h-9 bg-slate-50 rounded-lg lg:rounded-xl flex items-center justify-center text-slate-400 group-hover:bg-sky-50 group-hover:text-sky-600 transition-all">
-                                        <Calendar className="h-3.5 w-3.5" />
-                                    </div>
-                                    <div className="space-y-0.5">
-                                        <p className="text-[8px] lg:text-[9px] font-bold text-slate-400 uppercase tracking-widest leading-none">Reported</p>
-                                        <p className="text-[10px] lg:text-xs font-bold text-slate-700 tracking-tight whitespace-nowrap">{formatDate(report?.submission_timestamp)}</p>
-                                    </div>
+                                </h2>
+                                <div className="hidden sm:block h-3 w-px bg-serene-neutral-200" />
+                                <div className="flex items-center gap-2">
+                                    <Badge variant="outline" className="bg-serene-neutral-50/50 border-serene-neutral-100 text-[8px] sm:text-[9px] font-bold text-serene-neutral-500 uppercase tracking-widest px-1.5 py-0">
+                                        Partner: {displaySurvivorName}
+                                    </Badge>
+                                    <span className="text-[8px] sm:text-[9px] font-bold text-serene-neutral-400 uppercase tracking-widest hidden lg:block">
+                                        Reported {formatDate(report?.submission_timestamp)}
+                                    </span>
                                 </div>
                             </div>
-                        </div>
-                    </div>
+						</div>
+					</div>
 
-                    <div className="flex items-center gap-3 sm:gap-4 shrink-0 overflow-x-auto pb-1 sm:pb-0 scrollbar-hide">
-                        <Badge className={cn("px-3 sm:px-4 py-1 sm:py-1.5 rounded-full text-[8px] sm:text-[10px] font-bold border uppercase tracking-widest sm:tracking-[0.2em] whitespace-nowrap", urgencyColor(report?.urgency))}>
-                            {report?.urgency || 'Low'}
+					<div className="flex items-center gap-2 sm:gap-3 shrink-0">
+                        <Badge className={cn("px-2 sm:px-4 py-1 sm:py-1.5 rounded-full text-[8px] sm:text-[10px] font-bold border uppercase tracking-[0.1em] sm:tracking-[0.2em] whitespace-nowrap shadow-sm truncate max-w-[80px] sx:max-w-none", urgencyColor(report?.urgency))}>
+                            {report?.urgency || 'Low'} Priority
                         </Badge>
 
                         {caseItem.match_status_type === 'pending' && onAcceptCase && (
@@ -529,7 +518,7 @@ export function CaseDetailView({
                                 <EnhancedAppointmentScheduler isOpen={isSchedulerOpen} onClose={() => setIsSchedulerOpen(false)} userId={userId} professionalName="You" serviceName={caseItem.service_details?.name} onSchedule={async (appt: any) => { if (onAcceptCase) { onAcceptCase(matchId, appt); setIsSchedulerOpen(false); } }} />
                             </div>
                         )}
-
+                        
                         {caseItem.match_status_type !== 'completed' && caseItem.match_status_type !== 'pending' && onCompleteCase && (
                             <Dialog open={isCompletionDialogOpen} onOpenChange={setIsCompletionDialogOpen}>
                                 <DialogTrigger asChild>
@@ -568,9 +557,9 @@ export function CaseDetailView({
                                 </DialogContent>
                             </Dialog>
                         )}
-                    </div>
-                </div>
-            </header>
+					</div>
+				</div>
+			</nav>
 
             <ScrollArea className="flex-1">
                 <div className={cn(
@@ -578,7 +567,7 @@ export function CaseDetailView({
                     isFullPage ? "max-w-7xl pb-24" : "w-full pb-8"
                 )}>
                     {isFullPage ? (
-                        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+                        <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-start">
                             <div className="lg:col-span-8">
                                 {mainContent}
                             </div>

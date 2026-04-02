@@ -58,7 +58,7 @@ export function SereneWelcomeHeader({ name, timeOfDay = "morning", className, co
 
   return (
     <div className={cn(
-      "w-full p-6 md:p-8 bg-gradient-to-br from-serene-blue-50 to-white rounded-2xl mb-8 relative overflow-hidden shadow-sm border border-serene-blue-100 transition-all duration-500",
+      "w-full p-6 md:p-8 bg-gradient-to-br from-serene-blue-50 to-white rounded-[2.5rem] mb-8 relative overflow-hidden shadow-xl shadow-serene-blue-100/20 border border-serene-blue-100 transition-all duration-500",
       className
     )}>
       {/* Soft decorative blur */}
@@ -161,8 +161,8 @@ export function SereneQuickActionCard({
 
   const content = (
     <div className={cn(
-      "group relative overflow-hidden rounded-2xl p-5 transition-all duration-300",
-      "cursor-pointer border border-transparent hover:border-serene-blue-200/50 shadow-sm hover:shadow-md",
+      "group relative overflow-hidden rounded-[2.5rem] p-6 transition-all duration-300",
+      "cursor-pointer border border-transparent hover:border-serene-blue-200/50 shadow-xl shadow-slate-200/40 hover:shadow-2xl hover:shadow-slate-200/60",
       variants[variant],
       className
     )}>
@@ -244,8 +244,8 @@ export function SereneStatsCard({
   className 
 }: SereneStatsCardProps) {
   return (
-    <Card className={cn("overflow-hidden border-serene-neutral-200 shadow-sm hover:shadow-md transition-shadow duration-300 rounded-2xl", className)}>
-      <CardContent className="p-5">
+    <Card className={cn("overflow-hidden border-serene-neutral-100 shadow-xl shadow-slate-200/40 hover:shadow-2xl transition-all duration-300 rounded-[2.5rem]", className)}>
+      <CardContent className="p-6">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-xs font-bold uppercase tracking-wider text-serene-neutral-400">
             {title}
@@ -434,10 +434,10 @@ export function SereneReportCard({
     <div 
        onClick={onClick}
        className={cn(
-         "group relative p-5 bg-white rounded-2xl border transition-all duration-300 cursor-pointer overflow-hidden",
+         "group relative p-6 bg-white rounded-[2.5rem] border transition-all duration-300 cursor-pointer overflow-hidden",
          active 
-            ? "border-serene-blue-400 ring-4 ring-serene-blue-50 shadow-md z-10" 
-            : "border-serene-neutral-100 hover:border-serene-blue-200 hover:shadow-lg hover:-translate-y-0.5",
+            ? "border-sauti-teal ring-4 ring-sauti-teal/5 shadow-2xl shadow-sauti-teal/10 z-10 scale-[1.01]" 
+            : "border-serene-neutral-100 hover:border-serene-blue-200 hover:shadow-2xl hover:shadow-slate-200/60 hover:-translate-y-1",
          className
        )}
     >

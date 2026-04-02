@@ -911,18 +911,18 @@ export default function ReportsMasterDetail({ userId }: { userId: string }) {
 					}`}
 				>
 					<div className="mb-6 sm:mb-8">
-						<div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
-							<div>
+						<div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-10">
+							<div className="space-y-1">
 								<h1 className="text-xl sm:text-2xl lg:text-3xl font-black text-sauti-dark tracking-tight uppercase">My Reports</h1>
-								<p className="text-serene-neutral-500 mt-1 text-xs sm:text-sm lg:text-base font-medium">View your reports and check their status.</p>
+								<p className="text-serene-neutral-400 text-xs sm:text-sm font-medium">Your private space for recovery and coordination.</p>
 							</div>
 							{!needsOnboarding && (
 								<Button 
 									onClick={() => dash?.setIsReportDialogOpen(true)}
-									className="bg-serene-blue-600 hover:bg-serene-blue-700 text-white rounded-xl sm:rounded-2xl px-6 font-bold shadow-lg shadow-serene-blue-100 transition-all hover:scale-[1.02] h-10 sm:h-11 text-xs sm:text-sm w-full sm:w-auto"
+									className="bg-sauti-teal hover:bg-sauti-teal/90 text-white rounded-2xl px-8 font-bold shadow-xl shadow-sauti-teal/20 transition-all hover:scale-[1.02] h-11 sm:h-12 text-xs sm:text-sm w-full sm:w-auto"
 								>
-									<Plus className="h-4 w-4 sm:h-5 sm:w-5 mr-1.5" />
-									Report Abuse
+									<Plus className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
+									Submit New Report
 								</Button>
 							)}
 						</div>
@@ -952,7 +952,7 @@ export default function ReportsMasterDetail({ userId }: { userId: string }) {
 						</div>
 					</div>
 					{/* Premium Search and Filter Bar */}
-					<div className="mb-6 sticky top-0 z-30 bg-serene-neutral-50/95 backdrop-blur-lg border-b border-serene-neutral-100 pb-3 pt-2 -mx-1 px-1">
+					<div className="mb-8 sticky top-0 z-30 bg-serene-neutral-50/80 backdrop-blur-xl border-b border-serene-neutral-100/50 pb-5 pt-2 -mx-1 px-1 transition-all">
 						<div className="flex items-center gap-2 sm:gap-3">
 							{/* Search Bar */}
 							<div className="relative flex-1 min-w-0">
@@ -1127,7 +1127,7 @@ export default function ReportsMasterDetail({ userId }: { userId: string }) {
 						mobileView !== "calendar" ? "hidden lg:block" : ""
 					}`}
 				>
-					<Card className="p-4 sm:p-5 shadow-sm border-serene-neutral-200 rounded-2xl bg-white h-full flex flex-col">
+					<Card className="p-6 sm:p-8 shadow-2xl shadow-slate-200/40 border-serene-neutral-100/50 rounded-[2.5rem] bg-white h-full flex flex-col">
 						<div className="flex flex-col sm:flex-row sm:items-center justify-between mb-5 gap-3">
 							<div>
 								<div className="flex items-center gap-2 mb-1">
