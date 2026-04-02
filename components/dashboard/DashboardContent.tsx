@@ -38,7 +38,7 @@ export function DashboardContent({ children }: DashboardContentProps) {
     !hasAcceptedPolicies ||
     ((profile.user_type === 'professional' || profile.user_type === 'ngo') && !profile.professional_title));
 
-  const showTopPadding = !isChat && !needsOnboarding && !pathname?.includes("/dashboard/cases/") && !pathname?.includes("/dashboard/reports/") && !pathname?.includes("/dashboard/matches");
+  const showTopPadding = !isChat && !needsOnboarding;
 
   // Bottom Nav (pb-24) is hidden on chat DETAIL (but shown on list)
   // and Appointment detail
@@ -56,17 +56,19 @@ export function DashboardContent({ children }: DashboardContentProps) {
                 isCollapsed && "lg:ml-20" // Collapsed width
             )}
         >
-            <div className={cn(
+      <div className={cn(
                 "flex-1 flex flex-col w-full", // Ensure full width/height usage
                 "lg:pt-0 lg:pb-0", // Reset on desktop
-                showTopPadding ? "pt-16" : "", // 64px top bar
-                showBottomPadding ? "pb-24" : "" // Bottom nav spacing
+                showTopPadding ? "pt-14 lg:pt-0" : "", // 56px (h-14) mobile top bar
+                showBottomPadding ? "pb-24 lg:pb-0" : "" // Bottom nav spacing
             )}>
-                {!isChat && !needsOnboarding && !pathname?.includes("/dashboard/cases/") && !pathname?.includes("/dashboard/reports/") && pathname !== "/dashboard/matches" && (
-                    <DesktopHeader 
-                        showSearch={true} 
-                        showNotifications={true}
-                    />
+                {!isChat && !needsOnboarding && (
+                    <div className="hidden lg:block">
+                        <DesktopHeader 
+                            showSearch={true} 
+                            showNotifications={true}
+                        />
+                    </div>
                 )}
                 {children}
             </div>

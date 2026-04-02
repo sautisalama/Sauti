@@ -31,6 +31,10 @@ export type DashboardDataContextType = {
   isSidebarCollapsed: boolean;
   setIsSidebarCollapsed: (v: boolean) => void;
   isAdminMode: boolean;
+  topBarTitle: string | null;
+  setTopBarTitle: (v: string | null) => void;
+  topBarActions: React.ReactNode | null;
+  setTopBarActions: (v: React.ReactNode | null) => void;
   isReportDialogOpen: boolean;
   setIsReportDialogOpen: (v: boolean) => void;
 };
@@ -47,6 +51,9 @@ export function DashboardDataProvider({
   const [data, setData] = useState<DashboardData | null>(initialData ?? null);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isAdminMode, setIsAdminMode] = useState(false);
+  const [topBarTitle, setTopBarTitle] = useState<string | null>(null);
+  const [topBarActions, setTopBarActions] = useState<React.ReactNode | null>(null);
+
   // Initial load from localStorage
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -107,9 +114,13 @@ export function DashboardDataProvider({
     isSidebarCollapsed,
     setIsSidebarCollapsed,
     isAdminMode,
+    topBarTitle,
+    setTopBarTitle,
+    topBarActions,
+    setTopBarActions,
     isReportDialogOpen,
     setIsReportDialogOpen
-  }), [data, setUnreadChatCount, updatePartial, isSidebarCollapsed, isAdminMode, isReportDialogOpen]);
+  }), [data, setUnreadChatCount, updatePartial, isSidebarCollapsed, isAdminMode, topBarTitle, topBarActions, isReportDialogOpen]);
 
   return <DashboardDataContext.Provider value={value}>{children}</DashboardDataContext.Provider>;
 }

@@ -13,6 +13,7 @@ import {
 	type SupportServiceType,
 } from "@/lib/constants";
 import { useUser } from "@/hooks/useUser";
+import { useDashboard } from "@/app/dashboard/use-dashboard";
 import { VoiceRecorderEnhanced as InlineRecorder } from "@/components/VoiceRecorderEnhanced";
 import { EnhancedSelect } from "@/components/ui/enhanced-select";
 import { EnhancedToggle } from "@/components/ui/enhanced-toggle";
@@ -63,6 +64,8 @@ export default function AuthenticatedReportAbuseForm({
 	const isChildCase = incidentTypes.includes('child_abuse') || incidentTypes.includes('child_labor') || reportingFor === 'child';
 	const supabase = useMemo(() => createClient(), []);
 	const user = useUser();
+	const { updatePartial, reports: existingReports } = useDashboard();
+	const [phoneValue, setPhoneValue] = useState("");
 
 	// Start uploading immediately when voice note is attached
 	const startAudioUpload = (blob: Blob): Promise<string> => {
@@ -130,6 +133,7 @@ export default function AuthenticatedReportAbuseForm({
 				const result = await getPhoneForAutofill(userId);
 				if (result.phone) {
 					setAutofilledPhone(result.phone);
+					setPhoneValue(result.phone);
 				}
 			}
 		};
@@ -252,6 +256,15 @@ export default function AuthenticatedReportAbuseForm({
 
 			if (!response.ok) throw new Error("Failed to submit report");
 
+			const result = await response.json();
+			const newReport = result.report || result.data;
+
+			if (newReport) {
+				updatePartial({
+					reports: [newReport, ...(existingReports || [])]
+				});
+			}
+
 			toast({
 				title: "Report Submitted",
 				description: "Thank you for your report. We will review it shortly.",
@@ -282,12 +295,13 @@ export default function AuthenticatedReportAbuseForm({
 		const hasUrgency = urgency !== "";
 		const hasConsent = consent !== "";
 		const hasContactPref = contactPreference !== "";
-		// Phone is optional unless contact pref is call/sms
-		const phoneRequired = contactPreference === "phone_call" || contactPreference === "sms";
-		// We can't easily check phone value here without state, so we rely on HTML5 validation for phone
-		// but checking other state-based requirements is good.
+		
+		if (isChildCase) {
+			return hasIncidentType && hasContactPref;
+		}
+		
 		return hasIncidentType && hasUrgency && hasConsent && hasContactPref;
-	}, [incidentTypes, urgency, consent, contactPreference]);
+	}, [incidentTypes, urgency, consent, contactPreference, isChildCase]);
 
 	return (
 		<div className="flex flex-col h-full bg-white rounded-lg sm:rounded-none">
@@ -389,23 +403,26 @@ export default function AuthenticatedReportAbuseForm({
 							<option value="medium">medium urgency</option>
 							<option value="low">low urgency</option>
 						</select>
-						{isChildCase && (
-							<div className="mt-4 mb-2 p-4 bg-orange-50 border-2 border-orange-200 rounded-2xl flex items-start gap-3">
-								<div className="p-2 bg-orange-100 rounded-full text-orange-600">
-									<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-								</div>
-								<div>
-									<p className="text-sm font-bold text-orange-900 leading-tight">Mandatory Reporting Notice</p>
-									<p className="text-xs text-orange-800 mt-1">
-										Under Kenya&apos;s <a href="https://www.ilo.org/dyn/natlex/natlex4.detail?p_lang=en&p_isn=113388" target="_blank" rel="noopener noreferrer" className="underline font-bold">Children Act, 2022</a>, 
-										it is mandatory to report all cases of child exploitation and abuse to relevant authorities. 
-										Consent is implied for these cases.
-									</p>
-								</div>
-							</div>
-						)}
 					</div>
 				</div>
+
+				{isChildCase && (
+					<div className="-mx-4 md:-mx-6 mt-2 mb-6">
+						<div className="bg-orange-50 border-y border-orange-200 px-4 md:px-6 py-3 flex items-start gap-3">
+							<div className="p-2 bg-orange-100 rounded-full text-orange-600 shrink-0">
+								<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+							</div>
+							<div className="flex-1">
+								<p className="text-xs font-black text-orange-900 leading-tight uppercase tracking-tight">Mandatory Reporting Required</p>
+								<p className="text-[10px] md:text-xs text-orange-800 mt-1 font-medium leading-relaxed">
+									Under Kenya&apos;s <a href="https://www.ilo.org/dyn/natlex/natlex4.detail?p_lang=en&p_isn=113388" target="_blank" rel="noopener noreferrer" className="underline font-bold hover:text-orange-950 transition-colors">Children Act, 2022</a>, 
+									it is <span className="font-bold underline">legally mandatory</span> to report all cases of child exploitation and abuse. 
+									Consent is automatically established by law for these reports.
+								</p>
+							</div>
+						</div>
+					</div>
+				)}
 
 				<div className="w-full space-y-2">
 					<div className="flex items-center justify-between">
@@ -540,7 +557,8 @@ export default function AuthenticatedReportAbuseForm({
 								name="phone"
 								type="tel"
 								className="w-full rounded-lg border-neutral-200 h-10"
-								defaultValue={autofilledPhone || ""}
+								value={phoneValue}
+								onChange={(e) => setPhoneValue(e.target.value)}
 							/>
 						</div>
 						<div className="space-y-1">
@@ -586,10 +604,11 @@ export default function AuthenticatedReportAbuseForm({
 								</label>
 								<EnhancedSelect
 									options={[
-										{ value: "yes", label: "Yes, I consent" },
+										{ value: "yes", label: isChildCase ? "Established by Law (Yes)" : "Yes, I consent" },
 										{ value: "no", label: "No, I do not consent" },
 									]}
-									value={consent}
+									value={isChildCase ? "yes" : consent}
+									disabled={isChildCase}
 									onChange={(value) => {
 										setConsent(value);
 										const form = document.querySelector("form") as HTMLFormElement;
@@ -599,12 +618,18 @@ export default function AuthenticatedReportAbuseForm({
 									placeholder="Select option"
 									required
 									name="consent"
+									className={isChildCase ? "opacity-70 grayscale bg-neutral-100 border-neutral-300 font-bold" : ""}
 								/>
 								<select name="consent" className="hidden">
 									<option value="">select consent</option>
 									<option value="yes">Yes, I consent</option>
 									<option value="no">No, I don't consent</option>
 								</select>
+								{isChildCase && (
+									<p className="text-xs font-bold text-orange-600 mt-1">
+										Note: Consent is legally established for child cases.
+									</p>
+								)}
 							</div>
 
 							{/* Record Only Option */}

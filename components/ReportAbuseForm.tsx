@@ -447,17 +447,19 @@ export default function ReportAbuseForm({ onClose }: { onClose?: () => void }) {
 							<option value="low">low urgency</option>
 						</select>{" "}
 						{isChildCase && (
-							<div className="mt-4 mb-4 p-4 bg-orange-50 border-2 border-orange-200 rounded-2xl flex items-start gap-3">
-								<div className="p-2 bg-orange-100 rounded-full text-orange-600">
-									<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-								</div>
-								<div>
-									<p className="text-sm font-bold text-orange-900 leading-tight">Mandatory Reporting Notice</p>
-									<p className="text-xs text-orange-800 mt-1">
-										Under Kenya&apos;s <a href="https://www.ilo.org/dyn/natlex/natlex4.detail?p_lang=en&p_isn=113388" target="_blank" rel="noopener noreferrer" className="underline font-bold">Children Act, 2022</a>, 
-										it is mandatory to report all cases of child exploitation and abuse to relevant authorities. 
-										Consent is required by law for these cases.
-									</p>
+							<div className="-mx-4 md:-mx-8 mt-6 mb-6">
+								<div className="bg-orange-50 border-y-2 border-orange-200 px-4 md:px-8 py-4 flex items-start gap-4">
+									<div className="p-2.5 bg-orange-100 rounded-full text-orange-600 shrink-0">
+										<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+									</div>
+									<div className="flex-1">
+										<p className="text-sm font-black text-orange-900 leading-tight uppercase tracking-tight">Mandatory Reporting Required</p>
+										<p className="text-xs md:text-sm text-orange-850 mt-1.5 font-medium leading-relaxed">
+											Under Kenya&apos;s <a href="https://www.ilo.org/dyn/natlex/natlex4.detail?p_lang=en&p_isn=113388" target="_blank" rel="noopener noreferrer" className="underline font-bold hover:text-orange-950 transition-colors">Children Act, 2022</a>, 
+											it is <span className="font-bold underline">legally mandatory</span> to report all cases of child exploitation and abuse to relevant authorities. 
+											Consent is automatically established by law for these reports.
+										</p>
+									</div>
 								</div>
 							</div>
 						)}
@@ -602,14 +604,15 @@ export default function ReportAbuseForm({ onClose }: { onClose?: () => void }) {
 							I need queer support
 						</label>
 					</div>
-					{!isChildCase && (
+					<div className="inline-flex flex-wrap items-center gap-4">
 						<span className="block mt-3 w-full md:inline-block md:w-auto">
 							<EnhancedSelect
 								options={[
-									{ value: "yes", label: "I consent" },
+									{ value: "yes", label: isChildCase ? "Established by Law (Yes)" : "I consent" },
 									{ value: "no", label: "I don't consent" },
 								]}
-								value={consent}
+								value={isChildCase ? "yes" : consent}
+								disabled={isChildCase}
 								onChange={(value) => {
 									setConsent(value);
 									const form = document.querySelector("form") as HTMLFormElement;
@@ -621,9 +624,18 @@ export default function ReportAbuseForm({ onClose }: { onClose?: () => void }) {
 								placeholder="select consent"
 								required
 								name="consent"
+								className={isChildCase ? "opacity-70 grayscale bg-neutral-100 border-neutral-300 font-bold" : ""}
 							/>
 						</span>
-					)}
+						{!isChildCase && (
+							<span className="text-neutral-500 font-medium">to share this information with relevant authorities if needed.</span>
+						)}
+						{isChildCase && (
+							<p className="w-full text-xs font-bold text-orange-600 mt-1 shrink-0">
+								Note: Consent is legally established for child cases.
+							</p>
+						)}
+					</div>
 					<select name="consent" className="hidden">
 						<option value="">select consent</option>
 						<option value="yes">I consent</option>

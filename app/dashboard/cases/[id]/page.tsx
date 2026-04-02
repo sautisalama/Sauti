@@ -16,6 +16,7 @@ import { acceptAndScheduleCase } from "@/app/actions/matching";
 import { Chat } from "@/types/chat";
 import { Card } from "@/components/ui/card";
 import { SereneBreadcrumb } from "@/components/ui/SereneBreadcrumb";
+import { useDashboardData } from "@/components/providers/DashboardDataProvider";
 
 export default function CaseDetailPage({ params }: { params: Promise<{ id: string }> }) {
     const resolvedParams = use(params);
@@ -30,6 +31,7 @@ export default function CaseDetailPage({ params }: { params: Promise<{ id: strin
     const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
     const [activeChat, setActiveChat] = useState<Chat | null>(null);
     const [isChatLoading, setIsChatLoading] = useState(false);
+    const dash = useDashboardData();
 
     useEffect(() => {
         const fetchUser = async () => {
@@ -200,9 +202,12 @@ export default function CaseDetailPage({ params }: { params: Promise<{ id: strin
     }
 
     return (
-        <div className="min-h-screen bg-slate-50/50 pb-32 lg:pb-12 text-slate-900 selection:bg-teal-100">
-            {/* Focused Header Navigation */}
-			<nav className="sticky top-0 z-50 bg-white/80 backdrop-blur-xl border-b border-serene-neutral-100/50 transition-all duration-300 min-h-[64px] sm:min-h-[72px] flex items-center">
+        <div className={cn(
+            "flex flex-col h-full bg-slate-50/30 overflow-hidden",
+            "min-h-screen"
+        )}>
+			{/* Focused Header Navigation - Desktop Only */}
+			<nav className="hidden lg:flex sticky top-0 z-50 bg-white/80 backdrop-blur-xl border-b border-serene-neutral-100/50 transition-all duration-300 min-h-[64px] sm:min-h-[72px] flex items-center shrink-0">
 				<div className="max-w-7xl mx-auto px-4 sm:px-6 w-full flex items-center justify-between gap-4 py-2 sm:py-0">
 					<div className="flex items-center gap-2 sm:gap-4 flex-1 min-w-0">
 						<Link href="/dashboard/cases" className="shrink-0 w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-serene-neutral-50 flex items-center justify-center hover:bg-serene-neutral-100 transition-all text-serene-neutral-600">

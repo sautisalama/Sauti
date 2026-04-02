@@ -14,7 +14,7 @@ import {
 	BookOpen, HandHeart,
 	Mic, FileText, PenLine, VideoIcon, CheckSquare,
 	Trash2, MessageCircle, ChevronLeft, Sparkles, Activity, ArrowRight,
-	Shield, Quote, X, AlertCircle, Archive
+	Shield, Quote, X, AlertCircle, Archive, MoreVertical
 } from "lucide-react";
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -34,6 +34,12 @@ import { Chat } from "@/types/chat";
 import { getCaseChat } from "@/app/actions/chat";
 import { useDashboardData } from "@/components/providers/DashboardDataProvider";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { 
+    DropdownMenu, 
+    DropdownMenuContent, 
+    DropdownMenuItem, 
+    DropdownMenuTrigger 
+} from "@/components/ui/dropdown-menu";
 import { confirmAppointment, rescheduleAppointment } from "../../_views/actions/appointments";
 import { syncReportStatus } from "@/app/actions/matching";
 import { escalateReport } from "@/app/actions/escalate-report";
@@ -122,6 +128,51 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
 	const [showArchiveConfirm, setShowArchiveConfirm] = useState(false);
 	const [isDeleting, setIsDeleting] = useState(false);
 	const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
+    // Sync title and actions with top bar
+    useEffect(() => {
+        if (!report) return;
+        
+        const type = report?.type_of_incident?.replace(/_/g, " ") || "Incident";
+        const title = type.toLowerCase().includes("abuse") ? type : `${type} Abuse`;
+        dash?.setTopBarTitle(title);
+
+        const actions = (
+            <div className="flex items-center gap-1">
+                <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="sm" className="h-9 w-9 p-0 rounded-full hover:bg-serene-neutral-50 shrink-0">
+                            <MoreVertical className="h-5 w-5 text-serene-neutral-500" />
+                        </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-48 rounded-2xl border-serene-neutral-200 shadow-xl p-1.5 animate-in fade-in zoom-in-95 duration-200">
+                        <DropdownMenuItem 
+                            onClick={() => setShowArchiveConfirm(true)}
+                            className="flex items-center gap-3 cursor-pointer rounded-xl focus:bg-serene-neutral-50 focus:text-sauti-teal p-3"
+                        >
+                            <Archive className="h-4 w-4" />
+                            <span className="font-semibold text-sm">Archive Report</span>
+                        </DropdownMenuItem>
+                        {process.env.NODE_ENV === 'development' && (
+                            <DropdownMenuItem 
+                                onClick={() => setShowDeleteConfirm(true)}
+                                className="flex items-center gap-3 cursor-pointer rounded-xl focus:bg-red-50 focus:text-red-600 p-3"
+                            >
+                                <Trash2 className="h-4 w-4" />
+                                <span className="font-semibold text-sm">Delete Record</span>
+                            </DropdownMenuItem>
+                        )}
+                    </DropdownMenuContent>
+                </DropdownMenu>
+            </div>
+        );
+        dash?.setTopBarActions(actions);
+
+        return () => {
+            dash?.setTopBarTitle(null);
+            dash?.setTopBarActions(null);
+        };
+    }, [report, dash, setShowArchiveConfirm, setShowDeleteConfirm]);
 
 	const handleArchiveReport = async () => {
 		if (!report) return;
@@ -739,8 +790,8 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
 				</div>
 			)}
 			
-			{/* Focused Header Navigation - Unified with Case View */}
-			<nav className="sticky top-0 z-50 bg-white/80 backdrop-blur-xl border-b border-serene-neutral-100/50 transition-all duration-300 min-h-[64px] sm:min-h-[72px] flex items-center">
+			{/* Focused Header Navigation - Desktop Only */}
+			<nav className="hidden lg:flex sticky top-0 z-50 bg-white/80 backdrop-blur-xl border-b border-serene-neutral-100/50 transition-all duration-300 min-h-[64px] sm:min-h-[72px] flex items-center">
 				<div className="max-w-7xl mx-auto px-4 sm:px-6 w-full flex items-center justify-between gap-4 py-2 sm:py-0">
 					<div className="flex items-center gap-2 sm:gap-4 flex-1 min-w-0">
 						<Link href="/dashboard/reports" className="shrink-0 w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-serene-neutral-50 flex items-center justify-center hover:bg-serene-neutral-100 transition-all text-serene-neutral-600">
@@ -763,8 +814,13 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
                                 <div className="hidden sm:block h-3 w-px bg-serene-neutral-200" />
                                 <div className="flex items-center gap-2">
                                     <Badge variant="outline" className="bg-serene-neutral-50/50 border-serene-neutral-100 text-[8px] sm:text-[9px] font-bold text-serene-neutral-500 uppercase tracking-widest px-1.5 py-0">
-                                        {report?.is_onBehalf ? "Child" : "Personal"}
+                                        {report?.is_onBehalf ? "On Behalf Of Someone" : "Personal"}
                                     </Badge>
+                                    {(report?.additional_info as any)?.is_for_child && (
+                                        <Badge className="bg-amber-100 text-amber-700 border-0 text-[8px] sm:text-[9px] font-bold uppercase tracking-wider px-1.5 py-0 rounded-md">
+                                            Child Abuse
+                                        </Badge>
+                                    )}
                                     <span className="text-[8px] sm:text-[9px] font-bold text-serene-neutral-400 uppercase tracking-widest hidden lg:block">
                                         {report?.submission_timestamp ? new Date(report.submission_timestamp).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }) : ""}
                                     </span>
@@ -1263,15 +1319,25 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
 										</div>
 
 										{(() => {
-											const activeProposal = allMatches.find(m => m.status === 'proposed' || m.status === 'requested' || m.status === 'confirmed');
+											// Look for any active match that isn't finalized (accepted/completed) or rejected
+											const activeProposal = allMatches.find(m => 
+												m.status !== 'declined' && 
+												m.status !== 'cancelled' && 
+												m.status !== 'accepted' && 
+												m.status !== 'completed'
+											);
 											const matchingAppt = activeProposal ? appointments.find(a => a.status === 'pending' || a.status === 'requested') : null;
 											
 											if (activeProposal) {
+												const isAlreadyMatched = activeProposal.status === 'proposed' || activeProposal.status === 'requested' || activeProposal.status === 'confirmed';
+												
 												return (
 													<Card className="border border-white shadow-2xl rounded-[2.5rem] bg-white border-serene-neutral-100 overflow-hidden animate-in fade-in zoom-in-95 duration-500">
 														<CardHeader className="p-8 pb-4">
 															<div className="flex items-center justify-between">
-																<Badge className="bg-teal-50 text-teal-600 border-0 font-bold uppercase tracking-widest text-[9px]">Partner Proposal Received</Badge>
+																<Badge className="bg-teal-50 text-teal-600 border-0 font-bold uppercase tracking-widest text-[9px]">
+																	{isAlreadyMatched ? "Partner Proposal Received" : "Support Match Found"}
+																</Badge>
 																<Sparkles className="h-4 w-4 text-teal-400 animate-pulse" />
 															</div>
 														</CardHeader>
@@ -1352,10 +1418,10 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
 																	</div>
 																</div>
 															) : (
-																<div className="bg-slate-50 rounded-2xl p-6 text-center space-y-3">
-																	<p className="text-sm font-bold text-slate-600">Review in progress</p>
-																	<p className="text-xs text-slate-400 italic">Wait until the partner suggests a time.</p>
-																</div>
+ 																<div className="bg-teal-50/30 rounded-2xl p-6 text-center space-y-3 border border-teal-100/50 animate-pulse">
+ 																	<p className="text-sm font-bold text-teal-800">Matched with {activeProposal.name}</p>
+ 																	<p className="text-xs text-teal-600/70 font-semibold uppercase tracking-widest">Awaiting Scheduling</p>
+ 																</div>
 															)}
 														</CardContent>
 													</Card>
@@ -1374,9 +1440,9 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
 															</div>
 														</div>
 														<div className="space-y-2">
-															<h4 className="text-xl font-bold text-slate-900 tracking-tight">Seeking Specialists</h4>
-															<p className="text-xs font-bold text-slate-400 uppercase tracking-widest tracking-widest">
-																Evaluating the best match for your needs
+															<h4 className="text-xl font-bold text-slate-900 tracking-tight">Identifying Support Partners</h4>
+															<p className="text-xs font-bold text-slate-400 uppercase tracking-widest tracking-widest leading-relaxed">
+																Securing private matches for your recovery journey
 															</p>
 														</div>
 														<div className="w-full max-w-[160px] h-1.5 bg-slate-50 rounded-full overflow-hidden">

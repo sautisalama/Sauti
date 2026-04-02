@@ -18,6 +18,7 @@ import { cn } from "@/lib/utils";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useDashboard } from "../use-dashboard";
+import { useDashboardData } from "@/components/providers/DashboardDataProvider";
 import { 
 	SereneWelcomeHeader, 
 	SereneQuickActionCard, 
@@ -50,6 +51,13 @@ export default function ProfessionalView({
 		getTimeOfDay, 
 		setIsReportDialogOpen 
 	} = useDashboard();
+    const dash = useDashboardData();
+
+    // Set title on mount
+    useEffect(() => {
+        dash?.setTopBarTitle("Overview");
+        return () => dash?.setTopBarTitle(null);
+    }, [dash]);
 
     const searchParams = useSearchParams();
     const router = useRouter(); 

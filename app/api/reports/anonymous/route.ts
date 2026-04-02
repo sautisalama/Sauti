@@ -195,8 +195,7 @@ export async function POST(request: Request) {
 			user_id: userId,
 			media: formData.media || null,
 			is_onBehalf: !!formData.is_onBehalf,
-			// Ensure additional_info is a JSON string as per schema
-			additional_info: formData.additional_info ? JSON.stringify(formData.additional_info) : null,
+			additional_info: formData.additional_info || null,
 			gender: formData.gender || null,
 			preferred_language: formData.preferred_language || null,
 			dob: formData.dob || null,

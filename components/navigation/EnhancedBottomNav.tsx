@@ -139,6 +139,7 @@ export function EnhancedBottomNav({ forceShow = false, className }: EnhancedBott
     // Survivor: Home, Reports, Chats, Resources
     
     return [
+      { id: "overview", label: "Overview", icon: LayoutDashboard, href: "/dashboard" },
       { id: "chat", label: "Chats", icon: MessageCircle, href: "/dashboard/chat", badge: unreadMessages > 0 ? unreadMessages : undefined },
       { id: "calendar", label: "Calendar", icon: Calendar, href: "/dashboard/profile?section=calendar", showDot: !dash?.data?.profile?.google_calendar_token },
       { id: "learn", label: "Learn", icon: FileText, href: "/dashboard/resources" },

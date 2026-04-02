@@ -11,10 +11,10 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { User, LogOut, Shield, Building2 } from "lucide-react";
+import { User, LogOut, Shield, Building2, ChevronLeft } from "lucide-react";
 import { signOut } from "@/app/(auth)/actions/auth";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import Image from "next/image";
 import logo from "@/public/logo-small.png";
 import { useRoleSwitcher } from "@/hooks/useRoleSwitcher";
@@ -25,6 +25,7 @@ import { useDashboardData } from "@/components/providers/DashboardDataProvider";
 export function MobileTopBar() {
   const user = useUser();
   const pathname = usePathname();
+  const router = useRouter();
   const names = `${user?.profile?.first_name || ""} ${user?.profile?.last_name || ""}`.trim() || user?.email || "User";
   const initials = names.charAt(0).toUpperCase();
   const dash = useDashboardData();
@@ -32,13 +33,15 @@ export function MobileTopBar() {
   // Use Role Switcher Hook for actions, but global context for state if possible
   const { roleContext, switchToAdmin, switchToUser } = useRoleSwitcher();
   const isAdminMode = dash?.isAdminMode || false;
-  // Hide on desktop (lg hidden)
-  // Hide on chat pages (both list and detail) as requested
+  
+  // Logic for back button visibility
+  const showBack = pathname !== "/dashboard";
+
+  // Hide ONLY on chat detail pages if needed, but the user wants ease of navigation
   const isChat = pathname?.startsWith("/dashboard/chat");
-  const isCaseDetail = pathname?.includes("/dashboard/cases/");
-  const isReportDetail = pathname?.includes("/dashboard/reports/");
-  const isMatches = pathname === "/dashboard/matches";
-  if (isChat || isCaseDetail || isReportDetail || isMatches) return null;
+  const isOnboarding = pathname === "/dashboard/onboarding" || pathname?.startsWith("/dashboard/onboarding");
+  
+  if (isChat || isOnboarding) return null;
 
   const getRoleLabel = (userType: string) => {
     switch (userType) {
@@ -58,21 +61,39 @@ export function MobileTopBar() {
   if (needsOnboarding) return null;
 
   return (
-    <div className="lg:hidden fixed top-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-xl border-b border-serene-neutral-100 px-4 py-2.5 flex items-center justify-between shadow-sm transition-all duration-300">
+    <div className="lg:hidden fixed top-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-xl border-b border-serene-neutral-100 px-4 py-2 flex items-center justify-between shadow-sm transition-all duration-300 h-14">
       
-      {/* Brand / Logo */}
-      <Link href="/dashboard" className="flex items-center gap-2.5">
-            <Image 
-                src={logo} 
-                alt="Sauti Salama" 
-                priority
-                className="h-8 w-auto object-contain" 
-            />
-         <span className="font-bold text-base text-sauti-dark tracking-tight">Sauti Salama</span>
-      </Link>
+      <div className="flex items-center gap-2 min-w-0 flex-1">
+        {showBack ? (
+            <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={() => router.back()}
+                className="h-10 w-10 p-0 rounded-full hover:bg-serene-neutral-50 shrink-0"
+            >
+                <ChevronLeft className="h-5 w-5 text-serene-neutral-600" />
+            </Button>
+        ) : (
+            <Link href="/dashboard" className="flex items-center gap-2 shrink-0">
+                <Image 
+                    src={logo} 
+                    alt="Sauti Salama" 
+                    priority
+                    className="h-8 w-auto object-contain" 
+                />
+            </Link>
+        )}
 
-      <div className="flex items-center gap-2">
-        {!needsOnboarding && <NotificationDropdown />}
+        {dash?.topBarTitle ? (
+            <h1 className="font-bold text-sm text-sauti-dark tracking-tight truncate ml-1">{dash.topBarTitle}</h1>
+        ) : !showBack ? (
+            <span className="font-black text-sm text-sauti-dark tracking-widest uppercase ml-1">Sauti Salama</span>
+        ) : null}
+      </div>
+
+      <div className="flex items-center gap-1.5 shrink-0">
+        {dash?.topBarActions}
+        {!dash?.topBarTitle && !needsOnboarding && <NotificationDropdown />}
         
         {/* User Profile Dropdown */}
         <DropdownMenu>

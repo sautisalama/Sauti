@@ -15,6 +15,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Tables } from "@/types/db-schema";
 import { useDashboard } from "../use-dashboard";
+import { useDashboardData } from "@/components/providers/DashboardDataProvider";
 import { 
 	SereneWelcomeHeader, 
 	SereneQuickActionCard, 
@@ -42,6 +43,13 @@ export default function SurvivorView({
         isReportDialogOpen, 
         setIsReportDialogOpen 
     } = useDashboard();
+    const dash = useDashboardData();
+    
+    // Set title on mount
+    useEffect(() => {
+        dash?.setTopBarTitle("Overview");
+        return () => dash?.setTopBarTitle(null);
+    }, [dash]);
     
 	const searchParams = useSearchParams();
     const router = useRouter();
@@ -138,10 +146,12 @@ export default function SurvivorView({
                             </div>
                         </div>
 
-                        <CalendarWidget 
-                            appointments={appointments} 
-                            upcomingAppointmentsCount={stats.upcomingAppointmentsCount} 
-                        />
+                        {stats.upcomingAppointmentsCount > 0 && (
+                            <CalendarWidget 
+                                appointments={appointments} 
+                                upcomingAppointmentsCount={stats.upcomingAppointmentsCount} 
+                            />
+                        )}
 
                         <div>
                             <SereneSectionHeader 

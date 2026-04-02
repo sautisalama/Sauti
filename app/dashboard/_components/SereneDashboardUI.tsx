@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { 
+  Mic,
   TrendingUp, 
   TrendingDown, 
   Clock, 
@@ -233,9 +234,21 @@ export function SereneReportCard({ report, onClick, isSelected, className }: {
     >
         <CardContent className="p-4">
             <div className="flex justify-between items-start mb-2">
-                <Badge variant="outline" className={cn("text-[10px] font-bold uppercase border-0 px-2 py-0.5", statusTheme)}>
-                    {status}
-                </Badge>
+                <div className="flex items-center gap-1.5 min-w-0">
+                    <Badge variant="outline" className={cn("text-[10px] font-bold uppercase border-0 px-2 py-0.5", statusTheme)}>
+                        {status}
+                    </Badge>
+                    {(report.additional_info as any)?.is_for_child && (
+                        <Badge className="bg-amber-100 text-amber-700 border-0 text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-md">
+                            Child Abuse
+                        </Badge>
+                    )}
+                    {report.is_onBehalf && (
+                        <Badge className="bg-purple-100 text-purple-700 border-0 text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-md">
+                            On Behalf Of Someone
+                        </Badge>
+                    )}
+                </div>
                 <span className="text-[10px] font-bold text-serene-neutral-400 uppercase tracking-widest leading-none">
                     {report.submission_timestamp ? new Date(report.submission_timestamp).toLocaleDateString() : ""}
                 </span>
@@ -366,12 +379,35 @@ export function SereneActivityCard({ report, href, className }: {
           <div className="flex-1 min-w-0">
             <div className="flex items-center justify-between mb-1">
               <div className="flex items-center gap-2 min-w-0">
-                <h4 className="font-semibold text-serene-neutral-900 truncate">{report.type_of_incident?.replace(/_/g, " ") || "Incident Report"}</h4>
+                <h4 className="font-semibold text-serene-neutral-900 truncate">
+                  {report.type_of_incident?.replace(/_/g, " ") || "Incident Report"}
+                </h4>
                 <Badge variant="outline" className={cn("text-[10px] font-bold uppercase border-0 px-1.5 py-0.5", statusTheme)}>{status}</Badge>
+                {report.is_onBehalf && (
+                   <Badge className="bg-purple-100 text-purple-700 border-0 text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-md">
+                     On Behalf Of Someone
+                   </Badge>
+                )}
+                {(report.additional_info as any)?.is_for_child && (
+                   <Badge className="bg-amber-100 text-amber-700 border-0 text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-md">
+                     Child Abuse
+                   </Badge>
+                )}
               </div>
-              <span className="text-xs text-serene-neutral-400 font-medium ml-2">{report.submission_timestamp ? new Date(report.submission_timestamp).toLocaleDateString() : ""}</span>
+              <span className="text-xs text-serene-neutral-400 font-medium ml-2">
+                {report.submission_timestamp ? new Date(report.submission_timestamp).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' }) : ""}
+              </span>
             </div>
-            <p className="text-sm text-serene-neutral-500 truncate">{report.incident_description || "No description provided."}</p>
+            <div className="flex items-center justify-between gap-4">
+              <p className="text-sm text-serene-neutral-500 truncate flex-1">
+                {report.incident_description || "No description provided."}
+              </p>
+              {(report.media as any)?.url && (
+                <div className="flex items-center gap-1 text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider shrink-0">
+                   <Mic className="h-3 w-3" /> Audio
+                </div>
+              )}
+            </div>
           </div>
           <ChevronRight className="h-4 w-4 text-serene-neutral-300 group-hover:text-serene-blue-400" />
         </CardContent>

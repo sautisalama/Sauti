@@ -619,6 +619,12 @@ export default function ReportsMasterDetail({ userId }: { userId: string }) {
 		};
 	}, [userId, supabase, reports]);
 
+    // Sync title with mobile top bar
+    useEffect(() => {
+        dash?.setTopBarTitle("Reports");
+        return () => dash?.setTopBarTitle(null);
+    }, [dash]);
+
 	const filtered = useMemo(() => {
 		let filteredReports = reports.filter(r => {
             const admin = (r as any)?.administrative || {};
@@ -912,7 +918,7 @@ export default function ReportsMasterDetail({ userId }: { userId: string }) {
 				>
 					<div className="mb-6 sm:mb-8">
 						<div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-10">
-							<div className="space-y-1">
+							<div className="space-y-1 hidden sm:block">
 								<h1 className="text-xl sm:text-2xl lg:text-3xl font-black text-sauti-dark tracking-tight uppercase">My Reports</h1>
 								<p className="text-serene-neutral-400 text-xs sm:text-sm font-medium">Your private space for recovery and coordination.</p>
 							</div>
@@ -1110,6 +1116,8 @@ export default function ReportsMasterDetail({ userId }: { userId: string }) {
 											urgency={(r.urgency as any) || "low"}
 											matchesCount={r.matched_services?.length || 0}
 											active={isActive}
+											additionalInfo={r.additional_info}
+											media={r.media}
 											onClick={() => router.push(`/dashboard/reports/${r.report_id}`)}
 											onQuickView={(e) => { e.stopPropagation(); setSelectedId(r.report_id); }}
 											onChat={r.matched_services && r.matched_services.length > 0 ? (e) => { e.stopPropagation(); openFloatingChat(r); } : undefined}
@@ -1122,6 +1130,7 @@ export default function ReportsMasterDetail({ userId }: { userId: string }) {
 				</div>
 
 				{/* Right column: Calendar by default */}
+				{getAllAppointments(filtered).length > 0 && (
 				<div
 					className={`flex-1 lg:flex-[5] xl:flex-[5] min-w-0 h-full overflow-y-auto overflow-x-hidden ${
 						mobileView !== "calendar" ? "hidden lg:block" : ""
@@ -1393,6 +1402,7 @@ export default function ReportsMasterDetail({ userId }: { userId: string }) {
 						</div>
 					</Card>
 				</div>
+				)}
 
 				{/* Overlay Backdrop to close sidepanel on outside click */}
 				{selected && (

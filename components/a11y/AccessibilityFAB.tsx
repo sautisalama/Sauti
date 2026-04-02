@@ -6,6 +6,8 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Eye, Type, Contrast, RefreshCw, X, MousePointer2, Type as FontIcon, Underline, ExternalLink } from "lucide-react";
 
+import { usePathname } from "next/navigation";
+
 function ToggleRow({ label, property, icon: Icon }: { label: string; property: any; icon: any }) {
 	const a11y = useAccessibility();
 	const isOn = !!(a11y as any)[property];
@@ -53,16 +55,45 @@ function ToggleRow({ label, property, icon: Icon }: { label: string; property: a
 
 export default function AccessibilityFAB() {
 	const a11y = useAccessibility();
+    const pathname = usePathname();
 	const [open, setOpen] = useState(false);
 
+    // Hide on mobile for protected routes
+    const isProtected = pathname?.startsWith("/dashboard");
+    
+    // We can't use window directly in SSR, but this is a client component
+    // However, it's better to use a CSS class for hiding
+    
 	const scale = String(a11y.textScale);
 	const setScale = (val: string) => {
 		const n = Number(val) || 100;
 		a11y.set({ textScale: n });
 	};
 
-	return (
-		<div className="fixed bottom-6 left-6 z-[100]">
+    if (isProtected) {
+        return (
+            <div className="hidden lg:block">
+                <FABContent open={open} setOpen={setOpen} a11y={a11y} setScale={setScale} />
+            </div>
+        );
+    }
+
+	return <FABContent open={open} setOpen={setOpen} a11y={a11y} setScale={setScale} />;
+}
+
+function FABContent({ 
+  open, 
+  setOpen, 
+  a11y, 
+  setScale 
+}: { 
+  open: boolean; 
+  setOpen: (v: boolean | ((prev: boolean) => boolean)) => void; 
+  a11y: any; 
+  setScale: (v: string) => void; 
+}) {
+    return (
+        <div className="fixed bottom-6 left-6 z-[100]">
 			{open && (
 				<div className="mb-4 w-[calc(100vw-3rem)] sm:w-80 rounded-2xl border-2 border-gray-100 bg-white/95 backdrop-blur-xl shadow-2xl p-6 space-y-4 animate-in slide-in-from-bottom-4 duration-300">
 					<div className="flex items-center justify-between mb-2">
@@ -124,7 +155,7 @@ export default function AccessibilityFAB() {
 			)}
 
 			<button
-				onClick={() => setOpen((v) => !v)}
+				onClick={() => setOpen((v: boolean) => !v)}
 				className={cn(
                     "group relative rounded-full h-14 w-14 flex items-center justify-center transition-all duration-300 shadow-xl hover:scale-110 active:scale-95",
                     open 

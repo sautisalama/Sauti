@@ -1031,7 +1031,7 @@ export type Database = {
       }
       reports: {
         Row: {
-          additional_info: string | null
+          additional_info: Json | null
           administrative: Json | null
           city: string | null
           consent: Database["public"]["Enums"]["consent_type"] | null
@@ -1080,7 +1080,7 @@ export type Database = {
           user_id: string | null
         }
         Insert: {
-          additional_info?: string | null
+          additional_info?: Json | null
           administrative?: Json | null
           city?: string | null
           consent?: Database["public"]["Enums"]["consent_type"] | null
@@ -1129,7 +1129,7 @@ export type Database = {
           user_id?: string | null
         }
         Update: {
-          additional_info?: string | null
+          additional_info?: Json | null
           administrative?: Json | null
           city?: string | null
           consent?: Database["public"]["Enums"]["consent_type"] | null

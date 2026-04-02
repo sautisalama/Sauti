@@ -17,7 +17,8 @@ import {
   MessageCircle,
   Shield,
   FileText,
-  Home
+  Home,
+  Mic
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -395,6 +396,8 @@ interface SereneReportCardProps {
   urgency: 'high' | 'medium' | 'low';
   matchesCount?: number;
   unreadMessages?: number;
+  additionalInfo?: any;
+  media?: any;
   onClick?: () => void;
   onQuickView?: (e: React.MouseEvent) => void;
   onChat?: (e: React.MouseEvent) => void;
@@ -410,6 +413,8 @@ export function SereneReportCard({
   urgency, 
   matchesCount = 0,
   unreadMessages = 0,
+  additionalInfo,
+  media,
   onClick, 
   onQuickView,
   onChat,
@@ -459,19 +464,33 @@ export function SereneReportCard({
            <div>
              <h4 className="font-bold text-serene-neutral-900 group-hover:text-serene-blue-900 transition-colors text-base truncate">{type}</h4>
              <span className="text-xs text-serene-neutral-500 font-medium flex items-center gap-1.5 mt-0.5">
-               <Clock className="h-3.5 w-3.5" /> {date}
+               <Clock className="h-3.5 w-3.5" /> {new Date(date).toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
              </span>
            </div>
          </div>
-         <Badge variant="outline" className={cn("border-0 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider rounded-lg", urgencyColors[urgency])}>
-           {urgency}
-         </Badge>
+         <div className="flex flex-col items-end gap-2 shrink-0">
+           <Badge variant="outline" className={cn("border-0 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider rounded-lg", urgencyColors[urgency])}>
+             {urgency}
+           </Badge>
+           {additionalInfo?.is_for_child && (
+             <Badge className="bg-amber-100 text-amber-700 border-0 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md">
+               Child Case
+             </Badge>
+           )}
+         </div>
       </div>
       
       <div className="pl-[64px]">
-        <p className="text-sm text-serene-neutral-600 line-clamp-2 mb-4 leading-relaxed font-medium">
-          {description || "No description provided."}
-        </p>
+        <div className="flex items-center justify-between mb-2">
+          <p className="text-sm text-serene-neutral-600 line-clamp-1 flex-1 leading-relaxed font-medium">
+            {description || "No description provided."}
+          </p>
+          {media?.url && (
+            <div className="flex items-center gap-1 text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider animate-pulse ml-2 shrink-0">
+               <Mic className="h-3 w-3" /> Audio Attached
+            </div>
+          )}
+        </div>
 
         <div className="flex items-center justify-between pt-2 border-t border-serene-neutral-50">
           <div className="flex items-center gap-3">

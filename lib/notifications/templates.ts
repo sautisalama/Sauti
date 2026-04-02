@@ -155,6 +155,24 @@ export const baseTemplate = (content: string, title: string) => `
 </html>
 `;
 
+export const newReportAdminEmail = (
+	reportId: string,
+	incidentType: string,
+	urgency: string,
+	requiredServices: string[]
+) => baseTemplate(`
+    <p>A new abuse report has been submitted that requires administrative review.</p>
+    <div style="background: #f8fafc; border: 1px solid #f1f5f9; padding: 24px; border-radius: 16px; margin: 20px 0;">
+        <div style="margin-bottom: 12px; font-size: 14px;"><span style="font-weight: bold; color: #0d9488; width: 100px; display: inline-block;">Report ID:</span> ${reportId}</div>
+        <div style="margin-bottom: 12px; font-size: 14px;"><span style="font-weight: bold; color: #0d9488; width: 100px; display: inline-block;">Incident:</span> ${incidentType}</div>
+        <div style="margin-bottom: 12px; font-size: 14px;"><span style="font-weight: bold; color: #0d9488; width: 100px; display: inline-block;">Urgency:</span> <span style="color: ${urgency === 'high' ? '#dc2626' : '#92400e'}; font-weight: bold;">${urgency.toUpperCase()}</span></div>
+        <div style="margin-bottom: 0; font-size: 14px;"><span style="font-weight: bold; color: #0d9488; width: 100px; display: inline-block;">Services:</span> ${requiredServices.join(", ")}</div>
+    </div>
+    <div style="text-align: center; margin: 32px 0;">
+        <a href="${process.env.NEXT_PUBLIC_APP_URL}/admin/reports/${reportId}" class="button">View Full Details</a>
+    </div>
+`, "New Incident Report Received");
+
 export const matchFoundProfessionalEmail = (serviceType: string) => baseTemplate(`
     <p>We have matched you with a new case that requires your expertise in <strong>${serviceType}</strong>.</p>
     <p>Please log in to your coordinator dashboard to review the case details and propose a meeting time if you are available to support this individual.</p>

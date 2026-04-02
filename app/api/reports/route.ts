@@ -37,9 +37,7 @@ export async function POST(request: Request) {
 			administrative: formData.administrative || null,
 			media: formData.media || null,
 			is_onBehalf: !!formData.is_onBehalf,
-			additional_info: formData.additional_info
-				? JSON.stringify(formData.additional_info)
-				: null,
+			additional_info: formData.additional_info || null,
 			gender: formData.gender || null,
 			preferred_language: formData.preferred_language || null,
 			dob: formData.dob || null,
