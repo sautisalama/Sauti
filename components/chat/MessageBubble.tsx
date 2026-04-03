@@ -1,8 +1,9 @@
 'use client';
 
 import { Message } from '@/types/chat';
+import { MarkdownText } from "@/components/ui/MarkdownText";
 import { format } from 'date-fns';
-import { Check, CheckCheck, Reply, Trash2, Copy, Smile, Clock, Play } from 'lucide-react';
+import { Check, CheckCheck, Reply, Trash2, Copy, Smile, Clock, Play, Lock } from 'lucide-react';
 import { useState, useMemo } from 'react';
 import { addMessageReaction } from '@/app/actions/chat';
 import { DocumentPreview } from './DocumentPreview';
@@ -219,7 +220,10 @@ export function MessageBubble({ message, isOwn, showTail = true, currentUserId }
 
                     {/* Text Content */}
                     {message.type !== 'image' && message.type !== 'video' && (
-                        <span className={`break-words whitespace-pre-wrap ${isOwn ? 'text-white' : 'text-serene-neutral-900'}`}>{message.content}</span>
+                        <MarkdownText 
+                            content={message.content || ''} 
+                            className={isOwn ? 'text-white' : 'text-serene-neutral-900'} 
+                        />
                     )}
 
                     {/* Link Preview */}
