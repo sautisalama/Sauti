@@ -58,6 +58,7 @@ export interface CaseCardData {
 interface CaseCardProps {
 	data: CaseCardData;
 	onClick?: () => void;
+	onQuickView?: (e: React.MouseEvent) => void;
 	onChat?: (e: React.MouseEvent) => void;
 	active?: boolean;
 	actions?: React.ReactNode;
@@ -78,6 +79,7 @@ function formatDate(d?: string | null) {
 export function CaseCard({
 	data,
 	onClick,
+	onQuickView,
 	onChat,
 	active,
 	actions,
@@ -188,9 +190,17 @@ export function CaseCard({
 					</div>
 					
 					{actions || (
-						<div className="w-8 h-8 rounded-full flex items-center justify-center text-gray-300 group-hover:text-blue-600 group-hover:bg-blue-50 transition-all">
+						<button
+							onClick={(e) => {
+								e.preventDefault();
+								e.stopPropagation();
+								onQuickView?.(e);
+							}}
+							className="w-10 h-10 rounded-full flex items-center justify-center text-gray-300 hover:text-blue-600 hover:bg-blue-50 transition-all ml-2"
+							title="Quick view"
+						>
 							<ChevronRight className="h-5 w-5" />
-						</div>
+						</button>
 					)}
 				</div>
 			</div>

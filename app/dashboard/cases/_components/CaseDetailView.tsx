@@ -13,6 +13,7 @@ import {
     X, MoreHorizontal, AlertCircle, MoreVertical
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { MarkdownText } from "@/components/ui/MarkdownText";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -97,6 +98,10 @@ export function CaseDetailView({
     const notesTimerRef = useRef<NodeJS.Timeout | null>(null);
     const [appointments, setAppointments] = useState<any[]>([]);
 
+    const report = caseItem.report;
+    const matchId = caseItem.id;
+    const isAccepted = caseItem.match_status_type === 'accepted' || caseItem.match_status_type === 'completed' || caseItem.match_status_type === 'archived';
+
     useEffect(() => {
         const fetchAppointments = async () => {
             const { data } = await supabase
@@ -110,9 +115,6 @@ export function CaseDetailView({
         if (matchId) fetchAppointments();
     }, [matchId, supabase]);
 
-    const report = caseItem.report;
-    const matchId = caseItem.id;
-    const isAccepted = caseItem.match_status_type === 'accepted' || caseItem.match_status_type === 'completed' || caseItem.match_status_type === 'archived';
     const [isSchedulerOpen, setIsSchedulerOpen] = useState(false);
     const [isCompletionDialogOpen, setIsCompletionDialogOpen] = useState(false);
 
@@ -385,7 +387,9 @@ export function CaseDetailView({
                 <CardContent className="p-6 sm:p-10 space-y-6 sm:space-y-8">
                     <div className="bg-slate-50/50 rounded-2xl sm:rounded-3xl p-6 sm:p-8 border border-slate-50 leading-relaxed text-slate-600 font-medium text-sm sm:text-base italic relative text-center sm:text-left">
                         <div className="absolute top-4 left-4 text-teal-200/20 select-none"><span className="text-6xl font-serif">"</span></div>
-                        {isAccepted ? (report?.incident_description || "No description provided.") : (
+                        {isAccepted ? (
+                            <MarkdownText content={report?.incident_description || "No description provided."} />
+                        ) : (
                             <div className="flex flex-col items-center justify-center py-6 text-slate-400 gap-4">
                                 <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center">
                                     <Lock className="h-8 w-8" />
@@ -566,40 +570,40 @@ export function CaseDetailView({
             "flex flex-col bg-slate-50/30 overflow-hidden",
             isFullPage ? "min-h-screen w-full" : "h-full w-full"
         )}>
-			<nav className="lg:hidden sticky top-0 z-50 bg-white/80 backdrop-blur-xl border-b border-serene-neutral-100/50 transition-all duration-300 min-h-[64px] sm:min-h-[72px] flex items-center">
-				<div className="max-w-7xl mx-auto px-2 xs:px-4 sm:px-6 w-full flex items-center justify-between gap-2 sm:gap-4 py-2 sm:py-0">
-					<div className="flex items-center gap-1 sm:gap-4 flex-1 min-w-0">
+			<nav className="sticky top-0 z-50 bg-white shadow-sm border-b border-serene-neutral-100 transition-all duration-300 min-h-[64px] sm:min-h-[72px] flex items-center">
+				<div className="max-w-7xl mx-auto px-4 sm:px-6 w-full flex items-center justify-between gap-4 py-2 sm:py-0">
+					<div className="flex items-center gap-3 flex-1 min-w-0">
 						{!isFullPage && onClose ? (
-							<Button variant="ghost" size="icon" onClick={onClose} className="shrink-0 w-10 h-10 rounded-xl bg-serene-neutral-50 flex items-center justify-center hover:bg-serene-neutral-100 transition-all text-serene-neutral-600">
+							<button onClick={onClose} className="sm:hidden -ml-2 p-2 rounded-full hover:bg-serene-neutral-100 transition-all text-serene-neutral-600">
 								<ChevronLeft className="h-5 w-5" />
-							</Button>
+							</button>
 						) : (
 							<div className="shrink-0 w-10 h-10 rounded-xl bg-serene-neutral-50 flex items-center justify-center text-serene-neutral-600">
 								<Briefcase className="h-5 w-5" />
 							</div>
 						)}
-						<div className="flex-1 min-w-0 flex items-center gap-2">
-							<h2 className="text-sauti-dark font-bold tracking-tight uppercase text-xs sm:text-base whitespace-nowrap overflow-hidden text-ellipsis w-fit shrink-0">
+						<div className="flex-1 min-w-0 flex flex-col sm:flex-row sm:items-center gap-0.5 sm:gap-3">
+							<h2 className="text-sauti-dark font-bold tracking-tight uppercase text-xs sm:text-base truncate">
 								{formatIncidentType(report?.type_of_incident)}
 							</h2>
 							{(report?.additional_info as any)?.is_for_child && (
-								<Badge className="bg-purple-100 text-purple-700 border-purple-200 text-[10px] sm:text-[11px] font-black uppercase tracking-widest px-2 py-0.5 rounded-lg shadow-sm shrink-0 w-fit whitespace-nowrap">
+								<Badge className="bg-purple-100 text-purple-700 border-purple-200 text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-lg shadow-sm w-fit">
 									Child Abuse
 								</Badge>
 							)}
 						</div>
 					</div>
-                <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-                        <div className="hidden lg:flex items-center gap-2 sm:gap-3 shrink-0">
-                            <Badge className={cn("px-2 sm:px-4 py-1 sm:py-1.5 rounded-full text-[8px] sm:text-[10px] font-bold border uppercase tracking-[0.1em] sm:tracking-[0.2em] whitespace-nowrap shadow-sm truncate max-w-[80px] sx:max-w-none", urgencyColor(report?.urgency))}>
+                <div className="flex items-center gap-2 sm:gap-4 shrink-0">
+                        <div className="hidden sm:flex items-center gap-3">
+                            <Badge className={cn("px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest bg-white border shadow-sm", urgencyColor(report?.urgency))}>
                                 {report?.urgency || 'Low'} Priority
                             </Badge>
                         </div>
 
                         {caseItem.match_status_type === 'pending' && onAcceptCase && (
                             <div className="relative shrink-0">
-                                <Button onClick={() => setIsSchedulerOpen(true)} className="h-9 sm:h-11 bg-teal-600 hover:bg-teal-700 text-white font-bold rounded-lg sm:rounded-xl px-2 sm:px-5 shadow-lg shadow-teal-600/20 text-[10px] sm:text-xs gap-1 sm:gap-2 transition-all active:scale-95 whitespace-nowrap shrink-0">
-                                    <Calendar className="h-3.5 w-3.5" /> Accept & Schedule
+                                <Button onClick={() => setIsSchedulerOpen(true)} className="h-10 sm:h-11 bg-teal-600 hover:bg-teal-700 text-white font-bold rounded-xl px-3 sm:px-5 shadow-lg shadow-teal-600/20 text-[10px] sm:text-xs gap-2 transition-all active:scale-95">
+                                    <Calendar className="h-4 w-4" /> <span className="hidden xs:inline">Accept & Schedule</span><span className="xs:hidden">Accept</span>
                                 </Button>
                                 <EnhancedAppointmentScheduler isOpen={isSchedulerOpen} onClose={() => setIsSchedulerOpen(false)} userId={userId} professionalName="You" serviceName={caseItem.service_details?.name} onSchedule={async (appt: any) => { if (onAcceptCase) { onAcceptCase(matchId, appt); setIsSchedulerOpen(false); } }} />
                             </div>
@@ -609,7 +613,7 @@ export function CaseDetailView({
                             <div className="flex items-center gap-2">
                                 <DropdownMenu>
                                     <DropdownMenuTrigger asChild>
-                                        <Button variant="ghost" size="icon" className="h-9 w-9 sm:h-11 sm:w-11 rounded-lg sm:rounded-xl text-serene-neutral-400 hover:text-sauti-teal hover:bg-serene-neutral-50 transition-all">
+                                        <Button variant="ghost" size="icon" className="h-10 w-10 sm:h-11 sm:w-11 rounded-xl text-serene-neutral-400 hover:text-sauti-teal hover:bg-serene-neutral-50 transition-all">
                                             <MoreVertical className="h-5 w-5" />
                                         </Button>
                                     </DropdownMenuTrigger>
@@ -627,24 +631,24 @@ export function CaseDetailView({
                                 <Dialog open={isCompletionDialogOpen} onOpenChange={setIsCompletionDialogOpen}>
                                     <DialogContent className="w-[95vw] sm:max-w-md rounded-[2rem] border-0 shadow-2xl bg-white p-6 sm:p-8">
                                         <DialogHeader className="space-y-4">
-                                            <div className="w-12 sm:w-16 h-12 sm:h-16 bg-emerald-50 rounded-xl sm:rounded-[1.5rem] flex items-center justify-center text-emerald-600 mb-2">
-                                                <ShieldCheck className="h-6 sm:h-8 w-6 sm:w-8" />
+                                            <div className="w-16 h-16 bg-emerald-50 rounded-[1.5rem] flex items-center justify-center text-emerald-600 mb-2">
+                                                <ShieldCheck className="h-8 w-8" />
                                             </div>
                                             <DialogTitle className="text-xl sm:text-2xl font-black text-slate-900 leading-tight">Close this case?</DialogTitle>
                                             <DialogDescription className="text-slate-500 font-medium text-sm sm:text-base">
                                                 Completing this case will finalize all coordination actions for the survivor.
                                             </DialogDescription>
                                         </DialogHeader>
-                                        <DialogFooter className="flex flex-row gap-3 pt-6 mt-4 sm:mt-6 border-t border-slate-50">
+                                        <DialogFooter className="flex flex-row gap-3 pt-6 mt-6 border-t border-slate-50">
                                             <Button 
                                                 variant="outline" 
-                                                className="flex-1 h-10 sm:h-12 rounded-xl border-slate-100 font-bold text-[10px] uppercase tracking-widest text-slate-500"
+                                                className="flex-1 h-12 rounded-xl border-slate-100 font-bold text-[10px] uppercase tracking-widest text-slate-500"
                                                 onClick={() => setIsCompletionDialogOpen(false)}
                                             >
                                                 Cancel
                                             </Button>
                                             <Button 
-                                                className="flex-1 h-10 sm:h-12 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-[10px] uppercase tracking-widest shadow-lg shadow-emerald-600/20"
+                                                className="flex-1 h-12 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-[10px] uppercase tracking-widest shadow-lg shadow-emerald-600/20"
                                                 onClick={async () => {
                                                     if (onCompleteCase) await onCompleteCase(matchId);
                                                     setIsCompletionDialogOpen(false);
@@ -656,6 +660,17 @@ export function CaseDetailView({
                                     </DialogContent>
                                 </Dialog>
                             </div>
+                        )}
+
+                        {onClose && !isFullPage && (
+                            <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                onClick={onClose} 
+                                className="rounded-full hover:bg-red-50 hover:text-red-600 transition-colors h-10 w-10 shrink-0 shadow-sm sm:shadow-none"
+                            >
+                                <X className="h-5 w-5" />
+                            </Button>
                         )}
                     </div>
                 </div>

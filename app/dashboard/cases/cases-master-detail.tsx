@@ -1085,6 +1085,10 @@ export default function CasesMasterDetail({ userId }: { userId: string }) {
 
 											active={isActive}
 											onClick={() => {
+												router.push(`/dashboard/cases/${c.id}`);
+											}}
+											onQuickView={(e) => {
+												e.stopPropagation();
 												setSelectedId(c.id);
 												setActiveTab('details');
 											}}
@@ -1387,7 +1391,17 @@ export default function CasesMasterDetail({ userId }: { userId: string }) {
                             </Card>
                         </div>
 				</div>
-			</div>
+				)}
+
+				{/* Overlay Backdrop to close sidepanel on outside click */}
+				{selected && (
+					<div 
+						className="fixed inset-0 z-40 bg-black/40 transition-opacity" 
+						aria-hidden="true"
+						onClick={() => setSelectedId(null)}
+					/>
+				)}
+
 			<div
 					className={`fixed inset-0 sm:inset-y-0 sm:right-0 sm:left-auto w-full sm:w-[600px] lg:w-[800px] bg-white shadow-2xl z-50 transform transition-transform duration-300 ease-out sm:border-l sm:border-serene-neutral-200 ${
 						selected

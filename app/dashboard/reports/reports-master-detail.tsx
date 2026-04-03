@@ -15,6 +15,7 @@ import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/
 import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
+import { MarkdownText } from "@/components/ui/MarkdownText";
 import { SereneReportCard } from "@/app/dashboard/_components/SurvivorDashboardComponents";
 import { ReportCardSkeleton } from "@/components/reports/ReportCardSkeleton";
 import {
@@ -1463,12 +1464,9 @@ export default function ReportsMasterDetail({ userId }: { userId: string }) {
 								<div className="absolute left-1/2 -translate-x-1/2 -top-2 sm:hidden w-12 h-1.5 rounded-full bg-serene-neutral-200" />
 								
 								<div className="flex items-center gap-3 min-w-0 flex-1">
-									<button
-										onClick={() => setSelectedId(null)}
-										className="sm:hidden -ml-2 p-2 rounded-full hover:bg-gray-100 transition-colors"
-									>
-										<ChevronLeft className="h-5 w-5 text-gray-600" />
-									</button>
+									<div className="shrink-0 w-10 h-10 rounded-xl bg-serene-neutral-50 flex items-center justify-center text-serene-neutral-600">
+										<FileText className="h-5 w-5" />
+									</div>
 									
 									<div className="flex-1 min-w-0">
 										<div className="flex items-center gap-3 mb-1">
@@ -1545,7 +1543,7 @@ export default function ReportsMasterDetail({ userId }: { userId: string }) {
 									<Button
 										variant="ghost"
 										size="icon"
-										className="rounded-full hover:bg-red-50 hover:text-red-600 transition-colors h-10 w-10"
+										className="rounded-full hover:bg-red-50 hover:text-red-600 transition-colors h-10 w-10 flex items-center justify-center shadow-sm sm:shadow-none"
 										onClick={() => setSelectedId(null)}
 									>
 										<X className="h-5 w-5" />
@@ -1700,9 +1698,9 @@ export default function ReportsMasterDetail({ userId }: { userId: string }) {
 													</Button>
 												</div>
 												{selected.incident_description ? (
-													<p className="text-sm text-serene-neutral-700 leading-relaxed whitespace-pre-wrap">
-														{selected.incident_description}
-													</p>
+													<div className="text-sm text-serene-neutral-700 leading-relaxed">
+														<MarkdownText content={selected.incident_description} />
+													</div>
 												) : (
 													<p className="text-sm text-serene-neutral-400 italic">No description provided.</p>
 												)}

@@ -25,6 +25,15 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ReportWithRelations } from "../_types";
 import { getReportStatus, getStatusTheme } from "@/lib/utils/case-status";
 
+// Utility for theme mapping based on urgency
+const getUrgencyTheme = (u: string) => {
+  switch (u?.toLowerCase()) {
+    case 'high': return "bg-red-50 text-red-600 border-red-100";
+    case 'medium': return "bg-amber-50 text-amber-600 border-amber-100";
+    default: return "bg-blue-50 text-blue-600 border-blue-100";
+  }
+};
+
 // Serene Welcome Header
 interface SereneWelcomeHeaderProps {
   name: string;
@@ -159,6 +168,8 @@ export function SereneQuickActionCard({
     neutral: "text-serene-neutral-600 bg-white/60",
     custom: "bg-white/60" // Base bg for custom, text color comes from icon
   };
+
+
 
   const content = (
     <div className={cn(
@@ -421,11 +432,7 @@ export function SereneReportCard({
   className, 
   active 
 }: SereneReportCardProps) {
-  const urgencyColors = {
-    high: "bg-red-50 text-red-600 border-red-100",
-    medium: "bg-amber-50 text-amber-600 border-amber-100",
-    low: "bg-blue-50 text-blue-600 border-blue-100"
-  };
+
 
   const statusColors = {
     pending: "text-serene-neutral-500",
@@ -455,12 +462,12 @@ export function SereneReportCard({
 
       <div className="flex items-start justify-between mb-4">
          <div className="flex items-center gap-4">
-           <div className={cn(
-             "h-12 w-12 rounded-2xl flex items-center justify-center transition-colors duration-300 border border-white shadow-sm",
-             active ? "bg-serene-blue-600 text-white" : "bg-serene-neutral-50 text-serene-neutral-500 group-hover:bg-serene-blue-50 group-hover:text-serene-blue-600"
-           )}>
-              <Shield className="h-6 w-6" />
-           </div>
+            <div className={cn(
+              "h-12 w-12 rounded-2xl flex items-center justify-center transition-colors duration-300 border border-white shadow-sm font-bold text-lg",
+              active ? "bg-serene-blue-600 text-white" : getUrgencyTheme(urgency)
+            )}>
+               {type?.charAt(0).toUpperCase() || "R"}
+            </div>
            <div>
              <h4 className="font-bold text-serene-neutral-900 group-hover:text-serene-blue-900 transition-colors text-base truncate">{type}</h4>
              <span className="text-xs text-serene-neutral-500 font-medium flex items-center gap-1.5 mt-0.5">
@@ -469,7 +476,7 @@ export function SereneReportCard({
            </div>
          </div>
          <div className="flex flex-col items-end gap-2 shrink-0">
-           <Badge variant="outline" className={cn("border-0 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider rounded-lg", urgencyColors[urgency])}>
+           <Badge variant="outline" className={cn("border-0 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider rounded-lg", getUrgencyTheme(urgency))}>
              {urgency}
            </Badge>
            {additionalInfo?.is_for_child && (

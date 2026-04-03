@@ -231,18 +231,18 @@ export default function ProfessionalView({
 									{filteredCases.length > 0 ? (
 										filteredCases.slice(0, 3).map((match) => (
 											<Link href={`/dashboard/cases/${match.id}`} key={match.id} className="block group">
-												<Card className="overflow-hidden border-serene-neutral-100 hover:border-serene-blue-200 transition-all duration-300 hover:shadow-md rounded-2xl sm:rounded-[2.5rem]">
+												<Card className="overflow-hidden border-serene-neutral-100 hover:border-serene-blue-200 transition-all duration-300 hover:shadow-md cursor-pointer rounded-2xl sm:rounded-3xl">
 													<CardContent className="p-4 flex items-center gap-4">
 														<div className={cn(
-															"h-12 w-12 rounded-full flex items-center justify-center shrink-0 shadow-sm",
+															"h-12 w-12 rounded-full flex items-center justify-center text-lg font-bold shrink-0 shadow-sm",
 															match.report?.urgency === 'high' ? "bg-red-50 text-red-600" : "bg-serene-blue-50 text-serene-blue-600"
 														)}>
-															<Shield className="h-5 w-5" />
+															{match.report?.type_of_incident?.charAt(0).toUpperCase() || "S"}
 														</div>
 														<div className="flex-1 min-w-0">
 															<div className="flex items-center justify-between mb-1">
                                                                 <div className="flex flex-wrap items-center gap-2 min-w-0">
-                                                                    <h4 className="font-bold text-serene-neutral-900 truncate max-w-[150px] sm:max-w-none">
+                                                                    <h4 className="font-bold text-serene-neutral-900 truncate">
                                                                         {match.report?.type_of_incident?.replace(/_/g, " ") || "Support Case"}
                                                                     </h4>
                                                                     <Badge variant="outline" className={cn("text-[10px] font-bold uppercase border-0 px-1.5 py-0.5", getStatusTheme(getMatchStatus(match)))}>
@@ -255,25 +255,30 @@ export default function ProfessionalView({
                                                                     )}
                                                                 </div>
                                                                 {match.match_date && (
-                                                                    <span suppressHydrationWarning className="text-[10px] font-bold text-serene-neutral-400 uppercase tracking-widest hidden sm:block">
-                                                                        {match.match_date && format(new Date(match.match_date), "EEEE, MMM d, yyyy")}
+                                                                    <span suppressHydrationWarning className="text-xs text-serene-neutral-400 font-medium ml-2 shrink-0 hidden sm:block">
+                                                                        {format(new Date(match.match_date), "EEEE, MMM d")}
                                                                     </span>
                                                                 )}
 															</div>
-															<p className="text-xs text-serene-neutral-500 line-clamp-2 leading-relaxed mb-2">
-                                                                {match.report?.incident_description}
+															<p className="text-sm text-serene-neutral-500 line-clamp-2 leading-relaxed mb-3">
+                                                                {match.report?.incident_description || "No description provided."}
                                                             </p>
                                                             <div className="flex flex-wrap items-center gap-2">
-                                                                <div className="flex items-center gap-1 text-serene-neutral-400 text-[9px] sm:text-[10px] font-bold uppercase tracking-wider bg-serene-neutral-50 px-2 py-1 rounded-md border border-serene-neutral-100">
-                                                                    <MapPin className="h-2.5 w-2.5" />
-                                                                    <span className="truncate max-w-[120px] sm:max-w-none">
+                                                                <div className="flex items-center gap-1 text-serene-neutral-400 text-[10px] font-bold uppercase tracking-wider bg-serene-neutral-50 px-2.5 py-1 rounded-md border border-serene-neutral-100">
+                                                                    <MapPin className="h-3 w-3" />
+                                                                    <span className="truncate">
                                                                         {match.report?.city || "Region Confidential"}
                                                                     </span>
                                                                 </div>
                                                                 {match.match_date && (
-                                                                     <div className="flex items-center gap-1 text-serene-neutral-400 text-[9px] sm:text-[10px] font-bold uppercase tracking-wider bg-serene-neutral-50 px-2 py-1 rounded-md border border-serene-neutral-100 sm:hidden">
-                                                                        <Clock className="h-2.5 w-2.5" />
-                                                                        {match.match_date && format(new Date(match.match_date), "EEEE, MMM d")}
+                                                                     <div className="flex items-center gap-1 text-serene-neutral-400 text-[10px] font-bold uppercase tracking-wider bg-serene-neutral-50 px-2.5 py-1 rounded-md border border-serene-neutral-100 sm:hidden">
+                                                                        <Clock className="h-3 w-3" />
+                                                                        {format(new Date(match.match_date), "MMM d")}
+                                                                    </div>
+                                                                )}
+                                                                {match.report?.urgency === 'high' && (
+                                                                    <div className="flex items-center gap-1 text-red-600 bg-red-50 px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider border border-red-100">
+                                                                        High Urgency
                                                                     </div>
                                                                 )}
                                                             </div>
