@@ -51,13 +51,13 @@ export function DashboardContent({ children }: DashboardContentProps) {
     <>
         <main
             className={cn(
-                "flex-1 transition-all duration-300 ease-in-out relative min-h-screen flex flex-col",
+                "flex-1 transition-all duration-300 ease-in-out relative min-h-screen flex flex-col min-w-0 w-full",
                 "lg:ml-72", // Default expanded width
                 isCollapsed && "lg:ml-20" // Collapsed width
             )}
         >
       <div className={cn(
-                "flex-1 flex flex-col w-full", // Ensure full width/height usage
+                "flex-1 flex flex-col w-full min-w-0", // Ensure full width/height usage
                 "lg:pt-0 lg:pb-0", // Reset on desktop
                 showTopPadding ? "pt-14 lg:pt-0" : "", // 56px (h-14) mobile top bar
                 showBottomPadding ? "pb-24 lg:pb-0" : "" // Bottom nav spacing
@@ -73,7 +73,7 @@ export function DashboardContent({ children }: DashboardContentProps) {
                 {children}
             </div>
         </main>
-        {/* FAB removed as per request for cleaner UI */}
+        <GlobalReportFab userId={user} />
     </>
   );
 }

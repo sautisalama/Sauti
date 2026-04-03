@@ -16,6 +16,7 @@ import { signOut } from "@/app/(auth)/actions/auth";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import Image from "next/image";
+import { cn } from "@/lib/utils";
 import logo from "@/public/logo-small.png";
 import { useRoleSwitcher } from "@/hooks/useRoleSwitcher";
 import { Badge } from "@/components/ui/badge";
@@ -35,7 +36,7 @@ export function MobileTopBar() {
   const isAdminMode = dash?.isAdminMode || false;
   
   // Logic for back button visibility
-  const showBack = pathname !== "/dashboard";
+  const showBack = pathname !== "/dashboard" && pathname !== "/dashboard/admin";
 
   // Hide ONLY on chat detail pages if needed, but the user wants ease of navigation
   const isChat = pathname?.startsWith("/dashboard/chat");
@@ -61,9 +62,9 @@ export function MobileTopBar() {
   if (needsOnboarding) return null;
 
   return (
-    <div className="lg:hidden fixed top-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-xl border-b border-serene-neutral-100 px-4 py-2 flex items-center justify-between shadow-sm transition-all duration-300 h-14">
+    <div className="lg:hidden fixed top-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-xl border-b border-serene-neutral-100 px-4 sm:px-6 flex items-center justify-between shadow-sm transition-all duration-300 h-16">
       
-      <div className="flex items-center gap-2 min-w-0 flex-1">
+      <div className="flex items-center gap-1 sm:gap-2 min-w-0 flex-1 z-10 mr-2">
         {showBack ? (
             <Button 
                 variant="ghost" 
@@ -79,23 +80,30 @@ export function MobileTopBar() {
                     src={logo} 
                     alt="Sauti Salama" 
                     priority
-                    className="h-8 w-auto object-contain" 
+                    className="h-9 w-auto object-contain" 
                 />
             </Link>
         )}
 
-        {dash?.topBarTitle ? (
-            <h1 className="font-bold text-sm text-sauti-dark tracking-tight truncate ml-1">{dash.topBarTitle}</h1>
-        ) : !showBack ? (
-            <span className="font-black text-sm text-sauti-dark tracking-widest uppercase ml-1">Sauti Salama</span>
-        ) : null}
+        {dash?.topBarTitle && (
+            <h1 className="font-bold text-sm sm:text-base text-sauti-dark tracking-tight truncate leading-tight select-none">
+                {dash.topBarTitle}
+            </h1>
+        )}
       </div>
 
-      <div className="flex items-center gap-1.5 shrink-0">
+      {/* Sauti Salama Watermark - Centered and subtle */}
+      <div className={cn(
+        "absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none z-0 transition-opacity duration-500",
+        dash?.topBarTitle ? "opacity-0" : "opacity-30"
+      )}>
+        <span className="font-black text-[10px] sm:text-xs text-serene-neutral-200 tracking-[0.3em] uppercase">Sauti Salama</span>
+      </div>
+
+      <div className="flex items-center gap-2 sm:gap-3 shrink-0 z-10">
         {dash?.topBarActions}
-        {!dash?.topBarTitle && !needsOnboarding && <NotificationDropdown />}
         
-        {/* User Profile Dropdown */}
+        {/* User Profile Dropdown FIRST */}
         <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button variant="ghost" className="relative h-9 w-9 rounded-full p-0 hover:bg-serene-neutral-50 focus-visible:ring-0 transition-all">
@@ -173,6 +181,9 @@ export function MobileTopBar() {
           </DropdownMenuItem>
         </DropdownMenuContent>
         </DropdownMenu>
+
+        {/* Notifications to the RIGHT of the user */}
+        {!needsOnboarding && <NotificationDropdown />}
       </div>
     </div>
   );

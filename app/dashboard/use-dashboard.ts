@@ -111,8 +111,8 @@ export function useDashboard() {
     return {
       activeReportsCount: reports.length,
       matchedReportsCount: reports.filter(r => (r.matched_services?.length || 0) > 0).length,
-      activeCasesCount: matches.length,
-      pendingCasesCount: matches.filter(m => m.match_status_type?.toLowerCase() === 'pending').length,
+      activeCasesCount: matches.filter(m => (m.match_status_type || "").toLowerCase() !== 'completed').length,
+      pendingCasesCount: matches.filter(m => (m.match_status_type || "").toLowerCase() === 'pending').length,
       upcomingAppointmentsCount: appointments.filter(a => a.appointment_date && new Date(a.appointment_date) > new Date()).length,
       totalServicesCount: data?.supportServices?.length || 0,
       unreadChatCount: data?.unreadChatCount || 0

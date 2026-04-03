@@ -34,6 +34,7 @@ export interface CaseCardData {
 		submission_timestamp?: string | null;
 		urgency?: string | null;
 		is_onBehalf?: boolean | null;
+		additional_info?: any;
 		media?: { url?: string; type?: string; size?: number } | null;
 	} | null;
 	support_service?: {
@@ -129,6 +130,11 @@ export function CaseCard({
 									New
 								</Badge>
 							)}
+							{data.report?.additional_info?.is_for_child && (
+								<Badge className="bg-amber-100 text-amber-700 border-0 text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-md">
+									Child Abuse
+								</Badge>
+							)}
 						</div>
 						<p className="text-xs text-gray-500 font-medium truncate flex items-center gap-1.5">
 							<User className="h-3 w-3 text-gray-400" />
@@ -167,9 +173,16 @@ export function CaseCard({
 						{onChat && matchStatus !== 'pending' && (
 							<button
 								onClick={(e) => { e.preventDefault(); e.stopPropagation(); onChat(e); }}
-								className="flex items-center gap-1 px-2.5 py-1 rounded-md bg-sauti-teal/10 text-sauti-teal border border-sauti-teal/20 text-[10px] font-bold uppercase tracking-wider hover:bg-sauti-teal/20 transition-colors"
+								className="relative flex items-center gap-1 px-2.5 py-1 rounded-md bg-sauti-teal/10 text-sauti-teal border border-sauti-teal/20 text-[10px] font-bold uppercase tracking-wider hover:bg-sauti-teal/20 transition-colors"
 							>
 								<MessageCircle className="h-3 w-3" /> Chat
+								{hasUnreadMessages && (
+									<Badge 
+										className="absolute -top-2 -right-2 h-4 w-4 flex items-center justify-center p-0 text-[10px] font-black bg-red-600 text-white border border-white shadow-sm ring-2 ring-red-100 animate-bounce"
+									>
+										{data.unread_messages}
+									</Badge>
+								)}
 							</button>
 						)}
 					</div>

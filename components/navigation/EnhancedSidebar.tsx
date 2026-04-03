@@ -479,14 +479,14 @@ export function EnhancedSidebar({
 						)}
 					/>
 					{item.badge && item.badge > 0 && (
-						<Badge
-							className={cn(
-								"absolute -top-1.5 -right-1.5 h-4 w-4 flex items-center justify-center p-0 text-[9px] font-bold shadow-sm",
-								"bg-serene-red-500 text-white border border-white dark:border-neutral-950 min-w-[16px]" // Red for urgency/notification typically more standard, but using brand red if available or error red
-							)}
-						>
-							{item.badge > 99 ? "99" : item.badge}
-						</Badge>
+										<Badge
+											className={cn(
+												"absolute -top-1.5 -right-1.5 h-4 w-4 flex items-center justify-center p-0 text-[10px] font-black shadow-sm",
+												"bg-red-600 text-white border border-white min-w-[18px] ring-2 ring-red-100 animate-in zoom-in duration-300" 
+											)}
+										>
+											{item.badge > 99 ? "99" : item.badge}
+										</Badge>
 					)}
 					{item.showDot && (
 						<div className="absolute -top-0.5 -right-0.5 h-2.5 w-2.5 bg-serene-blue-500 rounded-full border-2 border-white dark:border-neutral-900 animate-pulse" />
@@ -750,14 +750,16 @@ export function EnhancedSidebar({
                         </div>
                     ) : needsOnboarding && isCollapsed ? (
 						<div className="flex flex-col items-center py-6 gap-6">
-                             <Tooltip>
-								<TooltipTrigger asChild>
-									<div className="h-10 w-10 rounded-xl bg-serene-blue-100 flex items-center justify-center cursor-help">
-										<Shield className="h-5 w-5 text-serene-blue-600" />
-									</div>
-								</TooltipTrigger>
-								<TooltipContent side="right">Setup in Progress</TooltipContent>
-							 </Tooltip>
+							<TooltipProvider>
+								<Tooltip>
+									<TooltipTrigger asChild>
+										<div className="h-10 w-10 rounded-xl bg-serene-blue-100 flex items-center justify-center cursor-help">
+											<Shield className="h-5 w-5 text-serene-blue-600" />
+										</div>
+									</TooltipTrigger>
+									<TooltipContent side="right">Setup in Progress</TooltipContent>
+								</Tooltip>
+							</TooltipProvider>
 						</div>
 					) : (
 					<div className="space-y-1">

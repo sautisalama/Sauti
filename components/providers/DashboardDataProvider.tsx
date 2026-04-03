@@ -31,8 +31,8 @@ export type DashboardDataContextType = {
   isSidebarCollapsed: boolean;
   setIsSidebarCollapsed: (v: boolean) => void;
   isAdminMode: boolean;
-  topBarTitle: string | null;
-  setTopBarTitle: (v: string | null) => void;
+  topBarTitle: React.ReactNode | string | null;
+  setTopBarTitle: (v: React.ReactNode | string | null) => void;
   topBarActions: React.ReactNode | null;
   setTopBarActions: (v: React.ReactNode | null) => void;
   isReportDialogOpen: boolean;
@@ -51,7 +51,7 @@ export function DashboardDataProvider({
   const [data, setData] = useState<DashboardData | null>(initialData ?? null);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isAdminMode, setIsAdminMode] = useState(false);
-  const [topBarTitle, setTopBarTitle] = useState<string | null>(null);
+  const [topBarTitle, setTopBarTitle] = useState<React.ReactNode | string | null>(null);
   const [topBarActions, setTopBarActions] = useState<React.ReactNode | null>(null);
 
   // Initial load from localStorage

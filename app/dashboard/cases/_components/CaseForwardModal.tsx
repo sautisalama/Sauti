@@ -159,7 +159,7 @@ export function CaseForwardModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-lg bg-white rounded-[2.5rem] p-0 overflow-hidden border-0 shadow-2xl max-h-[90vh] flex flex-col">
+      <DialogContent className="sm:max-w-lg bg-white rounded-2xl sm:rounded-[2.5rem] p-0 overflow-hidden border-0 shadow-2xl max-h-[90vh] flex flex-col">
         <div className="p-8 pb-0 border-b border-slate-50">
           <DialogHeader>
             <DialogTitle className="text-2xl font-bold flex items-center gap-3 text-slate-900">

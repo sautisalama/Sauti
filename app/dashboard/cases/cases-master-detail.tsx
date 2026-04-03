@@ -117,6 +117,7 @@ export default function CasesMasterDetail({ userId }: { userId: string }) {
 	const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
 	const [isLoadingMessages, setIsLoadingMessages] = useState(false);
     const [showArchived, setShowArchived] = useState(false);
+    const [isSearchModalOpen, setIsSearchModalOpen] = useState(false);
 	
 	// Chat State
 	const [activeTab, setActiveTab] = useState<'details' | 'chat'>('details');
@@ -171,13 +172,34 @@ export default function CasesMasterDetail({ userId }: { userId: string }) {
 		return all;
 	};
 
-
 	const getAppointmentsForDay = (date: Date, items: MatchedServiceItem[]) => {
 		const all = getAllAppointments(items);
 		return all.filter(a =>
 			a.appointment_date && new Date(a.appointment_date).toDateString() === date.toDateString()
 		);
 	};
+
+	// Initial selection strategy for calendar (Focus on upcoming or most recent past)
+	useEffect(() => {
+		if (loading || cases.length === 0) return;
+		
+		const allAppts = getAllAppointments(cases);
+		if (allAppts.length === 0) return;
+
+		const now = new Date();
+		const sorted = [...allAppts].sort((a, b) => 
+			new Date(a.appointment_date!).getTime() - new Date(b.appointment_date!).getTime()
+		);
+
+		const upcoming = sorted.find(a => new Date(a.appointment_date!) >= now);
+		if (upcoming) {
+			setCalendarSelectedDate(new Date(upcoming.appointment_date!));
+		} else if (sorted.length > 0) {
+			setCalendarSelectedDate(new Date(sorted[sorted.length - 1].appointment_date!));
+		}
+	}, [loading, cases.length]);
+
+	// ... rest of component ...
 
 	// Fetch chat when case is selected
 	useEffect(() => {
@@ -490,7 +512,7 @@ export default function CasesMasterDetail({ userId }: { userId: string }) {
 		}
 
 		return filteredCases;
-	}, [cases, q, urgencyFilter, statusFilter, onBehalfFilter]);
+	}, [cases, q, urgencyFilter, statusFilter, onBehalfFilter, showArchived]);
 
 	const selected = useMemo(
 		() => filtered.find((c) => c.id === selectedId) || null,
@@ -869,32 +891,56 @@ export default function CasesMasterDetail({ userId }: { userId: string }) {
 							</div>
 						</div>
 
-						{/* Subtle Archive Tabs */}
-						<div className="flex items-center gap-8 border-b border-serene-neutral-100/60">
-							<button 
-								onClick={() => setShowArchived(false)}
-								className={cn(
-									"pb-4 text-[10px] sm:text-xs font-bold uppercase tracking-widest transition-all relative",
-									!showArchived ? "text-sauti-teal" : "text-serene-neutral-400 hover:text-serene-neutral-600"
-								)}
-							>
-								Active Cases
-								{!showArchived && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-sauti-teal rounded-full animate-in fade-in zoom-in duration-300" />}
-							</button>
-							<button 
-								onClick={() => setShowArchived(true)}
-								className={cn(
-									"pb-4 text-[10px] sm:text-xs font-bold uppercase tracking-widest transition-all relative",
-									showArchived ? "text-sauti-teal" : "text-serene-neutral-400 hover:text-serene-neutral-600"
-								)}
-							>
-								Archived
-								{showArchived && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-sauti-teal rounded-full animate-in fade-in zoom-in duration-300" />}
-							</button>
+						{/* Subtle Archive Tabs + Search/Filter Toggle (Mobile) */}
+						<div className="flex items-center justify-between border-b border-serene-neutral-100/60 pr-1">
+							<div className="flex items-center gap-6 sm:gap-8">
+								<button 
+									onClick={() => setShowArchived(false)}
+									className={cn(
+										"pb-4 text-[10px] sm:text-xs font-bold uppercase tracking-widest transition-all relative",
+										!showArchived ? "text-sauti-teal" : "text-serene-neutral-400 hover:text-serene-neutral-600"
+									)}
+								>
+									Active Cases
+									{!showArchived && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-sauti-teal rounded-full animate-in fade-in zoom-in duration-300" />}
+								</button>
+								<button 
+									onClick={() => setShowArchived(true)}
+									className={cn(
+										"pb-4 text-[10px] sm:text-xs font-bold uppercase tracking-widest transition-all relative",
+										showArchived ? "text-sauti-teal" : "text-serene-neutral-400 hover:text-serene-neutral-600"
+									)}
+								>
+									Archived
+									{showArchived && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-sauti-teal rounded-full animate-in fade-in zoom-in duration-300" />}
+								</button>
+							</div>
+
+							<div className="flex items-center gap-1.5 pb-3 lg:hidden">
+								<Button
+									variant="ghost"
+									size="icon"
+									onClick={() => setShowFilters(!showFilters)}
+									className={cn(
+										"h-8 w-8 rounded-full transition-all",
+										showFilters ? "bg-sauti-teal/10 text-sauti-teal" : "text-serene-neutral-400"
+									)}
+								>
+									<Filter className="h-4 w-4" />
+								</Button>
+								<Button
+									variant="ghost"
+									size="icon"
+									onClick={() => setIsSearchModalOpen(true)}
+									className="h-8 w-8 rounded-full text-serene-neutral-400"
+								>
+									<Search className="h-4 w-4" />
+								</Button>
+							</div>
 						</div>
 					</div>
-					{/* Premium Search and Filter Bar */}
-					<div className="mb-8 sticky top-0 z-30 bg-serene-neutral-50/80 backdrop-blur-xl border-b border-serene-neutral-100/50 pb-5 pt-2 -mx-1 px-1 transition-all">
+					{/* Premium Search Bar (Desktop) */}
+					<div className="hidden lg:block mb-8 sticky top-0 z-30 bg-serene-neutral-50/80 backdrop-blur-xl border-b border-serene-neutral-100/50 pb-5 pt-2 -mx-1 px-1 transition-all">
 						<div className="flex items-center gap-2 sm:gap-3">
 							{/* Search Bar */}
 							<div className="relative flex-1 min-w-0">
@@ -1063,7 +1109,7 @@ export default function CasesMasterDetail({ userId }: { userId: string }) {
 					}`}
 				>
                     <div className="h-full pb-8">
-                            <Card className="p-6 sm:p-8 shadow-2xl shadow-slate-200/40 border-serene-neutral-100/50 rounded-[2.5rem] bg-white h-full flex flex-col">
+                            <Card className="p-6 sm:p-8 shadow-2xl shadow-slate-200/40 border-serene-neutral-100/50 rounded-2xl sm:rounded-[2.5rem] bg-white h-full flex flex-col">
                                 <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-5 gap-3">
                                     <div>
                                         <div className="flex items-center gap-2 mb-1">
@@ -1121,8 +1167,8 @@ export default function CasesMasterDetail({ userId }: { userId: string }) {
                                         <div className="flex items-center justify-between sm:justify-end gap-3 w-full sm:w-auto">
                                             <p className="text-xs sm:text-sm font-bold text-slate-700 uppercase tracking-widest">
                                                 {calendarViewMode === 'week' 
-                                                    ? `${weekDays[0].toLocaleDateString('default', { month: 'short', day: 'numeric' })} - ${weekDays[6].toLocaleDateString('default', { month: 'short', day: 'numeric' })}`
-                                                    : calendarSelectedDate.toLocaleDateString('default', { month: 'short', year: 'numeric' })
+                                                    ? `${weekDays[0].toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${weekDays[6].toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
+                                                    : calendarSelectedDate.toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
                                                 }
                                             </p>
                                             
@@ -1157,14 +1203,14 @@ export default function CasesMasterDetail({ userId }: { userId: string }) {
 
                                     {/* Days Grid */}
                                     <div className="grid grid-cols-7 gap-1 sm:gap-2 mb-6">
-                                        {['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map(day => (
-                                            <div key={day} className="text-center text-[10px] font-bold text-slate-300 uppercase tracking-[0.2em]">
+                                        {['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map((day, i) => (
+                                            <div key={`${day}-${i}`} className="text-center text-[10px] font-bold text-slate-300 uppercase tracking-[0.2em]">
                                                 {day}
                                             </div>
                                         ))}
                                         {calendarViewMode === 'week' ? (
                                             weekDays.map((day, idx) => {
-                                                const dayAppointments = getAppointmentsForDay(day, filtered);
+                                                const dayAppointments = getAppointmentsForDay(day, cases);
                                                 const isToday = day.toDateString() === new Date().toDateString();
                                                 const isSelected = day.toDateString() === calendarSelectedDate.toDateString();
                                                 
@@ -1201,7 +1247,7 @@ export default function CasesMasterDetail({ userId }: { userId: string }) {
                                         ) : (
                                             monthDays.map((dayInfo, idx) => {
                                                 const { date: day, isCurrentMonth } = dayInfo;
-                                                const dayAppointments = getAppointmentsForDay(day, filtered);
+                                                const dayAppointments = getAppointmentsForDay(day, cases);
                                                 const isToday = day.toDateString() === new Date().toDateString();
                                                 const isSelected = day.toDateString() === calendarSelectedDate.toDateString();
                                                 
@@ -1245,7 +1291,7 @@ export default function CasesMasterDetail({ userId }: { userId: string }) {
                                         </h4>
                                         
                                         {(() => {
-                                            const appointments = getAppointmentsForDay(calendarSelectedDate, filtered);
+                                            const appointments = getAppointmentsForDay(calendarSelectedDate, cases);
                                             const isToday = calendarSelectedDate.toDateString() === new Date().toDateString();
                                             
                                             if (appointments.length > 0) {
@@ -1362,6 +1408,61 @@ export default function CasesMasterDetail({ userId }: { userId: string }) {
                         />
 					)}
 			</div>
+			{/* Search Modal */}
+			<Dialog open={isSearchModalOpen} onOpenChange={setIsSearchModalOpen}>
+				<DialogContent className="sm:max-w-md p-0 overflow-hidden border-0 rounded-3xl">
+					<div className="p-6 bg-sauti-teal">
+						<DialogHeader className="text-left mb-6">
+							<DialogTitle className="text-white text-xl font-bold">Search Cases</DialogTitle>
+							<DialogDescription className="text-white/70">
+								Quickly find cases by survivor name, incident type or status.
+							</DialogDescription>
+						</DialogHeader>
+						
+						<div className="relative">
+							<Input
+								autoFocus
+								placeholder="Start typing to search..."
+								value={q}
+								onChange={(e) => setQ(e.target.value)}
+								className="h-14 pl-12 pr-4 bg-white/10 border-white/20 text-white placeholder:text-white/40 rounded-2xl focus:ring-white/20 focus:border-white/30"
+							/>
+							<Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-white/40" />
+						</div>
+					</div>
+					
+					<div className="p-4 max-h-[60vh] overflow-y-auto bg-serene-neutral-50">
+						{q.trim() && filtered.length > 0 ? (
+							<div className="space-y-3">
+								<p className="text-[10px] font-bold text-serene-neutral-400 uppercase tracking-widest px-2">{filtered.length} results found</p>
+								{filtered.map(c => (
+									<div 
+										key={c.id} 
+										onClick={() => {
+											setSelectedId(c.id);
+											setIsSearchModalOpen(false);
+										}}
+										className="p-4 bg-white rounded-2xl border border-serene-neutral-200 hover:border-sauti-teal/30 hover:shadow-md transition-all cursor-pointer group"
+									>
+										<p className="font-bold text-gray-900 group-hover:text-sauti-teal">{c.report?.type_of_incident?.replace(/_/g, " ") || "Case"}</p>
+										<p className="text-xs text-gray-500 mt-1 line-clamp-1">{c.report?.incident_description}</p>
+									</div>
+								))}
+							</div>
+						) : q.trim() ? (
+							<div className="py-12 text-center">
+								<Search className="h-10 w-10 text-serene-neutral-200 mx-auto mb-3" />
+								<p className="text-sm font-medium text-serene-neutral-400">No matching cases found</p>
+							</div>
+						) : (
+							<div className="py-12 text-center">
+								<MessageSquare className="h-10 w-10 text-serene-neutral-200 mx-auto mb-3" />
+								<p className="text-sm font-medium text-serene-neutral-400">Search results will appear here</p>
+							</div>
+						)}
+					</div>
+                </DialogContent>
+            </Dialog>
 		</div>
 	);
 }

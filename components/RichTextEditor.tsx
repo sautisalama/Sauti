@@ -153,12 +153,14 @@ export function RichTextEditor({
 		active, 
 		onClick, 
 		children,
-		disabled = false 
+		disabled = false,
+		className: extraClassName
 	}: { 
 		active?: boolean; 
 		onClick: () => void; 
 		children: React.ReactNode;
 		disabled?: boolean;
+		className?: string;
 	}) => (
 		<Button
 			type="button"
@@ -170,7 +172,8 @@ export function RichTextEditor({
 				"h-7 w-7 p-0 rounded-lg transition-colors",
 				active 
 					? "bg-sauti-teal/10 text-sauti-teal" 
-					: "text-serene-neutral-500 hover:text-sauti-teal hover:bg-sauti-teal/5"
+					: "text-serene-neutral-500 hover:text-sauti-teal hover:bg-sauti-teal/5",
+				extraClassName
 			)}
 		>
 			{children}
@@ -203,6 +206,7 @@ export function RichTextEditor({
 					<ToolbarButton
 						active={editor.isActive("underline")}
 						onClick={() => editor.chain().focus().toggleUnderline().run()}
+						className="hidden sm:flex"
 					>
 						<UnderlineIcon className="h-3.5 w-3.5" />
 					</ToolbarButton>
@@ -219,6 +223,7 @@ export function RichTextEditor({
 					<ToolbarButton
 						active={editor.isActive("orderedList")}
 						onClick={() => editor.chain().focus().toggleOrderedList().run()}
+						className="hidden sm:flex"
 					>
 						<ListOrdered className="h-3.5 w-3.5" />
 					</ToolbarButton>

@@ -44,12 +44,15 @@ export default function SurvivorView({
         setIsReportDialogOpen 
     } = useDashboard();
     const dash = useDashboardData();
-    
+    const setTopBarTitle = dash?.setTopBarTitle;
+
     // Set title on mount
     useEffect(() => {
-        dash?.setTopBarTitle("Overview");
-        return () => dash?.setTopBarTitle(null);
-    }, [dash]);
+        if (setTopBarTitle) setTopBarTitle("Overview");
+        return () => {
+			if (setTopBarTitle) setTopBarTitle(null);
+		};
+    }, [setTopBarTitle]);
     
 	const searchParams = useSearchParams();
     const router = useRouter();
@@ -74,8 +77,8 @@ export default function SurvivorView({
 	}, [reports, searchQuery]);
 
 	return (
-		<div className="min-h-screen bg-serene-neutral-50 pb-24">
-			<div className="max-w-4xl mx-auto px-4 lg:px-6 pt-4 lg:pt-8 space-y-8 min-h-[calc(100vh-80px)] relative">
+		<div className="min-h-screen bg-serene-neutral-50 pb-24 overflow-x-hidden">
+			<div className="max-w-4xl mx-auto px-4 lg:px-6 pt-4 lg:pt-8 space-y-8 min-h-[calc(100vh-80px)] w-full">
 				
                 {searchQuery.length > 0 ? (
                     <DashboardSearchOverlay 
@@ -103,7 +106,7 @@ export default function SurvivorView({
 
                         <div className="space-y-4">
                             <h3 className="text-sm font-bold text-serene-neutral-400 uppercase tracking-wider px-1">Dashboard</h3>
-                            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4">
+                            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 w-full auto-rows-fr min-w-0">
                                 <SereneQuickActionCard
                                     title="Reports"
                                     description={`${stats.activeReportsCount} Active`}
@@ -113,8 +116,6 @@ export default function SurvivorView({
                                     className="bg-sauti-red-light border-sauti-red/10"
                                     badge={stats.activeReportsCount || undefined}
                                     badgeClassName="bg-sauti-red text-white"
-                                    actionIcon={<Plus className="h-4 w-4" />}
-                                    onActionClick={() => setIsReportDialogOpen(true)}
                                 />
                                 <SereneQuickActionCard
                                     title="Matches"
@@ -146,12 +147,10 @@ export default function SurvivorView({
                             </div>
                         </div>
 
-                        {stats.upcomingAppointmentsCount > 0 && (
-                            <CalendarWidget 
-                                appointments={appointments} 
-                                upcomingAppointmentsCount={stats.upcomingAppointmentsCount} 
-                            />
-                        )}
+                        <CalendarWidget 
+                            appointments={appointments} 
+                            upcomingAppointmentsCount={stats.upcomingAppointmentsCount} 
+                        />
 
                         <div>
                             <SereneSectionHeader 

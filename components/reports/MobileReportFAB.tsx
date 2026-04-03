@@ -43,7 +43,7 @@ export function MobileReportFAB() {
 
   // Visibility Logic: Only show on Home or Reports (list/detail)
   // ... and only if onboarding is complete and NOT an admin
-  const isVisible = (isDashboardPage || isReportPage) && !needsOnboarding && !isAdmin;
+  const isVisible = (isDashboardPage) && !needsOnboarding && !isAdmin;
 
   if (!isVisible) return null;
 

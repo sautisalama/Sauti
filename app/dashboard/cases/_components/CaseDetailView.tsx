@@ -10,7 +10,7 @@ import {
     VideoIcon, CheckSquare, Trash2, MessageCircle, 
     ChevronLeft, Sparkles, Activity, ArrowRight,
     Shield, User, Briefcase, MessageSquare, ExternalLink,
-    X, MoreHorizontal, AlertCircle
+    X, MoreHorizontal, AlertCircle, MoreVertical
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -39,6 +39,13 @@ import {
 } from "@/components/ui/dialog";
 import { confirmAppointment, rescheduleAppointment, confirmReschedule } from "../../_views/actions/appointments";
 import { EnhancedAppointmentScheduler } from "../../_components/EnhancedAppointmentScheduler";
+import { 
+    DropdownMenu, 
+    DropdownMenuContent, 
+    DropdownMenuItem, 
+    DropdownMenuTrigger 
+} from "@/components/ui/dropdown-menu";
+import { ChatFAB } from "@/components/navigation/ChatFAB";
 
 interface ChecklistItem {
     id: string;
@@ -91,7 +98,7 @@ export function CaseDetailView({
 
     const report = caseItem.report;
     const matchId = caseItem.id;
-    const isAccepted = caseItem.match_status_type === 'accepted' || caseItem.match_status_type === 'completed';
+    const isAccepted = caseItem.match_status_type === 'accepted' || caseItem.match_status_type === 'completed' || caseItem.match_status_type === 'archived';
     const [isSchedulerOpen, setIsSchedulerOpen] = useState(false);
     const [isCompletionDialogOpen, setIsCompletionDialogOpen] = useState(false);
 
@@ -118,6 +125,13 @@ export function CaseDetailView({
         const ageDate = new Date(ageDifMs);
         const age = Math.abs(ageDate.getUTCFullYear() - 1970);
         return age < 18 ? "Child" : `${age} yrs`;
+    };
+
+    const formatIncidentType = (type: string) => {
+        if (!type) return "Incident Report";
+        const normalized = type.replace(/_/g, " ");
+        if (normalized.toLowerCase().includes("abuse")) return normalized;
+        return `${normalized} abuse`;
     };
 
     const displaySurvivorName = isAccepted 
@@ -245,6 +259,45 @@ export function CaseDetailView({
                 </div>
             )}
 
+            {/* New Incident Metadata Section - Primary for mobile navigation relief */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 lg:hidden">
+                <Card className="border border-slate-100 bg-white/50 backdrop-blur-sm shadow-sm rounded-2xl overflow-hidden p-4">
+                    <div className="flex items-center gap-3">
+                        <div className={cn("w-8 h-8 rounded-lg border flex items-center justify-center shrink-0", urgencyColor(report?.urgency))}>
+                            <Activity className="h-4 w-4" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none mb-1">Urgency</p>
+                            <p className="text-xs font-bold text-slate-700 uppercase tracking-tight">{report?.urgency || 'Low'} Priority</p>
+                        </div>
+                    </div>
+                </Card>
+
+                <Card className="border border-slate-100 bg-white/50 backdrop-blur-sm shadow-sm rounded-2xl overflow-hidden p-4">
+                    <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-lg bg-teal-50 border border-teal-100 flex items-center justify-center text-teal-600 shrink-0">
+                            <MapPin className="h-4 w-4" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none mb-1">Location</p>
+                            <p className="text-xs font-bold text-slate-700 truncate">{report?.location || report?.city || "Unknown"}</p>
+                        </div>
+                    </div>
+                </Card>
+
+                <Card className="border border-slate-100 bg-white/50 backdrop-blur-sm shadow-sm rounded-2xl overflow-hidden p-4">
+                    <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-lg bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 shrink-0">
+                            <Clock className="h-4 w-4" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none mb-1">Submitted</p>
+                            <p className="text-xs font-bold text-slate-700">{formatDate(report?.submission_timestamp)}</p>
+                        </div>
+                    </div>
+                </Card>
+            </div>
+
             {!isAccepted && (
                 <div className="bg-serene-blue-50/50 border border-serene-blue-100 rounded-2xl p-4 flex items-start gap-3">
                     <Shield className="h-5 w-5 text-serene-blue-600 mt-0.5" />
@@ -301,7 +354,7 @@ export function CaseDetailView({
             )}
 
 
-            <Card className="border-0 bg-white shadow-xl shadow-slate-200/50 rounded-[2.5rem] overflow-hidden">
+            <Card className="border-0 bg-white shadow-xl shadow-slate-200/50 rounded-2xl sm:rounded-[2.5rem] overflow-hidden">
                 <CardHeader className="p-6 sm:p-10 pb-0 flex flex-row items-center justify-between">
                     <div className="flex items-center gap-4">
                         <div className="w-10 h-10 sm:w-12 sm:h-12 bg-slate-50 rounded-xl sm:rounded-2xl flex items-center justify-center text-slate-400">
@@ -365,7 +418,7 @@ export function CaseDetailView({
                     </span>
                 </div>
 
-                <Card className="border-0 bg-white shadow-xl shadow-slate-200/50 rounded-[2.5rem] overflow-hidden">
+                <Card className="border-0 bg-white shadow-xl shadow-slate-200/50 rounded-2xl sm:rounded-[2.5rem] overflow-hidden">
                     <CardContent className="p-0">
                         {checklists.map((item, idx) => (
                             <div key={item.id} className={cn("group transition-all duration-300", idx < checklists.length - 1 && "border-b border-slate-50")}>
@@ -396,16 +449,16 @@ export function CaseDetailView({
                                 </div>
                             </div>
                         ))}
-                        <div className="p-5 sm:p-8 bg-slate-50/50 flex flex-col sm:flex-row gap-3 sm:gap-4 border-t border-slate-100">
+                        <div className="p-4 sm:p-8 bg-slate-50/50 flex flex-col sm:flex-row gap-3 sm:gap-4 border-t border-slate-100">
                             <Input 
                                 value={newChecklistItem}
                                 onChange={(e) => setNewChecklistItem(e.target.value)}
                                 placeholder="Add a new milestone..."
-                                className="h-12 sm:h-14 border-slate-100 rounded-xl sm:rounded-2xl bg-white shadow-sm flex-1 focus-visible:ring-teal-400/20 text-sm sm:text-base font-medium px-4 sm:px-6"
+                                className="h-12 border-slate-100 rounded-xl bg-white shadow-sm flex-1 focus-visible:ring-teal-400/20 text-sm font-medium px-4"
                                 onKeyDown={(e) => { if (e.key === 'Enter') addChecklistItem(); }}
                             />
-                            <Button onClick={addChecklistItem} disabled={!newChecklistItem.trim()} className="h-12 sm:h-14 w-full sm:w-14 shrink-0 bg-teal-600 hover:bg-teal-700 rounded-xl sm:rounded-2xl text-white shadow-xl shadow-teal-600/20 transition-all active:scale-95 gap-2">
-                                <Plus className="h-5 w-5 sm:h-6 sm:w-6" />
+                            <Button onClick={addChecklistItem} disabled={!newChecklistItem.trim()} className="h-12 w-full sm:w-14 shrink-0 bg-teal-600 hover:bg-teal-700 rounded-xl text-white shadow-xl shadow-teal-600/20 transition-all active:scale-95 gap-2">
+                                <Plus className="h-5 w-5" />
                                 <span className="sm:hidden font-bold text-xs uppercase tracking-widest">Add Milestone</span>
                             </Button>
                         </div>
@@ -418,7 +471,7 @@ export function CaseDetailView({
     const sidebarContent = (
         <div className="space-y-6">
             {isAccepted && (
-                <div className="h-[400px] sm:h-[600px] rounded-[2.5rem] border border-white shadow-2xl shadow-teal-500/10 overflow-hidden bg-white/70 backdrop-blur-2xl flex flex-col group mt-0">
+                <div className="hidden lg:flex flex-col h-[400px] sm:h-[600px] rounded-2xl sm:rounded-[2.5rem] border border-white shadow-2xl shadow-teal-500/10 overflow-hidden bg-white/70 backdrop-blur-2xl group mt-0">
 
                     {isChatLoading ? (
                         <div className="flex-1 flex flex-col items-center justify-center gap-4 text-slate-400">
@@ -442,7 +495,7 @@ export function CaseDetailView({
             )}
 
             <Accordion type="single" collapsible className="w-full">
-                <AccordionItem value="notes" className="bg-white rounded-[2.5rem] border border-slate-100 shadow-xl shadow-slate-200/50 overflow-hidden">
+                <AccordionItem value="notes" className="bg-white rounded-2xl sm:rounded-[2.5rem] border border-slate-100 shadow-xl shadow-slate-200/50 overflow-hidden">
                     <AccordionTrigger className="px-8 py-6 hover:no-underline [&[data-state=open]>svg]:rotate-180">
                         <div className="flex items-center gap-4">
                             <div className="w-10 h-10 bg-violet-50 rounded-xl flex items-center justify-center text-violet-600">
@@ -468,51 +521,42 @@ export function CaseDetailView({
 
     return (
         <div className={cn(
-            "flex flex-col h-full bg-slate-50/30 overflow-hidden",
-            isFullPage ? "min-h-screen" : "w-full"
+            "flex flex-col bg-slate-50/30 overflow-hidden",
+            isFullPage ? "min-h-screen w-full" : "h-full w-full"
         )}>
-			<nav className="sticky top-0 z-50 bg-white/80 backdrop-blur-xl border-b border-serene-neutral-100/50 transition-all duration-300 min-h-[64px] sm:min-h-[72px] flex items-center">
-				<div className="max-w-7xl mx-auto px-4 sm:px-6 w-full flex items-center justify-between gap-4 py-2 sm:py-0">
-					<div className="flex items-center gap-2 sm:gap-4 flex-1 min-w-0">
+			<nav className="lg:hidden sticky top-0 z-50 bg-white/80 backdrop-blur-xl border-b border-serene-neutral-100/50 transition-all duration-300 min-h-[64px] sm:min-h-[72px] flex items-center">
+				<div className="max-w-7xl mx-auto px-2 xs:px-4 sm:px-6 w-full flex items-center justify-between gap-2 sm:gap-4 py-2 sm:py-0">
+					<div className="flex items-center gap-1 sm:gap-4 flex-1 min-w-0">
 						{!isFullPage && onClose ? (
-							<Button variant="ghost" size="icon" onClick={onClose} className="shrink-0 w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-serene-neutral-50 flex items-center justify-center hover:bg-serene-neutral-100 transition-all text-serene-neutral-600">
-								<ChevronLeft className="h-4 w-4 sm:h-5 sm:w-5" />
+							<Button variant="ghost" size="icon" onClick={onClose} className="shrink-0 w-10 h-10 rounded-xl bg-serene-neutral-50 flex items-center justify-center hover:bg-serene-neutral-100 transition-all text-serene-neutral-600">
+								<ChevronLeft className="h-5 w-5" />
 							</Button>
 						) : (
-							<div className="shrink-0 w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-serene-neutral-50 flex items-center justify-center text-serene-neutral-600">
-								<Briefcase className="h-4 w-4 sm:h-5 sm:w-5" />
+							<div className="shrink-0 w-10 h-10 rounded-xl bg-serene-neutral-50 flex items-center justify-center text-serene-neutral-600">
+								<Briefcase className="h-5 w-5" />
 							</div>
 						)}
-						<div className="flex-1 min-w-0">
-							<div className="hidden sm:flex items-center gap-2 text-sauti-teal font-extrabold uppercase tracking-[0.2em] text-[8px] sm:text-[10px] mb-0.5">
-								<ShieldCheck className="h-3.5 w-3.5" />
-								<span className="truncate">Professional Support Mode</span>
-							</div>
-							<div className="flex flex-col sm:flex-row sm:items-center gap-0 sm:gap-4 shrink-0 min-w-0">
-                                <h2 className="text-sauti-dark font-bold tracking-tight uppercase text-[10px] sm:text-base whitespace-nowrap overflow-hidden text-ellipsis">
-                                    {report?.type_of_incident?.replace(/_/g, " ") || "Incident Report"}
-                                </h2>
-                                <div className="hidden sm:block h-3 w-px bg-serene-neutral-200" />
-                                <div className="flex items-center gap-2">
-                                    <Badge variant="outline" className="bg-serene-neutral-50/50 border-serene-neutral-100 text-[8px] sm:text-[9px] font-bold text-serene-neutral-500 uppercase tracking-widest px-1.5 py-0">
-                                        Partner: {displaySurvivorName}
-                                    </Badge>
-                                    <span className="text-[8px] sm:text-[9px] font-bold text-serene-neutral-400 uppercase tracking-widest hidden lg:block">
-                                        Reported {formatDate(report?.submission_timestamp)}
-                                    </span>
-                                </div>
-                            </div>
+						<div className="flex-1 min-w-0 flex items-center gap-2">
+							<h2 className="text-sauti-dark font-bold tracking-tight uppercase text-xs sm:text-base whitespace-nowrap overflow-hidden text-ellipsis w-fit shrink-0">
+								{formatIncidentType(report?.type_of_incident)}
+							</h2>
+							{(report?.additional_info as any)?.is_for_child && (
+								<Badge className="bg-purple-100 text-purple-700 border-purple-200 text-[10px] sm:text-[11px] font-black uppercase tracking-widest px-2 py-0.5 rounded-lg shadow-sm shrink-0 w-fit whitespace-nowrap">
+									Child Abuse
+								</Badge>
+							)}
 						</div>
 					</div>
-
-					<div className="flex items-center gap-2 sm:gap-3 shrink-0">
-                        <Badge className={cn("px-2 sm:px-4 py-1 sm:py-1.5 rounded-full text-[8px] sm:text-[10px] font-bold border uppercase tracking-[0.1em] sm:tracking-[0.2em] whitespace-nowrap shadow-sm truncate max-w-[80px] sx:max-w-none", urgencyColor(report?.urgency))}>
-                            {report?.urgency || 'Low'} Priority
-                        </Badge>
+                <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+                        <div className="hidden lg:flex items-center gap-2 sm:gap-3 shrink-0">
+                            <Badge className={cn("px-2 sm:px-4 py-1 sm:py-1.5 rounded-full text-[8px] sm:text-[10px] font-bold border uppercase tracking-[0.1em] sm:tracking-[0.2em] whitespace-nowrap shadow-sm truncate max-w-[80px] sx:max-w-none", urgencyColor(report?.urgency))}>
+                                {report?.urgency || 'Low'} Priority
+                            </Badge>
+                        </div>
 
                         {caseItem.match_status_type === 'pending' && onAcceptCase && (
                             <div className="relative shrink-0">
-                                <Button onClick={() => setIsSchedulerOpen(true)} className="h-9 sm:h-11 bg-teal-600 hover:bg-teal-700 text-white font-bold rounded-lg sm:rounded-xl px-4 sm:px-5 shadow-lg shadow-teal-600/20 text-[10px] sm:text-xs gap-2 transition-all active:scale-95 whitespace-nowrap">
+                                <Button onClick={() => setIsSchedulerOpen(true)} className="h-9 sm:h-11 bg-teal-600 hover:bg-teal-700 text-white font-bold rounded-lg sm:rounded-xl px-2 sm:px-5 shadow-lg shadow-teal-600/20 text-[10px] sm:text-xs gap-1 sm:gap-2 transition-all active:scale-95 whitespace-nowrap shrink-0">
                                     <Calendar className="h-3.5 w-3.5" /> Accept & Schedule
                                 </Button>
                                 <EnhancedAppointmentScheduler isOpen={isSchedulerOpen} onClose={() => setIsSchedulerOpen(false)} userId={userId} professionalName="You" serviceName={caseItem.service_details?.name} onSchedule={async (appt: any) => { if (onAcceptCase) { onAcceptCase(matchId, appt); setIsSchedulerOpen(false); } }} />
@@ -520,51 +564,65 @@ export function CaseDetailView({
                         )}
                         
                         {caseItem.match_status_type !== 'completed' && caseItem.match_status_type !== 'pending' && onCompleteCase && (
-                            <Dialog open={isCompletionDialogOpen} onOpenChange={setIsCompletionDialogOpen}>
-                                <DialogTrigger asChild>
-                                    <Button disabled={isUpdatingStatus} className="h-9 sm:h-11 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold rounded-lg sm:rounded-xl px-4 sm:px-5 shadow-lg shadow-emerald-600/20 text-[10px] sm:text-xs gap-2 transition-all active:scale-95 whitespace-nowrap">
-                                        <CheckCircle2 className="h-3.5 w-3.5" /> {isUpdatingStatus ? "Closing..." : "Complete Case"}
-                                    </Button>
-                                </DialogTrigger>
-                                <DialogContent className="w-[95vw] sm:max-w-md rounded-[2rem] border-0 shadow-2xl bg-white p-6 sm:p-8">
-                                    <DialogHeader className="space-y-4">
-                                        <div className="w-12 sm:w-16 h-12 sm:h-16 bg-emerald-50 rounded-xl sm:rounded-[1.5rem] flex items-center justify-center text-emerald-600 mb-2">
-                                            <ShieldCheck className="h-6 sm:h-8 w-6 sm:w-8" />
-                                        </div>
-                                        <DialogTitle className="text-xl sm:text-2xl font-black text-slate-900 leading-tight">Close this case?</DialogTitle>
-                                        <DialogDescription className="text-slate-500 font-medium text-sm sm:text-base">
-                                            Completing this case will finalize all coordination actions for the survivor.
-                                        </DialogDescription>
-                                    </DialogHeader>
-                                    <DialogFooter className="flex flex-row gap-3 pt-6 mt-4 sm:mt-6 border-t border-slate-50">
-                                        <Button 
-                                            variant="outline" 
-                                            className="flex-1 h-10 sm:h-12 rounded-xl border-slate-100 font-bold text-[10px] uppercase tracking-widest text-slate-500"
-                                            onClick={() => setIsCompletionDialogOpen(false)}
-                                        >
-                                            Cancel
+                            <div className="flex items-center gap-2">
+                                <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                        <Button variant="ghost" size="icon" className="h-9 w-9 sm:h-11 sm:w-11 rounded-lg sm:rounded-xl text-serene-neutral-400 hover:text-sauti-teal hover:bg-serene-neutral-50 transition-all">
+                                            <MoreVertical className="h-5 w-5" />
                                         </Button>
-                                        <Button 
-                                            className="flex-1 h-10 sm:h-12 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-[10px] uppercase tracking-widest shadow-lg shadow-emerald-600/20"
-                                            onClick={async () => {
-                                                if (onCompleteCase) await onCompleteCase(matchId);
-                                                setIsCompletionDialogOpen(false);
-                                            }}
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end" className="w-56 rounded-2xl border-serene-neutral-100 p-2 shadow-2xl bg-white">
+                                        <DropdownMenuItem 
+                                            onClick={() => setIsCompletionDialogOpen(true)}
+                                            className="flex items-center gap-2 p-3 text-sm font-bold text-slate-700 rounded-xl hover:bg-emerald-50 hover:text-emerald-600 cursor-pointer"
                                         >
-                                            Complete
-                                        </Button>
-                                    </DialogFooter>
-                                </DialogContent>
-                            </Dialog>
+                                            <CheckCircle2 className="h-4 w-4" />
+                                            Complete Case
+                                        </DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                </DropdownMenu>
+
+                                <Dialog open={isCompletionDialogOpen} onOpenChange={setIsCompletionDialogOpen}>
+                                    <DialogContent className="w-[95vw] sm:max-w-md rounded-[2rem] border-0 shadow-2xl bg-white p-6 sm:p-8">
+                                        <DialogHeader className="space-y-4">
+                                            <div className="w-12 sm:w-16 h-12 sm:h-16 bg-emerald-50 rounded-xl sm:rounded-[1.5rem] flex items-center justify-center text-emerald-600 mb-2">
+                                                <ShieldCheck className="h-6 sm:h-8 w-6 sm:w-8" />
+                                            </div>
+                                            <DialogTitle className="text-xl sm:text-2xl font-black text-slate-900 leading-tight">Close this case?</DialogTitle>
+                                            <DialogDescription className="text-slate-500 font-medium text-sm sm:text-base">
+                                                Completing this case will finalize all coordination actions for the survivor.
+                                            </DialogDescription>
+                                        </DialogHeader>
+                                        <DialogFooter className="flex flex-row gap-3 pt-6 mt-4 sm:mt-6 border-t border-slate-50">
+                                            <Button 
+                                                variant="outline" 
+                                                className="flex-1 h-10 sm:h-12 rounded-xl border-slate-100 font-bold text-[10px] uppercase tracking-widest text-slate-500"
+                                                onClick={() => setIsCompletionDialogOpen(false)}
+                                            >
+                                                Cancel
+                                            </Button>
+                                            <Button 
+                                                className="flex-1 h-10 sm:h-12 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-[10px] uppercase tracking-widest shadow-lg shadow-emerald-600/20"
+                                                onClick={async () => {
+                                                    if (onCompleteCase) await onCompleteCase(matchId);
+                                                    setIsCompletionDialogOpen(false);
+                                                }}
+                                            >
+                                                Complete
+                                            </Button>
+                                        </DialogFooter>
+                                    </DialogContent>
+                                </Dialog>
+                            </div>
                         )}
-					</div>
-				</div>
-			</nav>
+                    </div>
+                </div>
+            </nav>
 
             <ScrollArea className="flex-1">
                 <div className={cn(
-                    "p-8 mx-auto",
-                    isFullPage ? "max-w-7xl pb-24" : "w-full pb-8"
+                    "p-2 xs:p-4 sm:p-8 mx-auto w-full",
+                    isFullPage ? "max-w-7xl pb-24" : "pb-8"
                 )}>
                     {isFullPage ? (
                         <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-start">
@@ -577,12 +635,22 @@ export function CaseDetailView({
                         </div>
                     ) : (
                         <div className="flex flex-col gap-8">
-                            {sidebarContent}
                             {mainContent}
                         </div>
                     )}
                 </div>
             </ScrollArea>
+
+            {/* Floating Action Button for Chats (Mobile) */}
+            {matchId && (
+                <ChatFAB 
+                    matchId={matchId}
+                    survivorId={(caseItem.survivor_id || report?.user_id) as string}
+                    professionalId={userId}
+                    professionalName="You"
+                    survivorName={report?.first_name || 'Survivor'}
+                />
+            )}
         </div>
     );
 }

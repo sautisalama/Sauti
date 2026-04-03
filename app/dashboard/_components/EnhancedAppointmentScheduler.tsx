@@ -283,7 +283,7 @@ export function EnhancedAppointmentScheduler({
     }
 
     return (
-      <div className={cn("rounded-[2rem] p-4 flex-1 border border-slate-100/30", COLORS.teal, "bg-opacity-30 backdrop-blur-sm shadow-inner")}>
+      <div className={cn("rounded-[1.5rem] p-3 sm:p-4 flex-1 border border-slate-100/30", COLORS.teal, "bg-opacity-30 backdrop-blur-sm shadow-inner")}>
         <div className="flex items-center justify-between mb-4">
           <div className="flex bg-white/40 rounded-lg p-0.5 border border-white/40">
             <button onClick={() => setCalendarViewMode('week')} className={cn("px-2.5 py-1.5 text-[9px] font-bold uppercase tracking-wider rounded-md transition-all", calendarViewMode === 'week' ? "bg-white text-[#105D5D] shadow-sm" : "opacity-50")}>Week</button>
@@ -296,8 +296,8 @@ export function EnhancedAppointmentScheduler({
           </div>
         </div>
         <div className="grid grid-cols-7 gap-1">
-          {['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map((day, idx) => (
-            <div key={idx} className="text-center text-[8px] font-bold text-[#105D5D]/40 pb-2 uppercase tracking-tight">{day}</div>
+          {['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map((day, i) => (
+            <div key={`${day}-${i}`} className="text-center text-[8px] font-bold text-[#105D5D]/40 pb-2 uppercase tracking-tight">{day}</div>
           ))}
           {(calendarViewMode === 'week' ? weekDays : monthDays.map(d => d.date)).map((day, idx) => {
             const isSelected = isSameDay(day, selectedDate);
@@ -326,23 +326,24 @@ export function EnhancedAppointmentScheduler({
 
   const renderForm = () => {
     return (
-      <div className="flex flex-col gap-10 h-full">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 items-stretch flex-1">
-          {/* Date Selection */}
-          <div className="flex flex-col gap-3">
-            <div className="flex items-center gap-2 px-1">
-              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] leading-none">Pick Date</label>
-            </div>
-            {renderCalendar()}
-          </div>
-
-          {/* Time Picker */}
-          <div className="flex flex-col gap-3">
-            <div className="flex items-center gap-2 px-1">
-              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] leading-none">Set Time</label>
+      <div className="flex flex-col gap-6 h-full">
+        <div className="overflow-y-auto pr-1 flex-1 space-y-8 scrollbar-hide py-2">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
+            {/* Date Selection */}
+            <div className="flex flex-col gap-3">
+              <div className="flex items-center gap-2 px-1">
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] leading-none">Pick Date</label>
+              </div>
+              {renderCalendar()}
             </div>
 
-            <div className={cn("rounded-[2rem] p-6 flex-1 flex flex-col items-center justify-center gap-6", COLORS.blue, "bg-opacity-30 backdrop-blur-sm shadow-inner overflow-hidden")}>
+            {/* Time Picker */}
+            <div className="flex flex-col gap-3">
+              <div className="flex items-center gap-2 px-1">
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] leading-none">Set Time</label>
+              </div>
+
+              <div className={cn("rounded-[1.5rem] p-3 sm:p-6 flex-1 flex flex-col items-center justify-center gap-4 sm:gap-6", COLORS.blue, "bg-opacity-30 backdrop-blur-sm shadow-inner")}>
               {professionalId ? (
                 <div className="w-full space-y-4">
                   <p className="text-[10px] font-black text-[#004A99] uppercase tracking-widest text-center mb-2">Available Slots</p>
@@ -382,7 +383,7 @@ export function EnhancedAppointmentScheduler({
                 </div>
               ) : (
                 <>
-                  <div className="transition-all duration-700 hover:scale-[1.02]">
+                  <div className="hidden sm:block transition-all duration-700 hover:scale-[1.02]">
                     <SereneClockWidget hour={ampm === "PM" ? parseInt(hour) + 12 : parseInt(hour)} minute={parseInt(minute)} />
                   </div>
                   
@@ -455,15 +456,16 @@ export function EnhancedAppointmentScheduler({
                 ? "Private details or preparation notes for your specialist..." 
                 : "Enter an initial message for the survivor. This will be sent as your first chat with them..."
               }
-              className="w-full h-24 rounded-[1.5rem] bg-slate-50 border border-slate-100/50 p-6 text-xs font-medium text-slate-600 focus:outline-none focus:ring-1 focus:ring-teal-400/20 placeholder:text-slate-300 resize-none transition-all shadow-inner"
+              className="w-full h-20 sm:h-24 rounded-[1.2rem] sm:rounded-[1.5rem] bg-slate-50 border border-slate-100/50 p-3 sm:p-6 text-xs font-medium text-slate-600 focus:outline-none focus:ring-1 focus:ring-teal-400/20 placeholder:text-slate-300 resize-none transition-all shadow-inner"
             />
           </div>
         </div>
+      </div>
 
-        {/* Action Center */}
-        <div className="space-y-4">
+        {/* Action Center - Sticky on mobile if needed, but here we just ensure it's below the scroll area */}
+        <div className="space-y-4 pt-4 border-t border-slate-50 shrink-0">
            {/* Subtle Status Bar */}
-           <div className={cn("flex items-center justify-between p-5 rounded-[1.5rem] border border-white/50 relative overflow-hidden", COLORS.muted, "bg-opacity-50 shadow-sm")}>
+           <div className={cn("flex items-center justify-between p-4 sm:p-5 rounded-[1.5rem] border border-white/50 relative overflow-hidden", COLORS.muted, "bg-opacity-50 shadow-sm")}>
               <div className="flex flex-col sm:flex-row sm:items-center gap-3 relative z-10 text-slate-500 font-medium text-[11px]">
                  <div className="flex items-center gap-2">
                     <CheckCircle2 className="h-4 w-4 text-teal-500" />
@@ -502,11 +504,11 @@ export function EnhancedAppointmentScheduler({
   const content = (
     <div className="flex flex-col h-full overflow-hidden">
       {!inline && (
-        <div className="px-10 py-8 border-b border-slate-50 shrink-0 text-left">
+        <div className="px-4 sm:px-10 py-4 sm:py-8 border-b border-slate-50 shrink-0 text-left">
           <DialogHeader>
             <div className="flex items-center justify-between">
               <div>
-                <DialogTitle className="text-xl font-bold text-slate-900 tracking-tight leading-none uppercase">Coordination Session</DialogTitle>
+                <DialogTitle className="text-lg sm:text-xl font-bold text-slate-900 tracking-tight leading-none uppercase">Coordination Session</DialogTitle>
                 <div className="flex flex-col sm:flex-row sm:items-center gap-2 mt-2">
                   <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.1em]">Coordination Protocol</p>
                   <span className="hidden sm:block w-1 h-1 rounded-full bg-slate-200" />
@@ -517,7 +519,7 @@ export function EnhancedAppointmentScheduler({
           </DialogHeader>
         </div>
       )}
-      <div className={cn("overflow-hidden flex-1", !inline && "px-10 py-8 pt-2")}>
+      <div className={cn("overflow-hidden flex-1", !inline && "px-4 sm:px-10 py-2 sm:py-8 pt-1 sm:pt-2")}>
         {renderForm()}
       </div>
     </div>
@@ -529,7 +531,7 @@ export function EnhancedAppointmentScheduler({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="w-[95vw] sm:max-w-[750px] bg-white rounded-[2.5rem] p-0 overflow-hidden border-0 shadow-2xl max-h-[95vh] flex flex-col focus:outline-none scrollbar-hide">
+      <DialogContent className="w-[95vw] sm:max-w-[750px] bg-white rounded-2xl sm:rounded-[2.5rem] p-0 overflow-hidden border-0 shadow-2xl max-h-[95vh] flex flex-col focus:outline-none scrollbar-hide">
         {content}
       </DialogContent>
     </Dialog>

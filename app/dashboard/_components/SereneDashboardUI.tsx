@@ -2,6 +2,7 @@
 
 import { ReactNode, useState, useMemo } from "react";
 import Link from "next/link";
+import { format } from "date-fns";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -97,7 +98,7 @@ export function SereneWelcomeHeader({ name, timeOfDay = "morning", className, co
 
   return (
     <div className={cn(
-      "w-full p-6 md:p-8 bg-gradient-to-br from-serene-blue-50 to-white rounded-2xl mb-8 relative overflow-hidden shadow-sm border border-serene-blue-100 transition-all duration-500",
+      "w-full p-6 md:p-8 bg-gradient-to-br from-serene-blue-50 to-white rounded-2xl sm:rounded-3xl mb-8 relative overflow-hidden shadow-sm border border-serene-blue-100 transition-all duration-500",
       className
     )}>
       <div className="absolute top-0 right-0 w-64 h-64 bg-serene-blue-200/20 rounded-full -translate-y-1/2 translate-x-1/3 blur-3xl pointer-events-none" />
@@ -120,7 +121,7 @@ export function SereneSectionHeader({ title, description, action, className }: {
     className?: string;
 }) {
   return (
-    <div className={cn("flex flex-col sm:flex-row sm:items-center justify-between mb-6 gap-2", className)}>
+    <div className={cn("flex sm:flex-row sm:items-center justify-between mb-6 gap-2", className)}>
       <div>
         <h2 className="text-xl font-bold text-serene-neutral-900 tracking-tight">{title}</h2>
         {description && <p className="text-sm font-medium text-serene-neutral-500 mt-1">{description}</p>}
@@ -153,7 +154,7 @@ export function SereneQuickActionCard({
 
   const content = (
     <div className={cn(
-      "group relative overflow-hidden rounded-2xl p-5 transition-all duration-300 cursor-pointer border border-transparent hover:border-serene-blue-200/50 shadow-sm hover:shadow-md h-full",
+      "group relative overflow-hidden rounded-2xl sm:rounded-3xl p-4 sm:p-5 transition-all duration-300 cursor-pointer border border-transparent hover:border-serene-blue-200/50 shadow-sm hover:shadow-md h-full",
       variants[variant], className
     )}>
       {badge && (
@@ -167,9 +168,15 @@ export function SereneQuickActionCard({
             {icon}
           </div>
           {actionIcon && (
-            <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); onActionClick?.(e); }} className="p-2 rounded-full bg-white/40 hover:bg-white/60 transition-all shadow-sm">
+            <div 
+              role="button"
+              tabIndex={0}
+              onClick={(e) => { e.preventDefault(); e.stopPropagation(); onActionClick?.(e); }} 
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); onActionClick?.(e); } }}
+              className="p-2 rounded-full bg-white/40 hover:bg-white/60 transition-all shadow-sm cursor-pointer"
+            >
               {actionIcon}
-            </button>
+            </div>
           )}
         </div>
         <div>
@@ -180,7 +187,7 @@ export function SereneQuickActionCard({
     </div>
   );
 
-  return href ? <Link href={href} className="block h-full">{content}</Link> : <button onClick={onClick} className="block w-full text-left h-full">{content}</button>;
+  return href ? <Link href={href} className="block h-full min-w-0">{content}</Link> : <button onClick={onClick} className="block w-full text-left h-full min-w-0">{content}</button>;
 }
 
 export function SereneStatsCard({ title, value, icon, trend, trendValue, description, className }: { 
@@ -193,8 +200,8 @@ export function SereneStatsCard({ title, value, icon, trend, trendValue, descrip
     className?: string; 
 }) {
   return (
-    <Card className={cn("overflow-hidden border-serene-neutral-100 hover:border-serene-blue-200 transition-all duration-300", className)}>
-      <CardContent className="p-5">
+    <Card className={cn("overflow-hidden border-serene-neutral-100 hover:border-serene-blue-200 transition-all duration-300 rounded-2xl sm:rounded-3xl", className)}>
+      <CardContent className="p-4 sm:p-5">
         <div className="flex items-center justify-between mb-3">
           <p className="text-sm font-semibold text-serene-neutral-500 uppercase tracking-wider">{title}</p>
           {icon && <div className="text-serene-blue-600 bg-serene-blue-50 p-2 rounded-lg">{icon}</div>}
@@ -227,49 +234,71 @@ export function SereneReportCard({ report, onClick, isSelected, className }: {
     <Card 
         onClick={onClick}
         className={cn(
-            "group relative overflow-hidden transition-all duration-300 cursor-pointer border-serene-neutral-100 hover:border-serene-blue-200 hover:shadow-md",
+            "group relative overflow-hidden transition-all duration-300 cursor-pointer border-serene-neutral-100 hover:border-serene-blue-200 hover:shadow-md rounded-2xl sm:rounded-3xl",
             isSelected ? "border-serene-blue-600 ring-1 ring-serene-blue-600 shadow-md bg-serene-blue-50/30" : "bg-white",
             className
         )}
     >
-        <CardContent className="p-4">
-            <div className="flex justify-between items-start mb-2">
-                <div className="flex items-center gap-1.5 min-w-0">
-                    <Badge variant="outline" className={cn("text-[10px] font-bold uppercase border-0 px-2 py-0.5", statusTheme)}>
-                        {status}
-                    </Badge>
-                    {(report.additional_info as any)?.is_for_child && (
-                        <Badge className="bg-amber-100 text-amber-700 border-0 text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-md">
-                            Child Abuse
-                        </Badge>
-                    )}
-                    {report.is_onBehalf && (
-                        <Badge className="bg-purple-100 text-purple-700 border-0 text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-md">
-                            On Behalf Of Someone
-                        </Badge>
-                    )}
-                </div>
-                <span className="text-[10px] font-bold text-serene-neutral-400 uppercase tracking-widest leading-none">
-                    {report.submission_timestamp ? new Date(report.submission_timestamp).toLocaleDateString() : ""}
-                </span>
+        <CardContent className="p-4 flex items-center gap-4">
+            <div className={cn(
+                "h-12 w-12 rounded-full flex items-center justify-center text-lg font-bold shrink-0 shadow-sm",
+                isSelected ? "bg-serene-blue-600 text-white" : "bg-serene-blue-50 text-serene-blue-600"
+            )}>
+                {report.type_of_incident?.charAt(0).toUpperCase() || "R"}
             </div>
-            <h4 className={cn("font-bold text-serene-neutral-900 mb-1 line-clamp-1", isSelected ? "text-serene-blue-700" : "")}>
-                {report.type_of_incident?.replace(/_/g, " ") || "Incident Report"}
-            </h4>
-            <p className="text-xs text-serene-neutral-500 line-clamp-2 leading-relaxed mb-3">
-                {report.incident_description || "No specific details provided."}
-            </p>
-            <div className="flex items-center justify-between">
-                <div className="flex items-center gap-1.5">
-                    <div className="h-5 w-5 rounded-full bg-serene-neutral-100 flex items-center justify-center">
-                        <MapPin className="h-3 w-3 text-serene-neutral-400" />
+
+            <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between mb-1">
+                    <div className="flex flex-wrap items-center gap-1.5 min-w-0">
+                        <h4 className={cn(
+                            "font-bold truncate max-w-[150px] sm:max-w-none",
+                            isSelected ? "text-serene-blue-700" : "text-serene-neutral-900"
+                        )}>
+                            {report.type_of_incident?.replace(/_/g, " ") || "Incident Report"}
+                        </h4>
+                        <Badge variant="outline" className={cn("text-[10px] font-bold uppercase border-0 px-1.5 py-0.5", statusTheme)}>
+                            {status}
+                        </Badge>
+                        {(report.additional_info as any)?.is_for_child && (
+                            <Badge className="bg-amber-100 text-amber-700 border-0 text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-md">
+                                Child Abuse
+                            </Badge>
+                        )}
+                        {report.is_onBehalf && (
+                            <Badge className="bg-purple-100 text-purple-700 border-0 text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-md">
+                                On Behalf
+                            </Badge>
+                        )}
                     </div>
-                    <span className="text-[10px] font-bold text-serene-neutral-400 uppercase tracking-tight truncate max-w-[120px]">
-                        {report.city || report.state || report.locality || "Region Confidential"}
+                    <span suppressHydrationWarning className="text-[10px] font-bold text-serene-neutral-400 uppercase tracking-widest hidden sm:block">
+                        {report.submission_timestamp ? new Date(report.submission_timestamp).toLocaleDateString() : ""}
                     </span>
                 </div>
-                <ChevronRight className={cn("h-4 w-4 transition-all", isSelected ? "text-serene-blue-600 translate-x-1" : "text-serene-neutral-300 group-hover:text-serene-blue-400 group-hover:translate-x-1")} />
+
+                <p className="text-xs text-serene-neutral-500 line-clamp-2 leading-relaxed mb-2">
+                    {report.incident_description || "No specific details provided."}
+                </p>
+
+                <div className="flex flex-wrap items-center gap-2">
+                    <div className="flex items-center gap-1 text-serene-neutral-400 text-[9px] sm:text-[10px] font-bold uppercase tracking-wider bg-serene-neutral-50 px-2 py-1 rounded-md border border-serene-neutral-100">
+                        <MapPin className="h-2.5 w-2.5" />
+                        <span className="truncate max-w-[80px] sm:max-w-none">
+                            {report.city || "Region Confidential"}
+                        </span>
+                    </div>
+                    {report.submission_timestamp && (
+                         <div className="flex items-center gap-1 text-serene-neutral-400 text-[9px] sm:text-[10px] font-bold uppercase tracking-wider bg-serene-neutral-50 px-2 py-1 rounded-md border border-serene-neutral-100 sm:hidden">
+                            <Clock className="h-2.5 w-2.5" />
+                            {new Date(report.submission_timestamp).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                        </div>
+                    )}
+                </div>
             </div>
+
+            <ChevronRight className={cn(
+                "h-4 w-4 shrink-0 transition-all",
+                isSelected ? "text-serene-blue-600 translate-x-1" : "text-serene-neutral-200 group-hover:text-serene-blue-400 group-hover:translate-x-1"
+            )} />
         </CardContent>
     </Card>
   );
@@ -290,7 +319,7 @@ export function SereneProviderCard({ provider, onBook, onChat, className }: {
   className?: string;
 }) {
   return (
-    <Card className={cn("overflow-hidden border-serene-neutral-100 rounded-2xl shadow-sm hover:shadow-md transition-all", className)}>
+    <Card className={cn("overflow-hidden border-serene-neutral-200 rounded-2xl sm:rounded-3xl shadow-sm hover:shadow-md transition-all", className)}>
       <CardContent className="p-5">
         <div className="flex items-start justify-between gap-4">
           <div className="flex items-center gap-3">
@@ -371,14 +400,14 @@ export function SereneActivityCard({ report, href, className }: {
 
   return (
     <Link href={href} className={cn("block group", className)}>
-      <Card className="overflow-hidden border-serene-neutral-100 hover:border-serene-blue-200 transition-all duration-300 hover:shadow-md">
+      <Card className="overflow-hidden border-serene-neutral-100 hover:border-serene-blue-200 transition-all duration-300 hover:shadow-md cursor-pointer rounded-2xl sm:rounded-3xl">
         <CardContent className="p-4 flex items-center gap-4">
           <div className="h-12 w-12 rounded-full flex items-center justify-center text-lg font-bold shrink-0 bg-serene-blue-50 text-serene-blue-600">
             {report.type_of_incident?.charAt(0).toUpperCase() || "R"}
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center justify-between mb-1">
-              <div className="flex items-center gap-2 min-w-0">
+              <div className="flex flex-wrap items-center gap-2 min-w-0">
                 <h4 className="font-semibold text-serene-neutral-900 truncate">
                   {report.type_of_incident?.replace(/_/g, " ") || "Incident Report"}
                 </h4>
@@ -394,19 +423,24 @@ export function SereneActivityCard({ report, href, className }: {
                    </Badge>
                 )}
               </div>
-              <span className="text-xs text-serene-neutral-400 font-medium ml-2">
-                {report.submission_timestamp ? new Date(report.submission_timestamp).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' }) : ""}
+              <span suppressHydrationWarning className="text-xs text-serene-neutral-400 font-medium ml-2 shrink-0">
+                {report.submission_timestamp ? format(new Date(report.submission_timestamp), "EEEE, MMM d") : ""}
               </span>
             </div>
-            <div className="flex items-center justify-between gap-4">
-              <p className="text-sm text-serene-neutral-500 truncate flex-1">
+            <div className="flex flex-col gap-2 mt-1">
+              <p className="text-sm text-serene-neutral-500 line-clamp-2 w-full">
                 {report.incident_description || "No description provided."}
               </p>
-              {(report.media as any)?.url && (
-                <div className="flex items-center gap-1 text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider shrink-0">
-                   <Mic className="h-3 w-3" /> Audio
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="flex items-center gap-1 text-serene-neutral-400 text-[10px] font-bold uppercase tracking-wider bg-serene-neutral-50 px-2 py-1 rounded-md">
+                   <MapPin className="h-3 w-3" /> {report.city || "Region Confidential"}
                 </div>
-              )}
+                {(report.media as any)?.url && (
+                  <div className="flex items-center gap-1 text-amber-600 bg-amber-50 px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider shrink-0">
+                     <Mic className="h-3 w-3" /> Audio
+                  </div>
+                )}
+              </div>
             </div>
           </div>
           <ChevronRight className="h-4 w-4 text-serene-neutral-300 group-hover:text-serene-blue-400" />
@@ -491,8 +525,25 @@ export function VerificationBanner({ profileDetails, supportServices }: { profil
 }
 
 export function CalendarWidget({ appointments, upcomingAppointmentsCount }: { appointments: AppointmentWithDetails[]; upcomingAppointmentsCount: number; }) {
+  if (appointments.length === 0) return null;
+
   const [isExpanded, setIsExpanded] = useState(false);
-  const [selectedDate, setSelectedDate] = useState(new Date());
+  const [selectedDate, setSelectedDate] = useState(() => {
+    // Initial selection strategy:
+    // 1. First upcoming appointment
+    // 2. Most recent past appointment
+    // 3. Today
+    const now = new Date();
+    const sorted = [...appointments]
+      .filter(a => !!a.appointment_date)
+      .sort((a, b) => new Date(a.appointment_date!).getTime() - new Date(b.appointment_date!).getTime());
+    
+    const upcoming = sorted.find(a => new Date(a.appointment_date!) >= now);
+    if (upcoming) return new Date(upcoming.appointment_date!);
+    
+    if (sorted.length > 0) return new Date(sorted[sorted.length - 1].appointment_date!);
+    return now;
+  });
   const [viewMode, setViewMode] = useState<'week' | 'month'>('week');
 
   const getAppointmentsForDay = (date: Date) => appointments.filter(a => a.appointment_date && new Date(a.appointment_date).toDateString() === date.toDateString());
@@ -517,7 +568,11 @@ export function CalendarWidget({ appointments, upcomingAppointmentsCount }: { ap
           </div>
           <div className="text-left">
             <h3 className="font-semibold text-serene-neutral-900">Schedule</h3>
-            <p className="text-sm text-serene-neutral-500">{upcomingAppointmentsCount} upcoming appointment{upcomingAppointmentsCount !== 1 ? 's' : ''}</p>
+            <p className="text-sm text-serene-neutral-500">
+              {upcomingAppointmentsCount > 0 
+                ? `${upcomingAppointmentsCount} upcoming appointment${upcomingAppointmentsCount !== 1 ? 's' : ''}` 
+                : `${appointments.length} past appointment${appointments.length !== 1 ? 's' : ''}`}
+            </p>
           </div>
         </div>
         {isExpanded ? <ChevronUp className="h-5 w-5 text-serene-neutral-400" /> : <ChevronDown className="h-5 w-5 text-serene-neutral-400" />}
@@ -538,7 +593,7 @@ export function CalendarWidget({ appointments, upcomingAppointmentsCount }: { ap
           </div>
 
           <div className="grid grid-cols-7 gap-1">
-            {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map(d => <div key={d} className="text-center text-[10px] font-bold text-serene-neutral-400 py-1">{d}</div>)}
+            {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d, i) => <div key={`${d}-${i}`} className="text-center text-[10px] font-bold text-serene-neutral-400 py-1">{d}</div>)}
             {weekDays.map((day, idx) => {
               const isToday = day.toDateString() === new Date().toDateString();
               const isSelected = day.toDateString() === selectedDate.toDateString();
@@ -589,10 +644,15 @@ export function DashboardSearchOverlay({ query, filteredReports, filteredMatches
             ))}
             {filteredMatches?.map((match: any) => (
                <Link href={`/dashboard/cases/${match.id}`} key={match.id} className="block group">
-               <Card className="overflow-hidden border-serene-neutral-100 hover:border-serene-blue-200 p-4 flex items-center gap-4">
+                 <Card className="overflow-hidden border-serene-neutral-100 hover:border-serene-blue-200 p-4 flex items-center gap-4 rounded-2xl sm:rounded-3xl">
                  <div className="h-12 w-12 rounded-2xl flex items-center justify-center bg-serene-blue-50 text-serene-blue-600"><Shield className="h-5 w-5" /></div>
                  <div className="flex-1 min-w-0">
                     <h4 className="font-semibold text-serene-neutral-900 truncate">{match.report?.type_of_incident?.replace(/_/g, " ") || "Case"}</h4>
+                        {(match.report?.additional_info as any)?.is_for_child && (
+                            <Badge className="bg-amber-100 text-amber-700 border-0 text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-md text-nowrap">
+                                Child Abuse
+                            </Badge>
+                        )}
                     <p className="text-sm text-serene-neutral-500 truncate">{match.service_details?.name || "Support case"}</p>
                  </div>
                  <ChevronRight className="h-4 w-4 text-serene-neutral-300" />
@@ -614,7 +674,7 @@ export function DashboardSearchOverlay({ query, filteredReports, filteredMatches
 
 export function DashboardEmptyState({ icon, title, description, action }: any) {
     return (
-        <div className="text-center py-12 bg-white rounded-2xl border border-dashed border-serene-neutral-200">
+        <div className="text-center py-12 bg-white rounded-2xl sm:rounded-3xl border border-dashed border-serene-neutral-200">
             <div className="h-12 w-12 bg-serene-neutral-100 rounded-full flex items-center justify-center mx-auto mb-3 text-serene-neutral-400">
                 {icon}
             </div>

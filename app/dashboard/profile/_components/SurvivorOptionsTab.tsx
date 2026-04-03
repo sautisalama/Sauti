@@ -29,7 +29,7 @@ import {
 interface MatchedService {
   id: string;
   status: string;
-  created_at: string;
+  match_date: string;
   provider?: {
     id: string;
     first_name: string | null;
@@ -181,7 +181,7 @@ export function SurvivorOptionsTab({
                       </div>
                     )}
                     <p className="text-xs text-serene-neutral-400 pt-2">
-                      Matched on {new Date(match.created_at).toLocaleDateString()}
+                      Matched on {new Date(match.match_date).toLocaleDateString()}
                     </p>
                   </div>
                 </div>

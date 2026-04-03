@@ -13,7 +13,9 @@ import {
     FileText,
     History,
     Inbox,
-    AlertCircle
+    AlertCircle,
+    ChevronRight,
+    Search
 } from "lucide-react";
 import Link from "next/link";
 import { formatDistanceToNow } from "date-fns";
@@ -170,31 +172,25 @@ export function AdminActivitySection() {
     return (
         <div className="space-y-8">
             {/* New / Inbox Section */}
-            <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                    <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-                        <Inbox className="h-5 w-5 text-serene-blue-600" />
-                        New Verifications
-                    </h3>
-                    {newItems.length > 0 && (
-                         <span className="bg-serene-blue-100 text-serene-blue-700 text-xs font-bold px-2 py-0.5 rounded-full">
+            {newItems.length > 0 && (
+                <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                        <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                            <Inbox className="h-5 w-5 text-serene-blue-600" />
+                            New Verifications
+                        </h3>
+                        <span className="bg-serene-blue-100 text-serene-blue-700 text-xs font-bold px-2 py-0.5 rounded-full">
                             {newItems.length}
                         </span>
-                    )}
-                </div>
+                    </div>
 
-                <div className="grid gap-3">
-                    {newItems.length > 0 ? (
-                        newItems.map((item) => (
+                    <div className="grid gap-3">
+                        {newItems.map((item) => (
                             <ActivityCard key={`${item.type}-${item.id}`} item={item} isNew={true} />
-                        ))
-                    ) : (
-                        <div className="p-6 text-center bg-gray-50/50 rounded-2xl border border-dashed border-gray-200">
-                            <p className="text-gray-500 text-sm">No new verifications pending.</p>
-                        </div>
-                    )}
+                        ))}
+                    </div>
                 </div>
-            </div>
+            )}
 
             {/* History Section */}
             <div className="space-y-4">
@@ -240,17 +236,17 @@ function ActivityCard({ item, isNew }: { item: ActivityItem, isNew: boolean }) {
             className="block group"
         >
             <Card className={cn(
-                "hover:shadow-md transition-all duration-200 overflow-hidden border",
+                "hover:shadow-md transition-all duration-200 overflow-hidden border rounded-2xl sm:rounded-[2.5rem]",
                 isNew 
                     ? "border-serene-blue-200 bg-white shadow-sm ring-1 ring-serene-blue-50" 
                     : "border-gray-100 bg-gray-50/30 hover:bg-white"
             )}>
-                <CardContent className="p-3 sm:p-4 flex items-start gap-3 sm:gap-4">
+                <CardContent className="p-3 sm:p-4 flex items-center gap-3 sm:gap-4">
                     {/* Icon/Avatar */}
-                    <div className="shrink-0 pt-0.5">
+                    <div className="shrink-0">
                         {item.type === 'professional' ? (
                             <Avatar className={cn(
-                                "h-10 w-10 sm:h-12 sm:w-12 border-2 shadow-sm",
+                                "h-12 w-12 border-2 shadow-sm",
                                 isNew ? "border-serene-blue-100" : "border-white grayscale-[0.3]"
                             )}>
                                 <AvatarImage src={item.avatarUrl || undefined} />
@@ -263,81 +259,86 @@ function ActivityCard({ item, isNew }: { item: ActivityItem, isNew: boolean }) {
                             </Avatar>
                         ) : item.type === 'service' ? (
                             <div className={cn(
-                                "h-10 w-10 sm:h-12 sm:w-12 rounded-full flex items-center justify-center border-2 shadow-sm",
+                                "h-12 w-12 rounded-full flex items-center justify-center border-2 shadow-sm",
                                 isNew 
                                     ? "bg-serene-purple-50 text-serene-purple-600 border-serene-purple-100" 
                                     : "bg-gray-100 text-gray-400 border-white"
                             )}>
-                                <Building2 className="h-5 w-5 sm:h-6 sm:w-6" />
+                                <Building2 className="h-6 w-6" />
                             </div>
                         ) : (
                             <div className={cn(
-                                "h-10 w-10 sm:h-12 sm:w-12 rounded-full flex items-center justify-center border-2 shadow-sm",
+                                "h-12 w-12 rounded-full flex items-center justify-center border-2 shadow-sm",
                                 isNew 
                                     ? "bg-rose-50 text-rose-600 border-rose-100" 
                                     : "bg-gray-100 text-gray-400 border-white"
                             )}>
-                                <AlertCircle className="h-5 w-5 sm:h-6 sm:w-6" />
+                                <AlertCircle className="h-6 w-6" />
                             </div>
                         )}
                     </div>
 
                     {/* Content */}
-                    <div className="flex-1 min-w-0 grid gap-1">
-                        <div className="flex items-start justify-between gap-2">
-                            <h4 className={cn(
-                                "truncate text-sm sm:text-base pr-2",
-                                isNew ? "font-bold text-gray-900" : "font-medium text-gray-600"
-                            )}>
-                                {item.name}
-                            </h4>
-                            <span className="text-[10px] sm:text-xs text-gray-400 whitespace-nowrap pt-1 shrink-0 flex items-center gap-1">
+                    <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between mb-1">
+                            <div className="flex flex-wrap items-center gap-1.5 min-w-0">
+                                <h4 className={cn(
+                                    "font-bold truncate max-w-[150px] sm:max-w-none",
+                                    isNew ? "text-gray-900" : "text-gray-600"
+                                )}>
+                                    {item.name}
+                                </h4>
+                                <Badge variant="secondary" className={cn(
+                                    "px-1.5 py-0 h-5 text-[10px] font-bold border uppercase tracking-tight",
+                                    isNew ? "bg-white border-gray-200 text-gray-700" : "bg-gray-100 border-gray-200 text-gray-500"
+                                )}>
+                                    {item.type === 'professional' ? 'Pro' : item.type === 'service' ? 'Service' : 'Request'}
+                                </Badge>
+                                
+                                {!isNew && (
+                                    <Badge variant="outline" className={cn(
+                                        "px-1.5 py-0 h-5 text-[10px] font-bold border capitalize",
+                                        item.status === 'verified' ? "bg-green-50 text-green-700 border-green-200" :
+                                        item.status === 'rejected' ? "bg-red-50 text-red-700 border-red-200" :
+                                        "bg-gray-50 text-gray-600 border-gray-200"
+                                    )}>
+                                        {item.status.replace('_', ' ')}
+                                    </Badge>
+                                )}
+                            </div>
+                            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden sm:flex items-center gap-1">
                                 <Clock className="h-3 w-3" />
                                 {formatDistanceToNow(new Date(isNew ? item.submittedAt : (item.updatedAt || item.submittedAt)), { addSuffix: true })}
                             </span>
                         </div>
                         
-                        <div className="flex flex-wrap items-center gap-2">
-                            <Badge variant="secondary" className={cn(
-                                "px-1.5 py-0 h-5 text-[10px] sm:text-xs font-normal border uppercase tracking-tight",
-                                isNew ? "bg-white border-gray-200 text-gray-700" : "bg-gray-100 border-gray-200 text-gray-500"
-                            )}>
-                                {item.type === 'professional' ? 'Pro' : item.type === 'service' ? 'Service' : 'Request'}
-                            </Badge>
-                            
-                            {!isNew && (
-                                <Badge variant="outline" className={cn(
-                                    "px-1.5 py-0 h-5 text-[10px] sm:text-xs font-normal border capitalize",
-                                    item.status === 'verified' ? "bg-green-50 text-green-700 border-green-200" :
-                                    item.status === 'rejected' ? "bg-red-50 text-red-700 border-red-200" :
-                                    "bg-gray-50 text-gray-600 border-gray-200"
-                                )}>
-                                    {item.status.replace('_', ' ')}
-                                </Badge>
-                            )}
+                        <p className="text-xs text-gray-500 truncate max-w-[200px] sm:max-w-none mb-1">
+                            {item.details}
+                        </p>
 
-                            <span className="text-xs text-gray-500 truncate max-w-[150px] sm:max-w-[300px]">
-                                {item.details}
-                            </span>
+                        <div className="flex flex-wrap items-center gap-2">
+                             {isNew && item.type !== 'request' && (
+                                 <div className="flex items-center gap-1 text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-serene-blue-600 bg-serene-blue-50 px-1.5 py-0.5 rounded">
+                                    <FileText className="h-2.5 w-2.5" />
+                                    <span>Documents attached</span>
+                                 </div>
+                            )}
+                            {isNew && item.type === 'request' && (
+                                 <div className="flex items-center gap-1 text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-rose-600 bg-rose-50 px-1.5 py-0.5 rounded">
+                                    <AlertCircle className="h-2.5 w-2.5" />
+                                    <span>Action required</span>
+                                 </div>
+                            )}
+                            <div className="flex items-center gap-1 text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-gray-400 sm:hidden">
+                                <Clock className="h-2.5 w-2.5" />
+                                {formatDistanceToNow(new Date(isNew ? item.submittedAt : (item.updatedAt || item.submittedAt)), { addSuffix: true })}
+                            </div>
                         </div>
-                        
-                        {isNew && item.type !== 'request' && (
-                             <div className="flex items-center gap-1 mt-1 text-xs font-medium text-serene-blue-600">
-                                <FileText className="h-3 w-3" />
-                                <span>Documents attached</span>
-                             </div>
-                        )}
-                        {isNew && item.type === 'request' && (
-                             <div className="flex items-center gap-1 mt-1 text-xs font-medium text-rose-600">
-                                <AlertCircle className="h-3 w-3" />
-                                <span>Action required</span>
-                             </div>
-                        )}
                     </div>
 
-                    {/* Mobile Arrow / Desktop Action Indicator */}
-                    <div className="self-center text-gray-300 group-hover:text-serene-blue-400 transition-colors">
-                        <ArrowRight className="h-5 w-5" />
+                    {/* Arrow Indicator */}
+                    <div className="shrink-0 text-gray-300 group-hover:text-serene-blue-400 transition-colors">
+                        <ChevronRight className="h-5 w-5" />
                     </div>
                 </CardContent>
             </Card>

@@ -18,7 +18,7 @@ export function ChatModal({
 }: ChatModalProps) {
 	return (
 		<Dialog open={isOpen} onOpenChange={onClose}>
-			<DialogContent className="max-w-5xl h-[85vh] bg-white rounded-[2.5rem] p-0 overflow-hidden border-0 shadow-2xl flex flex-col">
+			<DialogContent className="max-w-5xl h-[85vh] bg-white rounded-2xl sm:rounded-[2.5rem] p-0 overflow-hidden border-0 shadow-2xl flex flex-col">
 				<div className="h-full overflow-hidden">
 					<AppointmentChat
 						userId={userId}

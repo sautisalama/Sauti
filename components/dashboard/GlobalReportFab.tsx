@@ -38,13 +38,21 @@ export function GlobalReportFab({ userId }: GlobalReportFabProps) {
 	const isDashboardPage = pathname === "/dashboard";
 	const isReportPage = pathname === "/dashboard/reports" || pathname.startsWith("/dashboard/reports/");
 	
-	// Visibility Logic: Only show on Home or Reports (list/detail), hide for admins
-	const isVisible = (isDashboardPage || isReportPage) && !isAdmin && !!userId;
+    const hasData = (dash?.data?.reports?.length || 0) > 0 || (dash?.data?.matchedServices?.length || 0) > 0;
+
+	// Visibility Logic: 
+    // 1. Hide for admins
+    // 2. Dashboard: Show only if NO data exists (new users)
+    // 3. Reports: Show 
+    // 4. Must be authenticated
+	const isVisible = !isAdmin && !!userId && (
+        (isDashboardPage && !hasData)
+    );
 
 	if (!isVisible) return null;
 
 	return (
-		<div className="fixed bottom-24 lg:bottom-8 right-6 z-50">
+		<div className="fixed bottom-24 lg:bottom-8 right-6 z-50 lg:hidden">
 			<Sheet open={isOpen} onOpenChange={setIsOpen}>
 				<SheetTrigger asChild>
 					<div

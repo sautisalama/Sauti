@@ -192,6 +192,23 @@ export async function markChatAsRead(chatId: string) {
   if (error) throw error;
 }
 
+export async function markAllChatsAsRead() {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Unauthorized');
+
+  const { error } = await supabase
+    .from('chat_participants')
+    .update({ 
+      status: {
+        last_read_at: new Date().toISOString()
+      } as any 
+    })
+    .eq('user_id', user.id);
+
+  if (error) throw error;
+}
+
 export async function searchUsers(query: string) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();

@@ -329,10 +329,6 @@ export default function ReportsMasterDetail({ userId }: { userId: string }) {
 		setFloatingChats(prev => prev.filter(c => c.id !== id));
 	}, []);
 
-	// Calendar State
-	const [calendarViewMode, setCalendarViewMode] = useState<'week' | 'month'>('week');
-	const [calendarSelectedDate, setCalendarSelectedDate] = useState(new Date());
-
 	const needsOnboarding = useMemo(() => {
 		const profile = dash?.data?.profile;
 		if (!profile) return false;
@@ -373,9 +369,6 @@ export default function ReportsMasterDetail({ userId }: { userId: string }) {
 		return days;
 	};
 
-	const weekDays = useMemo(() => getWeekDays(calendarSelectedDate), [calendarSelectedDate]);
-	const monthDays = useMemo(() => getMonthDays(calendarSelectedDate), [calendarSelectedDate]);
-
 	const getAllAppointments = (reportsData: ReportItem[]) => {
 		const all: any[] = [];
 		reportsData.forEach(r => {
@@ -394,6 +387,33 @@ export default function ReportsMasterDetail({ userId }: { userId: string }) {
 			a.appointment_date && new Date(a.appointment_date).toDateString() === date.toDateString()
 		);
 	};
+
+	// Calendar State
+	const [calendarViewMode, setCalendarViewMode] = useState<'week' | 'month'>('week');
+	const [calendarSelectedDate, setCalendarSelectedDate] = useState(new Date());
+
+	const weekDays = useMemo(() => getWeekDays(calendarSelectedDate), [calendarSelectedDate]);
+	const monthDays = useMemo(() => getMonthDays(calendarSelectedDate), [calendarSelectedDate]);
+
+	// Initial selection strategy for calendar (Focus on upcoming or most recent past)
+	useEffect(() => {
+		if (loading || reports.length === 0) return;
+		
+		const allAppts = getAllAppointments(reports);
+		if (allAppts.length === 0) return;
+
+		const now = new Date();
+		const sorted = [...allAppts].sort((a, b) => 
+			new Date(a.appointment_date!).getTime() - new Date(b.appointment_date!).getTime()
+		);
+
+		const upcoming = sorted.find(a => new Date(a.appointment_date!) >= now);
+		if (upcoming) {
+			setCalendarSelectedDate(new Date(upcoming.appointment_date!));
+		} else if (sorted.length > 0) {
+			setCalendarSelectedDate(new Date(sorted[sorted.length - 1].appointment_date!));
+		}
+	}, [loading, reports.length]);
 
 	useEffect(() => {
 		// Prefer provider snapshot when available (no spinner)
@@ -619,11 +639,15 @@ export default function ReportsMasterDetail({ userId }: { userId: string }) {
 		};
 	}, [userId, supabase, reports]);
 
+    const setTopBarTitle = dash?.setTopBarTitle;
+
     // Sync title with mobile top bar
     useEffect(() => {
-        dash?.setTopBarTitle("Reports");
-        return () => dash?.setTopBarTitle(null);
-    }, [dash]);
+        if (setTopBarTitle) setTopBarTitle("Reports");
+        return () => {
+			if (setTopBarTitle) setTopBarTitle(null);
+		};
+    }, [setTopBarTitle]);
 
 	const filtered = useMemo(() => {
 		let filteredReports = reports.filter(r => {
@@ -1136,7 +1160,7 @@ export default function ReportsMasterDetail({ userId }: { userId: string }) {
 						mobileView !== "calendar" ? "hidden lg:block" : ""
 					}`}
 				>
-					<Card className="p-6 sm:p-8 shadow-2xl shadow-slate-200/40 border-serene-neutral-100/50 rounded-[2.5rem] bg-white h-full flex flex-col">
+					<Card className="p-6 sm:p-8 shadow-2xl shadow-slate-200/40 border-serene-neutral-100/50 rounded-2xl sm:rounded-[2.5rem] bg-white h-full flex flex-col">
 						<div className="flex flex-col sm:flex-row sm:items-center justify-between mb-5 gap-3">
 							<div>
 								<div className="flex items-center gap-2 mb-1">
@@ -1194,8 +1218,8 @@ export default function ReportsMasterDetail({ userId }: { userId: string }) {
 								<div className="flex items-center justify-between sm:justify-end gap-3 w-full sm:w-auto">
 									<p className="text-xs sm:text-sm font-bold text-slate-700 uppercase tracking-widest">
 										{calendarViewMode === 'week' 
-											? `${weekDays[0].toLocaleDateString('default', { month: 'short', day: 'numeric' })} - ${weekDays[6].toLocaleDateString('default', { month: 'short', day: 'numeric' })}`
-											: calendarSelectedDate.toLocaleDateString('default', { month: 'short', year: 'numeric' })
+											? `${weekDays[0].toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${weekDays[6].toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
+											: calendarSelectedDate.toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
 										}
 									</p>
 									
@@ -1230,8 +1254,8 @@ export default function ReportsMasterDetail({ userId }: { userId: string }) {
 
 							{/* Days Grid */}
 							<div className="grid grid-cols-7 gap-1 mb-4">
-								{['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map(day => (
-									<div key={day} className="text-center text-xs font-medium text-gray-400 py-1">
+								{['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map((day, i) => (
+									<div key={`${day}-${i}`} className="text-center text-xs font-medium text-gray-400 py-1">
 										{day}
 									</div>
 								))}
@@ -1467,6 +1491,48 @@ export default function ReportsMasterDetail({ userId }: { userId: string }) {
 								</div>
 
 								<div className="flex items-center gap-1">
+									<Button
+										variant="ghost"
+										size="sm"
+										className={cn(
+											"hidden sm:flex text-xs font-semibold px-3 h-8 rounded-full transition-colors",
+											(selected as any)?.administrative?.is_archived 
+												? "text-amber-600 hover:bg-amber-50" 
+												: "text-serene-neutral-400 hover:text-serene-blue-600 hover:bg-serene-neutral-100"
+										)}
+										onClick={async () => {
+											try {
+												const currentAdmin = (selected as any)?.administrative || {};
+												const isArchived = !currentAdmin.is_archived;
+												const { error } = await supabase
+													.from("reports")
+													.update({ 
+														administrative: { ...currentAdmin, is_archived: isArchived } 
+													})
+													.eq("report_id", selected.report_id);
+												
+												if (error) throw error;
+												
+												toast({
+													title: isArchived ? "Report Archived" : "Report Restored",
+													description: isArchived 
+														? "The report has been moved to your archives." 
+														: "The report has been restored to your active folders.",
+												});
+												
+												// Update local state
+												setReports(prev => prev.map(r => 
+													r.report_id === selected.report_id 
+														? { ...r, administrative: { ...currentAdmin, is_archived: isArchived } } 
+														: r
+												));
+											} catch (e) {
+												console.error("Failed to archive report", e);
+											}
+										}}
+									>
+										{(selected as any)?.administrative?.is_archived ? "Restore" : "Archive"}
+									</Button>
 									<Button
 										variant="ghost"
 										size="sm"

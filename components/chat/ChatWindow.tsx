@@ -101,7 +101,7 @@ export function ChatWindow({ chat, onBack }: ChatWindowProps) {
                 report:reports(type_of_incident, report_id, user_id)
             `)
             .or(`survivor_id.eq.${userId},survivor_id.eq.${otherId}`)
-            .order('created_at', { ascending: false });
+            .order('match_date', { ascending: false });
           
           if (data) {
               // Filter for matches involving both parties
@@ -469,7 +469,7 @@ export function ChatWindow({ chat, onBack }: ChatWindowProps) {
                           </Badge>
                         </div>
                         <span className="text-[10px] text-serene-neutral-400 font-medium">
-                          {format(new Date(match.created_at), 'PPP')}
+                          {format(new Date(match.match_date), 'PPP')}
                         </span>
                       </Link>
                     </DropdownMenuItem>

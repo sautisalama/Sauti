@@ -1,12 +1,13 @@
 "use client";
 
-import { Bell, Search, ChevronLeft } from "lucide-react";
+import { Bell, Search, ChevronLeft, ShieldCheck } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { NotificationDropdown } from "./NotificationDropdown";
 import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { Button } from "@/components/ui/button";
+import { useDashboardData } from "@/components/providers/DashboardDataProvider";
 
 export function DesktopHeader({ 
     showSearch = true,
@@ -19,6 +20,9 @@ export function DesktopHeader({
     const router = useRouter();
     const pathname = usePathname();
     const [searchTerm, setSearchTerm] = useState(searchParams.get("q") || "");
+    const dash = useDashboardData();
+    const topBarTitle = dash?.topBarTitle;
+    const topBarActions = dash?.topBarActions;
 
     // Show back button on all pages except main dashboard
     const showBack = pathname !== "/dashboard";
@@ -57,9 +61,25 @@ export function DesktopHeader({
                         onClick={() => router.back()}
                         className="flex items-center gap-1.5 text-serene-neutral-600 hover:text-serene-blue-600 hover:bg-serene-blue-50/50 rounded-xl transition-all"
                     >
-                        <ChevronLeft className="h-4 w-4" />
-                        <span className="text-sm font-semibold hidden sm:inline">Back</span>
+                        <ChevronLeft className="h-5 w-5" />
                     </Button>
+                )}
+
+                {topBarTitle && (
+                    <div className="flex items-center gap-3 ml-2 min-w-0">
+                        <div className="hidden md:flex items-center gap-2 text-serene-blue-600 font-extrabold uppercase tracking-[0.2em] text-[10px] shrink-0">
+                            <ShieldCheck className="h-4 w-4" />
+                        </div>
+                        <div className="min-w-0 flex flex-col justify-center">
+                            {typeof topBarTitle === 'string' ? (
+                                <h1 className="text-sm sm:text-base font-bold text-serene-neutral-900 truncate">
+                                    {topBarTitle}
+                                </h1>
+                            ) : (
+                                topBarTitle
+                            )}
+                        </div>
+                    </div>
                 )}
 
                 {/* Search & Notifications Group - Centered */}
@@ -87,8 +107,15 @@ export function DesktopHeader({
                     {showNotifications && <NotificationDropdown />}
 				</div>
                 
+                {/* Right-aligned Actions (e.g. 3 dots menu) */}
+                {topBarActions && (
+                    <div className="flex items-center gap-2 ml-auto shrink-0 animate-in fade-in slide-in-from-right-4 duration-300">
+                        {topBarActions}
+                    </div>
+                )}
+                
                 {/* Right side spacer to balance back button */}
-                {showBack && <div className="w-[72px] hidden sm:block pointer-events-none" />}
+                {!topBarActions && showBack && <div className="w-[72px] hidden sm:block pointer-events-none" />}
 			</div>
 		</header>
 	);

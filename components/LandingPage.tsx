@@ -45,8 +45,6 @@ import { CircledText } from "@/components/ui/CircledText";
 export function LandingPage() {
 	const [isAuthenticated, setIsAuthenticated] = useState(false);
 	const supabase = createClient();
-	const url = process.env.NEXT_PUBLIC_APP_URL!;
-
 	useEffect(() => {
 		const checkAuth = async () => {
 			const {
@@ -151,24 +149,25 @@ export function LandingPage() {
 										width={800}
 										height={600}
 										className="w-full h-auto max-h-[80%] object-contain object-bottom grayscale contrast-125 mix-blend-multiply"
+										priority
 									/>
                                     
                                     {/* Speech Bubbles Overlay */}
 									<div className="absolute inset-0 pointer-events-none">
 										<div className="absolute top-0 left-0 w-16 md:w-24 h-auto opacity-90" style={{ filter: 'hue-rotate(330deg) saturate(1.2)' }}>
-											<Image src="/landing/chat-bubble.webp" alt="" width={100} height={100} className="w-full h-auto" />
+											<Image src="/landing/chat-bubble.webp" alt="" width={100} height={100} className="w-full h-auto" style={{ width: "auto" }} />
 										</div>
 										<div className="absolute top-4 left-[20%] w-20 md:w-28 h-auto opacity-85 -scale-x-100" style={{ filter: 'hue-rotate(240deg) saturate(1.5)' }}>
-											<Image src="/landing/chat-bubble.webp" alt="" width={120} height={120} className="w-full h-auto" />
+											<Image src="/landing/chat-bubble.webp" alt="" width={120} height={120} className="w-full h-auto" style={{ width: "auto" }} />
 										</div>
 										<div className="absolute top-0 right-[25%] w-18 md:w-24 h-auto opacity-90" style={{ filter: 'hue-rotate(180deg) saturate(1.3)' }}>
-											<Image src="/landing/chat-bubble.webp" alt="" width={100} height={100} className="w-full h-auto" />
+											<Image src="/landing/chat-bubble.webp" alt="" width={100} height={100} className="w-full h-auto" style={{ width: "auto" }} />
 										</div>
 										<div className="absolute top-6 right-0 w-14 md:w-18 h-auto opacity-85 -scale-x-100" style={{ filter: 'hue-rotate(300deg) saturate(1.4)' }}>
-											<Image src="/landing/chat-bubble.webp" alt="" width={100} height={100} className="w-full h-auto" />
+											<Image src="/landing/chat-bubble.webp" alt="" width={100} height={100} className="w-full h-auto" style={{ width: "auto" }} />
 										</div>
 										<div className="absolute top-1/3 left-1/2 -translate-x-1/2 w-14 md:w-20 h-auto opacity-80" style={{ filter: 'hue-rotate(260deg) saturate(1.2)' }}>
-											<Image src="/landing/chat-bubble.webp" alt="" width={80} height={80} className="w-full h-auto" />
+											<Image src="/landing/chat-bubble.webp" alt="" width={80} height={80} className="w-full h-auto" style={{ width: "auto" }} />
 										</div>
 									</div>
 								</div>

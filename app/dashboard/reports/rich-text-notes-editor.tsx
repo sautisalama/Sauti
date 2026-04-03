@@ -310,7 +310,7 @@ export default function ReportNotesEditor({
 			variant="ghost"
 			size="icon"
 			disabled={disabled}
-			className={`h-8 w-8 transition-all duration-150 ${
+			className={`h-9 w-9 shrink-0 transition-all duration-150 ${
 				active
 					? "bg-sauti-teal/10 text-sauti-teal border border-sauti-teal/20 shadow-sm"
 					: "hover:bg-serene-neutral-50 text-serene-neutral-600"
@@ -442,22 +442,49 @@ export default function ReportNotesEditor({
 			)}
 
 			{/* Premium Toolbar */}
-			<div className="flex flex-col gap-2 p-3 bg-gradient-to-b from-serene-neutral-50 to-white border-b border-serene-neutral-100">
-				<div className="flex items-center gap-1 flex-wrap" onMouseDown={prevent}>
+			<div className="flex flex-col bg-gradient-to-b from-serene-neutral-50 to-white border-b border-serene-neutral-100 sticky top-0 z-10">
+				<div className="flex items-center justify-between px-4 py-2 border-b border-serene-neutral-100">
+					<span className="text-[10px] font-bold text-serene-neutral-400 uppercase tracking-widest whitespace-nowrap">Your Journal</span>
+					<div className="flex items-center gap-2">
+						<span className="text-[10px] font-medium text-serene-neutral-400">
+							{saving ? (
+								<span className="flex items-center gap-1.5 text-sauti-teal">
+									<Loader2 className="h-2.5 w-2.5 animate-spin" /> Saving…
+								</span>
+							) : dirty ? (
+								<span className="text-amber-600">Unsaved</span>
+							) : lastSavedAt ? (
+								<span className="flex items-center gap-1 text-serene-green-600">
+									<Check className="h-2.5 w-2.5" /> Saved
+								</span>
+							) : null}
+						</span>
+						<Button
+							type="button"
+							size="sm"
+							onClick={() => save()}
+							disabled={saving || !dirty}
+							className="h-7 px-3 bg-sauti-teal hover:bg-sauti-dark text-white font-bold rounded-xl shadow-sm transition-all duration-200 text-[10px] uppercase tracking-wider"
+						>
+							<Save className="h-3 w-3 mr-1.5" /> Save
+						</Button>
+					</div>
+				</div>
+				<div className="flex items-center gap-1 p-1 overflow-x-auto whitespace-nowrap scrollbar-hide no-scrollbar" onMouseDown={prevent}>
 					<ToolbarBtn onClick={() => editor.chain().focus().undo().run()} title="Undo" disabled={!editor.can().undo()}>
 						<Undo2 className="h-4 w-4" />
 					</ToolbarBtn>
 					<ToolbarBtn onClick={() => editor.chain().focus().redo().run()} title="Redo" disabled={!editor.can().redo()}>
 						<Redo2 className="h-4 w-4" />
 					</ToolbarBtn>
-					<Separator orientation="vertical" className="h-4 mx-1" />
+					<Separator orientation="vertical" className="h-6 mx-1 shrink-0" />
 					<ToolbarBtn active={editor.isActive("heading", { level: 2 })} onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()} title="Heading 2">
 						<Heading2 className="h-4 w-4" />
 					</ToolbarBtn>
 					<ToolbarBtn active={editor.isActive("heading", { level: 3 })} onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()} title="Heading 3">
 						<Heading3 className="h-4 w-4" />
 					</ToolbarBtn>
-					<Separator orientation="vertical" className="h-4 mx-1" />
+					<Separator orientation="vertical" className="h-6 mx-1 shrink-0" />
 					<ToolbarBtn active={editor.isActive("bold")} onClick={() => editor.chain().focus().toggleBold().run()} title="Bold (Ctrl+B)">
 						<Bold className="h-4 w-4" />
 					</ToolbarBtn>
@@ -470,7 +497,7 @@ export default function ReportNotesEditor({
 					<ToolbarBtn active={editor.isActive("strike")} onClick={() => editor.chain().focus().toggleStrike().run()} title="Strikethrough">
 						<Strikethrough className="h-4 w-4" />
 					</ToolbarBtn>
-					<Separator orientation="vertical" className="h-4 mx-1" />
+					<Separator orientation="vertical" className="h-6 mx-1 shrink-0" />
 					<ToolbarBtn active={editor.isActive("bulletList")} onClick={() => editor.chain().focus().toggleBulletList().run()} title="Bullet List">
 						<List className="h-4 w-4" />
 					</ToolbarBtn>
@@ -486,8 +513,7 @@ export default function ReportNotesEditor({
 					<ToolbarBtn onClick={() => editor.chain().focus().setHorizontalRule().run()} title="Horizontal Rule">
 						<MinusSquare className="h-4 w-4" />
 					</ToolbarBtn>
-				</div>
-				<div className="flex items-center gap-1 flex-wrap" onMouseDown={prevent}>
+					<Separator orientation="vertical" className="h-6 mx-1 shrink-0" />
 					<ToolbarBtn active={editor.isActive({ textAlign: "left" })} onClick={() => editor.chain().focus().setTextAlign("left").run()} title="Align Left">
 						<AlignLeft className="h-4 w-4" />
 					</ToolbarBtn>
@@ -500,7 +526,7 @@ export default function ReportNotesEditor({
 					<ToolbarBtn active={editor.isActive({ textAlign: "justify" })} onClick={() => editor.chain().focus().setTextAlign("justify").run()} title="Justify">
 						<AlignJustify className="h-4 w-4" />
 					</ToolbarBtn>
-					<Separator orientation="vertical" className="h-4 mx-1" />
+					<Separator orientation="vertical" className="h-6 mx-1 shrink-0" />
 					<ToolbarBtn active={editor.isActive("link")} onClick={insertOrEditLink} title="Insert/Edit Link">
 						<LinkIcon className="h-4 w-4" />
 					</ToolbarBtn>
@@ -518,31 +544,6 @@ export default function ReportNotesEditor({
 					<ToolbarBtn onClick={onPickImage} title="Insert Image">
 						<ImageIcon className="h-4 w-4" />
 					</ToolbarBtn>
-					<div className="ml-auto flex items-center gap-3">
-						<span className="text-xs font-medium text-serene-neutral-400">
-							{saving ? (
-								<span className="flex items-center gap-1.5 text-sauti-teal">
-									<Loader2 className="h-3 w-3 animate-spin" />
-									Saving…
-								</span>
-							) : dirty ? (
-								<span className="text-amber-600">Unsaved changes</span>
-							) : lastSavedAt ? (
-								<span className="flex items-center gap-1 text-serene-green-600">
-									<Check className="h-3 w-3" /> Saved {lastSavedAt}
-								</span>
-							) : null}
-						</span>
-						<Button
-							type="button"
-							size="sm"
-							onClick={() => save()}
-							disabled={saving || !dirty}
-							className="h-8 px-3.5 bg-sauti-teal hover:bg-sauti-dark text-white font-semibold rounded-xl shadow-sm transition-all duration-200 text-xs"
-						>
-							<Save className="h-3.5 w-3.5 mr-1.5" /> Save
-						</Button>
-					</div>
 				</div>
 			</div>
 

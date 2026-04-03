@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { createClient } from "@/utils/supabase/client";
 
 export interface CalendarStatus {
@@ -20,7 +20,7 @@ export function useCalendarStatus(userId: string) {
 		isLoading: false,
 	});
 	const [isRefreshing, setIsRefreshing] = useState(false);
-	const supabase = createClient();
+	const supabase = useMemo(() => createClient(), []);
 
 	const checkCalendarStatus = useCallback(async () => {
 		if (!userId) return;

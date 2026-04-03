@@ -257,11 +257,30 @@ export default function CaseNotesEditor({
 
 	return (
 		<Card className="p-0 border">
-			<div className="flex items-center gap-2 px-2 sm:px-3 py-2 bg-neutral-50 border-b sticky top-0 z-10">
-				<span className="text-sm font-medium text-neutral-700">Case Notes</span>
-				<Separator orientation="vertical" className="h-4" />
+			<div className="flex flex-col bg-neutral-50 border-b sticky top-0 z-10">
+				<div className="flex items-center gap-2 px-3 py-2 border-b border-neutral-100">
+					<span className="text-xs font-bold text-neutral-500 uppercase tracking-widest">Case Notes</span>
+					<div className="ml-auto flex items-center gap-2">
+						{saving ? (
+							<span className="text-[10px] font-bold text-sauti-teal animate-pulse">Saving…</span>
+						) : dirty ? (
+							<span className="text-[10px] font-bold text-amber-500">Unsaved</span>
+						) : lastSavedAt ? (
+							<span className="text-[10px] font-bold text-green-500">Saved</span>
+						) : null}
+						<Button
+							type="button"
+							size="sm"
+							onClick={() => save()}
+							disabled={saving}
+							className="h-7 px-3 text-[10px] font-bold uppercase tracking-wider"
+						>
+							<Save className="h-3 w-3 mr-1.5" /> Save
+						</Button>
+					</div>
+				</div>
 				<div
-					className="flex items-center gap-1 ml-auto flex-wrap sm:flex-nowrap"
+					className="flex items-center gap-1 p-1 overflow-x-auto whitespace-nowrap scrollbar-hide no-scrollbar"
 					onMouseDown={prevent}
 				>
 					<Button
@@ -284,12 +303,12 @@ export default function CaseNotesEditor({
 					>
 						<Redo2 className="h-4 w-4" />
 					</Button>
-					<Separator orientation="vertical" className="h-4" />
+					<Separator orientation="vertical" className="h-6 mx-1 shrink-0" />
 					<Button
 						type="button"
 						variant={editor.isActive("bold") ? "secondary" : "ghost"}
 						size="icon"
-						className="h-8 w-8"
+						className="h-9 w-9 shrink-0"
 						onClick={() => editor.chain().focus().toggleBold().run()}
 						title="Bold"
 					>
@@ -299,7 +318,7 @@ export default function CaseNotesEditor({
 						type="button"
 						variant={editor.isActive("italic") ? "secondary" : "ghost"}
 						size="icon"
-						className="h-8 w-8"
+						className="h-9 w-9 shrink-0"
 						onClick={() => editor.chain().focus().toggleItalic().run()}
 						title="Italic"
 					>
@@ -309,7 +328,7 @@ export default function CaseNotesEditor({
 						type="button"
 						variant={editor.isActive("underline") ? "secondary" : "ghost"}
 						size="icon"
-						className="h-8 w-8"
+						className="h-9 w-9 shrink-0"
 						onClick={() => editor.chain().focus().toggleUnderline().run()}
 						title="Underline"
 					>
@@ -319,7 +338,7 @@ export default function CaseNotesEditor({
 						type="button"
 						variant={editor.isActive("strike") ? "secondary" : "ghost"}
 						size="icon"
-						className="h-8 w-8"
+						className="h-9 w-9 shrink-0"
 						onClick={() => editor.chain().focus().toggleStrike().run()}
 						title="Strikethrough"
 					>
@@ -476,30 +495,12 @@ export default function CaseNotesEditor({
 						type="button"
 						variant="ghost"
 						size="icon"
-						className="h-8 w-8"
+						className="h-9 w-9 shrink-0"
 						onClick={onPickImage}
 						title="Insert Image"
 					>
 						<ImageIcon className="h-4 w-4" />
 					</Button>
-					<div className="ml-2 flex items-center gap-3 text-xs text-neutral-500">
-						{saving ? (
-							<span>Saving…</span>
-						) : dirty ? (
-							<span>Unsaved changes</span>
-						) : lastSavedAt ? (
-							<span>Saved {lastSavedAt}</span>
-						) : null}
-						<Button
-							type="button"
-							size="sm"
-							onClick={() => save()}
-							disabled={saving}
-							className="h-7"
-						>
-							<Save className="h-4 w-4 mr-1" /> Save
-						</Button>
-					</div>
 				</div>
 			</div>
 
@@ -570,7 +571,7 @@ export default function CaseNotesEditor({
 					list-style: lower-alpha;
 				}
 			`}</style>
-			<EditorContent editor={editor} className="min-h-[200px] sm:min-h-[160px]" />
+			<EditorContent editor={editor} className="min-h-[250px] sm:min-h-[200px]" />
 		</Card>
 	);
 }

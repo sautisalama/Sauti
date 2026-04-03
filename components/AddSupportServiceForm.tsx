@@ -100,7 +100,7 @@ export function AddSupportServiceForm({
 						lng: position.coords.longitude,
 					});
 				},
-				(error) => console.error("Error getting location:", error)
+				(error) => console.warn("Could not get location automatically:", error.message)
 			);
 		}
 	}, []);

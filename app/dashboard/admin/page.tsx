@@ -17,6 +17,7 @@ import {
 	SereneBreadcrumb,
 } from "../_components/SereneDashboardUI";
 import { AdminActivitySection } from "./_components/AdminActivitySection";
+import { useDashboardData } from "@/components/providers/DashboardDataProvider";
 
 import { Database, Tables } from "@/types/db-schema";
 
@@ -36,10 +37,14 @@ export default function AdminDashboard() {
     const [adminProfile, setAdminProfile] = useState<Tables<"profiles"> | null>(null);
 
 	const supabase = createClient();
+    const dash = useDashboardData();
     
 	useEffect(() => {
 		checkAdminStatus();
 		loadQuickStats();
+        
+        dash?.setTopBarTitle("Overview");
+        return () => dash?.setTopBarTitle(null);
 	}, []);
 
 	const checkAdminStatus = async () => {
@@ -208,7 +213,7 @@ export default function AdminDashboard() {
             {/* Quick Action Grid */}
             <div className="pb-10">
                 <SereneSectionHeader title="Management Console" description="Core administrative functions" />
-                <div className="grid grid-cols-1 xs:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4 md:gap-6">
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 md:gap-6">
                      <SereneQuickActionCard 
                         title="Verifications"
                         description={stats ? `${stats.pendingVerifications} Pending` : "Queue"}
