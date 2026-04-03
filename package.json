@@ -5,6 +5,8 @@
 	"type": "module",
 	"scripts": {
 		"dev": "next dev",
+		"dev:ngrok": "npx concurrently \"npm run dev\" \"ngrok http --url=historiographical-baffledly-isadora.ngrok-free.dev 3000\"",
+		"dev:tunnel": "npx concurrently \"npm run dev\" \"npx localtunnel --port 3000\"",
 		"build": "next build",
 		"start": "next start",
 		"lint": "next lint",

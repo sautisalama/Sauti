@@ -119,7 +119,11 @@ export function getOrCreateDeviceId(): string {
 	const STORAGE_KEY = "ss_device_id";
 	let id = localStorage.getItem(STORAGE_KEY);
 	if (!id) {
-		id = crypto.randomUUID();
+		// crypto.randomUUID is only available in secure contexts (HTTPS or localhost)
+		// We provide a fallback for local network development (HTTP)
+		id = (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function")
+			? crypto.randomUUID()
+			: `dev-${Math.random().toString(36).slice(2, 11)}-${Date.now().toString(36)}`;
 		localStorage.setItem(STORAGE_KEY, id);
 	}
 

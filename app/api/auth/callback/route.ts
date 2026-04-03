@@ -71,25 +71,35 @@ export async function GET(request: Request) {
 		}
 
 		if (!error) {
-			const forwardedHost = request.headers.get("x-forwarded-host"); // original origin before load balancer
-			const isLocalEnv = process.env.NODE_ENV === "development";
-
-			// Construct redirect URL
-			let redirectUrl;
-			if (isLocalEnv) {
-				redirectUrl = `${origin}${next}`;
-			} else {
-				redirectUrl = `https://${forwardedHost || new URL(origin).host}${next}`;
-			}
+			const forwardedHost = request.headers.get("x-forwarded-host");
+			const host = request.headers.get("host");
+			const resolvedHost = forwardedHost || host;
+			const protocol = resolvedHost?.includes("localhost") || resolvedHost?.includes("192.168") ? "http" : "https";
+			
+			const redirectOrigin = resolvedHost ? `${protocol}://${resolvedHost}` : origin;
+			const redirectUrl = `${redirectOrigin}${next}`;
+			
 			return NextResponse.redirect(redirectUrl);
 		} else {
 			console.error("Auth exchange error:", error);
+			const forwardedHost = request.headers.get("x-forwarded-host");
+			const host = request.headers.get("host");
+			const resolvedHost = forwardedHost || host;
+			const protocol = resolvedHost?.includes("localhost") || resolvedHost?.includes("192.168") ? "http" : "https";
+			const redirectOrigin = resolvedHost ? `${protocol}://${resolvedHost}` : origin;
+			
 			return NextResponse.redirect(
-				`${origin}/error?message=${encodeURIComponent(error.message || 'auth_exchange_failed')}`
+				`${redirectOrigin}/error?message=${encodeURIComponent(error.message || 'auth_exchange_failed')}`
 			);
 		}
 	}
 
 	console.error("No code provided in callback");
-	return NextResponse.redirect(`${origin}/error?message=no_code_provided`);
+	const forwardedHost = request.headers.get("x-forwarded-host");
+	const host = request.headers.get("host");
+	const resolvedHost = forwardedHost || host;
+	const protocol = resolvedHost?.includes("localhost") || resolvedHost?.includes("192.168") ? "http" : "https";
+	const redirectOrigin = resolvedHost ? `${protocol}://${resolvedHost}` : origin;
+	
+	return NextResponse.redirect(`${redirectOrigin}/error?message=no_code_provided`);
 }

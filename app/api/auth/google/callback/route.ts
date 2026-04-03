@@ -12,7 +12,11 @@ export async function GET(request: Request) {
 	const code = url.searchParams.get("code");
 	const state = url.searchParams.get("state");
 	const error = url.searchParams.get("error");
-	const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+	const forwardedHost = request.headers.get("x-forwarded-host");
+	const protocol = forwardedHost?.includes("localhost") || forwardedHost?.includes("192.168") ? "http" : "https";
+	const appUrl = forwardedHost 
+		? `${protocol}://${forwardedHost}` 
+		: process.env.NODE_ENV === "production" ? process.env.NEXT_PUBLIC_APP_URL || url.origin : url.origin;
 
 	// Handle user denial or error
 	if (error) {
