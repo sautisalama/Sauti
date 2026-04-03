@@ -46,6 +46,7 @@ import {
     DropdownMenuTrigger 
 } from "@/components/ui/dropdown-menu";
 import { ChatFAB } from "@/components/navigation/ChatFAB";
+import { AppointmentBanner } from "@/components/dashboard/AppointmentBanner";
 
 interface ChecklistItem {
     id: string;
@@ -92,9 +93,22 @@ export function CaseDetailView({
 
     const [checklists, setChecklists] = useState<ChecklistItem[]>([]);
     const [newChecklistItem, setNewChecklistItem] = useState("");
-    const [editingItemId, setEditingItemId] = useState<string | null>(null);
     const [editingTitle, setEditingTitle] = useState("");
     const notesTimerRef = useRef<NodeJS.Timeout | null>(null);
+    const [appointments, setAppointments] = useState<any[]>([]);
+
+    useEffect(() => {
+        const fetchAppointments = async () => {
+            const { data } = await supabase
+                .from('appointments')
+                .select('*, service_details:support_services(*)')
+                .eq('matched_services', matchId)
+                .order('appointment_date', { ascending: true });
+            
+            if (data) setAppointments(data);
+        };
+        if (matchId) fetchAppointments();
+    }, [matchId, supabase]);
 
     const report = caseItem.report;
     const matchId = caseItem.id;
@@ -404,6 +418,34 @@ export function CaseDetailView({
                     )}
                 </CardContent>
             </Card>
+
+            {/* Appointments Banner - Conditional high-importance UI */}
+            {appointments.length > 0 && (
+                <AppointmentBanner 
+                    appointments={appointments.map(a => ({
+                        id: a.appointment_id,
+                        appointment_date: a.appointment_date,
+                        start_time: a.start_time,
+                        location_type: a.location_type as any,
+                        status: a.status as any,
+                        service_name: a.service_details?.name,
+                        professional_name: a.service_details?.provider_name,
+                        professional_id: a.professional_id,
+                        match_id: matchId
+                    }))} 
+                    onUpdate={() => {
+                        const fetchAgain = async () => {
+                            const { data } = await supabase
+                                .from('appointments')
+                                .select('*, service_details:support_services(*)')
+                                .eq('matched_services', matchId)
+                                .order('appointment_date', { ascending: true });
+                            if (data) setAppointments(data);
+                        };
+                        fetchAgain();
+                    }}
+                />
+            )}
 
             <div className="space-y-6">
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between px-2 gap-4">

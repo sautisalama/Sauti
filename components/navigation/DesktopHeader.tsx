@@ -23,6 +23,7 @@ export function DesktopHeader({
     const dash = useDashboardData();
     const topBarTitle = dash?.topBarTitle;
     const topBarActions = dash?.topBarActions;
+    const isSidebarCollapsed = dash?.isSidebarCollapsed;
 
     // Show back button on all pages except main dashboard
     const showBack = pathname !== "/dashboard";
@@ -51,7 +52,10 @@ export function DesktopHeader({
     }, [searchTerm, router, pathname, searchParams]);
 
 	return (
-		<header className="sticky top-0 z-40 w-full bg-white/80 backdrop-blur-xl border-b border-serene-neutral-200/60 transition-all duration-200 h-16 flex items-center shrink-0">
+		<header className={cn(
+            "fixed top-0 z-40 transition-all duration-300 bg-white/80 backdrop-blur-xl border-b border-serene-neutral-200/60 h-16 flex items-center shrink-0 overflow-hidden",
+            isSidebarCollapsed ? "left-20 w-[calc(100%-5rem)]" : "left-72 w-[calc(100%-18rem)]"
+        )}>
 			<div className="flex items-center px-6 lg:px-8 gap-4 w-full h-full relative">
                 
                 {showBack && (

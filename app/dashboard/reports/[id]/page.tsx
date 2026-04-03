@@ -34,6 +34,7 @@ import { Chat } from "@/types/chat";
 import { getCaseChat } from "@/app/actions/chat";
 import { useDashboardData } from "@/components/providers/DashboardDataProvider";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { AppointmentBanner } from "@/components/dashboard/AppointmentBanner";
 import { 
     DropdownMenu, 
     DropdownMenuContent, 
@@ -77,10 +78,18 @@ interface ProviderMatch {
 interface AppointmentData {
 	id: string;
 	appointment_date: string | null;
+    start_time: string | null;
 	status: string | null;
 	type?: string;
 	location?: string;
 	link?: string;
+    location_type?: string | null;
+    professional_id?: string | null;
+    matched_services?: string | null;
+    service_details?: {
+        name: string | null;
+        provider_name: string | null;
+    } | null;
 }
 
 // Type for media stored in reports
@@ -394,22 +403,24 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
 				if (matchIds.length > 0) {
 					const { data: apptData } = await supabase
 						.from("appointments")
-						.select("*")
+						.select("*, service_details:support_services(*)")
 						.in("matched_services", matchIds)
 						.order("appointment_date", { ascending: true });
 					
 					if (apptData) {
-						setAppointments(apptData.map((a: Tables<"appointments">) => ({
+						setAppointments(apptData.map((a: any) => ({
 							id: a.appointment_id,
 							appointment_date: a.appointment_date,
+                            start_time: a.start_time,
 							status: a.status,
-							type: a.appointment_type || 'virtual',
+							type: a.appointment_type || 'consultation',
 							location: a.notes || '',
-							link: ''
+                            location_type: a.location_type || 'virtual',
+                            professional_id: a.professional_id,
+                            matched_services: a.matched_services,
+                            service_details: a.service_details
 						})));
 					}
-
-
 				}
 			} else {
 				setErrorState("Report not found.");
@@ -943,6 +954,48 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
 				<main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 transition-all duration-700 animate-in fade-in slide-in-from-bottom-4">
 				
 
+				{/* Appointments Banner - Conditional high-importance UI */}
+				{appointments.length > 0 && (
+					<AppointmentBanner 
+						appointments={appointments.map(a => ({
+							id: a.id,
+							appointment_date: a.appointment_date,
+							start_time: a.start_time,
+							location_type: (a.location_type as any) || 'virtual',
+							status: (a.status as any) || 'requested',
+							service_name: a.service_details?.name || undefined,
+							professional_name: a.service_details?.provider_name || undefined,
+							professional_id: a.professional_id || undefined,
+							match_id: a.matched_services || undefined
+						}))} 
+						onUpdate={() => {
+							// Refresh appointments
+							const fetchAgain = async () => {
+								const { data } = await supabase
+									.from('appointments')
+									.select('*, service_details:support_services(*)')
+									.eq('matched_services', reportId)
+									.order('appointment_date', { ascending: true });
+								if (data) {
+									setAppointments(data.map((a: any) => ({
+										id: a.appointment_id,
+										appointment_date: a.appointment_date,
+										start_time: a.start_time,
+										status: a.status,
+										type: a.appointment_type || 'consultation',
+										location: a.notes || '',
+										location_type: a.location_type || 'virtual',
+										professional_id: a.professional_id,
+										matched_services: a.matched_services,
+										service_details: a.service_details
+									})));
+								}
+							};
+							fetchAgain();
+						}}
+					/>
+				)}
+
 				<div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-start">
 					
 					{/* Main Content: Story & Recovery */}
@@ -1286,46 +1339,6 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
 									</Card>
 								</div>
 
-								{/* Upcoming Sessions */}
-								{upcomingAppointments.length > 0 && (
-									<div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
-										<div className="flex items-center gap-2 px-2 text-slate-900 font-bold text-sm">
-											<Calendar className="h-4 w-4 text-teal-600" />
-											Upcoming Sessions
-										</div>
-										{upcomingAppointments.map((appt) => (
-											<Card key={appt.id} className={cn(
-												"border-0 shadow-lg rounded-2xl sm:rounded-[2.5rem] overflow-hidden",
-												appt.status === 'requested' ? "bg-amber-50 border border-amber-100" : "bg-white border border-slate-100"
-											)}>
-												<CardContent className="p-6">
-													<div className="flex items-center justify-between mb-2">
-														<div className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
-															{appt.type} Session
-														</div>
-														{appt.status === 'requested' && (
-															<Badge className="bg-amber-100 text-amber-700 border-0 text-[8px] uppercase tracking-widest px-2 py-0.5">Pending</Badge>
-														)}
-													</div>
-													<p className="text-xl font-bold text-slate-900 tracking-tight">{formatDate(appt.appointment_date)}</p>
-													<p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-4">{formatTime(appt.appointment_date)}</p>
-													
-													{appt.status === 'requested' && (
-														<Button 
-															onClick={() => {
-																setRespondingTo(appt);
-																setShowResponseModal(true);
-															}}
-															className="w-full bg-amber-600 hover:bg-amber-700 text-white rounded-xl h-9 text-xs font-bold transition-all"
-														>
-															Confirm Time
-														</Button>
-													)}
-												</CardContent>
-											</Card>
-										))}
-									</div>
-								)}
 							</div>
 						) : (
 							<div className="space-y-6">

@@ -57,9 +57,9 @@ export function DashboardContent({ children }: DashboardContentProps) {
             )}
         >
       <div className={cn(
-                "flex-1 flex flex-col w-full min-w-0", // Ensure full width/height usage
-                "lg:pt-0 lg:pb-0", // Reset on desktop
-                showTopPadding ? "pt-14 lg:pt-0" : "", // 56px (h-14) mobile top bar
+                "flex-1 flex flex-col w-full min-w-0 transition-all duration-300", // Ensure full width/height usage
+                "lg:pt-16 lg:pb-0", // Desktop: Fixed header spacing
+                showTopPadding ? "pt-14 lg:pt-16" : "", // 56px (h-14) mobile top bar
                 showBottomPadding ? "pb-24 lg:pb-0" : "" // Bottom nav spacing
             )}>
                 {!isChat && !needsOnboarding && (

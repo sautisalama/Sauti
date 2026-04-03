@@ -484,16 +484,22 @@ export function EnhancedAppointmentScheduler({
                 onClick={() => handleSchedule(true)} 
                 disabled={isLoading} 
                 variant="ghost"
-                className="flex-1 h-12 bg-white hover:bg-slate-50 text-slate-600 border border-slate-100 rounded-2xl font-bold text-[11px] uppercase tracking-widest shadow-none"
+                className={cn(
+                  "flex-1 h-12 bg-white hover:bg-slate-50 text-slate-600 border border-slate-100 rounded-2xl font-bold text-[11px] uppercase tracking-widest shadow-none",
+                  viewMode === 'respond' && "hidden"
+                )}
               >
                 Meet Now
               </Button>
               <Button 
                 onClick={() => handleSchedule(false)} 
                 disabled={isLoading}
-                className="flex-[2] h-12 bg-teal-600 hover:bg-teal-700 text-white rounded-2xl font-bold text-[11px] uppercase tracking-[0.2em] shadow-none transition-all active:scale-[0.98]"
+                className={cn(
+                    "flex-[2] h-12 text-white rounded-2xl font-bold text-[11px] uppercase tracking-[0.2em] shadow-none transition-all active:scale-[0.98]",
+                    viewMode === 'respond' ? "bg-[#E1580E] hover:bg-[#D14D0D] flex-1" : "bg-teal-600 hover:bg-teal-700"
+                )}
               >
-                {isLoading ? "Scheduling..." : (viewMode === 'respond' ? 'Accept Session' : 'Schedule & Accept')}
+                {isLoading ? "Scheduling..." : (viewMode === 'respond' ? 'Confirm & Finalize Time' : 'Schedule & Accept')}
               </Button>
            </div>
         </div>
