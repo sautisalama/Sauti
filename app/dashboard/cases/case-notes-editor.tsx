@@ -89,9 +89,6 @@ export default function CaseNotesEditor({
 			setDirty(true);
 		},
 		editorProps: {
-            attributes: {
-                class: "prose prose-sm max-w-none focus:outline-none p-[5px] min-h-[300px]",
-            },
 			handlePaste: (view, e: ClipboardEvent) => {
 
 				const items = (e.clipboardData?.items ||
