@@ -7,13 +7,15 @@ import { Textarea } from '@/components/ui/textarea';
 import { Check, Send, Eye, EyeOff, Loader2, Plus, Trash2, Clock } from 'lucide-react';
 import { format } from 'date-fns';
 
-interface Recommendation {
+interface CaseRecommendationItem {
   id: string;
-  content: string;
-  is_shared_with_survivor: boolean;
+  content: string | null;
+  is_shared_with_survivor: boolean | null;
   shared_at: string | null;
-  created_at: string;
-  updated_at: string;
+  created_at: string | null;
+  updated_at: string | null;
+  match_id?: string | null;
+  professional_id?: string | null;
 }
 
 interface CaseRecommendationsProps {
@@ -29,7 +31,7 @@ export function CaseRecommendations({
   survivorName = 'the survivor',
   onRecommendationShared
 }: CaseRecommendationsProps) {
-  const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
+  const [recommendations, setRecommendations] = useState<CaseRecommendationItem[]>([]);
   const [newContent, setNewContent] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -53,7 +55,10 @@ export function CaseRecommendations({
         .order('created_at', { ascending: false });
 
       if (data) {
-        setRecommendations(data);
+        setRecommendations(data.map(rec => ({
+          ...rec,
+          is_shared_with_survivor: rec.is_shared_with_survivor ?? false
+        })) as CaseRecommendationItem[]);
       }
     } catch (error) {
       console.error('Error loading recommendations:', error);
@@ -79,7 +84,10 @@ export function CaseRecommendations({
         .single();
 
       if (!error && data) {
-        setRecommendations(prev => [data, ...prev]);
+        setRecommendations(prev => [{
+          ...data,
+          is_shared_with_survivor: data.is_shared_with_survivor ?? false
+        } as CaseRecommendationItem, ...prev]);
         setNewContent('');
       }
     } catch (error) {
@@ -271,10 +279,10 @@ export function CaseRecommendations({
                   <div className="flex items-center justify-between mt-3 pt-3 border-t border-serene-neutral-100">
                     <div className="flex items-center gap-2 text-xs text-serene-neutral-400">
                       <Clock className="h-3.5 w-3.5" />
-                      {format(new Date(rec.created_at), 'MMM d, yyyy HH:mm')}
+                      {rec.created_at ? format(new Date(rec.created_at), 'MMM d, yyyy HH:mm') : 'Recently'}
                       {rec.is_shared_with_survivor && rec.shared_at && (
                         <span className="text-emerald-600 font-medium">
-                          • Shared {format(new Date(rec.shared_at), 'MMM d')}
+                          • Shared {rec.shared_at ? format(new Date(rec.shared_at), 'MMM d') : ''}
                         </span>
                       )}
                     </div>
@@ -286,7 +294,7 @@ export function CaseRecommendations({
                         className="h-7 w-7"
                         onClick={() => {
                           setEditingId(rec.id);
-                          setEditingContent(rec.content);
+                          setEditingContent(rec.content || '');
                         }}
                         title="Edit"
                       >

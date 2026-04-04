@@ -34,7 +34,7 @@ export default function AdvocacyAndJusticePage() {
                                      </Link>
                                 </div>
                             </div>
-                            <div className="relative aspect-[4/3] rounded-[32px] md:rounded-[60px] overflow-hidden shadow-3xl">
+                            <div className="relative aspect-[4/3] rounded-2xl md:rounded-[60px] overflow-hidden shadow-3xl">
                                 <Image src="/events/impact/at cop29.png" alt="Advocacy at COP29" fill className="object-cover" />
                             </div>
                         </div>
@@ -67,7 +67,7 @@ export default function AdvocacyAndJusticePage() {
 
 function PosterCard({ image, title, year }: { image: string, title: string, year: string }) {
     return (
-        <div className="group relative aspect-[3/4] rounded-[24px] md:rounded-[40px] overflow-hidden shadow-xl hover:shadow-2xl transition-all duration-500">
+        <div className="group relative aspect-[3/4] rounded-xl md:rounded-2xl overflow-hidden shadow-xl hover:shadow-2xl transition-all duration-500">
             <Image src={image} alt={title} fill className="object-cover group-hover:scale-105 transition-transform duration-700" />
             <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-80" />
             <div className="absolute bottom-6 md:bottom-10 left-6 md:left-10 right-6 md:right-10">
@@ -80,8 +80,8 @@ function PosterCard({ image, title, year }: { image: string, title: string, year
 
 function FeatureCard({ icon, title, description }: { icon: React.ReactNode, title: string, description: string }) {
     return (
-        <div className="p-6 md:p-8 rounded-[32px] md:rounded-[40px] bg-white border-2 border-gray-50 hover:border-sauti-yellow/20 hover:shadow-2xl transition-all group">
-            <div className="w-12 h-12 md:w-16 md:h-16 rounded-[16px] md:rounded-2xl bg-gray-50 flex items-center justify-center mb-6">{icon}</div>
+        <div className="p-6 md:p-8 rounded-2xl md:rounded-2xl bg-white border-2 border-gray-50 hover:border-sauti-yellow/20 hover:shadow-2xl transition-all group">
+            <div className="w-12 h-12 md:w-16 md:h-16 rounded-lg md:rounded-2xl bg-gray-50 flex items-center justify-center mb-6">{icon}</div>
             <h3 className="text-xl md:text-2xl font-black text-sauti-blue mb-4 uppercase tracking-tight">{title}</h3>
             <p className="text-sm md:text-base text-gray-500 font-medium leading-relaxed">{description}</p>
         </div>

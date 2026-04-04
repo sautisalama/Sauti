@@ -53,8 +53,6 @@ export function Nav() {
 	const [pwaHandlers, setPwaHandlers] = useState<PWAInstallHandlers | null>(
 		null
 	);
-	const url = process.env.NEXT_PUBLIC_APP_URL!;
-
 	// Mobile sub-menu states
 	const [showPrograms, setShowPrograms] = useState(false);
 	const [showLearn, setShowLearn] = useState(false);
@@ -266,7 +264,7 @@ export function Nav() {
 								<Megaphone className="h-5 w-5" /> Report Abuse
 							</Button>
 						</DialogTrigger>
-						<DialogContent className="max-w-4xl p-0 overflow-hidden rounded-[32px] h-[90vh] min-h-[600px]">
+						<DialogContent className="max-w-4xl p-0 overflow-hidden rounded-2xl h-[90vh] min-h-[600px]">
 							<DialogTitle className="sr-only">Report Abuse</DialogTitle>
 							<DialogDescription className="sr-only">
 								Submit a report about an incident. Your information is secure and encrypted.
@@ -280,7 +278,7 @@ export function Nav() {
 							<Button variant="outline" className="rounded-full border-2 border-sauti-blue text-sauti-blue font-black px-8 h-12 shadow-sm hover:bg-sauti-blue hover:text-white transition-all">Dashboard</Button>
 						</Link>
 					) : (
-						<Link href={`${url}/signin`} className="hidden lg:block">
+						<Link href="/signin" className="hidden lg:block">
 							<Button className="rounded-full bg-sauti-teal text-white font-black px-8 h-12 shadow-sm hover:shadow-lg hover:bg-sauti-teal/90 transition-all">Log In</Button>
 						</Link>
 					)}
@@ -528,7 +526,7 @@ export function Nav() {
 												</Button>
 											</Link>
 										) : (
-											<Link href={`${url}/signin`} className="w-full">
+											<Link href="/signin" className="w-full">
 												<Button className="w-full h-16 rounded-2xl text-xl font-black bg-sauti-blue text-white active:scale-95 transition-all">
 													Log In
 												</Button>

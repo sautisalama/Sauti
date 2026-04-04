@@ -280,3 +280,8 @@ html[data-a11y-high-contrast="1"] {
 		opacity: 0;
 	}
 }
+
+@keyframes progress {
+	0% { transform: translateX(-100%); }
+	100% { transform: translateX(200%); }
+}

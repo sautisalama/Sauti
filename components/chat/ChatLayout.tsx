@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { ChatSidebar } from './ChatSidebar';
 import { ChatWindow } from './ChatWindow';
 import { Chat } from '@/types/chat';
-import { getChats } from '@/app/actions/chat';
+import { getChats, markAllChatsAsRead } from '@/app/actions/chat';
 import { createClient } from '@/utils/supabase/client';
 
 export function ChatLayout() {
@@ -18,6 +18,11 @@ export function ChatLayout() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const chatId = searchParams.get('id');
+
+  useEffect(() => {
+    // Reset unread count when opening the messages page
+    markAllChatsAsRead().catch(console.error);
+  }, []);
 
   useEffect(() => {
     if (chatId && chats.length > 0) {

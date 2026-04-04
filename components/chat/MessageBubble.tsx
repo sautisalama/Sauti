@@ -1,8 +1,9 @@
 'use client';
 
 import { Message } from '@/types/chat';
+import { MarkdownText } from "@/components/ui/MarkdownText";
 import { format } from 'date-fns';
-import { Check, CheckCheck, Reply, Trash2, Copy, Smile, Clock, Play } from 'lucide-react';
+import { Check, CheckCheck, Reply, Trash2, Copy, Smile, Clock, Play, Lock } from 'lucide-react';
 import { useState, useMemo } from 'react';
 import { addMessageReaction } from '@/app/actions/chat';
 import { DocumentPreview } from './DocumentPreview';
@@ -131,6 +132,22 @@ export function MessageBubble({ message, isOwn, showTail = true, currentUserId }
     );
   };
 
+  if (message.type === 'system') {
+    return (
+      <div className="flex justify-center my-4 px-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
+        <div className="bg-serene-neutral-100/50 backdrop-blur-sm px-4 py-2 rounded-2xl text-center shadow-sm border border-serene-neutral-200/50 max-w-[85%]">
+          <div className="flex items-center justify-center gap-2 mb-1">
+            <Lock className="h-3 w-3 text-serene-neutral-400" />
+            <span className="text-[10px] font-bold text-serene-neutral-400 uppercase tracking-widest">Secure Coordination</span>
+          </div>
+          <p className="text-xs font-medium text-serene-neutral-600 leading-relaxed whitespace-pre-wrap">
+            {message.content}
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <ContextMenu>
       <ContextMenuTrigger>
@@ -203,7 +220,10 @@ export function MessageBubble({ message, isOwn, showTail = true, currentUserId }
 
                     {/* Text Content */}
                     {message.type !== 'image' && message.type !== 'video' && (
-                        <span className={`break-words whitespace-pre-wrap ${isOwn ? 'text-white' : 'text-serene-neutral-900'}`}>{message.content}</span>
+                        <MarkdownText 
+                            content={message.content || ''} 
+                            className={isOwn ? 'text-white' : 'text-serene-neutral-900'} 
+                        />
                     )}
 
                     {/* Link Preview */}

@@ -69,7 +69,7 @@ export function PolicyModal({ userId, initialPolicies, onAccepted }: PolicyModal
 	return (
 		<Dialog open={true}>
 			<DialogContent 
-				className="max-w-2xl max-h-[85vh] overflow-hidden flex flex-col p-0 border-0 rounded-[2.5rem] shadow-2xl bg-white"
+				className="max-w-2xl max-h-[85vh] overflow-hidden flex flex-col p-0 border-0 rounded-2xl shadow-2xl bg-white"
 				onPointerDownOutside={(e) => e.preventDefault()}
                 onEscapeKeyDown={(e) => e.preventDefault()}
 			>
@@ -94,7 +94,7 @@ export function PolicyModal({ userId, initialPolicies, onAccepted }: PolicyModal
 									key={policy.id} 
 									value={policy.id} 
 									className={cn(
-										"border rounded-[1.5rem] px-5 transition-all duration-300",
+										"border rounded-xl px-5 transition-all duration-300",
 										isAccepted ? "bg-emerald-50/30 border-emerald-100" : "bg-white border-slate-100"
 									)}
 								>
@@ -151,7 +151,7 @@ export function PolicyModal({ userId, initialPolicies, onAccepted }: PolicyModal
 					</Accordion>
 
 					{!allAccepted && (
-						<div className="mt-8 p-5 bg-amber-50 border border-amber-100 rounded-[1.5rem] flex items-start gap-4">
+						<div className="mt-8 p-5 bg-amber-50 border border-amber-100 rounded-xl flex items-start gap-4">
 							<AlertTriangle className="h-5 w-5 text-amber-500 shrink-0 mt-0.5" />
 							<p className="text-xs font-medium text-amber-800 leading-relaxed">
 								You must accept all policies before you can access your dashboard. Your safety and privacy are our highest priorities.

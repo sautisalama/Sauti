@@ -29,6 +29,7 @@ export default function ReportsList({ userId }: { userId: string }) {
 	const [reports, setReports] = useState<ReportWithRelations[]>([]);
 	const [q, setQ] = useState("");
 	const [page, setPage] = useState(1);
+    const [showArchived, setShowArchived] = useState(false);
 	const pageSize = 10;
 	const supabase = useMemo(() => createClient(), []);
 
@@ -67,15 +68,24 @@ export default function ReportsList({ userId }: { userId: string }) {
 	}, [userId, supabase]);
 
 	const filtered = useMemo(() => {
+		let list = reports;
+        
+        // Filter by archive state
+        list = list.filter(r => {
+            const admin = (r.administrative as Record<string, any>) || {};
+            const isArchived = !!admin.is_archived;
+            return showArchived ? isArchived : !isArchived;
+        });
+
 		const term = q.trim().toLowerCase();
-		if (!term) return reports;
-		return reports.filter(
+		if (!term) return list;
+		return list.filter(
 			(r) =>
 				(r.type_of_incident || "").toLowerCase().includes(term) ||
 				(r.incident_description || "").toLowerCase().includes(term) ||
 				(r.urgency || "").toLowerCase().includes(term)
 		);
-	}, [reports, q]);
+	}, [reports, q, showArchived]);
 
 	const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
 	const pageItems = useMemo(() => {
@@ -142,6 +152,19 @@ export default function ReportsList({ userId }: { userId: string }) {
 					</button>
 				</div>
 			)}
+
+            {/* Subtle Archived Link */}
+            <div className="pt-12 pb-4 text-center">
+                <button 
+                    onClick={() => {
+                        setShowArchived(!showArchived);
+                        setPage(1);
+                    }}
+                    className="text-[10px] font-bold text-slate-400 uppercase tracking-widest hover:text-teal-600 transition-colors"
+                >
+                    {showArchived ? "← Return to active reports" : "View archived reports"}
+                </button>
+            </div>
 		</div>
 	);
 }

@@ -1,4 +1,4 @@
-// ... imports ...
+import { format } from "date-fns";
 import {
 	CalendarDays,
 	ChevronRight,
@@ -34,6 +34,7 @@ export interface CaseCardData {
 		submission_timestamp?: string | null;
 		urgency?: string | null;
 		is_onBehalf?: boolean | null;
+		additional_info?: any;
 		media?: { url?: string; type?: string; size?: number } | null;
 	} | null;
 	support_service?: {
@@ -57,17 +58,30 @@ export interface CaseCardData {
 interface CaseCardProps {
 	data: CaseCardData;
 	onClick?: () => void;
+	onQuickView?: (e: React.MouseEvent) => void;
+	onChat?: (e: React.MouseEvent) => void;
 	active?: boolean;
 	actions?: React.ReactNode;
 	className?: string;
 	isLoadingMessages?: boolean;
 }
 
+// Utility for formatting dates consistently across the dashboard
+function formatAppointmentDate(d?: string | null) {
+	if (!d) return "";
+	try {
+		const date = new Date(d);
+		return format(date, "EEEE, MMM d"); // e.g., Monday, Apr 4
+	} catch {
+		return "";
+	}
+}
+
 function formatDate(d?: string | null) {
 	if (!d) return "";
 	try {
 		const date = new Date(d);
-		return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+		return format(date, "MMM d"); // Short for header
 	} catch {
 		return "";
 	}
@@ -76,6 +90,8 @@ function formatDate(d?: string | null) {
 export function CaseCard({
 	data,
 	onClick,
+	onQuickView,
+	onChat,
 	active,
 	actions,
 	className,
@@ -127,6 +143,11 @@ export function CaseCard({
 									New
 								</Badge>
 							)}
+							{data.report?.additional_info?.is_for_child && (
+								<Badge className="bg-amber-100 text-amber-700 border-0 text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-md">
+									Child Abuse
+								</Badge>
+							)}
 						</div>
 						<p className="text-xs text-gray-500 font-medium truncate flex items-center gap-1.5">
 							<User className="h-3 w-3 text-gray-400" />
@@ -157,18 +178,44 @@ export function CaseCard({
 						{hasAppointment && (
 							<span className="text-[10px] font-bold text-blue-600 flex items-center gap-1.5 bg-blue-50 px-2.5 py-1 rounded-md border border-blue-100">
 								<CalendarDays className="h-3 w-3" />
-								{formatDate(appointment.appointment_date)}
+								{formatAppointmentDate(appointment.appointment_date)}
 							</span>
+						)}
+
+						{/* Chat button for active cases */}
+						{onChat && matchStatus !== 'pending' && (
+							<button
+								onClick={(e) => { e.preventDefault(); e.stopPropagation(); onChat(e); }}
+								className="relative flex items-center gap-1 px-2.5 py-1 rounded-md bg-sauti-teal/10 text-sauti-teal border border-sauti-teal/20 text-[10px] font-bold uppercase tracking-wider hover:bg-sauti-teal/20 transition-colors"
+							>
+								<MessageCircle className="h-3 w-3" /> Chat
+								{hasUnreadMessages && (
+									<Badge 
+										className="absolute -top-2 -right-2 h-4 w-4 flex items-center justify-center p-0 text-[10px] font-black bg-red-600 text-white border border-white shadow-sm ring-2 ring-red-100 animate-bounce"
+									>
+										{data.unread_messages}
+									</Badge>
+								)}
+							</button>
 						)}
 					</div>
 					
 					{actions || (
-						<div className="w-8 h-8 rounded-full flex items-center justify-center text-gray-300 group-hover:text-blue-600 group-hover:bg-blue-50 transition-all">
+						<button
+							onClick={(e) => {
+								e.preventDefault();
+								e.stopPropagation();
+								onQuickView?.(e);
+							}}
+							className="w-10 h-10 rounded-full flex items-center justify-center text-gray-300 hover:text-blue-600 hover:bg-blue-50 transition-all ml-2"
+							title="Quick view"
+						>
 							<ChevronRight className="h-5 w-5" />
-						</div>
+						</button>
 					)}
 				</div>
 			</div>
 		</div>
 	);
 }
+

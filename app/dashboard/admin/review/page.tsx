@@ -20,16 +20,19 @@ import {
 	Clock,
 	FileText,
 	MapPin,
-    ArrowRight
+    ArrowRight,
+    ClipboardList
 } from "lucide-react";
 import Link from "next/link";
 import { SereneBreadcrumb } from "@/components/ui/SereneBreadcrumb";
 import { PendingUser, PendingService } from "@/types/admin-types";
 import { formatDistanceToNow } from "date-fns";
+import { AdminCasesTable } from "../_components/AdminCasesTable";
 
 export default function ReviewDashboardPage() {
 	const [pendingUsers, setPendingUsers] = useState<PendingUser[]>([]);
 	const [pendingServices, setPendingServices] = useState<PendingService[]>([]);
+    const [matchedCount, setMatchedCount] = useState(0);
 	const [isLoading, setIsLoading] = useState(true);
 	const supabase = createClient();
 
@@ -52,19 +55,25 @@ export default function ReviewDashboardPage() {
 				const { data: services } = await supabase
 					.from("support_services")
 					.select(
-						`id, name, service_types, verification_status, accreditation_files, accreditation_files_metadata, created_at, verification_updated_at, latitude, longitude, coverage_area_radius`
+						`id, name, service_types, verification_status, accreditation_files_metadata, created_at, verification_updated_at, latitude, longitude, coverage_area_radius`
 					)
 					.in("verification_status", ["pending", "under_review"])
 					.order("created_at", { ascending: false });
 
-				setPendingUsers((users || []).filter(u => 
+                // Load matched cases count
+                const { count: casesCount } = await supabase
+                    .from("reports")
+                    .select("report_id", { count: 'exact', head: true })
+                    .eq("ismatched", true);
+
+				setPendingUsers(((users || []) as any[]).filter(u => 
 					(Array.isArray(u.accreditation_files_metadata) && u.accreditation_files_metadata.length > 0) ||
 					(Array.isArray(u.accreditation_files) && u.accreditation_files.length > 0)
-				));
-				setPendingServices((services || []).filter(s => 
-					(Array.isArray(s.accreditation_files_metadata) && s.accreditation_files_metadata.length > 0) ||
-					(Array.isArray(s.accreditation_files) && s.accreditation_files.length > 0)
-				));
+				) as PendingUser[]);
+				setPendingServices(((services || []) as any[]).filter(s => 
+					(Array.isArray(s.accreditation_files_metadata) && s.accreditation_files_metadata.length > 0)
+				) as PendingService[]);
+                setMatchedCount(casesCount || 0);
 			} catch (error) {
 				console.error("Error loading pending verifications:", error);
 			} finally {
@@ -117,6 +126,9 @@ export default function ReviewDashboardPage() {
                      <Badge variant="outline" className="px-3 py-1 bg-white shadow-sm border-gray-200 text-gray-700">
                         {pendingServices.length} Services
                     </Badge>
+                     <Badge variant="outline" className="px-3 py-1 bg-white shadow-sm border-blue-100 text-blue-700 bg-blue-50/50">
+                        {matchedCount} Matched Cases
+                    </Badge>
                 </div>
 			</div>
 
@@ -130,6 +142,10 @@ export default function ReviewDashboardPage() {
 						<Building2 className="h-4 w-4 mr-2" />
 						Support Services
 					</TabsTrigger>
+                    <TabsTrigger value="cases" className="rounded-none border-b-2 border-transparent data-[state=active]:border-blue-600 data-[state=active]:bg-transparent data-[state=active]:shadow-none py-3 px-1 data-[state=active]:text-blue-700 font-medium">
+						<ClipboardList className="h-4 w-4 mr-2" />
+						Incident Cases
+					</TabsTrigger>
 				</TabsList>
 
 				<TabsContent value="users" className="space-y-4 animate-in slide-in-from-bottom-2 duration-300">
@@ -140,12 +156,12 @@ export default function ReviewDashboardPage() {
 							{pendingUsers.map((user) => (
 								<ReviewCard 
                                     key={user.id} 
-                                    title={`${user.first_name} ${user.last_name}`}
-                                    subtitle={user.user_type}
-                                    status={user.verification_status}
-                                    date={user.created_at}
+                                    title={`${user.first_name || 'Unknown'} ${user.last_name || ''}`}
+                                    subtitle={user.user_type || 'Professional'}
+                                    status={user.verification_status || 'pending'}
+                                    date={user.created_at || new Date().toISOString()}
                                     docsCount={Array.isArray(user.accreditation_files_metadata) ? user.accreditation_files_metadata.length : 0}
-                                    statusColor={getStatusColor(user.verification_status)}
+                                    statusColor={getStatusColor(user.verification_status || 'pending')}
                                     href={`/dashboard/admin/review/${user.id}?type=professional`} 
                                 />
 							))}
@@ -161,12 +177,12 @@ export default function ReviewDashboardPage() {
 							{pendingServices.map((service) => (
 								<ReviewCard 
                                     key={service.id} 
-                                    title={service.name}
-                                    subtitle={service.service_types}
-                                    status={service.verification_status}
-                                    date={service.created_at}
+                                    title={service.name || 'Untitled Service'}
+                                    subtitle={service.service_types || 'Support Service'}
+                                    status={service.verification_status || 'pending'}
+                                    date={service.created_at || new Date().toISOString()}
                                     docsCount={Array.isArray(service.accreditation_files_metadata) ? service.accreditation_files_metadata.length : 0}
-                                    statusColor={getStatusColor(service.verification_status)}
+                                    statusColor={getStatusColor(service.verification_status || 'pending')}
                                     location={service.latitude && service.longitude ? "Location set" : undefined}
                                     href={`/dashboard/admin/review/${service.id}?type=service`}
                                 />
@@ -174,12 +190,27 @@ export default function ReviewDashboardPage() {
 						</div>
 					)}
 				</TabsContent>
+
+                <TabsContent value="cases" className="space-y-4 animate-in slide-in-from-bottom-2 duration-300">
+                    <AdminCasesTable />
+                </TabsContent>
 			</Tabs>
 		</div>
 	);
 }
 
-function ReviewCard({ title, subtitle, status, date, docsCount, statusColor, location, href }: any) {
+interface ReviewCardProps {
+    title: string;
+    subtitle: string | null;
+    status: string;
+    date: string;
+    docsCount: number;
+    statusColor: string;
+    location?: string;
+    href: string;
+}
+
+function ReviewCard({ title, subtitle, status, date, docsCount, statusColor, location, href }: ReviewCardProps) {
     return (
         <Link href={href} className="group block h-full">
             <Card className="h-full border-gray-200 hover:border-blue-300 hover:shadow-md transition-all duration-300 rounded-2xl overflow-hidden group-hover:scale-[1.01]">
@@ -227,7 +258,7 @@ function ReviewCard({ title, subtitle, status, date, docsCount, statusColor, loc
 
 function EmptyState({ type }: { type: 'users' | 'services' }) {
     return (
-        <div className="flex flex-col items-center justify-center py-16 text-center bg-gray-50/50 rounded-3xl border border-dashed border-gray-200">
+        <div className="flex flex-col items-center justify-center py-16 text-center bg-gray-50/50 rounded-2xl border border-dashed border-gray-200">
             <div className="h-16 w-16 bg-white rounded-full flex items-center justify-center shadow-sm mb-4">
                 <CheckCircle className="h-8 w-8 text-green-500 opacity-80" />
             </div>

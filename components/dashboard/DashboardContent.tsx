@@ -29,46 +29,51 @@ export function DashboardContent({ children }: DashboardContentProps) {
   const isChat = pathname?.startsWith("/dashboard/chat");
   const isChatDetail = isChat && !!chatId; // Chat + ID param means detail view
 
-  // Top Bar (pt-16) is hidden on ALL chat pages (list and detail)
-  // So pt-0 for chat. pt-16 for others.
-  const showTopPadding = !isChat;
+  // Top Bar (pt-16) is hidden on ALL chat pages (list and detail) and Onboarding.
+  // So pt-0 for chat/onboarding. pt-16 for others.
+  const profile = dash?.data?.profile;
+  const hasAcceptedPolicies = !!(profile?.policies as any)?.all_policies_accepted;
+  const isOnboardingRoute = pathname === "/dashboard/onboarding" || pathname?.startsWith("/dashboard/onboarding");
+  const needsOnboarding = isOnboardingRoute || (!profile?.user_type || 
+    !hasAcceptedPolicies ||
+    ((profile.user_type === 'professional' || profile.user_type === 'ngo') && !profile.professional_title));
+
+  const showTopPadding = !isChat && !needsOnboarding;
 
   // Bottom Nav (pb-24) is hidden on chat DETAIL (but shown on list)
   // and Appointment detail
   const isApptDetail = pathname?.includes("/appointment/");
-  const showBottomPadding = !isChatDetail && !isApptDetail;
+  const showBottomPadding = !isChatDetail && !isApptDetail && !pathname?.includes("/dashboard/cases/") && !pathname?.includes("/dashboard/reports/") && !pathname?.includes("/dashboard/matches");
 
-  const profile = dash?.data?.profile;
-  const hasAcceptedPolicies = !!(profile?.policies as any)?.all_policies_accepted;
-  const needsOnboarding = !profile?.user_type || 
-    !hasAcceptedPolicies ||
-    ((profile.user_type === 'professional' || profile.user_type === 'ngo') && !profile.professional_title);
+
 
   return (
     <>
         <main
             className={cn(
-                "flex-1 transition-all duration-300 ease-in-out relative min-h-screen flex flex-col",
+                "flex-1 transition-all duration-300 ease-in-out relative min-h-screen flex flex-col min-w-0 w-full",
                 "lg:ml-72", // Default expanded width
                 isCollapsed && "lg:ml-20" // Collapsed width
             )}
         >
-            <div className={cn(
-                "flex-1 flex flex-col w-full", // Ensure full width/height usage
-                "lg:pt-0 lg:pb-0", // Reset on desktop
-                showTopPadding ? "pt-16" : "", // 64px top bar
-                showBottomPadding ? "pb-24" : "" // Bottom nav spacing
+      <div className={cn(
+                "flex-1 flex flex-col w-full min-w-0 transition-all duration-300", // Ensure full width/height usage
+                "lg:pt-16 lg:pb-0", // Desktop: Fixed header spacing
+                showTopPadding ? "pt-14 lg:pt-16" : "", // 56px (h-14) mobile top bar
+                showBottomPadding ? "pb-24 lg:pb-0" : "" // Bottom nav spacing
             )}>
-                {!isChat && (
-                    <DesktopHeader 
-                        showSearch={!needsOnboarding} 
-                        showNotifications={!needsOnboarding}
-                    />
+                {!isChat && !needsOnboarding && (
+                    <div className="hidden lg:block">
+                        <DesktopHeader 
+                            showSearch={true} 
+                            showNotifications={true}
+                        />
+                    </div>
                 )}
                 {children}
             </div>
         </main>
-        {/* FAB removed as per request for cleaner UI */}
+        <GlobalReportFab userId={user} />
     </>
   );
 }

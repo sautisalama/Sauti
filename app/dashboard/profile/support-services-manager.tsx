@@ -244,7 +244,7 @@ export function SupportServicesManager({
 	};
 
 	const getDocumentCount = (service: SupportService) => {
-		return safelyParseJsonArray(service.accreditation_files_metadata).length;
+		return safelyParseJsonArray(service.accreditation_files_metadata as any).length;
 	};
 
 	// Partition shared services
@@ -273,7 +273,7 @@ export function SupportServicesManager({
 	return (
 		<div className="space-y-8">
 			{/* Header Card */}
-			<div className="bg-white rounded-3xl border border-serene-neutral-200 p-5 sm:p-6 shadow-sm overflow-hidden relative">
+			<div className="bg-white rounded-2xl border border-serene-neutral-200 p-5 sm:p-6 shadow-sm overflow-hidden relative">
 				<div className="absolute top-0 right-0 w-32 h-32 bg-serene-blue-50/50 rounded-full -mr-16 -mt-16 blur-2xl" />
 				<div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6 relative z-10">
 					<div className="flex items-start sm:items-center gap-4">
@@ -506,7 +506,7 @@ function ServiceCard({
 	};
 
 	const getDocumentCount = (service: SupportService) => {
-		return safelyParseJsonArray(service.accreditation_files_metadata).length;
+		return safelyParseJsonArray(service.accreditation_files_metadata as any).length;
 	};
 
 	return (
@@ -532,7 +532,9 @@ function ServiceCard({
 								{service.name}
 							</h3>
 							<p className="text-xs text-serene-neutral-500 capitalize">
-								{service.service_types.replace("_", " ")}
+								{Array.isArray(service.service_types) 
+									? service.service_types.join(", ").replace(/_/g, " ") 
+									: (typeof service.service_types === 'string' ? service.service_types.replace("_", " ") : "Service")}
 							</p>
 						</div>
 					</div>

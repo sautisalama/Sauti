@@ -126,12 +126,14 @@ export function NotificationDropdown() {
     };
 
 	return (
-        <DropdownMenu>
+        <DropdownMenu onOpenChange={(open) => open && unreadCount > 0 && handleMarkAllRead()}>
             <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="icon" className="relative rounded-full hover:bg-serene-neutral-100 text-serene-neutral-500 hover:text-serene-blue-600 transition-colors h-10 w-10">
                     <Bell className="h-5 w-5 transition-transform group-active:scale-95" />
                     {unreadCount > 0 && (
-                        <span className="absolute top-2 right-2 h-2.5 w-2.5 rounded-full bg-red-500 ring-2 ring-white animate-pulse" />
+                        <Badge variant="destructive" className="absolute -top-1 -right-1 h-5 w-5 p-0 flex items-center justify-center text-[10px] font-black ring-2 ring-white animate-in zoom-in bg-red-600 text-white shadow-lg shadow-red-500/20">
+                            {unreadCount > 9 ? "9+" : unreadCount}
+                        </Badge>
                     )}
                 </Button>
             </DropdownMenuTrigger>

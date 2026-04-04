@@ -60,13 +60,16 @@ export function MobileSupportServicesSidepanel({
 			if (serviceData?.accreditation_files_metadata) {
 				const metadata = Array.isArray(serviceData.accreditation_files_metadata)
 					? serviceData.accreditation_files_metadata
-					: JSON.parse(serviceData.accreditation_files_metadata);
+					: (typeof serviceData.accreditation_files_metadata === 'string' 
+						? JSON.parse(serviceData.accreditation_files_metadata) 
+						: []);
 
-				const docs = metadata.map((doc: any, index: number) => ({
+				const docs = (metadata as any[]).map((doc: { title?: string; url?: string; status?: string }, index: number) => ({
 					id: `doc-${index}`,
 					title: doc.title || `Document ${index + 1}`,
 					fileUrl: doc.url,
 					uploaded: !!doc.url,
+					uploading: false,
 					status: doc.status || "under_review",
 				}));
 

@@ -1,8 +1,26 @@
 import { createClient } from "@/utils/supabase/client";
-import { Database } from "@/types/db-schema";
+import { Database, Json } from "@/types/db-schema";
+
 
 type SupportServiceType = Database["public"]["Enums"]["support_service_type"];
 type UserType = Database["public"]["Enums"]["user_type"];
+
+interface FileMetadata {
+	url: string;
+	title?: string;
+	uploadedAt?: string;
+	serviceId?: string;
+	serviceType?: SupportServiceType;
+	certificateNumber?: string;
+	fileType?: string;
+	fileSize?: number;
+	status?: string;
+	notes?: string;
+	[key: string]: Json | undefined;
+}
+
+
+
 
 export interface FileUploadOptions {
 	userId: string;
@@ -340,22 +358,27 @@ export class FileUploadService {
 
 			const metadataDocs = profileData?.accreditation_files_metadata
 				? Array.isArray(profileData.accreditation_files_metadata)
-					? profileData.accreditation_files_metadata
-					: JSON.parse(profileData.accreditation_files_metadata)
+					? (profileData.accreditation_files_metadata as unknown as FileMetadata[])
+					: typeof profileData.accreditation_files_metadata === "string"
+						? (JSON.parse(profileData.accreditation_files_metadata) as FileMetadata[])
+						: []
 				: [];
 
 			// Filter out the document with the matching URL
 			const updatedDocs = metadataDocs.filter(
-				(doc: any) => doc.url !== documentUrl
+				(doc) => doc.url !== documentUrl
 			);
+
+
 
 			// Update the profile with the filtered documents
 			const { error } = await this.supabase
 				.from("profiles")
 				.update({
-					accreditation_files_metadata: updatedDocs,
+					accreditation_files_metadata: updatedDocs as unknown as Json,
 					updated_at: new Date().toISOString(),
 				})
+
 				.eq("id", userId);
 
 			if (error) {
@@ -395,22 +418,27 @@ export class FileUploadService {
 
 			const metadataDocs = serviceData?.accreditation_files_metadata
 				? Array.isArray(serviceData.accreditation_files_metadata)
-					? serviceData.accreditation_files_metadata
-					: JSON.parse(serviceData.accreditation_files_metadata)
+					? (serviceData.accreditation_files_metadata as unknown as FileMetadata[])
+					: typeof serviceData.accreditation_files_metadata === "string"
+						? (JSON.parse(serviceData.accreditation_files_metadata) as FileMetadata[])
+						: []
 				: [];
 
 			// Filter out the document with the matching URL
 			const updatedDocs = metadataDocs.filter(
-				(doc: any) => doc.url !== documentUrl
+				(doc) => doc.url !== documentUrl
 			);
+
+
 
 			// Update the service with the filtered documents
 			const { error } = await this.supabase
 				.from("support_services")
 				.update({
-					accreditation_files_metadata: updatedDocs,
+					accreditation_files_metadata: updatedDocs as unknown as Json,
 					updated_at: new Date().toISOString(),
 				})
+
 				.eq("id", serviceId)
 				.eq("user_id", userId);
 
@@ -499,13 +527,17 @@ export class FileUploadService {
 
 			const metadataDocs = profileData?.accreditation_files_metadata
 				? Array.isArray(profileData.accreditation_files_metadata)
-					? profileData.accreditation_files_metadata
-					: JSON.parse(profileData.accreditation_files_metadata)
+					? (profileData.accreditation_files_metadata as unknown as FileMetadata[])
+					: typeof profileData.accreditation_files_metadata === "string"
+						? (JSON.parse(profileData.accreditation_files_metadata) as FileMetadata[])
+						: []
 				: [];
 
 			// Filter out service-specific documents from metadata
 			// Only include documents that don't have a serviceId (accreditation documents)
-			const accreditationDocs = metadataDocs.filter((doc: any) => !doc.serviceId);
+			const accreditationDocs = metadataDocs.filter((doc) => !doc.serviceId);
+
+
 
 			// Create a map of files by URL for easy lookup
 			const storageFilesMap = new Map<string, UploadedFile>();
@@ -517,7 +549,8 @@ export class FileUploadService {
 			const allDocuments: UploadedFile[] = [];
 
 			// Add documents from metadata (these have additional info like title, certificate number)
-			accreditationDocs.forEach((doc: any, index: number) => {
+			accreditationDocs.forEach((doc, index: number) => {
+
 				if (doc.url) {
 					const storageFile = storageFilesMap.get(doc.url);
 					allDocuments.push({
@@ -539,12 +572,15 @@ export class FileUploadService {
 				}
 			});
 
+
 			// Add any storage files that don't have metadata (orphaned files)
 			// Only include files from the root user folder (not service subfolders)
 			storageFiles.forEach((file) => {
 				const hasMetadata = accreditationDocs.some(
-					(doc: any) => doc.url === file.url
+					(doc) => doc.url === file.url
 				);
+
+
 				// Only include files that are in the root user folder (no service subfolder in path)
 				const isRootFolderFile =
 					!file.filePath.includes("/") || file.filePath.split("/").length === 2;
@@ -597,9 +633,12 @@ export class FileUploadService {
 
 			const metadataDocs = serviceData?.accreditation_files_metadata
 				? Array.isArray(serviceData.accreditation_files_metadata)
-					? serviceData.accreditation_files_metadata
-					: JSON.parse(serviceData.accreditation_files_metadata)
+					? (serviceData.accreditation_files_metadata as unknown as FileMetadata[])
+					: typeof serviceData.accreditation_files_metadata === "string"
+						? (JSON.parse(serviceData.accreditation_files_metadata) as FileMetadata[])
+						: []
 				: [];
+
 
 			// Create a map of files by URL for easy lookup
 			const storageFilesMap = new Map<string, UploadedFile>();
@@ -611,31 +650,34 @@ export class FileUploadService {
 			const allDocuments: UploadedFile[] = [];
 
 			// Add documents from metadata
-			metadataDocs.forEach((doc: any, index: number) => {
+			metadataDocs.forEach((doc, index: number) => {
+
 				if (doc.url) {
-					const storageFile = storageFilesMap.get(doc.url);
+					const storageFile = storageFilesMap.get(doc.url as string);
 					allDocuments.push({
-						url: doc.url,
-						fileName: doc.title || storageFile?.fileName || `Document ${index + 1}`,
+						url: doc.url as string,
+						fileName: (doc.title as string) || storageFile?.fileName || `Document ${index + 1}`,
 						filePath: storageFile?.filePath || "",
 						uploadedAt:
-							doc.uploadedAt || storageFile?.uploadedAt || new Date().toISOString(),
-						serviceId: doc.serviceId,
-						serviceType: doc.serviceType,
+							(doc.uploadedAt as string) || storageFile?.uploadedAt || new Date().toISOString(),
+						serviceId: doc.serviceId as string,
+						serviceType: doc.serviceType as SupportServiceType,
 						// Additional metadata
-						title: doc.title,
-						certificateNumber: doc.certificateNumber,
-						fileType: doc.fileType,
-						fileSize: doc.fileSize,
-						status: doc.status || "under_review",
-						notes: doc.notes,
+						title: doc.title as string,
+						certificateNumber: doc.certificateNumber as string,
+						fileType: doc.fileType as string,
+						fileSize: doc.fileSize as number,
+						status: (doc.status as string) || "under_review",
+						notes: doc.notes as string,
 					});
 				}
 			});
 
 			// Add any storage files that don't have metadata (orphaned files)
 			storageFiles.forEach((file) => {
-				const hasMetadata = metadataDocs.some((doc: any) => doc.url === file.url);
+				const hasMetadata = metadataDocs.some((doc) => doc.url === file.url);
+
+
 				if (!hasMetadata) {
 					allDocuments.push({
 						...file,

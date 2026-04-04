@@ -610,13 +610,17 @@ export type Database = {
       }
       matched_services: {
         Row: {
+          cascade_level: number | null
+          cascade_phase_triggered_at: string | null
           chat_id: string | null
+          completed_at: string | null
           decline_reason: string | null
           description: string | null
           escalation_required: boolean | null
           feedback: string | null
           hrd_profile_id: string | null
           id: string
+          is_fallback_match: boolean | null
           match_date: string | null
           match_reason: string | null
           match_score: number | null
@@ -638,13 +642,17 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          cascade_level?: number | null
+          cascade_phase_triggered_at?: string | null
           chat_id?: string | null
+          completed_at?: string | null
           decline_reason?: string | null
           description?: string | null
           escalation_required?: boolean | null
           feedback?: string | null
           hrd_profile_id?: string | null
           id?: string
+          is_fallback_match?: boolean | null
           match_date?: string | null
           match_reason?: string | null
           match_score?: number | null
@@ -666,13 +674,17 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          cascade_level?: number | null
+          cascade_phase_triggered_at?: string | null
           chat_id?: string | null
+          completed_at?: string | null
           decline_reason?: string | null
           description?: string | null
           escalation_required?: boolean | null
           feedback?: string | null
           hrd_profile_id?: string | null
           id?: string
+          is_fallback_match?: boolean | null
           match_date?: string | null
           match_reason?: string | null
           match_score?: number | null
@@ -1019,7 +1031,7 @@ export type Database = {
       }
       reports: {
         Row: {
-          additional_info: string | null
+          additional_info: Json | null
           administrative: Json | null
           city: string | null
           consent: Database["public"]["Enums"]["consent_type"] | null
@@ -1057,6 +1069,7 @@ export type Database = {
           record_only: boolean | null
           report_id: string
           required_services: Json | null
+          requires_manual_review: boolean | null
           state: string | null
           submission_timestamp: string | null
           support_services:
@@ -1067,7 +1080,7 @@ export type Database = {
           user_id: string | null
         }
         Insert: {
-          additional_info?: string | null
+          additional_info?: Json | null
           administrative?: Json | null
           city?: string | null
           consent?: Database["public"]["Enums"]["consent_type"] | null
@@ -1105,6 +1118,7 @@ export type Database = {
           record_only?: boolean | null
           report_id?: string
           required_services?: Json | null
+          requires_manual_review?: boolean | null
           state?: string | null
           submission_timestamp?: string | null
           support_services?:
@@ -1115,7 +1129,7 @@ export type Database = {
           user_id?: string | null
         }
         Update: {
-          additional_info?: string | null
+          additional_info?: Json | null
           administrative?: Json | null
           city?: string | null
           consent?: Database["public"]["Enums"]["consent_type"] | null
@@ -1153,6 +1167,7 @@ export type Database = {
           record_only?: boolean | null
           report_id?: string
           required_services?: Json | null
+          requires_manual_review?: boolean | null
           state?: string | null
           submission_timestamp?: string | null
           support_services?:
@@ -1384,6 +1399,10 @@ export type Database = {
       }
     }
     Functions: {
+      check_user_is_chat_participant: {
+        Args: { _chat_id: string; _user_id?: string }
+        Returns: boolean
+      }
       cleanup_expired_calendar_tokens: { Args: never; Returns: undefined }
       cleanup_orphaned_files: { Args: never; Returns: number }
       get_active_case_count: {
@@ -1486,6 +1505,8 @@ export type Database = {
         | "proposed"
         | "pending_survivor"
         | "reschedule_requested"
+        | "completion_pending"
+        | "completed_auto"
       message_type:
         | "text"
         | "image"
@@ -1698,6 +1719,8 @@ export const Constants = {
         "proposed",
         "pending_survivor",
         "reschedule_requested",
+        "completion_pending",
+        "completed_auto",
       ],
       message_type: [
         "text",

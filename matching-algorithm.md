@@ -1,126 +1,172 @@
-# Sauti Salama: Comprehensive Matching Specification & Walkthrough
+# Sauti Salama: Matching Algorithm & Coordination Protocol
+**Version:** 2.6 (Conclusive Truth)  
+**Status:** Unified System Specification  
+**Last Updated:** April 2026
 
-## 1. Executive Summary
+## 1. Actor Taxonomy
+The matching engine coordinates interactions between four primary entities:
 
-The Sauti Salama Matching Engine is a multi-dimensional recommendation system designed to connect survivors of abuse with the most "clinically" and geographically appropriate verified professionals. Unlike simple search-based systems, it evaluates a survivor's entire profile against a professional's specialized capabilities and operational constraints in real-time.
-
----
-
-## 2. Exhaustive Data Schema (Matching Inputs)
-
-The algorithm consumes data from three primary tables. Below are all fields currently influencing the match results:
-
-### A. The Survivor Request (`reports` table)
-
-| Field                    | Data Type              | Usage in Algorithm                                                           |
-| :----------------------- | :--------------------- | :--------------------------------------------------------------------------- |
-| `type_of_incident`       | `incident_type` (Enum) | Primary key for selecting the Clinical Specialty Map.                        |
-| `required_services`      | `text[]`               | Explicit survivor requests that grant a +20 point bonus.                     |
-| `urgency`                | `urgency_level` (Enum) | Determines the final scoring multiplier (1.0x to 1.15x).                     |
-| `latitude` / `longitude` | `float8`               | Used as the origin point for Haversine distance calculations.                |
-| `preferred_language`     | `language_type` (Enum) | Triggers a +15 point bonus match against professional traits.                |
-| `gender`                 | `gender_type` (Enum)   | Triggers a +10 point bonus for specific gender preferences.                  |
-| `consent`                | `consent_type` (Enum)  | **Negative Weighting**: If 'no', Legal services are penalized by -50 points. |
-| `additional_info`        | `jsonb`                | Parsed for `special_needs` (e.g., `disabled`, `queer_support`).              |
-| `record_only`            | `boolean`              | **Control Flag**: Prevents matching for non-child cases if set to true.      |
-
-### B. The Professional Service (`support_services` table)
-
-| Field                    | Data Type              | Usage in Algorithm                                             |
-| :----------------------- | :--------------------- | :------------------------------------------------------------- |
-| `service_types`          | `support_service_type` | Evaluated against the Clinical Specialty Map.                  |
-| `coverage_area_radius`   | `integer` (km)         | Defines the maximum proximity boundary. `null` = Remote.       |
-| `availability`           | `availability_type`    | Weighted against the Report Urgency level (1-10 points).       |
-| `verification_status`    | `text`                 | **Hard Filter**: Only `verified` services are considered.      |
-| `specialises_in_...`     | `boolean`              | Flags for Disability, Queer Support, and Child specialization. |
-| `latitude` / `longitude` | `float8`               | Destination point for proximity calculations.                  |
-
-### C. The Professional Profile (`profiles` table)
-
-| Field                      | Data Type | Usage in Algorithm                                                        |
-| :------------------------- | :-------- | :------------------------------------------------------------------------ |
-| `professional_title`       | `text`    | Maps to `PROFESSIONAL_AUTHORITY` scores (e.g., "Doctor" knows "Medical"). |
-| `settings`                 | `jsonb`   | Parsed for `matching_traits` (Gender and Languages).                      |
-| `bio` / `city` / `country` | `text`    | Snapshotted into `matched_services` for survivor UI display.              |
+- **Survivor (User):** The initiator of a report. Can be a self-reporter, a child (via specialized protection logic), or an anonymous reporter.
+- **Support Service (Provider):** A verified organization or clinic offering specific clinical specialties (Medical, Legal, Mental Health, etc.).
+- **HRD / Professional (Individual):** A verified individual responder (Lawyer, Doctor, Human Rights Defender) who can handle cases directly or on behalf of a service.
+- **Service Pool (Delegation):** A collective queue where cases are forwarded when a direct match is unavailable or specialized triage is required.
 
 ---
 
-## 3. The Matching Workflow (The Algorithm)
-
-The engine follows a strict 8-step pipeline to ensure high-fidelity matches:
-
-### Step 1: Candidate Aggregation
-
-The engine compiles a unified list of "Candidate" objects by merging:
-
-- **Verified Support Services**: Linked to their owner's profile.
-- **Standalone Experts (HRDs & Paralegals)**: Individuals who don't have a formal "Service" entity but provide verified expertise. HRDs focus on "Other" support, while Paralegals are automatically mapped to "Legal" services.
-
-### Level 2: Clinical Specialty Map (The Standalone Logic)
-
-- **Human Rights Defenders**: Default radius 100km, Focus on "Other" / Protection.
-- **Paralegals**: Default radius 60km, Focus on "Legal" / Front-line legal aid.
-
-### Step 2: Service-Type Compatibility (+25 to +45 pts)
-
-It uses a `INCIDENT_SPECIALTY_MAP` to determine relevance:
-
-- **Primary Match**: e.g., Physical Incident -> Medical Service (+25 pts).
-- **Secondary Match**: e.g., Physical Incident -> Mental Health Service (+15 pts).
-- **Explicit Request**: If the survivor manually requested the service type (+20 pts).
-
-### Step 3: Proximity Scoring (0 to 20 pts)
-
-- For locals: $Score = 20 \times (1 - \frac{Distance}{Radius})$.
-- For remote: Proximity score is skipped, but the candidate is flagged with "Remote service available".
-
-### Step 4: Demographic Alignment (+10 to +30 pts)
-
-- **Language**: Exact match on preferred language (+15 pts).
-- **Gender**: Exact match on survivor's gender preference (+10 pts).
-- **Special Needs**: Matching `special_needs` flags from the report to specialization toggles on the service (+15 pts each).
-
-### Step 5: Professional Authority (0 to 10 pts)
-
-A static matrix boosts specifically qualified titles. A **Lawyer** matching a **Trafficking** report gets +10, whereas a **Paralegal** gets +4, reflecting the higher capacity for high-stakes legal intervention.
-
-### Step 6: Negative Weights & Safety Filters
-
-- **Consent Check**: If a survivor withholds legal consent, Professionals with "Lawyer" or "Law Firm" titles are penalized (-50 pts), effectively filtering them out unless the survivor changes their mind.
-- **Child Safety**: If a report involves children, the algorithm ignores `record_only` and forces a match with specialists capable of child protection.
-
-### Step 7: Load Balancing (Dynamic Penalty)
-
-The engine calls `get_active_case_count`. For every active case a professional is currently handling, their score for the new match is reduced by **5 points**. This prevents "super-providers" from being overwhelmed and ensures survivors get matched with responsive professionals.
-
-### Step 8: Urgency Scaling & Selection
-
-The final raw score is multiplied by the urgency factor (1.15x or 1.05x). Only the **Top 5** candidates scoring above **10 points** are persisted.
+## 2. Global Matching Strategy: "Human-Centric Precision"
+Sauti Salama utilizes a **Multi-Stage Weighted Scoring Cascade**. Unlike simple search, the engine optimizes for:
+1. **Clinical Relevance:** Ensuring the victim gets the *right* type of help.
+2. **Proximity & Access:** Minimizing physical barriers to support.
+3. **Professional Authority:** Prioritizing responders with legal or medical standing for high-risk incidents.
+4. **Load Balancing:** Preventing responder burnout by distributing case volume.
+5. **Temporal Urgency:** Accelerating the matching speed as a report age increases.
 
 ---
 
-## 4. Nuances & Recent Enhancements (Walkthrough)
+## 3. The Coordination Lifecycle
+A match moves through a strictly defined state machine to ensure zero "dead cases":
 
-### Remote vs. Local Heuristics
+```mermaid
+stateDiagram-v2
+    [*] --> Unmatched: Report Submitted
+    Unmatched --> Pending: Engine Triggered (Phase 0)
+    Pending --> Proposed: Match Suggested to Prof
+    Pending --> Accepted: Prof Schedules Directly
+    Proposed --> PendingSurvivor: Prof Accepts & Proposes Times
+    PendingSurvivor --> Accepted: Survivor Confirms Time
+    Accepted --> RescheduleRequested: Survivor Rejects/Reschedules
+    RescheduleRequested --> PendingSurvivor: Prof Proposes New Time
+    Accepted --> Completed: Case Marked Final (Archive)
+    Accepted --> Forwarded: Case Forwarded/Shared
+    Forwarded --> Pending: Added to recipient pool
+    Pending --> Declined: Prof Rejects Match
+    Accepted --> Cancelled: Safety Breach/User Request
+    Declined --> Unmatched: Re-triggered by Cascade
+```
 
-One of the most significant recent changes is the removal of the explicit `is_remote` column in favor of an **Implicit Heuristic**.
+---
 
-- **The Nuance**: We now treat `coverage_area_radius === null` as the single source of truth for remote services. This simplifies the DB schema and allows the UI to dynamically toggle proximity logic based on a single numeric field.
+## 4. The Data Model (High-Level)
+| Field | Type | Description |
+| :--- | :--- | :--- |
+| `report_id` | UUID | Foreign Key to the incident report. |
+| `service_id` | UUID | (Optional) Link to a Support Service organization. |
+| `hrd_profile_id` | UUID | (Optional) Link to an individual Professional profile. |
+| `match_score` | Integer | The final calculated score (0-100+). |
+| `match_status_type` | Enum | {pending, proposed, accepted, declined, completed, cancelled, reschedule_requested, pending_survivor}. |
+| `cascade_level` | Integer | Tracking which phase of the temporal cascade generated this match. |
+| `is_fallback_match`| Boolean | True if the match was selected via the fallback threshold (-50). |
+| `escalation_required`| Boolean | True for child cases or high-risk incidents. |
 
-### HRD Merging Logic
+---
 
-Standalone Human Rights Defenders (HRDs) often operate without a fixed "Service" address but are vital for protection.
+## 5. Security & Privacy Gates (Privacy Shield)
+The engine enforces a strictly gated protocol to protect survivor PII:
+- **Phase 0 (Privacy Mode):** Professional sees **only** the incident type, urgency, and generalized location. Survivor identity is hashed/hidden.
+- **Phase 1 (Finalized):** Once an appointment is scheduled/confirmed, the "Privacy Shield" is lifted. Secure end-to-end encrypted chat is initialized, and PII (Name, Phone) is revealed.
 
-- **The Change**: The algorithm now performs a `LEFT JOIN` or separate query to find verified profiles with the title "Human rights defender" who **do not** have a linked `support_service`. It synthesizes a candidate object for them so they are weighted identically to formal organizations.
+---
 
-### The "Address Snapshot" (Privacy & Speed)
+## 6. The 10-Stage Scoring Algorithm
+The engine runs the following pipeline for every candidate in the pool:
 
-When a match is found, we store the provider's Bio and Location (City/Country) in the `matched_services.description` and `matched_services.notes` columns.
+### Stage 1: Candidate Aggregation
+Building the pool of verified professionals and services. (Filtering out unverified accounts).
 
-- **Why?**: This creates a "snapshot" of the provider's status at the time of the match. If the provider later edits their profile, the survivor's match record retains the context that led to the connection, and it avoids complex triple-joins when loading the survivor's dashboard list.
+### Stage 2: Hard Filters (Elimination)
+Candidates are instantly disqualified (-∞ score) if:
+- **Legal Consent:** Report withheld legal consent and responder is a Lawyer (unless minor).
+- **Service Relevance:** Zero overlap between report `incident_type` and responder `service_capabilities`.
+- **Capacity:** Responder has **5+ truly active cases**.
+- **Geographic Boundary:** Distance exceeds `radius * 2.5` (Std) or `radius * 4.0` (Relaxed).
 
-### Real-time Escalation Flow
+### Stage 3: Clinical Specialty Scoring
+- **Primary Match:** +25 pts (High-fidelity specialty alignment).
+- **Secondary Match:** +15 pts.
+- **Requested By Name:** +20 pts (Stackable bonus).
 
-Matching isn't just a one-time event.
+### Stage 4: Proximity Scoring
+- **Remote Service:** +15 pts (Flat bonus).
+- **In-Person Proximity:** `MAX(0, 20 * (1 - distance/radius))`.
+- **Temporal Relaxation:** +5 pts (If report is >24hrs old).
+- **Outside Area Penalty:** -10 pts.
 
-- **The Flow**: If a survivor initially submits a "Record Only" report (no match), they can later click "Request Help". This triggers the `/api/reports/[id]/escalate` route, which flips the `record_only` bit and **reruns the entire matching engine**. This ensures help is available exactly when the survivor is ready for it.
+### Stage 5: Professional Authority Matrix
+Weighting based on Title vs. Incident Type (e.g., Doctor for Sexual Abuse = +10, Lawyer for Financial = +10). See Authority Matrix in `lib/matching-engine/constants.ts`.
+
+### Stage 6: Availability Alignment
+Matches urgency against the responder's availability profile:
+- **24/7 Profile:** +10 (High), +8 (Medium), +5 (Low).
+- **Flexible Profile:** +7 (High), +8 (Medium), +8 (Low).
+
+### Stage 7: Demographic & Special Needs
+- **Language Match:** +15 pts.
+- **Gender Match:** +10 pts.
+- **Disability Specialist:** +15 pts.
+- **Queer Support Specialist:** +15 pts.
+- **Child Case Penalty:** -50 pts (For non-specialists handling minors).
+
+### Stage 8: Load Balancing
+- **0 Active Cases:** +30 pts (Incentivizing idle responders).
+- **1 Active Case:** -8 pts.
+- **2 Active Cases:** -16 pts.
+- **3 Active Cases:** -24 pts.
+- **4 Active Cases:** -40 pts.
+
+### Stage 9: Urgency Multiplier
+Raw total is multiplied to accelerate high-priority incidents:
+- **High:** 1.2x
+- **Medium:** 1.1x
+- **Low:** 1.0x
+
+### Stage 10: Final Selection
+1. **Primary Selection:** Filter score ≥ 10. Select Top 5.
+2. **Fallback Selection:** If Primary is empty, filter score > -50. Select Top 3 (Flagged as `is_fallback`).
+3. **Manual Review:** If Fallback is empty, report is flagged for `requires_manual_review`.
+
+---
+
+## 7. The Temporal Cascade Protocol
+If a report is not accepted within specific timeframes, the engine escalates by relaxing geo-filters and expanding the pool.
+
+| Phase | Threshold (Std) | Threshold (High) | Logic Change |
+| :--- | :--- | :--- | :--- |
+| **1: Nudge** | 20 Minutes | 10 Minutes | Re-send push notifications to Top 3 candidates. |
+| **2: Extended** | 40 Minutes | 20 Minutes | Expand search radius to `radius * 4`. Re-run engine. |
+| **3: Open Pool**| 12 Hours | 6 Hours | Remove geographic restrictions (National scope). |
+| **4: HRD Relay**| 18 Hours | 9 Hours | Dispatch task to relevant Human Rights Defenders. |
+| **5: Admin** | 24 Hours | 12 Hours | Critical escalation to Sauti Salama administrators. |
+
+---
+
+## 8. Professional Engagement: The "Accept & Schedule" Flow
+To prevent race conditions, the engine utilizes an **atomic server action** for acceptance:
+- **Atomic Locking:** Professional selects an appointment time to instantly flip status to `accepted`.
+- **Exclusivity:** All other `pending` matches for the report are automatically declined with `reason: "Taken by others"`.
+- **Chat Bridge:** Supabase Realtime initializes the chat and yields the "Privacy Shield".
+
+---
+
+## 9. Recursive Matching (Reverse Flow)
+When a professional becomes available (clears their queue), the engine runs "Reverse Matching":
+- Identifies unmatched reports in the proximity.
+- Dispatches "New Case Available" notifications to the idle professional.
+
+---
+
+## 10. Case Forwarding & Collaborative Coordination
+Professionals can delegate cases when specialized care or local presence is required:
+- **Forwarding:** Transferring a case directly to another verified professional via `case_shares`.
+- **Triage:** Preserves milestones, private notes (if shared), and support history for the recipient.
+
+---
+
+## 11. Case Recommendations & Resource Linking
+Responders can provide survivors with non-interactive support via **Tailored Recommendations**:
+- Linking to legal documents, medical clinics, or shelters via `case_recommendations`.
+- Accessible even if chat is not yet active or the professional is pending.
+
+---
+
+## 12. Conclusion: Zero Dead Cases
+The algorithm's primary KPI is **"Time to First Professional Response"**. Through the temporal cascade and the load-balancing multipliers, Sauti Salama ensures that no survivor is left without a professional point of contact for longer than 24 hours.

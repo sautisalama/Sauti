@@ -12,24 +12,30 @@ import {
     Building2,
     FileText,
     History,
-    Inbox
+    Inbox,
+    AlertCircle,
+    ChevronRight,
+    Search
 } from "lucide-react";
 import Link from "next/link";
 import { formatDistanceToNow } from "date-fns";
 import { cn } from "@/lib/utils";
 import { useUser } from "@/hooks/useUser";
+import { Tables } from "@/types/db-schema";
+import { ReviewAuditLog } from "@/types/admin-types";
 
 type ActivityItem = {
     id: string;
-    type: "professional" | "service";
+    type: "professional" | "service" | "request";
     name: string;
     submittedAt: string;
-    updatedAt?: string;
+    updatedAt?: string | null;
     avatarUrl?: string | null;
     status: string;
     details?: string;
     hasDocuments: boolean;
-    reviewerId?: string;
+    reviewerId?: string | null;
+    reportId?: string | null; // For requests
 };
 
 export function AdminActivitySection() {
@@ -66,22 +72,32 @@ export function AdminActivitySection() {
             // Fetch services
             const { data: services } = await supabase
                 .from("support_services")
-                .select("id, name, created_at, updated_at, verification_updated_at, service_types, verification_status, accreditation_files_metadata, reviewed_by")
-                .order("updated_at", { ascending: false })
+                .select("id, name, created_at, verification_updated_at, service_types, verification_status, accreditation_files_metadata, reviewed_by")
+                .order("verification_updated_at", { ascending: false })
                 .limit(20);
 
-            const combinedItems: ActivityItem[] = [
+            // Fetch change requests
+            const { data: requests } = await supabase
+                .from("notifications")
+                .select("*")
+                .eq("type", "provider_change_request")
+                .order("created_at", { ascending: false })
+                .limit(10);
+
+
+             const combinedItems: ActivityItem[] = [
                 ...(professionals?.map(p => {
                     const hasDocs = Array.isArray(p.accreditation_files_metadata) && p.accreditation_files_metadata.length > 0;
                     // Check if reviewed_by is object or string and extract ID
-                    const reviewerId = typeof p.reviewed_by === 'object' && p.reviewed_by !== null ? (p.reviewed_by as any).reviewer_id : null;
+                    const reviewedByAny = p.reviewed_by as any;
+                    const reviewerId = (typeof reviewedByAny === 'object' && reviewedByAny !== null) ? reviewedByAny.reviewer_id : null;
                     
                     return {
                         id: p.id,
                         type: "professional" as const,
-                        name: `${p.first_name} ${p.last_name}`,
-                        submittedAt: p.verification_updated_at || p.created_at || new Date().toISOString(),
-                        updatedAt: p.updated_at || p.created_at,
+                        name: `${p.first_name || 'Unknown'} ${p.last_name || ''}`.trim(),
+                        submittedAt: (p.verification_updated_at as string) || (p.created_at as string) || new Date().toISOString(),
+                        updatedAt: (p.updated_at as string) || (p.created_at as string),
                         avatarUrl: p.avatar_url,
                         status: p.verification_status || 'pending',
                         details: p.user_type === 'ngo' ? 'NGO Representative' : 'Professional',
@@ -91,19 +107,33 @@ export function AdminActivitySection() {
                 }) || []),
                 ...(services?.map(s => {
                     const hasDocs = Array.isArray(s.accreditation_files_metadata) && s.accreditation_files_metadata.length > 0;
-                    const reviewerId = typeof s.reviewed_by === 'object' && s.reviewed_by !== null ? (s.reviewed_by as any).reviewer_id : null;
+                    const reviewedByAny = s.reviewed_by as any;
+                    const reviewerId = (typeof reviewedByAny === 'object' && reviewedByAny !== null) ? reviewedByAny.reviewer_id : null;
 
                     return {
                         id: s.id,
                         type: "service" as const,
-                        name: s.name,
-                        submittedAt: s.verification_updated_at || s.created_at || new Date().toISOString(),
-                        updatedAt: s.updated_at || s.created_at,
+                        name: s.name || 'Untitled Service',
+                        submittedAt: (s.verification_updated_at as string) || (s.created_at as string) || new Date().toISOString(),
+                        updatedAt: (s.verification_updated_at as string) || (s.created_at as string),
                         avatarUrl: null,
                         status: s.verification_status || 'pending',
-                        details: Array.isArray(s.service_types) ? s.service_types[0] : s.service_types,
+                        details: Array.isArray(s.service_types) ? (s.service_types[0] as string) : (s.service_types as string),
                         hasDocuments: hasDocs,
                         reviewerId
+                    };
+                }) || []),
+                ...(requests?.map(r => {
+                    const metadata = r.metadata as any;
+                    return {
+                        id: r.id,
+                        type: "request" as const,
+                        name: r.title || 'Change Request',
+                        submittedAt: r.created_at || new Date().toISOString(),
+                        status: metadata?.status || 'pending',
+                        details: r.message || 'Provider Change Request',
+                        hasDocuments: false,
+                        reportId: metadata?.report_id
                     };
                 }) || [])
             ];
@@ -119,7 +149,7 @@ export function AdminActivitySection() {
     // Filter Logic
     const newItems = useMemo(() => {
         return items
-            .filter(i => (i.status === 'pending' || i.status === 'under_review') && i.hasDocuments)
+            .filter(i => (i.status === 'pending' || i.status === 'under_review') && (i.hasDocuments || i.type === 'request'))
             .sort((a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime())
             .slice(0, 3);
     }, [items]);
@@ -142,31 +172,25 @@ export function AdminActivitySection() {
     return (
         <div className="space-y-8">
             {/* New / Inbox Section */}
-            <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                    <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-                        <Inbox className="h-5 w-5 text-serene-blue-600" />
-                        New Verifications
-                    </h3>
-                    {newItems.length > 0 && (
-                         <span className="bg-serene-blue-100 text-serene-blue-700 text-xs font-bold px-2 py-0.5 rounded-full">
+            {newItems.length > 0 && (
+                <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                        <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                            <Inbox className="h-5 w-5 text-serene-blue-600" />
+                            New Verifications
+                        </h3>
+                        <span className="bg-serene-blue-100 text-serene-blue-700 text-xs font-bold px-2 py-0.5 rounded-full">
                             {newItems.length}
                         </span>
-                    )}
-                </div>
+                    </div>
 
-                <div className="grid gap-3">
-                    {newItems.length > 0 ? (
-                        newItems.map((item) => (
+                    <div className="grid gap-3">
+                        {newItems.map((item) => (
                             <ActivityCard key={`${item.type}-${item.id}`} item={item} isNew={true} />
-                        ))
-                    ) : (
-                        <div className="p-6 text-center bg-gray-50/50 rounded-2xl border border-dashed border-gray-200">
-                            <p className="text-gray-500 text-sm">No new verifications pending.</p>
-                        </div>
-                    )}
+                        ))}
+                    </div>
                 </div>
-            </div>
+            )}
 
             {/* History Section */}
             <div className="space-y-4">
@@ -201,33 +225,28 @@ export function AdminActivitySection() {
 
 function ActivityCard({ item, isNew }: { item: ActivityItem, isNew: boolean }) {
     // Determine link - always go to profile-centric review
-    // If it's a service, we might want to pass a tab? For now, standard review page.
-    const href = `/dashboard/admin/review/${item.id}`; // Wait, this ID is profile ID or service ID.
-    // If it's a service, we need the OWNER's ID for the profile-centric view. 
-    // Ah, my Implementation Plan says "Clicking a Service... takes you to Professional's review page".
-    // I need to fetch the owner ID for services in the main fetch.
-    
-    // NOTE: For now, the review page [id] handles `type` param correctly to fetch either profile or service.
-    // I will update the [id] page to *redirect* or *handle* this unifying logic. 
-    // For this card, I will pass `?type=${item.type}` so the page knows what ID it is receiving.
+    // If it's a request, go to matching dashboard with reportId
+    const href = item.type === 'request' 
+        ? `/dashboard/admin/matching${item.reportId ? `?reportId=${item.reportId}` : ''}`
+        : `/dashboard/admin/review/${item.id}`; 
     
     return (
         <Link 
-            href={`${href}?type=${item.type}`}
+            href={item.type === 'request' ? href : `${href}?type=${item.type}`}
             className="block group"
         >
             <Card className={cn(
-                "hover:shadow-md transition-all duration-200 overflow-hidden border",
+                "hover:shadow-md transition-all duration-200 overflow-hidden border rounded-2xl sm:rounded-[2.5rem]",
                 isNew 
                     ? "border-serene-blue-200 bg-white shadow-sm ring-1 ring-serene-blue-50" 
                     : "border-gray-100 bg-gray-50/30 hover:bg-white"
             )}>
-                <CardContent className="p-3 sm:p-4 flex items-start gap-3 sm:gap-4">
+                <CardContent className="p-3 sm:p-4 flex items-center gap-3 sm:gap-4">
                     {/* Icon/Avatar */}
-                    <div className="shrink-0 pt-0.5">
+                    <div className="shrink-0">
                         {item.type === 'professional' ? (
                             <Avatar className={cn(
-                                "h-10 w-10 sm:h-12 sm:w-12 border-2 shadow-sm",
+                                "h-12 w-12 border-2 shadow-sm",
                                 isNew ? "border-serene-blue-100" : "border-white grayscale-[0.3]"
                             )}>
                                 <AvatarImage src={item.avatarUrl || undefined} />
@@ -238,68 +257,88 @@ function ActivityCard({ item, isNew }: { item: ActivityItem, isNew: boolean }) {
                                     {item.name.substring(0, 2).toUpperCase()}
                                 </AvatarFallback>
                             </Avatar>
-                        ) : (
+                        ) : item.type === 'service' ? (
                             <div className={cn(
-                                "h-10 w-10 sm:h-12 sm:w-12 rounded-full flex items-center justify-center border-2 shadow-sm",
+                                "h-12 w-12 rounded-full flex items-center justify-center border-2 shadow-sm",
                                 isNew 
                                     ? "bg-serene-purple-50 text-serene-purple-600 border-serene-purple-100" 
                                     : "bg-gray-100 text-gray-400 border-white"
                             )}>
-                                <Building2 className="h-5 w-5 sm:h-6 sm:w-6" />
+                                <Building2 className="h-6 w-6" />
+                            </div>
+                        ) : (
+                            <div className={cn(
+                                "h-12 w-12 rounded-full flex items-center justify-center border-2 shadow-sm",
+                                isNew 
+                                    ? "bg-rose-50 text-rose-600 border-rose-100" 
+                                    : "bg-gray-100 text-gray-400 border-white"
+                            )}>
+                                <AlertCircle className="h-6 w-6" />
                             </div>
                         )}
                     </div>
 
                     {/* Content */}
-                    <div className="flex-1 min-w-0 grid gap-1">
-                        <div className="flex items-start justify-between gap-2">
-                            <h4 className={cn(
-                                "truncate text-sm sm:text-base pr-2",
-                                isNew ? "font-bold text-gray-900" : "font-medium text-gray-600"
-                            )}>
-                                {item.name}
-                            </h4>
-                            <span className="text-[10px] sm:text-xs text-gray-400 whitespace-nowrap pt-1 shrink-0 flex items-center gap-1">
+                    <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between mb-1">
+                            <div className="flex flex-wrap items-center gap-1.5 min-w-0">
+                                <h4 className={cn(
+                                    "font-bold truncate max-w-[150px] sm:max-w-none",
+                                    isNew ? "text-gray-900" : "text-gray-600"
+                                )}>
+                                    {item.name}
+                                </h4>
+                                <Badge variant="secondary" className={cn(
+                                    "px-1.5 py-0 h-5 text-[10px] font-bold border uppercase tracking-tight",
+                                    isNew ? "bg-white border-gray-200 text-gray-700" : "bg-gray-100 border-gray-200 text-gray-500"
+                                )}>
+                                    {item.type === 'professional' ? 'Pro' : item.type === 'service' ? 'Service' : 'Request'}
+                                </Badge>
+                                
+                                {!isNew && (
+                                    <Badge variant="outline" className={cn(
+                                        "px-1.5 py-0 h-5 text-[10px] font-bold border capitalize",
+                                        item.status === 'verified' ? "bg-green-50 text-green-700 border-green-200" :
+                                        item.status === 'rejected' ? "bg-red-50 text-red-700 border-red-200" :
+                                        "bg-gray-50 text-gray-600 border-gray-200"
+                                    )}>
+                                        {item.status.replace('_', ' ')}
+                                    </Badge>
+                                )}
+                            </div>
+                            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden sm:flex items-center gap-1">
                                 <Clock className="h-3 w-3" />
                                 {formatDistanceToNow(new Date(isNew ? item.submittedAt : (item.updatedAt || item.submittedAt)), { addSuffix: true })}
                             </span>
                         </div>
                         
-                        <div className="flex flex-wrap items-center gap-2">
-                            <Badge variant="secondary" className={cn(
-                                "px-1.5 py-0 h-5 text-[10px] sm:text-xs font-normal border uppercase tracking-tight",
-                                isNew ? "bg-white border-gray-200 text-gray-700" : "bg-gray-100 border-gray-200 text-gray-500"
-                            )}>
-                                {item.type === 'professional' ? 'Pro' : 'Service'}
-                            </Badge>
-                            
-                            {!isNew && (
-                                <Badge variant="outline" className={cn(
-                                    "px-1.5 py-0 h-5 text-[10px] sm:text-xs font-normal border capitalize",
-                                    item.status === 'verified' ? "bg-green-50 text-green-700 border-green-200" :
-                                    item.status === 'rejected' ? "bg-red-50 text-red-700 border-red-200" :
-                                    "bg-gray-50 text-gray-600 border-gray-200"
-                                )}>
-                                    {item.status.replace('_', ' ')}
-                                </Badge>
-                            )}
+                        <p className="text-xs text-gray-500 truncate max-w-[200px] sm:max-w-none mb-1">
+                            {item.details}
+                        </p>
 
-                            <span className="text-xs text-gray-500 truncate max-w-[150px] sm:max-w-[300px]">
-                                {item.details}
-                            </span>
+                        <div className="flex flex-wrap items-center gap-2">
+                             {isNew && item.type !== 'request' && (
+                                 <div className="flex items-center gap-1 text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-serene-blue-600 bg-serene-blue-50 px-1.5 py-0.5 rounded">
+                                    <FileText className="h-2.5 w-2.5" />
+                                    <span>Documents attached</span>
+                                 </div>
+                            )}
+                            {isNew && item.type === 'request' && (
+                                 <div className="flex items-center gap-1 text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-rose-600 bg-rose-50 px-1.5 py-0.5 rounded">
+                                    <AlertCircle className="h-2.5 w-2.5" />
+                                    <span>Action required</span>
+                                 </div>
+                            )}
+                            <div className="flex items-center gap-1 text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-gray-400 sm:hidden">
+                                <Clock className="h-2.5 w-2.5" />
+                                {formatDistanceToNow(new Date(isNew ? item.submittedAt : (item.updatedAt || item.submittedAt)), { addSuffix: true })}
+                            </div>
                         </div>
-                        
-                        {isNew && (
-                             <div className="flex items-center gap-1 mt-1 text-xs font-medium text-serene-blue-600">
-                                <FileText className="h-3 w-3" />
-                                <span>Documents attached</span>
-                             </div>
-                        )}
                     </div>
 
-                    {/* Mobile Arrow / Desktop Action Indicator */}
-                    <div className="self-center text-gray-300 group-hover:text-serene-blue-400 transition-colors">
-                        <ArrowRight className="h-5 w-5" />
+                    {/* Arrow Indicator */}
+                    <div className="shrink-0 text-gray-300 group-hover:text-serene-blue-400 transition-colors">
+                        <ChevronRight className="h-5 w-5" />
                     </div>
                 </CardContent>
             </Card>

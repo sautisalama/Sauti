@@ -3,7 +3,7 @@
 import { Chat } from '@/types/chat';
 import { Search, MessageSquare, Filter, Users, Plus } from 'lucide-react';
 import { format } from 'date-fns';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { NewChatModal } from './NewChatModal';
@@ -57,7 +57,13 @@ export function ChatSidebar({ chats, selectedChatId, onSelectChat, isLoading, cu
             .order('created_at', { ascending: false });
           
           if (!error && data) {
-            setCommunities(data);
+            setCommunities(data.map(c => ({
+              ...c,
+              is_public: !!c.is_public,
+              member_count: c.member_count || 0,
+              created_at: c.created_at || new Date().toISOString(),
+              creator_id: c.creator_id || ''
+            })));
           }
         } catch (e) {
           console.error('Error fetching communities:', e);
@@ -74,11 +80,20 @@ export function ChatSidebar({ chats, selectedChatId, onSelectChat, isLoading, cu
     const names = `${user.profile.first_name || ""} ${user.profile.last_name || ""}`.trim();
     return names.charAt(0).toUpperCase() || user.email?.charAt(0).toUpperCase() || 'U';
   };
-
   const filteredChats = chats.filter(chat => {
     const meta = chat.metadata || {};
-    const otherParticipant = chat.participants?.find(p => p.user_id !== currentUserId) || chat.participants?.[0];
-    const name = meta.name || otherParticipant?.user?.first_name || 'Unknown User'; 
+    const otherParticipant = currentUserId 
+      ? chat.participants?.find(p => p.user_id !== currentUserId) || chat.participants?.[0]
+      : chat.participants?.[0];
+    
+    // Determine name and avatar based on other participant
+    let name = meta.name;
+    if (!name && otherParticipant?.user) {
+        const u = otherParticipant.user;
+        name = `${u.first_name || ''} ${u.last_name || ''}`.trim() || 'Survivor';
+    }
+    if (!name) name = 'Unknown User';
+
     const matchesSearch = name.toLowerCase().includes(search.toLowerCase());
     
     if (!matchesSearch) return false;
@@ -86,6 +101,48 @@ export function ChatSidebar({ chats, selectedChatId, onSelectChat, isLoading, cu
     if (filter === 'groups') return chat.type === 'group';
     return true;
   });
+
+  // Consolidate duplicates in display for DMs/Match chats
+  const consolidatedChats = useMemo(() => {
+    const map = new Map<string, Chat>();
+    for (const chat of filteredChats) {
+      const other = currentUserId 
+        ? chat.participants?.find(p => p.user_id !== currentUserId) || chat.participants?.[0]
+        : chat.participants?.[0];
+      
+      // If it's a DM or Match chat, group by the other participant's ID
+      // Otherwise, use the chat ID (for groups/communities)
+      const isDirect = chat.type === 'dm' || chat.type === 'support_match' || !chat.type;
+      const key = isDirect && other?.user_id 
+        ? other.user_id 
+        : chat.id;
+      
+      const existing = map.get(key);
+      // Keep the one with the most recent activity, but merge all IDs
+      if (!existing || (new Date(chat.last_message_at || 0) > new Date(existing.last_message_at || 0))) {
+        const updatedChat = {
+          ...chat,
+          metadata: {
+            ...chat.metadata,
+            all_chat_ids: existing 
+              ? Array.from(new Set([...(existing.metadata?.all_chat_ids || []), chat.id]))
+              : [chat.id]
+          }
+        };
+        map.set(key, updatedChat);
+      } else {
+        // Current chat is older, but its ID should still be in the consolidated list
+        existing.metadata = {
+          ...existing.metadata,
+          all_chat_ids: Array.from(new Set([...(existing.metadata?.all_chat_ids || []), chat.id]))
+        };
+      }
+    }
+    // Sort by latest message
+    return Array.from(map.values()).sort((a, b) => 
+      new Date(b.last_message_at || 0).getTime() - new Date(a.last_message_at || 0).getTime()
+    );
+  }, [filteredChats, currentUserId]);
 
   const filteredCommunities = communities.filter(community => 
     community.name.toLowerCase().includes(search.toLowerCase())
@@ -293,10 +350,18 @@ export function ChatSidebar({ chats, selectedChatId, onSelectChat, isLoading, cu
                  </div>
                )}
 
-              {filteredChats.map(chat => {
+              {consolidatedChats.map(chat => {
               const meta = chat.metadata || {};
-              const otherParticipant = chat.participants?.find(p => p.user_id !== currentUserId) || chat.participants?.[0];
-              const name = meta.name || `${otherParticipant?.user?.first_name || 'User'} ${otherParticipant?.user?.last_name || ''}`;
+              const otherParticipant = currentUserId 
+                ? chat.participants?.find(p => p.user_id !== currentUserId) || chat.participants?.[0]
+                : chat.participants?.[0];
+              
+              let name = meta.name;
+              if (!name && otherParticipant?.user) {
+                  const u = otherParticipant.user;
+                  name = `${u.first_name || ''} ${u.last_name || ''}`.trim() || 'Survivor';
+              }
+              if (!name) name = 'Unknown User';
               const lastMsg = meta.last_message_preview;
               const time = lastMsg?.created_at ? format(new Date(lastMsg.created_at), 'HH:mm') : '';
 

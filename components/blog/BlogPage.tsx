@@ -18,6 +18,7 @@ interface Blog {
   cover_image_url?: string | null;
   created_at: string;
   view_count?: number;
+  status: 'draft' | 'pending_review' | 'approved' | 'rejected' | 'published';
   author?: {
     id: string;
     first_name: string | null;
@@ -48,14 +49,18 @@ export function BlogPage({ slug }: BlogPageProps) {
           .from('blogs')
           .select(`
             *,
-            author:profiles(id, first_name, last_name, avatar_url, professional_title, bio)
+            author:profiles!blogs_author_id_fkey(id, first_name, last_name, avatar_url, professional_title, bio)
           `)
           .eq('slug', slug)
           .eq('status', 'published')
           .single();
 
         if (!error && blogData) {
-          setBlog(blogData);
+          const processedBlog = {
+            ...blogData,
+            excerpt: blogData.content ? blogData.content.substring(0, 160).replace(/<[^>]*>/g, '') + '...' : ''
+          } as Blog;
+          setBlog(processedBlog);
           
           // Increment view count
           await supabase
@@ -67,17 +72,21 @@ export function BlogPage({ slug }: BlogPageProps) {
           const { data: related } = await supabase
             .from('blogs')
             .select(`
-              id, title, slug, excerpt, cover_image_url, created_at, status,
-              author:profiles(first_name, last_name, avatar_url)
+              id, title, slug, cover_image_url, created_at, status, content,
+              author: profiles!blogs_author_id_fkey(first_name, last_name, avatar_url)
             `)
             .eq('status', 'published')
-            .eq('author_id', blogData.author?.id)
+            .eq('author_id', blogData.author?.id ?? '')
             .neq('id', blogData.id)
             .order('created_at', { ascending: false })
             .limit(3);
 
           if (related) {
-            setRelatedBlogs(related as any);
+            const processedRelated = (related as any[]).map(r => ({
+              ...r,
+              excerpt: r.content ? r.content.substring(0, 100).replace(/<[^>]*>/g, '') + '...' : ''
+            })) as Blog[];
+            setRelatedBlogs(processedRelated);
           }
         }
       } catch (error) {

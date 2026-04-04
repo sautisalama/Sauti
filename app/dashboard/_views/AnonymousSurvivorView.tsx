@@ -142,7 +142,7 @@ export default function AnonymousSurvivorView({
 											key={report.report_id}
 											className="block group"
 										>
-											<Card className="border-slate-100 bg-white shadow-sm hover:shadow-xl hover:border-teal-100/50 transition-all duration-500 rounded-[2.5rem] overflow-hidden">
+											<Card className="border-slate-100 bg-white shadow-sm hover:shadow-xl hover:border-teal-100/50 transition-all duration-500 rounded-2xl overflow-hidden">
 												<CardContent className="p-0">
 													<div className="p-8 md:p-10">
 														<div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 mb-6">
@@ -208,7 +208,7 @@ export default function AnonymousSurvivorView({
 									))}
 								</div>
 							) : (
-								<Card className="border-2 border-dashed border-slate-200 rounded-[3rem] p-16 text-center bg-white/50">
+								<Card className="border-2 border-dashed border-slate-200 rounded-2xl p-16 text-center bg-white/50">
 									<div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-6">
 										<HandHeart className="h-10 w-10 text-slate-200" />
 									</div>
@@ -228,7 +228,7 @@ export default function AnonymousSurvivorView({
 
 						{/* Supportive Tips / Help */}
 						<div className="space-y-4">
-							<div className="p-8 bg-white border border-slate-100 rounded-[2rem] shadow-sm space-y-4">
+							<div className="p-8 bg-white border border-slate-100 rounded-2xl shadow-sm space-y-4">
 								<div className="flex items-center gap-3 text-teal-600">
 									<Sparkles className="h-5 w-5" />
 									<h4 className="font-bold text-slate-800">Did you know?</h4>
@@ -238,7 +238,7 @@ export default function AnonymousSurvivorView({
 								</p>
 							</div>
 
-							<Link href="/dashboard/chat" className="flex items-center justify-between p-6 bg-teal-50 hover:bg-teal-100 transition-all rounded-[2rem] group border border-teal-100 shadow-sm">
+							<Link href="/dashboard/chat" className="flex items-center justify-between p-6 bg-teal-50 hover:bg-teal-100 transition-all rounded-2xl group border border-teal-100 shadow-sm">
 								<div className="flex items-center gap-4">
 									<div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center shadow-sm">
 										<MessageCircle className="h-5 w-5 text-teal-600 group-hover:scale-110 transition-transform" />
@@ -253,7 +253,7 @@ export default function AnonymousSurvivorView({
 			</div>
 
 			<Dialog open={open} onOpenChange={setOpen}>
-				<DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto p-0 border-0 rounded-[3rem] shadow-2xl bg-white">
+				<DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto p-0 border-0 rounded-2xl shadow-2xl bg-white">
 					<div className="p-10 md:p-12">
 						<DialogHeader className="mb-10">
 							<div className="flex items-center gap-4 mb-3">

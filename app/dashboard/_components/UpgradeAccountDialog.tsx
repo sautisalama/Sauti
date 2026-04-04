@@ -112,7 +112,7 @@ export function UpgradeAccountDialog({
 
 	return (
 		<Dialog open={open} onOpenChange={onOpenChange}>
-			<DialogContent className="max-w-md p-0 overflow-hidden border-0 rounded-[2rem] shadow-2xl bg-white">
+			<DialogContent className="max-w-md p-0 overflow-hidden border-0 rounded-2xl shadow-2xl bg-white">
 				<div className="bg-slate-900 p-8 text-center relative overflow-hidden">
 					<div className="absolute top-0 left-0 w-full h-full bg-gradient-to-b from-teal-500/20 to-transparent pointer-events-none" />
 					<div className="w-16 h-16 bg-white/10 rounded-2xl flex items-center justify-center mx-auto mb-6 backdrop-blur-md shadow-inner relative z-10">

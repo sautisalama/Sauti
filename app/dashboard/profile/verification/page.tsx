@@ -38,9 +38,11 @@ export default function VerificationPage() {
 						.eq("id", userId)
 						.single();
 					const docs = data?.accreditation_files_metadata
-						? Array.isArray(data.accreditation_files_metadata)
+						? (Array.isArray(data.accreditation_files_metadata)
 							? data.accreditation_files_metadata
-							: JSON.parse(data.accreditation_files_metadata)
+							: (typeof data.accreditation_files_metadata === "string"
+								? JSON.parse(data.accreditation_files_metadata)
+								: []))
 						: [];
 					dash?.updatePartial({
 						verification: {

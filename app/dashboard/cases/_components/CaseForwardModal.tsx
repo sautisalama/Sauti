@@ -19,7 +19,7 @@ interface Professional {
   last_name: string | null;
   avatar_url: string | null;
   professional_title: string | null;
-  user_type: string;
+  user_type: string | null;
 }
 
 interface SupportService {
@@ -159,16 +159,20 @@ export function CaseForwardModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <ArrowRightCircle className="h-5 w-5 text-serene-blue-500" />
-            Forward Case
-          </DialogTitle>
-          <DialogDescription>
-            Share this case with another service provider
-          </DialogDescription>
-        </DialogHeader>
+      <DialogContent className="sm:max-w-lg bg-white rounded-2xl sm:rounded-[2.5rem] p-0 overflow-hidden border-0 shadow-2xl max-h-[90vh] flex flex-col">
+        <div className="p-8 pb-0 border-b border-slate-50">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-bold flex items-center gap-3 text-slate-900">
+              <ArrowRightCircle className="h-6 w-6 text-teal-600" />
+              Forward Case
+            </DialogTitle>
+            <DialogDescription className="text-slate-500 font-medium">
+              Securely share this case with another verified professional.
+            </DialogDescription>
+          </DialogHeader>
+        </div>
+
+        <div className="p-8 overflow-y-auto">
 
         {step === 'select' && (
           <div className="space-y-4">
@@ -374,6 +378,7 @@ export function CaseForwardModal({
             </div>
           </div>
         )}
+        </div>
       </DialogContent>
     </Dialog>
   );

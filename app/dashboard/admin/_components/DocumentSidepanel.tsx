@@ -28,10 +28,19 @@ type DocumentSidepanelProps = {
         notes?: string;
         reviewed_at?: string;
         docNumber?: string;
+        doc_number?: string;
         issuer?: string;
-        [key: string]: any;
+        issuing_authority?: string;
+        title?: string;
     } | null;
-    contextData?: any; 
+    contextData?: {
+        first_name?: string | null;
+        last_name?: string | null;
+        professional_title?: string | null;
+        email?: string | null;
+        name?: string | null;
+        service_types?: string | string[] | null;
+    } | null; 
     contextType?: 'profile' | 'service';
     onSaveReview: (doc: any, status: 'verified' | 'rejected', notes: string) => void;
 };

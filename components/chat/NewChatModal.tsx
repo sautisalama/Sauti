@@ -62,7 +62,7 @@ export function NewChatModal({ isOpen, onClose, onChatCreated }: NewChatModalPro
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-md rounded-3xl p-0 overflow-hidden bg-serene-neutral-50">
+      <DialogContent className="sm:max-w-md rounded-2xl p-0 overflow-hidden bg-serene-neutral-50">
         <DialogHeader className="p-6 pb-0">
           <div className="flex items-center gap-3 mb-1">
             <div className="h-10 w-10 rounded-xl bg-serene-blue-100 flex items-center justify-center">

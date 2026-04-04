@@ -196,8 +196,9 @@ export async function getAvailableSlotsForDate(
     })
     
     appointments?.forEach(apt => {
+        if (!apt.appointment_date) return
         const start = new Date(apt.appointment_date)
-        const end = new Date(start.getTime() + (apt.duration_minutes || 60) * 60000)
+        const end = new Date(start.getTime() + (Number(apt.duration_minutes) || 60) * 60000)
         busyTimes.push({ start, end })
     })
     

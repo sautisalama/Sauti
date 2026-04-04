@@ -1,7 +1,11 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { format } from "date-fns";
 import { createClient } from "@/utils/supabase/client";
+import { Tables } from "@/types/db-schema";
+
+import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -42,11 +46,24 @@ import { SereneBreadcrumb } from "@/components/ui/SereneBreadcrumb";
 import { useRouter } from "next/navigation";
 import { ChatWindow } from "@/components/chat/ChatWindow";
 import { CaseChatPanel } from "@/components/chat/CaseChatPanel";
-import { getCaseChat } from "@/app/actions/chat";
+import { getCaseChat, sendMessage } from "@/app/actions/chat";
 import { Chat } from "@/types/chat";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { Calendar } from "lucide-react";
+import { matchProfessionalWithUnmatchedReports } from "@/app/actions/match-services";
+import { CaseDetailView } from "./_components/CaseDetailView";
+import { EnhancedAppointmentScheduler } from "../_components/EnhancedAppointmentScheduler";
+import { createAppointment } from "../_views/actions/appointments";
+import { markCaseAsExclusive } from "@/app/actions/matching";
+import {
+	Dialog,
+	DialogContent,
+	DialogHeader,
+	DialogTitle,
+	DialogDescription,
+} from "@/components/ui/dialog";
+import { Zap } from "lucide-react";
 
 
 interface MatchedServiceItem {
@@ -55,24 +72,34 @@ interface MatchedServiceItem {
 	match_status_type: string | null;
 	match_score: number | null;
 	completed_at?: string | null;
+    feedback?: string | null;
 	unread_messages?: number;
-	report: any;
-	service_details: any;
+	survivor_id?: string | null;
+	report: Tables<"reports">;
+	service_details: Tables<"support_services">;
 	notes?: string | null;
 	support_service?: {
-		name?: string;
-		category?: string;
-		organization_name?: string;
+		name?: string | null;
+		phone_number?: string | null;
+		email?: string | null;
+		category?: string | null;
+		organization_name?: string | null;
 	} | null;
-	appointments?: Array<{
+ 	appointments?: Array<{
 		id: string;
 		appointment_id: string;
-		appointment_date: string;
-		status: string;
+		appointment_date: string | null;
+		status: string | null;
+		professional?: {
+			first_name: string | null;
+			last_name: string | null;
+		} | null;
 	}>;
 }
 
+
 export default function CasesMasterDetail({ userId }: { userId: string }) {
+	const { toast } = useToast();
 	const router = useRouter();
 	const supabase = useMemo(() => createClient(), []);
 	const dash = useDashboardData();
@@ -89,7 +116,9 @@ export default function CasesMasterDetail({ userId }: { userId: string }) {
 	const [showFilters, setShowFilters] = useState(false);
 	const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
 	const [isLoadingMessages, setIsLoadingMessages] = useState(false);
-
+    const [showArchived, setShowArchived] = useState(false);
+    const [isSearchModalOpen, setIsSearchModalOpen] = useState(false);
+	
 	// Chat State
 	const [activeTab, setActiveTab] = useState<'details' | 'chat'>('details');
 	const [activeChat, setActiveChat] = useState<Chat | null>(null);
@@ -134,7 +163,7 @@ export default function CasesMasterDetail({ userId }: { userId: string }) {
 	const monthDays = useMemo(() => getMonthDays(calendarSelectedDate), [calendarSelectedDate]);
 
 	const getAllAppointments = (casesData: MatchedServiceItem[]) => {
-		const all: any[] = [];
+		const all: (NonNullable<MatchedServiceItem["appointments"]>[number] & { case: MatchedServiceItem })[] = [];
 		casesData.forEach(c => {
 			 c.appointments?.forEach(a => {
 				 all.push({ ...a, case: c });
@@ -150,19 +179,42 @@ export default function CasesMasterDetail({ userId }: { userId: string }) {
 		);
 	};
 
+	// Initial selection strategy for calendar (Focus on upcoming or most recent past)
+	useEffect(() => {
+		if (loading || cases.length === 0) return;
+		
+		const allAppts = getAllAppointments(cases);
+		if (allAppts.length === 0) return;
+
+		const now = new Date();
+		const sorted = [...allAppts].sort((a, b) => 
+			new Date(a.appointment_date!).getTime() - new Date(b.appointment_date!).getTime()
+		);
+
+		const upcoming = sorted.find(a => new Date(a.appointment_date!) >= now);
+		if (upcoming) {
+			setCalendarSelectedDate(new Date(upcoming.appointment_date!));
+		} else if (sorted.length > 0) {
+			setCalendarSelectedDate(new Date(sorted[sorted.length - 1].appointment_date!));
+		}
+	}, [loading, cases.length]);
+
+	// ... rest of component ...
+
 	// Fetch chat when case is selected
 	useEffect(() => {
 		if (selectedId) {
 			const selectedCase = cases.find(c => c.id === selectedId);
-			if (selectedCase && selectedCase.report?.survivor_id) {
+			if (selectedCase && (selectedCase.survivor_id || selectedCase.report?.user_id)) {
 				setIsChatLoading(true);
-				const survId = selectedCase.report.survivor_id;
+				const survId = (selectedCase.survivor_id || selectedCase.report?.user_id) as string;
 				getCaseChat(selectedId, survId)
 					.then(chat => setActiveChat(chat))
 					.catch(err => console.error("Failed to load chat", err))
 					.finally(() => setIsChatLoading(false));
 			}
 		} else {
+
 			setActiveChat(null);
 			setActiveTab('details');
 		}
@@ -177,33 +229,36 @@ export default function CasesMasterDetail({ userId }: { userId: string }) {
 				seededFromProviderRef.current
 			)
 				return;
-			const apptByMatchId = new Map<string, any[]>();
-			(dash.data.appointments || []).forEach((a: any) => {
+			const apptByMatchId = new Map<string, NonNullable<MatchedServiceItem["appointments"]>>();
+			(dash.data.appointments || []).forEach((a) => {
 				const mid = a?.matched_service?.id;
 				if (!mid) return;
 				const arr = apptByMatchId.get(mid) || [];
 				arr.push({
-					id: a.id,
+					id: a.appointment_id,
 					appointment_id: a.appointment_id,
 					appointment_date: a.appointment_date,
 					status: a.status,
 				});
 				apptByMatchId.set(mid, arr);
 			});
+
+
 			const seeded: MatchedServiceItem[] = (dash.data.matchedServices || []).map(
-				(m: any) => ({
+				(m) => ({
 					id: m.id,
 					match_date: m.match_date || null,
 					match_status_type: m.match_status_type || null,
-					match_score: (m as any).match_score ?? null,
-					completed_at: (m as any).completed_at ?? null,
+					match_score: m.match_score ?? null,
+					completed_at: m.completed_at ?? null,
 					unread_messages: 0,
-					report: m.report,
-					service_details: m.service_details,
-					notes: (m as any).notes || null,
+					report: m.report as Tables<"reports">,
+					service_details: m.service_details as Tables<"support_services">,
+					notes: m.notes || null,
 					appointments: apptByMatchId.get(m.id) || [],
 				})
 			);
+
 			setCases(seeded);
 			setLoading(false);
 			seededFromProviderRef.current = true;
@@ -212,68 +267,93 @@ export default function CasesMasterDetail({ userId }: { userId: string }) {
 	}, [dash?.data, userId]);
 
 	// Load matched services and appointments in parallel (skip if already seeded)
-	useEffect(() => {
-		const load = async () => {
-			if (seededFromProviderRef.current) return;
-			setLoading(true);
-			try {
-				// Get the user's services
-				const { data: services } = await supabase
-					.from("support_services")
-					.select("id")
-					.eq("user_id", userId);
-				const ids = (services || []).map((s) => s.id);
-				if (ids.length === 0) {
-					setCases([]);
-					setLoading(false);
-					return;
-				}
+	const loadCases = useMemo(() => async (forceRefresh: boolean = false) => {
+		if (seededFromProviderRef.current && !forceRefresh) return;
+		setLoading(true);
+		try {
+			// Get the user's services
+			const { data: services } = await supabase
+				.from("support_services")
+				.select("id")
+				.eq("user_id", userId);
+			const ids = (services || []).map((s) => s.id);
+			
+            // Fetch matches (service-based OR hrd-based)
+            let matchesQuery = supabase
+                .from("matched_services")
+                .select(`*, report:reports(*), service_details:support_services(*)`);
+            
+            if (ids.length > 0) {
+                matchesQuery = matchesQuery.or(`service_id.in.("${ids.join('","')}"),hrd_profile_id.eq."${userId}"`);
+            } else {
+                matchesQuery = matchesQuery.eq("hrd_profile_id", userId);
+            }
 
-				const [{ data: matches }, { data: appts }] = await Promise.all([
-					supabase
-						.from("matched_services")
-						.select(`*, report:reports(*), service_details:support_services(*)`)
-						.in("service_id", ids)
-						.order("match_date", { ascending: false }),
-					supabase
-						.from("appointments")
-						.select("*, matched_services")
-						.in(
-							"matched_services",
-							ids.length
-								? (
-										await supabase
-											.from("matched_services")
-											.select("id")
-											.in("service_id", ids)
-								  ).data?.map((m: any) => m.id) || []
-								: []
-						),
-				]);
+            // Fetch appointments for these matches
+            // We need the match IDs first, or we can just fetch all for these services/profile
+            const { data: matchesData } = await matchesQuery.order("match_date", { ascending: false });
+            const matchIds = (matchesData || []).map((m) => m.id);
 
-				const apptByMatchId = new Map<string, any[]>();
-				(appts || []).forEach((a: any) => {
-					const k = a.matched_services as string;
-					const arr = apptByMatchId.get(k) || [];
-					arr.push(a);
-					apptByMatchId.set(k, arr);
+
+			const { data: appts } = await supabase
+					.from("appointments")
+					.select("*, matched_services")
+					.in(
+						"matched_services",
+						matchIds
+					);
+            
+            const matches = matchesData;
+
+			const apptByMatchId = new Map<string, NonNullable<MatchedServiceItem["appointments"]>>();
+			(appts || []).forEach((a) => {
+				const k = a.matched_services as string;
+				const arr = apptByMatchId.get(k) || [];
+				arr.push({
+					id: a.appointment_id,
+					appointment_id: a.appointment_id,
+					appointment_date: a.appointment_date || '',
+					status: a.status || 'pending',
 				});
 
-				const normalized: MatchedServiceItem[] = (matches || []).map((m: any) => ({
-					...m,
-					notes: m.notes || null,
-					appointments: apptByMatchId.get(m.id) || [],
-				}));
+				apptByMatchId.set(k, arr);
+			});
 
-				setCases(normalized);
-			} catch (error) {
-				console.error("Failed to load cases:", error);
-			} finally {
-				setLoading(false);
+
+
+			const normalized: MatchedServiceItem[] = (matches || []).map((m) => ({
+				...m,
+				notes: m.notes || null,
+				appointments: apptByMatchId.get(m.id) || [],
+			} as MatchedServiceItem));
+
+
+
+			setCases(normalized);
+			
+			// PROACTIVE MATCHING: If after loading we still have NO cases, 
+			// trigger the proactive matching engine once per session.
+			if (normalized.length === 0 && !seededFromProviderRef.current) {
+				console.log("[Cases] No cases found. Triggering proactive matching engine...");
+				const res = await matchProfessionalWithUnmatchedReports(userId);
+				if (res && typeof res === 'object' && 'matched' in res && (res as { matched: number }).matched > 0) {
+					console.log(`[Cases] Success! Matched ${res.matched} reports. Refreshing...`);
+
+					// Re-run the load to pick up new matches
+					seededFromProviderRef.current = false; // allow re-fetch
+					loadCases(true); 
+				}
 			}
-		};
-		load();
-	}, [userId, supabase]);
+		} catch (error) {
+			console.error("Failed to load cases:", error);
+		} finally {
+			setLoading(false);
+		}
+	}, [userId, supabase, seededFromProviderRef]);
+
+	useEffect(() => {
+		loadCases();
+	}, [loadCases]);
 
 	// Track unread messages for each case - load after cases are loaded
 	// This prevents delays and freezing during initial case loading
@@ -343,8 +423,48 @@ export default function CasesMasterDetail({ userId }: { userId: string }) {
 		return () => clearTimeout(timeoutId);
 	}, [cases.length, loading]); // Only depend on cases.length and loading state
 
+	// Subscribe to real-time match updates (for exclusivity and new cases)
+	useEffect(() => {
+		if (!userId) return;
+		const channel = supabase.channel('realtime_cases_prof')
+			.on(
+				'postgres_changes',
+				{ event: '*', schema: 'public', table: 'matched_services' },
+				(payload) => {
+					if (payload.eventType === 'UPDATE') {
+						const newRecord = payload.new as Tables<"matched_services">;
+						setCases((prev) => {
+							const exists = prev.find(c => c.id === newRecord.id);
+							if (!exists) return prev;
+							
+							if (selectedId === newRecord.id && newRecord.match_status_type === 'declined') {
+								toast({
+									title: "Case Unavailable",
+									description: "This case has been taken by another professional.",
+									variant: "destructive"
+								});
+							}
+							
+							return prev.map(c => c.id === newRecord.id ? { ...c, match_status_type: newRecord.match_status_type } : c);
+						});
+					} else if (payload.eventType === 'INSERT') {
+						loadCases(true);
+					}
+				}
+			)
+			.subscribe();
+
+		return () => { supabase.removeChannel(channel); };
+	}, [userId, supabase, selectedId, toast, loadCases]);
+
 	const filtered = useMemo(() => {
-		let filteredCases = cases;
+		let filteredCases = cases.filter(c => {
+            const isCompleted = (c.match_status_type || "").toLowerCase() === 'completed';
+            return showArchived ? isCompleted : !isCompleted;
+        });
+
+		// Default exclusivity filter: hide declined cases unless currently selected
+		filteredCases = filteredCases.filter((c) => c.match_status_type !== 'declined' || c.id === selectedId);
 
 		// Text search filter
 		const term = q.trim().toLowerCase();
@@ -392,7 +512,7 @@ export default function CasesMasterDetail({ userId }: { userId: string }) {
 		}
 
 		return filteredCases;
-	}, [cases, q, urgencyFilter, statusFilter, onBehalfFilter]);
+	}, [cases, q, urgencyFilter, statusFilter, onBehalfFilter, showArchived]);
 
 	const selected = useMemo(
 		() => filtered.find((c) => c.id === selectedId) || null,
@@ -422,20 +542,49 @@ export default function CasesMasterDetail({ userId }: { userId: string }) {
 	const formatDate = (d?: string | null) =>
 		d ? new Date(d).toLocaleString() : "";
 
-	// Handle case completion
+	// Handle case completion (Professional side)
 	const handleCompleteCase = async (caseId: string) => {
 		try {
 			setIsUpdatingStatus(true);
+            const selectedCase = cases.find(c => c.id === caseId);
+            if (!selectedCase) return;
+
+            // Use feedback field to track dual completion status
+            let completionStatus = { is_prof_complete: false, is_surv_complete: false };
+            try {
+                if (selectedCase.feedback && selectedCase.feedback.startsWith('{')) {
+                    completionStatus = JSON.parse(selectedCase.feedback);
+                }
+            } catch (e) {
+                console.warn("Failed to parse completion status from feedback:", e);
+            }
+
+            completionStatus.is_prof_complete = true;
+            const isFullyComplete = completionStatus.is_surv_complete === true;
+
+            const updateData: any = {
+                feedback: JSON.stringify(completionStatus),
+                updated_at: new Date().toISOString(),
+            };
+
+            if (isFullyComplete) {
+                updateData.match_status_type = "completed";
+                updateData.completed_at = new Date().toISOString();
+            }
+
 			const { error } = await supabase
 				.from("matched_services")
-				.update({
-					match_status_type: "completed",
-					completed_at: new Date().toISOString(),
-					updated_at: new Date().toISOString(),
-				})
+				.update(updateData)
 				.eq("id", caseId);
 
 			if (error) throw error;
+
+            toast({
+                title: isFullyComplete ? "Case Fully Completed" : "Case Marked as Complete",
+                description: isFullyComplete 
+                    ? "Both parties have confirmed. Case is now archived." 
+                    : "Waiting for survivor to confirm completion. You are now available for new matches.",
+            });
 
 			// Update local state
 			setCases((prev) =>
@@ -443,18 +592,140 @@ export default function CasesMasterDetail({ userId }: { userId: string }) {
 					c.id === caseId
 						? {
 								...c,
-								match_status_type: "completed",
-								completed_at: new Date().toISOString(),
+								match_status_type: isFullyComplete ? "completed" : c.match_status_type,
+                                feedback: JSON.stringify(completionStatus),
+								completed_at: isFullyComplete ? new Date().toISOString() : c.completed_at,
 						  }
 						: c
 				)
 			);
 		} catch (error) {
 			console.error("Error completing case:", error);
+            toast({
+                title: "Error",
+                description: "Failed to update completion status.",
+                variant: "destructive"
+            });
 		} finally {
 			setIsUpdatingStatus(false);
 		}
 	};
+
+    // Handle case acceptance trigger
+    const handleAcceptCase = (caseId: string, apptData?: any) => {
+        if (apptData) {
+            handleScheduleAndAccept(apptData, caseId);
+        } else {
+            setSelectedId(caseId);
+        }
+    };
+
+    // Unified Acceptance & Scheduling Handler
+    const handleScheduleAndAccept = async (apptData: {
+        date: Date;
+        duration: number;
+        type: string;
+        notes?: string;
+    }, caseIdOverride?: string) => {
+        const targetCaseId = caseIdOverride || selectedId;
+        if (!targetCaseId) return;
+
+        try {
+            setIsUpdatingStatus(true);
+            const selectedCase = cases.find(c => c.id === targetCaseId);
+            if (!selectedCase) return;
+
+            const survId = (selectedCase.survivor_id || selectedCase.report?.user_id) as string;
+            const isMeetNow = apptData.type === 'meet-now';
+
+            // 1. Update Match Status
+            const { error: matchError } = await supabase
+                .from("matched_services")
+                .update({
+                    match_status_type: "accepted",
+                    professional_accepted_at: new Date().toISOString(),
+                    survivor_accepted_at: isMeetNow ? new Date().toISOString() : null,
+                    updated_at: new Date().toISOString(),
+                })
+                .eq("id", targetCaseId);
+
+            if (matchError) throw matchError;
+            
+            // Mark case as exclusive
+            if (selectedCase.report?.report_id) {
+                await markCaseAsExclusive(selectedCase.report.report_id, targetCaseId);
+            }
+
+            // 2. Create Appointment
+            await createAppointment({
+                professional_id: userId,
+                survivor_id: survId,
+                matched_services: targetCaseId,
+                appointment_date: apptData.date.toISOString(),
+                duration_minutes: apptData.duration,
+                status: isMeetNow ? 'confirmed' : 'requested',
+                appointment_type: isMeetNow ? 'Immediate Consultation' : apptData.type,
+                notes: apptData.notes,
+                created_via: isMeetNow ? 'meet_now' : 'scheduled_acceptance'
+            });
+
+            // 3. Update Local State
+            setCases((prev) =>
+                prev.map((c) =>
+                    c.id === targetCaseId
+                        ? {
+                                ...c,
+                                match_status_type: "accepted",
+                                appointments: [
+                                    ...(c.appointments || []),
+                                    {
+                                        id: 'new-' + Date.now(),
+                                        appointment_id: 'new-' + Date.now(),
+                                        appointment_date: apptData.date.toISOString(),
+                                        status: isMeetNow ? 'confirmed' : 'requested'
+                                    }
+                                ]
+                          }
+                        : c
+                )
+            );
+
+            // 3. Send Initial Chat Message
+            try {
+                const chat = await getCaseChat(targetCaseId, survId);
+                const formattedDate = format(apptData.date, "EEEE, MMMM do 'at' h:mm a");
+                const messageContent = apptData.notes 
+                    ? `${apptData.notes}\n\n📅 **Scheduled Session:** ${formattedDate}`
+                    : `I've suggested a session for us on **${formattedDate}**. Looking forward to our coordination.`;
+                
+                await sendMessage(chat.id, messageContent);
+            } catch (chatError) {
+                console.error("Failed to send initial chat message:", chatError);
+                // Don't throw here, as the appointment was already created successfully
+            }
+
+            toast({
+                title: isMeetNow ? "Meeting Started" : "Schedule Suggested",
+                description: isMeetNow 
+                    ? "The case is now active. Switching to chat..." 
+                    : `We've sent your suggested time to the survivor.`,
+            });
+
+            if (isMeetNow) {
+                setActiveTab('chat');
+            }
+
+        } catch (error) {
+            console.error("Error accepting case:", error);
+            toast({
+                title: "Error",
+                description: "Failed to accept case and suggest schedule.",
+                variant: "destructive"
+            });
+        } finally {
+            setIsUpdatingStatus(false);
+        }
+    };
 
 	// Enhanced Audio Player Component with seek controls
 	const AudioPlayer = ({ src, type }: { src: string; type?: string }) => {
@@ -612,27 +883,74 @@ export default function CasesMasterDetail({ userId }: { userId: string }) {
 						mobileView !== "list" ? "hidden lg:block" : ""
 					}`}
 				>
-					<div className="mb-8">
-						<SereneBreadcrumb items={[{ label: "Cases", active: true }]} className="mb-4" />
-						<div className="flex items-center justify-between">
-							<div>
-								<h1 className="text-2xl lg:text-3xl font-bold text-sauti-dark tracking-tight">Case Management</h1>
-								<p className="text-serene-neutral-500 mt-1 text-sm lg:text-base font-medium">Review your matched cases and track progress.</p>
+					<div className="mb-6 sm:mb-8">
+						<div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-10">
+							<div className="space-y-1">
+								<h1 className="text-xl sm:text-2xl lg:text-3xl font-black text-sauti-dark tracking-tight uppercase">Case Management</h1>
+								<p className="text-serene-neutral-400 text-xs sm:text-sm font-medium">Coordinate care and track progress for your assigned cases.</p>
+							</div>
+						</div>
+
+						{/* Subtle Archive Tabs + Search/Filter Toggle (Mobile) */}
+						<div className="flex items-center justify-between border-b border-serene-neutral-100/60 pr-1">
+							<div className="flex items-center gap-6 sm:gap-8">
+								<button 
+									onClick={() => setShowArchived(false)}
+									className={cn(
+										"pb-4 text-[10px] sm:text-xs font-bold uppercase tracking-widest transition-all relative",
+										!showArchived ? "text-sauti-teal" : "text-serene-neutral-400 hover:text-serene-neutral-600"
+									)}
+								>
+									Active Cases
+									{!showArchived && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-sauti-teal rounded-full animate-in fade-in zoom-in duration-300" />}
+								</button>
+								<button 
+									onClick={() => setShowArchived(true)}
+									className={cn(
+										"pb-4 text-[10px] sm:text-xs font-bold uppercase tracking-widest transition-all relative",
+										showArchived ? "text-sauti-teal" : "text-serene-neutral-400 hover:text-serene-neutral-600"
+									)}
+								>
+									Archived
+									{showArchived && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-sauti-teal rounded-full animate-in fade-in zoom-in duration-300" />}
+								</button>
+							</div>
+
+							<div className="flex items-center gap-1.5 pb-3 lg:hidden">
+								<Button
+									variant="ghost"
+									size="icon"
+									onClick={() => setShowFilters(!showFilters)}
+									className={cn(
+										"h-8 w-8 rounded-full transition-all",
+										showFilters ? "bg-sauti-teal/10 text-sauti-teal" : "text-serene-neutral-400"
+									)}
+								>
+									<Filter className="h-4 w-4" />
+								</Button>
+								<Button
+									variant="ghost"
+									size="icon"
+									onClick={() => setIsSearchModalOpen(true)}
+									className="h-8 w-8 rounded-full text-serene-neutral-400"
+								>
+									<Search className="h-4 w-4" />
+								</Button>
 							</div>
 						</div>
 					</div>
-					{/* Premium Search and Filter Bar */}
-					<div className="mb-6 sticky top-0 z-30 bg-serene-neutral-50/95 backdrop-blur-lg border-b border-serene-neutral-100 pb-4 pt-3 -mx-1 px-1">
-						<div className="flex items-center gap-3">
+					{/* Premium Search Bar (Desktop) */}
+					<div className="hidden lg:block mb-8 sticky top-0 z-30 bg-serene-neutral-50/80 backdrop-blur-xl border-b border-serene-neutral-100/50 pb-5 pt-2 -mx-1 px-1 transition-all">
+						<div className="flex items-center gap-2 sm:gap-3">
 							{/* Search Bar */}
 							<div className="relative flex-1 min-w-0">
 								<Input
 									placeholder="Search cases..."
 									value={q}
 									onChange={(e) => setQ(e.target.value)}
-									className="pl-11 pr-4 py-2.5 text-sm border-serene-neutral-200 rounded-2xl bg-white shadow-sm focus:ring-2 focus:ring-sauti-teal/20 focus:border-sauti-teal transition-all placeholder:text-serene-neutral-400"
+									className="pl-9 sm:pl-11 pr-4 py-2 sm:py-2.5 text-xs sm:text-sm border-serene-neutral-200 rounded-xl sm:rounded-2xl bg-white shadow-sm focus:ring-2 focus:ring-sauti-teal/20 focus:border-sauti-teal transition-all placeholder:text-serene-neutral-400 h-9 sm:h-11"
 								/>
-								<Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-4 w-4 text-serene-neutral-400" />
+								<Search className="absolute left-3 sm:left-4 top-1/2 transform -translate-y-1/2 h-3.5 sm:h-4 w-3.5 sm:w-4 text-serene-neutral-400" />
 							</div>
 
 							{/* Filter Toggle Button */}
@@ -640,7 +958,7 @@ export default function CasesMasterDetail({ userId }: { userId: string }) {
 								variant="outline"
 								size="sm"
 								onClick={() => setShowFilters(!showFilters)}
-								className={`h-10 px-4 rounded-2xl border-serene-neutral-200 hover:bg-white hover:border-sauti-teal/30 shadow-sm transition-all font-semibold ${
+								className={`h-9 sm:h-11 px-3 sm:px-4 rounded-xl sm:rounded-2xl border-serene-neutral-200 hover:bg-white hover:border-sauti-teal/30 shadow-sm transition-all font-bold text-[10px] sm:text-xs shrink-0 ${
 									urgencyFilter !== "all" ||
 									statusFilter !== "all" ||
 									onBehalfFilter !== "all"
@@ -648,65 +966,64 @@ export default function CasesMasterDetail({ userId }: { userId: string }) {
 										: "bg-white text-serene-neutral-600"
 								}`}
 							>
-								<Filter className="h-4 w-4 mr-1.5" />
-								Filters
+								<Filter className="h-3.5 sm:h-4 w-3.5 sm:w-4 sm:mr-1.5" />
+								<span className="hidden sm:inline">Filters</span>
 								{(urgencyFilter !== "all" ||
 									statusFilter !== "all" ||
 									onBehalfFilter !== "all") && (
-									<span className="ml-1.5 h-2 w-2 bg-sauti-teal rounded-full animate-pulse"></span>
+									<span className="ml-1.5 h-1.5 w-1.5 bg-sauti-teal rounded-full animate-pulse"></span>
 								)}
 							</Button>
 						</div>
 
 						{/* Collapsible Filter Panel */}
 						{showFilters && (
-							<div className="mt-3 p-4 bg-gray-50 rounded-lg border border-gray-200">
-								<div className="flex flex-col sm:flex-row sm:items-center gap-4">
-									<div className="flex flex-wrap items-center gap-3">
-										{/* Urgency Filter */}
-										<div className="flex flex-col gap-1">
-											<label className="text-xs font-medium text-gray-600">Urgency</label>
-											<select
-												value={urgencyFilter}
-												onChange={(e) => setUrgencyFilter(e.target.value)}
-												className="px-3 py-1.5 text-sm border border-gray-200 rounded-md bg-white focus:ring-2 focus:ring-[#1A3434]/20 focus:border-[#1A3434] min-w-[100px]"
-											>
-												<option value="all">All</option>
-												<option value="high">High</option>
-												<option value="medium">Medium</option>
-												<option value="low">Low</option>
-											</select>
-										</div>
-
-										{/* Status Filter */}
-										<div className="flex flex-col gap-1">
-											<label className="text-xs font-medium text-gray-600">Status</label>
-											<select
-												value={statusFilter}
-												onChange={(e) => setStatusFilter(e.target.value)}
-												className="px-3 py-1.5 text-sm border border-gray-200 rounded-md bg-white focus:ring-2 focus:ring-[#1A3434]/20 focus:border-[#1A3434] min-w-[120px]"
-											>
-												<option value="all">All</option>
-												<option value="pending">Pending</option>
-												<option value="matched">Matched</option>
-												<option value="appointment">With Appointment</option>
-											</select>
-										</div>
-
-										{/* On Behalf Filter */}
-										<div className="flex flex-col gap-1">
-											<label className="text-xs font-medium text-gray-600">Type</label>
-											<select
-												value={onBehalfFilter}
-												onChange={(e) => setOnBehalfFilter(e.target.value)}
-												className="px-3 py-1.5 text-sm border border-gray-200 rounded-md bg-white focus:ring-2 focus:ring-[#1A3434]/20 focus:border-[#1A3434] min-w-[100px]"
-											>
-												<option value="all">All</option>
-												<option value="yes">On Behalf</option>
-												<option value="no">Personal</option>
-											</select>
-										</div>
+							<div className="mt-2 p-3 bg-white rounded-xl border border-serene-neutral-100 shadow-xl shadow-slate-200/50">
+								<div className="grid grid-cols-2 xs:grid-cols-3 gap-3">
+									{/* Urgency Filter */}
+									<div className="flex flex-col gap-1">
+										<label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest pl-1">Urgency</label>
+										<select
+											value={urgencyFilter}
+											onChange={(e) => setUrgencyFilter(e.target.value)}
+											className="px-2.5 py-1.5 text-xs border border-serene-neutral-100 rounded-lg bg-slate-50 focus:ring-2 focus:ring-sauti-teal/20 focus:border-sauti-teal outline-none font-bold text-slate-700"
+										>
+											<option value="all">All Levels</option>
+											<option value="high">High</option>
+											<option value="medium">Medium</option>
+											<option value="low">Low</option>
+										</select>
 									</div>
+
+									{/* Status Filter */}
+									<div className="flex flex-col gap-1">
+										<label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest pl-1">Status</label>
+										<select
+											value={statusFilter}
+											onChange={(e) => setStatusFilter(e.target.value)}
+											className="px-2.5 py-1.5 text-xs border border-serene-neutral-100 rounded-lg bg-slate-50 focus:ring-2 focus:ring-sauti-teal/20 focus:border-sauti-teal outline-none font-bold text-slate-700"
+										>
+											<option value="all">All Status</option>
+											<option value="pending">Pending</option>
+											<option value="matched">Matched</option>
+											<option value="appointment">With Sessions</option>
+										</select>
+									</div>
+
+									{/* On Behalf Filter */}
+									<div className="flex flex-col gap-1 col-span-2 xs:col-span-1">
+										<label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest pl-1">Type</label>
+										<select
+											value={onBehalfFilter}
+											onChange={(e) => setOnBehalfFilter(e.target.value)}
+											className="px-2.5 py-1.5 text-xs border border-serene-neutral-100 rounded-lg bg-slate-50 focus:ring-2 focus:ring-sauti-teal/20 focus:border-sauti-teal outline-none font-bold text-slate-700"
+										>
+											<option value="all">All Types</option>
+											<option value="yes">On Behalf</option>
+											<option value="no">Personal</option>
+										</select>
+									</div>
+								</div>
 
 									{/* Clear Filters */}
 									{(urgencyFilter !== "all" ||
@@ -726,7 +1043,6 @@ export default function CasesMasterDetail({ userId }: { userId: string }) {
 										</Button>
 									)}
 								</div>
-							</div>
 						)}
 					</div>
 
@@ -741,7 +1057,7 @@ export default function CasesMasterDetail({ userId }: { userId: string }) {
 							</>
 						) : filtered.length === 0 ? (
 							<div className="text-center py-24 px-6">
-								<div className="w-20 h-20 mx-auto mb-6 rounded-3xl bg-gradient-to-br from-sauti-teal/10 to-serene-blue-100 flex items-center justify-center shadow-sm">
+								<div className="w-20 h-20 mx-auto mb-6 rounded-2xl bg-gradient-to-br from-sauti-teal/10 to-serene-blue-100 flex items-center justify-center shadow-sm">
 									<Shield className="h-10 w-10 text-sauti-teal" />
 								</div>
 								<h3 className="text-xl font-bold text-sauti-dark mb-3">
@@ -764,9 +1080,23 @@ export default function CasesMasterDetail({ userId }: { userId: string }) {
 								return (
 									<div key={c.id} className="transition-all duration-200 min-w-0">
 										<CaseCard
-											data={c as any}
+											data={c as any} // Cast to any to satisfy the specific CaseCardData interface for now, or match it exactly
+
+
 											active={isActive}
-											onClick={() => router.push(`/dashboard/reports/${c.report.report_id}`)}
+											onClick={() => {
+												router.push(`/dashboard/cases/${c.id}`);
+											}}
+											onQuickView={(e) => {
+												e.stopPropagation();
+												setSelectedId(c.id);
+												setActiveTab('details');
+											}}
+											onChat={(e) => {
+												e.stopPropagation();
+												setSelectedId(c.id);
+												setActiveTab('chat');
+											}}
 											isLoadingMessages={isLoadingMessages}
 										/>
 									</div>
@@ -776,678 +1106,377 @@ export default function CasesMasterDetail({ userId }: { userId: string }) {
 					</div>
 				</div>
 
-				{/* Right column: Calendar by default */}
+				{/* Right column: Detail Panel or Calendar */}
 				<div
 					className={`flex-1 lg:flex-[5] xl:flex-[5] min-w-0 h-full overflow-y-auto overflow-x-hidden ${
 						mobileView !== "calendar" ? "hidden lg:block" : ""
 					}`}
 				>
-					<Card className="p-5 shadow-sm border-serene-neutral-200 rounded-2xl bg-white">
-						<div className="flex items-center justify-between mb-5">
-							<div>
-								<div className="flex items-center gap-2 mb-1">
-									<h3 className="text-base font-semibold text-gray-900">
-										Appointments Calendar
-									</h3>
-									{filtered.length > 0 && (
-										<span className="px-2 py-1 bg-blue-100 text-blue-700 text-xs font-medium rounded-full">
-											{filtered.length} case{filtered.length === 1 ? "" : "s"}
-										</span>
-									)}
-								</div>
-								<p className="text-xs text-gray-500">
-									Click on a date to view related cases
-								</p>
-							</div>
-							{selectedId && (
-								<Button
-									variant="outline"
-									size="sm"
-									onClick={() => setSelectedId(null)}
-									className="h-8 text-xs border-gray-200 hover:bg-gray-50"
-								>
-									Clear selection
-								</Button>
-							)}
-						</div>
+                    <div className="h-full pb-8">
+                            <Card className="p-6 sm:p-8 shadow-2xl shadow-slate-200/40 border-serene-neutral-100/50 rounded-2xl sm:rounded-[2.5rem] bg-white h-full flex flex-col">
+                                <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-5 gap-3">
+                                    <div>
+                                        <div className="flex items-center gap-2 mb-1">
+                                            <h3 className="text-sm sm:text-base font-bold text-gray-900 uppercase">
+                                                Appointments
+                                            </h3>
+                                            {filtered.length > 0 && (
+                                                <span className="px-2 py-0.5 bg-teal-50 text-teal-700 text-[8px] sm:text-[10px] font-bold uppercase tracking-widest rounded-full border border-teal-100">
+                                                    {filtered.length} Active
+                                                </span>
+                                            )}
+                                        </div>
+                                        <p className="text-[10px] sm:text-xs font-medium text-gray-400">
+                                           Manage your upcoming sessions and availability
+                                        </p>
+                                    </div>
+                                </div>
 
-						{/* Calendar Connection Status */}
-						<CalendarConnectionStatus
-							userId={userId}
-							variant="inline"
-							className="mb-3"
-						/>
+                                {/* Calendar Connection Status */}
+                                <CalendarConnectionStatus
+                                    userId={userId}
+                                    variant="inline"
+                                    className="mb-6"
+                                />
 
-						{/* Custom Calendar UI */}
-						<div className="bg-white rounded-lg overflow-hidden">
-							{/* View Mode Toggle + Navigation */}
-							<div className="flex items-center justify-between mb-4">
-								<div className="flex bg-gray-100 rounded-lg p-0.5">
-									<button
-										onClick={() => setCalendarViewMode('week')}
-										className={cn(
-											"px-3 py-1.5 text-xs font-medium rounded-md transition-all",
-											calendarViewMode === 'week' 
-												? "bg-white text-blue-700 shadow-sm"
-												: "text-gray-600 hover:text-gray-900"
-										)}
-									>
-										Week
-									</button>
-									<button
-										onClick={() => setCalendarViewMode('month')}
-										className={cn(
-											"px-3 py-1.5 text-xs font-medium rounded-md transition-all",
-											calendarViewMode === 'month' 
-												? "bg-white text-blue-700 shadow-sm"
-												: "text-gray-600 hover:text-gray-900"
-										)}
-									>
-										Month
-									</button>
-								</div>
-								
-								<p className="text-sm font-medium text-gray-700">
-									{calendarViewMode === 'week' 
-										? `${weekDays[0].toLocaleDateString('default', { month: 'short', day: 'numeric' })} - ${weekDays[6].toLocaleDateString('default', { month: 'short', day: 'numeric' })}`
-										: calendarSelectedDate.toLocaleDateString('default', { month: 'long', year: 'numeric' })
-									}
-								</p>
-								
-								<div className="flex gap-1">
-									<Button
-										variant="ghost"
-										size="sm"
-										className="h-8 w-8 p-0"
-										onClick={() => {
-											const prev = new Date(calendarSelectedDate);
-											prev.setDate(prev.getDate() - (calendarViewMode === 'week' ? 7 : 30));
-											setCalendarSelectedDate(prev);
-										}}
-									>
-										←
-									</Button>
-									<Button
-										variant="ghost"
-										size="sm"
-										className="h-8 w-8 p-0"
-										onClick={() => {
-											const next = new Date(calendarSelectedDate);
-											next.setDate(next.getDate() + (calendarViewMode === 'week' ? 7 : 30));
-											setCalendarSelectedDate(next);
-										}}
-									>
-										→
-									</Button>
-								</div>
-							</div>
+                                {/* Custom Calendar UI */}
+                                <div className="bg-white rounded-3xl overflow-hidden flex-1 flex flex-col">
+                                    {/* View Mode Toggle + Navigation */}
+                                    <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 gap-4">
+                                        <div className="flex bg-slate-50 rounded-xl p-1 border border-slate-100 w-full sm:w-auto">
+                                            <button
+                                                onClick={() => setCalendarViewMode('week')}
+                                                className={cn(
+                                                    "flex-1 sm:flex-none px-4 py-1.5 text-[10px] sm:text-xs font-bold rounded-lg transition-all",
+                                                    calendarViewMode === 'week' 
+                                                        ? "bg-white text-teal-600 shadow-sm"
+                                                        : "text-slate-400 hover:text-slate-600"
+                                                )}
+                                            >
+                                                Week
+                                            </button>
+                                            <button
+                                                onClick={() => setCalendarViewMode('month')}
+                                                className={cn(
+                                                    "flex-1 sm:flex-none px-4 py-1.5 text-[10px] sm:text-xs font-bold rounded-lg transition-all",
+                                                    calendarViewMode === 'month' 
+                                                        ? "bg-white text-teal-600 shadow-sm"
+                                                        : "text-slate-400 hover:text-slate-600"
+                                                )}
+                                            >
+                                                Month
+                                            </button>
+                                        </div>
+                                        
+                                        <div className="flex items-center justify-between sm:justify-end gap-3 w-full sm:w-auto">
+                                            <p className="text-xs sm:text-sm font-bold text-slate-700 uppercase tracking-widest">
+                                                {calendarViewMode === 'week' 
+                                                    ? `${weekDays[0].toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${weekDays[6].toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
+                                                    : calendarSelectedDate.toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
+                                                }
+                                            </p>
+                                            
+                                            <div className="flex gap-1">
+                                                <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    className="h-8 w-8 p-0 hover:bg-slate-100 rounded-lg"
+                                                    onClick={() => {
+                                                        const prev = new Date(calendarSelectedDate);
+                                                        prev.setDate(prev.getDate() - (calendarViewMode === 'week' ? 7 : 30));
+                                                        setCalendarSelectedDate(prev);
+                                                    }}
+                                                >
+                                                    <ChevronLeft className="h-4 w-4" />
+                                                </Button>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    className="h-8 w-8 p-0 hover:bg-slate-100 rounded-lg"
+                                                    onClick={() => {
+                                                        const next = new Date(calendarSelectedDate);
+                                                        next.setDate(next.getDate() + (calendarViewMode === 'week' ? 7 : 30));
+                                                        setCalendarSelectedDate(next);
+                                                    }}
+                                                >
+                                                    <ChevronRight className="h-4 w-4" />
+                                                </Button>
+                                            </div>
+                                        </div>
+                                    </div>
 
-							{/* Days Grid */}
-							<div className="grid grid-cols-7 gap-1 mb-4">
-								{['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map(day => (
-									<div key={day} className="text-center text-xs font-medium text-gray-400 py-1">
-										{day}
-									</div>
-								))}
-								{calendarViewMode === 'week' ? (
-									weekDays.map((day, idx) => {
-										const dayAppointments = getAppointmentsForDay(day, filtered);
-										const isToday = day.toDateString() === new Date().toDateString();
-										const isSelected = day.toDateString() === calendarSelectedDate.toDateString();
-										
-										return (
-											<button
-												key={idx}
-												onClick={() => {
-													setCalendarSelectedDate(day);
-													// If has appointments, allow selection logic if needed
-													if (dayAppointments.length > 0) {
-														// Example: select first case? Or list below?
-														// The list below shows appointments. Clicking here just updates `calendarSelectedDate`.
-														// The user can then click the appointment list item below to open the case.
-													}
-												}}
-												className={cn(
-													"relative aspect-square rounded-xl flex flex-col items-center justify-center transition-all",
-													isSelected 
-														? "bg-blue-600 text-white" 
-														: isToday 
-															? "bg-blue-50 text-blue-700" 
-															: "hover:bg-gray-50 text-gray-700"
-												)}
-											>
-												<span className="text-sm font-semibold">{day.getDate()}</span>
-												{dayAppointments.length > 0 && (
-													<div className="flex gap-0.5 mt-0.5">
-														{Array.from({ length: Math.min(dayAppointments.length, 3) }).map((_, i) => (
-															<div 
-																key={i} 
-																className={cn(
-																	"h-1 w-1 rounded-full",
-																	isSelected ? "bg-white/80" : "bg-blue-500"
-																)} 
-															/>
-														))}
-													</div>
-												)}
-											</button>
-										);
-									})
-								) : (
-									monthDays.map((dayInfo, idx) => {
-										const { date: day, isCurrentMonth } = dayInfo;
-										const dayAppointments = getAppointmentsForDay(day, filtered);
-										const isToday = day.toDateString() === new Date().toDateString();
-										const isSelected = day.toDateString() === calendarSelectedDate.toDateString();
-										
-										return (
-											<button
-												key={idx}
-												onClick={() => setCalendarSelectedDate(day)}
-												className={cn(
-													"relative h-9 rounded-lg flex flex-col items-center justify-center transition-all text-xs",
-													!isCurrentMonth && "opacity-40",
-													isSelected 
-														? "bg-blue-600 text-white" 
-														: isToday 
-															? "bg-blue-50 text-blue-700 font-bold" 
-															: "hover:bg-gray-50 text-gray-700"
-												)}
-											>
-												<span className="font-medium">{day.getDate()}</span>
-												{dayAppointments.length > 0 && isCurrentMonth && (
-													<div className={cn(
-														"h-1 w-1 rounded-full mt-0.5",
-														isSelected ? "bg-white/80" : "bg-blue-500"
-													)} />
-												)}
-											</button>
-										);
-									})
-								)}
-							</div>
+                                    {/* Days Grid */}
+                                    <div className="grid grid-cols-7 gap-1 sm:gap-2 mb-6">
+                                        {['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map((day, i) => (
+                                            <div key={`${day}-${i}`} className="text-center text-[10px] font-bold text-slate-300 uppercase tracking-[0.2em]">
+                                                {day}
+                                            </div>
+                                        ))}
+                                        {calendarViewMode === 'week' ? (
+                                            weekDays.map((day, idx) => {
+                                                const dayAppointments = getAppointmentsForDay(day, cases);
+                                                const isToday = day.toDateString() === new Date().toDateString();
+                                                const isSelected = day.toDateString() === calendarSelectedDate.toDateString();
+                                                
+                                                return (
+                                                    <button
+                                                        key={idx}
+                                                        onClick={() => setCalendarSelectedDate(day)}
+                                                        className={cn(
+                                                            "relative aspect-square rounded-xl sm:rounded-2xl flex flex-col items-center justify-center transition-all duration-300",
+                                                            isSelected 
+                                                                ? "bg-teal-600 text-white shadow-lg shadow-teal-600/20" 
+                                                                : isToday 
+                                                                    ? "bg-teal-50 text-teal-700 border border-teal-100" 
+                                                                    : "hover:bg-slate-50 text-slate-600"
+                                                        )}
+                                                    >
+                                                        <span className="text-xs sm:text-sm font-bold">{day.getDate()}</span>
+                                                        {dayAppointments.length > 0 && (
+                                                            <div className="flex gap-0.5 mt-1">
+                                                                {Array.from({ length: Math.min(dayAppointments.length, 3) }).map((_, i) => (
+                                                                    <div 
+                                                                        key={i} 
+                                                                        className={cn(
+                                                                            "h-1 w-1 rounded-full",
+                                                                            isSelected ? "bg-white/60" : "bg-teal-500"
+                                                                        )} 
+                                                                    />
+                                                                ))}
+                                                            </div>
+                                                        )}
+                                                    </button>
+                                                );
+                                            })
+                                        ) : (
+                                            monthDays.map((dayInfo, idx) => {
+                                                const { date: day, isCurrentMonth } = dayInfo;
+                                                const dayAppointments = getAppointmentsForDay(day, cases);
+                                                const isToday = day.toDateString() === new Date().toDateString();
+                                                const isSelected = day.toDateString() === calendarSelectedDate.toDateString();
+                                                
+                                                return (
+                                                    <button
+                                                        key={idx}
+                                                        onClick={() => setCalendarSelectedDate(day)}
+                                                        className={cn(
+                                                            "relative h-10 rounded-xl flex flex-col items-center justify-center transition-all duration-300 text-xs font-bold",
+                                                            !isCurrentMonth && "opacity-20",
+                                                            isSelected 
+                                                                ? "bg-teal-600 text-white shadow-md shadow-teal-600/20" 
+                                                                : isToday 
+                                                                    ? "bg-teal-50 text-teal-700 border border-teal-100" 
+                                                                    : "hover:bg-slate-50 text-slate-500"
+                                                        )}
+                                                    >
+                                                        <span>{day.getDate()}</span>
+                                                        {dayAppointments.length > 0 && isCurrentMonth && (
+                                                            <div className={cn(
+                                                                "h-1 w-1 rounded-full mt-0.5",
+                                                                isSelected ? "bg-white/60" : "bg-teal-500"
+                                                            )} />
+                                                        )}
+                                                    </button>
+                                                );
+                                            })
+                                        )}
+                                    </div>
 
-							{/* Selected Date Details */}
-							<div className="pt-4 border-t border-gray-100">
-								<h4 className="text-sm font-semibold text-gray-900 mb-3 block">
-									{calendarSelectedDate.toDateString() === new Date().toDateString() ? "Today" : calendarSelectedDate.toLocaleDateString('default', { weekday: 'long', month: 'long', day: 'numeric' })}
-								</h4>
-								
-								{(() => {
-									const appointments = getAppointmentsForDay(calendarSelectedDate, filtered);
-									const isToday = calendarSelectedDate.toDateString() === new Date().toDateString();
-									
-									if (appointments.length > 0) {
-										return (
-											<div className="space-y-2">
-												{appointments.map((appt, i) => (
-													<div 
-														key={i} 
-														className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl cursor-pointer hover:bg-gray-100 transition-colors"
-														onClick={() => setSelectedId(appt.case.id)}
-													>
-														<div className="h-10 w-10 bg-blue-100 rounded-lg flex items-center justify-center text-blue-700 shrink-0">
-															<Clock className="h-4 w-4" />
-														</div>
-														<div className="flex-1 min-w-0">
-															<p className="font-medium text-gray-900 text-sm truncate">
-																{appt.case?.support_service?.name || "Appointment"}
-															</p>
-															<p className="text-xs text-gray-500">
-																{new Date(appt.appointment_date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-															</p>
-														</div>
-														<Badge className="bg-blue-50 text-blue-700 border-0 text-xs shrink-0">
-															{appt.status || 'Scheduled'}
-														</Badge>
-													</div>
-												))}
-											</div>
-										);
-									} else if (isToday) {
-										// Show upcoming for week logic
-										const allAppts = getAllAppointments(filtered);
-										const today = new Date();
-										const nextWeek = new Date(today);
-										nextWeek.setDate(today.getDate() + 7);
-										
-										const upcoming = allAppts
-											.filter(a => {
-												if (!a.appointment_date) return false;
-												const d = new Date(a.appointment_date);
-												return d > today && d <= nextWeek;
-											})
-											.sort((a, b) => new Date(a.appointment_date).getTime() - new Date(b.appointment_date).getTime())
-											.slice(0, 3); // Top 3
+                                    {/* Selected Date Details */}
+                                    <div className="pt-6 border-t border-slate-50 overflow-y-auto min-h-0 flex-1">
+                                        <h4 className="text-[10px] sm:text-xs font-bold text-slate-400 uppercase tracking-[0.2em] mb-4 flex items-center justify-between">
+                                            <span>
+                                                {calendarSelectedDate.toDateString() === new Date().toDateString() 
+                                                    ? "Today's Schedule" 
+                                                    : calendarSelectedDate.toLocaleDateString('default', { weekday: 'short', month: 'short', day: 'numeric' })
+                                                }
+                                            </span>
+                                            <Calendar className="h-4 w-4 text-slate-200" />
+                                        </h4>
+                                        
+                                        {(() => {
+                                            const appointments = getAppointmentsForDay(calendarSelectedDate, cases);
+                                            const isToday = calendarSelectedDate.toDateString() === new Date().toDateString();
+                                            
+                                            if (appointments.length > 0) {
+                                                return (
+                                                    <div className="space-y-3">
+                                                        {appointments.map((appt, i) => (
+                                                            <div 
+                                                                key={i} 
+                                                                className="group flex items-center gap-4 p-4 bg-slate-50/50 hover:bg-white hover:shadow-xl hover:shadow-slate-200/50 rounded-2xl cursor-pointer transition-all duration-300 border border-transparent hover:border-slate-100"
+                                                                onClick={() => setSelectedId(appt.case.id)}
+                                                            >
+                                                                <div className="h-12 w-12 bg-white rounded-xl flex items-center justify-center text-teal-600 shadow-sm group-hover:bg-teal-600 group-hover:text-white transition-colors duration-300">
+                                                                    <Clock className="h-5 w-5" />
+                                                                </div>
+                                                                <div className="flex-1 min-w-0">
+                                                                    <p className="font-bold text-slate-900 text-sm truncate">
+                                                                        {appt.case?.report?.first_name ? `${appt.case.report.first_name} ${appt.case.report.last_name || ''}` : "Secret Consultation"}
+                                                                    </p>
+                                                                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">
+                                                                        {appt.appointment_date ? new Date(appt.appointment_date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "Time not set"}
+                                                                    </p>
+                                                                </div>
+                                                                <Badge className={cn(
+                                                                    "text-[10px] font-bold uppercase tracking-widest border-0 px-3 py-1",
+                                                                    appt.status === 'confirmed' ? "bg-emerald-50 text-emerald-600" : "bg-amber-50 text-amber-600"
+                                                                )}>
+                                                                    {appt.status}
+                                                                </Badge>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                );
+                                            } else if (isToday) {
+                                                const allAppts = getAllAppointments(filtered);
+                                                const today = new Date();
+                                                const nextWeek = new Date(today);
+                                                nextWeek.setDate(today.getDate() + 7);
+                                                
+                                                const upcoming = allAppts
+                                                    .filter(a => {
+                                                        if (!a.appointment_date) return false;
+                                                        const d = new Date(a.appointment_date);
+                                                        return d > today && d <= nextWeek;
+                                                    })
+                                                    .sort((a, b) => {
+                                                        const dateA = a.appointment_date ? new Date(a.appointment_date).getTime() : 0;
+                                                        const dateB = b.appointment_date ? new Date(b.appointment_date).getTime() : 0;
+                                                        return dateA - dateB;
+                                                    })
+                                                    .slice(0, 3);
 
-										if (upcoming.length > 0) {
-											return (
-												<div>
-													<p className="text-xs font-medium text-gray-500 mb-2 uppercase tracking-wide">Upcoming This Week</p>
-													<div className="space-y-2">
-														{upcoming.map((appt, i) => (
-															<div 
-																key={i} 
-																className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl cursor-pointer hover:bg-gray-100 transition-colors"
-																onClick={() => setSelectedId(appt.case.id)}
-															>
-																<div className="h-10 w-10 bg-green-100 rounded-lg flex items-center justify-center text-green-700 shrink-0">
-																	<Calendar className="h-4 w-4" />
-																</div>
-																<div className="flex-1 min-w-0">
-																	<p className="font-medium text-gray-900 text-sm truncate">
-																		{appt.case?.support_service?.name || "Appointment"}
-																	</p>
-																	<div className="flex items-center gap-2 text-xs text-gray-500">
-																		<span>{new Date(appt.appointment_date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</span>
-																		<span>•</span>
-																		<span>{new Date(appt.appointment_date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-																	</div>
-																</div>
-															</div>
-														))}
-													</div>
-												</div>
-											);
-										}
-									}
-									
-									return (
-										<div className="text-center py-6 bg-gray-50 rounded-xl border border-dashed border-gray-200">
-											<p className="text-sm text-gray-500">No appointments scheduled</p>
-										</div>
-									);
-								})()}
-							</div>
-						</div>
-					</Card>
+                                                if (upcoming.length > 0) {
+                                                    return (
+                                                        <div className="space-y-4">
+                                                            <p className="text-[10px] font-bold text-slate-300 uppercase tracking-[0.2em] mb-2">Upcoming This Week</p>
+                                                            <div className="space-y-2">
+                                                                {upcoming.map((appt, i) => (
+                                                                    <div 
+                                                                        key={i} 
+                                                                        className="flex items-center gap-4 p-4 bg-slate-50/50 hover:bg-white hover:shadow-lg rounded-2xl cursor-pointer transition-all duration-300"
+                                                                        onClick={() => setSelectedId(appt.case.id)}
+                                                                    >
+                                                                        <div className="h-10 w-10 bg-white rounded-lg flex items-center justify-center text-teal-600 shadow-sm">
+                                                                            <Calendar className="h-4 w-4" />
+                                                                        </div>
+                                                                        <div className="flex-1 min-w-0">
+                                                                            <p className="font-bold text-slate-800 text-sm truncate">
+                                                                                {appt.case?.report?.first_name || "Secret Consultation"}
+                                                                            </p>
+                                                                            <div className="flex items-center gap-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">
+                                                                                <span>{appt.appointment_date ? new Date(appt.appointment_date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : "Date not set"}</span>
+                                                                                <span>•</span>
+                                                                                <span>{appt.appointment_date ? new Date(appt.appointment_date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "Time not set"}</span>
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                }
+                                            }
+                                            
+                                            return (
+                                                <div className="text-center py-10 bg-slate-50/50 rounded-3xl border border-dashed border-slate-100">
+                                                    <Clock className="h-8 w-8 text-slate-200 mx-auto mb-3" />
+                                                    <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">No sessions scheduled</p>
+                                                </div>
+                                            );
+                                        })()}
+                                    </div>
+                                </div>
+                            </Card>
+				</div>
+				</div>
 				</div>
 
-				{/* Overlay Detail Panel with animation */}
-			{/* Backdrop for mobile */}
-			{selected && (
-				<div 
-					className="fixed inset-0 bg-black/20 z-40 sm:hidden"
-					onClick={() => setSelectedId(null)}
-				/>
-			)}
-				<div
-					className={`fixed inset-0 sm:inset-y-0 sm:right-0 sm:left-auto w-full sm:w-[600px] lg:w-[800px] bg-white shadow-2xl border-l border-serene-neutral-200 z-50 transform transition-transform duration-300 ease-out ${
+				{/* Overlay Backdrop to close sidepanel on outside click */}
+				{selected && (
+					<div 
+						className="fixed inset-0 z-40 bg-black/40 transition-opacity" 
+						aria-hidden="true"
+						onClick={() => setSelectedId(null)}
+					/>
+				)}
+
+			<div
+					className={`fixed inset-0 sm:inset-y-0 sm:right-0 sm:left-auto w-full sm:w-[600px] lg:w-[800px] bg-white shadow-2xl z-50 transform transition-transform duration-300 ease-out sm:border-l sm:border-serene-neutral-200 ${
 						selected
 							? "translate-y-0 sm:translate-x-0"
 							: "translate-y-full sm:translate-x-full"
 					}`}
-					aria-hidden={!selected}
 				>
 					{selected && (
-						<div className="h-full flex flex-col bg-gray-50/50">
-							{/* Header */}
-							<div className="p-6 border-b border-serene-neutral-200 bg-white flex items-center justify-between gap-4 shadow-sm sticky top-0 z-20">
-								<div className="absolute left-1/2 -translate-x-1/2 -top-2 sm:hidden w-12 h-1.5 rounded-full bg-gray-300" />
-
-								<div className="flex items-center gap-3 min-w-0 flex-1">
-									<button
-										onClick={() => setSelectedId(null)}
-										className="sm:hidden -ml-2 p-2 rounded-full hover:bg-gray-100 transition-colors"
-									>
-										<ChevronLeft className="h-5 w-5 text-gray-600" />
-									</button>
-									
-									<div className="flex-1 min-w-0">
-										<div className="flex items-center gap-3 mb-1">
-											<h2 className="text-xl font-bold text-gray-900 truncate">
-												{selected.report?.type_of_incident || "Unknown Incident"}
-											</h2>
-											<span
-												className={`px-2.5 py-1 rounded-lg text-xs font-bold uppercase tracking-wider ${urgencyColor(
-													selected.report?.urgency
-												)}`}
-											>
-												{selected.report?.urgency || "low"}
-											</span>
-										</div>
-										<p className="text-xs font-medium text-gray-500 flex items-center gap-2">
-											<Clock className="h-3.5 w-3.5" />
-											Submitted {formatDate(selected.report?.submission_timestamp)}
-										</p>
-									</div>
-								</div>
-
-								<div className="flex items-center gap-2">
-									{/* Complete Case Button (if not completed) */}
-									{!selected.completed_at && (
-										<Button 
-											size="sm"
-											className="bg-serene-green-600 hover:bg-serene-green-700 text-white shadow-sm border border-serene-green-700 font-semibold"
-											onClick={() => handleCompleteCase(selected.id)}
-											disabled={isUpdatingStatus}
-										>
-											{isUpdatingStatus ? (
-												<div className="h-4 w-4 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2" />
-											) : (
-												<CheckCircle2 className="h-4 w-4 mr-1.5" />
-											)}
-											Complete Case
-										</Button>
-									)}
-									
-									<Button
-										variant="ghost"
-										size="icon"
-										className="rounded-full hover:bg-red-50 hover:text-red-600 transition-colors h-10 w-10"
-										onClick={() => setSelectedId(null)}
-									>
-										<X className="h-5 w-5" />
-									</Button>
-								</div>
-							</div>
-
-							{/* Tabs */}
-							<div className="flex border-b border-gray-200 px-4 gap-6 bg-white shrink-0">
-								<button
-									onClick={() => setActiveTab('details')}
-									className={`py-3 text-sm font-medium border-b-2 transition-colors ${
-										activeTab === 'details'
-											? 'border-blue-600 text-blue-600'
-											: 'border-transparent text-gray-500 hover:text-gray-700'
-									}`}
-								>
-									Case Details
-								</button>
-								<button
-									onClick={() => setActiveTab('chat')}
-									className={`py-3 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 ${
-										activeTab === 'chat'
-											? 'border-blue-600 text-blue-600'
-											: 'border-transparent text-gray-500 hover:text-gray-700'
-									}`}
-								>
-									<MessageSquare className="h-4 w-4" />
-									Chat
-								</button>
-							</div>
-
-							{activeTab === 'chat' ? (
-								<div className="flex-1 overflow-hidden flex flex-col relative h-full">
-									{isChatLoading ? (
-										<div className="flex items-center justify-center h-full text-gray-500">
-											<div className="animate-spin h-6 w-6 border-2 border-blue-600 border-t-transparent rounded-full mr-2"></div>
-											Loading chat...
-										</div>
-									) : activeChat ? (
-										<ChatWindow 
-											chat={activeChat} 
-											onBack={() => setActiveTab('details')} 
-										/>
-									) : (
-										<div className="flex items-center justify-center h-full text-gray-500 p-8 text-center">
-											<p>Unable to load chat or no survivor associated.</p>
-										</div>
-									)}
-								</div>
-							) : (
-								/* Premium Case Details Body */
-								<div className="flex-1 overflow-y-auto bg-gray-50/50">
-									<div className="p-6 space-y-6">
-
-										{/* Status Card */}
-										<Card className="p-5 border-serene-neutral-200 shadow-sm bg-white">
-											<div className="flex items-center justify-between mb-4">
-												<div className="flex items-center gap-2">
-													<div className="h-8 w-8 rounded-full bg-blue-50 flex items-center justify-center">
-														<TrendingUp className="h-4 w-4 text-blue-600" />
-													</div>
-													<span className="text-sm font-semibold text-gray-900">Case Status</span>
-												</div>
-												{selected.match_status_type === "completed" ? (
-													<Badge className="bg-green-50 text-green-700 border-green-200 hover:bg-green-100">
-														<CheckCircle2 className="h-3 w-3 mr-1" />
-														Completed
-													</Badge>
-												) : (
-													<Button
-														variant="outline"
-														size="sm"
-														onClick={() => handleCompleteCase(selected.id)}
-														disabled={isUpdatingStatus}
-														className="h-8 text-xs border-green-200 text-green-700 hover:bg-green-50 hover:text-green-800"
-													>
-														{isUpdatingStatus ? (
-															<Clock className="h-3 w-3 mr-1 animate-spin" />
-														) : (
-															<CheckCircle2 className="h-3 w-3 mr-1" />
-														)}
-														Mark Complete
-													</Button>
-												)}
-											</div>
-											
-											{selected.unread_messages && selected.unread_messages > 0 && (
-												<div className="flex items-center gap-3 p-3 bg-blue-50/50 rounded-lg border border-blue-100">
-													<div className="relative">
-														<MessageCircle className="h-5 w-5 text-blue-600" />
-														<span className="absolute -top-1 -right-1 h-2.5 w-2.5 bg-red-500 rounded-full border-2 border-white" />
-													</div>
-													<div className="flex-1">
-														<p className="text-sm font-medium text-blue-900">New Messages</p>
-														<p className="text-xs text-blue-600">You have {selected.unread_messages} unread message(s)</p>
-													</div>
-													<Button
-														size="sm"
-														className="h-8 bg-blue-600 text-white hover:bg-blue-700 shadow-sm"
-														onClick={() => window.open(`/dashboard/chats?caseId=${selected.id}`, "_blank")}
-													>
-														View Chat
-													</Button>
-												</div>
-											)}
-										</Card>
-
-										{/* Quick Chat Preview - Inline Panel */}
-										{selected.match_status_type === 'matched' && selected.report?.survivor_id && (
-											<Card className="overflow-hidden border-serene-neutral-200 shadow-sm bg-white">
-												<div className="p-4 border-b border-gray-100 bg-gray-50/30 flex justify-between items-center">
-													<h3 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
-														<MessageSquare className="h-4 w-4 text-gray-500" />
-														Case Chat
-													</h3>
-													<Button
-														variant="ghost"
-														size="sm"
-														className="h-7 text-xs text-serene-blue-600 hover:text-serene-blue-700 hover:bg-serene-blue-50"
-														onClick={() => setActiveTab('chat')}
-													>
-														Full Screen
-														<ChevronRight className="h-3 w-3 ml-1" />
-													</Button>
-												</div>
-												<CaseChatPanel
-													matchId={selected.id}
-													survivorId={selected.report.survivor_id}
-													professionalId={userId}
-													professionalName="You"
-													survivorName={selected.report.first_name || 'Survivor'}
-													existingChatId={activeChat?.id}
-													className="border-0 rounded-none shadow-none"
-													isExpanded={false}
-												/>
-											</Card>
-										)}
-
-										{/* Survivor & Incident Card */}
-										<Card className="overflow-hidden border-serene-neutral-200 shadow-sm bg-white">
-											<div className="p-5 border-b border-gray-100 bg-gray-50/30">
-												<h3 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
-													<User className="h-4 w-4 text-gray-500" />
-													Survivor & Incident Details
-												</h3>
-											</div>
-											<div className="p-5 grid grid-cols-1 sm:grid-cols-2 gap-6">
-												{/* Incident Type */}
-												<div>
-													<p className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1.5">Incident Type</p>
-													<div className="flex items-center gap-2">
-														<Shield className="h-4 w-4 text-gray-400" />
-														<span className="text-sm font-medium text-gray-900">
-															{selected.report?.type_of_incident || "Not specified"}
-														</span>
-													</div>
-												</div>
-
-												{/* Urgency */}
-												<div>
-													<p className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1.5">Urgency Level</p>
-													<Badge variant="outline" className={cn("capitalize font-medium", urgencyColor(selected.report?.urgency))}>
-														{selected.report?.urgency || "Low"} Priority
-													</Badge>
-												</div>
-
-												{/* Date */}
-												<div>
-													<p className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1.5">Reported On</p>
-													<div className="flex items-center gap-2">
-														<Calendar className="h-4 w-4 text-gray-400" />
-														<span className="text-sm text-gray-900">
-															{formatDate(selected.report?.submission_timestamp)}
-														</span>
-													</div>
-												</div>
-
-												{/* Connection */}
-												<div>
-													<p className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1.5">Connection Type</p>
-													<div className="flex items-center gap-2">
-														<User className="h-4 w-4 text-gray-400" />
-														<span className="text-sm text-gray-900 capitalize">
-															{selected.report?.reporting_on_behalf ? "On Behalf" : "Direct Report"}
-														</span>
-													</div>
-												</div>
-											</div>
-										</Card>
-
-										{/* Matched Service Card */}Welcome back, you're safe here.
-										<Card className="overflow-hidden border-serene-neutral-200 shadow-sm bg-white">
-											<div className="p-5 border-b border-gray-100 bg-gray-50/30 flex justify-between items-center">
-												<h3 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
-													<Briefcase className="h-4 w-4 text-gray-500" />
-													Matched Service
-												</h3>
-												<Badge variant="secondary" className="bg-gray-100 text-gray-600 font-normal">
-													{selected.match_status_type === 'matched' ? 'Active Match' : 'Pending'}
-												</Badge>
-											</div>
-											<div className="p-5">
-												<div className="flex items-start gap-4 mb-6">
-													<div className="h-12 w-12 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center shrink-0">
-														<span className="text-lg font-bold text-blue-600">
-															{selected.support_service?.name?.charAt(0) || "S"}
-														</span>
-													</div>
-													<div>
-														<h4 className="text-base font-bold text-gray-900">
-															{selected.support_service?.name || "Pending Service Allocation"}
-														</h4>
-														<p className="text-sm text-gray-500 mt-0.5">
-															{selected.support_service?.category || "Support Service"} • {selected.support_service?.organization_name || "Sauti Salama Network"}
-														</p>
-													</div>
-												</div>
-
-												{selected.appointments?.[0] ? (
-													<div className="bg-green-50/50 rounded-xl border border-green-100 p-4">
-														<div className="flex items-center gap-2 mb-3">
-															<CalendarDays className="h-4 w-4 text-green-600" />
-															<span className="text-sm font-bold text-green-900">Upcoming Appointment</span>
-														</div>
-														<div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-															<div>
-																<p className="text-sm font-medium text-gray-900">
-																	{new Date(selected.appointments[0].appointment_date).toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}
-																</p>
-																<p className="text-sm text-gray-500">
-																	{new Date(selected.appointments[0].appointment_date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-																</p>
-															</div>
-															<Badge className={cn(
-																"self-start sm:self-center capitalize",
-																selected.appointments[0].status === 'confirmed' ? "bg-green-100 text-green-700 hover:bg-green-200" : "bg-gray-100 text-gray-700"
-															)}>
-																{selected.appointments[0].status}
-															</Badge>
-														</div>
-													</div>
-												) : (
-													<div className="text-center py-6 bg-gray-50 rounded-xl border border-dashed border-gray-200">
-														<CalendarDays className="h-8 w-8 text-gray-300 mx-auto mb-2" />
-														<p className="text-sm text-gray-500">No appointments scheduled yet</p>
-													</div>
-												)}
-											</div>
-										</Card>
-
-										{/* Description & Media */}
-										{(selected.report?.incident_description || selected.report?.media?.url) && (
-											<Card className="border-serene-neutral-200 shadow-sm bg-white overflow-hidden">
-												<div className="p-5 border-b border-gray-100 bg-gray-50/30">
-													<h3 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
-														<FileText className="h-4 w-4 text-gray-500" />
-														Incident Description
-													</h3>
-												</div>
-												<div className="p-5 space-y-4">
-													{selected.report?.incident_description && (
-														<div className="prose prose-sm max-w-none text-gray-600">
-															<p className="whitespace-pre-wrap leading-relaxed">
-																{selected.report.incident_description}
-															</p>
-														</div>
-													)}
-													
-													{selected.report?.media?.url && (
-														<div className="bg-gray-50 rounded-xl p-3 border border-gray-100">
-															<p className="text-xs font-medium text-gray-500 mb-2 uppercase tracking-wide">Attached Media</p>
-															<AudioPlayer
-																src={selected.report.media.url}
-																type={selected.report.media.type}
-															/>
-														</div>
-													)}
-												</div>
-											</Card>
-										)}
-
-										{/* Notes Editor */}
-										<Card className="overflow-hidden flex flex-col h-[500px]">
-											<div className="p-4 flex items-center justify-between">
-												<h3 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
-													<FileText className="h-4 w-4 text-gray-500" />
-													Case Notes
-												</h3>
-												<span className="text-xs text-gray-400">Private & Secure</span>
-											</div>
-											<div className="flex-1 overflow-hidden bg-gray-50/20">
-												<CaseNotesEditor
-													matchId={selected.id}
-													initialHtml={selected.notes || ""}
-													onSaved={(html) => {
-														setCases((prev) =>
-															prev.map((c) =>
-																c.id === selected?.id ? { ...c, notes: html } : c
-															)
-														);
-													}}
-												/>
-											</div>
-										</Card>
-
-									</div>
-								</div>
-							)}
-						</div>
+                        <CaseDetailView 
+                            caseItem={selected}
+                            userId={userId}
+                            onCompleteCase={handleCompleteCase}
+                            onAcceptCase={handleAcceptCase}
+                            isUpdatingStatus={isUpdatingStatus}
+                            onClose={() => setSelectedId(null)}
+                            activeChat={activeChat}
+                            isChatLoading={isChatLoading}
+                        />
 					)}
-				</div>
 			</div>
+			{/* Search Modal */}
+			<Dialog open={isSearchModalOpen} onOpenChange={setIsSearchModalOpen}>
+				<DialogContent className="sm:max-w-md p-0 overflow-hidden border-0 rounded-3xl">
+					<div className="p-6 bg-sauti-teal">
+						<DialogHeader className="text-left mb-6">
+							<DialogTitle className="text-white text-xl font-bold">Search Cases</DialogTitle>
+							<DialogDescription className="text-white/70">
+								Quickly find cases by survivor name, incident type or status.
+							</DialogDescription>
+						</DialogHeader>
+						
+						<div className="relative">
+							<Input
+								autoFocus
+								placeholder="Start typing to search..."
+								value={q}
+								onChange={(e) => setQ(e.target.value)}
+								className="h-14 pl-12 pr-4 bg-white/10 border-white/20 text-white placeholder:text-white/40 rounded-2xl focus:ring-white/20 focus:border-white/30"
+							/>
+							<Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-white/40" />
+						</div>
+					</div>
+					
+					<div className="p-4 max-h-[60vh] overflow-y-auto bg-serene-neutral-50">
+						{q.trim() && filtered.length > 0 ? (
+							<div className="space-y-3">
+								<p className="text-[10px] font-bold text-serene-neutral-400 uppercase tracking-widest px-2">{filtered.length} results found</p>
+								{filtered.map(c => (
+									<div 
+										key={c.id} 
+										onClick={() => {
+											setSelectedId(c.id);
+											setIsSearchModalOpen(false);
+										}}
+										className="p-4 bg-white rounded-2xl border border-serene-neutral-200 hover:border-sauti-teal/30 hover:shadow-md transition-all cursor-pointer group"
+									>
+										<p className="font-bold text-gray-900 group-hover:text-sauti-teal">{c.report?.type_of_incident?.replace(/_/g, " ") || "Case"}</p>
+										<p className="text-xs text-gray-500 mt-1 line-clamp-1">{c.report?.incident_description}</p>
+									</div>
+								))}
+							</div>
+						) : q.trim() ? (
+							<div className="py-12 text-center">
+								<Search className="h-10 w-10 text-serene-neutral-200 mx-auto mb-3" />
+								<p className="text-sm font-medium text-serene-neutral-400">No matching cases found</p>
+							</div>
+						) : (
+							<div className="py-12 text-center">
+								<MessageSquare className="h-10 w-10 text-serene-neutral-200 mx-auto mb-3" />
+								<p className="text-sm font-medium text-serene-neutral-400">Search results will appear here</p>
+							</div>
+						)}
+					</div>
+                </DialogContent>
+            </Dialog>
 		</div>
 	);
 }

@@ -46,7 +46,9 @@ import {
 } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { Database } from "@/types/db-schema";
+import { Database, Tables } from "@/types/db-schema";
+import { VerificationDocument } from "../../../lib/verification-utils";
+import { safelyParseJsonArray } from "../../../lib/utils";
 
 type SupportServiceType = Database["public"]["Enums"]["support_service_type"];
 type UserType = Database["public"]["Enums"]["user_type"];
@@ -64,7 +66,7 @@ interface VerificationMetrics {
 interface VerificationDashboardProps {
 	userId: string;
 	userType: UserType;
-	profile: any;
+	profile: Tables<"profiles">;
 	onUpdate?: () => void;
 }
 
@@ -107,38 +109,32 @@ export function VerificationDashboard({
 				.eq("id", userId)
 				.single();
 
-			// Load services verification data for NGO users
+			// 2. Load services verification data for NGO users
+			let currentServicesData: any[] = [];
 			if (userType === "ngo") {
 				const { data: services } = await supabase
 					.from("support_services")
 					.select("verification_status, accreditation_files_metadata")
 					.eq("user_id", userId);
-				setServicesData(services || []);
+				currentServicesData = services || [];
+				setServicesData(currentServicesData);
 			} else {
 				setServicesData([]);
 			}
 
-			// Calculate metrics
-			const profileDocs = profileData?.accreditation_files_metadata
-				? Array.isArray(profileData.accreditation_files_metadata)
-					? profileData.accreditation_files_metadata
-					: JSON.parse(profileData.accreditation_files_metadata)
-				: [];
+			// 3. Calculate metrics
+			const profileDocs: VerificationDocument[] = safelyParseJsonArray(profileData?.accreditation_files_metadata);
 
-			const serviceDocs = servicesData.flatMap((service) =>
-				service.accreditation_files_metadata
-					? Array.isArray(service.accreditation_files_metadata)
-						? service.accreditation_files_metadata
-						: JSON.parse(service.accreditation_files_metadata)
-					: []
-			);
+			const serviceDocs: VerificationDocument[] = currentServicesData.flatMap((service) => {
+				return safelyParseJsonArray(service.accreditation_files_metadata);
+			});
 
 			const allDocs = [...profileDocs, ...serviceDocs];
 			const verifiedDocs = allDocs.filter(
 				(doc) => doc.status === "verified"
 			).length;
 			const pendingDocs = allDocs.filter(
-				(doc) => doc.status === "pending" || doc.status === "under_review"
+				(doc) => (doc.status as string) === "pending" || (doc.status as string) === "under_review"
 			).length;
 			const rejectedDocs = allDocs.filter(
 				(doc) => doc.status === "rejected"
@@ -147,8 +143,8 @@ export function VerificationDashboard({
 			const overallProgress =
 				allDocs.length > 0 ? Math.round((verifiedDocs / allDocs.length) * 100) : 0;
 			const verificationScore = calculateVerificationScore(
-				profileData,
-				servicesData,
+				profileData ? (profileData as Tables<"profiles">) : null,
+				currentServicesData,
 				allDocs
 			);
 
@@ -180,9 +176,9 @@ export function VerificationDashboard({
 	}, [loadVerificationMetrics]);
 
 	const calculateVerificationScore = (
-		profileData: any,
-		servicesData: any[],
-		allDocs: any[]
+		profileData: Tables<"profiles"> | null | undefined,
+		servicesData: Array<{ verification_status: string | null }>,
+		allDocs: VerificationDocument[]
 	) => {
 		let score = 0;
 		const maxScore = 100;

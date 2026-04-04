@@ -52,7 +52,7 @@ export default function SignUp() {
 							</p>
 						</div>
 
-                        <div className="bg-white/80 backdrop-blur-sm p-8 rounded-3xl border border-serene-neutral-100 shadow-xl shadow-serene-neutral-200/50 space-y-6">
+                        <div className="bg-white/80 backdrop-blur-sm p-8 rounded-2xl border border-serene-neutral-100 shadow-xl shadow-serene-neutral-200/50 space-y-6">
                             <form action={signUp} className="space-y-5">
                                 <div className="grid grid-cols-2 gap-4">
                                     <div className="space-y-2">

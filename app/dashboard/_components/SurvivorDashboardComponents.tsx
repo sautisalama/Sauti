@@ -17,10 +17,22 @@ import {
   MessageCircle,
   Shield,
   FileText,
-  Home
+  Home,
+  Mic
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { ReportWithRelations } from "../_types";
+import { getReportStatus, getStatusTheme } from "@/lib/utils/case-status";
+
+// Utility for theme mapping based on urgency
+const getUrgencyTheme = (u: string) => {
+  switch (u?.toLowerCase()) {
+    case 'high': return "bg-red-50 text-red-600 border-red-100";
+    case 'medium': return "bg-amber-50 text-amber-600 border-amber-100";
+    default: return "bg-blue-50 text-blue-600 border-blue-100";
+  }
+};
 
 // Serene Welcome Header
 interface SereneWelcomeHeaderProps {
@@ -56,7 +68,7 @@ export function SereneWelcomeHeader({ name, timeOfDay = "morning", className, co
 
   return (
     <div className={cn(
-      "p-6 md:p-8 bg-gradient-to-br from-serene-blue-50 to-white rounded-3xl mb-8 relative overflow-hidden shadow-sm border border-serene-blue-100 transition-all duration-500",
+      "w-full p-6 md:p-8 bg-gradient-to-br from-serene-blue-50 to-white rounded-2xl sm:rounded-[2.5rem] mb-8 relative overflow-hidden shadow-xl shadow-serene-blue-100/20 border border-serene-blue-100 transition-all duration-500",
       className
     )}>
       {/* Soft decorative blur */}
@@ -157,10 +169,12 @@ export function SereneQuickActionCard({
     custom: "bg-white/60" // Base bg for custom, text color comes from icon
   };
 
+
+
   const content = (
     <div className={cn(
-      "group relative overflow-hidden rounded-2xl p-5 transition-all duration-300",
-      "cursor-pointer border border-transparent hover:border-serene-blue-200/50 shadow-sm hover:shadow-md",
+      "group relative overflow-hidden rounded-2xl sm:rounded-[2.5rem] p-4 sm:p-6 transition-all duration-300",
+      "cursor-pointer border border-transparent hover:border-serene-blue-200/50 shadow-xl shadow-slate-200/40 hover:shadow-2xl hover:shadow-slate-200/60",
       variants[variant],
       className
     )}>
@@ -242,8 +256,8 @@ export function SereneStatsCard({
   className 
 }: SereneStatsCardProps) {
   return (
-    <Card className={cn("overflow-hidden border-serene-neutral-200 shadow-sm hover:shadow-md transition-shadow duration-300 rounded-2xl", className)}>
-      <CardContent className="p-5">
+    <Card className={cn("overflow-hidden border-serene-neutral-100 shadow-xl shadow-slate-200/40 hover:shadow-2xl transition-all duration-300 rounded-2xl sm:rounded-[2.5rem]", className)}>
+      <CardContent className="p-4 sm:p-6">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-xs font-bold uppercase tracking-wider text-serene-neutral-400">
             {title}
@@ -338,8 +352,8 @@ interface SereneProviderCardProps {
 
 export function SereneProviderCard({ provider, onBook, onChat, className }: SereneProviderCardProps) {
   return (
-    <Card className={cn("overflow-hidden border-serene-neutral-200 rounded-3xl shadow-sm hover:shadow-md transition-all", className)}>
-      <CardContent className="p-5">
+    <Card className={cn("overflow-hidden border-serene-neutral-200 rounded-2xl sm:rounded-[2.5rem] shadow-sm hover:shadow-md transition-all", className)}>
+      <CardContent className="p-4 sm:p-5">
         <div className="flex items-start justify-between gap-4">
           <div className="flex items-center gap-3">
              <Avatar className="h-12 w-12 border-2 border-white shadow-sm">
@@ -389,11 +403,15 @@ interface SereneReportCardProps {
   type: string;
   date: string;
   description: string;
-  status: 'pending' | 'matched' | 'resolved';
+  status: 'pending' | 'matched' | 'accepted' | 'completed' | 'resolved';
   urgency: 'high' | 'medium' | 'low';
   matchesCount?: number;
   unreadMessages?: number;
+  additionalInfo?: any;
+  media?: any;
   onClick?: () => void;
+  onQuickView?: (e: React.MouseEvent) => void;
+  onChat?: (e: React.MouseEvent) => void;
   className?: string;
   active?: boolean;
 }
@@ -406,30 +424,32 @@ export function SereneReportCard({
   urgency, 
   matchesCount = 0,
   unreadMessages = 0,
+  additionalInfo,
+  media,
   onClick, 
+  onQuickView,
+  onChat,
   className, 
   active 
 }: SereneReportCardProps) {
-  const urgencyColors = {
-    high: "bg-red-50 text-red-600 border-red-100",
-    medium: "bg-amber-50 text-amber-600 border-amber-100",
-    low: "bg-blue-50 text-blue-600 border-blue-100"
-  };
+
 
   const statusColors = {
-    pending: "text-gray-500",
+    pending: "text-serene-neutral-500",
     matched: "text-serene-green-600",
-    resolved: "text-serene-blue-600"
+    accepted: "text-serene-blue-600",
+    completed: "text-indigo-600",
+    resolved: "text-serene-neutral-600"
   };
 
   return (
     <div 
        onClick={onClick}
        className={cn(
-         "group relative p-5 bg-white rounded-2xl border transition-all duration-300 cursor-pointer overflow-hidden",
+         "group relative p-4 sm:p-6 bg-white rounded-2xl sm:rounded-[2.5rem] border transition-all duration-300 cursor-pointer overflow-hidden",
          active 
-            ? "border-serene-blue-400 ring-4 ring-serene-blue-50 shadow-md z-10" 
-            : "border-serene-neutral-100 hover:border-serene-blue-200 hover:shadow-lg hover:-translate-y-0.5",
+            ? "border-sauti-teal ring-4 ring-sauti-teal/5 shadow-2xl shadow-sauti-teal/10 z-10 scale-[1.01]" 
+            : "border-serene-neutral-100 hover:border-serene-blue-200 hover:shadow-2xl hover:shadow-slate-200/60 hover:-translate-y-1",
          className
        )}
     >
@@ -442,28 +462,42 @@ export function SereneReportCard({
 
       <div className="flex items-start justify-between mb-4">
          <div className="flex items-center gap-4">
-           <div className={cn(
-             "h-12 w-12 rounded-2xl flex items-center justify-center transition-colors duration-300 border border-white shadow-sm",
-             active ? "bg-serene-blue-600 text-white" : "bg-serene-neutral-50 text-serene-neutral-500 group-hover:bg-serene-blue-50 group-hover:text-serene-blue-600"
-           )}>
-              <Shield className="h-6 w-6" />
-           </div>
+            <div className={cn(
+              "h-12 w-12 rounded-2xl flex items-center justify-center transition-colors duration-300 border border-white shadow-sm font-bold text-lg",
+              active ? "bg-serene-blue-600 text-white" : getUrgencyTheme(urgency)
+            )}>
+               {type?.charAt(0).toUpperCase() || "R"}
+            </div>
            <div>
              <h4 className="font-bold text-serene-neutral-900 group-hover:text-serene-blue-900 transition-colors text-base truncate">{type}</h4>
              <span className="text-xs text-serene-neutral-500 font-medium flex items-center gap-1.5 mt-0.5">
-               <Clock className="h-3.5 w-3.5" /> {date}
+               <Clock className="h-3.5 w-3.5" /> {new Date(date).toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
              </span>
            </div>
          </div>
-         <Badge variant="outline" className={cn("border-0 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider rounded-lg", urgencyColors[urgency])}>
-           {urgency}
-         </Badge>
+         <div className="flex flex-col items-end gap-2 shrink-0">
+           <Badge variant="outline" className={cn("border-0 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider rounded-lg", getUrgencyTheme(urgency))}>
+             {urgency}
+           </Badge>
+           {additionalInfo?.is_for_child && (
+             <Badge className="bg-amber-100 text-amber-700 border-0 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md">
+               Child Case
+             </Badge>
+           )}
+         </div>
       </div>
       
-      <div className="pl-[64px]">
-        <p className="text-sm text-serene-neutral-600 line-clamp-2 mb-4 leading-relaxed font-medium">
-          {description || "No description provided."}
-        </p>
+      <div className="pl-0 sm:pl-[64px]">
+        <div className="flex items-center justify-between mb-2">
+          <p className="text-sm text-serene-neutral-600 line-clamp-1 flex-1 leading-relaxed font-medium">
+            {description || "No description provided."}
+          </p>
+          {media?.url && (
+            <div className="flex items-center gap-1 text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider animate-pulse ml-2 shrink-0">
+               <Mic className="h-3 w-3" /> Audio Attached
+            </div>
+          )}
+        </div>
 
         <div className="flex items-center justify-between pt-2 border-t border-serene-neutral-50">
           <div className="flex items-center gap-3">
@@ -471,6 +505,16 @@ export function SereneReportCard({
                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-serene-green-50 text-serene-green-700 border border-serene-green-100 text-[10px] font-bold uppercase tracking-wider">
                   <div className="w-1.5 h-1.5 rounded-full bg-serene-green-500" />
                   {matchesCount} Match{matchesCount !== 1 ? 'es' : ''}
+               </div>
+            ) : status === 'accepted' ? (
+               <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-serene-blue-50 text-serene-blue-700 border border-serene-blue-100 text-[10px] font-bold uppercase tracking-wider">
+                  <div className="w-1.5 h-1.5 rounded-full bg-serene-blue-500" />
+                  Accepted
+               </div>
+            ) : status === 'completed' ? (
+               <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-100 text-[10px] font-bold uppercase tracking-wider">
+                  <div className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
+                  Completed
                </div>
             ) : status === 'pending' ? (
                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-serene-neutral-50 text-serene-neutral-500 border border-serene-neutral-100 text-[10px] font-bold uppercase tracking-wider">
@@ -485,11 +529,35 @@ export function SereneReportCard({
                   {unreadMessages}
                </span>
             )}
+
+            {/* Chat button for matched cases */}
+            {onChat && matchesCount > 0 && (
+              <button
+                onClick={(e) => { e.preventDefault(); e.stopPropagation(); onChat(e); }}
+                className="flex items-center gap-1 px-2.5 py-1 rounded-md bg-sauti-teal/10 text-sauti-teal border border-sauti-teal/20 text-[10px] font-bold uppercase tracking-wider hover:bg-sauti-teal/20 transition-colors"
+              >
+                <MessageCircle className="h-3 w-3" /> Chat
+              </button>
+            )}
           </div>
           
-          <div className="w-8 h-8 rounded-full flex items-center justify-center text-serene-neutral-300 group-hover:text-serene-blue-600 group-hover:bg-serene-blue-50 transition-all">
-             <ChevronRight className="h-5 w-5" />
-          </div>
+          {/* Quick view arrow with tooltip */}
+          {onQuickView ? (
+              <button
+                onClick={(e) => { e.preventDefault(); e.stopPropagation(); onQuickView(e); }}
+                className="group/qv relative w-8 h-8 rounded-full flex items-center justify-center text-serene-neutral-300 hover:text-serene-blue-600 hover:bg-serene-blue-50 transition-all rounded-2xl sm:rounded-[2.5rem]"
+                title="Quick view"
+              >
+              <ChevronRight className="h-5 w-5" />
+              <span className="absolute -top-8 right-0 px-2 py-1 rounded-md bg-sauti-dark text-white text-[10px] font-medium whitespace-nowrap opacity-0 group-hover/qv:opacity-100 transition-opacity pointer-events-none shadow-lg">
+                Quick view
+              </span>
+            </button>
+          ) : (
+            <div className="w-8 h-8 rounded-full flex items-center justify-center text-serene-neutral-300 group-hover:text-serene-blue-600 group-hover:bg-serene-blue-50 transition-all">
+              <ChevronRight className="h-5 w-5" />
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -553,7 +621,7 @@ export function SereneAppointmentCard({ date, title, providerName, status, onAct
   const isUpcoming = status === 'upcoming';
   
   return (
-    <Card className={cn("overflow-hidden border-serene-neutral-200 rounded-3xl shadow-sm hover:shadow-md transition-all", className)}>
+    <Card className={cn("overflow-hidden border-serene-neutral-200 rounded-2xl sm:rounded-[2.5rem] shadow-sm hover:shadow-md transition-all", className)}>
       <CardContent className="p-0 flex flex-col sm:flex-row">
          {/* Calendar Date Block */}
          <div className={cn(
@@ -598,4 +666,52 @@ export function SereneAppointmentCard({ date, title, providerName, status, onAct
       </CardContent>
     </Card>
   )
+}
+// Serene Incident Activity Card (used in Recent Activity and Search)
+interface SereneIncidentActivityCardProps {
+  report: ReportWithRelations;
+  href: string;
+  className?: string;
+}
+
+export function SereneIncidentActivityCard({ report, href, className }: SereneIncidentActivityCardProps) {
+  const status = getReportStatus(report);
+  const statusTheme = getStatusTheme(status);
+
+  return (
+    <Link href={href} className={cn("block group", className)}>
+      <Card className="overflow-hidden border-serene-neutral-100 hover:border-serene-blue-200 transition-all duration-300 hover:shadow-md cursor-pointer rounded-2xl sm:rounded-[2.5rem]">
+        <CardContent className="p-4 flex items-center gap-4">
+          <div className={cn(
+            "h-12 w-12 rounded-full flex items-center justify-center text-lg font-bold shrink-0",
+            "bg-serene-blue-50 text-serene-blue-600"
+          )}>
+            {report.type_of_incident?.charAt(0).toUpperCase() || "R"}
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center justify-between mb-1">
+              <div className="flex items-center gap-2 min-w-0">
+                <h4 className="font-semibold text-serene-neutral-900 truncate">
+                  {report.type_of_incident?.replace(/_/g, " ") || "Incident Report"}
+                </h4>
+                <Badge variant="outline" className={cn(
+                  "text-[10px] font-bold uppercase border-0 px-1.5 py-0.5 whitespace-nowrap",
+                  statusTheme
+                )}>
+                  {status}
+                </Badge>
+              </div>
+              <span className="text-xs text-serene-neutral-400 font-medium whitespace-nowrap ml-2">
+                {report.submission_timestamp ? new Date(report.submission_timestamp).toLocaleDateString() : ""}
+              </span>
+            </div>
+            <p className="text-sm text-serene-neutral-500 truncate">
+              {report.incident_description || "No description provided."}
+            </p>
+          </div>
+          <ChevronRight className="h-4 w-4 text-serene-neutral-300 group-hover:text-serene-blue-400 transition-colors" />
+        </CardContent>
+      </Card>
+    </Link>
+  );
 }

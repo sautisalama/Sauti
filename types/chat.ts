@@ -22,10 +22,12 @@ export interface ChatMetadata {
   match_id?: string;
   support_service_id?: string;
   pinned_message_ids?: string[];
+  report_id?: string;
   // Community-related fields
   is_community?: boolean;
   community_id?: string;
   member_count?: number;
+  all_chat_ids?: string[];
   last_message_preview?: {
     content: string;
     sender_id: string;
@@ -107,6 +109,7 @@ export interface Message {
   reactions?: MessageReactions;
   read_by?: ReadReceipt[];
   delivered_at?: string;
+  is_read?: boolean;
   is_deleted?: boolean;
   deleted_at?: string;
   reply_to_id?: string;
@@ -171,5 +174,33 @@ export interface MatchedService {
     first_name?: string;
     last_name?: string;
     avatar_url?: string;
+  };
+}
+// Transformation utilities for Supabase JSONB fields
+export function transformChat(data: any): Chat {
+  return {
+    ...data,
+    metadata: (data.metadata || {}) as ChatMetadata,
+    participants: data.participants?.map((p: any) => ({
+      ...p,
+      status: (p.status || {}) as ParticipantStatus,
+      user: p.user ? {
+        id: p.user.id,
+        first_name: p.user.first_name || '',
+        last_name: p.user.last_name || '',
+        avatar_url: p.user.avatar_url || '',
+        isVerified: p.user.isVerified
+      } : undefined
+    }))
+  };
+}
+
+export function transformMessage(data: any): Message {
+  return {
+    ...data,
+    metadata: (data.metadata || {}) as MessageMetadata,
+    attachments: (data.attachments as unknown as Attachment[]) || null,
+    reactions: (data.reactions || {}) as MessageReactions,
+    read_by: (data.read_by as unknown as ReadReceipt[]) || undefined
   };
 }

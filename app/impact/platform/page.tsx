@@ -53,7 +53,7 @@ export default function PlatformPage() {
                                 />
                             </div>
                             {/* Mobile Float */}
-                             <div className="absolute -bottom-10 -left-6 w-1/3 rounded-[2.5rem] overflow-hidden shadow-2xl border-8 border-gray-900 bg-gray-900 aspect-[9/19]">
+                             <div className="absolute -bottom-10 -left-6 w-1/3 rounded-2xl overflow-hidden shadow-2xl border-8 border-gray-900 bg-gray-900 aspect-[9/19]">
                                 <Image
                                     src="/platform/sauti salama - survivor dashboard - mobile.png"
                                     alt="Mobile App"
@@ -100,7 +100,7 @@ export default function PlatformPage() {
                             </div>
                         </div>
 
-                         <div className="bg-gray-50 rounded-[40px] p-10 md:p-14 text-center">
+                         <div className="bg-gray-50 rounded-2xl p-10 md:p-14 text-center">
                             <h2 className="text-3xl font-bold text-sauti-dark mb-6">Choice is Power.</h2>
                             <p className="text-gray-600 max-w-2xl mx-auto text-lg mb-10">
                                 Survivors retain full agency. You can choose to:

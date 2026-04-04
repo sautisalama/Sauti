@@ -33,7 +33,7 @@ export function InfoBlock({
     variant = "default",
 }: {
 	label: string;
-	value: any;
+	value: React.ReactNode;
 	fullWidth?: boolean;
 	icon?: React.ReactNode;
     variant?: "default" | "inline";
@@ -144,7 +144,7 @@ export function ActionButtons({
     size = "default",
     className
 }: { 
-    status: string, 
+    status: string | null, 
     onAction: (action: 'verify' | 'reject' | 'ban') => void, 
     size?: "default" | "sm",
     className?: string
@@ -194,7 +194,7 @@ export function ActionButtons({
 }
 
 // Detail Header Badge Helper
-export function VerificationStatusBadge({ status }: { status: string }) {
+export function VerificationStatusBadge({ status }: { status: string | null }) {
     return (
         <span className={cn(
             "flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-medium border shadow-sm transition-colors",
@@ -222,9 +222,9 @@ export function DetailHeader({
     meta = [] 
 }: { 
     title: string, 
-    type?: string, 
+    type?: string | null, 
     backUrl: string, 
-    status: string, 
+    status: string | null, 
     onAction: (action: 'verify' | 'reject' | 'ban') => void,
     meta?: React.ReactNode[]
 }) {

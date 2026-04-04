@@ -1,17 +1,30 @@
 import { Chat, Message } from '@/types/chat';
-import { useState, useEffect, useRef } from 'react';
+import { cn } from '@/lib/utils';
+import { Badge } from '@/components/ui/badge';
+import { useState, useEffect, useRef, useOptimistic, startTransition } from 'react';
 import { getMessages, sendMessage, markMessagesAsRead } from '@/app/actions/chat';
 import { fetchLinkMetadata } from '@/app/actions/chat-media';
 import { createClient } from '@/utils/supabase/client';
 import { MessageBubble } from './MessageBubble';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { Phone, Video, Search, MoreVertical, Smile, Paperclip, Mic, Send, X, Lock, ArrowLeft, Info } from 'lucide-react';
+import { Phone, Video, Search, MoreVertical, Smile, ShieldCheck, Mic, Send, X, Lock, ArrowLeft, FileText  } from 'lucide-react';
 import { ChatMediaDrawer } from './ChatMediaDrawer';
 import { EmojiPicker } from './EmojiPicker';
 import { AttachmentMenu } from './AttachmentMenu';
 import { FilePreviewModal } from './FilePreviewModal';
 import { format } from 'date-fns';
+import { usePathname } from 'next/navigation';
+import Link from 'next/link';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { History, User, Shield, Info } from 'lucide-react';
 
 interface ChatWindowProps {
   chat: Chat;
@@ -20,6 +33,15 @@ interface ChatWindowProps {
 
 export function ChatWindow({ chat, onBack }: ChatWindowProps) {
   const [messages, setMessages] = useState<Message[]>([]);
+  const [optimisticMessages, addOptimisticMessage] = useOptimistic(
+    messages,
+    (state: Message[], newMessage: Message) => {
+        // Check for duplicates in optimistic state (e.g. if real-time update arrived simultaneously)
+        if (state.find(m => m.id === newMessage.id)) return state;
+        return [...state, newMessage];
+    }
+  );
+  
   const [inputText, setInputText] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [sending, setSending] = useState(false);
@@ -40,20 +62,62 @@ export function ChatWindow({ chat, onBack }: ChatWindowProps) {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [currentUserName, setCurrentUserName] = useState<string>('there');
   const [isTyping, setIsTyping] = useState(false);
-
-  // ... (User Data and Effect logic remains the same) ...
-  // Fetch current user ID and Profile
+  const pathname = usePathname();
+  const isCaseDetailPage = pathname.includes('/dashboard/cases/');
+  const isReportDetailPage = pathname.includes('/dashboard/reports/');
+  const [isOwner, setIsOwner] = useState(false);
+  const [sharedMatches, setSharedMatches] = useState<any[]>([]);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+  
   useEffect(() => {
     const getUserData = async () => {
        const { data: { user } } = await supabase.auth.getUser();
        if (user) {
            setCurrentUserId(user.id);
-           const { data: profile } = await supabase.from('profiles').select('first_name').eq('id', user.id).single();
+           const { data: profile } = await supabase.from('profiles').select('first_name, last_name').eq('id', user.id).single();
            if (profile?.first_name) setCurrentUserName(profile.first_name);
+           
+           // Fetch chat ownership/role context
+           const { data: creator } = await supabase.from('chats').select('created_by').eq('id', chat.id).single();
+           setIsOwner(creator?.created_by === user.id);
+           
+           // Fetch Shared Match History
+           fetchMatchHistory(user.id);
        }
     };
     getUserData();
-  }, []);
+  }, [chat.id]);
+
+  const fetchMatchHistory = async (userId: string) => {
+      setIsLoadingHistory(true);
+      try {
+          const otherId = chat.participants?.find(p => p.user_id !== userId)?.user_id;
+          if (!otherId) return;
+
+          const { data } = await supabase
+            .from('matched_services')
+            .select(`
+                *,
+                report:reports(type_of_incident, report_id, user_id)
+            `)
+            .or(`survivor_id.eq.${userId},survivor_id.eq.${otherId}`)
+            .order('match_date', { ascending: false });
+          
+          if (data) {
+              // Filter for matches involving both parties
+              const filtered = data.filter((m: any) => {
+                  const profId = (m as any).support_services?.user_id || (m as any).hrd_profile_id;
+                  return (m.survivor_id === userId && profId === otherId) || 
+                         (m.survivor_id === otherId && profId === userId);
+              });
+              setSharedMatches(filtered);
+          }
+      } catch (e) {
+          console.error('History fetch failed', e);
+      } finally {
+          setIsLoadingHistory(false);
+      }
+  };
 
   // Detect link in text
   useEffect(() => {
@@ -72,32 +136,35 @@ export function ChatWindow({ chat, onBack }: ChatWindowProps) {
   useEffect(() => {
     loadMessages();
 
-    const channel = supabase
-      .channel(`chat:${chat.id}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'messages',
-          filter: `chat_id=eq.${chat.id}`
-        },
-        (payload) => {
-          const newMsg = payload.new as Message;
-          // Check if message ID already exists (optimistic update handling)
-          setMessages(prev => {
-             if (prev.find(m => m.id === newMsg.id)) return prev;
-             return [...prev, newMsg];
-          });
-          scrollToBottom();
-        }
-      )
-      .subscribe();
+    const ids = chat.metadata?.all_chat_ids || [chat.id];
+    const channels = ids.map(id => {
+        return supabase
+          .channel(`chat:${id}`)
+          .on(
+            'postgres_changes',
+            {
+              event: 'INSERT',
+              schema: 'public',
+              table: 'messages',
+              filter: `chat_id=eq.${id}`
+            },
+            (payload) => {
+              const newMsg = payload.new as Message;
+              // Check if message ID already exists (optimistic update handling)
+              setMessages(prev => {
+                 if (prev.find(m => m.id === newMsg.id)) return prev;
+                 return [...prev, newMsg];
+              });
+              scrollToBottom();
+            }
+          )
+          .subscribe();
+    });
 
     return () => {
-      supabase.removeChannel(channel);
+      channels.forEach(channel => supabase.removeChannel(channel));
     };
-  }, [chat.id]);
+  }, [chat.id, chat.metadata?.all_chat_ids]);
 
   const loadMessages = async () => {
     setIsLoading(true);
@@ -106,10 +173,16 @@ export function ChatWindow({ chat, onBack }: ChatWindowProps) {
           // Fake AI Bot logic preserved
           setMessages([]);
       } else {
-          const data = await getMessages(chat.id);
+          // Use all_chat_ids if available to get full consolidated history
+          const idsToFetch = chat.metadata?.all_chat_ids || chat.id;
+          const data = await getMessages(idsToFetch);
           setMessages(data);
           // Mark as read immediately on load
-          markMessagesAsRead(chat.id).catch(err => console.error('Failed to mark read', err));
+          if (Array.isArray(idsToFetch)) {
+              idsToFetch.forEach(id => markMessagesAsRead(id).catch(err => console.error('Failed to mark read', id, err)));
+          } else {
+              markMessagesAsRead(idsToFetch).catch(err => console.error('Failed to mark read', err));
+          }
       }
       scrollToBottom();
     } catch (error) {
@@ -186,54 +259,66 @@ export function ChatWindow({ chat, onBack }: ChatWindowProps) {
 
   const handleSend = async () => {
     if ((!inputText.trim() && !linkPreview) || sending) return;
-    setSending(true);
+    
+    const tempId = `temp-${Date.now()}`;
+    const pendingMsg: Message = {
+        id: tempId,
+        chat_id: chat.id,
+        sender_id: currentUserId || 'user',
+        content: inputText,
+        type: 'text',
+        created_at: new Date().toISOString(),
+        metadata: linkPreview ? { link_preview: linkPreview } : {},
+        is_read: true
+    };
+
+    // Store state for rollback if needed (though useOptimistic handles this by nature of re-renders)
+    const previousInput = inputText;
+    const previousPreview = linkPreview;
+
+    // Reset inputs immediately
+    setInputText('');
+    setLinkPreview(null);
+    scrollToBottom();
     
     try {
       if (chat.id === 'salama-ai-bot') {
-          // Fake Send preserved
-          const userMsg: Message = {
-              id: Date.now().toString(),
-              chat_id: chat.id,
-              sender_id: currentUserId || 'user',
-              content: inputText,
-              type: 'text',
-              created_at: new Date().toISOString(),
-              metadata: {}
-          };
-          setMessages(prev => [...prev, userMsg]);
-          setInputText('');
-          scrollToBottom();
-
+          // AI Bot logic
+          startTransition(() => {
+            addOptimisticMessage(pendingMsg);
+          });
+          
           setTimeout(async () => {
               setIsTyping(true);
               scrollToBottom();
               await new Promise(r => setTimeout(r, 2000));
               
               const replyMsg: Message = {
-                 id: Date.now().toString() + '-reply',
-                 chat_id: 'salama-ai-bot',
-                 sender_id: 'system',
-                 content: `This feature is under development and is coming soon.`,
-                 type: 'text',
-                 created_at: new Date().toISOString(),
-                 metadata: {}
-             };
-             setMessages(prev => [...prev, replyMsg]);
-             setIsTyping(false);
-             scrollToBottom();
+                  id: Date.now().toString() + '-reply',
+                  chat_id: 'salama-ai-bot',
+                  sender_id: 'system',
+                  content: `This feature is under development and is coming soon.`,
+                  type: 'text',
+                  created_at: new Date().toISOString(),
+                  metadata: {}
+              };
+              setMessages(prev => [...prev, pendingMsg, replyMsg]); // Commit both
+              setIsTyping(false);
+              scrollToBottom();
           }, 500);
 
       } else {
-        const metadata = linkPreview ? { link_preview: linkPreview } : {};
-        await sendMessage(chat.id, inputText, 'text', metadata);
-        setInputText('');
-        setLinkPreview(null);
-        // height reset logic handled by state change usually, but explicit reset in ref if needed
+        startTransition(async () => {
+          addOptimisticMessage(pendingMsg);
+          const metadata = previousPreview ? { link_preview: previousPreview } : {};
+          await sendMessage(chat.id, previousInput, 'text', metadata);
+        });
       }
     } catch (error) {
       console.error('Failed to send', error);
-    } finally {
-      setSending(false);
+      // Rollback inputs so user doesn't lose text
+      setInputText(previousInput);
+      setLinkPreview(previousPreview);
     }
   };
 
@@ -294,7 +379,8 @@ export function ChatWindow({ chat, onBack }: ChatWindowProps) {
   };
 
   // Chat Info Logic
-  const otherParticipant = chat.participants?.find((p) => p.user_id !== chat.created_by) || chat.participants?.[0]; 
+  // Filter out the current user to find the other party
+  const otherParticipant = chat.participants?.find((p) => p.user_id !== currentUserId) || chat.participants?.[0]; 
   const meta = chat.metadata || {};
   const name = meta.name || `${otherParticipant?.user?.first_name || 'User'} ${otherParticipant?.user?.last_name || ''}`;
   const avatar = meta.image_url || otherParticipant?.user?.avatar_url;
@@ -338,42 +424,93 @@ export function ChatWindow({ chat, onBack }: ChatWindowProps) {
              <Phone className="h-5 w-5" />
            </Button>
            <div className="w-px h-7 bg-serene-neutral-200 mx-1.5" />
-           <Button 
-             variant="ghost" 
-             size="icon" 
-             className="rounded-full h-10 w-10 text-serene-neutral-400 hover:bg-serene-neutral-100 hover:text-serene-neutral-600 transition-all" 
-             onClick={(e) => { e.stopPropagation(); setIsDrawerOpen(true); }}
-           >
-              <MoreVertical className="h-5 w-5" />
-           </Button>
+           
+           <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  className="rounded-full h-10 w-10 text-serene-neutral-400 hover:bg-serene-neutral-100 hover:text-serene-neutral-600 transition-all" 
+                >
+                   <MoreVertical className="h-5 w-5" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-64 rounded-2xl p-2 shadow-2xl border-serene-neutral-100 bg-white">
+                <DropdownMenuLabel className="px-3 py-2 text-xs font-bold text-serene-neutral-400 uppercase tracking-widest">Chat Options</DropdownMenuLabel>
+                <DropdownMenuItem onClick={() => setIsDrawerOpen(true)} className="rounded-xl px-3 py-2.5 cursor-pointer hover:bg-serene-neutral-50 gap-3">
+                  <Info className="h-4 w-4 text-serene-neutral-400" />
+                  <span className="font-medium text-serene-neutral-700">Chat Media & Info</span>
+                </DropdownMenuItem>
+                
+                <DropdownMenuSeparator className="my-2 bg-serene-neutral-100" />
+                
+                <DropdownMenuLabel className="px-3 py-2 text-xs font-bold text-serene-neutral-400 uppercase tracking-widest flex items-center gap-2">
+                  <History className="h-3 w-3" /> Shared {isOwner ? 'Reports' : 'Cases'}
+                </DropdownMenuLabel>
+                
+                {isLoadingHistory ? (
+                   <DropdownMenuItem className="px-3 py-2 text-xs text-serene-neutral-400 animate-pulse">Loading history...</DropdownMenuItem>
+                ) : sharedMatches.length === 0 ? (
+                   <DropdownMenuItem className="px-3 py-2 text-xs text-serene-neutral-400 italic">No shared history found</DropdownMenuItem>
+                ) : (
+                  sharedMatches.map(match => (
+                    <DropdownMenuItem 
+                      key={match.id} 
+                      asChild
+                      className="rounded-xl px-3 py-2.5 cursor-pointer hover:bg-serene-blue-50 group"
+                    >
+                      <Link href={`/dashboard/${isOwner ? 'reports' : 'cases'}/${match.id}`} className="flex flex-col items-start gap-0.5">
+                        <div className="flex items-center gap-2 w-full">
+                          <span className="font-bold text-serene-neutral-800 text-[13px] truncate">
+                            {match.report?.type_of_incident?.replace(/_/g, ' ') || 'Support Context'}
+                          </span>
+                          <Badge variant="outline" className="ml-auto text-[8px] bg-white border-serene-neutral-100 text-serene-neutral-400 font-bold uppercase py-0 px-1">
+                            {match.match_status_type}
+                          </Badge>
+                        </div>
+                        <span className="text-[10px] text-serene-neutral-400 font-medium">
+                          {format(new Date(match.match_date), 'PPP')}
+                        </span>
+                      </Link>
+                    </DropdownMenuItem>
+                  ))
+                )}
+              </DropdownMenuContent>
+           </DropdownMenu>
          </div>
        </div>
 
-       {/* Appointment Banner */}
-       {chat.metadata?.appointment_id && (
-         <div className="bg-teal-50 border-b border-teal-100 p-2 flex items-center justify-between z-10 text-sm text-teal-900">
-            <div className="flex items-center gap-2">
-              <span className="font-semibold">📅 Upcoming Appointment</span>
-              <span>- View details</span>
-            </div>
-            <Button variant="outline" size="sm" className="h-7 text-xs border-teal-200 hover:bg-teal-100 text-teal-700">
-              View
-            </Button>
-         </div>
-       )}
-
-       {/* Case File Banner */}
-       {chat.metadata?.case_id && (
-         <div className="bg-blue-50 border-b border-blue-100 p-2 flex items-center justify-between z-10 text-sm text-blue-900">
-            <div className="flex items-center gap-2">
-              <span className="font-semibold">📂 Case File</span>
-              <span>- Review case details</span>
-            </div>
-            <Button variant="outline" size="sm" className="h-7 text-xs border-blue-200 hover:bg-blue-100 text-blue-700">
-              View Case
-            </Button>
-         </div>
-       )}
+         {/* Dynamic Context Pin - Sticky & Premium */}
+         {(chat.metadata?.case_id || chat.metadata?.report_id) && (
+           <div className="bg-white/80 backdrop-blur-md border-b border-serene-neutral-100/50 px-4 py-2.5 flex items-center justify-between z-10 animate-in fade-in slide-in-from-top-1">
+              <div className="flex items-center gap-3 pl-1">
+                <div className={cn(
+                  "p-2 rounded-xl",
+                  isOwner ? "bg-teal-50 text-teal-600" : "bg-serene-blue-50 text-serene-blue-600"
+                )}>
+                  {isOwner ? <ShieldCheck className="h-4 w-4" /> : <FileText className="h-4 w-4" />}
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-[10px] font-bold text-serene-neutral-400 uppercase tracking-widest">{isOwner ? 'Report Journey' : 'Case Context'}</span>
+                  <span className="text-[13px] font-bold text-serene-neutral-800 leading-tight">
+                    {sharedMatches.find(m => m.id === (chat.metadata?.case_id || chat.metadata?.report_id))?.report?.type_of_incident?.replace(/_/g, ' ') || 'Active Session'}
+                  </span>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                {!isCaseDetailPage && !isReportDetailPage && (
+                  <Button asChild variant="outline" size="sm" className={cn(
+                    "h-8 text-[11px] font-bold px-4 rounded-xl shadow-sm transition-all hover:scale-105 active:scale-95",
+                    isOwner ? "border-teal-100 text-teal-700 hover:bg-teal-50" : "border-serene-blue-100 text-serene-blue-700 hover:bg-serene-blue-50"
+                  )}>
+                    <Link href={`/dashboard/${isOwner ? 'reports' : 'cases'}/${chat.metadata?.case_id || chat.metadata?.report_id}`}>
+                      {isOwner ? 'View Journey' : 'View Case'}
+                    </Link>
+                  </Button>
+                )}
+              </div>
+           </div>
+         )}
 
        {/* Out of Office Warning */}
        {(otherParticipant?.user as any)?.out_of_office && (
@@ -391,9 +528,9 @@ export function ChatWindow({ chat, onBack }: ChatWindowProps) {
                  </div>
              </div>
          )}
-         {messages.map((msg, idx) => {
+         {optimisticMessages.map((msg, idx) => {
            const isOwn = msg.sender_id === currentUserId;
-           const showTail = idx === 0 || messages[idx - 1].sender_id !== msg.sender_id;
+           const showTail = idx === 0 || optimisticMessages[idx - 1].sender_id !== msg.sender_id;
            return (
              <MessageBubble 
                key={msg.id} 

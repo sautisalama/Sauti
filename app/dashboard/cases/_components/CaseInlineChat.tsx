@@ -6,7 +6,7 @@ import { MessageBubble } from '@/components/chat/MessageBubble';
 import { EmojiPicker } from '@/components/chat/EmojiPicker';
 import { Button } from '@/components/ui/button';
 import { Send, Smile, Paperclip, ChevronDown, ChevronUp, Loader2 } from 'lucide-react';
-import { Message } from '@/types/chat';
+import { Message, transformMessage } from '@/types/chat';
 
 interface CaseInlineChatProps {
   matchId: string;
@@ -105,7 +105,7 @@ export function CaseInlineChat({
           filter: `chat_id=eq.${chatId}`
         },
         (payload) => {
-          const newMsg = payload.new as Message;
+          const newMsg = transformMessage(payload.new);
           setMessages(prev => {
             if (prev.find(m => m.id === newMsg.id)) return prev;
             return [...prev, newMsg];
@@ -129,7 +129,7 @@ export function CaseInlineChat({
       .limit(50);
 
     if (data) {
-      setMessages(data);
+      setMessages(data.map(m => transformMessage(m)));
       scrollToBottom();
     }
   };
@@ -159,17 +159,7 @@ export function CaseInlineChat({
       await supabase
         .from('chats')
         .update({ 
-          last_message_at: new Date().toISOString(),
-          metadata: supabase.rpc('jsonb_set_nested', {
-            target: 'metadata',
-            path: '{last_message_preview}',
-            value: JSON.stringify({
-              content: inputText.substring(0, 100),
-              sender_id: currentUserId,
-              type: 'text',
-              created_at: new Date().toISOString()
-            })
-          }) as any
+          last_message_at: new Date().toISOString()
         })
         .eq('id', chatId);
 

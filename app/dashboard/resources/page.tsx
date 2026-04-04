@@ -119,7 +119,7 @@ export default function BlogPage() {
 				{filteredPosts.map((post, index) => (
 					<Card
 						key={index}
-						className="overflow-hidden hover:shadow-lg transition-shadow rounded-3xl border border-serene-neutral-200"
+						className="overflow-hidden hover:shadow-lg transition-shadow rounded-2xl border border-serene-neutral-200"
 					>
 						<div className="relative h-48 w-full overflow-hidden">
 							<Image

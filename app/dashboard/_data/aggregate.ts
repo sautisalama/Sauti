@@ -72,19 +72,36 @@ export async function fetchDashboardData(): Promise<AggregatedDashboardData | nu
 				.select("id")
 				.eq("user_id", userId);
 			const ids = (services || []).map((s: any) => s.id);
-			if (ids.length === 0) return [] as MatchedServiceWithRelations[];
-			const { data } = await supabase
-				.from("matched_services")
-				.select(
-					`
-        *,
-        report:reports(*),
-        support_service:support_services(*)
-      `
-				)
-				.in("service_id", ids)
-				.order("match_date", { ascending: false });
-			return (data as any) || [];
+
+            let query = supabase.from("matched_services").select(`
+                *,
+                report:reports(*),
+                service_details:support_services(*),
+                appointments:appointments(*)
+            `);
+
+            if (ids.length > 0) {
+                query = query.or(`service_id.in.("${ids.join('","')}"),hrd_profile_id.eq."${userId}"`);
+            } else {
+                query = query.eq("hrd_profile_id", userId);
+            }
+
+			const { data } = await query.order("match_date", { ascending: false });
+			
+			// Backfill matched_service into nested appointments for type compatibility
+			const transformedData = data?.map((match: any) => ({
+				...match,
+				appointments: match.appointments?.map((appt: any) => ({
+					...appt,
+					matched_service: {
+						id: match.id,
+						service_details: match.service_details,
+						report: match.report,
+					},
+				})),
+			}));
+
+			return (transformedData as MatchedServiceWithRelations[]) || [];
 		})();
 
 		const appointmentsPromise = (async (): Promise<AppointmentWithDetails[]> => {
@@ -93,7 +110,7 @@ export async function fetchDashboardData(): Promise<AggregatedDashboardData | nu
       *,
       matched_service:matched_services (
         *,
-        support_service:support_services (*),
+        service_details:support_services (*),
         report:reports (*)
       ),
       professional:profiles!appointments_professional_id_fkey (*),
@@ -117,11 +134,16 @@ export async function fetchDashboardData(): Promise<AggregatedDashboardData | nu
 				.select("id")
 				.eq("user_id", userId);
 			const ids = (services || []).map((s: any) => s.id);
-			if (ids.length === 0) return 0;
-			const { count } = await supabase
-				.from("matched_services")
-				.select("id", { count: "exact", head: true })
-				.in("service_id", ids);
+
+            let query = supabase.from("matched_services").select("id", { count: "exact", head: true });
+            
+            if (ids.length > 0) {
+                query = query.or(`service_id.in.("${ids.join('","')}"),hrd_profile_id.eq."${userId}"`);
+            } else {
+                query = query.eq("hrd_profile_id", userId);
+            }
+
+			const { count } = await query;
 			return count || 0;
 		})();
 
@@ -134,10 +156,13 @@ export async function fetchDashboardData(): Promise<AggregatedDashboardData | nu
 					)
 					.eq("id", userId)
 					.single();
-				const docs = data?.accreditation_files_metadata
-					? Array.isArray(data.accreditation_files_metadata)
-						? data.accreditation_files_metadata
-						: JSON.parse(data.accreditation_files_metadata)
+				const metadata = data?.accreditation_files_metadata;
+				const docs = metadata
+					? Array.isArray(metadata)
+						? metadata
+						: typeof metadata === 'string'
+							? JSON.parse(metadata)
+							: metadata
 					: [];
 				return {
 					overallStatus: data?.verification_status || "pending",

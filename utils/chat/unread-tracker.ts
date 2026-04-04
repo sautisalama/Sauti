@@ -1,5 +1,15 @@
 "use client";
 
+interface ChatChannel {
+	countUnread?: () => number;
+}
+
+interface ChatClient {
+	on: (event: string, handler: () => void) => void;
+	off: (event: string, handler: () => void) => void;
+}
+
+
 import { getPreloadedChat, preloadChat } from "./preload";
 
 export interface UnreadMessageData {
@@ -13,6 +23,7 @@ export async function getUnreadMessagesForCases(
 	caseIds: string[]
 ): Promise<UnreadMessageData[]> {
 	try {
+
 		let pre = getPreloadedChat(userId);
 		if (!pre) {
 			pre = await preloadChat(userId, username);
@@ -58,10 +69,11 @@ export function subscribeToUnreadMessages(
 
 			const computeUnread = () => {
 				try {
-					const total = (pre?.dmChannels || []).reduce((sum: number, ch: any) => {
+					const total = (pre?.dmChannels as ChatChannel[] || []).reduce((sum: number, ch: ChatChannel) => {
 						const n = typeof ch.countUnread === "function" ? ch.countUnread() : 0;
 						return sum + (Number.isFinite(n) ? n : 0);
 					}, 0);
+
 
 					// This is a simplified implementation
 					// In a real implementation, you would map channels to case IDs
@@ -72,7 +84,8 @@ export function subscribeToUnreadMessages(
 			};
 
 			computeUnread();
-			const client = pre?.client as any;
+			const client = pre?.client as ChatClient | undefined;
+
 			if (client && typeof client.on === "function") {
 				const handler = () => computeUnread();
 				client.on("notification.message_new", handler);

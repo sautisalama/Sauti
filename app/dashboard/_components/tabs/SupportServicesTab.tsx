@@ -110,7 +110,7 @@ export function SupportServicesTab({
 			)}
 
 			<Dialog open={open} onOpenChange={setOpen}>
-				<DialogContent className="max-w-4xl p-0 overflow-hidden rounded-[32px] h-[90vh] min-h-[600px]">
+				<DialogContent className="max-w-4xl p-0 overflow-hidden rounded-2xl h-[90vh] min-h-[600px]">
 					<DialogTitle className="sr-only">Add Support Service</DialogTitle>
 					<DialogDescription className="sr-only">
 						Tell us about your support service. Fill in the details below to register

@@ -72,16 +72,16 @@ Report Created → Matching Algorithm → Matched Services → Professional Noti
    - Incident description and required services
    - Urgency indicators and match score
 
-2. **Professional can take actions:**
-   - ✅ **Accept** - Agree to help this survivor
-   - ❌ **Decline** - Not able to help (with optional reason)
-   - 📝 **Request more info** - Need clarification before deciding
+2. **Professional must take action to accept:**
+   - ⚡ **"Meet Now" (Accept & Start)**: Immediately creates a confirmed appointment and opens the chat.
+   - 📅 **"Schedule for Later" (Accept & Pick Time)**: Professional selects a future date/time via the scheduler.
+   - ❌ **Decline**: Not able to help (with optional reason).
 
 3. **When professional accepts:**
-   - Match status changes to `accepted`
-   - Report status changes to `accepted`
-   - Report marked as `ismatched: true`
-   - **Appointment scheduling becomes available**
+   - **Crucial Rule**: Acceptance is only finalized once an appointment is created.
+   - Match status changes to `accepted`.
+   - **Privacy Unlock**: Full survivor details (Name, Contact, History) are revealed. Prior to this, details are masked for survivor protection.
+   - Report marked as `ismatched: true`.
 
 ---
 
@@ -89,26 +89,22 @@ Report Created → Matching Algorithm → Matched Services → Professional Noti
 
 **Three ways appointments can be created:**
 
-#### Option A: Professional Schedules (Internal)
-1. **Professional goes to accepted match**
-2. **Clicks "Schedule Appointment" button**
-3. **Enhanced scheduler opens:**
-   - Calendar date picker (weekdays only)
-   - Time slot selection (9 AM - 5 PM)
-   - Appointment type selection (consultation, therapy, etc.)
-   - Duration selection (30, 45, 60, 90, 120 minutes)
-   - Professional notes field
-
-4. **Appointment is created:**
+#### Option A: Mandatory Acceptance Scheduling
+1. **Professional clicks "Begin Support"**
+2. **Acceptance Choice Dialog opens:**
+   - **"Meet Now"**: Creates an immediate session (60 mins) for right now.
+   - **"Schedule Later"**: Opens the enhanced scheduler.
+3. **Appointment is created automatically as part of acceptance:**
    ```sql
    INSERT INTO appointments (
      professional_id,
      survivor_id,
+     matched_services,
      appointment_date,
      appointment_type,
      duration_minutes,
      status: 'confirmed',
-     created_via: 'dashboard'
+     created_via: 'meet_now' | 'scheduled_acceptance'
    )
    ```
 
@@ -198,14 +194,16 @@ Report Created → Matching Algorithm → Matched Services → Professional Noti
 
 #### **Report Status Flow:**
 ```
-Report Created → Matched → Accepted → Appointment Scheduled → Session Completed
+Report Created → Matched → Accepted & Scheduled → Session Completed → Dual Completion Confirm → Archived
 ```
 
-#### **Data Linking:**
-- Reports link to `matched_services`
-- Matched services link to `appointments`
-- Full traceability from report to resolution
-- Comprehensive case management view
+#### **Privacy-First Data Masking:**
+- **Pending Match**: Professionals see only Gender, Age Category, and Incident Type.
+- **Accepted Match**: Full contact details and incident story are unlocked.
+
+#### **Dual-Completion Lifecycle:**
+- A case is only fully "Closed" (Archived) when **both** the Professional and Survivor mark it as complete.
+- If the Professional completes it first, they are immediately boosted in the matching algorithm for new cases, even while waiting for the survivor's final confirmation.
 
 ---
 

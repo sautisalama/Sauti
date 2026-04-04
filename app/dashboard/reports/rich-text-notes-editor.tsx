@@ -21,23 +21,28 @@ import {
 	Underline,
 	Undo2,
 	Quote,
+	Check,
+	Loader2,
+	Heading2,
+	Heading3,
+	MinusSquare,
+	FileText,
 } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { Tables } from "@/types/db-schema";
 import { createClient } from "@/utils/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
 // Tiptap imports
 import { useEditor, EditorContent } from "@tiptap/react";
+import { BubbleMenu } from "@tiptap/react/menus";
 import StarterKit from "@tiptap/starter-kit";
 import UnderlineExt from "@tiptap/extension-underline";
 import LinkExt from "@tiptap/extension-link";
 import ImageExt from "@tiptap/extension-image";
 import TextAlign from "@tiptap/extension-text-align";
 import Placeholder from "@tiptap/extension-placeholder";
-import TextStyle from "@tiptap/extension-text-style";
-import OrderedList from "@tiptap/extension-ordered-list";
-import BulletList from "@tiptap/extension-bullet-list";
-import ListItem from "@tiptap/extension-list-item";
+import { TextStyle } from "@tiptap/extension-text-style";
 
 export default function ReportNotesEditor({
 	userId,
@@ -54,18 +59,22 @@ export default function ReportNotesEditor({
 	const [dirty, setDirty] = useState(false);
 	const [lastSavedAt, setLastSavedAt] = useState<string | null>(null);
 	const fileInputRef = useRef<HTMLInputElement | null>(null);
+	const autosaveTimerRef = useRef<NodeJS.Timeout | null>(null);
+	const isMountedRef = useRef(true);
 
-	const initialHtml = useMemo(() => report.notes || "", [report.notes]);
+	// Track report ID to detect report switching
+	const currentReportIdRef = useRef(report.report_id);
 
-const editor = useEditor({
+	const initialHtml = useMemo(() => report.notes || "", [report.report_id, report.notes]);
+
+	const editor = useEditor({
+		immediatelyRender: false,
 		extensions: [
 			StarterKit.configure({
-				heading: false,
+				heading: {
+					levels: [2, 3],
+				},
 			}),
-			// Explicit list extensions to ensure list behavior works reliably
-			BulletList,
-			OrderedList,
-			ListItem,
 			UnderlineExt,
 			TextStyle,
 			LinkExt.configure({
@@ -76,7 +85,7 @@ const editor = useEditor({
 			}),
 			ImageExt.configure({ allowBase64: true }),
 			TextAlign.configure({
-				types: ["paragraph"],
+				types: ["heading", "paragraph"],
 				alignments: ["left", "center", "right", "justify"],
 			}),
 			Placeholder.configure({
@@ -87,6 +96,16 @@ const editor = useEditor({
 		editable: true,
 		onUpdate: ({ editor }) => {
 			setDirty(true);
+			if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current);
+			autosaveTimerRef.current = setTimeout(() => {
+				void save(editor.getHTML(), { autosave: true });
+			}, 2000);
+		},
+		onBlur: ({ editor }) => {
+			if (dirty) {
+				if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current);
+				void save(editor.getHTML(), { autosave: true });
+			}
 		},
 		editorProps: {
 			handlePaste: (view: any, e: ClipboardEvent) => {
@@ -116,11 +135,21 @@ const editor = useEditor({
 				return false;
 			},
 			attributes: {
-				class:
-					"tiptap prose-sm max-w-none focus:outline-none break-words whitespace-pre-wrap min-h-[300px] p-4",
+				class: cn(
+					"prose prose-sm max-w-none min-h-[300px] p-4 focus:outline-none",
+					"text-sauti-dark font-medium leading-relaxed",
+					"[&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5",
+					"[&_p]:my-2 first:[&_p]:mt-0 last:[&_p]:mb-0",
+					"tiptap"
+				),
 			},
 		},
 	});
+
+	useEffect(() => {
+		isMountedRef.current = true;
+		return () => { isMountedRef.current = false; };
+	}, []);
 
 	const save = useCallback(
 		async (html?: string, opts?: { autosave?: boolean }) => {
@@ -136,8 +165,10 @@ const editor = useEditor({
 					.select()
 					.single();
 				if (error) throw error;
-				setDirty(false);
-				setLastSavedAt(new Date().toLocaleTimeString());
+				if (isMountedRef.current) {
+					setDirty(false);
+					setLastSavedAt(new Date().toLocaleTimeString());
+				}
 				onSaved(data as any);
 				if (!autosave) {
 					toast({
@@ -154,21 +185,23 @@ const editor = useEditor({
 					});
 				}
 			} finally {
-				setSaving(false);
+				if (isMountedRef.current) setSaving(false);
 			}
 		},
 		[editor, report.report_id, supabase, toast, onSaved]
 	);
 
-	// Keep editor content in sync if the selected report changes
 	useEffect(() => {
-		if (editor && initialHtml !== editor.getHTML()) {
-			editor.commands.setContent(initialHtml || "", false);
+		if (!editor) return;
+		if (currentReportIdRef.current !== report.report_id) {
+			currentReportIdRef.current = report.report_id;
+			if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current);
+			editor.commands.setContent(initialHtml || "", { emitUpdate: false });
 			setDirty(false);
+			setLastSavedAt(null);
 		}
-	}, [editor, initialHtml]);
+	}, [editor, initialHtml, report.report_id]);
 
-	// Save on Ctrl/Cmd+S
 	useEffect(() => {
 		const onKeyDown = (e: KeyboardEvent) => {
 			const isCtrlS = (e.ctrlKey || e.metaKey) && (e.key === "s" || e.key === "S");
@@ -181,19 +214,17 @@ const editor = useEditor({
 		return () => window.removeEventListener("keydown", onKeyDown);
 	}, [save]);
 
-	// 30-second autosave interval (only when there are unsaved changes)
 	useEffect(() => {
-		const id = window.setInterval(() => {
-			if (dirty) void save(undefined, { autosave: true });
-		}, 30000);
-		return () => window.clearInterval(id);
-	}, [dirty, save]);
+		return () => {
+			if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current);
+		};
+	}, []);
 
 	const insertOrEditLink = useCallback(() => {
 		if (!editor || !editor.chain) return;
 		const prev = editor.getAttributes("link").href as string | undefined;
 		const url = prompt("Enter URL:", prev ?? "https://");
-		if (url === null) return; // cancelled
+		if (url === null) return;
 		if (url === "") {
 			editor.chain().focus().unsetLink().run();
 			return;
@@ -225,7 +256,6 @@ const editor = useEditor({
 				}
 				throw new Error("Failed to resolve public URL");
 			} catch (err) {
-				// Fallback to inline base64 to avoid data loss
 				try {
 					const dataUrl = await new Promise<string>((resolve, reject) => {
 						const reader = new FileReader();
@@ -251,349 +281,179 @@ const editor = useEditor({
 	);
 
 	const onPickImage = useCallback(() => fileInputRef.current?.click(), []);
+	const prevent = useCallback((e: React.MouseEvent) => e.preventDefault(), []);
 
-	// Prevent editor losing selection when toolbar is clicked
-	const prevent = useCallback((e: any) => e.preventDefault(), []);
+	if (!editor) return null;
 
-	if (!editor || !editor.chain) return null;
+	const ToolbarButton = ({ 
+		active, 
+		onClick, 
+		children,
+		disabled = false,
+		className: extraClassName,
+		title
+	}: { 
+		active?: boolean; 
+		onClick: () => void; 
+		children: React.ReactNode;
+		disabled?: boolean;
+		className?: string;
+		title?: string;
+	}) => (
+		<Button
+			type="button"
+			variant="ghost"
+			size="sm"
+			onClick={onClick}
+			disabled={disabled}
+			title={title}
+			className={cn(
+				"h-8 w-8 p-0 rounded-lg transition-colors",
+				active 
+					? "bg-sauti-teal/10 text-sauti-teal" 
+					: "text-serene-neutral-500 hover:text-sauti-teal hover:bg-sauti-teal/5",
+				extraClassName
+			)}
+		>
+			{children}
+		</Button>
+	);
 
 	return (
-		<div className="flex flex-col h-full bg-white rounded-2xl border border-serene-neutral-200 shadow-sm overflow-hidden">
-			<style jsx>{`
-				/* Tiptap premium styles */
-				.tiptap :global(.ProseMirror) {
-					outline: none;
-					color: #1f2937;
-					font-size: 0.9375rem;
-					line-height: 1.7;
-				}
-				.tiptap :global(.ProseMirror p.is-editor-empty:first-child::before) {
-					content: attr(data-placeholder);
-					color: #9ca3af;
-					float: left;
-					height: 0;
-					pointer-events: none;
-					font-style: italic;
-				}
-				.tiptap :global(img) {
-					max-width: 100%;
-					height: auto;
-				}
-				.tiptap :global(blockquote) {
-					border-left: 3px solid #1A3434;
-					margin: 1rem 0;
-					padding-left: 1rem;
-					color: #4b5563;
-					background: linear-gradient(90deg, rgba(26, 52, 52, 0.05) 0%, transparent 100%);
-					border-radius: 0 0.5rem 0.5rem 0;
-					padding: 0.75rem 1rem;
-				}
-				.tiptap :global(pre) {
-					background: #f8fafc;
-					border-radius: 0.75rem;
-					border: 1px solid #e2e8f0;
-					padding: 0.875rem 1rem;
-					font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
-						"Liberation Mono", "Courier New", monospace;
-					font-size: 0.8125rem;
-					line-height: 1.6;
-					overflow-x: auto;
-				}
-				/* Ensure lists render with styles even without typography plugin */
-				.tiptap :global(ul) {
-					list-style: disc;
-					padding-left: 1.5rem;
-					margin: 0.5rem 0;
-				}
-				.tiptap :global(ol) {
-					list-style: decimal;
-					padding-left: 1.5rem;
-					margin: 0.5rem 0;
-				}
-				.tiptap :global(li) {
-					margin: 0.25rem 0;
-				}
-				.tiptap :global(ul ul) {
-					list-style: circle;
-				}
-				.tiptap :global(ol ol) {
-					list-style: lower-alpha;
-				}
-			`}</style>
+		<div className="rounded-xl border border-serene-neutral-200 bg-white overflow-hidden transition-all duration-300 focus-within:border-sauti-teal/50 focus-within:ring-2 focus-within:ring-sauti-teal/10 h-full flex flex-col">
+			{/* Floating Bubble Menu */}
+			<BubbleMenu editor={editor} className="flex gap-1 p-1.5 bg-white border border-serene-neutral-200 rounded-xl shadow-xl shadow-slate-200/50 animate-in fade-in zoom-in-95 duration-200">
+				<ToolbarButton active={editor.isActive("bold")} onClick={() => editor.chain().focus().toggleBold().run()} title="Bold">
+					<Bold className="h-3.5 w-3.5" />
+				</ToolbarButton>
+				<ToolbarButton active={editor.isActive("italic")} onClick={() => editor.chain().focus().toggleItalic().run()} title="Italic">
+					<Italic className="h-3.5 w-3.5" />
+				</ToolbarButton>
+				<ToolbarButton active={editor.isActive("link")} onClick={insertOrEditLink} title="Link">
+					<LinkIcon className="h-3.5 w-3.5" />
+				</ToolbarButton>
+			</BubbleMenu>
 
-			{/* Premium Toolbar */}
-			<div className="flex flex-col gap-3 p-4 bg-gradient-to-b from-serene-neutral-50 to-white border-b border-serene-neutral-100">
-				<div className="flex items-center gap-1.5 flex-wrap" onMouseDown={prevent}>
-					<span className="text-xs font-bold text-serene-neutral-500 uppercase tracking-wider mr-2">Format</span>
-					<Button
-						type="button"
-						variant="ghost"
-						size="icon"
-						className="h-8 w-8"
-						onClick={() => editor.chain().focus().undo().run()}
-						title="Undo"
-					>
-						<Undo2 className="h-4 w-4" />
-					</Button>
-					<Button
-						type="button"
-						variant="ghost"
-						size="icon"
-						className="h-8 w-8"
-						onClick={() => editor.chain().focus().redo().run()}
-						title="Redo"
-					>
-						<Redo2 className="h-4 w-4" />
-					</Button>
-					<Separator orientation="vertical" className="h-4" />
-					<Button
-						type="button"
-						variant={editor.isActive("bold") ? "secondary" : "ghost"}
-						size="icon"
-						className={`h-8 w-8 ${
-							editor.isActive("bold")
-								? "bg-sauti-teal/10 text-sauti-teal border border-sauti-teal/20 shadow-sm"
-								: "hover:bg-serene-neutral-50"
-						}`}
-						onClick={() => editor.chain().focus().toggleBold().run()}
-						title="Bold"
-					>
-						<Bold
-							className={`h-4 w-4 ${editor.isActive("bold") ? "font-bold" : ""}`}
-						/>
-					</Button>
-					<Button
-						type="button"
-						variant={editor.isActive("italic") ? "secondary" : "ghost"}
-						size="icon"
-						className={`h-8 w-8 ${
-							editor.isActive("italic")
-								? "bg-sauti-teal/10 text-sauti-teal border border-sauti-teal/20 shadow-sm"
-								: "hover:bg-serene-neutral-50"
-						}`}
-						onClick={() => editor.chain().focus().toggleItalic().run()}
-						title="Italic"
-					>
-						<Italic
-							className={`h-4 w-4 ${editor.isActive("italic") ? "italic" : ""}`}
-						/>
-					</Button>
-					<Button
-						type="button"
-						variant={editor.isActive("underline") ? "secondary" : "ghost"}
-						size="icon"
-						className={`h-8 w-8 ${
-							editor.isActive("underline")
-								? "bg-sauti-teal/10 text-sauti-teal border border-sauti-teal/20 shadow-sm"
-								: "hover:bg-serene-neutral-50"
-						}`}
-						onClick={() => editor.chain().focus().toggleUnderline().run()}
-						title="Underline"
-					>
-						<Underline
-							className={`h-4 w-4 ${editor.isActive("underline") ? "underline" : ""}`}
-						/>
-					</Button>
-					<Button
-						type="button"
-						variant={editor.isActive("strike") ? "secondary" : "ghost"}
-						size="icon"
-						className={`h-8 w-8 ${
-							editor.isActive("strike")
-								? "bg-sauti-teal/10 text-sauti-teal border border-sauti-teal/20 shadow-sm"
-								: "hover:bg-serene-neutral-50"
-						}`}
-						onClick={() => editor.chain().focus().toggleStrike().run()}
-						title="Strikethrough"
-					>
-						<Strikethrough
-							className={`h-4 w-4 ${editor.isActive("strike") ? "line-through" : ""}`}
-						/>
-					</Button>
-					<Separator orientation="vertical" className="h-4" />
-					<Button
-						type="button"
-						variant={editor.isActive("bulletList") ? "secondary" : "ghost"}
-						size="icon"
-						className={`h-8 w-8 ${
-							editor.isActive("bulletList")
-								? "bg-sauti-teal/10 text-sauti-teal border border-sauti-teal/20 shadow-sm"
-								: "hover:bg-serene-neutral-50"
-						}`}
-						onClick={() => editor.chain().focus().toggleBulletList().run()}
-						title="Bullet List"
-					>
-						<List className="h-4 w-4" />
-					</Button>
-					<Button
-						type="button"
-						variant={editor.isActive("orderedList") ? "secondary" : "ghost"}
-						size="icon"
-						className={`h-8 w-8 ${
-							editor.isActive("orderedList")
-								? "bg-sauti-teal/10 text-sauti-teal border border-sauti-teal/20 shadow-sm"
-								: "hover:bg-serene-neutral-50"
-						}`}
-						onClick={() => editor.chain().focus().toggleOrderedList().run()}
-						title="Numbered List"
-					>
-						<ListOrdered className="h-4 w-4" />
-					</Button>
-					<Button
-						type="button"
-						variant={editor.isActive("blockquote") ? "secondary" : "ghost"}
-						size="icon"
-						className={`h-8 w-8 ${
-							editor.isActive("blockquote")
-								? "bg-sauti-teal/10 text-sauti-teal border border-sauti-teal/20 shadow-sm"
-								: "hover:bg-serene-neutral-50"
-						}`}
-						onClick={() => editor.chain().focus().toggleBlockquote().run()}
-						title="Blockquote"
-					>
-						<Quote className="h-4 w-4" />
-					</Button>
-					<Button
-						type="button"
-						variant={editor.isActive("codeBlock") ? "secondary" : "ghost"}
-						size="icon"
-						className={`h-8 w-8 ${
-							editor.isActive("codeBlock")
-								? "bg-sauti-teal/10 text-sauti-teal border border-sauti-teal/20 shadow-sm"
-								: "hover:bg-serene-neutral-50"
-						}`}
-						onClick={() => editor.chain().focus().toggleCodeBlock().run()}
-						title="Code Block"
-					>
-						<Code className="h-4 w-4" />
-					</Button>
-				</div>
-				<div className="flex items-center gap-1.5 flex-wrap" onMouseDown={prevent}>
-					<span className="text-xs font-bold text-serene-neutral-500 uppercase tracking-wider mr-2">Align</span>
-					<Button
-						type="button"
-						variant={editor.isActive({ textAlign: "left" }) ? "secondary" : "ghost"}
-						size="icon"
-						className={`h-8 w-8 ${
-							editor.isActive({ textAlign: "left" })
-								? "bg-sauti-teal/10 text-sauti-teal border border-sauti-teal/20 shadow-sm"
-								: "hover:bg-serene-neutral-50"
-						}`}
-						onClick={() => editor.chain().focus().setTextAlign("left").run()}
-						title="Align Left"
-					>
-						<AlignLeft className="h-4 w-4" />
-					</Button>
-					<Button
-						type="button"
-						variant={editor.isActive({ textAlign: "center" }) ? "secondary" : "ghost"}
-						size="icon"
-						className={`h-8 w-8 ${
-							editor.isActive({ textAlign: "center" })
-								? "bg-sauti-teal/10 text-sauti-teal border border-sauti-teal/20 shadow-sm"
-								: "hover:bg-serene-neutral-50"
-						}`}
-						onClick={() => editor.chain().focus().setTextAlign("center").run()}
-						title="Align Center"
-					>
-						<AlignCenter className="h-4 w-4" />
-					</Button>
-					<Button
-						type="button"
-						variant={editor.isActive({ textAlign: "right" }) ? "secondary" : "ghost"}
-						size="icon"
-						className={`h-8 w-8 ${
-							editor.isActive({ textAlign: "right" })
-								? "bg-sauti-teal/10 text-sauti-teal border border-sauti-teal/20 shadow-sm"
-								: "hover:bg-serene-neutral-50"
-						}`}
-						onClick={() => editor.chain().focus().setTextAlign("right").run()}
-						title="Align Right"
-					>
-						<AlignRight className="h-4 w-4" />
-					</Button>
-					<Button
-						type="button"
-						variant={
-							editor.isActive({ textAlign: "justify" }) ? "secondary" : "ghost"
-						}
-						size="icon"
-						className={`h-8 w-8 ${
-							editor.isActive({ textAlign: "justify" })
-								? "bg-sauti-teal/10 text-sauti-teal border border-sauti-teal/20 shadow-sm"
-								: "hover:bg-serene-neutral-50"
-						}`}
-						onClick={() => editor.chain().focus().setTextAlign("justify").run()}
-						title="Justify"
-					>
-						<AlignJustify className="h-4 w-4" />
-					</Button>
-					<Separator orientation="vertical" className="h-4" />
-					<Button
-						type="button"
-						variant={editor.isActive("link") ? "secondary" : "ghost"}
-						size="icon"
-						className={`h-8 w-8 ${
-							editor.isActive("link")
-								? "bg-sauti-teal/10 text-sauti-teal border border-sauti-teal/20 shadow-sm"
-								: "hover:bg-serene-neutral-50"
-						}`}
-						onClick={insertOrEditLink}
-						title="Insert/Edit Link"
-					>
-						<LinkIcon className="h-4 w-4" />
-					</Button>
-					<input
-						ref={fileInputRef}
-						type="file"
-						accept="image/*"
-						className="hidden"
-						onChange={(e) => {
-							const file = e.target.files?.[0];
-							if (file) void uploadImage(file);
-							// reset input so the same file can be picked again
-							if (fileInputRef.current) fileInputRef.current.value = "";
-						}}
-					/>
-					<Button
-						type="button"
-						variant="ghost"
-						size="icon"
-						className="h-8 w-8 hover:bg-serene-neutral-50"
-						onClick={onPickImage}
-						title="Insert Image"
-					>
-						<ImageIcon className="h-4 w-4" />
-					</Button>
-					<div className="ml-auto flex items-center gap-4">
-						<span className="text-xs font-medium text-serene-neutral-400">
-							{saving ? (
-								<span className="flex items-center gap-1.5">
-									<span className="h-2 w-2 bg-sauti-teal rounded-full animate-pulse" />
-									Saving…
-								</span>
-							) : dirty ? (
-								<span className="text-amber-600">Unsaved changes</span>
-							) : lastSavedAt ? (
-								<span className="text-serene-green-600">Saved {lastSavedAt}</span>
-							) : null}
-						</span>
-						<Button
-							type="button"
-							size="sm"
-							onClick={() => save()}
-							disabled={saving}
-							className="h-9 px-4 bg-sauti-teal hover:bg-sauti-dark text-white font-semibold rounded-xl shadow-sm transition-all duration-200"
-						>
-							<Save className="h-4 w-4 mr-1.5" /> Save Notes
-						</Button>
+			{/* Header area */}
+			<div className="flex items-center justify-between px-4 py-2 border-b border-serene-neutral-100 bg-white">
+				<div className="flex items-center gap-2">
+					<div className="p-1.5 bg-sauti-teal/10 rounded-lg">
+						<FileText className="h-3.5 w-3.5 text-sauti-teal" />
 					</div>
+					<span className="text-[10px] font-bold text-serene-neutral-400 uppercase tracking-widest">Report Journal</span>
+				</div>
+				<div className="flex items-center gap-3">
+					{saving ? (
+						<span className="flex items-center gap-1.5 text-sauti-teal animate-in fade-in duration-300">
+							<Loader2 className="h-3 w-3 animate-spin" />
+							<span className="text-[10px] font-bold uppercase tracking-wider">Saving</span>
+						</span>
+					) : dirty ? (
+						<span className="text-[10px] font-bold text-amber-500 uppercase tracking-wider animate-in fade-in duration-300">Unsaved Changes</span>
+					) : lastSavedAt ? (
+						<span className="flex items-center gap-1.5 text-serene-green-600 animate-in fade-in zoom-in-95 duration-500">
+							<Check className="h-3 w-3" />
+							<span className="text-[10px] font-bold uppercase tracking-wider">Saved at {lastSavedAt}</span>
+						</span>
+					) : null}
+					
+					<Button
+						type="button"
+						variant="ghost"
+						size="sm"
+						onClick={() => save()}
+						disabled={saving || !dirty}
+						className={cn(
+							"h-7 px-3 text-[10px] font-bold uppercase tracking-wider rounded-lg border",
+							dirty 
+								? "bg-sauti-teal text-white hover:bg-sauti-teal/90 border-sauti-teal" 
+								: "text-serene-neutral-400 border-serene-neutral-100"
+						)}
+					>
+						<Save className="h-3 w-3 mr-1.5" /> Save
+					</Button>
 				</div>
 			</div>
 
-			{/* Premium Editor Area */}
-			<div className="flex-1 overflow-hidden bg-white">
-				<EditorContent editor={editor} className="h-full overflow-y-auto p-6" />
+			{/* Toolbar */}
+			<div className="flex items-center gap-1 p-1.5 bg-serene-neutral-50/50 border-b border-serene-neutral-100 overflow-x-auto no-scrollbar scrollbar-hide" onMouseDown={prevent}>
+				<ToolbarButton onClick={() => editor.chain().focus().undo().run()} title="Undo" disabled={!editor.can().undo()}>
+					<Undo2 className="h-3.5 w-3.5" />
+				</ToolbarButton>
+				<ToolbarButton onClick={() => editor.chain().focus().redo().run()} title="Redo" disabled={!editor.can().redo()}>
+					<Redo2 className="h-3.5 w-3.5" />
+				</ToolbarButton>
+				
+				<div className="w-px h-4 bg-serene-neutral-200 mx-1" />
+				
+				<ToolbarButton active={editor.isActive("bold")} onClick={() => editor.chain().focus().toggleBold().run()} title="Bold">
+					<Bold className="h-3.5 w-3.5" />
+				</ToolbarButton>
+				<ToolbarButton active={editor.isActive("italic")} onClick={() => editor.chain().focus().toggleItalic().run()} title="Italic">
+					<Italic className="h-3.5 w-3.5" />
+				</ToolbarButton>
+				<ToolbarButton active={editor.isActive("underline")} onClick={() => editor.chain().focus().toggleUnderline().run()} title="Underline">
+					<Underline className="h-3.5 w-3.5" />
+				</ToolbarButton>
+				<ToolbarButton active={editor.isActive("strike")} onClick={() => editor.chain().focus().toggleStrike().run()} title="Strike">
+					<Strikethrough className="h-3.5 w-3.5" />
+				</ToolbarButton>
+
+				<div className="w-px h-4 bg-serene-neutral-200 mx-1" />
+
+				<ToolbarButton active={editor.isActive("heading", { level: 2 })} onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()} title="H2">
+					<Heading2 className="h-3.5 w-3.5" />
+				</ToolbarButton>
+				<ToolbarButton active={editor.isActive("heading", { level: 3 })} onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()} title="H3">
+					<Heading3 className="h-3.5 w-3.5" />
+				</ToolbarButton>
+
+				<div className="w-px h-4 bg-serene-neutral-200 mx-1" />
+
+				<ToolbarButton active={editor.isActive("bulletList")} onClick={() => editor.chain().focus().toggleBulletList().run()} title="Bullets">
+					<List className="h-3.5 w-3.5" />
+				</ToolbarButton>
+				<ToolbarButton active={editor.isActive("orderedList")} onClick={() => editor.chain().focus().toggleOrderedList().run()} title="Numbers">
+					<ListOrdered className="h-3.5 w-3.5" />
+				</ToolbarButton>
+				<ToolbarButton active={editor.isActive("blockquote")} onClick={() => editor.chain().focus().toggleBlockquote().run()} title="Quote">
+					<Quote className="h-3.5 w-3.5" />
+				</ToolbarButton>
+
+				<div className="w-px h-4 bg-serene-neutral-200 mx-1" />
+
+				<ToolbarButton active={editor.isActive({ textAlign: "left" })} onClick={() => editor.chain().focus().setTextAlign("left").run()} title="Left">
+					<AlignLeft className="h-3.5 w-3.5" />
+				</ToolbarButton>
+				<ToolbarButton active={editor.isActive({ textAlign: "center" })} onClick={() => editor.chain().focus().setTextAlign("center").run()} title="Center">
+					<AlignCenter className="h-3.5 w-3.5" />
+				</ToolbarButton>
+
+				<div className="w-px h-4 bg-serene-neutral-200 mx-1" />
+
+				<ToolbarButton active={editor.isActive("link")} onClick={insertOrEditLink} title="Link">
+					<LinkIcon className="h-3.5 w-3.5" />
+				</ToolbarButton>
+				<ToolbarButton onClick={onPickImage} title="Image">
+					<ImageIcon className="h-3.5 w-3.5" />
+				</ToolbarButton>
+				
+				<input
+					ref={fileInputRef}
+					type="file"
+					accept="image/*"
+					className="hidden"
+					onChange={(e) => {
+						const file = e.target.files?.[0];
+						if (file) void uploadImage(file);
+						if (fileInputRef.current) fileInputRef.current.value = "";
+					}}
+				/>
+			</div>
+
+			{/* Editor Area */}
+			<div className="flex-1 bg-white overflow-hidden">
+				<EditorContent editor={editor} className="h-full overflow-y-auto" />
 			</div>
 		</div>
 	);

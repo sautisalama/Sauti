@@ -30,7 +30,7 @@ export function AppointmentsTab({
 	const loadAppointments = useCallback(async () => {
 		try {
 			const data = await fetchUserAppointments(userId, userType, true);
-			setAppointments(data);
+			setAppointments(data as AppointmentWithDetails[]);
 			onAppointmentsChange?.();
 		} catch (error) {
 			toast({
@@ -64,7 +64,7 @@ useEffect(() => {
 				<div className="">
 					{appointments.map((appointment) => (
 						<AppointmentCard
-							key={appointment.id}
+							key={appointment.appointment_id}
 							appointment={appointment}
 							onStatusUpdate={loadAppointments}
 							userId={userId}

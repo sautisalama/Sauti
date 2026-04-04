@@ -35,7 +35,7 @@ import {
 	AlertCircle
 } from "lucide-react";
 import { useSearchParams, useRouter } from "next/navigation";
-import { SereneBreadcrumb, SereneSectionHeader } from "../_components/SurvivorDashboardComponents";
+import { SereneProviderCard, SereneSectionHeader, SereneBreadcrumb } from "../_components/SereneDashboardUI";
 import {Alert, AlertDescription, AlertTitle	} from "@/components/ui/alert"
 
 interface ProfileData {
@@ -215,7 +215,7 @@ export default function ProfilePage() {
 			</div>
 
             {/* Profile Verification Banner - Just below header */}
-            {(profile?.verification_status === 'rejected' || (profile as any)?.accreditation_notes) && (
+            {(profile?.verification_status === 'rejected' || (profile as any)?.verification_notes) && (
                  <div className="px-4 md:px-8 pt-4">
                      <div className="max-w-6xl mx-auto w-full">
                         <div className="bg-red-50 border border-red-100 rounded-2xl p-4 flex items-start gap-4 animate-in slide-in-from-top-2">
@@ -286,7 +286,7 @@ export default function ProfilePage() {
 						<div className="space-y-4">
 							{/* Header Card - Only shown on Account tab */}
 							{activeSection === 'account' && (
-								<Card className="rounded-[1.75rem] border-serene-neutral-100 shadow-sm overflow-hidden bg-white">
+								<Card className="rounded-xl border-serene-neutral-100 shadow-sm overflow-hidden bg-white">
 									<div className="h-28 sm:h-32 bg-gradient-to-br from-serene-blue-50 via-serene-neutral-50 to-serene-blue-50/30 relative overflow-hidden">
 										<div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(100,140,180,0.08),transparent_70%)]" />
 									</div>
@@ -339,7 +339,7 @@ export default function ProfilePage() {
 										</Alert>
 									)}
 
-									<Card className="rounded-[2rem] border-serene-neutral-200/60 shadow-sm bg-white overflow-hidden">
+									<Card className="rounded-2xl border-serene-neutral-200/60 shadow-sm bg-white overflow-hidden">
 										<CardHeader className="border-b border-serene-neutral-100 pb-4 pt-6 px-6 sm:px-8">
 											<CardTitle className="text-lg text-serene-neutral-900">Basic Information</CardTitle>
 										</CardHeader>
@@ -381,7 +381,7 @@ export default function ProfilePage() {
 							{/* Section: Accessibility */}
 							{activeSection === 'accessibility' && (
 								<div className="space-y-6">
-									<Card className="rounded-[2rem] border-serene-neutral-200 shadow-sm bg-white overflow-hidden">
+									<Card className="rounded-2xl border-serene-neutral-200 shadow-sm bg-white overflow-hidden">
 										<CardHeader className="border-b border-serene-neutral-100 pb-6">
 											<CardTitle className="flex items-center gap-2 text-xl text-serene-neutral-900">
 												<Contrast className="h-6 w-6 text-serene-blue-500" />

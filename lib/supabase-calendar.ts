@@ -56,7 +56,12 @@ export class SupabaseCalendarService {
 	/**
 	 * Update calendar event (mock implementation)
 	 */
-	async updateEvent(userId: string, eventId: string, eventData: any) {
+	async updateEvent(
+		userId: string,
+		eventId: string,
+		eventData: Record<string, unknown>
+	) {
+
 		console.log("Calendar integration is optional - mock update");
 		return { id: eventId, ...eventData };
 	}

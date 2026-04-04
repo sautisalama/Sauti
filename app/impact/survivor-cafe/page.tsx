@@ -71,7 +71,7 @@ export default function SurvivorCafePage() {
                                 </p>
                             </div>
                             
-                            <div className="bg-sauti-dark text-white p-10 rounded-[40px] shadow-2xl relative overflow-hidden">
+                            <div className="bg-sauti-dark text-white p-10 rounded-2xl shadow-2xl relative overflow-hidden">
                                 <div className="absolute top-0 right-0 w-64 h-64 bg-sauti-teal rounded-full blur-[80px] opacity-20" />
                                 <h3 className="text-2xl font-bold text-sauti-yellow mb-8 relative z-10">Join the Community</h3>
                                 <div className="space-y-6 relative z-10">

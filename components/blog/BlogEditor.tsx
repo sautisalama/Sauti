@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useCallback, useMemo } from 'react';
-import { useEditor, EditorContent, BubbleMenu } from '@tiptap/react';
+import { useEditor, EditorContent} from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Placeholder from '@tiptap/extension-placeholder';
 import Link from '@tiptap/extension-link';
@@ -94,7 +94,7 @@ export function BlogEditor({
       .trim();
   };
 
-  const handleSave = async (status: 'draft' | 'pending' = 'draft') => {
+   const handleSave = async (status: 'draft' | 'pending_review' = 'draft') => {
     if (!title.trim() || !editor) return;
     
     const saving = status === 'draft';
@@ -139,7 +139,7 @@ export function BlogEditor({
 
       setLastSaved(new Date());
       
-      if (status === 'pending') {
+      if (status === 'pending_review') {
         onPublished?.(result);
       } else {
         onSaved?.(result);
@@ -213,7 +213,7 @@ export function BlogEditor({
             <Button
               size="sm"
               className="bg-serene-blue-500 hover:bg-serene-blue-600"
-              onClick={() => handleSave('pending')}
+              onClick={() => handleSave('pending_review')}
               disabled={isPublishing || !title.trim() || !editor.getText().trim()}
             >
               {isPublishing ? (

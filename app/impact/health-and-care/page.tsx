@@ -34,7 +34,7 @@ export default function HealthAndCarePage() {
                                      </Link>
                                 </div>
                             </div>
-                            <div className="relative aspect-[4/3] rounded-[32px] md:rounded-[60px] overflow-hidden shadow-3xl">
+                            <div className="relative aspect-[4/3] rounded-2xl md:rounded-[60px] overflow-hidden shadow-3xl">
                                 <Image src="/events/programs/survivors cafe program.png" alt="Survivor Cafe Program" fill className="object-cover" />
                             </div>
                         </div>
@@ -49,7 +49,7 @@ export default function HealthAndCarePage() {
                             <FeatureCard icon={<Users className="w-6 h-6 md:w-8 md:h-8 text-sauti-yellow" />} title="Survivor Cafes" description="Peer-to-peer support networks for sustained mental well-being." />
                         </div>
 
-                        <div className="bg-[#fff1f2] rounded-[32px] md:rounded-[60px] p-8 md:p-16 lg:p-20 flex flex-col md:flex-row gap-8 lg:gap-16 items-center">
+                        <div className="bg-[#fff1f2] rounded-2xl md:rounded-[60px] p-8 md:p-16 lg:p-20 flex flex-col md:flex-row gap-8 lg:gap-16 items-center">
                             <div className="md:w-1/2">
                                 <h2 className="text-2xl md:text-4xl lg:text-5xl font-black text-sauti-dark mb-6 md:mb-8 uppercase tracking-tighter">Survivor Cafes</h2>
                                 <p className="text-lg md:text-xl text-gray-700 leading-relaxed mb-6 md:mb-8 font-medium">
@@ -71,7 +71,7 @@ export default function HealthAndCarePage() {
                                     </Button>
                                 </Link>
                             </div>
-                            <div className="md:w-1/2 relative aspect-video rounded-2xl md:rounded-3xl overflow-hidden shadow-2xl">
+                            <div className="md:w-1/2 relative aspect-video rounded-2xl md:rounded-2xl overflow-hidden shadow-2xl">
                                 <Image src="/events/impact/Learning Program - 748 registered learners.png" alt="Survivor Cafe Session" fill className="object-cover" />
                             </div>
                         </div>
@@ -85,8 +85,8 @@ export default function HealthAndCarePage() {
 
 function FeatureCard({ icon, title, description }: { icon: React.ReactNode, title: string, description: string }) {
     return (
-        <div className="p-6 md:p-8 rounded-[32px] md:rounded-[40px] bg-white border-2 border-gray-50 hover:border-sauti-yellow/20 hover:shadow-2xl transition-all group">
-            <div className="w-12 h-12 md:w-16 md:h-16 rounded-[16px] md:rounded-2xl bg-gray-50 flex items-center justify-center mb-6">{icon}</div>
+        <div className="p-6 md:p-8 rounded-2xl md:rounded-2xl bg-white border-2 border-gray-50 hover:border-sauti-yellow/20 hover:shadow-2xl transition-all group">
+            <div className="w-12 h-12 md:w-16 md:h-16 rounded-lg md:rounded-2xl bg-gray-50 flex items-center justify-center mb-6">{icon}</div>
             <h3 className="text-xl md:text-2xl font-black text-sauti-blue mb-4 uppercase tracking-tight">{title}</h3>
             <p className="text-sm md:text-base text-gray-500 font-medium leading-relaxed">{description}</p>
         </div>

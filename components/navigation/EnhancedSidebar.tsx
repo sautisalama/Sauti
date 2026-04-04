@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import logo from "@/public/logo-small.png";
 import { usePathname, useRouter } from "next/navigation";
 import {
 	LayoutDashboard,
@@ -25,7 +26,8 @@ import {
 	Megaphone,
 	Shield,
 	BookOpen, 
-	Building2
+	Building2,
+    Network
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -71,6 +73,7 @@ interface SidebarItem {
 	separator?: boolean;
 	survivorOnly?: boolean;
 	professionalOnly?: boolean;
+	showDot?: boolean;
 }
 
 interface EnhancedSidebarProps {
@@ -107,7 +110,19 @@ export function EnhancedSidebar({
     const hasAcceptedPolicies = !!(profile?.policies as any)?.all_policies_accepted;
     const needsOnboarding = !profile?.user_type || 
         !hasAcceptedPolicies ||
-        ((profile.user_type === 'professional' || profile.user_type === 'ngo') && !profile.professional_title);
+        ((profile?.user_type === 'professional' || profile?.user_type === 'ngo') && !profile?.professional_title);
+
+    let setupProgress = 25;
+    if (needsOnboarding && profile) {
+        const isProRole = profile.user_type === 'professional' || profile.user_type === 'ngo';
+        const totalSteps = isProRole ? 4 : 2;
+        let stepCount = 0;
+        if (profile.user_type) stepCount = 1;
+        if (profile.user_type && hasAcceptedPolicies) stepCount = 2;
+        if (isProRole && hasAcceptedPolicies && profile.professional_title) stepCount = 3;
+        
+        setupProgress = ((stepCount + 1) / totalSteps) * 100;
+    }
 	useEffect(() => {
 		const handleResize = () => {
 			if (window.innerWidth < 1024) {
@@ -152,14 +167,16 @@ export function EnhancedSidebar({
 					.select("id")
 					.eq("user_id", uid);
 				const ids = (services || []).map((s: any) => s.id);
-				if (ids.length === 0) {
-					if (!cancelled) setCasesCount(0);
-					return;
-				}
-				const { count } = await supabase
-					.from("matched_services")
-					.select("id", { count: "exact", head: true })
-					.in("service_id", ids);
+
+                let query = supabase.from("matched_services").select("id", { count: "exact", head: true });
+                
+                if (ids.length > 0) {
+                    query = query.or(`service_id.in.(${ids.join(',')}),hrd_profile_id.eq.${uid}`);
+                } else {
+                    query = query.eq("hrd_profile_id", uid);
+                }
+
+				const { count } = await query;
 				if (!cancelled) setCasesCount(count || 0);
 			} catch {
 				// ignore
@@ -256,6 +273,13 @@ export function EnhancedSidebar({
 					section: "main",
 				},
 				{
+					id: "matching",
+					label: "Matching Engine",
+					icon: Network,
+					href: "/dashboard/admin/matching",
+					section: "main",
+				},
+				{
 					id: "chat",
 					label: "Messages",
 					icon: MessageCircle,
@@ -267,7 +291,14 @@ export function EnhancedSidebar({
 							: undefined,
 					section: "main",
 				},
-
+				{
+					id: "calendar",
+					label: "Calendar",
+					icon: Calendar,
+					href: "/dashboard/profile?section=calendar", // Link to calendar settings for now
+					section: "main",
+					showDot: !dash?.data?.profile?.google_calendar_token,
+				},
 				{
 					id: "report",
 					label: "Report Abuse",
@@ -318,6 +349,14 @@ export function EnhancedSidebar({
 					href: "/dashboard/resources",
 					section: "main",
 				},
+				{
+					id: "calendar",
+					label: "Calendar",
+					icon: Calendar,
+					href: "/dashboard/profile?section=calendar",
+					section: "main",
+					showDot: !dash?.data?.profile?.google_calendar_token,
+				},
 			];
 			return [
 				...survivorMain,
@@ -361,6 +400,14 @@ export function EnhancedSidebar({
 					icon: FileText,
 					href: "/dashboard/resources",
 					section: "main",
+				},
+				{
+					id: "calendar",
+					label: "Calendar",
+					icon: Calendar,
+					href: "/dashboard/profile?section=calendar",
+					section: "main",
+					showDot: !dash?.data?.profile?.google_calendar_token,
 				},
 				{
 					id: "services",
@@ -432,14 +479,17 @@ export function EnhancedSidebar({
 						)}
 					/>
 					{item.badge && item.badge > 0 && (
-						<Badge
-							className={cn(
-								"absolute -top-1.5 -right-1.5 h-4 w-4 flex items-center justify-center p-0 text-[9px] font-bold shadow-sm",
-								"bg-serene-red-500 text-white border border-white dark:border-neutral-950 min-w-[16px]" // Red for urgency/notification typically more standard, but using brand red if available or error red
-							)}
-						>
-							{item.badge > 99 ? "99" : item.badge}
-						</Badge>
+										<Badge
+											className={cn(
+												"absolute -top-1.5 -right-1.5 h-4 w-4 flex items-center justify-center p-0 text-[10px] font-black shadow-sm",
+												"bg-red-600 text-white border border-white min-w-[18px] ring-2 ring-red-100 animate-in zoom-in duration-300" 
+											)}
+										>
+											{item.badge > 99 ? "99" : item.badge}
+										</Badge>
+					)}
+					{item.showDot && (
+						<div className="absolute -top-0.5 -right-0.5 h-2.5 w-2.5 bg-serene-blue-500 rounded-full border-2 border-white dark:border-neutral-900 animate-pulse" />
 					)}
 				</div>
 
@@ -512,11 +562,10 @@ export function EnhancedSidebar({
 						{!isCollapsed && (
 						<Link href="/dashboard" className="flex items-center gap-3">
 							<Image
-								src="/logo-small.png"
+								src={logo}
 								alt="Sauti Salama"
-								width={32}
-								height={32}
-								className="rounded-lg"
+								priority
+								className="rounded-lg h-8 w-auto object-contain"
 							/>
 							<div>
 								<h2 className="text-lg font-bold text-sauti-blue">Sauti Salama</h2>
@@ -528,11 +577,10 @@ export function EnhancedSidebar({
 						{isCollapsed && (
 						<Link href="/dashboard" className="flex justify-center w-full">
 							<Image
-								src="/logo-small.png"
+								src={logo}
 								alt="Sauti Salama"
-								width={32}
-								height={32}
-								className="rounded-lg"
+								priority
+								className="rounded-lg h-8 w-auto object-contain"
 							/>
 						</Link>
 					)}
@@ -675,7 +723,7 @@ export function EnhancedSidebar({
 				<div className="flex-1 flex flex-col justify-between px-2 py-4">
                     {needsOnboarding && !isCollapsed ? (
                          <div className="px-3 py-4 space-y-4">
-                            <div className="bg-serene-blue-50/50 border border-serene-blue-100 rounded-[2rem] p-5 space-y-4 shadow-sm">
+                            <div className="bg-serene-blue-50/50 border border-serene-blue-100 rounded-2xl p-5 space-y-4 shadow-sm">
                                 <div className="h-10 w-10 rounded-xl bg-serene-blue-600 flex items-center justify-center shadow-lg shadow-serene-blue-200 transition-transform hover:scale-105">
                                     <Shield className="h-5 w-5 text-white" />
                                 </div>
@@ -686,10 +734,10 @@ export function EnhancedSidebar({
                                     </p>
                                 </div>
                                 <div className="pt-2">
-                                     <div className="h-2 w-full bg-serene-blue-100/50 rounded-full overflow-hidden shadow-inner">
+                                     <div className="h-1.5 w-full bg-serene-neutral-100 rounded-full overflow-hidden shadow-inner border border-serene-neutral-200/50">
                                         <div 
-											className="h-full bg-serene-blue-600 rounded-full transition-all duration-1000" 
-											style={{ width: '35%' }}
+											className="h-full bg-gradient-to-r from-serene-blue-400 to-serene-blue-600 transition-all duration-700 ease-out shadow-sm" 
+											style={{ width: `${setupProgress}%` }}
 										/>
                                      </div>
                                 </div>
@@ -702,14 +750,16 @@ export function EnhancedSidebar({
                         </div>
                     ) : needsOnboarding && isCollapsed ? (
 						<div className="flex flex-col items-center py-6 gap-6">
-                             <Tooltip>
-								<TooltipTrigger asChild>
-									<div className="h-10 w-10 rounded-xl bg-serene-blue-100 flex items-center justify-center cursor-help">
-										<Shield className="h-5 w-5 text-serene-blue-600" />
-									</div>
-								</TooltipTrigger>
-								<TooltipContent side="right">Setup in Progress</TooltipContent>
-							 </Tooltip>
+							<TooltipProvider>
+								<Tooltip>
+									<TooltipTrigger asChild>
+										<div className="h-10 w-10 rounded-xl bg-serene-blue-100 flex items-center justify-center cursor-help">
+											<Shield className="h-5 w-5 text-serene-blue-600" />
+										</div>
+									</TooltipTrigger>
+									<TooltipContent side="right">Setup in Progress</TooltipContent>
+								</Tooltip>
+							</TooltipProvider>
 						</div>
 					) : (
 					<div className="space-y-1">

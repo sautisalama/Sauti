@@ -30,6 +30,7 @@ export function VoiceRecorderEnhanced({
 	const sourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
 	const chunksRef = useRef<Blob[]>([]);
 	const audioRef = useRef<HTMLAudioElement | null>(null);
+	const recordingRef = useRef(false);
 
 	const [permissionError, setPermissionError] = useState<string | null>(null);
 	const [recording, setRecording] = useState(false);
@@ -58,6 +59,7 @@ export function VoiceRecorderEnhanced({
 			mediaRecorderRef.current?.stream.getTracks().forEach((t) => t.stop());
 		} catch {}
 		mediaRecorderRef.current = null;
+		recordingRef.current = false;
 		stopTimer();
 		cleanupAudioGraph();
 	};
@@ -144,12 +146,18 @@ export function VoiceRecorderEnhanced({
 					cleanupAudioGraph();
 				}
 			};
-			mr.start();
+			mr.start(100); // 100ms timeslice to ensure data flows
 			mediaRecorderRef.current = mr;
-
-			const Ctor: any =
-				(window as any).AudioContext || (window as any).webkitAudioContext;
+			setRecording(true);
+			recordingRef.current = true;
+			setPaused(false);
+			setElapsed(0);
+			startTimer();
+			
+			// Set up Audio Visualizer
+			const Ctor: any = (window as any).AudioContext || (window as any).webkitAudioContext;
 			const ctx = new Ctor();
+			if (ctx.state === 'suspended') await ctx.resume();
 			audioContextRef.current = ctx as AudioContext;
 			const analyser = ctx.createAnalyser();
 			analyser.fftSize = 512;
@@ -160,6 +168,7 @@ export function VoiceRecorderEnhanced({
 
 			const dataArray = new Uint8Array(analyser.frequencyBinCount);
 			const update = () => {
+				if (!recordingRef.current) return;
 				analyser.getByteTimeDomainData(dataArray);
 				const step = Math.floor(dataArray.length / 32);
 				const next: number[] = [];
@@ -175,11 +184,6 @@ export function VoiceRecorderEnhanced({
 				rafRef.current = requestAnimationFrame(update);
 			};
 			rafRef.current = requestAnimationFrame(update);
-
-			setRecording(true);
-			setPaused(false);
-			setElapsed(0);
-			startTimer();
 		} catch (err: any) {
 			console.error(err);
 			if (err?.name === "NotAllowedError" || err?.name === "NotFoundError") {
@@ -221,6 +225,7 @@ export function VoiceRecorderEnhanced({
 			mr.stop();
 			mr.stream.getTracks().forEach((t) => t.stop());
 			setRecording(false);
+			recordingRef.current = false;
 			setPaused(false);
 			stopTimer();
 			if (rafRef.current) cancelAnimationFrame(rafRef.current);

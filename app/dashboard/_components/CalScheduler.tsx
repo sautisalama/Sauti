@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Calendar, Clock, Globe, Settings } from 'lucide-react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from '@/components/ui/dialog';
 
 interface CalSchedulerProps {
   professionalId: string;
@@ -91,17 +91,28 @@ export function CalScheduler({ professionalId, calLink }: CalSchedulerProps) {
                   Configure
                 </Button>
               </DialogTrigger>
-              <DialogContent className="max-w-md">
-                <DialogHeader>
-                  <DialogTitle>Scheduling Configuration</DialogTitle>
-                </DialogHeader>
-                <div className="space-y-4">
-                  <p className="text-sm text-gray-600">
-                    Configure your availability, meeting types, and scheduling preferences.
-                  </p>
+              <DialogContent className="max-w-md bg-white rounded-[2rem] p-0 overflow-hidden border-0 shadow-2xl">
+                <div className="p-8 pb-0 border-b border-slate-50">
+                  <DialogHeader>
+                    <DialogTitle className="text-2xl font-bold flex items-center gap-3 text-slate-900">
+                      <Settings className="h-6 w-6 text-teal-600" />
+                      Configure Scheduler
+                    </DialogTitle>
+                    <DialogDescription className="text-slate-500 font-medium pt-1">
+                      Manage your availability and meeting preferences.
+                    </DialogDescription>
+                  </DialogHeader>
+                </div>
+                <div className="p-8 space-y-6">
+                  <div className="bg-slate-50 rounded-xl p-4 flex gap-3">
+                    <Calendar className="h-5 w-5 text-slate-400 shrink-0 mt-0.5" />
+                    <p className="text-sm text-slate-600 leading-relaxed font-medium">
+                      Configure your official availability, meeting types, and scheduling preferences directly on your Cal.com dashboard.
+                    </p>
+                  </div>
                   <Button 
                     onClick={() => window.open(`https://cal.com/${embedLink}`, '_blank')}
-                    className="w-full"
+                    className="w-full h-14 rounded-2xl bg-teal-600 hover:bg-teal-700 text-white font-bold shadow-lg shadow-teal-600/20"
                   >
                     Open Cal.com Dashboard
                   </Button>

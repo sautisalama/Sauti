@@ -1,4 +1,4 @@
-"use client";
+import { format } from "date-fns";
 
 import {
 	CalendarDays,
@@ -99,6 +99,16 @@ function getMatchStatusColor(matchStatus?: string) {
 	}
 }
 
+function formatAppointmentDate(d?: string | null) {
+	if (!d) return "";
+	try {
+		const date = new Date(d);
+		return format(date, "EEEE, MMM d"); // e.g., Monday, Apr 4
+	} catch {
+		return "";
+	}
+}
+
 function formatDate(d?: string | null) {
 	if (!d) return "";
 	try {
@@ -109,33 +119,13 @@ function formatDate(d?: string | null) {
 		const diffHours = Math.ceil(diffTime / (1000 * 60 * 60));
 		const diffMinutes = Math.ceil(diffTime / (1000 * 60));
 
-		// Show relative time with actual time
-		let relativeTime = "";
-		if (diffMinutes < 60) {
-			relativeTime = diffMinutes <= 1 ? "Just now" : `${diffMinutes}m ago`;
-		} else if (diffHours < 24) {
-			relativeTime = `${diffHours}h ago`;
-		} else if (diffDays === 1) {
-			relativeTime = "Yesterday";
-		} else if (diffDays < 7) {
-			relativeTime = `${diffDays}d ago`;
-		} else if (diffDays < 30) {
-			relativeTime = `${Math.ceil(diffDays / 7)}w ago`;
-		} else {
-			relativeTime = `${Math.ceil(diffDays / 30)}mo ago`;
-		}
-
-		// Format actual time
-		const actualTime = date.toLocaleTimeString([], {
-			hour: "2-digit",
-			minute: "2-digit",
-		});
-		const actualDate = date.toLocaleDateString([], {
-			month: "short",
-			day: "numeric",
-		});
-
-		return `${relativeTime} • ${actualDate} ${actualTime}`;
+		// Relative for header is fine
+		if (diffMinutes < 60) return diffMinutes <= 1 ? "Just now" : `${diffMinutes}m ago`;
+		if (diffHours < 24) return `${diffHours}h ago`;
+		if (diffDays === 1) return "Yesterday";
+		if (diffDays < 7) return `${diffDays}d ago`;
+		
+		return format(date, "MMM d, yyyy");
 	} catch {
 		return String(d);
 	}
@@ -330,7 +320,7 @@ export function ReportCard({
 						<div className="flex items-center gap-1 text-xs text-gray-600">
 							<CalendarDays className="h-3 w-3" />
 							<span className="font-medium">
-								{formatDate(appointment.appointment_date)}
+								{formatAppointmentDate(appointment.appointment_date)}
 							</span>
 							<div className="flex items-center gap-1">
 								{getStatusIcon(appointment.status)}

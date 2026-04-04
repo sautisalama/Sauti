@@ -15,13 +15,12 @@ export async function fetchUserReports(
 			.select(`
 				*,
 				matched_services (
-					match_status_type,
+					*,
 					service_details:support_services!matched_services_service_id_fkey (
-						name
+						*
 					),
-					appointments:appointments!appointments_matched_services_fkey (
-						appointment_date,
-						status
+					appointments (
+						*
 					)
 				)
 			`)

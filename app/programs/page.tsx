@@ -145,7 +145,7 @@ function ProgramSection({ number, icon, title, subtitle, description, benefits, 
 				</div>
 				<h3 className="text-2xl md:text-4xl lg:text-6xl font-bold text-sauti-dark mb-4 md:mb-6">{title}</h3>
 				<p className="text-lg md:text-2xl text-sauti-yellow font-bold mb-6 md:mb-10">{subtitle}</p>
-				<div className="p-6 md:p-10 bg-gray-50 rounded-[32px] md:rounded-[60px] relative overflow-hidden mb-8 md:mb-12">
+				<div className="p-6 md:p-10 bg-gray-50 rounded-2xl md:rounded-[60px] relative overflow-hidden mb-8 md:mb-12">
 					<div className="text-sauti-teal mb-6 md:mb-8">{icon}</div>
 					<p className="text-base md:text-xl text-gray-700 leading-relaxed font-medium">
 						{description}
@@ -174,7 +174,7 @@ function ProgramSection({ number, icon, title, subtitle, description, benefits, 
 				<h4 className="text-xs md:text-sm font-black text-gray-400 uppercase tracking-[0.2em] mb-4 md:mb-8">Key Components</h4>
 				<ul className="space-y-4 md:space-y-6">
 					{benefits.map((benefit, i) => (
-						<li key={i} className="flex items-center gap-3 md:gap-6 p-3 md:p-4 rounded-2xl md:rounded-3xl hover:bg-gray-50 transition-colors border-b border-gray-100">
+						<li key={i} className="flex items-center gap-3 md:gap-6 p-3 md:p-4 rounded-2xl md:rounded-2xl hover:bg-gray-50 transition-colors border-b border-gray-100">
 							<div className="w-8 h-8 md:w-14 md:h-14 rounded-full bg-sauti-teal text-white flex items-center justify-center font-bold shadow-lg shrink-0">
 								<ArrowRight className="w-4 h-4 md:w-6 md:h-6" />
 							</div>

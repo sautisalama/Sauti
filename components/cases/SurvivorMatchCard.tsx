@@ -123,7 +123,7 @@ export function SurvivorMatchCard({ match, onUpdate }: SurvivorMatchCardProps) {
 
   return (
     <>
-      <Card className="overflow-hidden rounded-3xl border-serene-neutral-100/50 bg-white shadow-sm hover:shadow-md transition-all">
+      <Card className="overflow-hidden rounded-2xl border-serene-neutral-100/50 bg-white shadow-sm hover:shadow-md transition-all">
         {/* Status Bar */}
         <div className={`h-1.5 ${match.match_status_type === 'accepted' ? 'bg-serene-green-500' : match.match_status_type === 'pending_survivor' ? 'bg-serene-blue-500' : 'bg-serene-neutral-200'}`} />
         

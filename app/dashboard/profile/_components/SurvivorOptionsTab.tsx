@@ -29,7 +29,7 @@ import {
 interface MatchedService {
   id: string;
   status: string;
-  created_at: string;
+  match_date: string;
   provider?: {
     id: string;
     first_name: string | null;
@@ -74,13 +74,17 @@ export function SurvivorOptionsTab({
     try {
       // Create a support request for provider change
       const { error } = await supabase
-        .from('support_requests')
+        .from('notifications')
         .insert({
-          user_id: userId,
-          report_id: reportId,
-          request_type: 'provider_change',
-          reason: changeReason.trim(),
-          status: 'pending'
+          title: 'Provider Change Request',
+          message: `Survivor requested a provider change. Reason: ${changeReason.trim().substring(0, 50)}${changeReason.length > 50 ? '...' : ''}`,
+          type: 'provider_change_request',
+          metadata: {
+            user_id: userId,
+            report_id: reportId,
+            reason: changeReason.trim(),
+            status: 'pending'
+          }
         });
 
       if (!error) {
@@ -177,7 +181,7 @@ export function SurvivorOptionsTab({
                       </div>
                     )}
                     <p className="text-xs text-serene-neutral-400 pt-2">
-                      Matched on {new Date(match.created_at).toLocaleDateString()}
+                      Matched on {new Date(match.match_date).toLocaleDateString()}
                     </p>
                   </div>
                 </div>

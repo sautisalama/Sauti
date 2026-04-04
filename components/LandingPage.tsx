@@ -45,8 +45,6 @@ import { CircledText } from "@/components/ui/CircledText";
 export function LandingPage() {
 	const [isAuthenticated, setIsAuthenticated] = useState(false);
 	const supabase = createClient();
-	const url = process.env.NEXT_PUBLIC_APP_URL!;
-
 	useEffect(() => {
 		const checkAuth = async () => {
 			const {
@@ -76,7 +74,7 @@ export function LandingPage() {
 						<div className="grid lg:grid-cols-2 gap-6 items-stretch">
 							{/* Left Column */}
 							<div className="flex flex-col gap-6">
-								<div className="bg-sauti-dark rounded-[32px] md:rounded-[40px] px-6 py-10 md:px-8 md:py-16 flex flex-col justify-center flex-1 min-h-[400px] md:min-h-[500px] relative overflow-hidden">
+								<div className="bg-sauti-dark rounded-2xl md:rounded-2xl px-6 py-10 md:px-8 md:py-16 flex flex-col justify-center flex-1 min-h-[400px] md:min-h-[500px] relative overflow-hidden">
                                     <div className="absolute top-0 right-0 w-64 h-64 bg-sauti-teal/20 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
 									<span className="relative z-10 inline-flex w-fit px-4 py-2 rounded-full bg-sauti-teal/20 text-white text-sm font-bold mb-8 uppercase tracking-wider mx-auto lg:mx-0 border border-sauti-teal/30">
 										Safety, Care, and Justice.
@@ -97,7 +95,7 @@ export function LandingPage() {
 													Get Support Now
 												</Button>
 											</DialogTrigger>
-											<DialogContent className="max-w-4xl p-0 overflow-hidden rounded-[24px] md:rounded-[32px] h-[90vh] min-h-[600px]">
+											<DialogContent className="max-w-4xl p-0 overflow-hidden rounded-xl md:rounded-2xl h-[90vh] min-h-[600px]">
 												<DialogTitle className="sr-only">Report Abuse</DialogTitle>
 												<DialogDescription className="sr-only">
 													Submit a report about an incident. Your information is secure and encrypted.
@@ -119,7 +117,7 @@ export function LandingPage() {
 								</div>
 
 								{/* Trust Banner */}
-								<div className="bg-sauti-yellow/50 rounded-[24px] md:rounded-[32px] p-6 md:p-10 flex flex-col sm:flex-row items-center justify-between shadow-lg gap-6">
+								<div className="bg-sauti-yellow/50 rounded-xl md:rounded-2xl p-6 md:p-10 flex flex-col sm:flex-row items-center justify-between shadow-lg gap-6">
                                     <div className="text-center sm:text-left">
                                         <h3 className="font-sans text-xl md:text-2xl font-bold text-sauti-dark mb-1 md:mb-2 tracking-tight">
                                             How can we help?
@@ -143,7 +141,7 @@ export function LandingPage() {
 							</div>
 
 							{/* Right - Image with Chat Bubbles */}
-							<div className="bg-[#f2f1ef] rounded-[32px] md:rounded-[40px] overflow-hidden flex items-end justify-center min-h-[400px] md:min-h-[500px] relative p-6 md:p-10">
+							<div className="bg-[#f2f1ef] rounded-2xl md:rounded-2xl overflow-hidden flex items-end justify-center min-h-[400px] md:min-h-[500px] relative p-6 md:p-10">
 								<div className="relative w-full h-full flex items-end justify-center">
 									<Image
 										src="/landing/team.png"
@@ -151,24 +149,25 @@ export function LandingPage() {
 										width={800}
 										height={600}
 										className="w-full h-auto max-h-[80%] object-contain object-bottom grayscale contrast-125 mix-blend-multiply"
+										priority
 									/>
                                     
                                     {/* Speech Bubbles Overlay */}
 									<div className="absolute inset-0 pointer-events-none">
 										<div className="absolute top-0 left-0 w-16 md:w-24 h-auto opacity-90" style={{ filter: 'hue-rotate(330deg) saturate(1.2)' }}>
-											<Image src="/landing/chat-bubble.webp" alt="" width={100} height={100} className="w-full h-auto" />
+											<Image src="/landing/chat-bubble.webp" alt="" width={100} height={100} className="w-full h-auto" style={{ width: "auto" }} />
 										</div>
 										<div className="absolute top-4 left-[20%] w-20 md:w-28 h-auto opacity-85 -scale-x-100" style={{ filter: 'hue-rotate(240deg) saturate(1.5)' }}>
-											<Image src="/landing/chat-bubble.webp" alt="" width={120} height={120} className="w-full h-auto" />
+											<Image src="/landing/chat-bubble.webp" alt="" width={120} height={120} className="w-full h-auto" style={{ width: "auto" }} />
 										</div>
 										<div className="absolute top-0 right-[25%] w-18 md:w-24 h-auto opacity-90" style={{ filter: 'hue-rotate(180deg) saturate(1.3)' }}>
-											<Image src="/landing/chat-bubble.webp" alt="" width={100} height={100} className="w-full h-auto" />
+											<Image src="/landing/chat-bubble.webp" alt="" width={100} height={100} className="w-full h-auto" style={{ width: "auto" }} />
 										</div>
 										<div className="absolute top-6 right-0 w-14 md:w-18 h-auto opacity-85 -scale-x-100" style={{ filter: 'hue-rotate(300deg) saturate(1.4)' }}>
-											<Image src="/landing/chat-bubble.webp" alt="" width={100} height={100} className="w-full h-auto" />
+											<Image src="/landing/chat-bubble.webp" alt="" width={100} height={100} className="w-full h-auto" style={{ width: "auto" }} />
 										</div>
 										<div className="absolute top-1/3 left-1/2 -translate-x-1/2 w-14 md:w-20 h-auto opacity-80" style={{ filter: 'hue-rotate(260deg) saturate(1.2)' }}>
-											<Image src="/landing/chat-bubble.webp" alt="" width={80} height={80} className="w-full h-auto" />
+											<Image src="/landing/chat-bubble.webp" alt="" width={80} height={80} className="w-full h-auto" style={{ width: "auto" }} />
 										</div>
 									</div>
 								</div>
@@ -186,7 +185,7 @@ export function LandingPage() {
 								Our <CircledText circleColor="#F4B400">Story</CircledText>
 							</h2>
 						</div>
-						<div className="bg-sauti-teal-light/30 rounded-[32px] md:rounded-[60px] p-6 md:p-12 lg:p-24 relative overflow-hidden">
+						<div className="bg-sauti-teal-light/30 rounded-2xl md:rounded-[60px] p-6 md:p-12 lg:p-24 relative overflow-hidden">
 							<div className="grid lg:grid-cols-2 gap-16 lg:gap-24 items-start relative z-10">
 								<div>
 									<h2 className="text-3xl md:text-5xl lg:text-7xl font-black text-sauti-dark mb-4 md:mb-6 leading-[1.1] tracking-tight">
@@ -292,7 +291,7 @@ export function LandingPage() {
                 {/* 4. DIGITAL PLATFORM (STAY CONNECTED) */}
 				<div className="py-12 md:py-20 bg-white">
 					<div className="container px-4">
-						<div className="bg-sauti-dark rounded-[32px] md:rounded-[80px] p-8 md:p-16 lg:p-24 flex flex-col lg:flex-row gap-12 md:gap-20 items-center text-white overflow-hidden relative">
+						<div className="bg-sauti-dark rounded-2xl md:rounded-[80px] p-8 md:p-16 lg:p-24 flex flex-col lg:flex-row gap-12 md:gap-20 items-center text-white overflow-hidden relative">
 							<div className="lg:w-1/2 relative z-10">
                                 <span className="inline-block rounded-full px-4 py-1 text-xs md:text-sm font-bold bg-sauti-yellow text-sauti-dark mb-4 md:mb-6 uppercase tracking-wider">
                                     Digital Infrastructure
@@ -351,7 +350,7 @@ export function LandingPage() {
 								</div>
 
 								{/* Mobile Mockup */}
-								<div className="absolute bottom-4 right-4 w-[140px] lg:w-[160px] aspect-[9/19] bg-gray-900 rounded-[2rem] border-[6px] border-gray-900 shadow-2xl overflow-hidden z-20 transform translate-y-4 hover:translate-y-0 transition-transform duration-500">
+								<div className="absolute bottom-4 right-4 w-[140px] lg:w-[160px] aspect-[9/19] bg-gray-900 rounded-2xl border-[6px] border-gray-900 shadow-2xl overflow-hidden z-20 transform translate-y-4 hover:translate-y-0 transition-transform duration-500">
 									<div className="relative w-full h-full bg-white">
 										<Image src="/platform/sauti salama - survivor dashboard - mobile.png" alt="Mobile App" fill className="object-cover" />
 									</div>
@@ -373,10 +372,10 @@ export function LandingPage() {
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-10 items-stretch">
                             {/* Column 1 */}
                             <div className="flex flex-col gap-6 md:gap-10">
-                                <div className="rounded-[24px] md:rounded-[40px] overflow-hidden aspect-video relative shadow-2xl hover:scale-[1.02] transition-transform duration-500">
+                                <div className="rounded-xl md:rounded-2xl overflow-hidden aspect-video relative shadow-2xl hover:scale-[1.02] transition-transform duration-500">
                                     <Image src="/events/impact/Community -Letu.png" alt="Community gathering" fill className="object-cover" />
                                 </div>
-                                <div className="bg-white rounded-[24px] md:rounded-[40px] p-6 md:p-10 shadow-xl flex-1 flex flex-col">
+                                <div className="bg-white rounded-xl md:rounded-2xl p-6 md:p-10 shadow-xl flex-1 flex flex-col">
                                     <h3 className="text-2xl md:text-3xl font-bold text-[#1a365d] mb-4 md:mb-6">Health & Care</h3>
                                     <p className="text-gray-500 text-base md:text-lg leading-relaxed mb-6 md:mb-10 flex-1">
                                         Trauma-informed psychosocial and medical referral networks for survivors.
@@ -389,7 +388,7 @@ export function LandingPage() {
 
                             {/* Column 2 */}
                             <div className="flex flex-col gap-6 md:gap-10 md:pt-16">
-                                <div className="bg-white rounded-[24px] md:rounded-[40px] p-6 md:p-10 shadow-xl flex-1 flex flex-col">
+                                <div className="bg-white rounded-xl md:rounded-2xl p-6 md:p-10 shadow-xl flex-1 flex flex-col">
                                     <h3 className="text-2xl md:text-3xl font-bold text-[#1a365d] mb-4 md:mb-6">Advocacy & Justice</h3>
                                     <p className="text-gray-500 text-base md:text-lg leading-relaxed mb-6 md:mb-10 flex-1">
                                         Empowering survivors to navigate legal systems and advocating for systemic change.
@@ -398,17 +397,17 @@ export function LandingPage() {
                                         More <ArrowRight className="w-4 h-4 group-hover/link:translate-x-1 transition-transform" />
                                     </Link>
                                 </div>
-                                <div className="rounded-[24px] md:rounded-[40px] overflow-hidden aspect-video relative shadow-2xl hover:scale-[1.02] transition-transform duration-500">
+                                <div className="rounded-xl md:rounded-2xl overflow-hidden aspect-video relative shadow-2xl hover:scale-[1.02] transition-transform duration-500">
                                     <Image src="/events/impact/at cop30.png" alt="Advocacy action" fill className="object-cover" />
                                 </div>
                             </div>
 
                             {/* Column 3 */}
                             <div className="flex flex-col gap-6 md:gap-10">
-                                <div className="rounded-[24px] md:rounded-[40px] overflow-hidden aspect-video relative shadow-2xl hover:scale-[1.02] transition-transform duration-500">
+                                <div className="rounded-xl md:rounded-2xl overflow-hidden aspect-video relative shadow-2xl hover:scale-[1.02] transition-transform duration-500">
                                     <Image src="/events/impact/oliver-teaching-tech.jpg" alt="Strategic meeting" fill className="object-cover" />
                                 </div>
-                                <div className="bg-white rounded-[24px] md:rounded-[40px] p-6 md:p-10 shadow-xl flex-1 flex flex-col">
+                                <div className="bg-white rounded-xl md:rounded-2xl p-6 md:p-10 shadow-xl flex-1 flex flex-col">
                                     <h3 className="text-2xl md:text-3xl font-bold text-[#1a365d] mb-4 md:mb-6">Education Access</h3>
                                     <p className="text-gray-500 text-base md:text-lg leading-relaxed mb-6 md:mb-10 flex-1">
                                         Equipping youth with tools and knowledge to prevent violence and lead within communities.
@@ -434,7 +433,7 @@ export function LandingPage() {
                         <div className="grid md:grid-cols-2 gap-8 md:gap-12">
                             {/* Card 1: Survivor Cafe */}
                             <Link href="/impact/health-and-care" className="group">
-                                <div className="bg-[#f0f4f8] rounded-[32px] md:rounded-[60px] p-6 md:p-12 flex flex-col h-full hover:shadow-2xl transition-all duration-500 border border-transparent hover:border-gray-100 overflow-hidden relative">
+                                <div className="bg-[#f0f4f8] rounded-2xl md:rounded-[60px] p-6 md:p-12 flex flex-col h-full hover:shadow-2xl transition-all duration-500 border border-transparent hover:border-gray-100 overflow-hidden relative">
                                     <div className="absolute top-0 left-0 w-full h-[240px] md:h-[320px] rounded-t-[32px] md:rounded-t-[60px] overflow-hidden">
                                         <Image src="/events/programs/survivors cafe program.png" alt="Survivor Cafe" fill className="object-cover object-top group-hover:scale-105 transition-transform duration-700" />
                                     </div>
@@ -458,7 +457,7 @@ export function LandingPage() {
 
                              {/* Card 2: 16 Days of Activism */}
                              <Link href="/impact/advocacy-and-justice" className="group">
-                                <div className="bg-[#1a365d] rounded-[32px] md:rounded-[60px] p-6 md:p-12 flex flex-col h-full text-white hover:shadow-2xl transition-all duration-500 relative overflow-hidden">
+                                <div className="bg-[#1a365d] rounded-2xl md:rounded-[60px] p-6 md:p-12 flex flex-col h-full text-white hover:shadow-2xl transition-all duration-500 relative overflow-hidden">
                                     <div className="absolute top-0 left-0 w-full h-[240px] md:h-[320px] rounded-t-[32px] md:rounded-t-[60px] overflow-hidden">
                                         <Image src="/events/programs/16 days of activism.png" alt="16 Days of Activism" fill className="object-cover object-top group-hover:scale-105 transition-transform duration-700 opacity-60" />
                                     </div>
@@ -522,9 +521,9 @@ function ServiceCard({ icon, title, description, slug, theme = 'teal' }: { icon:
 	return (
 		<motion.div 
 			whileHover={{ y: -12, boxShadow: "0 40px 60px -15px rgba(0,0,0,0.1)" }}
-			className={`bg-white rounded-[24px] md:rounded-[40px] p-6 md:p-10 border border-gray-100 flex flex-col gap-4 md:gap-6 group transition-all ${bgMap[theme]} ${borderMap[theme]}`}
+			className={`bg-white rounded-xl md:rounded-2xl p-6 md:p-10 border border-gray-100 flex flex-col gap-4 md:gap-6 group transition-all ${bgMap[theme]} ${borderMap[theme]}`}
 		>
-			<div className="flex items-center justify-center w-16 h-16 md:w-20 md:h-20 rounded-[20px] md:rounded-[24px] bg-gray-50 mb-2 md:mb-4 group-hover:bg-white transition-colors shadow-sm">
+			<div className="flex items-center justify-center w-16 h-16 md:w-20 md:h-20 rounded-xl md:rounded-xl bg-gray-50 mb-2 md:mb-4 group-hover:bg-white transition-colors shadow-sm">
 				{icon}
 			</div>
 			<h3 className="text-2xl md:text-3xl font-bold text-sauti-dark group-hover:text-black transition-colors">{title}</h3>
@@ -539,7 +538,7 @@ function ServiceCard({ icon, title, description, slug, theme = 'teal' }: { icon:
 function FeatureRow({ icon, title, description }: { icon: React.ReactNode, title: string, description: string }) {
      return (
         <div className="flex gap-4 md:gap-6 items-start">
-             <div className="flex-shrink-0 w-12 h-12 md:w-16 md:h-16 rounded-[16px] md:rounded-[20px] bg-white border border-gray-100 flex items-center justify-center shadow-lg text-sauti-dark">
+             <div className="flex-shrink-0 w-12 h-12 md:w-16 md:h-16 rounded-lg md:rounded-xl bg-white border border-gray-100 flex items-center justify-center shadow-lg text-sauti-dark">
                  {icon}
              </div>
              <div>

@@ -13,7 +13,7 @@ interface BlogCardProps {
     excerpt?: string | null;
     cover_image_url?: string | null;
     created_at: string;
-    status: 'draft' | 'pending' | 'published' | 'rejected';
+    status: 'draft' | 'pending_review' | 'approved' | 'rejected' | 'published';
     view_count?: number;
     author?: {
       first_name: string | null;
@@ -37,7 +37,8 @@ export function BlogCard({
   
   const statusColors = {
     draft: 'bg-gray-100 text-gray-600',
-    pending: 'bg-amber-100 text-amber-700',
+    pending_review: 'bg-amber-100 text-amber-700',
+    approved: 'bg-blue-100 text-blue-700',
     published: 'bg-emerald-100 text-emerald-700',
     rejected: 'bg-red-100 text-red-700'
   };

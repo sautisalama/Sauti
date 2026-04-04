@@ -38,45 +38,46 @@ import { Label } from "@/components/ui/label";
 type ReviewHistoryItem = {
     id: string;
     action_type: string;
-    created_at: string;
-    admin: { first_name: string; last_name: string };
-    details: { notes?: string };
+    created_at: string | null;
+    admin: { first_name: string | null; last_name: string | null } | null;
+    details: any;
     target_type?: string;
 };
 
 type ServiceItem = {
     id: string;
-    name: string;
-    service_types: string | string[];
-    verification_status: string;
-    verification_notes?: string;
-    created_at: string;
-    updated_at: string;
-    helpline?: string;
-    website?: string;
-    coverage_area_radius?: number;
-    description?: string; // Assuming description exists or falling back
+    name: string | null;
+    service_types: string | string[] | null;
+    verification_status: string | null;
+    verification_notes?: string | null;
+    created_at: string | null;
+    updated_at: string | null;
+    helpline?: string | null;
+    website?: string | null;
+    coverage_area_radius?: number | null;
+    description?: string | null;
     accreditation_files?: any;
-    accreditation_files_metadata?: AccreditationDocument[];
-    latitude?: number;
-    longitude?: number;
+    accreditation_files_metadata?: AccreditationDocument[] | null;
+    latitude?: number | null;
+    longitude?: number | null;
+    phone_number?: string | null;
 };
 
 type ProfileItem = {
     id: string;
-    first_name: string;
-    last_name: string;
-    email: string;
-    phone: string;
-    user_type: string;
-    professional_title?: string;
-    bio?: string;
-    verification_status: string;
-    verification_notes?: string;
-    created_at: string;
-    updated_at: string;
+    first_name: string | null;
+    last_name: string | null;
+    email: string | null;
+    phone: string | null;
+    user_type: string | null;
+    professional_title?: string | null;
+    bio?: string | null;
+    verification_status: string | null;
+    verification_notes?: string | null;
+    created_at: string | null;
+    updated_at: string | null;
     accreditation_files?: any;
-    accreditation_files_metadata?: AccreditationDocument[];
+    accreditation_files_metadata?: AccreditationDocument[] | null;
 };
 
 export default function ReviewPage() {
@@ -187,16 +188,16 @@ export default function ReviewPage() {
                 .in('target_id', targetIds)
                 .order('created_at', { ascending: false });
 
-            // Parse Documents
-            const parsedProfile = {
+            const parsedProfile: ProfileItem = {
                 ...profileData,
-                accreditation_files_metadata: parseDocuments(profileData.accreditation_files, profileData.accreditation_files_metadata)
+                accreditation_files_metadata: parseDocuments(profileData.accreditation_files as any, profileData.accreditation_files_metadata as any)
             };
 
-            const parsedServices = servicesData?.map(s => ({
+            const parsedServices: ServiceItem[] = (servicesData || []).map(s => ({
                 ...s,
-                accreditation_files_metadata: parseDocuments(s.accreditation_files, s.accreditation_files_metadata)
-            })) || [];
+                updated_at: (s as any).updated_at || (s as any).verification_updated_at || s.created_at,
+                accreditation_files_metadata: parseDocuments((s as any).accreditation_files, s.accreditation_files_metadata as any)
+            })) as ServiceItem[];
 
             setProfile(parsedProfile);
             setServices(parsedServices);
@@ -224,7 +225,7 @@ export default function ReviewPage() {
             }
 
             // 1. Update Target Status
-            const updatePayload: any = {
+            const updatePayload: Record<string, unknown> = {
                 verification_status: status,
                 verification_notes: notes,
                 verification_updated_at: new Date().toISOString(),
@@ -306,7 +307,7 @@ export default function ReviewPage() {
         }
     };
 
-    const handleDocumentReview = async (doc: any, status: 'verified' | 'rejected', notes: string) => {
+    const handleDocumentReview = async (doc: AccreditationDocument, status: 'verified' | 'rejected', notes: string) => {
         if (!viewingDoc) return;
         const { contextId, contextType } = viewingDoc;
 
@@ -338,7 +339,7 @@ export default function ReviewPage() {
              currentMetadata.push(reviewEntry);
 
              // Save
-             const { error } = await supabase.from(table).update({ accreditation_files_metadata: currentMetadata }).eq('id', contextId);
+             const { error } = await supabase.from(table).update({ accreditation_files_metadata: currentMetadata as any }).eq('id', contextId);
              if (error) throw error;
 
              toast({ title: "Success", description: "Document status updated." });
@@ -395,7 +396,7 @@ export default function ReviewPage() {
                 status={profile.verification_status}
                 onAction={(action) => openActionDialog(profile.id, 'profile', action, `${profile.first_name} ${profile.last_name}`)}
                 meta={[
-                    <span key="joined">Joined {new Date(profile.created_at).toLocaleDateString()}</span>
+                    <span key="joined">Joined {new Date(profile.created_at || 0).toLocaleDateString()}</span>
                 ]}
             />
 
@@ -413,7 +414,7 @@ export default function ReviewPage() {
             <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
                 {/* Left Column: Navigation / Summary */}
                 <div className="lg:col-span-1 space-y-6">
-                     <Card className="rounded-3xl border-serene-neutral-200 shadow-sm overflow-hidden bg-white">
+                     <Card className="rounded-2xl border-serene-neutral-200 shadow-sm overflow-hidden bg-white">
                         <CardHeader className="bg-gray-50/50 pb-4 border-b border-gray-100">
                             <CardTitle className="text-sm font-bold uppercase tracking-wider text-gray-500">Quick Stats</CardTitle>
                         </CardHeader>
@@ -443,7 +444,7 @@ export default function ReviewPage() {
 
                         <TabsContent value="profile" className="space-y-6 animate-in slide-in-from-bottom-2">
                              {/* Profile Details Card */}
-                             <Card className="border-serene-neutral-200 shadow-sm rounded-3xl overflow-hidden bg-white">
+                             <Card className="border-serene-neutral-200 shadow-sm rounded-2xl overflow-hidden bg-white">
                                 <CardHeader className="flex flex-row items-center justify-between pb-4 border-b border-gray-100 bg-gray-50/30">
                                     <div className="space-y-1">
                                         <CardTitle className="text-xl text-gray-900 font-bold">Personal Details</CardTitle>
@@ -482,7 +483,7 @@ export default function ReviewPage() {
 
                         <TabsContent value="services" className="space-y-6 animate-in slide-in-from-bottom-2">
                             {services.length === 0 ? (
-                                <div className="p-12 text-center bg-white rounded-3xl border border-dashed border-gray-200">
+                                <div className="p-12 text-center bg-white rounded-2xl border border-dashed border-gray-200">
                                     <Building2 className="h-10 w-10 text-gray-300 mx-auto mb-3" />
                                     <p className="text-gray-500 font-medium">No services listed.</p>
                                 </div>
@@ -591,7 +592,7 @@ export default function ReviewPage() {
                                                             <span className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Actions</span>
                                                             <ActionButtons 
                                                                 status={service.verification_status}
-                                                                onAction={(action) => openActionDialog(service.id, 'service', action, service.name)}
+                                                                onAction={(action) => openActionDialog(service.id, 'service', action, service.name || 'Service')}
                                                                 size="sm"
                                                                 className="flex-col items-stretch w-full"
                                                             />
@@ -616,7 +617,7 @@ export default function ReviewPage() {
                         </TabsContent>
 
                         <TabsContent value="history" className="animate-in slide-in-from-bottom-2">
-                             <Card className="border-gray-200 shadow-sm rounded-3xl bg-white">
+                             <Card className="border-gray-200 shadow-sm rounded-2xl bg-white">
                                 <CardContent className="pt-6 space-y-6">
                                     {history.length === 0 ? (
                                         <p className="text-center text-gray-500 py-8">No history recorded.</p>
@@ -634,7 +635,7 @@ export default function ReviewPage() {
                                                             {log.action_type.replace('_', ' ')}
                                                         </p>
                                                         <p className="text-sm text-gray-500">
-                                                            by {log.admin?.first_name} {log.admin?.last_name} • {new Date(log.created_at).toLocaleString()}
+                                                            by {log.admin?.first_name} {log.admin?.last_name} • {log.created_at ? new Date(log.created_at).toLocaleString() : 'Date unavailable'}
                                                         </p>
                                                         {log.details?.notes && (
                                                             <p className="text-sm text-gray-700 mt-2 bg-white p-2 rounded border border-gray-200">
@@ -655,7 +656,7 @@ export default function ReviewPage() {
 
             {/* Action Dialog - Premium Polish */}
             <Dialog open={actionDialog.isOpen} onOpenChange={(open) => !open && setActionDialog(prev => ({ ...prev, isOpen: false }))}>
-                <DialogContent className="rounded-3xl max-w-md overflow-hidden p-0 border-0 bg-white shadow-2xl">
+                <DialogContent className="rounded-2xl max-w-md overflow-hidden p-0 border-0 bg-white shadow-2xl">
                     <div className="p-8 pb-0">
                         <div className={cn(
                             "w-16 h-16 rounded-full flex items-center justify-center mb-6 mx-auto transition-colors",
@@ -738,13 +739,13 @@ export default function ReviewPage() {
     );
 }
 
-const parseDocuments = (filesJson: any, metadataJson: any): AccreditationDocument[] => {
+const parseDocuments = (filesJson: unknown, metadataJson: unknown): AccreditationDocument[] => {
     // Prefer metadata as it has review status and extended info
     if (metadataJson && Array.isArray(metadataJson)) {
-        return metadataJson.map((meta: any) => ({
-            url: meta.url || filesJson?.find((f: any) => f.url === meta.url)?.url || '#',
-            name: meta.title || meta.name || 'Untitled Document',
-            type: meta.type || filesJson?.find((f: any) => f.url === meta.url)?.type || 'unknown',
+        return (metadataJson as AccreditationDocument[]).map((meta) => ({
+            url: meta.url || '#',
+            name: meta.name || 'Untitled Document',
+            type: meta.type || 'unknown',
             status: meta.status,
             notes: meta.notes,
             docNumber: meta.docNumber,
@@ -752,11 +753,11 @@ const parseDocuments = (filesJson: any, metadataJson: any): AccreditationDocumen
             reviewed_at: meta.reviewed_at,
         }));
     } else if (filesJson && Array.isArray(filesJson)) {
-        return filesJson.map((file: any) => ({
+        return (filesJson as { url?: string; name?: string; type?: string }[]).map((file) => ({
             url: file.url || '#',
             name: file.name || 'Untitled Document',
             type: file.type || 'unknown',
-            status: 'pending', 
+            status: 'pending' as const, 
         }));
     }
     return [];

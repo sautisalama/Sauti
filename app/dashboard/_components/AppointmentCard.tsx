@@ -58,7 +58,7 @@ export function AppointmentCard({
 	const [isSavingNotes, setIsSavingNotes] = useState(false);
 	const [isEditingNotes, setIsEditingNotes] = useState(false);
 	const [showCalendarModal, setShowCalendarModal] = useState(false);
-	const appointmentDate = new Date(appointment.appointment_date);
+	const appointmentDate = appointment.appointment_date ? new Date(appointment.appointment_date) : null;
 
 	const handleOpenChat = () => {
 		setIsChatOpen(true);
@@ -69,7 +69,7 @@ export function AppointmentCard({
 	) => {
 		try {
 			setIsUpdating(true);
-			await updateAppointmentStatus(appointment.appointment_id, status);
+			await updateAppointmentStatus(appointment.appointment_id, status as any);
 			onStatusUpdate?.();
 			// Show calendar modal when confirming
 			if (status === "confirmed") {
@@ -103,7 +103,14 @@ export function AppointmentCard({
 	};
 
 	// Helper function to get status color and icon
-	const getStatusConfig = (status: string) => {
+	const getStatusConfig = (status: string | null) => {
+		if (!status) {
+			return {
+				color: "bg-gray-100 text-gray-600",
+				icon: <Clock className="h-3 w-3" />,
+				label: "Pending",
+			};
+		}
 		switch (status) {
 			case "confirmed":
 				return {
@@ -133,11 +140,10 @@ export function AppointmentCard({
 	};
 
 	const statusConfig = getStatusConfig(appointment.status);
-	const isUpcoming = new Date(appointment.appointment_date) > new Date();
-	const timeUntilAppointment = Math.ceil(
-		(new Date(appointment.appointment_date).getTime() - new Date().getTime()) /
-			(1000 * 60 * 60 * 24)
-	);
+	const isUpcoming = appointment.appointment_date ? new Date(appointment.appointment_date) > new Date() : false;
+	const timeUntilAppointment = appointment.appointment_date 
+		? Math.ceil((new Date(appointment.appointment_date).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))
+		: 0;
 
 	// Early return if matched_service data is missing
 	if (!appointment.matched_service) {
@@ -155,10 +161,10 @@ export function AppointmentCard({
 								<h3 className="font-semibold text-gray-900">Direct Appointment</h3>
 								<div className="flex items-center gap-2 text-sm text-gray-500">
 									<Calendar className="h-3 w-3" />
-									<span>{format(appointmentDate, "MMM d, yyyy")}</span>
+									<span>{appointmentDate ? format(appointmentDate, "MMM d, yyyy") : "Not Set"}</span>
 									<span>•</span>
 									<Clock className="h-3 w-3" />
-									<span>{format(appointmentDate, "h:mm a")}</span>
+									<span>{appointmentDate ? format(appointmentDate, "h:mm a") : "N/A"}</span>
 								</div>
 							</div>
 						</div>
@@ -267,24 +273,24 @@ export function AppointmentCard({
 								isUpcoming ? "bg-blue-50 border-blue-100 text-blue-700" : "bg-gray-50 border-gray-200 text-gray-500"
 							)}>
 								<span className="text-[10px] font-bold uppercase tracking-wider leading-none mb-1">
-									{format(appointmentDate, "MMM")}
+									{appointmentDate ? format(appointmentDate, "MMM") : "---"}
 								</span>
 								<span className="text-xl font-bold leading-none">
-									{format(appointmentDate, "d")}
+									{appointmentDate ? format(appointmentDate, "d") : "--"}
 								</span>
 							</div>
 
 							<div className="min-w-0">
 								<h3 className="font-bold text-gray-900 truncate text-base mb-1">
-									{appointment.matched_service?.service_details.name ||
+									{appointment.matched_service?.service_details?.name ||
 										"Direct Appointment"}
 								</h3>
 								<div className="flex items-center gap-2 text-xs text-gray-500 font-medium">
 									<Clock className="h-3.5 w-3.5 text-gray-400" />
-									<span>{format(appointmentDate, "h:mm a")}</span>
+									<span>{appointmentDate ? format(appointmentDate, "h:mm a") : "N/A"}</span>
 									<span className="text-gray-300">•</span>
 									<span className={isUpcoming ? "text-blue-600" : ""}>
-										{format(appointmentDate, "EEEE")}
+										{appointmentDate ? format(appointmentDate, "EEEE") : "Date Not Set"}
 									</span>
 									{isUpcoming && timeUntilAppointment > 0 && (
 										<Badge variant="secondary" className="ml-1 h-5 px-1.5 text-[10px] font-bold bg-blue-50 text-blue-700 hover:bg-blue-100 border-0">
@@ -306,10 +312,10 @@ export function AppointmentCard({
 									<MessageCircle className="h-4 w-4 mr-2" />
 									Chat
 								</DropdownMenuItem>
-								{appointment.matched_service?.service_details.phone_number && (
+								{appointment.matched_service?.service_details?.phone_number && (
 									<DropdownMenuItem
 										onClick={() =>
-											(window.location.href = `tel:${appointment.matched_service.service_details.phone_number}`)
+											(window.location.href = `tel:${appointment.matched_service?.service_details?.phone_number}`)
 										}
 									>
 										<Phone className="h-4 w-4 mr-2" />
@@ -444,7 +450,7 @@ export function AppointmentCard({
 				userId={userId}
 				appointmentDetails={{
 					appointmentId: appointment.appointment_id,
-					date: appointmentDate,
+					date: appointmentDate || new Date(),
 					duration: 60,
 					serviceName: appointment.matched_service?.service_details?.name,
 					professionalName: appointment.professional

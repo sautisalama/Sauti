@@ -44,6 +44,13 @@ export async function POST(request: Request) {
 		const existingServiceTypes =
 			existingServices?.map((s) => s.service_types) || [];
 
+		if (!profile.user_type) {
+			return NextResponse.json(
+				{ error: "User type not defined in profile" },
+				{ status: 400 }
+			);
+		}
+
 		// Validate service creation
 		const validation = serviceValidationService.validateServiceCreation(
 			existingServiceTypes,

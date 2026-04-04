@@ -26,6 +26,7 @@ interface NavItem {
   icon: React.ComponentType<{ className?: string }>;
   href: string;
   badge?: number;
+  showDot?: boolean;
 }
 
 interface EnhancedBottomNavProps {
@@ -71,8 +72,10 @@ export function EnhancedBottomNav({ forceShow = false, className }: EnhancedBott
     needsOnboarding ||
     // Hide ONLY on chat detail page (either by UUID path OR by query param)
     isChatDetail || 
-    (pathname?.startsWith("/dashboard/chat/") && pathname !== "/dashboard/chat") || // Fallback for uuid path
-    pathname?.includes("/appointment/")
+    (pathname?.includes("/dashboard/chat/") && pathname !== "/dashboard/chat") ||
+    pathname?.includes("/appointment/") ||
+    // Hide on detail pages (cases/reports/matches) for better focus (mobile request)
+    (pathname?.split('/').filter(Boolean).length || 0) > 2 && (pathname?.includes('/cases/') || pathname?.includes('/reports/') || pathname?.includes('/matches/'))
   );
 
   const isDashboard = pathname?.startsWith("/dashboard");
@@ -137,12 +140,17 @@ export function EnhancedBottomNav({ forceShow = false, className }: EnhancedBott
     // Professional: Home, Cases, Chats, Resources
     // Survivor: Home, Reports, Chats, Resources
     
-    return [
-      { id: "home", label: "Home", icon: LayoutDashboard, href: "/dashboard" },
-      isProfessional 
-        ? { id: "cases", label: "Cases", icon: ClipboardList, href: "/dashboard/cases", badge: casesCount > 0 ? casesCount : undefined }
-        : { id: "reports", label: "Reports", icon: ClipboardList, href: "/dashboard/reports" },
+    const middleItems = isProfessional ? [
+      { id: "cases", label: "Cases", icon: ClipboardList, href: "/dashboard/cases", badge: casesCount > 0 ? casesCount : undefined },
       { id: "chat", label: "Chats", icon: MessageCircle, href: "/dashboard/chat", badge: unreadMessages > 0 ? unreadMessages : undefined },
+    ] : [
+      { id: "reports", label: "Reports", icon: ClipboardList, href: "/dashboard/reports" },
+      { id: "chat", label: "Chats", icon: MessageCircle, href: "/dashboard/chat", badge: unreadMessages > 0 ? unreadMessages : undefined },
+    ];
+
+    return [
+      { id: "overview", label: "Overview", icon: LayoutDashboard, href: "/dashboard" },
+      ...middleItems,
       { id: "learn", label: "Learn", icon: FileText, href: "/dashboard/resources" },
     ];
   };
@@ -174,11 +182,14 @@ export function EnhancedBottomNav({ forceShow = false, className }: EnhancedBott
             <Badge 
               className={cn(
                 "absolute -top-1.5 -right-1.5 h-4 w-4 flex items-center justify-center p-0 text-[9px] font-bold shadow-sm",
-                "bg-serene-red-500 text-white border border-white min-w-[16px]"
+                item.id === 'cases' ? "bg-serene-blue-600 text-white border border-white min-w-[17px] ring-1 ring-serene-blue-200" : "bg-red-600 text-white border border-white min-w-[17px] ring-1 ring-red-200"
               )}
             >
               {item.badge > 99 ? "99+" : item.badge}
             </Badge>
+          )}
+          {item.showDot && (
+            <div className="absolute -top-0.5 -right-0.5 h-2.5 w-2.5 bg-serene-blue-500 rounded-full border-2 border-white animate-pulse" />
           )}
         </div>
         <span className={cn(

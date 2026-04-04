@@ -47,7 +47,7 @@ export default async function ProfessionalSchedulePage({ params }: SchedulePageP
   const { data: supportServices } = await supabase
     .from('support_services')
     .select('*')
-    .eq('professional_id', professionalId);
+    .eq('user_id', professionalId);
 
   if (!supportServices || supportServices.length === 0) {
     notFound();
@@ -106,7 +106,7 @@ export default async function ProfessionalSchedulePage({ params }: SchedulePageP
         <EnhancedPublicScheduler 
           professionalId={professionalId}
           professionalName={`${profile.first_name} ${profile.last_name}`}
-          calLink={profile.cal_link}
+          calLink={profile.cal_link || undefined}
         />
 
         {/* Trust & Safety */}

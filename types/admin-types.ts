@@ -1,4 +1,15 @@
 // Admin system type definitions with enum types
+import { Json } from "./db-schema";
+
+export interface FileMetadata {
+	url: string;
+	name: string;
+	type?: string;
+	size?: number;
+	serviceId?: string;
+	uploaded_at?: string;
+}
+
 
 export type VerificationStatus =
 	| "pending"
@@ -56,28 +67,30 @@ export interface AdminStats {
 
 export interface PendingUser {
 	id: string;
-	first_name: string;
-	last_name: string;
-	user_type: "professional" | "ngo" | "survivor";
-	verification_status: VerificationStatus;
-	verification_notes?: string;
-	accreditation_files_metadata?: any[];
-	created_at: string;
-	verification_updated_at: string;
+	first_name: string | null;
+	last_name: string | null;
+	user_type: "professional" | "ngo" | "survivor" | null;
+	verification_status: VerificationStatus | null;
+	verification_notes?: string | null;
+	accreditation_files_metadata?: FileMetadata[] | null;
+
+	created_at: string | null;
+	verification_updated_at: string | null;
 }
 
 export interface PendingService {
 	id: string;
 	name: string;
-	service_types: string;
-	verification_status: VerificationStatus;
-	verification_notes?: string;
-	accreditation_files_metadata?: any[];
-	created_at: string;
-	verification_updated_at: string;
-	latitude?: number;
-	longitude?: number;
-	coverage_area_radius?: number;
+	service_types: string | null;
+	verification_status: VerificationStatus | null;
+	verification_notes?: string | null;
+	accreditation_files_metadata?: FileMetadata[] | null;
+
+	created_at: string | null;
+	verification_updated_at: string | null;
+	latitude?: number | null;
+	longitude?: number | null;
+	coverage_area_radius?: number | null;
 }
 
 export interface User {
@@ -121,7 +134,8 @@ export interface Service {
 	};
 
 	// Added via migration - standardized to metadata
-	accreditation_files_metadata?: any[]; // JSONB
+	accreditation_files_metadata?: FileMetadata[]; // JSONB
+
 	reviewed_by?: ReviewAuditLog;
 }
 
@@ -149,7 +163,8 @@ export interface AdminAction {
 	action_type: AdminActionType;
 	target_type: TargetType;
 	target_id: string;
-	details: any;
+	details: Json;
+
 	created_at: string;
 }
 

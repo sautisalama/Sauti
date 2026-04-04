@@ -1,7 +1,7 @@
 'use server';
 
 import { createClient } from '@/utils/supabase/server';
-import { Chat, Message, ChatType, MessageType } from '@/types/chat';
+import { Chat, Message, ChatType, MessageType, transformChat, transformMessage, MessageReactions, ChatMetadata } from '@/types/chat';
 
 export async function getChats() {
   const supabase = await createClient();
@@ -22,11 +22,10 @@ export async function getChats() {
 
   if (error) throw error;
   
-  // Filter client-side if needed or rely on RLS (RLS is safer)
-  return data as Chat[];
+  return (data || []).map(transformChat);
 }
 
-export async function getMessages(chatId: string, limit = 50, before?: string) {
+export async function getMessages(chatId: string | string[], limit = 50, before?: string) {
   const supabase = await createClient();
   
   let query = supabase
@@ -34,8 +33,15 @@ export async function getMessages(chatId: string, limit = 50, before?: string) {
     .select(`
       *,
       sender:profiles(id, first_name, last_name, avatar_url)
-    `)
-    .eq('chat_id', chatId)
+    `);
+
+  if (Array.isArray(chatId)) {
+    query = query.in('chat_id', chatId);
+  } else {
+    query = query.eq('chat_id', chatId);
+  }
+
+  query = query
     .order('created_at', { ascending: false })
     .limit(limit);
 
@@ -46,7 +52,7 @@ export async function getMessages(chatId: string, limit = 50, before?: string) {
   const { data, error } = await query;
   if (error) throw error;
 
-  return (data as Message[]).reverse(); // Return in chronological order for UI
+  return (data || []).map(transformMessage).reverse(); // Return in chronological order for UI
 }
 
 export async function addMessageReaction(messageId: string, emoji: string) {
@@ -63,7 +69,7 @@ export async function addMessageReaction(messageId: string, emoji: string) {
 
   if (fetchError) throw fetchError;
 
-  const currentReactions = message.reactions || {};
+  const currentReactions = (message.reactions as unknown as MessageReactions) || {};
   
   // Toggle reaction: if exists, remove it; if not, add/update it
   if (currentReactions[user.id] === emoji) {
@@ -112,14 +118,14 @@ export async function sendMessage(chatId: string, content: string, type: Message
       sender_id: user.id,
       content,
       type,
-      metadata,
-      attachments
+      metadata: metadata as any,
+      attachments: attachments as any
     })
     .select()
     .single();
 
   if (error) throw error;
-  return data as Message;
+  return transformMessage(data);
 }
 
 export async function createChat(participantIds: string[], type: ChatType = 'dm', initialMessage?: string) {
@@ -186,6 +192,23 @@ export async function markChatAsRead(chatId: string) {
   if (error) throw error;
 }
 
+export async function markAllChatsAsRead() {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Unauthorized');
+
+  const { error } = await supabase
+    .from('chat_participants')
+    .update({ 
+      status: {
+        last_read_at: new Date().toISOString()
+      } as any 
+    })
+    .eq('user_id', user.id);
+
+  if (error) throw error;
+}
+
 export async function searchUsers(query: string) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -207,56 +230,131 @@ export async function getCaseChat(caseId: string, survivorId: string) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Unauthorized');
 
-  // 1. Try to find existing chat for this case
-  const { data: existingChats, error: searchError } = await supabase
-    .from('chats')
+  // 1. Resolve true participants from matched_services
+  const { data: matchData } = await supabase
+    .from('matched_services')
     .select(`
-      *,
-      participants:chat_participants(
-        *,
-        user:profiles(*)
-      )
+      survivor_id,
+      hrd_profile_id,
+      report_id,
+      chat_id,
+      support_services ( user_id )
     `)
-    // We use granular metadata query if possible, or filter in code if contains is tricky with partial JSON
-    // .contains('metadata', { case_id: caseId }) // This works if metadata is JSONB and indexed
-    .textSearch('metadata', `${caseId}`) // Alternative or just fetch and filter
-    .limit(5); // Fetch a few and filter in JS to be safe
+    .eq('id', caseId)
+    .single();
 
-  if (searchError) throw searchError;
-
-  // Filter precisely for case_id in metadata
-  const foundChat = existingChats?.find((c: any) => c.metadata?.case_id === caseId);
-
-  if (foundChat) {
-    return foundChat as Chat;
+  // 1.2. If match already has a linked chat, return it immediately
+  if (matchData?.chat_id) {
+    const { data: linkedChat } = await supabase
+      .from('chats')
+      .select('*, participants:chat_participants(*, user:profiles(*))')
+      .eq('id', matchData.chat_id)
+      .single();
+    
+    if (linkedChat) return transformChat(linkedChat);
   }
 
-  // 2. Create new chat if not found
+  const actualSurvId = matchData?.survivor_id || survivorId;
+  
+  // The professional is either HRD directly, or the user of the service
+  let profId = matchData?.hrd_profile_id;
+  if (!profId && matchData?.support_services) {
+      // Support services might be returned as an object or a single-item array
+      const ss = Array.isArray(matchData.support_services) 
+        ? matchData.support_services[0] 
+        : matchData.support_services;
+      profId = (ss as any)?.user_id;
+  }
+  
+  // Fallback to caller if no professional found (edge case)
+  if (!profId) profId = user.id;
+
+  // 1.5. Safety: Don't create DM with self if we can avoid it by resolving correctly
+  // If I am the professional, the "other" must be the survivor.
+  // If I am the survivor, the "other" must be the professional.
+  const targetOtherId = user.id === profId ? actualSurvId : profId;
+
+  // 2. Try to find existing chat between these two people
+  const { data: allParticipants } = await supabase
+    .from('chat_participants')
+    .select('chat_id, user_id')
+    .in('user_id', [actualSurvId, profId]);
+
+  if (allParticipants && allParticipants.length > 0) {
+    // Robust Share Detection: Find ANY chat ID that contains BOTH users
+    const myChatIds = new Set(allParticipants.filter(p => p.user_id === user.id).map(p => p.chat_id));
+    const targetChatIds = allParticipants.filter(p => p.user_id === targetOtherId).map(p => p.chat_id);
+    
+    const sharedChatId = targetChatIds.find(cid => myChatIds.has(cid));
+
+    if (sharedChatId) {
+      // If we found a shared chat, link it to the match for future direct access
+      if (matchData && !matchData.chat_id) {
+          await supabase.from('matched_services').update({ chat_id: sharedChatId }).eq('id', caseId);
+      }
+      const { data: fullChat } = await supabase
+        .from('chats')
+        .select(`
+          *,
+          participants:chat_participants(
+            *,
+            user:profiles(*)
+          )
+        `)
+        .eq('id', sharedChatId)
+        .single();
+
+      if (fullChat) {
+        // Update metadata with latest case context
+        const meta = (fullChat.metadata || {}) as ChatMetadata;
+        await supabase
+          .from('chats')
+          .update({ 
+            metadata: { 
+              ...meta, 
+              case_id: caseId, 
+              report_id: matchData?.report_id 
+            } 
+          })
+          .eq('id', sharedChatId);
+          
+        return transformChat(fullChat);
+      }
+    }
+  }
+
+  // 3. Create new chat if not found
   const { data: chat, error: createError } = await supabase
     .from('chats')
     .insert({
       type: 'support_match',
       created_by: user.id,
-      metadata: { case_id: caseId }
+      match_id: caseId,
+      metadata: { 
+        case_id: caseId,
+        report_id: matchData?.report_id
+      }
     })
     .select()
     .single();
 
   if (createError) throw createError;
 
-  // 3. Add Participants (Professional and Survivor)
   const participants = [
     {
       chat_id: chat.id,
-      user_id: user.id,
+      user_id: profId,
       status: { role: 'admin' }
-    },
-    {
-      chat_id: chat.id,
-      user_id: survivorId,
-      status: { role: 'member' }
     }
   ];
+
+  if (actualSurvId && actualSurvId !== profId) {
+    participants.push({
+      chat_id: chat.id,
+      user_id: actualSurvId,
+      status: { role: 'member' }
+    });
+  }
 
   const { error: partError } = await supabase
     .from('chat_participants')
@@ -279,5 +377,5 @@ export async function getCaseChat(caseId: string, survivorId: string) {
 
   if (fetchError) throw fetchError;
 
-  return fullChat as Chat;
+  return transformChat(fullChat);
 }

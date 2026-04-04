@@ -105,10 +105,15 @@ export function ScheduleMeetingModal({
           .in('status', ['pending', 'confirmed']);
 
         if (appointments) {
-          const apptBlocks = appointments.map(apt => ({
-            start: new Date(apt.appointment_date),
-            end: new Date(new Date(apt.appointment_date).getTime() + (apt.duration_minutes || 60) * 60000)
-          }));
+          const apptBlocks = appointments
+            .filter(apt => apt.appointment_date !== null)
+            .map(apt => {
+              const startDate = new Date(apt.appointment_date as string);
+              return {
+                start: startDate,
+                end: new Date(startDate.getTime() + (apt.duration_minutes || 60) * 60000)
+              };
+            });
           setBlockedSlots(prev => [...prev, ...apptBlocks]);
         }
       } catch (error) {
@@ -165,7 +170,7 @@ export function ScheduleMeetingModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-2xl rounded-[24px] bg-white shadow-2xl border-none p-0 overflow-hidden">
+      <DialogContent className="max-w-2xl rounded-xl bg-white shadow-2xl border-none p-0 overflow-hidden">
         {/* Header */}
         <div className="bg-gradient-to-br from-serene-blue-50 to-serene-blue-100/50 p-6 pb-4">
           <DialogHeader className="space-y-2">

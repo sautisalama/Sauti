@@ -167,7 +167,7 @@ export function SupportServiceSidepanel({
 	onClose,
 	onUpdate,
 }: SupportServiceSidepanelProps) {
-	const [documents, setDocuments] = useState<any[]>([]);
+	const [documents, setDocuments] = useState<VerificationDocument[]>([]);
 	const [sharedUsers, setSharedUsers] = useState<any[]>([]);
 	const [isLoading, setIsLoading] = useState(false);
 	const [isUploading, setIsUploading] = useState(false);
@@ -194,7 +194,7 @@ export function SupportServiceSidepanel({
 	const [isShareModalOpen, setIsShareModalOpen] = useState(false);
 	const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
 
-	const [availableDocuments, setAvailableDocuments] = useState<any[]>([]);
+	const [availableDocuments, setAvailableDocuments] = useState<VerificationDocument[]>([]);
 	const [isSubmitting, setIsSubmitting] = useState(false); // For "Submit for Review"
 
 	// Upload form state
@@ -327,7 +327,7 @@ export function SupportServiceSidepanel({
 
 			if (error) throw error;
 
-			let docs: any[] = [];
+			let docs: VerificationDocument[] = [];
 			if (data?.accreditation_files_metadata) {
 				const rawDocs = safelyParseJsonArray(data.accreditation_files_metadata);
 				docs = rawDocs.map((d: any) => ({
@@ -360,7 +360,7 @@ export function SupportServiceSidepanel({
 				.eq("id", userId)
 				.single();
 
-			const availableDocs: any[] = [];
+			const availableDocs: VerificationDocument[] = [];
 
 			if (profile?.accreditation_files_metadata) {
 				const profileDocs = safelyParseJsonArray(profile.accreditation_files_metadata);
@@ -761,15 +761,11 @@ export function SupportServiceSidepanel({
 		if (!service) return;
 
 		// Ensure no undefined values are passed
-		const linkedDoc = {
+		const linkedDoc: VerificationDocument = {
 			title: doc.title || "Untitled Document",
 			url: doc.url || "",
 			uploadedAt: doc.uploadedAt || new Date().toISOString(),
-			status: 'pending', // Linking triggers re-review usually? Or if it's already verified? 
-            // If it's a profile doc that is verified, maybe we trust it? 
-            // Safest to set to 'pending' for this specific service context, or inherit.
-            // Let's default to pending for the service's context unless we want to propagate.
-            
+			status: 'pending', 
 			linked: true,
 			sourceId: doc.sourceId || null,
 			sourceName: doc.source || doc.sourceName || "Unknown Source",
@@ -793,7 +789,7 @@ export function SupportServiceSidepanel({
 		}
 	};
 
-	const saveDocuments = async (newDocuments: any[]) => {
+	const saveDocuments = async (newDocuments: VerificationDocument[]) => {
 		if (!service) return;
 		
 		// Sanitize payload: JSON does not support 'undefined'

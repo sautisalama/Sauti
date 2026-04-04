@@ -70,7 +70,7 @@ export default function PreventionPage() {
 
 function FeatureCard({ icon, title, description }: { icon: React.ReactNode, title: string, description: string }) {
     return (
-        <div className="p-8 rounded-[40px] bg-white border-2 border-gray-50 hover:border-sauti-yellow/20 hover:shadow-2xl transition-all group">
+        <div className="p-8 rounded-2xl bg-white border-2 border-gray-50 hover:border-sauti-yellow/20 hover:shadow-2xl transition-all group">
             <div className="w-16 h-16 rounded-2xl bg-gray-50 flex items-center justify-center mb-6">{icon}</div>
             <h3 className="text-2xl font-black text-sauti-dark mb-4 uppercase tracking-tight">{title}</h3>
             <p className="text-gray-500 font-medium leading-relaxed">{description}</p>

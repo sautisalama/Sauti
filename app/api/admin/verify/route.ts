@@ -25,7 +25,8 @@ export async function POST(request: Request) {
 			return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 		}
 
-		const { targetType, targetId, action, notes } = await request.json();
+		const { targetType, targetId, action, notes } = (await request.json()) as VerificationRequest;
+
 
 		if (!targetType || !targetId || !action) {
 			return NextResponse.json(
@@ -38,11 +39,12 @@ export async function POST(request: Request) {
 		const verificationStatus = action === "verify" ? "verified" : "rejected";
 
 		// Update verification status
-		const updateData: any = {
+		const updateData: Record<string, unknown> = {
 			verification_status: verificationStatus,
 			verification_notes: notes || null,
 			verification_updated_at: new Date().toISOString(),
 		};
+
 
 		if (action === "verify") {
 			updateData.verified_by = user.id;

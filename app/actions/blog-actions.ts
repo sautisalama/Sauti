@@ -12,6 +12,9 @@ export type BlogParams = {
     is_event: boolean;
     event_details: any;
     author_id: string;
+    slug?: string;
+    cover_image_url?: string;
+    excerpt?: string;
 };
 
 export async function manageBlogPost(params: BlogParams) {
@@ -56,8 +59,20 @@ export async function manageBlogPost(params: BlogParams) {
         event_details: params.is_event ? params.event_details : null,
         author_id: params.id ? params.author_id : user.id,
         updated_at: new Date().toISOString(),
+        slug: params.slug || generateSlug(params.title),
+        cover_image_url: params.cover_image_url || null,
+        excerpt: params.excerpt || null,
         ...(publishedAt && { published_at: publishedAt })
     };
+
+    function generateSlug(title: string) {
+        return title
+            .toLowerCase()
+            .replace(/[^a-z0-9\s-]/g, '')
+            .replace(/\s+/g, '-')
+            .replace(/-+/g, '-')
+            .trim();
+    }
 
     let result;
     if (params.id) {

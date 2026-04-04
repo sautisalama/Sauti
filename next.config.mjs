@@ -5,6 +5,7 @@ const isWindows = process.platform === "win32";
 /** @type {import('next').NextConfig} */
 
 const nextConfig = {
+	allowedDevOrigins: ["192.168.150.110", "historiographical-baffledly-isadora.ngrok-free.dev"],
 	images: {
 		remotePatterns: [
 			{

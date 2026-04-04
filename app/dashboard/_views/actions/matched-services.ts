@@ -1,25 +1,47 @@
 import { createClient } from "@/utils/supabase/client";
-import { Tables } from "@/types/db-schema";
+import { Database, Tables } from "@/types/db-schema";
+
+type MatchStatus = Database["public"]["Enums"]["match_status_type"];
 
 export async function fetchMatchedServices(userId: string) {
 	const supabase = createClient();
 	const serviceIds = await getServiceIdsByUserId(userId);
 
-	const { data, error } = await supabase
+    let query = supabase
 		.from("matched_services")
 		.select(`
 			*,
 			report:reports(*),
-			service_details:support_services(*)
-		`)
-		.in("service_id", serviceIds)
-		.order("match_date", { ascending: false });
+			service_details:support_services(*),
+            appointments:appointments(*)
+		`);
+    
+    if (serviceIds.length > 0) {
+        query = query.or(`service_id.in.("${serviceIds.join('","')}"),hrd_profile_id.eq."${userId}"`);
+    } else {
+        query = query.eq("hrd_profile_id", userId);
+    }
 
+	const { data, error } = await query.order("match_date", { ascending: false });
 	if (error) throw error;
-	return data || [];
+
+	// Backfill matched_service into nested appointments for type compatibility with AppointmentWithDetails
+	const transformedData = data?.map((match: any) => ({
+		...match,
+		appointments: match.appointments?.map((appt: any) => ({
+			...appt,
+			matched_service: {
+				id: match.id,
+				service_details: match.service_details,
+				report: match.report,
+			},
+		})),
+	}));
+
+	return (transformedData as any[]) || [];
 }
 
-async function updateReportMatchStatus(reportId: string, status: string) {
+async function updateReportMatchStatus(reportId: string, status: MatchStatus) {
 	const supabase = createClient();
 	
 	const { error } = await supabase
@@ -145,5 +167,5 @@ export async function getServiceIdsByUserId(userId: string) {
 		.eq("user_id", userId);
 
 	if (error) throw error;
-	return data?.map(service => service.id) || [];
+	return data?.map((service: any) => service.id) || [];
 }

@@ -1,11 +1,13 @@
 "use client";
 
-import { Bell, Search } from "lucide-react";
+import { Bell, Search, ChevronLeft, ShieldCheck } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { NotificationDropdown } from "./NotificationDropdown";
 import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import { useDashboardData } from "@/components/providers/DashboardDataProvider";
 
 export function DesktopHeader({ 
     showSearch = true,
@@ -18,6 +20,13 @@ export function DesktopHeader({
     const router = useRouter();
     const pathname = usePathname();
     const [searchTerm, setSearchTerm] = useState(searchParams.get("q") || "");
+    const dash = useDashboardData();
+    const topBarTitle = dash?.topBarTitle;
+    const topBarActions = dash?.topBarActions;
+    const isSidebarCollapsed = dash?.isSidebarCollapsed;
+
+    // Show back button on all pages except main dashboard
+    const showBack = pathname !== "/dashboard";
 
     // Debounce search update
     useEffect(() => {
@@ -43,18 +52,49 @@ export function DesktopHeader({
     }, [searchTerm, router, pathname, searchParams]);
 
 	return (
-		<header className="sticky top-0 z-40 w-full bg-white/80 backdrop-blur-xl border-b border-serene-neutral-200/60 transition-all duration-200 h-16 flex items-center shrink-0">
-			<div className="flex items-center px-6 lg:px-8 gap-4 w-full h-full">
+		<header className={cn(
+            "fixed top-0 z-40 transition-all duration-300 bg-white/80 backdrop-blur-xl border-b border-serene-neutral-200/60 h-16 flex items-center shrink-0 overflow-hidden",
+            isSidebarCollapsed ? "left-20 w-[calc(100%-5rem)]" : "left-72 w-[calc(100%-18rem)]"
+        )}>
+			<div className="flex items-center px-6 lg:px-8 gap-4 w-full h-full relative">
                 
+                {showBack && (
+                    <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        onClick={() => router.back()}
+                        className="flex items-center gap-1.5 text-serene-neutral-600 hover:text-serene-blue-600 hover:bg-serene-blue-50/50 rounded-xl transition-all"
+                    >
+                        <ChevronLeft className="h-5 w-5" />
+                    </Button>
+                )}
+
+                {topBarTitle && (
+                    <div className="flex items-center gap-3 ml-2 min-w-0">
+                        <div className="hidden md:flex items-center gap-2 text-serene-blue-600 font-extrabold uppercase tracking-[0.2em] text-[10px] shrink-0">
+                            <ShieldCheck className="h-4 w-4" />
+                        </div>
+                        <div className="min-w-0 flex flex-col justify-center">
+                            {typeof topBarTitle === 'string' ? (
+                                <h1 className="text-sm sm:text-base font-bold text-serene-neutral-900 truncate">
+                                    {topBarTitle}
+                                </h1>
+                            ) : (
+                                topBarTitle
+                            )}
+                        </div>
+                    </div>
+                )}
+
                 {/* Search & Notifications Group - Centered */}
-				<div className="hidden md:flex items-center gap-4 flex-1 max-w-2xl mx-auto">
+				<div className="flex items-center gap-4 flex-1 max-w-2xl mx-auto">
                     {/* Search Input - Pill Shape */}
 					{showSearch && (
-                        <div className="relative flex-1 max-w-md group mx-auto">
+                        <div className="relative flex-1 group max-w-md mx-auto">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-serene-neutral-400 group-focus-within:text-serene-blue-500 transition-colors" />
                             <Input
                                 type="search"
-                                placeholder="Search professionals, services, cases..."
+                                placeholder="Search..."
                                 className={cn(
                                     "pl-10 h-10 w-full rounded-full transition-all duration-300",
                                     "bg-serene-neutral-50/50 border-serene-neutral-200/60",
@@ -70,6 +110,16 @@ export function DesktopHeader({
                     {/* Notification Bell - Next to search */}
                     {showNotifications && <NotificationDropdown />}
 				</div>
+                
+                {/* Right-aligned Actions (e.g. 3 dots menu) */}
+                {topBarActions && (
+                    <div className="flex items-center gap-2 ml-auto shrink-0 animate-in fade-in slide-in-from-right-4 duration-300">
+                        {topBarActions}
+                    </div>
+                )}
+                
+                {/* Right side spacer to balance back button */}
+                {!topBarActions && showBack && <div className="w-[72px] hidden sm:block pointer-events-none" />}
 			</div>
 		</header>
 	);

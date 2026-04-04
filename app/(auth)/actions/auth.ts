@@ -4,7 +4,7 @@ import { createClient } from "@/utils/supabase/server";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { cookies, headers } from "next/headers";
-import { registerDevice, parseSettings } from "@/lib/user-settings";
+import { registerDevice, parseSettings, TrackedDevice } from "@/lib/user-settings";
 
 export async function signUp(formData: FormData) {
 	const supabase = await createClient();
@@ -12,7 +12,12 @@ export async function signUp(formData: FormData) {
 	const password = formData.get("password") as string;
 	const firstName = formData.get("firstName") as string;
 	const lastName = formData.get("lastName") as string;
-	const redirectUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+	const headersList = await headers();
+	const forwardedHost = headersList.get("x-forwarded-host");
+	const hostHeader = headersList.get("host");
+	const host = forwardedHost || hostHeader;
+	const protocol = host?.includes("localhost") || host?.includes("192.168") ? "http" : "https";
+	const redirectUrl = host ? `${protocol}://${host}` : process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 
 	const { data: authData, error: authError } = await supabase.auth.signUp({
 		email,
@@ -46,7 +51,7 @@ export async function signUp(formData: FormData) {
 			.single();
 
 		const settings = parseSettings(currentProfile?.settings);
-		let updatedDevices = currentProfile?.devices || [];
+		let updatedDevices: TrackedDevice[] = (currentProfile?.devices as unknown as TrackedDevice[]) || [];
 
 		if (deviceId && settings.device_tracking_enabled !== false) {
 			updatedDevices = registerDevice(updatedDevices, deviceId, userAgent);
@@ -59,7 +64,7 @@ export async function signUp(formData: FormData) {
 				last_name: lastName,
 				created_at: now,
 				updated_at: now,
-				devices: updatedDevices,
+				devices: updatedDevices as any, // Cast back to any for supabase json
 			},
 			{ onConflict: "id" }
 		);
@@ -104,10 +109,10 @@ export async function signIn(formData: FormData) {
 
 		const settings = parseSettings(profile?.settings);
 		if (deviceId && settings.device_tracking_enabled !== false) {
-			const updatedDevices = registerDevice(profile?.devices, deviceId, userAgent);
+			const updatedDevices = registerDevice(profile?.devices as unknown as TrackedDevice[], deviceId, userAgent);
 			await supabase
 				.from("profiles")
-				.update({ devices: updatedDevices })
+				.update({ devices: updatedDevices as any })
 				.eq("id", user.id);
 		}
 	}
@@ -118,7 +123,12 @@ export async function signIn(formData: FormData) {
 
 export async function signInWithGoogle() {
 	const supabase = await createClient();
-	const redirectUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+	const headersList = await headers();
+	const forwardedHost = headersList.get("x-forwarded-host");
+	const hostHeader = headersList.get("host");
+	const host = forwardedHost || hostHeader;
+	const protocol = host?.includes("localhost") || host?.includes("192.168") ? "http" : "https";
+	const redirectUrl = host ? `${protocol}://${host}` : process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 
 	const { data, error } = await supabase.auth.signInWithOAuth({
 		provider: "google",
