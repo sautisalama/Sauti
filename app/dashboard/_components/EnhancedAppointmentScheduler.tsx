@@ -93,51 +93,6 @@ interface EnhancedAppointmentSchedulerProps {
  * Serene Analog Clock Widget - Ultra minimalist for a calm, professional atmosphere.
  * Designed to be fully responsive and visually light.
  */
-function SereneClockWidget({ hour, minute }: { hour: number; minute: number }) {
-  const hourDeg = (hour % 12) * 30 + (minute / 60) * 30;
-  const minuteDeg = minute * 6;
-
-  return (
-    <div className="relative w-32 h-32 xs:w-40 xs:h-40 sm:w-56 sm:h-56 rounded-full bg-white flex items-center justify-center border-[0.5px] border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.04)] mx-auto group ring-[12px] ring-slate-50/30">
-      {/* Dynamic Background Pattern - Very subtle */}
-      <div className="absolute inset-0 opacity-[0.02] select-none pointer-events-none">
-        <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_center,_#105D5D_0.5px,_transparent_0.5px)] bg-[size:16px_16px]" />
-      </div>
-
-      {/* Simplified Markers - Minimalist dots */}
-      {[...Array(12)].map((_, i) => (
-        <div key={i} className="absolute inset-3 text-center" style={{ transform: `rotate(${i * 30}deg)` }}>
-          <div className={cn(
-            "w-0.5 rounded-full mx-auto",
-            i % 3 === 0 ? "h-1.5 bg-slate-200" : "h-0.5 bg-slate-100"
-          )} />
-        </div>
-      ))}
-      
-      {/* Hour Hand - Soft, elegant */}
-      <motion.div
-        animate={{ rotate: hourDeg }}
-        transition={{ type: "spring", stiffness: 120, damping: 20 }}
-        className="absolute w-1 h-[28%] bg-slate-400 rounded-full origin-bottom z-10"
-        style={{ bottom: "50%", x: "0%", transformOrigin: "bottom" }}
-      />
-      
-      {/* Minute Hand - Teal accent, very thin */}
-      <motion.div
-        animate={{ rotate: minuteDeg }}
-        transition={{ type: "spring", stiffness: 100, damping: 25 }}
-        className="absolute w-0.5 h-[38%] bg-teal-500 rounded-full origin-bottom z-20"
-        style={{ bottom: "50%", x: "0%", transformOrigin: "bottom" }}
-      />
-      
-      {/* Minimal Center Cap */}
-      <div className="absolute w-2 h-2 bg-white rounded-full z-30 ring-2 ring-slate-100 shadow-sm" />
-      
-      {/* Floating Ambient Glow */}
-      <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-teal-50/10 to-transparent pointer-events-none" />
-    </div>
-  );
-}
 
 export function EnhancedAppointmentScheduler({
   isOpen,
@@ -326,11 +281,11 @@ export function EnhancedAppointmentScheduler({
 
   const renderForm = () => {
     return (
-      <div className="flex flex-col gap-6 h-full">
-        <div className="overflow-y-auto pr-1 flex-1 space-y-8 scrollbar-hide py-2">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
+      <div className="flex flex-col gap-8 h-full">
+        <div className="flex-1 space-y-4 sm:space-y-6 py-1 sm:py-2">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-8 items-start">
             {/* Date Selection */}
-            <div className="flex flex-col gap-3">
+            <div className="flex flex-col gap-2 sm:gap-3">
               <div className="flex items-center gap-2 px-1">
                 <label className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] leading-none">Pick Date</label>
               </div>
@@ -338,7 +293,7 @@ export function EnhancedAppointmentScheduler({
             </div>
 
             {/* Time Picker */}
-            <div className="flex flex-col gap-3">
+            <div className="flex flex-col gap-2 sm:gap-3">
               <div className="flex items-center gap-2 px-1">
                 <label className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] leading-none">Set Time</label>
               </div>
@@ -383,9 +338,6 @@ export function EnhancedAppointmentScheduler({
                 </div>
               ) : (
                 <>
-                  <div className="hidden sm:block transition-all duration-700 hover:scale-[1.02]">
-                    <SereneClockWidget hour={ampm === "PM" ? parseInt(hour) + 12 : parseInt(hour)} minute={parseInt(minute)} />
-                  </div>
                   
                   <div className="flex items-center gap-2 justify-center w-full max-w-[240px]">
                     <div className="flex flex-col gap-1.5 flex-1">
@@ -437,35 +389,59 @@ export function EnhancedAppointmentScheduler({
             </div>
           </div>
         </div>
-
-        {/* Private Recovery Notes */}
-        <div className="flex flex-col gap-3">
-          <div className="flex items-center gap-2 px-1">
-            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] leading-none">
-              {viewMode === 'respond' ? "Confidential Session Notes" : "Confidential First Greeting"}
-            </label>
-            <Badge variant="outline" className="text-[8px] font-bold px-1.5 h-4 border-slate-100 text-slate-400 uppercase tracking-widest leading-none bg-slate-50/50">
-              {viewMode === 'respond' ? "Session Prep" : "Sent as First Chat"}
-            </Badge>
-          </div>
-          <div className="relative">
-            <textarea
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder={viewMode === 'respond' 
-                ? "Private details or preparation notes for your specialist..." 
-                : "Enter an initial message for the survivor. This will be sent as your first chat with them..."
-              }
-              className="w-full h-20 sm:h-24 rounded-[1.2rem] sm:rounded-[1.5rem] bg-slate-50 border border-slate-100/50 p-3 sm:p-6 text-xs font-medium text-slate-600 focus:outline-none focus:ring-1 focus:ring-teal-400/20 placeholder:text-slate-300 resize-none transition-all shadow-inner"
-            />
+          {/* Private Recovery Notes */}
+          <div className="flex flex-col gap-2 sm:gap-3">
+            <div className="flex items-center gap-2 px-1">
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] leading-none">
+                {viewMode === 'respond' ? "Confidential Session Notes" : "Confidential First Greeting"}
+              </label>
+              <Badge variant="outline" className="text-[8px] font-bold px-1.5 h-4 border-slate-100 text-slate-400 uppercase tracking-widest leading-none bg-slate-50/50">
+                {viewMode === 'respond' ? "Session Prep" : "Sent as First Chat"}
+              </Badge>
+            </div>
+            <div className="relative">
+              <textarea
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder={viewMode === 'respond' 
+                  ? "Private details or preparation notes for your specialist..." 
+                  : "Enter an initial message for the survivor. This will be sent as your first chat with them..."
+                }
+                className="w-full h-14 sm:h-16 rounded-xl bg-slate-50 border border-slate-100/50 p-3 sm:p-4 text-xs font-medium text-slate-600 focus:outline-none focus:ring-1 focus:ring-teal-400/30 placeholder:text-slate-300 resize-none transition-all"
+              />
+            </div>
           </div>
         </div>
       </div>
+    );
+  };
 
-        {/* Action Center - Sticky on mobile if needed, but here we just ensure it's below the scroll area */}
-        <div className="space-y-4 pt-4 border-t border-slate-50 shrink-0">
+  const content = (
+    <div className="flex flex-col h-full overflow-hidden">
+      {!inline && (
+        <div className="px-4 sm:px-10 py-4 sm:py-8 border-b border-slate-50 shrink-0 text-left">
+          <DialogHeader>
+            <div className="flex items-center justify-between">
+              <div>
+                <DialogTitle className="text-lg sm:text-xl font-bold text-slate-900 tracking-tight leading-none uppercase">Coordination Session</DialogTitle>
+                <div className="flex flex-col sm:flex-row sm:items-center gap-2 mt-2">
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.1em]">Coordination Protocol</p>
+                  <span className="hidden sm:block w-1 h-1 rounded-full bg-slate-200" />
+                  <p className="text-[10px] font-bold text-teal-500/60 uppercase tracking-[0.1em]">Verification Level 4</p>
+                </div>
+              </div>
+            </div>
+          </DialogHeader>
+        </div>
+      )}
+      <div className={cn("overflow-y-auto flex-1", !inline && "px-4 sm:px-10 py-1 sm:py-6")}>
+        {renderForm()}
+      </div>
+
+      {!inline && (
+        <div className="px-4 sm:px-10 py-4 sm:py-6 border-t border-slate-50 shrink-0 bg-white/50 backdrop-blur-md">
            {/* Subtle Status Bar */}
-           <div className={cn("flex items-center justify-between p-4 sm:p-5 rounded-[1.5rem] border border-white/50 relative overflow-hidden", COLORS.muted, "bg-opacity-50 shadow-sm")}>
+           <div className={cn("flex items-center justify-between p-3 sm:p-5 rounded-[1.5rem] border border-white/50 relative overflow-hidden mb-4", COLORS.muted, "bg-opacity-50 shadow-sm")}>
               <div className="flex flex-col sm:flex-row sm:items-center gap-3 relative z-10 text-slate-500 font-medium text-[11px]">
                  <div className="flex items-center gap-2">
                     <CheckCircle2 className="h-4 w-4 text-teal-500" />
@@ -503,31 +479,7 @@ export function EnhancedAppointmentScheduler({
               </Button>
            </div>
         </div>
-      </div>
-    );
-  };
-
-  const content = (
-    <div className="flex flex-col h-full overflow-hidden">
-      {!inline && (
-        <div className="px-4 sm:px-10 py-4 sm:py-8 border-b border-slate-50 shrink-0 text-left">
-          <DialogHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <DialogTitle className="text-lg sm:text-xl font-bold text-slate-900 tracking-tight leading-none uppercase">Coordination Session</DialogTitle>
-                <div className="flex flex-col sm:flex-row sm:items-center gap-2 mt-2">
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.1em]">Coordination Protocol</p>
-                  <span className="hidden sm:block w-1 h-1 rounded-full bg-slate-200" />
-                  <p className="text-[10px] font-bold text-teal-500/60 uppercase tracking-[0.1em]">Verification Level 4</p>
-                </div>
-              </div>
-            </div>
-          </DialogHeader>
-        </div>
       )}
-      <div className={cn("overflow-hidden flex-1", !inline && "px-4 sm:px-10 py-2 sm:py-8 pt-1 sm:pt-2")}>
-        {renderForm()}
-      </div>
     </div>
   );
 

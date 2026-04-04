@@ -173,8 +173,8 @@ export const newReportAdminEmail = (
     </div>
 `, "New Incident Report Received");
 
-export const matchFoundProfessionalEmail = (serviceType: string) => baseTemplate(`
-    <p>We have matched you with a new case that requires your expertise in <strong>${serviceType}</strong>.</p>
+export const matchFoundProfessionalEmail = (survivorName: string) => baseTemplate(`
+    <p>We have matched you with a new case: <strong>${survivorName}</strong>.</p>
     <p>Please log in to your coordinator dashboard to review the case details and propose a meeting time if you are available to support this individual.</p>
     <div style="text-align: center; margin: 32px 0;">
         <a href="${process.env.NEXT_PUBLIC_APP_URL}/dashboard/cases" class="button">View Case Details</a>
@@ -190,3 +190,95 @@ export const matchFoundSurvivorEmail = (displayName: string, serviceCapability: 
     </div>
     <p>Remember, you are in control of this journey. You can choose when and how to coordinate with your matched specialists.</p>
 `, "Specialist Match Found");
+
+export const welcomeEmail = (userName: string) => baseTemplate(`
+    <p>Welcome to Sauti Salama, ${userName}.</p>
+    <p>We are glad to have you join our community. Sauti Salama is a secure and private platform designed to support survivors and professionals in their journey toward healing and justice.</p>
+    <p>You can now access your secure dashboard to begin coordinating care, reporting incidents, or managing your professional profile.</p>
+    <div style="text-align: center; margin: 32px 0;">
+        <a href="${process.env.NEXT_PUBLIC_APP_URL}/dashboard" class="button">Go to My Dashboard</a>
+    </div>
+`, "Welcome to Sauti Salama");
+
+export const profileVerifiedEmail = (name: string) => baseTemplate(`
+    <p>Hello ${name},</p>
+    <p>We are pleased to inform you that your professional profile has been verified by our administrative team. You are now a verified specialist on Sauti Salama.</p>
+    <p>You can now receive case matches and begin supporting survivors through our secure platform.</p>
+    <div style="text-align: center; margin: 32px 0;">
+        <a href="${process.env.NEXT_PUBLIC_APP_URL}/dashboard" class="button">Access Dashboard</a>
+    </div>
+`, "Profile Verified");
+
+export const profileRejectedEmail = (name: string, reason: string) => baseTemplate(`
+    <p>Hello ${name},</p>
+    <p>Thank you for your interest in joining Sauti Salama as a verified specialist. At this time, we are unable to verify your profile for the following reason:</p>
+    <div style="background: #fff1f2; border: 1px solid #ffe4e6; padding: 16px; border-radius: 12px; margin: 20px 0; color: #9f1239;">
+        <strong>Reason:</strong> ${reason}
+    </div>
+    <p>You can update your profile information and re-submit for verification at any time.</p>
+    <div style="text-align: center; margin: 32px 0;">
+        <a href="${process.env.NEXT_PUBLIC_APP_URL}/dashboard/profile" class="button">Update Profile</a>
+    </div>
+`, "Profile Verification Update");
+
+export const serviceVerifiedEmail = (serviceName: string) => baseTemplate(`
+    <p>Your service, <strong>${serviceName}</strong>, has been successfully verified and added to the Sauti Salama service directory.</p>
+    <p>It is now available for survivors and professionals seeking specialized support in your area of expertise.</p>
+    <div style="text-align: center; margin: 32px 0;">
+        <a href="${process.env.NEXT_PUBLIC_APP_URL}/dashboard/services" class="button">Manage Services</a>
+    </div>
+`, "Service Verified");
+
+export const serviceRejectedEmail = (serviceName: string, reason: string) => baseTemplate(`
+    <p>We have reviewed your service submission for <strong>${serviceName}</strong>. At this time, we cannot include it in our directory.</p>
+    <div style="background: #fff1f2; border: 1px solid #ffe4e6; padding: 16px; border-radius: 12px; margin: 20px 0; color: #9f1239;">
+        <strong>Feedback:</strong> ${reason}
+    </div>
+    <p>Please feel free to address these points and re-submit when ready.</p>
+`, "Service Verification Update");
+
+export const caseForwardedEmail = (senderName: string) => baseTemplate(`
+    <p>A specialist, <strong>${senderName}</strong>, has forwarded a case to you for further coordination or specialized care.</p>
+    <p>Please log in to your secure dashboard to review the case details and accept the referral.</p>
+    <div style="text-align: center; margin: 32px 0;">
+        <a href="${process.env.NEXT_PUBLIC_APP_URL}/dashboard/cases" class="button">View Referral</a>
+    </div>
+`, "Case Forwarded to You");
+
+export const newBlogSubmissionEmail = (title: string, category: string, author: string) => baseTemplate(`
+    <p>A new content piece has been submitted for review on Sauti Salama.</p>
+    <div style="background: #f8fafc; border: 1px solid #f1f5f9; padding: 24px; border-radius: 16px; margin: 20px 0;">
+        <div style="margin-bottom: 8px;"><strong>Title:</strong> ${title}</div>
+        <div style="margin-bottom: 8px;"><strong>Category:</strong> ${category}</div>
+        <div style="margin-bottom: 0;"><strong>Author:</strong> ${author}</div>
+    </div>
+    <p>Please review the submission in the admin console to ensure it aligns with our community guidelines and trauma-informed standards.</p>
+    <div style="text-align: center; margin: 32px 0;">
+        <a href="${process.env.NEXT_PUBLIC_APP_URL}/admin/blog" class="button">Review Submission</a>
+    </div>
+`, "New Content Submission");
+
+export const blogApprovedEmail = (title: string) => baseTemplate(`
+    <p>Congratulations! Your article, <strong>"${title}"</strong>, has been approved and is now live on Sauti Salama.</p>
+    <p>Thank you for contributing your insights and helping our community grow stronger through shared knowledge.</p>
+    <div style="text-align: center; margin: 32px 0;">
+        <a href="${process.env.NEXT_PUBLIC_APP_URL}/blog" class="button">View Your Post</a>
+    </div>
+`, "Content Approved");
+
+export const blogRejectedEmail = (title: string, reason: string) => baseTemplate(`
+    <p>Thank you for your submission, <strong>"${title}"</strong>. Our editorial team has reviewed your work and suggests some modifications before it can be published.</p>
+    <div style="background: #f8fafc; border: 1px solid #f1f5f9; padding: 16px; border-radius: 12px; margin: 20px 0;">
+        <strong>Editorial Notes:</strong> ${reason}
+    </div>
+    <p>You can edit and re-submit your article through your dashboard.</p>
+`, "Content Update Requested");
+
+export const newBlogContentEmail = (title: string, type: string) => baseTemplate(`
+    <p>New content has been published on Sauti Salama!</p>
+    <p>Check out our latest <strong>${type}</strong>: <strong>"${title}"</strong></p>
+    <p>Join the conversation and stay informed on our secure platform.</p>
+    <div style="text-align: center; margin: 32px 0;">
+        <a href="${process.env.NEXT_PUBLIC_APP_URL}/blog" class="button">Read More</a>
+    </div>
+`, "New Content on Sauti Salama");

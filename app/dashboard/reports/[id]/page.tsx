@@ -14,7 +14,7 @@ import {
 	BookOpen, HandHeart,
 	Mic, FileText, PenLine, VideoIcon, CheckSquare,
 	Trash2, MessageCircle, ChevronLeft, Sparkles, Activity, ArrowRight,
-	Shield, Quote, X, AlertCircle, Archive, MoreVertical
+	Shield, Quote, X, AlertCircle, Archive, MoreVertical, Check
 } from "lucide-react";
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -26,6 +26,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { AudioPlayer } from "../../_components/AudioPlayer";
 import { RichTextEditor } from "@/components/RichTextEditor";
 import { VoiceRecorderInline } from "@/components/VoiceRecorderInline";
@@ -146,6 +147,7 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
     useEffect(() => {
         if (!report) return;
         
+        const displayStatus = getReportStatus(report as ReportWithRelations);
         const type = report?.type_of_incident?.replace(/_/g, " ") || "Incident";
         const abuseType = type.toLowerCase().includes("abuse") ? type : `${type} Abuse`;
         
@@ -166,6 +168,39 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
                 <div className="flex items-center gap-1.5 text-[11px] font-medium text-serene-neutral-500">
                     <CalendarIcon className="h-3 w-3" />
                     <span>{formatDate(report?.submission_timestamp)}</span>
+                    <TooltipProvider>
+                        <Tooltip delayDuration={0}>
+                            <TooltipTrigger asChild>
+                                <div className="flex items-center ml-0.5 cursor-help">
+                                    {report?.match_status === 'accepted' ? (
+                                        <div className="flex items-center">
+                                            <Check className="h-3 w-3 text-blue-500 stroke-[3]" />
+                                            <Check className="h-3 w-3 text-blue-500 stroke-[3] -ml-2" />
+                                        </div>
+                                    ) : report?.match_status ? (
+                                        <div className="flex items-center">
+                                            <Check className="h-3 w-3 text-slate-300 stroke-[3]" />
+                                            <Check className="h-3 w-3 text-slate-300 stroke-[3] -ml-2" />
+                                        </div>
+                                    ) : (
+                                        <Check className="h-3 w-3 text-slate-300 stroke-[3]" />
+                                    )}
+                                </div>
+                            </TooltipTrigger>
+                            <TooltipContent side="bottom" align="center" className="bg-slate-900 border-0 text-white rounded-xl shadow-2xl p-3 max-w-[200px] animate-in fade-in zoom-in-95 duration-200">
+                                <p className="text-[10px] font-bold uppercase tracking-wider mb-1 text-slate-400">
+                                    {report?.match_status === 'accepted' ? "Accepted & Scheduled" : report?.match_status ? "Professional Matched" : "Report Submitted"}
+                                </p>
+                                <p className="text-xs font-medium leading-tight text-white/90">
+                                    {report?.match_status === 'accepted' 
+                                        ? "Your support coordination has been finalized and a session is scheduled." 
+                                        : report?.match_status 
+                                        ? "A professional has been assigned and is reviewing your incident details." 
+                                        : "Your secure report has been received and is awaiting professional assignment."}
+                                </p>
+                            </TooltipContent>
+                        </Tooltip>
+                    </TooltipProvider>
                 </div>
             </div>
         );
@@ -173,7 +208,7 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
         if (setTopBarTitle) setTopBarTitle(title);
 
         const actions = (
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 sm:gap-3">
                 <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                         <Button variant="ghost" size="sm" className="h-9 w-9 p-0 rounded-full hover:bg-serene-neutral-50 shrink-0">
@@ -182,28 +217,30 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="w-56 rounded-2xl border-serene-neutral-200 shadow-xl p-2 animate-in fade-in zoom-in-95 duration-200">
                         <div className="px-3 py-2 border-b border-serene-neutral-50 mb-1">
-                            <p className="text-[10px] font-bold text-serene-neutral-400 uppercase tracking-widest">Administrative Actions</p>
+                            <p className="text-[10px] font-bold text-serene-neutral-400 uppercase tracking-widest">Case Actions</p>
                         </div>
                         <DropdownMenuItem 
                             onClick={() => setShowArchiveConfirm(true)}
                             className="flex items-center gap-3 cursor-pointer rounded-xl focus:bg-serene-neutral-50 focus:text-sauti-teal p-3 text-sm font-semibold text-serene-neutral-700"
                         >
                             <Archive className="h-4 w-4" />
-                            Close Report
+                            {isOwner ? 'Close Report' : 'Archive Case'}
                         </DropdownMenuItem>
+
                         {process.env.NODE_ENV === 'development' && (
                             <DropdownMenuItem 
                                 onClick={() => setShowDeleteConfirm(true)}
-                                className="flex items-center gap-3 cursor-pointer rounded-xl focus:bg-rose-50 focus:text-rose-600 p-3 text-sm font-semibold text-rose-600"
+                                className="flex items-center gap-3 cursor-pointer rounded-xl focus:bg-rose-50 focus:text-rose-600 p-3 text-sm font-semibold text-rose-600 border-t border-serene-neutral-50 mt-1"
                             >
                                 <Trash2 className="h-4 w-4" />
-                                Delete Record
+                                Delete Record (Dev)
                             </DropdownMenuItem>
                         )}
                     </DropdownMenuContent>
                 </DropdownMenu>
             </div>
         );
+
         if (setTopBarActions) setTopBarActions(actions);
 
         return () => {
@@ -432,6 +469,20 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
 		}
 	}, [reportId, supabase, router]);
 
+	// Shared Auth Session Lifecycle
+	useEffect(() => {
+		const fetchSession = async () => {
+			const { data: { session } } = await supabase.auth.getSession();
+			if (session?.user) setCurrentUserId(session.user.id);
+		};
+		fetchSession();
+
+		const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+			setCurrentUserId(session?.user?.id || null);
+		});
+		return () => subscription.unsubscribe();
+	}, [supabase]);
+
 	// IMMEDIATE CHAT WARMUP: Fetch active match ID and initialize chat in parallel with main report data
 	useEffect(() => {
 		const warmupChat = async () => {
@@ -443,32 +494,24 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
 					.or('match_status_type.eq.accepted,match_status_type.eq.completed')
 					.maybeSingle();
 				
-				if (match) {
-					const { data: { user } } = await supabase.auth.getUser();
-					if (user) {
-						setCurrentUserId(user.id);
-						const chat = await getCaseChat(match.id, user.id);
-						if (chat) setActiveChat(chat);
-					}
+				if (match && currentUserId) {
+					const chat = await getCaseChat(match.id, currentUserId);
+					if (chat) setActiveChat(chat);
 				}
 			} catch (err) {
 				console.error("Chat warmup failed:", err);
 			}
 		};
 		warmupChat();
-	}, [reportId, supabase]);
+	}, [reportId, currentUserId, supabase]);
 
 	// Keep existing sync logic for when match is accepted in-page
 	useEffect(() => {
 		const preloadChat = async () => {
-			if (!acceptedMatch) return;
-			const { data: { user } } = await supabase.auth.getUser();
-			if (!user) return;
-            setCurrentUserId(user.id);
-
+			if (!acceptedMatch || !currentUserId) return;
 			setIsChatLoading(true);
 			try {
-				const chat = await getCaseChat(acceptedMatch.id, user.id);
+				const chat = await getCaseChat(acceptedMatch.id, currentUserId);
 				setActiveChat(chat);
 			} catch (err) {
 				console.error("Chat preload failed:", err);
@@ -477,7 +520,7 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
 			}
 		};
 		preloadChat();
-	}, [acceptedMatch, supabase]);
+	}, [acceptedMatch, currentUserId, supabase]);
 
     // Handle real-time unread count
     useEffect(() => {
@@ -808,7 +851,7 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
 	}
 
 	const upcomingAppointments = appointments.filter(a => a.appointment_date && new Date(a.appointment_date) >= new Date());
-    const displayStatus = getReportStatus(report as ReportWithRelations);
+
 
 	const isArchived = (report.administrative as any)?.is_archived === true;
 
@@ -831,127 +874,10 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
 			)}
 			
 			{/* Focused Header Navigation - Mobile Only (Hidden on Desktop to avoid double top bars) */}
-			<nav className="lg:hidden sticky top-0 z-50 bg-white/80 backdrop-blur-xl border-b border-serene-neutral-100/50 transition-all duration-300 min-h-[64px] sm:min-h-[72px] flex items-center">
-				<div className="max-w-7xl mx-auto px-2 xs:px-4 sm:px-6 w-full flex items-center justify-between gap-2 sm:gap-4 py-2 sm:py-0">
-					<div className="flex items-center gap-1 sm:gap-4 flex-1 min-w-0">
-						<Link href="/dashboard/reports" className="shrink-0 w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-serene-neutral-50 flex items-center justify-center hover:bg-serene-neutral-100 transition-all text-serene-neutral-600">
-							<ChevronLeft className="h-4 w-4 sm:h-5 sm:w-5" />
-						</Link>
-						<div className="flex-1 min-w-0">
-							<div className="hidden sm:flex items-center gap-2 text-sauti-teal font-extrabold uppercase tracking-[0.2em] text-[10px] mb-0.5">
-								<ShieldCheck className="h-3.5 w-3.5" />
-								<span className="truncate">
-									{!currentUserId ? 'Secure Anonymous Session' : (isOwner ? 'Secure Journey Hub' : 'Case Coordination Hub')}
-								</span>
-							</div>
-							<div className="flex-1 min-w-0 flex items-center gap-2">
-								<h2 className="text-sauti-dark font-bold tracking-tight uppercase text-xs sm:text-base whitespace-nowrap overflow-hidden text-ellipsis w-fit shrink-0">
-									{(() => {
-										const type = report?.type_of_incident?.replace(/_/g, " ") || "Incident";
-										if (type.toLowerCase().includes("abuse")) return type;
-										return `${type} abuse`;
-									})()}
-								</h2>
-								{(report?.additional_info as any)?.is_for_child && (
-									<Badge className="bg-purple-100 text-purple-700 border-purple-200 text-[10px] sm:text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-lg shadow-sm shrink-0 w-fit whitespace-nowrap">
-										Child Abuse
-									</Badge>
-								)}
-							</div>
-						</div>
-					</div>
-
-					<div className="hidden lg:flex items-center gap-1 sm:gap-3 shrink-0 min-w-0">
-                        <Badge className={cn("px-2 sm:px-4 py-1 sm:py-1.5 rounded-full text-[8px] sm:text-[10px] font-bold border uppercase tracking-[0.1em] sm:tracking-[0.2em] shadow-sm truncate max-w-[80px] xs:max-w-none", getStatusTheme(displayStatus))}>
-                            {displayStatus}
-                        </Badge>
-						
-						<Dialog open={showArchiveConfirm} onOpenChange={setShowArchiveConfirm}>
-							<DialogTrigger asChild>
-								<Button variant="ghost" className="text-serene-neutral-400 hover:text-sauti-teal font-bold text-[9px] sm:text-[10px] gap-2 uppercase tracking-widest h-8 sm:h-10 px-1 sm:px-2 group">
-									<Archive className="h-3.5 w-3.5 sm:h-4 sm:w-4 group-hover:scale-110 transition-transform" /> 
-									<span className="hidden sm:inline text-serene-neutral-500">{isOwner ? 'Close Report' : 'Close Case'}</span>
-								</Button>
-							</DialogTrigger>
-							<DialogContent className="sm:max-w-[425px] rounded-[2rem] border-serene-neutral-100 p-8 bg-white shadow-2xl">
-								<DialogHeader className="space-y-4">
-									<div className="w-14 h-14 bg-amber-50 rounded-2xl flex items-center justify-center text-amber-500 mx-auto">
-										<AlertCircle className="h-7 w-7" />
-									</div>
-									<div className="text-center space-y-2">
-										<DialogTitle className="text-xl font-bold tracking-tight text-sauti-dark">Archive this report?</DialogTitle>
-										<DialogDescription className="text-serene-neutral-500 font-medium leading-relaxed">
-											Archiving will move this report to your history. You will still be able to access it later from the archived reports section.
-										</DialogDescription>
-									</div>
-								</DialogHeader>
-								<div className="flex flex-col gap-3 mt-6">
-									<Button 
-										onClick={handleArchiveReport} 
-										disabled={isArchiving}
-										className="h-12 bg-sauti-dark hover:bg-sauti-dark/90 text-white font-bold rounded-2xl w-full shadow-lg transition-all"
-									>
-										{isArchiving ? "Archiving..." : "Yes, Archive Report"}
-									</Button>
-									<Button 
-										variant="ghost" 
-										onClick={() => setShowArchiveConfirm(false)}
-										className="h-12 text-serene-neutral-400 font-bold rounded-2xl w-full hover:bg-serene-neutral-50"
-									>
-										Keep {isOwner ? 'Report' : 'Case'} Active
-									</Button>
-								</div>
-							</DialogContent>
-						</Dialog>
-
-						{/* Dev-only Delete Button */}
-						{process.env.NODE_ENV === 'development' && (
-							<Dialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
-								<DialogTrigger asChild>
-									<Button variant="ghost" className="text-rose-400 hover:text-rose-600 font-bold text-[9px] sm:text-[10px] gap-2 uppercase tracking-widest h-8 sm:h-10 px-1 sm:px-2 group">
-										<Trash2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 group-hover:scale-110 transition-transform" /> 
-										<span className="hidden sm:inline">Delete Record (Dev Only)</span>
-									</Button>
-								</DialogTrigger>
-								<DialogContent className="sm:max-w-[425px] rounded-[2rem] border-rose-100 p-8 bg-white shadow-2xl">
-									<DialogHeader className="space-y-4">
-										<div className="w-14 h-14 bg-rose-50 rounded-2xl flex items-center justify-center text-rose-500 mx-auto">
-											<AlertCircle className="h-7 w-7" />
-										</div>
-										<div className="text-center space-y-2">
-											<DialogTitle className="text-xl font-bold tracking-tight text-rose-900 uppercase tracking-widest">Hard Delete Report?</DialogTitle>
-											<DialogDescription className="text-rose-500 font-medium leading-relaxed">
-												This action is permanent and will cascade to all matches, chats, and notifications associated with this report. This button is only visible in development.
-											</DialogDescription>
-										</div>
-									</DialogHeader>
-									<div className="flex flex-col gap-3 mt-6">
-										<Button 
-											onClick={handleDeleteReport} 
-											disabled={isDeleting}
-											className="h-12 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-2xl w-full shadow-lg transition-all"
-										>
-											{isDeleting ? "Deleting..." : "PERMANENTLY DELETE"}
-										</Button>
-										<Button 
-											variant="ghost" 
-											onClick={() => setShowDeleteConfirm(false)}
-											className="h-12 text-slate-400 font-bold rounded-2xl w-full hover:bg-slate-50"
-										>
-											Cancel
-										</Button>
-									</div>
-								</DialogContent>
-							</Dialog>
-						)}
-
-					</div>
-				</div>
-			</nav>
 
 
 			<ScrollArea className="flex-1">
-				<main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 transition-all duration-700 animate-in fade-in slide-in-from-bottom-4">
+				<main className="px-4 sm:px-6 py-6 transition-all duration-700 animate-in fade-in slide-in-from-bottom-4">
 				
 
 				{/* Appointments Banner - Conditional high-importance UI */}
@@ -1086,44 +1012,7 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
 								</CardContent>
 							</Card>
 
-                            {/* New Incident Metadata Section - Primary for mobile navigation relief */}
-                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 lg:hidden mt-6">
-                                <Card className="border border-slate-100 bg-white shadow-sm rounded-2xl overflow-hidden p-4">
-                                    <div className="flex items-center gap-3">
-                                        <div className={cn("w-8 h-8 rounded-lg border flex items-center justify-center shrink-0", getStatusTheme(displayStatus))}>
-                                            <Activity className="h-4 w-4" />
-                                        </div>
-                                        <div className="flex-1 min-w-0">
-                                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none mb-1">Status</p>
-                                            <p className="text-xs font-bold text-slate-700 uppercase tracking-tight">{displayStatus}</p>
-                                        </div>
-                                    </div>
-                                </Card>
 
-                                <Card className="border border-slate-100 bg-white shadow-sm rounded-2xl overflow-hidden p-4">
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-8 h-8 rounded-lg bg-teal-50 border border-teal-100 flex items-center justify-center text-teal-600 shrink-0">
-                                            <MapPin className="h-4 w-4" />
-                                        </div>
-                                        <div className="flex-1 min-w-0">
-                                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none mb-1">Location</p>
-                                            <p className="text-xs font-bold text-slate-700 truncate">{report?.location || report?.city || "Unknown"}</p>
-                                        </div>
-                                    </div>
-                                </Card>
-
-                                <Card className="border border-slate-100 bg-white shadow-sm rounded-2xl overflow-hidden p-4">
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-8 h-8 rounded-lg bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 shrink-0">
-                                            <Clock className="h-4 w-4" />
-                                        </div>
-                                        <div className="flex-1 min-w-0">
-                                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none mb-1">Submitted</p>
-                                            <p className="text-xs font-bold text-slate-700">{report?.submission_timestamp ? new Date(report.submission_timestamp).toLocaleDateString() : ""}</p>
-                                        </div>
-                                    </div>
-                                </Card>
-                            </div>
 						</div>
 
 						{/* Report Info & Personal Details Section - Rebranded as Discrete Accordion */}
@@ -1253,9 +1142,10 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
 								<h2 className="text-xl font-bold tracking-tight text-slate-800">Your Private Journal</h2>
 							</div>
 							<p className="text-sm text-slate-400 font-medium leading-relaxed px-2">Only you can see these notes. Reflect on your healing, progress, and thoughts here.</p>
-							<div className="bg-white/50 backdrop-blur-sm rounded-2xl sm:rounded-[2.5rem] shadow-xl shadow-slate-200/20 border border-white p-2 overflow-hidden">
+							<div className="bg-white/50 backdrop-blur-sm rounded-xl xs:rounded-2xl sm:rounded-[2.5rem] shadow-xl shadow-slate-200/20 border border-white p-2 overflow-hidden">
 								<RichTextEditor content={report.notes || ""} onSave={handleSaveNotes} placeholder="How are you feeling today?" />
-</div>
+							</div>
+
 						</div>
 					</div>
 
@@ -1275,7 +1165,7 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
 										<h3 className="text-2xl font-bold text-slate-900 tracking-tight">Coordination Line</h3>
 									</div>
 									
-									<div className="h-[600px] rounded-2xl sm:rounded-[2.5rem] border border-serene-neutral-100 shadow-2xl shadow-slate-200/50 overflow-hidden bg-white flex flex-col group">
+									<div className="h-[600px] rounded-xl xs:rounded-2xl sm:rounded-[2.5rem] border border-serene-neutral-100 shadow-2xl shadow-slate-200/50 overflow-hidden bg-white flex flex-col group">
 										{isChatLoading ? (
 											<div className="flex-1 flex flex-col items-center justify-center p-12 text-center space-y-4">
 												<div className="w-12 h-12 rounded-2xl bg-teal-50 flex items-center justify-center animate-spin">
@@ -1310,7 +1200,7 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
 
 
 										{/* Help Card */}
-										<Card className="bg-violet-600 rounded-2xl sm:rounded-[2.5rem] shadow-xl shadow-violet-600/20 border-0 p-8 text-white relative overflow-hidden group">
+										<Card className="bg-violet-600 rounded-xl xs:rounded-2xl sm:rounded-[2.5rem] shadow-xl shadow-violet-600/20 border-0 p-5 xs:p-6 sm:p-8 text-white relative overflow-hidden group">
 											<div className="absolute top-0 right-0 p-4 opacity-10 group-hover:scale-110 transition-transform">
 												<Heart className="h-24 w-24" />
 											</div>
@@ -1324,8 +1214,8 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
 										</Card>
 
 									{/* Supportive Hint Card */}
-									<Card className="border border-slate-100 bg-white shadow-sm rounded-2xl sm:rounded-[2.5rem] overflow-hidden">
-										<CardContent className="p-8 space-y-6">
+									<Card className="border border-slate-100 bg-white shadow-sm rounded-xl xs:rounded-2xl sm:rounded-[2.5rem] overflow-hidden">
+										<CardContent className="p-5 xs:p-6 sm:p-8 space-y-6">
 											<div className="flex items-center gap-3">
 												<div className="w-10 h-10 rounded-xl bg-teal-50 flex items-center justify-center text-teal-600">
 													<Sparkles className="h-5 w-5" />

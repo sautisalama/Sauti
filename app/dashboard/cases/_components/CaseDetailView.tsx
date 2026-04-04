@@ -10,7 +10,7 @@ import {
     VideoIcon, CheckSquare, Trash2, MessageCircle, 
     ChevronLeft, Sparkles, Activity, ArrowRight,
     Shield, User, Briefcase, MessageSquare, ExternalLink,
-    X, MoreHorizontal, AlertCircle, MoreVertical
+    X, MoreHorizontal, AlertCircle, MoreVertical, Check
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { MarkdownText } from "@/components/ui/MarkdownText";
@@ -48,6 +48,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { ChatFAB } from "@/components/navigation/ChatFAB";
 import { AppointmentBanner } from "@/components/dashboard/AppointmentBanner";
+import { LottieLoader } from "@/components/ui/LottieLoader";
+import loadingHands from "@/public/lottie-animations/loading-hands.json";
 
 interface ChecklistItem {
     id: string;
@@ -253,7 +255,7 @@ export function CaseDetailView({
     const mainContent = (
         <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
             {isSurvComplete && !isProfComplete && (
-                <div className="bg-emerald-50 border border-emerald-100 rounded-2xl p-4 flex items-center justify-between gap-4">
+                <div className="bg-emerald-50 border border-emerald-100 rounded-xl xs:rounded-2xl p-4 flex items-center justify-between gap-4">
                     <div className="flex items-center gap-3 text-emerald-700">
                         <CheckCircle2 className="h-5 w-5" />
                         <p className="text-sm font-bold">The survivor has marked this case as completed. Do you want to close it?</p>
@@ -269,65 +271,17 @@ export function CaseDetailView({
             )}
 
             {isProfComplete && !isSurvComplete && (
-                <div className="bg-amber-50 border border-amber-100 rounded-2xl p-4 flex items-center gap-3 text-amber-700">
+                <div className="bg-amber-50 border border-amber-100 rounded-xl xs:rounded-2xl p-4 flex items-center gap-3 text-amber-700">
                     <Clock className="h-5 w-5" />
                     <p className="text-sm font-medium">You've marked this as complete. Waiting for survivor to confirm and archive.</p>
                 </div>
             )}
 
-            {/* New Incident Metadata Section - Primary for mobile navigation relief */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 lg:hidden">
-                <Card className="border border-slate-100 bg-white/50 backdrop-blur-sm shadow-sm rounded-2xl overflow-hidden p-4">
-                    <div className="flex items-center gap-3">
-                        <div className={cn("w-8 h-8 rounded-lg border flex items-center justify-center shrink-0", urgencyColor(report?.urgency))}>
-                            <Activity className="h-4 w-4" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none mb-1">Urgency</p>
-                            <p className="text-xs font-bold text-slate-700 uppercase tracking-tight">{report?.urgency || 'Low'} Priority</p>
-                        </div>
-                    </div>
-                </Card>
 
-                <Card className="border border-slate-100 bg-white/50 backdrop-blur-sm shadow-sm rounded-2xl overflow-hidden p-4">
-                    <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-lg bg-teal-50 border border-teal-100 flex items-center justify-center text-teal-600 shrink-0">
-                            <MapPin className="h-4 w-4" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none mb-1">Location</p>
-                            <p className="text-xs font-bold text-slate-700 truncate">{report?.location || report?.city || "Unknown"}</p>
-                        </div>
-                    </div>
-                </Card>
 
-                <Card className="border border-slate-100 bg-white/50 backdrop-blur-sm shadow-sm rounded-2xl overflow-hidden p-4">
-                    <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-lg bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 shrink-0">
-                            <Clock className="h-4 w-4" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none mb-1">Submitted</p>
-                            <p className="text-xs font-bold text-slate-700">{formatDate(report?.submission_timestamp)}</p>
-                        </div>
-                    </div>
-                </Card>
-            </div>
-
-            {!isAccepted && (
-                <div className="bg-serene-blue-50/50 border border-serene-blue-100 rounded-2xl p-4 flex items-start gap-3">
-                    <Shield className="h-5 w-5 text-serene-blue-600 mt-0.5" />
-                    <div className="space-y-1">
-                        <p className="text-sm font-bold text-serene-blue-900">Privacy Mode Enabled</p>
-                        <p className="text-xs text-serene-blue-700 leading-relaxed">
-                            Survivor details are protected. Full contact information and incident history will be visible once you accept the case and schedule a meeting.
-                        </p>
-                    </div>
-                </div>
-            )}
 
             {caseItem.match_status_type === 'reschedule_requested' && (
-                <div className="bg-amber-600 shadow-xl shadow-amber-600/20 rounded-[2rem] p-8 text-white relative overflow-hidden group">
+                <div className="bg-amber-600 shadow-xl shadow-amber-600/20 rounded-2xl xs:rounded-[2rem] p-5 xs:p-8 text-white relative overflow-hidden group">
                     <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:rotate-12 transition-transform duration-700">
                         <Calendar className="h-24 w-24" />
                     </div>
@@ -370,8 +324,8 @@ export function CaseDetailView({
             )}
 
 
-            <Card className="border-0 bg-white shadow-xl shadow-slate-200/50 rounded-2xl sm:rounded-[2.5rem] overflow-hidden">
-                <CardHeader className="p-6 sm:p-10 pb-0 flex flex-row items-center justify-between">
+            <Card className="border-0 bg-white shadow-xl shadow-slate-200/50 rounded-2xl overflow-hidden">
+                <CardHeader className="p-4 xs:p-5 sm:p-6 pb-0 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <div className="flex items-center gap-4">
                         <div className="w-10 h-10 sm:w-12 sm:h-12 bg-slate-50 rounded-xl sm:rounded-2xl flex items-center justify-center text-slate-400">
                             <BookOpen className="h-5 w-5 sm:h-6 sm:w-6" />
@@ -383,9 +337,20 @@ export function CaseDetailView({
                             </p>
                         </div>
                     </div>
+                    
+                    <div className="flex items-center gap-2">
+                        <Badge className={cn("px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border shadow-none shrink-0", urgencyColor(report?.urgency))}>
+                            {report?.urgency || 'Low'} Priority
+                        </Badge>
+                        {caseItem.match_status_type === 'accepted' && (
+                            <Badge className="px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest bg-emerald-50 text-emerald-600 border-emerald-100 shadow-none shrink-0">
+                                Active Case
+                            </Badge>
+                        )}
+                    </div>
                 </CardHeader>
-                <CardContent className="p-6 sm:p-10 space-y-6 sm:space-y-8">
-                    <div className="bg-slate-50/50 rounded-2xl sm:rounded-3xl p-6 sm:p-8 border border-slate-50 leading-relaxed text-slate-600 font-medium text-sm sm:text-base italic relative text-center sm:text-left">
+                <CardContent className="p-4 xs:p-5 sm:p-6 space-y-4 sm:space-y-6">
+                    <div className="bg-slate-50/50 rounded-xl xs:rounded-2xl sm:rounded-3xl p-5 xs:p-6 sm:p-8 border border-slate-50 leading-relaxed text-slate-600 font-medium text-sm sm:text-base italic relative text-center sm:text-left">
                         <div className="absolute top-4 left-4 text-teal-200/20 select-none"><span className="text-6xl font-serif">"</span></div>
                         {isAccepted ? (
                             <MarkdownText content={report?.incident_description || "No description provided."} />
@@ -516,15 +481,21 @@ export function CaseDetailView({
 
     const sidebarContent = (
         <div className="space-y-6">
-            {isAccepted && (
+            {isAccepted ? 
                 <div className="hidden lg:flex flex-col h-[400px] sm:h-[600px] rounded-2xl sm:rounded-[2.5rem] border border-white shadow-2xl shadow-teal-500/10 overflow-hidden bg-white/70 backdrop-blur-2xl group mt-0">
-
-                    {isChatLoading ? (
-                        <div className="flex-1 flex flex-col items-center justify-center gap-4 text-slate-400">
-                            <div className="w-10 h-10 border-4 border-teal-100 border-t-teal-600 rounded-full animate-spin" />
-                            <p className="font-bold text-xs uppercase tracking-widest">Accessing Chat...</p>
+                    {isChatLoading ? 
+                        <div className="flex-1 flex flex-col items-center justify-center bg-slate-50/10 p-12">
+                            <LottieLoader 
+                                animationData={loadingHands} 
+                                size={180} 
+                                className="mb-4"
+                            />
+                            <div className="flex flex-col items-center gap-2">
+                                <span className="text-[11px] font-black text-teal-600 uppercase tracking-[0.3em] animate-pulse">Initializing Secure Chat</span>
+                                <p className="text-[10px] font-bold text-slate-400 tracking-wider">Establishing end-to-end encryption</p>
+                            </div>
                         </div>
-                    ) : (
+                     : 
                         <div className="flex-1 relative">
                             <CaseChatPanel 
                                 matchId={matchId}
@@ -536,13 +507,36 @@ export function CaseDetailView({
                                 className="absolute inset-0 border-0 rounded-none shadow-none h-full w-full"
                             />
                         </div>
-                    )}
+                    }
                 </div>
-            )}
+             : 
+                <div className="hidden lg:flex flex-col h-[600px] rounded-[2.5rem] border border-slate-100 bg-slate-100/10 backdrop-blur-md overflow-hidden p-8 group transition-all duration-700 hover:shadow-2xl hover:shadow-blue-500/5">
+                    <div className="flex-1 flex flex-col items-center justify-center text-center space-y-6">
+                        <div className="relative">
+                            <div className="absolute inset-0 bg-blue-100/30 blur-3xl rounded-full animate-pulse" />
+                            <div className="w-20 h-20 bg-white rounded-[2rem] shadow-xl border border-slate-50 flex items-center justify-center relative transition-all duration-700 group-hover:scale-110 group-hover:rotate-3">
+                                <MessageCircle className="h-10 w-10 text-slate-200" />
+                                <div className="absolute -top-1 -right-1 w-8 h-8 bg-blue-500 rounded-xl flex items-center justify-center text-white border-2 border-white shadow-lg animate-in zoom-in-50 duration-500">
+                                    <Lock className="h-3.5 w-3.5" />
+                                </div>
+                            </div>
+                        </div>
+                        <div className="space-y-2 max-w-[260px]">
+                            <h3 className="text-xl font-bold text-slate-900 tracking-tight">Coordination Gated</h3>
+                            <p className="text-sm font-medium text-slate-400 leading-relaxed italic">
+                                "Safe dialogue requires a finalized match."
+                            </p>
+                            <p className="text-xs font-bold text-slate-500 leading-tight pt-2">
+                                Please accept and schedule the case to unlock secure direct messaging.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            }
 
             <Accordion type="single" collapsible className="w-full">
-                <AccordionItem value="notes" className="bg-white rounded-2xl sm:rounded-[2.5rem] border border-slate-100 shadow-xl shadow-slate-200/50 overflow-hidden">
-                    <AccordionTrigger className="px-8 py-6 hover:no-underline [&[data-state=open]>svg]:rotate-180">
+                <AccordionItem value="notes" className="bg-white rounded-xl border border-slate-100 shadow-xl shadow-slate-200/50 overflow-hidden">
+                    <AccordionTrigger className="px-5 xs:px-6 sm:px-8 py-6 hover:no-underline [&[data-state=open]>svg]:rotate-180">
                         <div className="flex items-center gap-4">
                             <div className="w-10 h-10 bg-violet-50 rounded-xl flex items-center justify-center text-violet-600">
                                 <PenLine className="h-5 w-5" />
@@ -550,7 +544,7 @@ export function CaseDetailView({
                             <span className="text-xl font-bold tracking-tight text-slate-900">Private Notes</span>
                         </div>
                     </AccordionTrigger>
-                    <AccordionContent className="px-8 pb-8 pt-0">
+                    <AccordionContent className="px-1.5 pb-2 pt-0">
                         <p className="text-sm text-slate-400 font-medium leading-relaxed mb-4">Only you can access these notes.</p>
                         <div className="h-[300px] border border-slate-100 rounded-2xl overflow-hidden shadow-inner">
                             <CaseNotesEditor 
@@ -570,123 +564,62 @@ export function CaseDetailView({
             "flex flex-col bg-slate-50/30 overflow-hidden",
             isFullPage ? "min-h-screen w-full" : "h-full w-full"
         )}>
-			<nav className="sticky top-0 z-50 bg-white shadow-sm border-b border-serene-neutral-100 transition-all duration-300 min-h-[64px] sm:min-h-[72px] flex items-center">
-				<div className="max-w-7xl mx-auto px-4 sm:px-6 w-full flex items-center justify-between gap-4 py-2 sm:py-0">
-					<div className="flex items-center gap-3 flex-1 min-w-0">
-						{!isFullPage && onClose ? (
-							<button onClick={onClose} className="sm:hidden -ml-2 p-2 rounded-full hover:bg-serene-neutral-100 transition-all text-serene-neutral-600">
-								<ChevronLeft className="h-5 w-5" />
-							</button>
-						) : (
-							<div className="shrink-0 w-10 h-10 rounded-xl bg-serene-neutral-50 flex items-center justify-center text-serene-neutral-600">
-								<Briefcase className="h-5 w-5" />
-							</div>
-						)}
-						<div className="flex-1 min-w-0 flex flex-col sm:flex-row sm:items-center gap-0.5 sm:gap-3">
-							<h2 className="text-sauti-dark font-bold tracking-tight uppercase text-xs sm:text-base truncate">
-								{formatIncidentType(report?.type_of_incident)}
-							</h2>
-							{(report?.additional_info as any)?.is_for_child && (
-								<Badge className="bg-purple-100 text-purple-700 border-purple-200 text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-lg shadow-sm w-fit">
-									Child Abuse
-								</Badge>
-							)}
-						</div>
-					</div>
-                <div className="flex items-center gap-2 sm:gap-4 shrink-0">
-                        <div className="hidden sm:flex items-center gap-3">
-                            <Badge className={cn("px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest bg-white border shadow-sm", urgencyColor(report?.urgency))}>
-                                {report?.urgency || 'Low'} Priority
-                            </Badge>
-                        </div>
-
-                        {caseItem.match_status_type === 'pending' && onAcceptCase && (
-                            <div className="relative shrink-0">
-                                <Button onClick={() => setIsSchedulerOpen(true)} className="h-10 sm:h-11 bg-teal-600 hover:bg-teal-700 text-white font-bold rounded-xl px-3 sm:px-5 shadow-lg shadow-teal-600/20 text-[10px] sm:text-xs gap-2 transition-all active:scale-95">
-                                    <Calendar className="h-4 w-4" /> <span className="hidden xs:inline">Accept & Schedule</span><span className="xs:hidden">Accept</span>
-                                </Button>
-                                <EnhancedAppointmentScheduler isOpen={isSchedulerOpen} onClose={() => setIsSchedulerOpen(false)} userId={userId} professionalName="You" serviceName={caseItem.service_details?.name} onSchedule={async (appt: any) => { if (onAcceptCase) { onAcceptCase(matchId, appt); setIsSchedulerOpen(false); } }} />
-                            </div>
-                        )}
-                        
-                        {caseItem.match_status_type !== 'completed' && caseItem.match_status_type !== 'pending' && onCompleteCase && (
-                            <div className="flex items-center gap-2">
-                                <DropdownMenu>
-                                    <DropdownMenuTrigger asChild>
-                                        <Button variant="ghost" size="icon" className="h-10 w-10 sm:h-11 sm:w-11 rounded-xl text-serene-neutral-400 hover:text-sauti-teal hover:bg-serene-neutral-50 transition-all">
-                                            <MoreVertical className="h-5 w-5" />
-                                        </Button>
-                                    </DropdownMenuTrigger>
-                                    <DropdownMenuContent align="end" className="w-56 rounded-2xl border-serene-neutral-100 p-2 shadow-2xl bg-white">
-                                        <DropdownMenuItem 
-                                            onClick={() => setIsCompletionDialogOpen(true)}
-                                            className="flex items-center gap-2 p-3 text-sm font-bold text-slate-700 rounded-xl hover:bg-emerald-50 hover:text-emerald-600 cursor-pointer"
-                                        >
-                                            <CheckCircle2 className="h-4 w-4" />
-                                            Complete Case
-                                        </DropdownMenuItem>
-                                    </DropdownMenuContent>
-                                </DropdownMenu>
-
-                                <Dialog open={isCompletionDialogOpen} onOpenChange={setIsCompletionDialogOpen}>
-                                    <DialogContent className="w-[95vw] sm:max-w-md rounded-[2rem] border-0 shadow-2xl bg-white p-6 sm:p-8">
-                                        <DialogHeader className="space-y-4">
-                                            <div className="w-16 h-16 bg-emerald-50 rounded-[1.5rem] flex items-center justify-center text-emerald-600 mb-2">
-                                                <ShieldCheck className="h-8 w-8" />
-                                            </div>
-                                            <DialogTitle className="text-xl sm:text-2xl font-black text-slate-900 leading-tight">Close this case?</DialogTitle>
-                                            <DialogDescription className="text-slate-500 font-medium text-sm sm:text-base">
-                                                Completing this case will finalize all coordination actions for the survivor.
-                                            </DialogDescription>
-                                        </DialogHeader>
-                                        <DialogFooter className="flex flex-row gap-3 pt-6 mt-6 border-t border-slate-50">
-                                            <Button 
-                                                variant="outline" 
-                                                className="flex-1 h-12 rounded-xl border-slate-100 font-bold text-[10px] uppercase tracking-widest text-slate-500"
-                                                onClick={() => setIsCompletionDialogOpen(false)}
-                                            >
-                                                Cancel
-                                            </Button>
-                                            <Button 
-                                                className="flex-1 h-12 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-[10px] uppercase tracking-widest shadow-lg shadow-emerald-600/20"
-                                                onClick={async () => {
-                                                    if (onCompleteCase) await onCompleteCase(matchId);
-                                                    setIsCompletionDialogOpen(false);
-                                                }}
-                                            >
-                                                Complete
-                                            </Button>
-                                        </DialogFooter>
-                                    </DialogContent>
-                                </Dialog>
-                            </div>
-                        )}
-
-                        {onClose && !isFullPage && (
-                            <Button 
-                                variant="ghost" 
-                                size="icon" 
-                                onClick={onClose} 
-                                className="rounded-full hover:bg-red-50 hover:text-red-600 transition-colors h-10 w-10 shrink-0 shadow-sm sm:shadow-none"
-                            >
-                                <X className="h-5 w-5" />
-                            </Button>
-                        )}
-                    </div>
-                </div>
-            </nav>
-
             <ScrollArea className="flex-1">
                 <div className={cn(
-                    "p-2 xs:p-4 sm:p-8 mx-auto w-full",
-                    isFullPage ? "max-w-7xl pb-24" : "pb-8"
+                    "p-2 xs:p-4 sm:p-5 mx-auto w-full",
+                    isFullPage ? "max-w-[1440px] pb-12" : "pb-6"
                 )}>
+                    {/* High-importance Action Banner - Collapsed for space optimization */}
+                    {!isAccepted ? (
+                        <div className="w-full flex flex-col sm:flex-row items-center justify-between gap-6 mb-6 p-4 sm:p-5 bg-sky-50/50 border border-sky-100/50 rounded-[2rem] backdrop-blur-sm animate-in fade-in slide-in-from-top-4 duration-700">
+                             <div className="flex items-center gap-5">
+                                 <div className="w-12 h-12 bg-white/60 rounded-2xl flex items-center justify-center text-sky-600 shadow-sm border border-white/40 shrink-0">
+                                     <Shield className="h-6 w-6" />
+                                 </div>
+                                 <div className="space-y-1">
+                                     <p className="text-[10px] font-bold text-sky-800/60 uppercase tracking-[0.2em] leading-none mb-1">Security Protocol</p>
+                                     <h4 className="text-base sm:text-lg font-black text-sky-900 tracking-tight leading-tight">Privacy Mode Enabled</h4>
+                                     <p className="text-xs font-medium text-sky-700/70">Survivor details are protected until case acceptance.</p>
+                                 </div>
+                             </div>
+                             
+                             {caseItem.match_status_type === 'pending' && onAcceptCase && (
+                                 <div className="flex gap-3 w-full sm:w-auto">
+                                    <Button 
+                                        onClick={() => setIsSchedulerOpen(true)} 
+                                        className="flex-1 sm:flex-none h-12 bg-teal-600 hover:bg-teal-700 text-white font-black rounded-2xl px-10 shadow-none border border-teal-500/20 text-[11px] uppercase tracking-widest gap-3 transition-all active:scale-95"
+                                    >
+                                        <Calendar className="h-5 w-5" /> 
+                                        Accept & Schedule Case
+                                    </Button>
+                                    <EnhancedAppointmentScheduler 
+                                        isOpen={isSchedulerOpen} 
+                                        onClose={() => setIsSchedulerOpen(false)} 
+                                        userId={userId} 
+                                        professionalName="You" 
+                                        serviceName={caseItem.service_details?.name} 
+                                        onSchedule={async (appt: any) => { 
+                                            if (onAcceptCase) { 
+                                                onAcceptCase(matchId, appt); 
+                                                setIsSchedulerOpen(false); 
+                                            } 
+                                        }} 
+                                    />
+                                 </div>
+                             )}
+                        </div>
+                    ) : (
+                        /* Standard layout after acceptance - no large banner */
+                        <div className="flex items-center justify-end gap-4 mb-4 sm:mb-6">
+                            {/* Actions moved to Top Bar for accepted cases */}
+                        </div>
+                    )}
                     {isFullPage ? (
-                        <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-start">
-                            <div className="lg:col-span-8">
+                        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-start">
+                            <div className="lg:col-span-7">
                                 {mainContent}
                             </div>
-                            <div className="lg:col-span-4 lg:sticky lg:top-24 self-start">
+                            <div className="lg:col-span-5 lg:sticky lg:top-24 self-start">
                                 {sidebarContent}
                             </div>
                         </div>
@@ -696,6 +629,7 @@ export function CaseDetailView({
                         </div>
                     )}
                 </div>
+
             </ScrollArea>
 
             {/* Floating Action Button for Chats (Mobile) */}

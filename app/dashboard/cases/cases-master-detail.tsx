@@ -1389,9 +1389,9 @@ export default function CasesMasterDetail({ userId }: { userId: string }) {
                                     </div>
                                 </div>
                             </Card>
-                        </div>
 				</div>
-				)}
+				</div>
+				</div>
 
 				{/* Overlay Backdrop to close sidepanel on outside click */}
 				{selected && (

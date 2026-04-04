@@ -1,4 +1,4 @@
-// ... imports ...
+import { format } from "date-fns";
 import {
 	CalendarDays,
 	ChevronRight,
@@ -66,11 +66,22 @@ interface CaseCardProps {
 	isLoadingMessages?: boolean;
 }
 
+// Utility for formatting dates consistently across the dashboard
+function formatAppointmentDate(d?: string | null) {
+	if (!d) return "";
+	try {
+		const date = new Date(d);
+		return format(date, "EEEE, MMM d"); // e.g., Monday, Apr 4
+	} catch {
+		return "";
+	}
+}
+
 function formatDate(d?: string | null) {
 	if (!d) return "";
 	try {
 		const date = new Date(d);
-		return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+		return format(date, "MMM d"); // Short for header
 	} catch {
 		return "";
 	}
@@ -167,7 +178,7 @@ export function CaseCard({
 						{hasAppointment && (
 							<span className="text-[10px] font-bold text-blue-600 flex items-center gap-1.5 bg-blue-50 px-2.5 py-1 rounded-md border border-blue-100">
 								<CalendarDays className="h-3 w-3" />
-								{formatDate(appointment.appointment_date)}
+								{formatAppointmentDate(appointment.appointment_date)}
 							</span>
 						)}
 

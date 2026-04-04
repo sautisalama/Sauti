@@ -26,6 +26,8 @@ import { EmojiPicker } from './EmojiPicker';
 import { AttachmentMenu } from './AttachmentMenu';
 import { FilePreviewModal } from './FilePreviewModal';
 import { format } from 'date-fns';
+import { LottieLoader } from "@/components/ui/LottieLoader";
+import loadingHands from "@/public/lottie-animations/loading-hands.json";
 
 interface CaseChatPanelProps {
   matchId: string;
@@ -77,13 +79,22 @@ export function CaseChatPanel({
   const supabase = createClient();
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
-  // Get current user
+  // Get current user and subscribe to auth changes
   useEffect(() => {
-    const getUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) setCurrentUserId(user.id);
+    const fetchUser = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) setCurrentUserId(session.user.id);
     };
-    getUser();
+    
+    fetchUser();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setCurrentUserId(session?.user?.id || null);
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
 
   // Initialize or load chat
@@ -285,9 +296,17 @@ export function CaseChatPanel({
   // Render loading state
   if (isLoading) {
     return (
-      <div className={`flex flex-col bg-white rounded-2xl border border-serene-neutral-100 shadow-sm overflow-hidden ${className}`}>
-        <div className="flex items-center justify-center h-64">
-          <Loader2 className="h-8 w-8 animate-spin text-serene-blue-500" />
+      <div className={`flex flex-col bg-white rounded-2xl border border-serene-neutral-100 shadow-sm overflow-hidden p-12 ${className}`}>
+        <div className="flex flex-col items-center justify-center min-h-[300px]">
+          <LottieLoader 
+            animationData={loadingHands} 
+            size={200} 
+            className="mb-6"
+          />
+          <div className="text-center space-y-2">
+            <h4 className="text-sm font-black text-serene-blue-600 uppercase tracking-[0.3em] animate-pulse">Initializing Dialogue</h4>
+            <p className="text-xs font-bold text-slate-400 tracking-wider">Please wait while we secure your connection.</p>
+          </div>
         </div>
       </div>
     );

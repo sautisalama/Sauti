@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, MouseEvent, TouchEvent } from "react";
+import { cn } from "@/lib/utils";
 
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -27,6 +28,9 @@ import {
 	Underline,
 	Undo2,
 	Quote,
+	PenLine,
+	Loader2,
+	CheckCircle2
 } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -85,6 +89,9 @@ export default function CaseNotesEditor({
 			setDirty(true);
 		},
 		editorProps: {
+            attributes: {
+                class: "prose prose-sm max-w-none focus:outline-none p-[5px] min-h-[300px]",
+            },
 			handlePaste: (view, e: ClipboardEvent) => {
 
 				const items = (e.clipboardData?.items ||
@@ -114,8 +121,13 @@ export default function CaseNotesEditor({
 				return false;
 			},
 			attributes: {
-				class:
-					"tiptap prose-sm max-w-none focus:outline-none break-words whitespace-pre-wrap min-h-[200px] p-3",
+				class: cn(
+					"prose prose-sm max-w-none min-h-[200px] p-4 focus:outline-none",
+					"text-sauti-dark font-medium leading-relaxed",
+					"[&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5",
+					"[&_p]:my-2 first:[&_p]:mt-0 last:[&_p]:mb-0",
+					"tiptap"
+				),
 			},
 		},
 	});
@@ -248,330 +260,217 @@ export default function CaseNotesEditor({
 
 
 
-	if (!editor || !editor.chain)
+	if (!editor) {
 		return (
-			<Card className="p-0 border">
-				<div className="p-3 text-sm text-neutral-500">Loading editor…</div>
-			</Card>
+			<div className="animate-pulse bg-serene-neutral-100 rounded-xl h-48" />
 		);
+	}
+
+	const ToolbarButton = ({ 
+		active, 
+		onClick, 
+		children,
+		disabled = false,
+		className: extraClassName,
+		title
+	}: { 
+		active?: boolean; 
+		onClick: () => void; 
+		children: React.ReactNode;
+		disabled?: boolean;
+		className?: string;
+		title?: string;
+	}) => (
+		<Button
+			type="button"
+			variant="ghost"
+			size="sm"
+			onClick={onClick}
+			disabled={disabled}
+			title={title}
+			className={cn(
+				"h-8 w-8 p-0 rounded-lg transition-colors",
+				active 
+					? "bg-sauti-teal/10 text-sauti-teal" 
+					: "text-serene-neutral-500 hover:text-sauti-teal hover:bg-sauti-teal/5",
+				extraClassName
+			)}
+		>
+			{children}
+		</Button>
+	);
 
 	return (
-		<Card className="p-0 border">
-			<div className="flex flex-col bg-neutral-50 border-b sticky top-0 z-10">
-				<div className="flex items-center gap-2 px-3 py-2 border-b border-neutral-100">
-					<span className="text-xs font-bold text-neutral-500 uppercase tracking-widest">Case Notes</span>
-					<div className="ml-auto flex items-center gap-2">
-						{saving ? (
-							<span className="text-[10px] font-bold text-sauti-teal animate-pulse">Saving…</span>
-						) : dirty ? (
-							<span className="text-[10px] font-bold text-amber-500">Unsaved</span>
-						) : lastSavedAt ? (
-							<span className="text-[10px] font-bold text-green-500">Saved</span>
-						) : null}
-						<Button
-							type="button"
-							size="sm"
-							onClick={() => save()}
-							disabled={saving}
-							className="h-7 px-3 text-[10px] font-bold uppercase tracking-wider"
-						>
-							<Save className="h-3 w-3 mr-1.5" /> Save
-						</Button>
+		<div className="rounded-xl border border-serene-neutral-200 bg-white overflow-hidden transition-all duration-300 focus-within:border-sauti-teal/50 focus-within:ring-2 focus-within:ring-sauti-teal/10">
+			{/* Header area with title and save status */}
+			<div className="flex items-center justify-between px-4 py-2 border-b border-serene-neutral-100 bg-white">
+				<div className="flex items-center gap-2">
+					<div className="p-1.5 bg-sauti-teal/10 rounded-lg">
+						<PenLine className="h-3.5 w-3.5 text-sauti-teal" />
 					</div>
+					<span className="text-[10px] font-bold text-serene-neutral-400 uppercase tracking-widest">Case Records</span>
 				</div>
-				<div
-					className="flex items-center gap-1 p-1 overflow-x-auto whitespace-nowrap scrollbar-hide no-scrollbar"
-					onMouseDown={prevent}
-				>
+				<div className="flex items-center gap-3">
+					{saving ? (
+						<span className="flex items-center gap-1.5 text-sauti-teal animate-in fade-in duration-300">
+							<Loader2 className="h-3 w-3 animate-spin" />
+							<span className="text-[10px] font-bold uppercase tracking-wider">Saving</span>
+						</span>
+					) : dirty ? (
+						<span className="text-[10px] font-bold text-amber-500 uppercase tracking-wider animate-in fade-in duration-300">Unsaved Changes</span>
+					) : lastSavedAt ? (
+						<span className="flex items-center gap-1.5 text-serene-green-600 animate-in fade-in zoom-in-95 duration-500">
+							<CheckCircle2 className="h-3 w-3" />
+							<span className="text-[10px] font-bold uppercase tracking-wider">Saved at {lastSavedAt}</span>
+						</span>
+					) : null}
+					
 					<Button
 						type="button"
 						variant="ghost"
-						size="icon"
-						className="h-8 w-8 sm:h-7 sm:w-7"
-						onClick={() => editor.chain().focus().undo().run()}
-						title="Undo"
+						size="sm"
+						onClick={() => save()}
+						disabled={saving || !dirty}
+						className={cn(
+							"h-7 px-3 text-[10px] font-bold uppercase tracking-wider rounded-lg border",
+							dirty 
+								? "bg-sauti-teal text-white hover:bg-sauti-teal/90 border-sauti-teal" 
+								: "text-serene-neutral-400 border-serene-neutral-100"
+						)}
 					>
-						<Undo2 className="h-4 w-4" />
-					</Button>
-					<Button
-						type="button"
-						variant="ghost"
-						size="icon"
-						className="h-8 w-8 sm:h-7 sm:w-7"
-						onClick={() => editor.chain().focus().redo().run()}
-						title="Redo"
-					>
-						<Redo2 className="h-4 w-4" />
-					</Button>
-					<Separator orientation="vertical" className="h-6 mx-1 shrink-0" />
-					<Button
-						type="button"
-						variant={editor.isActive("bold") ? "secondary" : "ghost"}
-						size="icon"
-						className="h-9 w-9 shrink-0"
-						onClick={() => editor.chain().focus().toggleBold().run()}
-						title="Bold"
-					>
-						<Bold className="h-4 w-4" />
-					</Button>
-					<Button
-						type="button"
-						variant={editor.isActive("italic") ? "secondary" : "ghost"}
-						size="icon"
-						className="h-9 w-9 shrink-0"
-						onClick={() => editor.chain().focus().toggleItalic().run()}
-						title="Italic"
-					>
-						<Italic className="h-4 w-4" />
-					</Button>
-					<Button
-						type="button"
-						variant={editor.isActive("underline") ? "secondary" : "ghost"}
-						size="icon"
-						className="h-9 w-9 shrink-0"
-						onClick={() => editor.chain().focus().toggleUnderline().run()}
-						title="Underline"
-					>
-						<Underline className="h-4 w-4" />
-					</Button>
-					<Button
-						type="button"
-						variant={editor.isActive("strike") ? "secondary" : "ghost"}
-						size="icon"
-						className="h-9 w-9 shrink-0"
-						onClick={() => editor.chain().focus().toggleStrike().run()}
-						title="Strikethrough"
-					>
-						<Strikethrough className="h-4 w-4" />
-					</Button>
-					<Separator orientation="vertical" className="h-4" />
-					<Button
-						type="button"
-						variant={editor.isActive("heading", { level: 1 }) ? "secondary" : "ghost"}
-						size="icon"
-						className="h-8 w-8"
-						onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
-						title="Heading 1"
-					>
-						<Heading1 className="h-4 w-4" />
-					</Button>
-					<Button
-						type="button"
-						variant={editor.isActive("heading", { level: 2 }) ? "secondary" : "ghost"}
-						size="icon"
-						className="h-8 w-8"
-						onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
-						title="Heading 2"
-					>
-						<Heading2 className="h-4 w-4" />
-					</Button>
-					<Button
-						type="button"
-						variant={editor.isActive("heading", { level: 3 }) ? "secondary" : "ghost"}
-						size="icon"
-						className="h-8 w-8"
-						onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}
-						title="Heading 3"
-					>
-						<Heading3 className="h-4 w-4" />
-					</Button>
-					<Button
-						type="button"
-						variant={editor.isActive("heading", { level: 4 }) ? "secondary" : "ghost"}
-						size="icon"
-						className="h-8 w-8"
-						onClick={() => editor.chain().focus().toggleHeading({ level: 4 }).run()}
-						title="Heading 4"
-					>
-						<Heading4 className="h-4 w-4" />
-					</Button>
-					<Separator orientation="vertical" className="h-4" />
-					<Button
-						type="button"
-						variant={editor.isActive("bulletList") ? "secondary" : "ghost"}
-						size="icon"
-						className="h-8 w-8"
-						onClick={() => editor.chain().focus().toggleBulletList().run()}
-						title="Bullet List"
-					>
-						<List className="h-4 w-4" />
-					</Button>
-					<Button
-						type="button"
-						variant={editor.isActive("orderedList") ? "secondary" : "ghost"}
-						size="icon"
-						className="h-8 w-8"
-						onClick={() => editor.chain().focus().toggleOrderedList().run()}
-						title="Numbered List"
-					>
-						<ListOrdered className="h-4 w-4" />
-					</Button>
-					<Button
-						type="button"
-						variant={editor.isActive("blockquote") ? "secondary" : "ghost"}
-						size="icon"
-						className="h-8 w-8"
-						onClick={() => editor.chain().focus().toggleBlockquote().run()}
-						title="Blockquote"
-					>
-						<Quote className="h-4 w-4" />
-					</Button>
-					<Button
-						type="button"
-						variant={editor.isActive("codeBlock") ? "secondary" : "ghost"}
-						size="icon"
-						className="h-8 w-8"
-						onClick={() => editor.chain().focus().toggleCodeBlock().run()}
-						title="Code Block"
-					>
-						<Code className="h-4 w-4" />
-					</Button>
-					<Separator orientation="vertical" className="h-4" />
-					<Button
-						type="button"
-						variant={editor.isActive({ textAlign: "left" }) ? "secondary" : "ghost"}
-						size="icon"
-						className="h-8 w-8"
-						onClick={() => editor.chain().focus().setTextAlign("left").run()}
-						title="Align Left"
-					>
-						<AlignLeft className="h-4 w-4" />
-					</Button>
-					<Button
-						type="button"
-						variant={editor.isActive({ textAlign: "center" }) ? "secondary" : "ghost"}
-						size="icon"
-						className="h-8 w-8"
-						onClick={() => editor.chain().focus().setTextAlign("center").run()}
-						title="Align Center"
-					>
-						<AlignCenter className="h-4 w-4" />
-					</Button>
-					<Button
-						type="button"
-						variant={editor.isActive({ textAlign: "right" }) ? "secondary" : "ghost"}
-						size="icon"
-						className="h-8 w-8"
-						onClick={() => editor.chain().focus().setTextAlign("right").run()}
-						title="Align Right"
-					>
-						<AlignRight className="h-4 w-4" />
-					</Button>
-					<Button
-						type="button"
-						variant={
-							editor.isActive({ textAlign: "justify" }) ? "secondary" : "ghost"
-						}
-						size="icon"
-						className="h-8 w-8"
-						onClick={() => editor.chain().focus().setTextAlign("justify").run()}
-						title="Justify"
-					>
-						<AlignJustify className="h-4 w-4" />
-					</Button>
-					<Separator orientation="vertical" className="h-4" />
-					<Button
-						type="button"
-						variant={editor.isActive("link") ? "secondary" : "ghost"}
-						size="icon"
-						className="h-8 w-8"
-						onClick={insertOrEditLink}
-						title="Insert/Edit Link"
-					>
-						<LinkIcon className="h-4 w-4" />
-					</Button>
-					<input
-						ref={fileInputRef}
-						type="file"
-						accept="image/*"
-						className="hidden"
-						onChange={(e) => {
-							const file = e.target.files?.[0];
-							if (file) void uploadImage(file);
-							if (fileInputRef.current) fileInputRef.current.value = "";
-						}}
-					/>
-					<Button
-						type="button"
-						variant="ghost"
-						size="icon"
-						className="h-9 w-9 shrink-0"
-						onClick={onPickImage}
-						title="Insert Image"
-					>
-						<ImageIcon className="h-4 w-4" />
+						<Save className="h-3 w-3 mr-1.5" /> Save
 					</Button>
 				</div>
 			</div>
 
-			{/* Editor */}
-			<style jsx>{`
-				.tiptap :global(.ProseMirror) {
-					outline: none;
-				}
-				.tiptap :global(img) {
-					max-width: 100%;
-					height: auto;
-				}
-				.tiptap :global(blockquote) {
-					border-left: 3px solid #e5e7eb;
-					margin: 0.75rem 0;
-					padding-left: 0.75rem;
-					color: #374151;
-				}
-				.tiptap :global(pre) {
-					background: #f3f4f6;
-					border-radius: 6px;
-					padding: 0.5rem 0.75rem;
-					font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
-						"Liberation Mono", "Courier New", monospace;
-					font-size: 0.85rem;
-				}
-				.tiptap :global(h1) {
-					font-size: 1.25rem;
-					line-height: 1.75rem;
-					font-weight: 700;
-					margin: 0.5rem 0;
-				}
-				.tiptap :global(h2) {
-					font-size: 1.125rem;
-					line-height: 1.75rem;
-					font-weight: 700;
-					margin: 0.5rem 0;
-				}
-				.tiptap :global(h3) {
-					font-size: 1rem;
-					line-height: 1.5rem;
-					font-weight: 600;
-					margin: 0.5rem 0;
-				}
-				.tiptap :global(h4) {
-					font-size: 0.95rem;
-					line-height: 1.4rem;
-					font-weight: 600;
-					margin: 0.5rem 0;
-				}
-				.tiptap :global(ul) {
-					list-style: disc;
-					padding-left: 1.25rem;
-					margin: 0.5rem 0;
-				}
-				.tiptap :global(ol) {
-					list-style: decimal;
-					padding-left: 1.25rem;
-					margin: 0.5rem 0;
-				}
-				.tiptap :global(li) {
-					margin: 0.25rem 0;
-				}
-				.tiptap :global(ul ul) {
-					list-style: circle;
-				}
-				.tiptap :global(ol ol) {
-					list-style: lower-alpha;
-				}
-			`}</style>
-			<EditorContent editor={editor} className="min-h-[250px] sm:min-h-[200px]" />
-		</Card>
+			{/* Toolbar */}
+			<div className="flex items-center gap-1 p-1.5 bg-serene-neutral-50/50 border-b border-serene-neutral-100 overflow-x-auto no-scrollbar scrollbar-hide" onMouseDown={prevent}>
+				<ToolbarButton onClick={() => editor.chain().focus().undo().run()} title="Undo">
+					<Undo2 className="h-3.5 w-3.5" />
+				</ToolbarButton>
+				<ToolbarButton onClick={() => editor.chain().focus().redo().run()} title="Redo">
+					<Redo2 className="h-3.5 w-3.5" />
+				</ToolbarButton>
+				
+				<div className="w-px h-4 bg-serene-neutral-200 mx-1" />
+				
+				<ToolbarButton 
+					active={editor.isActive("bold")} 
+					onClick={() => editor.chain().focus().toggleBold().run()} 
+					title="Bold"
+				>
+					<Bold className="h-3.5 w-3.5" />
+				</ToolbarButton>
+				<ToolbarButton 
+					active={editor.isActive("italic")} 
+					onClick={() => editor.chain().focus().toggleItalic().run()} 
+					title="Italic"
+				>
+					<Italic className="h-3.5 w-3.5" />
+				</ToolbarButton>
+				<ToolbarButton 
+					active={editor.isActive("underline")} 
+					onClick={() => editor.chain().focus().toggleUnderline().run()} 
+					title="Underline"
+				>
+					<Underline className="h-3.5 w-3.5" />
+				</ToolbarButton>
+				<ToolbarButton 
+					active={editor.isActive("strike")} 
+					onClick={() => editor.chain().focus().toggleStrike().run()} 
+					title="Strikethrough"
+				>
+					<Strikethrough className="h-3.5 w-3.5" />
+				</ToolbarButton>
+
+				<div className="w-px h-4 bg-serene-neutral-200 mx-1" />
+
+				<ToolbarButton 
+					active={editor.isActive("heading", { level: 1 })} 
+					onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()} 
+					title="H1"
+				>
+					<Heading1 className="h-3.5 w-3.5" />
+				</ToolbarButton>
+				<ToolbarButton 
+					active={editor.isActive("heading", { level: 2 })} 
+					onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()} 
+					title="H2"
+				>
+					<Heading2 className="h-3.5 w-3.5" />
+				</ToolbarButton>
+
+				<div className="w-px h-4 bg-serene-neutral-200 mx-1" />
+
+				<ToolbarButton 
+					active={editor.isActive("bulletList")} 
+					onClick={() => editor.chain().focus().toggleBulletList().run()} 
+					title="Bullet List"
+				>
+					<List className="h-3.5 w-3.5" />
+				</ToolbarButton>
+				<ToolbarButton 
+					active={editor.isActive("orderedList")} 
+					onClick={() => editor.chain().focus().toggleOrderedList().run()} 
+					title="Numbers"
+				>
+					<ListOrdered className="h-3.5 w-3.5" />
+				</ToolbarButton>
+				<ToolbarButton 
+					active={editor.isActive("blockquote")} 
+					onClick={() => editor.chain().focus().toggleBlockquote().run()} 
+					title="Quote"
+				>
+					<Quote className="h-3.5 w-3.5" />
+				</ToolbarButton>
+
+				<div className="w-px h-4 bg-serene-neutral-200 mx-1" />
+
+				<ToolbarButton 
+					active={editor.isActive({ textAlign: "left" })} 
+					onClick={() => editor.chain().focus().setTextAlign("left").run()} 
+					title="Left"
+				>
+					<AlignLeft className="h-3.5 w-3.5" />
+				</ToolbarButton>
+				<ToolbarButton 
+					active={editor.isActive({ textAlign: "center" })} 
+					onClick={() => editor.chain().focus().setTextAlign("center").run()} 
+					title="Center"
+				>
+					<AlignCenter className="h-3.5 w-3.5" />
+				</ToolbarButton>
+
+				<div className="w-px h-4 bg-serene-neutral-200 mx-1" />
+
+				<ToolbarButton 
+					active={editor.isActive("link")} 
+					onClick={insertOrEditLink} 
+					title="Link"
+				>
+					<LinkIcon className="h-3.5 w-3.5" />
+				</ToolbarButton>
+				<ToolbarButton onClick={onPickImage} title="Image">
+					<ImageIcon className="h-3.5 w-3.5" />
+				</ToolbarButton>
+				
+				<input
+					ref={fileInputRef}
+					type="file"
+					accept="image/*"
+					className="hidden"
+					onChange={(e) => {
+						const file = e.target.files?.[0];
+						if (file) void uploadImage(file);
+						if (fileInputRef.current) fileInputRef.current.value = "";
+					}}
+				/>
+			</div>
+
+			{/* Editor Content Area */}
+			<div className="bg-white">
+				<EditorContent editor={editor} />
+			</div>
+		</div>
 	);
 }

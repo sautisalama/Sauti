@@ -18,8 +18,19 @@ import {
     MoreVertical, 
     CheckCircle2, 
     Trash2,
-    Calendar as CalendarIcon
+    Calendar as CalendarIcon,
+    ShieldCheck as ShieldCheckIcon,
+    Check,
+    Archive
 } from "lucide-react";
+import { 
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    DialogDescription,
+    DialogFooter
+} from "@/components/ui/dialog";
 import { 
     DropdownMenu, 
     DropdownMenuContent, 
@@ -29,6 +40,7 @@ import {
 import { Card } from "@/components/ui/card";
 import { SereneBreadcrumb } from "@/components/ui/SereneBreadcrumb";
 import { useDashboardData } from "@/components/providers/DashboardDataProvider";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 export default function CaseDetailPage({ params }: { params: Promise<{ id: string }> }) {
     const resolvedParams = use(params);
@@ -43,6 +55,7 @@ export default function CaseDetailPage({ params }: { params: Promise<{ id: strin
     const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
     const [activeChat, setActiveChat] = useState<Chat | null>(null);
     const [isChatLoading, setIsChatLoading] = useState(false);
+    const [isCompletionDialogOpen, setIsCompletionDialogOpen] = useState(false);
     const dash = useDashboardData();
 
     useEffect(() => {
@@ -162,6 +175,28 @@ export default function CaseDetailPage({ params }: { params: Promise<{ id: strin
                 <div className="flex items-center gap-1.5 text-[11px] font-medium text-serene-neutral-500">
                     <CalendarIcon className="h-3 w-3" />
                     <span>{formatDate(report.submission_timestamp)}</span>
+                    <TooltipProvider>
+                        <Tooltip delayDuration={0}>
+                            <TooltipTrigger asChild>
+                                <div className="flex items-center ml-0.5 cursor-help">
+                                    <div className="flex items-center">
+                                        <Check className={cn("h-3 w-3 stroke-[3]", caseData.match_status_type === 'accepted' ? "text-blue-500" : "text-serene-neutral-300")} />
+                                        <Check className={cn("h-3 w-3 stroke-[3] -ml-2", caseData.match_status_type === 'accepted' ? "text-blue-500" : "text-serene-neutral-300")} />
+                                    </div>
+                                </div>
+                            </TooltipTrigger>
+                            <TooltipContent side="bottom" align="center" className="bg-slate-900 border-0 text-white rounded-xl shadow-2xl p-3 max-w-[200px] animate-in fade-in zoom-in-95 duration-200">
+                                <p className="text-[10px] font-bold uppercase tracking-wider mb-1 text-slate-400">
+                                    {caseData.match_status_type === 'accepted' ? "Accepted & Scheduled" : "Case Pending"}
+                                </p>
+                                <p className="text-xs font-medium leading-tight text-white/90">
+                                    {caseData.match_status_type === 'accepted' 
+                                        ? "Coordination is finalized and a support session is locked in with the survivor." 
+                                        : "You have been matched. Please review, accept, and schedule to unlock full survivor access."}
+                                </p>
+                            </TooltipContent>
+                        </Tooltip>
+                    </TooltipProvider>
                 </div>
             </div>
         );
@@ -180,18 +215,20 @@ export default function CaseDetailPage({ params }: { params: Promise<{ id: strin
                         <div className="px-3 py-2 border-b border-serene-neutral-50 mb-1">
                             <p className="text-[10px] font-bold text-serene-neutral-400 uppercase tracking-widest">Case Management</p>
                         </div>
-                        {caseData.match_status_type !== 'completed' && caseData.match_status_type !== 'pending' && (
+                        
+                        {(caseData.match_status_type === 'accepted' || caseData.match_status_type === 'reschedule_requested') && (
                             <DropdownMenuItem 
-                                onClick={() => router.push(`/dashboard/cases/${caseId}`)} // Just a placeholder or logic for detail
+                                onClick={() => setIsCompletionDialogOpen(true)}
                                 className="flex items-center gap-3 cursor-pointer rounded-xl focus:bg-serene-neutral-50 focus:text-sauti-teal p-3 text-sm font-semibold text-serene-neutral-700"
                             >
                                 <CheckCircle2 className="h-4 w-4" />
                                 Mark as Completed
                             </DropdownMenuItem>
                         )}
+
                         {process.env.NODE_ENV === 'development' && (
                             <DropdownMenuItem 
-                                className="flex items-center gap-3 cursor-pointer rounded-xl focus:bg-rose-50 focus:text-rose-600 p-3 text-sm font-semibold text-rose-600"
+                                className="flex items-center gap-3 cursor-pointer rounded-xl focus:bg-rose-50 focus:text-rose-600 p-3 text-sm font-semibold text-rose-600 border-t border-serene-neutral-50 mt-1"
                             >
                                 <Trash2 className="h-4 w-4" />
                                 Delete Case Record
@@ -308,35 +345,44 @@ export default function CaseDetailPage({ params }: { params: Promise<{ id: strin
             "flex flex-col min-h-full bg-slate-50/30",
             "min-h-screen"
         )}>
-			{/* Focused Header Navigation - Mobile Only (Hidden on Desktop) */}
-			<nav className="lg:hidden sticky top-0 z-50 bg-white/80 backdrop-blur-xl border-b border-serene-neutral-100/50 transition-all duration-300 min-h-[64px] sm:min-h-[72px] flex items-center shrink-0">
-				<div className="max-w-7xl mx-auto px-4 sm:px-6 w-full flex items-center justify-between gap-4 py-2 sm:py-0">
-					<div className="flex items-center gap-2 sm:gap-4 flex-1 min-w-0">
-						<Link href="/dashboard/cases" className="shrink-0 w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-serene-neutral-50 flex items-center justify-center hover:bg-serene-neutral-100 transition-all text-serene-neutral-600">
-							<ChevronLeft className="h-4 w-4 sm:h-5 sm:w-5" />
-						</Link>
-						<div className="flex-1 min-w-0">
-							<div className="hidden sm:flex items-center gap-2 text-sauti-teal font-extrabold uppercase tracking-[0.2em] text-[8px] sm:text-[10px] mb-0.5">
-								<ShieldCheck className="h-3.5 w-3.5" />
-								<span className="truncate">Professional Support Mode</span>
-							</div>
-							<h2 className="text-sauti-dark font-bold tracking-tight uppercase text-[10px] sm:text-base whitespace-nowrap overflow-hidden text-ellipsis">
-                                Case Journey SS-{caseId.slice(0, 8).toUpperCase()}
-                            </h2>
-						</div>
-					</div>
-
-					<div className="flex items-center gap-2 sm:gap-3 shrink-0">
-						<Button onClick={exitSafely} variant="ghost" className="text-serene-neutral-400 hover:text-rose-500 font-bold text-[9px] sm:text-[10px] gap-2 uppercase tracking-widest h-8 sm:h-10 px-1 sm:px-2 group">
-							<LogOut className="h-3.5 w-3.5 sm:h-4 sm:w-4 group-hover:scale-110 transition-transform" /> 
-							<span className="hidden sm:inline text-serene-neutral-500">Quick Exit</span>
-						</Button>
-					</div>
-				</div>
-			</nav>
 
 
-            <main className="max-w-7xl mx-auto py-2 sm:py-6 px-4 xs:px-6 transition-all duration-700 animate-in fade-in slide-in-from-bottom-4 flex-1">
+
+
+            {/* Completion Confirmation Dialog */}
+            <Dialog open={isCompletionDialogOpen} onOpenChange={setIsCompletionDialogOpen}>
+                <DialogContent className="w-[95vw] sm:max-w-md rounded-[2rem] border-0 shadow-2xl bg-white p-6 sm:p-8 animate-in fade-in zoom-in-95 duration-300">
+                    <DialogHeader className="space-y-4">
+                        <div className="w-16 h-16 bg-emerald-50 rounded-[1.5rem] flex items-center justify-center text-emerald-600 mb-2">
+                            <ShieldCheck className="h-8 w-8" />
+                        </div>
+                        <DialogTitle className="text-xl sm:text-2xl font-black text-slate-900 leading-tight">Close this case?</DialogTitle>
+                        <DialogDescription className="text-slate-500 font-medium text-sm sm:text-base">
+                            Completing this case will finalize all coordination actions for the survivor.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter className="flex flex-row gap-3 pt-6 mt-6 border-t border-slate-50">
+                        <Button 
+                            variant="outline" 
+                            className="flex-1 h-12 rounded-xl border-slate-100 font-bold text-[10px] uppercase tracking-widest text-slate-500"
+                            onClick={() => setIsCompletionDialogOpen(false)}
+                        >
+                            Cancel
+                        </Button>
+                        <Button 
+                            className="flex-1 h-12 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-[10px] uppercase tracking-widest shadow-lg shadow-emerald-600/20"
+                            onClick={async () => {
+                                await handleCompleteCase(caseId);
+                                setIsCompletionDialogOpen(false);
+                            }}
+                        >
+                            Complete
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            <main className="sm:py-2 px-4 xs:px-6 transition-all duration-700 animate-in fade-in slide-in-from-bottom-4 flex-1">
                 <CaseDetailView 
                     caseItem={caseData}
                     userId={userId}
