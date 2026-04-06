@@ -73,7 +73,7 @@ export default function ChooseUser() {
 						}`}
 						onClick={() => setSelectedType("survivor")}
 					>
-						<div className="flex flex-row sm:flex-col items-center gap-4 sm:gap-6 relative z-10">
+						<div className="flex flex-row sm:flex-col items-center justify-between sm:justify-center gap-4 sm:gap-6 relative z-10 w-full">
 							<div className="w-16 sm:w-24 aspect-square relative flex justify-center items-center bg-white rounded-2xl shadow-sm border border-neutral-100 group-hover:scale-110 transition-transform duration-500">
 								<Image
 									src="/icons/survivor-light.png"
@@ -103,7 +103,7 @@ export default function ChooseUser() {
 						}`}
 						onClick={() => setSelectedType("professional")}
 					>
-						<div className="flex flex-row sm:flex-col items-center gap-4 sm:gap-6 relative z-10">
+						<div className="flex flex-row sm:flex-col items-center justify-between sm:justify-center gap-4 sm:gap-6 relative z-10 w-full">
 							<div className="w-16 sm:w-24 aspect-square relative flex justify-center items-center bg-white rounded-2xl shadow-sm border border-neutral-100 group-hover:scale-110 transition-transform duration-500">
 								<Image
 									src="/icons/professional-light.png"
@@ -133,7 +133,7 @@ export default function ChooseUser() {
 						}`}
 						onClick={() => setSelectedType("ngo")}
 					>
-						<div className="flex flex-row sm:flex-col items-center gap-4 sm:gap-6 relative z-10">
+						<div className="flex flex-row sm:flex-col items-center justify-between sm:justify-center gap-4 sm:gap-6 relative z-10 w-full">
 							<div className="w-16 sm:w-24 aspect-square relative flex justify-center items-center bg-white rounded-2xl shadow-sm border border-neutral-100 group-hover:scale-110 transition-transform duration-500">
 								<Image
 									src="/icons/ngo-light.png"

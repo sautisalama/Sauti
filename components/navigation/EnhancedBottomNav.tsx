@@ -13,7 +13,8 @@ import {
   TrendingUp, 
   Users, 
   Shield, 
-  Building2 
+  Building2,
+  Plus
 } from "lucide-react";
 import { useUser } from "@/hooks/useUser";
 import { cn } from "@/lib/utils";
@@ -22,11 +23,12 @@ import { useDashboardData } from "@/components/providers/DashboardDataProvider";
 
 interface NavItem {
   id: string;
-  label: string;
+  label?: string;
   icon: React.ComponentType<{ className?: string }>;
-  href: string;
+  href?: string;
   badge?: number;
   showDot?: boolean;
+  isAction?: boolean;
 }
 
 interface EnhancedBottomNavProps {
@@ -140,13 +142,29 @@ export function EnhancedBottomNav({ forceShow = false, className }: EnhancedBott
     // Professional: Home, Cases, Chats, Resources
     // Survivor: Home, Reports, Chats, Resources
     
-    const middleItems = isProfessional ? [
-      { id: "cases", label: "Cases", icon: ClipboardList, href: "/dashboard/cases", badge: casesCount > 0 ? casesCount : undefined },
-      { id: "chat", label: "Chats", icon: MessageCircle, href: "/dashboard/chat", badge: unreadMessages > 0 ? unreadMessages : undefined },
-    ] : [
-      { id: "reports", label: "Reports", icon: ClipboardList, href: "/dashboard/reports" },
-      { id: "chat", label: "Chats", icon: MessageCircle, href: "/dashboard/chat", badge: unreadMessages > 0 ? unreadMessages : undefined },
-    ];
+    let middleItems: NavItem[] = [];
+    
+    if (isProfessional) {
+      middleItems = [
+        { id: "cases", label: "Cases", icon: ClipboardList, href: "/dashboard/cases", badge: casesCount > 0 ? casesCount : undefined },
+        { id: "chat", label: "Chats", icon: MessageCircle, href: "/dashboard/chat", badge: unreadMessages > 0 ? unreadMessages : undefined },
+      ];
+    } else {
+      const hasReports = Array.isArray(dash?.data?.reports) && dash.data.reports.length > 0;
+      
+      if (!hasReports) {
+        middleItems = [
+          { id: "reports", label: "Reports", icon: ClipboardList, href: "/dashboard/reports" },
+          { id: "add_report", icon: Plus, isAction: true },
+          { id: "chat", label: "Chats", icon: MessageCircle, href: "/dashboard/chat", badge: unreadMessages > 0 ? unreadMessages : undefined },
+        ];
+      } else {
+        middleItems = [
+          { id: "reports", label: "Reports", icon: ClipboardList, href: "/dashboard/reports" },
+          { id: "chat", label: "Chats", icon: MessageCircle, href: "/dashboard/chat", badge: unreadMessages > 0 ? unreadMessages : undefined },
+        ];
+      }
+    }
 
     return [
       { id: "overview", label: "Overview", icon: LayoutDashboard, href: "/dashboard" },
@@ -158,6 +176,7 @@ export function EnhancedBottomNav({ forceShow = false, className }: EnhancedBott
   const navItems = getNavItems();
 
   const isActive = (item: NavItem) => {
+    if (item.isAction) return false;
     if (!item.href) return false;
     if (item.href === "/dashboard") return pathname === "/dashboard";
     return pathname?.startsWith(item.href);
@@ -165,6 +184,30 @@ export function EnhancedBottomNav({ forceShow = false, className }: EnhancedBott
 
   const NavItemComponent = ({ item }: { item: NavItem }) => {
     const Icon = item.icon;
+    
+    if (item.isAction) {
+      return (
+        <div className="flex-1 flex justify-center items-end" style={{ height: "100%" }}>
+          <div className="flex flex-col items-center justify-end relative h-full min-h-[46px] w-[52px]">
+            <button
+              onClick={(e) => {
+                e.preventDefault();
+                dash?.setIsReportDialogOpen?.(true);
+              }}
+              className="absolute -top-[24px] left-1/2 -translate-x-1/2 flex items-center justify-center h-[52px] w-[52px] rounded-full bg-serene-blue-600 text-white shadow-[0_8px_20px_rgba(59,130,246,0.3)] ring-[6px] ring-white transition-transform active:scale-95 z-20"
+            >
+              <Icon className="h-6 w-6 stroke-[2.5px]" />
+            </button>
+            {item.label && (
+              <span className="text-[10px] font-bold leading-none tracking-wide text-serene-neutral-500 mt-auto mb-[2px] whitespace-nowrap">
+                {item.label}
+              </span>
+            )}
+          </div>
+        </div>
+      );
+    }
+    
     const active = isActive(item);
 
     // Simplified without complex disabled logic for now to match request cleanliness
@@ -202,9 +245,15 @@ export function EnhancedBottomNav({ forceShow = false, className }: EnhancedBott
     );
 
     return (
-      <Link href={item.href} className="flex-1 flex justify-center">
-        {content}
-      </Link>
+      item.href ? (
+        <Link href={item.href} className="flex-1 flex justify-center">
+          {content}
+        </Link>
+      ) : (
+        <div className="flex-1 flex justify-center">
+          {content}
+        </div>
+      )
     );
   };
 

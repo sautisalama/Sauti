@@ -400,7 +400,7 @@ export default function OnboardingFlow() {
 						}`}
 						onClick={() => setProfile(p => ({ ...p, user_type: "survivor" }))}
 					>
-						<div className="flex flex-row sm:flex-col items-center gap-3 sm:gap-4 relative z-10">
+						<div className="flex flex-row sm:flex-col items-center justify-between sm:justify-center gap-3 sm:gap-4 relative z-10 w-full">
 							<div className="w-12 sm:w-16 aspect-square relative flex justify-center items-center bg-serene-blue-50 rounded-lg shadow-sm border border-serene-blue-100 transition-all duration-500 group-hover:bg-serene-blue-100/50">
 								<Image
 									src="/icons/survivor-light.png"
@@ -430,7 +430,7 @@ export default function OnboardingFlow() {
 						}`}
 						onClick={() => setProfile(p => ({ ...p, user_type: "professional" }))}
 					>
-						<div className="flex flex-row sm:flex-col items-center gap-4 sm:gap-6 relative z-10">
+						<div className="flex flex-row sm:flex-col items-center justify-between sm:justify-center gap-4 sm:gap-6 relative z-10 w-full">
 							<div className="w-16 sm:w-24 aspect-square relative flex justify-center items-center bg-serene-blue-50 rounded-xl shadow-sm border border-serene-blue-100 transition-all duration-500 group-hover:bg-serene-blue-100/50">
 								<Image
 									src="/icons/professional-light.png"
@@ -460,7 +460,7 @@ export default function OnboardingFlow() {
 						}`}
 						onClick={() => setProfile(p => ({ ...p, user_type: "ngo" }))}
 					>
-						<div className="flex flex-row sm:flex-col items-center gap-3 sm:gap-4 relative z-10">
+						<div className="flex flex-row sm:flex-col items-center justify-between sm:justify-center gap-3 sm:gap-4 relative z-10 w-full">
 							<div className="w-12 sm:w-16 aspect-square relative flex justify-center items-center bg-serene-blue-50 rounded-lg shadow-sm border border-serene-blue-100 transition-all duration-500 group-hover:bg-serene-blue-100/50">
 								<Image
 									src="/icons/ngo-light.png"

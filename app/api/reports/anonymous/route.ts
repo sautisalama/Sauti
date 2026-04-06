@@ -168,6 +168,7 @@ export async function POST(request: Request) {
 						created_at: new Date().toISOString(),
 						updated_at: new Date().toISOString(),
 						devices: updatedDevices,
+						settings: { device_tracking_enabled: false },
 					});
 				}
 			} catch (accountError) {

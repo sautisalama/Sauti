@@ -111,8 +111,7 @@ export function MobileTopBar() {
       <div className="flex items-center gap-2 sm:gap-3 shrink-0 z-10">
         
         {/* User Profile Dropdown FIRST */}
-        {!dash?.topBarTitle && (
-            <DropdownMenu>
+        <DropdownMenu>
             <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="relative h-9 w-9 rounded-full p-0 hover:bg-serene-neutral-50 focus-visible:ring-0 transition-all">
                     <Avatar className="h-8 w-8 border-2 border-white shadow-sm ring-1 ring-serene-neutral-100 transition-transform active:scale-95">
@@ -188,8 +187,7 @@ export function MobileTopBar() {
                     <span>Log out</span>
                 </DropdownMenuItem>
             </DropdownMenuContent>
-            </DropdownMenu>
-        )}
+        </DropdownMenu>
 
         {/* Notifications first, then actions for mobile parity */}
         {!needsOnboarding && <NotificationDropdown />}
