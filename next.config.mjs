@@ -1,4 +1,4 @@
-import withPWA from "next-pwa";
+import withPWAInit from "@ducanh2912/next-pwa";
 
 const isWindows = process.platform === "win32";
 
@@ -45,10 +45,16 @@ const nextConfig = {
 	turbopack: {},
 };
 
-export default withPWA({
-	dest: "public", // destination directory for the PWA files
+const withPWA = withPWAInit({
+	dest: "public",
 	// Disable PWA on Windows to avoid EPERM errors from terser/jest-worker during build
 	disable: isWindows || process.env.NODE_ENV === "development",
-	register: true, // register the PWA service worker
-	skipWaiting: true, // skip waiting for service worker activation
-})(nextConfig);
+	register: true,
+	skipWaiting: true,
+	fallbacks: {
+		document: "/~offline",
+	},
+	// Other configurations you want...
+});
+
+export default withPWA(nextConfig);

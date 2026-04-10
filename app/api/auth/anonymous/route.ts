@@ -148,6 +148,7 @@ export async function POST(request: Request) {
 			verification_status: "pending",
 			created_at: new Date().toISOString(),
 			updated_at: new Date().toISOString(),
+			settings: { device_tracking_enabled: false },
 		});
 
 		if (profileError) {

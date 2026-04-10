@@ -14,21 +14,39 @@
 			"src": "/icons/icons-192.png",
 			"type": "image/png",
 			"sizes": "192x192",
-			"purpose": "any maskable"
+			"purpose": "maskable"
+		},
+		{
+			"src": "/icons/icons-192.png",
+			"type": "image/png",
+			"sizes": "192x192",
+			"purpose": "any"
 		},
 		{
 			"src": "/icons/icons-256.png",
 			"type": "image/png",
 			"sizes": "256x256",
-			"purpose": "any maskable"
+			"purpose": "maskable"
+		},
+		{
+			"src": "/icons/icons-256.png",
+			"type": "image/png",
+			"sizes": "256x256",
+			"purpose": "any"
 		},
 		{
 			"src": "/icons/icons-512.png",
 			"type": "image/png",
 			"sizes": "512x512",
-			"purpose": "any maskable"
+			"purpose": "maskable"
+		},
+		{
+			"src": "/icons/icons-512.png",
+			"type": "image/png",
+			"sizes": "512x512",
+			"purpose": "any"
 		}
-],
+	],
 	"screenshots": [
 		{
 			"src": "/dashboard/featured.png",

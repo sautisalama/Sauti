@@ -4,7 +4,6 @@ import React from "react";
 import { useDashboardData } from "@/components/providers/DashboardDataProvider";
 import { usePathname, useSearchParams } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { GlobalReportFab } from "@/components/dashboard/GlobalReportFab";
 import { DesktopHeader } from "@/components/navigation/DesktopHeader";
 
 interface DashboardContentProps {
@@ -73,7 +72,6 @@ export function DashboardContent({ children }: DashboardContentProps) {
                 {children}
             </div>
         </main>
-        <GlobalReportFab userId={user} />
     </>
   );
 }

@@ -41,6 +41,11 @@ export function MobileTopBar() {
   // Hide ONLY on chat detail pages if needed, but the user wants ease of navigation
   const isChat = pathname?.startsWith("/dashboard/chat");
   const isOnboarding = pathname === "/dashboard/onboarding" || pathname?.startsWith("/dashboard/onboarding");
+
+  // Logic to hide avatar on detail pages
+  const isCaseDetail = pathname?.startsWith('/dashboard/cases/') && pathname !== '/dashboard/cases';
+  const isReportDetail = pathname?.startsWith('/dashboard/reports/') && pathname !== '/dashboard/reports';
+  const shouldHideAvatar = isCaseDetail || isReportDetail;
   
   if (isChat || isOnboarding) return null;
 
@@ -110,84 +115,84 @@ export function MobileTopBar() {
 
       <div className="flex items-center gap-2 sm:gap-3 shrink-0 z-10">
         
-        {/* User Profile Dropdown FIRST */}
-        {!dash?.topBarTitle && (
+        {/* User Profile Dropdown FIRST - Hidden on detail pages per request */}
+        {!shouldHideAvatar && (
             <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="relative h-9 w-9 rounded-full p-0 hover:bg-serene-neutral-50 focus-visible:ring-0 transition-all">
-                    <Avatar className="h-8 w-8 border-2 border-white shadow-sm ring-1 ring-serene-neutral-100 transition-transform active:scale-95">
-                    <AvatarImage src={user?.profile?.avatar_url || ""} />
-                    <AvatarFallback className="bg-gradient-to-br from-sauti-teal to-sauti-dark text-white text-sm font-semibold">
-                        {initials}
-                    </AvatarFallback>
-                    </Avatar>
-                </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent className="w-64 mt-2 mr-2 rounded-2xl border-serene-neutral-200 shadow-xl bg-white/95 backdrop-blur-xl animate-in fade-in zoom-in-95 duration-200">
-                <DropdownMenuLabel className="font-normal p-3">
-                    <div className="flex flex-col space-y-1">
-                    <p className="text-sm font-semibold leading-none text-sauti-dark">{names}</p>
-                    <p className="text-xs leading-none text-serene-neutral-500 truncate">{user?.email}</p>
-                    </div>
-                </DropdownMenuLabel>
-                {!needsOnboarding && (
-                    <>
-                    <DropdownMenuSeparator className="bg-serene-neutral-100" />
-                    <DropdownMenuItem asChild>
-                        <Link href="/dashboard/profile" className="cursor-pointer rounded-xl focus:bg-serene-neutral-50 focus:text-sauti-teal p-3">
-                        <User className="mr-3 h-4 w-4" />
-                        <span>Profile</span>
-                        </Link>
-                    </DropdownMenuItem>
-
-                    {user?.profile?.user_type === "professional" && (
+                <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" className="relative h-9 w-9 rounded-full p-0 hover:bg-serene-neutral-50 focus-visible:ring-0 transition-all">
+                        <Avatar className="h-8 w-8 border-2 border-white shadow-sm ring-1 ring-serene-neutral-100 transition-transform active:scale-95">
+                        <AvatarImage src={user?.profile?.avatar_url || ""} />
+                        <AvatarFallback className="bg-gradient-to-br from-sauti-teal to-sauti-dark text-white text-sm font-semibold">
+                            {initials}
+                        </AvatarFallback>
+                        </Avatar>
+                    </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent className="w-64 mt-2 mr-2 rounded-2xl border-serene-neutral-200 shadow-xl bg-white/95 backdrop-blur-xl animate-in fade-in zoom-in-95 duration-200">
+                    <DropdownMenuLabel className="font-normal p-3">
+                        <div className="flex flex-col space-y-1">
+                        <p className="text-sm font-semibold leading-none text-sauti-dark">{names}</p>
+                        <p className="text-xs leading-none text-serene-neutral-500 truncate">{user?.email}</p>
+                        </div>
+                    </DropdownMenuLabel>
+                    {!needsOnboarding && (
+                        <>
+                        <DropdownMenuSeparator className="bg-serene-neutral-100" />
                         <DropdownMenuItem asChild>
-                            <Link href="/dashboard/profile?section=verification" className="cursor-pointer rounded-xl focus:bg-serene-neutral-50 focus:text-sauti-teal p-3">
-                            <Shield className="mr-3 h-4 w-4 text-sauti-teal" />
-                            <span>Verification</span>
+                            <Link href="/dashboard/profile" className="cursor-pointer rounded-xl focus:bg-serene-neutral-50 focus:text-sauti-teal p-3">
+                            <User className="mr-3 h-4 w-4" />
+                            <span>Profile</span>
                             </Link>
                         </DropdownMenuItem>
+    
+                        {user?.profile?.user_type === "professional" && (
+                            <DropdownMenuItem asChild>
+                                <Link href="/dashboard/profile?section=verification" className="cursor-pointer rounded-xl focus:bg-serene-neutral-50 focus:text-sauti-teal p-3">
+                                <Shield className="mr-3 h-4 w-4 text-sauti-teal" />
+                                <span>Verification</span>
+                                </Link>
+                            </DropdownMenuItem>
+                        )}
+    
+                        {/* Role Switcher Options */}
+                        {roleContext?.can_switch_to_admin && (
+                                <>
+                                    <DropdownMenuSeparator className="bg-serene-neutral-100 my-1" />
+                                    {!isAdminMode ? (
+                                        <DropdownMenuItem 
+                                            onClick={switchToAdmin} 
+                                            className="flex items-center gap-3 cursor-pointer rounded-xl focus:bg-blue-50 focus:text-blue-700 p-3"
+                                        >
+                                            <div className="h-6 w-6 rounded-md bg-blue-100 flex items-center justify-center text-blue-600">
+                                                <Shield className="h-3.5 w-3.5" />
+                                            </div>
+                                            <span className="font-semibold text-sm">Switch to Admin</span>
+                                        </DropdownMenuItem>
+                                    ) : (
+                                        <DropdownMenuItem 
+                                            onClick={switchToUser} 
+                                            className="flex items-center gap-3 cursor-pointer rounded-xl focus:bg-serene-neutral-50 focus:text-serene-neutral-900 p-3"
+                                        >
+                                            <div className="h-6 w-6 rounded-md bg-serene-neutral-100 flex items-center justify-center text-serene-neutral-600">
+                                                {roleContext.primary_role === 'ngo' ? <Building2 className="h-3.5 w-3.5" /> : <User className="h-3.5 w-3.5" />}
+                                            </div>
+                                            <span className="font-semibold text-sm">Switch to {getRoleLabel(roleContext.primary_role)}</span>
+                                        </DropdownMenuItem>
+                                    )}
+                                </>
+                        )}
+                        </>
                     )}
-
-                    {/* Role Switcher Options */}
-                    {roleContext?.can_switch_to_admin && (
-                            <>
-                                <DropdownMenuSeparator className="bg-serene-neutral-100 my-1" />
-                                {!isAdminMode ? (
-                                    <DropdownMenuItem 
-                                        onClick={switchToAdmin} 
-                                        className="flex items-center gap-3 cursor-pointer rounded-xl focus:bg-blue-50 focus:text-blue-700 p-3"
-                                    >
-                                        <div className="h-6 w-6 rounded-md bg-blue-100 flex items-center justify-center text-blue-600">
-                                            <Shield className="h-3.5 w-3.5" />
-                                        </div>
-                                        <span className="font-semibold text-sm">Switch to Admin</span>
-                                    </DropdownMenuItem>
-                                ) : (
-                                    <DropdownMenuItem 
-                                        onClick={switchToUser} 
-                                        className="flex items-center gap-3 cursor-pointer rounded-xl focus:bg-serene-neutral-50 focus:text-serene-neutral-900 p-3"
-                                    >
-                                        <div className="h-6 w-6 rounded-md bg-serene-neutral-100 flex items-center justify-center text-serene-neutral-600">
-                                            {roleContext.primary_role === 'ngo' ? <Building2 className="h-3.5 w-3.5" /> : <User className="h-3.5 w-3.5" />}
-                                        </div>
-                                        <span className="font-semibold text-sm">Switch to {getRoleLabel(roleContext.primary_role)}</span>
-                                    </DropdownMenuItem>
-                                )}
-                            </>
-                    )}
-                    </>
-                )}
-
-                <DropdownMenuSeparator className="bg-serene-neutral-100" />
-                <DropdownMenuItem 
-                    className="cursor-pointer text-red-600 focus:text-red-600 focus:bg-red-50 rounded-xl p-3"
-                    onClick={() => signOut()}
-                >
-                    <LogOut className="mr-3 h-4 w-4" />
-                    <span>Log out</span>
-                </DropdownMenuItem>
-            </DropdownMenuContent>
+    
+                    <DropdownMenuSeparator className="bg-serene-neutral-100" />
+                    <DropdownMenuItem 
+                        className="cursor-pointer text-red-600 focus:text-red-600 focus:bg-red-50 rounded-xl p-3"
+                        onClick={() => signOut()}
+                    >
+                        <LogOut className="mr-3 h-4 w-4" />
+                        <span>Log out</span>
+                    </DropdownMenuItem>
+                </DropdownMenuContent>
             </DropdownMenu>
         )}
 

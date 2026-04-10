@@ -462,14 +462,15 @@ export function EnhancedSidebar({
 		const content = (
 			<div
 				className={cn(
-					"flex items-center gap-3 px-4 py-3.5 rounded-2xl transition-all duration-300 mx-3 my-1", // Increased margin x, added margin y
+					"flex items-center rounded-2xl transition-all duration-300 my-1 overflow-hidden",
 					"group cursor-pointer select-none ring-offset-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-serene-blue-400 focus-visible:ring-offset-2",
 					active
-						? "bg-serene-blue-50 text-serene-blue-700 font-bold shadow-none" // Softer active state
-						: "text-serene-neutral-500 hover:bg-serene-neutral-50 hover:text-serene-blue-600 dark:text-neutral-400 dark:hover:bg-neutral-800"
+						? "bg-serene-blue-50 text-serene-blue-700 font-bold shadow-none" 
+						: "text-serene-neutral-500 hover:bg-serene-neutral-50 hover:text-serene-blue-600 dark:text-neutral-400 dark:hover:bg-neutral-800",
+					isCollapsed ? "px-0 w-12 h-12 mx-auto justify-center" : "px-4 py-3.5 mx-3 justify-start"
 				)}
 			>
-				<div className="relative flex items-center justify-center">
+				<div className="relative flex-shrink-0 flex items-center justify-center">
 					<Icon
 						className={cn(
 							"h-5 w-5 transition-all duration-300",
@@ -493,18 +494,17 @@ export function EnhancedSidebar({
 					)}
 				</div>
 
-				{!isCollapsed && (
-					<span
-						className={cn(
-							"flex-1 text-sm tracking-wide transition-colors",
-							active
-								? "text-serene-blue-900 font-bold"
-								: "text-serene-neutral-600 font-medium group-hover:text-serene-blue-800"
-						)}
-					>
-						{item.label}
-					</span>
-				)}
+				<span
+					className={cn(
+						"whitespace-nowrap transition-all duration-300 ease-in-out",
+						isCollapsed ? "w-0 opacity-0 ml-0 overflow-hidden" : "w-auto opacity-100 ml-3 flex-1",
+						active
+							? "text-serene-blue-900 font-bold"
+							: "font-medium group-hover:text-serene-blue-800"
+					)}
+				>
+					{item.label}
+				</span>
 			</div>
 		);
 
@@ -551,78 +551,74 @@ export function EnhancedSidebar({
 		<>
 			<div
 				className={cn(
-					"hidden lg:flex lg:fixed lg:inset-y-0 lg:left-0 lg:z-40 lg:overflow-y-auto flex-col h-screen transition-all duration-500 ease-spring",
-					"bg-white/90 backdrop-blur-2xl border-r border-serene-neutral-200/40 shadow-[1px_0_20px_rgba(0,0,0,0.02)]", // Softer border, glass effect
-					isCollapsed ? "w-20 items-center" : "w-72", // Collapsed centers items
+					"hidden lg:flex lg:fixed lg:inset-y-0 lg:left-0 lg:z-40 lg:overflow-y-auto flex-col h-screen transition-all duration-300 ease-in-out",
+					"bg-white/90 backdrop-blur-2xl border-r border-serene-neutral-200/40 shadow-[1px_0_20px_rgba(0,0,0,0.02)]",
+					isCollapsed ? "w-20" : "w-72",
 					className
 				)}
 			>
 				{/* Header */}
-				<div className="flex items-center justify-between p-4 border-b border-neutral-200 dark:border-neutral-800">
-						{!isCollapsed && (
-						<Link href="/dashboard" className="flex items-center gap-3">
-							<Image
-								src={logo}
-								alt="Sauti Salama"
-								priority
-								className="rounded-lg h-8 w-auto object-contain"
-							/>
-							<div>
-								<h2 className="text-lg font-bold text-sauti-blue">Sauti Salama</h2>
-								<p className="text-xs text-neutral-500">Safe Voice Platform</p>
-							</div>
-						</Link>
-					)}
+				<div className={cn(
+					"flex items-center p-4 border-b border-neutral-200 dark:border-neutral-800 transition-all duration-300 overflow-hidden",
+					isCollapsed ? "justify-center" : "justify-between"
+				)}>
+					<Link href="/dashboard" className="flex items-center overflow-hidden">
+						<Image
+							src={logo}
+							alt="Sauti Salama"
+							priority
+							className="rounded-lg h-8 w-auto object-contain flex-shrink-0"
+						/>
+						<div className={cn(
+							"transition-all duration-300 whitespace-nowrap",
+							isCollapsed ? "w-0 opacity-0 ml-0 overflow-hidden" : "w-[120px] opacity-100 ml-3"
+						)}>
+							<h2 className="text-lg font-bold text-sauti-blue">Sauti Salama</h2>
+							<p className="text-xs text-neutral-500">Safe Voice Tool</p>
+						</div>
+					</Link>
 
-						{isCollapsed && (
-						<Link href="/dashboard" className="flex justify-center w-full">
-							<Image
-								src={logo}
-								alt="Sauti Salama"
-								priority
-								className="rounded-lg h-8 w-auto object-contain"
-							/>
-						</Link>
-					)}
-
-					{!isCollapsed && (
+					{!needsOnboarding && (
 						<Button
 							variant="ghost"
 							size="icon"
-							onClick={() => setIsCollapsed(true)}
-							className="h-8 w-8 text-neutral-500 hover:text-sauti-orange"
+							onClick={() => setIsCollapsed(!isCollapsed)}
+							className={cn(
+								"h-8 w-8 text-neutral-500 hover:bg-neutral-50 hover:text-sauti-orange flex-shrink-0 transition-all duration-300",
+								isCollapsed ? "opacity-0 w-0 hidden" : "opacity-100"
+							)}
 						>
 							<ChevronLeft className="h-4 w-4" />
 						</Button>
 					)}
 				</div>
 
-				{/* Collapsed expand button */}
+				{/* Collapsed expand button overlay */}
 				{isCollapsed && !needsOnboarding && (
-					<div className="px-2 py-2">
+					<div className="absolute right-0 top-5 translate-x-1/2 z-50">
 						<Button
-							variant="ghost"
+							variant="outline"
 							size="icon"
 							onClick={() => setIsCollapsed(false)}
-							className="w-full h-10 text-neutral-500 hover:text-sauti-teal hover:bg-neutral-50"
+							className="h-6 w-6 rounded-full bg-white hover:bg-neutral-50 shadow-sm border-neutral-200 text-neutral-500"
 						>
-							<ChevronRight className="h-5 w-5" />
+							<ChevronRight className="h-3 w-3" />
 						</Button>
 					</div>
 				)}
 
 				{/* User Info - Wrapped with Dropdown */}
-				<div className="border-b border-neutral-200 dark:border-neutral-800">
+				<div className="border-b border-neutral-200 dark:border-neutral-800 overflow-hidden">
 					<DropdownMenu>
 						<DropdownMenuTrigger asChild>
 							<div
 								suppressHydrationWarning
 								className={cn(
-									"flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-neutral-50 dark:hover:bg-neutral-800 transition-colors",
-									isCollapsed && "justify-center px-0"
+									"flex items-center py-3 cursor-pointer hover:bg-neutral-50 dark:hover:bg-neutral-800 transition-all duration-300",
+									isCollapsed ? "justify-center px-0 gap-0" : "px-4 gap-3"
 								)}
 							>
-								<Avatar className="h-10 w-10 border border-neutral-200 dark:border-neutral-700">
+								<Avatar className="h-10 w-10 border border-neutral-200 dark:border-neutral-700 flex-shrink-0 transition-transform duration-300">
 									<AvatarImage
 										src={
 											mounted &&
@@ -642,24 +638,26 @@ export function EnhancedSidebar({
 									</AvatarFallback>
 								</Avatar>
 
-								{!isCollapsed && (
-									<div className="flex-1 min-w-0 text-left">
-										<p className="text-sm font-bold text-neutral-900 dark:text-neutral-100 truncate">
-											{dash?.data?.profile?.first_name || user?.email || "User"}
+								<div className={cn(
+									"text-left transition-all duration-300 whitespace-nowrap",
+									isCollapsed ? "w-0 opacity-0 overflow-hidden pointer-events-none" : "flex-1 min-w-0 opacity-100 w-auto"
+								)}>
+									<p className="text-sm font-bold text-neutral-900 dark:text-neutral-100 truncate">
+										{dash?.data?.profile?.first_name || user?.email || "User"}
+									</p>
+									{role !== "survivor" && (
+										<p className="text-xs text-neutral-500 truncate capitalize">
+											{role || "Member"}
 										</p>
-										{role !== "survivor" && (
-											<p className="text-xs text-neutral-500 truncate capitalize">
-												{role || "Member"}
-											</p>
-										)}
-									</div>
-								)}
+									)}
+								</div>
 
-								{!isCollapsed && (
-									<div className="text-neutral-400">
-										<ChevronRight className="h-4 w-4 rotate-90" />
-									</div>
-								)}
+								<div className={cn(
+									"text-neutral-400 transition-all duration-300 flex-shrink-0",
+									isCollapsed ? "w-0 opacity-0 overflow-hidden" : "w-4 opacity-100"
+								)}>
+									<ChevronRight className="h-4 w-4 rotate-90" />
+								</div>
 							</div>
 						</DropdownMenuTrigger>
 						<DropdownMenuContent

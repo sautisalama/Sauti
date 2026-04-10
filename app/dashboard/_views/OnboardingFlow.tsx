@@ -393,15 +393,15 @@ export default function OnboardingFlow() {
 				<div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-6">
 					{/* Survivor Tile */}
 					<div
-						className={`cursor-pointer rounded-xl border-2 p-3 md:p-6 text-center transition-all duration-300 group relative overflow-hidden bg-white h-full flex flex-col justify-center ${
+						className={`cursor-pointer rounded-xl border-2 p-4 md:p-6 transition-all duration-300 group relative overflow-hidden bg-white h-full flex flex-col justify-center ${
 							profile.user_type === "survivor"
 								? "border-serene-blue-500 shadow-xl ring-2 ring-serene-blue-500/10"
-								: "border-serene-neutral-100 hover:border-serene-blue-200"
+								: "border-serene-neutral-100 hover:border-serene-blue-200 hover:shadow-md"
 						}`}
 						onClick={() => setProfile(p => ({ ...p, user_type: "survivor" }))}
 					>
-						<div className="flex flex-row sm:flex-col items-center gap-3 sm:gap-4 relative z-10">
-							<div className="w-12 sm:w-16 aspect-square relative flex justify-center items-center bg-serene-blue-50 rounded-lg shadow-sm border border-serene-blue-100 transition-all duration-500 group-hover:bg-serene-blue-100/50">
+						<div className="flex flex-row sm:flex-col items-center sm:justify-center gap-4 relative z-10 w-full">
+							<div className="w-14 sm:w-16 shrink-0 aspect-square relative flex justify-center items-center bg-serene-blue-50 rounded-xl shadow-sm border border-serene-blue-100 transition-all duration-500 group-hover:bg-serene-blue-100/50">
 								<Image
 									src="/icons/survivor-light.png"
 									alt="Survivor"
@@ -410,11 +410,11 @@ export default function OnboardingFlow() {
 									width={60}
 								/>
 							</div>
-							<div className="flex-1 sm:w-full">
-								<h3 className="text-lg font-bold text-serene-neutral-900 left sm:text-center group-hover:text-serene-blue-600 transition-colors">
+							<div className="flex-1 text-left sm:text-center">
+								<h3 className="text-base sm:text-lg font-bold text-serene-neutral-900 group-hover:text-serene-blue-600 transition-colors">
 									Survivor
 								</h3>
-								<p className="text-[10px] sm:text-xs font-medium text-serene-neutral-500 left sm:text-center mt-1 sm:mt-2 leading-tight">
+								<p className="text-[11px] sm:text-xs font-medium text-serene-neutral-500 mt-1 sm:mt-2 leading-tight">
 									Report abuse incidents and receive secure confidential support.
 								</p>
 							</div>
@@ -423,28 +423,28 @@ export default function OnboardingFlow() {
 
 					{/* Professional Tile */}
 					<div
-						className={`cursor-pointer rounded-2xl border-2 p-8 text-center transition-all duration-300 group relative overflow-hidden bg-white h-full flex flex-col justify-center ${
+						className={`cursor-pointer rounded-xl border-2 p-4 md:p-6 transition-all duration-300 group relative overflow-hidden bg-white h-full flex flex-col justify-center ${
 							profile.user_type === "professional"
 								? "border-serene-blue-500 shadow-xl ring-2 ring-serene-blue-500/10"
-								: "border-serene-neutral-100 hover:border-serene-blue-200 hover:shadow-lg"
+								: "border-serene-neutral-100 hover:border-serene-blue-200 hover:shadow-md"
 						}`}
 						onClick={() => setProfile(p => ({ ...p, user_type: "professional" }))}
 					>
-						<div className="flex flex-row sm:flex-col items-center gap-4 sm:gap-6 relative z-10">
-							<div className="w-16 sm:w-24 aspect-square relative flex justify-center items-center bg-serene-blue-50 rounded-xl shadow-sm border border-serene-blue-100 transition-all duration-500 group-hover:bg-serene-blue-100/50">
+						<div className="flex flex-row sm:flex-col items-center sm:justify-center gap-4 relative z-10 w-full">
+							<div className="w-14 sm:w-16 shrink-0 aspect-square relative flex justify-center items-center bg-serene-blue-50 rounded-xl shadow-sm border border-serene-blue-100 transition-all duration-500 group-hover:bg-serene-blue-100/50">
 								<Image
 									src="/icons/professional-light.png"
 									alt="Service Provider"
-									height={80}
-									width={80}
-									className="object-contain p-3"
+									className="object-contain p-2"
+									height={60}
+									width={60}
 								/>
 							</div>
-							<div className="flex-1 sm:w-full">
-								<h3 className="text-lg font-bold text-serene-neutral-900 left sm:text-center group-hover:text-serene-blue-600 transition-colors">
+							<div className="flex-1 text-left sm:text-center">
+								<h3 className="text-base sm:text-lg font-bold text-serene-neutral-900 group-hover:text-serene-blue-600 transition-colors">
 									Professional
 								</h3>
-								<p className="text-[10px] sm:text-xs font-medium text-serene-neutral-500 left sm:text-center mt-1 sm:mt-2 leading-tight">
+								<p className="text-[11px] sm:text-xs font-medium text-serene-neutral-500 mt-1 sm:mt-2 leading-tight">
 									Provide expert support to survivors.
 								</p>
 							</div>
@@ -453,28 +453,28 @@ export default function OnboardingFlow() {
 
 					{/* NGO Tile */}
 					<div
-						className={`cursor-pointer rounded-xl border-2 p-3 md:p-6 text-center transition-all duration-300 group relative overflow-hidden bg-white h-full flex flex-col justify-center ${
+						className={`cursor-pointer rounded-xl border-2 p-4 md:p-6 transition-all duration-300 group relative overflow-hidden bg-white h-full flex flex-col justify-center ${
 							profile.user_type === "ngo"
 								? "border-serene-blue-500 shadow-xl ring-2 ring-serene-blue-500/10"
-								: "border-serene-neutral-100 hover:border-serene-blue-200"
+								: "border-serene-neutral-100 hover:border-serene-blue-200 hover:shadow-md"
 						}`}
 						onClick={() => setProfile(p => ({ ...p, user_type: "ngo" }))}
 					>
-						<div className="flex flex-row sm:flex-col items-center gap-3 sm:gap-4 relative z-10">
-							<div className="w-12 sm:w-16 aspect-square relative flex justify-center items-center bg-serene-blue-50 rounded-lg shadow-sm border border-serene-blue-100 transition-all duration-500 group-hover:bg-serene-blue-100/50">
+						<div className="flex flex-row sm:flex-col items-center sm:justify-center gap-4 relative z-10 w-full">
+							<div className="w-14 sm:w-16 shrink-0 aspect-square relative flex justify-center items-center bg-serene-blue-50 rounded-xl shadow-sm border border-serene-blue-100 transition-all duration-500 group-hover:bg-serene-blue-100/50">
 								<Image
 									src="/icons/ngo-light.png"
-									alt="NGO"
+									alt="Organisation"
 									className="object-contain p-2"
 									height={60}
 									width={60}
 								/>
 							</div>
-							<div className="flex-1 sm:w-full">
-								<h3 className="text-lg font-bold text-serene-neutral-900 left sm:text-center group-hover:text-serene-blue-600 transition-colors">
+							<div className="flex-1 text-left sm:text-center">
+								<h3 className="text-base sm:text-lg font-bold text-serene-neutral-900 group-hover:text-serene-blue-600 transition-colors">
 									Organisation
 								</h3>
-								<p className="text-[10px] sm:text-xs font-medium text-serene-neutral-500 left sm:text-center mt-1 sm:mt-2 leading-tight">
+								<p className="text-[11px] sm:text-xs font-medium text-serene-neutral-500 mt-1 sm:mt-2 leading-tight">
 									Manage non profit services, multiple professionals and provide support to survivors.
 								</p>
 							</div>

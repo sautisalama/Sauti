@@ -155,8 +155,8 @@ export async function POST(request: Request) {
 						updatedDevices = registerDevice([], deviceId, userAgent, screenHint);
 					}
 
-					// Create profile
-					await supabaseAdmin.from("profiles").insert({
+					// Update/Upsert profile (handle_new_user trigger might have already created a basic row)
+					const { error: profileError } = await supabaseAdmin.from("profiles").upsert({
 						id: userId,
 						email,
 						first_name: "Anonymous",
@@ -168,7 +168,12 @@ export async function POST(request: Request) {
 						created_at: new Date().toISOString(),
 						updated_at: new Date().toISOString(),
 						devices: updatedDevices,
-					});
+						settings: { device_tracking_enabled: false },
+					}, { onConflict: 'id' });
+					
+					if (profileError) {
+						console.error("Failed to upsert profile for anonymous user:", profileError);
+					}
 				}
 			} catch (accountError) {
 				console.error("Account creation process failed:", accountError);

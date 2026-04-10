@@ -20,9 +20,10 @@ export function useUser() {
 			try {
 				// Get authenticated user
 				const {
-					data: { user: authUser },
+					data: { session },
                                         error: authError
-				} = await supabase.auth.getUser();
+				} = await supabase.auth.getSession();
+				const authUser = session?.user;
 
 				if (cancelled) return;
                                 if (authError) throw authError;

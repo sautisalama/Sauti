@@ -35,9 +35,10 @@ export function useRoleSwitcher() {
 	const loadRoleContext = async () => {
 		try {
 			const {
-				data: { user },
+				data: { session },
 				error: authError,
-			} = await supabase.auth.getUser();
+			} = await supabase.auth.getSession();
+			const user = session?.user;
 
 			if (authError) throw authError;
 			
