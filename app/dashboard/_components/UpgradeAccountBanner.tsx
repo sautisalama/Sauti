@@ -2,8 +2,10 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { ArrowRight, Copy, Check, Key } from "lucide-react";
+import { ArrowRight, Copy, Check, Key, AlertTriangle } from "lucide-react";
 import { UpgradeAccountDialog } from "./UpgradeAccountDialog";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { cn } from "@/lib/utils";
 
 interface UpgradeAccountBannerProps {
 	userEmail: string;
@@ -21,42 +23,43 @@ export function UpgradeAccountBanner({ userEmail }: UpgradeAccountBannerProps) {
 
 	return (
 		<>
-			{/* Compact, non-intrusive banner */}
 			<div className="mb-8">
-				<div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-3 pr-4 bg-amber-50/50 border border-amber-100/60 rounded-2xl backdrop-blur-sm">
-					<div className="flex items-center gap-3 overflow-hidden w-full sm:w-auto">
-						<div className="h-10 w-10 shrink-0 bg-white rounded-xl flex items-center justify-center shadow-sm border border-amber-100 text-amber-500">
-							<Key className="h-5 w-5" />
+				<Alert className={cn(
+					"border-0 shadow-sm rounded-2xl p-5 sm:p-6 transition-all duration-300",
+					"bg-amber-50 text-amber-900"
+				)}>
+					<div className="flex flex-col sm:flex-row gap-4 sm:items-center">
+						<div className="h-12 w-12 rounded-2xl flex items-center justify-center shrink-0 shadow-sm bg-amber-100 text-amber-600">
+							<AlertTriangle className="h-6 w-6" />
 						</div>
-						<div className="min-w-0 flex-1">
-							<p className="text-xs font-bold text-amber-900 uppercase tracking-wider mb-0.5">
-								Temporary Session
-							</p>
-							<div className="flex items-center gap-2 text-xs text-amber-700/80">
-								<span className="shrink-0 opacity-70">Login Key:</span>
-								<code className="font-mono bg-white px-2 py-0.5 rounded border border-amber-100 text-amber-800 select-all truncate max-w-[180px] sm:max-w-none">
-									{userEmail}
-								</code>
-								<button 
-									onClick={handleCopy} 
-									className="p-1 hover:bg-amber-100 rounded-md transition-colors text-amber-600 focus:outline-none focus:ring-2 focus:ring-amber-200"
-									aria-label="Copy login key"
-								>
-									{copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
-								</button>
-							</div>
+						<div className="flex-1">
+							<AlertTitle className="font-bold text-lg mb-1">Temporary Session</AlertTitle>
+							<AlertDescription className="text-sm font-medium opacity-80 whitespace-pre-line">
+								Your login key is securely generated. Please save it to access this space again.
+								<div className="mt-3 flex items-center gap-2">
+									<code className="font-mono bg-white px-3 py-1 rounded-md border border-amber-200 text-amber-800 select-all max-w-[200px] sm:max-w-none truncate font-bold shadow-sm">
+										{userEmail}
+									</code>
+									<button 
+										onClick={handleCopy} 
+										className="p-1.5 hover:bg-amber-100 rounded-md transition-colors text-amber-600 focus:outline-none focus:ring-2 focus:ring-amber-200"
+										aria-label="Copy login key"
+									>
+										{copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+									</button>
+								</div>
+								<div className="flex flex-wrap gap-3 mt-4">
+									<button 
+										onClick={() => setOpen(true)}
+										className="inline-flex items-center text-xs font-bold uppercase tracking-wider hover:underline border-b border-current pb-0.5"
+									>
+										Move to permanent Account <ArrowRight className="h-3 w-3 ml-1" />
+									</button>
+								</div>
+							</AlertDescription>
 						</div>
 					</div>
-
-					<Button 
-						onClick={() => setOpen(true)}
-						size="sm"
-						variant="ghost"
-						className="w-full sm:w-auto whitespace-nowrap bg-white hover:bg-amber-50 text-amber-700 border border-amber-200 hover:border-amber-300 text-xs font-bold h-9 rounded-xl shadow-sm px-4 transition-all"
-					>
-						Move to permanent Account <ArrowRight className="h-3 w-3 ml-1.5 opacity-60" />
-					</Button>
-				</div>
+				</Alert>
 			</div>
 
 			<UpgradeAccountDialog 

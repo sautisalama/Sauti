@@ -215,7 +215,7 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
                             <MoreVertical className="h-5 w-5 text-serene-neutral-500" />
                         </Button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-56 rounded-2xl border-serene-neutral-200 shadow-xl p-2 animate-in fade-in zoom-in-95 duration-200">
+                    <DropdownMenuContent align="end" className="w-56 rounded-xl border-serene-neutral-200 shadow-xl p-2 animate-in fade-in zoom-in-95 duration-200">
                         <div className="px-3 py-2 border-b border-serene-neutral-50 mb-1">
                             <p className="text-[10px] font-bold text-serene-neutral-400 uppercase tracking-widest">Case Actions</p>
                         </div>
@@ -842,7 +842,7 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
 					</div>
 					<h2 className="text-2xl font-bold text-slate-900 mb-4">Secure Access Only</h2>
 					<p className="text-slate-500 mb-10 leading-relaxed font-medium">{errorState || "Record not found."}</p>
-					<Button asChild className="w-full bg-teal-600 hover:bg-teal-700 text-white font-bold rounded-2xl h-14 shadow-lg">
+					<Button asChild className="w-full bg-teal-600 hover:bg-teal-700 text-white font-bold rounded-xl h-14 shadow-lg">
 						<Link href="/dashboard">Return to Dashboard</Link>
 					</Button>
 				</Card>
@@ -953,7 +953,7 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
 								</span>
 							</div>
 
-							<Card className="border-0 bg-white shadow-xl shadow-slate-200/50 rounded-2xl sm:rounded-[2.5rem] overflow-hidden">
+							<Card className="border-0 bg-white shadow-xl shadow-slate-200/50 rounded-xl sm:rounded-[2.5rem] overflow-hidden">
 								<CardContent className="p-0">
 									{checklists.map((item, idx) => (
 										<div key={item.id} className={cn("group transition-all duration-300", idx < checklists.length - 1 && "border-b border-slate-100/50")}>
@@ -1019,10 +1019,10 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
 						<div className="max-w-2xl">
 							<Accordion type="single" collapsible className="w-full">
 								<AccordionItem value="report-details" className="border-0">
-									<Card className="border border-serene-neutral-100 bg-white shadow-sm rounded-2xl sm:rounded-[2.5rem] overflow-hidden group/statement transition-all duration-300">
+									<Card className="border border-serene-neutral-100 bg-white shadow-sm rounded-xl sm:rounded-[2.5rem] overflow-hidden group/statement transition-all duration-300">
 										<AccordionTrigger className="w-full text-left p-4 sm:p-6 hover:no-underline group/trigger">
 											<div className="flex items-center gap-4 w-full">
-												<div className="w-10 h-10 bg-slate-50 rounded-2xl flex items-center justify-center text-slate-400 group-data-[state=open]/trigger:bg-teal-50 group-data-[state=open]/trigger:text-teal-600 transition-all duration-300">
+												<div className="w-10 h-10 bg-slate-50 rounded-xl flex items-center justify-center text-slate-400 group-data-[state=open]/trigger:bg-teal-50 group-data-[state=open]/trigger:text-teal-600 transition-all duration-300">
 													<FileText className="h-5 w-5" />
 												</div>
 												<div className="space-y-0 text-left">
@@ -1036,13 +1036,13 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
 												
 												{/* Statement Box - Hidden if empty */}
 												{report.incident_description ? (
-                                                    <div className="bg-slate-50/50 rounded-2xl p-4 sm:p-6 border border-slate-100/50">
+                                                    <div className="bg-slate-50/50 rounded-xl p-4 sm:p-6 border border-slate-100/50">
                                                         <p className="text-slate-600 font-medium text-sm leading-relaxed whitespace-pre-wrap italic">
                                                             {report.incident_description}
                                                         </p>
                                                     </div>
                                                 ) : (
-                                                    <div className="flex flex-col items-center justify-center py-6 px-4 border border-dashed border-slate-100 rounded-2xl bg-slate-50/20">
+                                                    <div className="flex flex-col items-center justify-center py-6 px-4 border border-dashed border-slate-100 rounded-xl bg-slate-50/20">
                                                         <p className="text-xs font-bold text-slate-400 uppercase tracking-widest text-center">No personal statement was shared during report</p>
                                                     </div>
                                                 )}
@@ -1084,7 +1084,7 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
 														</p>
 														<div className="grid grid-cols-1 gap-3">
 															{audioFiles.map((audio, index) => (
-																<div key={index} className="bg-slate-50 border border-slate-100/50 rounded-2xl p-3 shadow-none">
+																<div key={index} className="bg-slate-50 border border-slate-100/50 rounded-xl p-3 shadow-none">
 																	<AudioPlayer src={audio.url} title={audio.title || `Voice Note ${index + 1}`} />
 																</div>
 															))}
@@ -1142,7 +1142,7 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
 								<h2 className="text-xl font-bold tracking-tight text-slate-800">Your Private Journal</h2>
 							</div>
 							<p className="text-sm text-slate-400 font-medium leading-relaxed px-2">Only you can see these notes. Reflect on your healing, progress, and thoughts here.</p>
-							<div className="bg-white/50 backdrop-blur-sm rounded-xl xs:rounded-2xl sm:rounded-[2.5rem] shadow-xl shadow-slate-200/20 border border-white p-2 overflow-hidden">
+							<div className="bg-white/50 backdrop-blur-sm rounded-xl xs:rounded-xl sm:rounded-[2.5rem] shadow-xl shadow-slate-200/20 border border-white p-2 overflow-hidden">
 								<RichTextEditor content={report.notes || ""} onSave={handleSaveNotes} placeholder="How are you feeling today?" />
 							</div>
 
@@ -1165,10 +1165,10 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
 										<h3 className="text-2xl font-bold text-slate-900 tracking-tight">Coordination Line</h3>
 									</div>
 									
-									<div className="h-[600px] rounded-xl xs:rounded-2xl sm:rounded-[2.5rem] border border-serene-neutral-100 shadow-2xl shadow-slate-200/50 overflow-hidden bg-white flex flex-col group">
+									<div className="h-[600px] rounded-xl xs:rounded-xl sm:rounded-[2.5rem] border border-serene-neutral-100 shadow-2xl shadow-slate-200/50 overflow-hidden bg-white flex flex-col group">
 										{isChatLoading ? (
 											<div className="flex-1 flex flex-col items-center justify-center p-12 text-center space-y-4">
-												<div className="w-12 h-12 rounded-2xl bg-teal-50 flex items-center justify-center animate-spin">
+												<div className="w-12 h-12 rounded-xl bg-teal-50 flex items-center justify-center animate-spin">
 													<Shield className="h-6 w-6 text-teal-600" />
 												</div>
 												<p className="text-sm font-bold text-slate-400 uppercase tracking-widest">Securing Connection...</p>
@@ -1200,7 +1200,7 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
 
 
 										{/* Help Card */}
-										<Card className="bg-violet-600 rounded-xl xs:rounded-2xl sm:rounded-[2.5rem] shadow-xl shadow-violet-600/20 border-0 p-5 xs:p-6 sm:p-8 text-white relative overflow-hidden group">
+										<Card className="bg-violet-600 rounded-xl xs:rounded-xl sm:rounded-[2.5rem] shadow-xl shadow-violet-600/20 border-0 p-5 xs:p-6 sm:p-8 text-white relative overflow-hidden group">
 											<div className="absolute top-0 right-0 p-4 opacity-10 group-hover:scale-110 transition-transform">
 												<Heart className="h-24 w-24" />
 											</div>
@@ -1214,7 +1214,7 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
 										</Card>
 
 									{/* Supportive Hint Card */}
-									<Card className="border border-slate-100 bg-white shadow-sm rounded-xl xs:rounded-2xl sm:rounded-[2.5rem] overflow-hidden">
+									<Card className="border border-slate-100 bg-white shadow-sm rounded-xl xs:rounded-xl sm:rounded-[2.5rem] overflow-hidden">
 										<CardContent className="p-5 xs:p-6 sm:p-8 space-y-6">
 											<div className="flex items-center gap-3">
 												<div className="w-10 h-10 rounded-xl bg-teal-50 flex items-center justify-center text-teal-600">
@@ -1232,7 +1232,7 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
 							</div>
 						) : (
 							<div className="space-y-6">
-								<Card className="border-0 bg-teal-600 shadow-2xl shadow-teal-600/30 rounded-2xl sm:rounded-[2.5rem] overflow-hidden group">
+								<Card className="border-0 bg-teal-600 rounded-xl sm:rounded-[2.5rem] overflow-hidden group">
 									<CardContent className="p-10 relative">
 										<Sparkles className="absolute -top-4 -right-4 h-24 w-24 text-white/5 group-hover:rotate-12 transition-transform duration-700" />
 										<div className="space-y-6 relative">
@@ -1249,7 +1249,7 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
 								</Card>
 
 								{report.record_only ? (
-									<Card className="border-0 bg-white shadow-xl shadow-slate-200/50 rounded-2xl sm:rounded-[2.5rem] overflow-hidden">
+									<Card className="border-0 bg-white shadow-xl shadow-slate-200/50 rounded-xl sm:rounded-[2.5rem] overflow-hidden">
 										<CardContent className="p-10 text-center space-y-6">
 											<div className="w-20 h-20 bg-amber-50 rounded-[2rem] flex items-center justify-center mx-auto mb-2 text-amber-600">
 												<Sparkles className="h-10 w-10" />
@@ -1258,7 +1258,7 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
 												<h3 className="text-xl font-bold text-slate-900 tracking-tight">Record-Only Space</h3>
 												<p className="text-slate-400 font-medium leading-relaxed">Your story is saved safely. Toggle escalation to find professional matches.</p>
 											</div>
-											<Button onClick={handleEscalate} disabled={escalating} className="w-full h-14 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-2xl shadow-lg shadow-amber-500/20 text-base transition-all hover:scale-[1.02]">
+											<Button onClick={handleEscalate} disabled={escalating} className="w-full h-14 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-xl shadow-lg shadow-amber-500/20 text-base transition-all hover:scale-[1.02]">
 												{escalating ? "Requesting Connection..." : "Find Support Matches"}
 											</Button>
 										</CardContent>
@@ -1290,7 +1290,7 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
 												const isAlreadyMatched = activeProposal.status === 'proposed' || activeProposal.status === 'requested' || activeProposal.status === 'confirmed';
 												
 												return (
-													<Card className="border border-white shadow-2xl rounded-2xl sm:rounded-[2.5rem] bg-white border-serene-neutral-100 overflow-hidden animate-in fade-in zoom-in-95 duration-500">
+													<Card className="border border-white rounded-xl sm:rounded-[2.5rem] bg-white border-serene-neutral-100 overflow-hidden animate-in fade-in zoom-in-95 duration-500">
 														<CardHeader className="p-8 pb-4">
 															<div className="flex items-center justify-between">
 																<Badge className="bg-teal-50 text-teal-600 border-0 font-bold uppercase tracking-widest text-[9px]">
@@ -1300,8 +1300,8 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
 															</div>
 														</CardHeader>
 														<CardContent className="p-4 sm:p-8 pt-0 space-y-6">
-															<div className="flex items-center gap-4 bg-slate-50 p-4 rounded-2xl border border-slate-100">
-																<Avatar className="h-12 w-12 rounded-2xl border-2 border-white shadow-sm">
+															<div className="flex items-center gap-4 bg-slate-50 p-4 rounded-xl border border-slate-100">
+																<Avatar className="h-12 w-12 rounded-xl border-2 border-white shadow-sm">
 																	<AvatarFallback className="bg-teal-100 text-teal-700 font-bold">
 																		{activeProposal.name.charAt(0)}
 																	</AvatarFallback>
@@ -1314,7 +1314,7 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
 
 															{matchingAppt ? (
 																<div className="space-y-4">
-																	<div className="bg-teal-50/50 border border-teal-100 rounded-2xl p-5 space-y-3">
+																	<div className="bg-teal-50/50 border border-teal-100 rounded-xl p-5 space-y-3">
 																		<div className="flex items-center gap-3 text-teal-700">
 																			<Calendar className="h-4 w-4" />
 																			<span className="text-sm font-bold">Proposed Meeting:</span>
@@ -1333,18 +1333,18 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
 																				toast({ title: "Partner Confirmed", description: "You are now connected." });
 																				fetchReport();
 																			}}
-																			className="w-full h-12 bg-teal-600 hover:bg-teal-700 text-white font-bold rounded-2xl shadow-lg shadow-teal-600/20 transition-all hover:scale-[1.02]"
+																			className="w-full h-12 bg-teal-600 hover:bg-teal-700 text-white font-bold rounded-xl shadow-lg shadow-teal-600/20 transition-all hover:scale-[1.02]"
 																		>
 																			Accept & Connect
 																		</Button>
 																		
 																		<Dialog>
 																			<DialogTrigger asChild>
-																				<Button variant="outline" className="w-full h-12 border-slate-200 text-slate-600 font-bold rounded-2xl hover:bg-slate-50 transition-all text-xs">
+																				<Button variant="outline" className="w-full h-12 border-slate-200 text-slate-600 font-bold rounded-xl hover:bg-slate-50 transition-all text-xs">
 																					Suggest Another Time
 																				</Button>
 																			</DialogTrigger>
-																			<DialogContent className="max-w-2xl bg-white rounded-2xl sm:rounded-[2.5rem] p-0 overflow-hidden border-0 shadow-2xl">
+																			<DialogContent className="max-w-2xl bg-white rounded-xl sm:rounded-[2.5rem] p-0 overflow-hidden border-0 shadow-2xl">
 																				<div className="p-8 border-b border-slate-50">
 																					<DialogTitle className="text-2xl font-bold flex items-center gap-3">
 																						<Calendar className="h-6 w-6 text-teal-600" />
@@ -1376,7 +1376,7 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
 																	</div>
 																</div>
 															) : (
- 																<div className="bg-teal-50/30 rounded-2xl p-6 text-center space-y-3 border border-teal-100/50 animate-pulse">
+ 																<div className="bg-teal-50/30 rounded-xl p-6 text-center space-y-3 border border-teal-100/50 animate-pulse">
  																	<p className="text-sm font-bold text-teal-800">Matched with {activeProposal.name}</p>
  																	<p className="text-xs text-teal-600/70 font-semibold uppercase tracking-widest">Awaiting Scheduling</p>
  																</div>
@@ -1387,7 +1387,7 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
 											}
 											
 											return (
-												<Card className="border border-serene-neutral-100 shadow-2xl rounded-2xl sm:rounded-[2.5rem] bg-white overflow-hidden group">
+												<Card className="border border-serene-neutral-100 shadow-2xl rounded-xl sm:rounded-[2.5rem] bg-white overflow-hidden group">
 													<CardContent className="p-12 flex flex-col items-center text-center space-y-6">
 														<div className="relative">
 															<div className="w-20 h-20 bg-teal-50 rounded-full flex items-center justify-center text-teal-600">
@@ -1411,7 +1411,7 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
 											);
 										})()}
 									{/* Sauti Salama Tips Card */}
-									<Card className="border-0 bg-gradient-to-br from-teal-600 to-emerald-700 shadow-xl shadow-teal-600/20 rounded-2xl sm:rounded-[2.5rem] overflow-hidden group">
+									<Card className="border-0 bg-gradient-to-br from-teal-600 to-emerald-700 rounded-xl sm:rounded-[2.5rem] overflow-hidden group">
 										<CardContent className="p-8 relative">
 											<div className="absolute top-0 right-0 p-4 opacity-10">
 												<ShieldCheck className="h-20 w-20 text-white" />
