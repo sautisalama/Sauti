@@ -1,5 +1,6 @@
 import { WifiOff } from "lucide-react";
 import type { Metadata } from "next";
+import { RetryButton } from "./RetryButton";
 
 export const metadata: Metadata = {
 	title: "You are offline | Sauti Salama",
@@ -20,16 +21,7 @@ export default function OfflinePage() {
 				It looks like you've lost your internet connection. Don't worry, Sauti Salama will automatically reconnect when your connection is restored.
 			</p>
 			
-			<button
-				onClick={() => {
-					if (typeof window !== "undefined") {
-						window.location.reload();
-					}
-				}}
-				className="bg-[#FC8E00] hover:bg-[#e07d00] text-white px-6 py-3 rounded-md font-medium transition-colors"
-			>
-				Try again
-			</button>
+			<RetryButton />
 		</div>
 	);
 }
