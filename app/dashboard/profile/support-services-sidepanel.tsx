@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -247,7 +247,7 @@ export function SupportServiceSidepanel({
 	const [currentLocation, setCurrentLocation] = useState<{ lat: number; lng: number } | null>(null);
 	const [shouldUpdateLocation, setShouldUpdateLocation] = useState(false);
 
-	const supabase = createClient();
+	const supabase = useMemo(() => createClient(), []);
 	const { toast } = useToast();
 
 	// --- Effects ---
