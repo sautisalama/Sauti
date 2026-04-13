@@ -80,7 +80,7 @@ export async function updateSession(request: NextRequest) {
 		// Verify device authorization
 		const { data: profile } = await supabase
 			.from("profiles")
-			.select("settings, devices")
+			.select("settings, devices, is_admin")
 			.eq("id", user.id)
 			.single();
 
@@ -126,14 +126,15 @@ export async function updateSession(request: NextRequest) {
 			return redirectResponse;
 		}
 
-		// 2. Redirect authorized users away from auth pages
+		// 2. Redirect authorized users away from auth pages and the landing page
 		if (
 			isAuthorized &&
 			(request.nextUrl.pathname.startsWith("/signin") ||
-				request.nextUrl.pathname.startsWith("/signup"))
+				request.nextUrl.pathname.startsWith("/signup") ||
+				request.nextUrl.pathname === "/")
 		) {
 			const url = request.nextUrl.clone();
-			url.pathname = "/dashboard";
+			url.pathname = profile?.is_admin ? "/dashboard/admin" : "/dashboard";
 			const redirectResponse = NextResponse.redirect(url);
 			
 			// Sync cookies here too
