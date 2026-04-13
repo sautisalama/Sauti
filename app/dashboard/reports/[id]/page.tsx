@@ -60,6 +60,7 @@ import { getReportStatus, getStatusTheme } from "@/lib/utils/case-status";
 import { ReportWithRelations } from "../../_types";
 import { SereneBreadcrumb } from "@/components/ui/SereneBreadcrumb";
 import { ChatFAB } from "@/components/navigation/ChatFAB";
+import { LocationDisplay } from "../../_components/SereneDashboardUI";
 
 interface ProviderMatch {
     id: string;
@@ -1053,7 +1054,9 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
 														<p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
                                                             <MapPin className="h-2.5 w-2.5 text-teal-500" /> Location
                                                         </p>
-														<p className="text-xs sm:text-sm font-bold text-slate-700">{report.location || report.city || "Not specified"}</p>
+														<p className="text-xs sm:text-sm font-bold text-slate-700">
+                                                            <LocationDisplay lat={report.latitude} lng={report.longitude} fallback={report.location || report.city || "Not specified"} />
+                                                        </p>
 													</div>
                                                     <div className="space-y-0.5">
 														<p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
