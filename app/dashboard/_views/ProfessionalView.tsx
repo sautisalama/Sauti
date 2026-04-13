@@ -30,7 +30,8 @@ import {
 	VerificationBanner,
 	CalendarWidget,
 	DashboardSearchOverlay,
-	DashboardEmptyState
+	DashboardEmptyState,
+	LocationDisplay
 } from "../_components/SereneDashboardUI";
 import { CalendarConnectionStatus } from "../_components/CalendarConnectionStatus";
 import { OutOfOfficeBanner } from "@/components/dashboard/OutOfOfficeBanner";
@@ -267,7 +268,7 @@ export default function ProfessionalView({
                                                                 <div className="flex items-center gap-1 text-serene-neutral-400 text-[10px] font-bold uppercase tracking-wider bg-serene-neutral-50 px-2.5 py-1 rounded-md border border-serene-neutral-100">
                                                                     <MapPin className="h-3 w-3" />
                                                                     <span className="truncate">
-                                                                        {match.report?.city || "Region Confidential"}
+                                                                        <LocationDisplay lat={match.report?.latitude} lng={match.report?.longitude} fallback={match.report?.city || "Region Confidential"} />
                                                                     </span>
                                                                 </div>
                                                                 {match.match_date && (

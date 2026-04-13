@@ -1194,10 +1194,11 @@ export function SupportServiceSidepanel({
 																			initialLng={editData.longitude || 36.8219}
 																			initialRadius={Number(editData.coverage_area_radius) || 5000}
 																			initialAddress={editData.address}
-																			onLocationChange={(lat, lng, address) => {
+                                                                            showRadius={true}
+																			onLocationChange={(lat: number, lng: number, address: string) => {
 																				setEditData(prev => ({ ...prev, latitude: lat, longitude: lng, address }));
 																			}}
-																			onRadiusChange={(radius) => {
+																			onRadiusChange={(radius: number) => {
 																				setEditData(prev => ({ ...prev, coverage_area_radius: String(radius) }));
 																			}}
 																			className="w-full"
@@ -1306,6 +1307,7 @@ export function SupportServiceSidepanel({
 																	initialLng={service.longitude}
 																	initialRadius={Number(service.coverage_area_radius)}
 																	disabled={true}
+                                                                    showRadius={true}
 																	onLocationChange={() => {}}
 																	onRadiusChange={() => {}}
 																	className="w-full h-full"

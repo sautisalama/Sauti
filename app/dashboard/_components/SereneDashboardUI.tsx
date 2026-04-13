@@ -1,6 +1,6 @@
 "use client";
 
-import { ReactNode, useState, useMemo } from "react";
+import { ReactNode, useState, useMemo, useEffect } from "react";
 import Link from "next/link";
 import { format } from "date-fns";
 import { Card, CardContent } from "@/components/ui/card";
@@ -25,15 +25,25 @@ import {
   Home,
   AlertTriangle,
   AlertCircle,
-  Users,
-  Search,
-  Plus
+  Search
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ReportWithRelations, MatchedServiceWithRelations, AppointmentWithDetails } from "../_types";
 import { getReportStatus, getStatusTheme, getMatchStatus } from "@/lib/utils/case-status";
 import { Tables } from "@/types/db-schema";
+
+// --- Location Text Helper ---
+function LocationDisplay({ lat, lng, fallback }: { lat?: number | null, lng?: number | null, fallback: string }) {
+   const [display, setDisplay] = useState(fallback);
+   useEffect(() => {
+     if (lat && lng) {
+        import("@/lib/utils/geocoding").then(m => m.reverseGeocodeToDistrict(lat, lng))
+        .then(res => { if (res) setDisplay(res); })
+     }
+   }, [lat, lng]);
+   return <span>{display}</span>;
+}
 
 // --- Breadcrumbs ---
 
@@ -283,7 +293,7 @@ export function SereneReportCard({ report, onClick, isSelected, className }: {
                     <div className="flex items-center gap-1 text-serene-neutral-400 text-[9px] sm:text-[10px] font-bold uppercase tracking-wider bg-serene-neutral-50 px-2 py-1 rounded-md border border-serene-neutral-100">
                         <MapPin className="h-2.5 w-2.5" />
                         <span className="truncate max-w-[80px] sm:max-w-none">
-                            {report.city || "Region Confidential"}
+                            <LocationDisplay lat={report.latitude} lng={report.longitude} fallback={report.city || "Region Confidential"} />
                         </span>
                     </div>
                     {report.submission_timestamp && (
@@ -433,7 +443,7 @@ export function SereneActivityCard({ report, href, className }: {
               </p>
               <div className="flex flex-wrap items-center gap-2">
                 <div className="flex items-center gap-1 text-serene-neutral-400 text-[10px] font-bold uppercase tracking-wider bg-serene-neutral-50 px-2 py-1 rounded-md">
-                   <MapPin className="h-3 w-3" /> {report.city || "Region Confidential"}
+                   <MapPin className="h-3 w-3" /> <LocationDisplay lat={report.latitude} lng={report.longitude} fallback={report.city || "Region Confidential"} />
                 </div>
                 {(report.media as any)?.url && (
                   <div className="flex items-center gap-1 text-amber-600 bg-amber-50 px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider shrink-0">
@@ -688,3 +698,5 @@ export function DashboardEmptyState({ icon, title, description, action }: any) {
         </div>
     );
 }
+
+export { LocationDisplay };

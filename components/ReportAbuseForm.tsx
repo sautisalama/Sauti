@@ -74,6 +74,7 @@ export default function ReportAbuseForm({ onClose }: { onClose?: () => void }) {
 	const isChildCase = incidentTypes.includes('child_abuse') || incidentTypes.includes('child_labor') || reportingFor === 'child';
 	const [autofilledPhone, setAutofilledPhone] = useState<string | null>(null);
 	const [contactPreference, setContactPreference] = useState<string>("");
+	const [allowLocation, setAllowLocation] = useState(true);
 	// Password for anonymous account
 	const [password, setPassword] = useState("");
 	const [showPassword, setShowPassword] = useState(false);
@@ -248,8 +249,8 @@ export default function ReportAbuseForm({ onClose }: { onClose?: () => void }) {
 				consent: isChildCase ? "yes" : (formData.get("consent") || null),
 				contact_preference: "do_not_contact",
 				required_services: [],
-				latitude: location?.latitude || null,
-				longitude: location?.longitude || null,
+				latitude: allowLocation ? (location?.latitude || null) : null,
+				longitude: allowLocation ? (location?.longitude || null) : null,
 				submission_timestamp: new Date().toISOString(),
 				media,
 				is_onBehalf: reportingFor !== 'self',
@@ -655,6 +656,32 @@ export default function ReportAbuseForm({ onClose }: { onClose?: () => void }) {
 						</label>
 					</div>
 				</div>
+                
+                <div className="mt-6 flex flex-col gap-1.5 p-4 bg-serene-neutral-50/50 rounded-xl border border-serene-neutral-200/50">
+                    <label className="inline-flex items-center gap-3 cursor-pointer text-sm font-semibold text-neutral-800">
+                        <input
+                            type="radio"
+                            name="allow_location"
+                            className="w-4 h-4 accent-sauti-teal shrink-0"
+                            checked={allowLocation}
+                            onChange={(e) => setAllowLocation(true)}
+                        />
+                        Allow Sauti to automatically use my device's location to assist responders.
+                    </label>
+                    <label className="inline-flex items-center gap-3 cursor-pointer text-sm font-semibold text-neutral-800">
+                        <input
+                            type="radio"
+                            name="allow_location"
+                            className="w-4 h-4 accent-sauti-teal shrink-0"
+                            checked={!allowLocation}
+                            onChange={(e) => setAllowLocation(false)}
+                        />
+                        Do not use my device's location.
+                    </label>
+					<p className="text-[10px] text-neutral-500 pl-7 leading-relaxed mt-1">
+						We will securely attach your estimated location without displaying a map. This helps us direct support units nearest to you. Your permission ensures safe alignment with privacy laws.
+					</p>
+                </div>
 				</div>
 
 			{/* Anonymous Account Password Section */}

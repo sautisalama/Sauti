@@ -373,10 +373,11 @@ export function AddSupportServiceForm({
 													initialLat={location?.lat || -1.2921}
 													initialLng={location?.lng || 36.8219}
 													initialRadius={Number(formData.coverage_area_radius) === 0 ? 5000 : Number(formData.coverage_area_radius)}
-													onLocationChange={(lat, lng, address) => {
+                                                    showRadius={true}
+													onLocationChange={(lat: number, lng: number, address: string) => {
 														setFormData(prev => ({ ...prev, latitude: lat, longitude: lng, address }));
 													}}
-													onRadiusChange={(radius) => {
+													onRadiusChange={(radius: number) => {
 														setFormData(prev => ({ ...prev, coverage_area_radius: String(radius) }));
 													}}
 												/>
