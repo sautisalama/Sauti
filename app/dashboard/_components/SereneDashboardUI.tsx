@@ -25,7 +25,9 @@ import {
   Home,
   AlertTriangle,
   AlertCircle,
-  Search
+  Search,
+  ExternalLink,
+  Users
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -538,6 +540,7 @@ export function CalendarWidget({ appointments, upcomingAppointmentsCount }: { ap
   if (appointments.length === 0) return null;
 
   const [isExpanded, setIsExpanded] = useState(false);
+  const [expandedAppointmentId, setExpandedAppointmentId] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState(() => {
     // Initial selection strategy:
     // 1. First upcoming appointment
@@ -559,15 +562,27 @@ export function CalendarWidget({ appointments, upcomingAppointmentsCount }: { ap
   const getAppointmentsForDay = (date: Date) => appointments.filter(a => a.appointment_date && new Date(a.appointment_date).toDateString() === date.toDateString());
   const selectedDayAppointments = getAppointmentsForDay(selectedDate);
 
-  const weekDays = useMemo(() => {
-    const start = new Date(selectedDate);
-    start.setDate(start.getDate() - start.getDay());
-    return Array.from({ length: 7 }, (_, i) => {
-      const day = new Date(start);
-      day.setDate(start.getDate() + i);
-      return day;
-    });
-  }, [selectedDate]);
+  const calendarDays = useMemo(() => {
+    if (viewMode === 'week') {
+      const start = new Date(selectedDate);
+      start.setDate(start.getDate() - start.getDay());
+      return Array.from({ length: 7 }, (_, i) => {
+        const day = new Date(start);
+        day.setDate(start.getDate() + i);
+        return day;
+      });
+    } else {
+      // Month Grid: always 42 days (6 weeks) starting from the Sunday of or before the 1st of the month
+      const firstOfMonth = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1);
+      const start = new Date(firstOfMonth);
+      start.setDate(firstOfMonth.getDate() - firstOfMonth.getDay());
+      return Array.from({ length: 42 }, (_, i) => {
+        const day = new Date(start);
+        day.setDate(start.getDate() + i);
+        return day;
+      });
+    }
+  }, [selectedDate, viewMode]);
 
   return (
     <div className="bg-white rounded-2xl border border-serene-neutral-100 overflow-hidden shadow-sm">
@@ -597,20 +612,40 @@ export function CalendarWidget({ appointments, upcomingAppointmentsCount }: { ap
             </div>
             <p className="text-sm font-medium text-serene-neutral-700">{selectedDate.toLocaleDateString('default', { month: 'short', year: 'numeric' })}</p>
             <div className="flex gap-1">
-              <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => { const d = new Date(selectedDate); d.setDate(d.getDate() - 7); setSelectedDate(d); }}>←</Button>
-              <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => { const d = new Date(selectedDate); d.setDate(d.getDate() + 7); setSelectedDate(d); }}>→</Button>
+              <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => { 
+                const d = new Date(selectedDate); 
+                if (viewMode === 'week') d.setDate(d.getDate() - 7); 
+                else d.setMonth(d.getMonth() - 1);
+                setSelectedDate(d); 
+              }}>←</Button>
+              <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => { 
+                const d = new Date(selectedDate); 
+                if (viewMode === 'week') d.setDate(d.getDate() + 7); 
+                else d.setMonth(d.getMonth() + 1);
+                setSelectedDate(d); 
+              }}>→</Button>
             </div>
           </div>
 
           <div className="grid grid-cols-7 gap-1">
             {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d, i) => <div key={`${d}-${i}`} className="text-center text-[10px] font-bold text-serene-neutral-400 py-1">{d}</div>)}
-            {weekDays.map((day, idx) => {
+            {calendarDays.map((day, idx) => {
               const isToday = day.toDateString() === new Date().toDateString();
               const isSelected = day.toDateString() === selectedDate.toDateString();
               const hasAppts = getAppointmentsForDay(day).length > 0;
+              const isSameMonth = day.getMonth() === selectedDate.getMonth();
+
               return (
-                <button key={idx} onClick={() => setSelectedDate(day)} className={cn("aspect-square rounded-xl flex flex-col items-center justify-center transition-all", isSelected ? "bg-serene-blue-600 text-white" : isToday ? "bg-serene-blue-50 text-serene-blue-700" : "hover:bg-serene-neutral-50 text-serene-neutral-700")}>
-                  <span className="text-sm font-semibold">{day.getDate()}</span>
+                <button 
+                  key={idx} 
+                  onClick={() => setSelectedDate(day)} 
+                  className={cn(
+                    "aspect-square rounded-xl flex flex-col items-center justify-center transition-all relative", 
+                    isSelected ? "bg-serene-blue-600 text-white" : isToday ? "bg-serene-blue-50 text-serene-blue-700" : "hover:bg-serene-neutral-50 text-serene-neutral-700",
+                    !isSameMonth && viewMode === 'month' && "opacity-20"
+                  )}
+                >
+                  <span className="text-[13px] font-semibold">{day.getDate()}</span>
                   {hasAppts && <div className={cn("h-1 w-1 rounded-full mt-0.5", isSelected ? "bg-white" : "bg-serene-blue-500")} />}
                 </button>
               );
@@ -620,17 +655,121 @@ export function CalendarWidget({ appointments, upcomingAppointmentsCount }: { ap
           <div className="pt-2 border-t border-serene-neutral-100">
             {selectedDayAppointments.length > 0 ? (
               <div className="space-y-2">
-                {selectedDayAppointments.map((appt, idx) => (
-                  <div key={idx} className="flex items-center gap-3 p-3 bg-serene-neutral-50/80 rounded-xl">
-                    <div className="h-10 w-10 bg-serene-blue-100 rounded-lg flex items-center justify-center text-serene-blue-700"><Clock className="h-4 w-4" /></div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium text-serene-neutral-900 text-sm truncate">{appt.matched_service?.service_details?.name || 'Appointment'}</p>
-                      <p className="text-xs text-serene-neutral-500">{new Date(appt.appointment_date || 0).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+                {selectedDayAppointments.map((appt, idx) => {
+                  const isExpanded = expandedAppointmentId === appt.appointment_id;
+                  return (
+                    <div key={idx} className="group/appt">
+                      <button 
+                        onClick={() => setExpandedAppointmentId(isExpanded ? null : appt.appointment_id)}
+                        className={cn(
+                          "w-full flex items-center gap-3 p-3 transition-all rounded-xl text-left border border-transparent",
+                          isExpanded ? "bg-serene-blue-50/50 border-serene-blue-100 shadow-sm" : "bg-serene-neutral-50/80 hover:bg-serene-neutral-100"
+                        )}
+                      >
+                        <div className={cn(
+                          "h-10 w-10 rounded-lg flex items-center justify-center transition-colors",
+                          isExpanded ? "bg-serene-blue-600 text-white" : "bg-serene-blue-100 text-serene-blue-700"
+                        )}>
+                          <Clock className="h-4 w-4" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-bold text-serene-neutral-900 text-sm truncate">
+                            {appt.matched_service?.service_details?.name || 'Appointment'}
+                          </p>
+                          <p className="text-xs font-semibold text-serene-neutral-500">
+                            {format(new Date(appt.appointment_date || 0), "h:mm a")} • {appt.status || "Scheduled"}
+                          </p>
+                        </div>
+                        {isExpanded ? <ChevronUp className="h-4 w-4 text-serene-blue-600" /> : <ChevronDown className="h-4 w-4 text-serene-neutral-400 opacity-0 group-hover/appt:opacity-100 transition-opacity" />}
+                      </button>
+
+                      {isExpanded && (
+                        <div className="mt-2 p-4 bg-white border border-serene-blue-100/60 rounded-xl space-y-5 animate-in slide-in-from-top-2 duration-300">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div className="space-y-2 pb-3 sm:pb-0 sm:border-r border-serene-neutral-100">
+                              <p className="text-[10px] font-bold text-serene-neutral-400 uppercase tracking-widest flex items-center gap-1.5">
+                                <Users className="h-3 w-3" /> Parties involved
+                              </p>
+                              <div className="space-y-2">
+                                <div className="flex items-center gap-3">
+                                  <div className="h-8 w-8 rounded-full bg-serene-blue-100 flex items-center justify-center text-[10px] font-bold text-serene-blue-600">S</div>
+                                  <div>
+                                    <p className="text-xs font-bold text-serene-neutral-900">{appt.survivor?.first_name || "Confidential Survivor"}</p>
+                                    <p className="text-[10px] text-serene-neutral-500 font-medium">Service Seeker</p>
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                  <div className="h-8 w-8 rounded-full bg-serene-neutral-100 flex items-center justify-center text-[10px] font-bold text-serene-neutral-600">P</div>
+                                  <div>
+                                    <p className="text-xs font-bold text-serene-neutral-900">You ({appt.professional?.first_name || "Provider"})</p>
+                                    <p className="text-[10px] text-serene-neutral-500 font-medium">Support Professional</p>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                            
+                            <div className="space-y-2">
+                              <p className="text-[10px] font-bold text-serene-neutral-400 uppercase tracking-widest flex items-center gap-1.5">
+                                <Calendar className="h-3 w-3" /> Schedule Details
+                              </p>
+                              <div className="space-y-1">
+                                <p className="text-xs font-bold text-serene-neutral-800">
+                                  {format(new Date(appt.appointment_date || 0), "EEEE, MMMM do, yyyy")}
+                                </p>
+                                <p className="text-xs font-medium text-serene-neutral-500">
+                                  {format(new Date(appt.appointment_date || 0), "h:mm a")} • {appt.duration_minutes || 60} mins
+                                </p>
+                                {appt.meeting_link && (
+                                   <a 
+                                    href={appt.meeting_link} 
+                                    target="_blank" 
+                                    rel="noopener noreferrer"
+                                    className="inline-flex items-center gap-1 text-[11px] font-bold text-serene-blue-600 hover:text-serene-blue-700 mt-1"
+                                   >
+                                     <MessageCircle className="h-3 w-3" /> Join Virtual Meeting
+                                   </a>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+
+                          {appt.notes && (
+                            <div className="space-y-2 bg-serene-neutral-50 p-3 rounded-lg border border-serene-neutral-100">
+                              <p className="text-[10px] font-bold text-serene-neutral-400 uppercase tracking-wider">Session Goals / Notes</p>
+                              <p className="text-xs text-serene-neutral-600 italic leading-relaxed">"{appt.notes}"</p>
+                            </div>
+                          )}
+
+                          <div className="pt-2 flex flex-wrap gap-2">
+                            {appt.matched_service?.id && (
+                              <Button variant="outline" size="sm" className="h-8 text-[10px] font-bold uppercase tracking-wider border-serene-neutral-200 hover:bg-serene-blue-50 hover:text-serene-blue-600 hover:border-serene-blue-200" asChild>
+                                <Link href={`/dashboard/cases/${appt.matched_service.id}`}>
+                                  Open Case File
+                                </Link>
+                              </Button>
+                            )}
+                            {appt.matched_service?.report?.report_id && (
+                              <Button variant="outline" size="sm" className="h-8 text-[10px] font-bold uppercase tracking-wider border-serene-neutral-200 hover:bg-amber-50 hover:text-amber-700 hover:border-amber-200" asChild>
+                                <Link href={`/dashboard/reports/${appt.matched_service.report.report_id}`}>
+                                  View Incident Report <FileText className="h-3 w-3 ml-1.5" />
+                                </Link>
+                              </Button>
+                            )}
+                            {appt.meeting_link && (
+                              <Button size="sm" className="h-8 text-[10px] font-bold uppercase tracking-wider bg-serene-blue-600 hover:bg-serene-blue-700 shadow-sm shadow-serene-blue-200" asChild>
+                                <a href={appt.meeting_link} target="_blank" rel="noopener noreferrer">
+                                  Join Now <ExternalLink className="h-3 w-3 ml-1.5" />
+                                </a>
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      )}
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
-            ) : <p className="text-xs text-serene-neutral-400 text-center py-2">No appointments scheduled</p>}
+            ) : <p className="text-xs text-serene-neutral-400 text-center py-2">No appointments scheduled for this day</p>}
           </div>
         </div>
       )}
