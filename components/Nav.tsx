@@ -19,6 +19,7 @@ import {
 	Map,
 	Handshake,
 	Info,
+	Leaf,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger, SheetTitle, SheetDescription } from "@/components/ui/sheet";
@@ -82,7 +83,7 @@ export function Nav() {
 	const isActive = (path: string) => pathname === path;
 
 	return (
-		<header className="sticky top-0 z-50 w-full border-b-2 border-gray-100 bg-white/98 backdrop-blur h-20 md:h-24 flex items-center shadow-sm">
+		<header className={`${pathname.startsWith("/learn") ? "relative" : "sticky top-0"} z-50 w-full border-b-2 border-gray-100 bg-white/98 backdrop-blur h-20 md:h-24 flex items-center shadow-sm`}>
 			<div className="container w-full max-w-[100vw] flex items-center justify-between px-6 md:px-12 relative">
 				{/* Extreme Left: Logo */}
 				<Link href="/" className="flex items-center gap-2 shrink-0">
@@ -207,6 +208,12 @@ export function Nav() {
 								<Link href="/learn?type=resources" className="flex items-center gap-3 rounded-xl px-4 py-3 hover:bg-gray-50 font-bold text-sauti-blue cursor-pointer outline-none transition-colors group">
 									<BookOpen className="h-5 w-5 text-indigo-500" />
 									<span>Resources</span>
+								</Link>
+							</DropdownMenuItem>
+							<DropdownMenuItem asChild>
+								<Link href="/learn/climate-care" className="flex items-center gap-3 rounded-xl px-4 py-3 hover:bg-gray-50 font-bold text-sauti-blue cursor-pointer outline-none transition-colors group">
+									<Leaf className="h-5 w-5 text-sauti-teal" />
+									<span>Climate & Care</span>
 								</Link>
 							</DropdownMenuItem>
 						</DropdownMenuContent>
@@ -446,6 +453,15 @@ export function Nav() {
 													>
 														<BookOpen className="h-4 w-4 text-indigo-500" />
 														<span>Resources</span>
+													</Link>
+													<Link 
+														href="/learn/climate-care" 
+														className={`flex items-center gap-3 rounded-xl px-4 py-3 font-bold transition-all ${
+															isActive("/learn/climate-care") ? "bg-sauti-teal/10 text-sauti-teal" : "text-gray-600 hover:bg-gray-50 hover:text-sauti-blue"
+														}`}
+													>
+														<Leaf className="h-4 w-4 text-sauti-teal" />
+														<span>Climate & Care</span>
 													</Link>
 												</div>
 											)}

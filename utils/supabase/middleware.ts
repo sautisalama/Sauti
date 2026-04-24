@@ -55,6 +55,7 @@ export async function updateSession(request: NextRequest) {
 		!user &&
 		!request.nextUrl.pathname.startsWith("/signin") &&
 		!request.nextUrl.pathname.startsWith("/signup") &&
+		!request.nextUrl.pathname.startsWith("/auth/setup-password") &&
 		!request.nextUrl.pathname.startsWith("/error") &&
 		!request.nextUrl.pathname.startsWith("/api/auth/callback") &&
 		!request.nextUrl.pathname.startsWith("/api/auth/confirm") &&
@@ -71,7 +72,7 @@ export async function updateSession(request: NextRequest) {
 		request.nextUrl.pathname !== "/"
 	) {
 		const url = request.nextUrl.clone();
-		url.pathname = "/";
+		url.pathname = "/signin";
 		return NextResponse.redirect(url);
 	}
 
@@ -80,7 +81,7 @@ export async function updateSession(request: NextRequest) {
 		// Verify device authorization
 		const { data: profile } = await supabase
 			.from("profiles")
-			.select("settings, devices")
+			.select("settings, devices, is_admin")
 			.eq("id", user.id)
 			.single();
 
@@ -126,14 +127,16 @@ export async function updateSession(request: NextRequest) {
 			return redirectResponse;
 		}
 
-		// 2. Redirect authorized users away from auth pages
+		// 2. Redirect authorized users away from auth pages and the landing page
+		// (but NOT from /auth/setup-password — invite recipients need to set their password first)
 		if (
 			isAuthorized &&
 			(request.nextUrl.pathname.startsWith("/signin") ||
-				request.nextUrl.pathname.startsWith("/signup"))
+				request.nextUrl.pathname.startsWith("/signup") ||
+				request.nextUrl.pathname === "/")
 		) {
 			const url = request.nextUrl.clone();
-			url.pathname = "/dashboard";
+			url.pathname = profile?.is_admin ? "/dashboard/admin" : "/dashboard";
 			const redirectResponse = NextResponse.redirect(url);
 			
 			// Sync cookies here too

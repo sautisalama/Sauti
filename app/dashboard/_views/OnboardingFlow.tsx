@@ -118,10 +118,15 @@ export default function OnboardingFlow() {
 	// Track if we've already done the initial check to avoid skipping steps twice if we manually go back
 	const [hasResumed, setHasResumed] = useState(false);
 	const [openPolicy, setOpenPolicy] = useState<string | undefined>("terms");
+	// True when this account was created via the admin invite flow
+	const [isAdminInvited, setIsAdminInvited] = useState(false);
 
 	useEffect(() => {
 		if (user?.profile && !hasResumed) {
 			const policies = parsePolicies(user.profile.policies);
+			const adminInvited = !!(user.profile as any).onboarded_by_admin;
+			setIsAdminInvited(adminInvited);
+
 			setProfile({
 				first_name: user.profile.first_name || "",
 				last_name: user.profile.last_name || "",
@@ -136,7 +141,8 @@ export default function OnboardingFlow() {
 			});
 
 			// Only resume once on load
-			if (user.profile.user_type && stepIndex === 0) {
+			// Admin-invited users always start from step 0 so they verify all pre-filled data.
+			if (user.profile.user_type && stepIndex === 0 && !adminInvited) {
 				const uType = user.profile.user_type;
 				const isProfessionalOrNGO = uType === 'professional' || uType === 'ngo';
 				const hasAcceptedAll = policies.all_policies_accepted; 
@@ -152,8 +158,8 @@ export default function OnboardingFlow() {
 					// Role selected but policies not accepted
 					setStepIndex(1);
 				}
-				setHasResumed(true);
 			}
+			setHasResumed(true);
 		}
 	}, [user?.profile, hasResumed]);
 
@@ -208,6 +214,13 @@ export default function OnboardingFlow() {
 				.eq("id", user.id);
 
 			if (isLastStep) {
+				// Clear admin invite flag now that they've verified all data and accepted T&C
+				if (isAdminInvited && user?.id) {
+					await supabase
+						.from("profiles")
+						.update({ onboarded_by_admin: false } as any)
+						.eq("id", user.id);
+				}
 				// Update provider instantly for UI response
 				if (dash && user?.profile) {
 					dash.updatePartial({
@@ -619,6 +632,10 @@ export default function OnboardingFlow() {
 
 	/* Required steps defined above */
 
+	// Extract the admin-provided service name hint if this is an admin-invited account
+	const adminServiceName =
+		(user?.profile?.settings as any)?.admin_invite_data?.service_name || "";
+
 	const Services = (
 		<Card className="bg-white border-serene-neutral-100 shadow-premium rounded-2xl overflow-hidden">
 			{StepProgressTopBorder}
@@ -627,7 +644,7 @@ export default function OnboardingFlow() {
 				<p className="text-sm font-medium text-serene-neutral-500 mt-1">List your core services for the community</p>
 			</CardHeader>
 			<CardContent className="p-0">
-				<AddSupportServiceForm embedded onSuccess={() => {}} />
+				<AddSupportServiceForm embedded onSuccess={() => {}} initialName={adminServiceName} />
 			</CardContent>
 		</Card>
 	);

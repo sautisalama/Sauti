@@ -58,6 +58,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { User as UserType } from "@/types/admin-types"; // Ensure this type exists and matches
 import { cn } from "@/lib/utils";
+import { InviteProfessionalDialog } from "./InviteProfessionalDialog";
 
 export function ProfessionalsTable() {
 	const router = useRouter();
@@ -68,12 +69,19 @@ export function ProfessionalsTable() {
 	const [statusFilter, setStatusFilter] = useState("all");
 	const [isProcessing, setIsProcessing] = useState(false);
     
-    // Ban Dialog State
     const [banDialog, setBanDialog] = useState<{ isOpen: boolean; userId: string; userName: string; isBanned: boolean }>({
         isOpen: false,
         userId: '',
         userName: '',
         isBanned: false
+    });
+
+    // Delete Dialog State
+    const [deleteDialog, setDeleteDialog] = useState<{ isOpen: boolean; userId: string; userName: string; email: string }>({
+        isOpen: false,
+        userId: '',
+        userName: '',
+        email: ''
     });
 	
 	// Pagination state
@@ -191,8 +199,53 @@ export function ProfessionalsTable() {
 		}
 	};
 
-    const getVerificationBadge = (status: string | null) => {
-        switch(status) {
+    const handleDeleteUser = async (userId: string) => {
+        try {
+            setIsProcessing(true);
+            const res = await fetch("/api/admin/delete-pending-user", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ userId }),
+            });
+
+            const data = await res.json();
+
+            if (!res.ok) {
+                toast({
+                    title: "Deletion Failed",
+                    description: data.error || "Could not delete user account.",
+                    variant: "destructive",
+                });
+                return;
+            }
+
+            toast({
+                title: "User Deleted",
+                description: "The pending account has been successfully removed.",
+            });
+            loadProfessionals();
+        } catch (error) {
+            console.error("Error deleting user:", error);
+            toast({
+                title: "Error",
+                description: "An unexpected error occurred during account deletion.",
+                variant: "destructive",
+            });
+        } finally {
+            setIsProcessing(false);
+        }
+    };
+
+    const getVerificationBadge = (user: UserType) => {
+        if (user.is_banned) {
+            return (
+                <div className="flex flex-col gap-1">
+                    <Badge variant="destructive" className="bg-red-50 text-red-700 border border-red-200 shadow-sm rounded-full px-3 py-0.5">Banned</Badge>
+                </div>
+            );
+        }
+        
+        switch(user.verification_status) {
             case 'verified': return <Badge className="bg-green-50 text-green-700 border border-green-200 hover:bg-green-100 shadow-sm rounded-full px-3 py-0.5">Verified</Badge>;
             case 'pending': return <Badge className="bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 shadow-sm rounded-full px-3 py-0.5">Pending</Badge>;
             case 'under_review': return <Badge className="bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 shadow-sm rounded-full px-3 py-0.5">Reviewing</Badge>;
@@ -251,6 +304,8 @@ export function ProfessionalsTable() {
 							<SelectItem value="banned">Banned</SelectItem>
 						</SelectContent>
 					</Select>
+					{/* Invite new professional */}
+					<InviteProfessionalDialog onSuccess={loadProfessionals} />
 				</div>
 			</div>
 
@@ -296,7 +351,7 @@ export function ProfessionalsTable() {
 												</div>
 											</TableCell>
 											<TableCell className="py-4">
-												{getVerificationBadge(user.verification_status)}
+												{getVerificationBadge(user)}
 											</TableCell>
 											<TableCell className="py-4 text-sm text-serene-neutral-500">
 												{new Date(user.created_at).toLocaleDateString()}
@@ -323,34 +378,53 @@ export function ProfessionalsTable() {
 																<Eye className="mr-2 h-3.5 w-3.5" /> View Profile
 															</DropdownMenuItem>
 															<DropdownMenuSeparator className="bg-serene-neutral-50" />
-															<DropdownMenuSeparator className="bg-serene-neutral-50" />
-                                                            <DropdownMenuItem 
-                                                                onClick={(e) => {
-                                                                    e.stopPropagation();
-                                                                    setBanDialog({
-                                                                        isOpen: true,
-                                                                        userId: user.id,
-                                                                        userName: `${user.first_name} ${user.last_name}`,
-                                                                        isBanned: user.is_banned
-                                                                    });
-                                                                }}
-                                                                className={cn(
-                                                                    "rounded-lg cursor-pointer", 
-                                                                    user.is_banned ? "text-green-600 focus:text-green-700 focus:bg-green-50" : "text-red-600 focus:text-red-700 focus:bg-red-50"
-                                                                )}
-                                                            >
-                                                                {user.is_banned ? (
-                                                                    <>
-                                                                        <CheckCircle className="mr-2 h-3.5 w-3.5" />
-                                                                        Unban User
-                                                                    </>
-                                                                ) : (
-                                                                    <>
-                                                                        <Ban className="mr-2 h-3.5 w-3.5" />
-                                                                        Ban User
-                                                                    </>
-                                                                )}
-                                                            </DropdownMenuItem>
+															<DropdownMenuItem 
+																onClick={(e) => {
+																	e.stopPropagation();
+																	setBanDialog({
+																		isOpen: true,
+																		userId: user.id,
+																		userName: `${user.first_name} ${user.last_name}`,
+																		isBanned: user.is_banned
+																	});
+																}}
+																className={cn(
+																	"rounded-lg cursor-pointer", 
+																	user.is_banned ? "text-green-600 focus:text-green-700 focus:bg-green-50" : "text-red-600 focus:text-red-700 focus:bg-red-50"
+																)}
+															>
+																{user.is_banned ? (
+																	<>
+																		<CheckCircle className="mr-2 h-3.5 w-3.5" />
+																		Unban User
+																	</>
+																) : (
+																	<>
+																		<Ban className="mr-2 h-3.5 w-3.5" />
+																		Ban User
+																	</>
+																)}
+															</DropdownMenuItem>
+															{(user.verification_status === "pending" || user.verification_status === "rejected") && (
+																<>
+																	<DropdownMenuSeparator className="bg-serene-neutral-50" />
+																	<DropdownMenuItem 
+																		onClick={(e) => {
+																			e.stopPropagation();
+																			setDeleteDialog({
+																				isOpen: true,
+																				userId: user.id,
+																				userName: `${user.first_name} ${user.last_name}`,
+																				email: user.email || ""
+																			});
+																		}}
+																		className="rounded-lg cursor-pointer text-red-600 focus:text-red-700 focus:bg-red-50"
+																	>
+																		<XCircle className="mr-2 h-3.5 w-3.5" />
+																		Delete Pending
+																	</DropdownMenuItem>
+																</>
+															)}
 														</DropdownMenuContent>
 													</DropdownMenu>
 												</div>
@@ -448,7 +522,7 @@ export function ProfessionalsTable() {
 									<div className="flex items-center justify-between mt-3 pl-[3.25rem]">
 										<div className="flex flex-col gap-1">
 											<span className="text-[10px] uppercase tracking-wider text-serene-neutral-400 font-semibold">Status</span>
-											{getVerificationBadge(user.verification_status)}
+											{getVerificationBadge(user)}
 										</div>
 										<div className="flex flex-col gap-1 text-right">
 											<span className="text-[10px] uppercase tracking-wider text-serene-neutral-400 font-semibold">Joined</span>
@@ -541,6 +615,49 @@ export function ProfessionalsTable() {
                             )}
                         >
                             {banDialog.isBanned ? 'Unban User' : 'Suspend User'}
+                        </Button>
+                    </div>
+                </DialogContent>
+            </Dialog>
+
+            {/* Delete Confirmation Dialog - Development Only */}
+            <Dialog open={deleteDialog.isOpen} onOpenChange={(open) => setDeleteDialog(prev => ({ ...prev, isOpen: open }))}>
+                <DialogContent className="rounded-2xl max-w-md overflow-hidden p-0 border-0 bg-white shadow-2xl">
+                    <div className="p-8 pb-0">
+                        <div className="w-16 h-16 rounded-full flex items-center justify-center mb-6 mx-auto bg-red-100 text-red-600">
+                            <XCircle className="w-8 h-8" />
+                        </div>
+                        
+                        <DialogTitle className="text-2xl font-bold text-center text-gray-900">
+                            Delete Account
+                        </DialogTitle>
+                        
+                        <DialogDescription className="text-center text-gray-500 mt-2 text-base">
+                            Are you sure you want to permanently delete <span className="font-semibold text-gray-900">{deleteDialog.userName}</span> ({deleteDialog.email})?
+                            <br />
+                            <span className="text-sm mt-3 p-3 bg-red-50 text-red-700 rounded-lg block border border-red-100">
+                                This action is irreversible and will remove all login credentials and profile data. 
+                                <strong className="block mt-1">Only available in development.</strong>
+                            </span>
+                        </DialogDescription>
+                    </div>
+
+                    <div className="p-6 bg-gray-50 flex gap-3 mt-6">
+                        <Button 
+                            variant="outline" 
+                            onClick={() => setDeleteDialog(prev => ({ ...prev, isOpen: false }))}
+                            className="flex-1 rounded-xl h-12 border-gray-200 hover:bg-white hover:text-gray-900 font-medium"
+                        >
+                            Cancel
+                        </Button>
+                        <Button 
+                            onClick={async () => {
+                                await handleDeleteUser(deleteDialog.userId);
+                                setDeleteDialog(prev => ({ ...prev, isOpen: false }));
+                            }}
+                            className="flex-1 rounded-xl h-12 bg-red-600 hover:bg-red-700 text-white font-semibold shadow-lg shadow-red-200 transition-all hover:scale-[1.02]"
+                        >
+                            Delete Permanently
                         </Button>
                     </div>
                 </DialogContent>
