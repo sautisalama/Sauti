@@ -63,9 +63,11 @@ const COVERAGE_OPTIONS = [
 export function AddSupportServiceForm({
 	onSuccess,
 	embedded = false,
+	initialName = "",
 }: {
 	onSuccess?: (newServiceId?: string) => void;
 	embedded?: boolean;
+	initialName?: string;
 }) {
 	const { toast } = useToast();
 	const dash = useDashboardData();
@@ -74,7 +76,7 @@ export function AddSupportServiceForm({
 	const [location, setLocation] = useState<{ lat: number; lng: number } | null>(null);
 	
 	const [formData, setFormData] = useState({
-		name: "",
+		name: initialName,
 		service_types: "" as ServiceType,
 		phone_number: "",
 		email: "",

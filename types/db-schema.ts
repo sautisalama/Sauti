@@ -901,6 +901,7 @@ export type Database = {
           isVerified: boolean | null
           last_name: string | null
           last_verification_check: string | null
+          onboarded_by_admin: boolean | null
           out_of_office: boolean | null
           phone: string | null
           policies: Json | null
@@ -948,6 +949,7 @@ export type Database = {
           isVerified?: boolean | null
           last_name?: string | null
           last_verification_check?: string | null
+          onboarded_by_admin?: boolean | null
           out_of_office?: boolean | null
           phone?: string | null
           policies?: Json | null
@@ -995,6 +997,7 @@ export type Database = {
           isVerified?: boolean | null
           last_name?: string | null
           last_verification_check?: string | null
+          onboarded_by_admin?: boolean | null
           out_of_office?: boolean | null
           phone?: string | null
           policies?: Json | null

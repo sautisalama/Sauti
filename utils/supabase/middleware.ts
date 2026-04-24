@@ -55,6 +55,7 @@ export async function updateSession(request: NextRequest) {
 		!user &&
 		!request.nextUrl.pathname.startsWith("/signin") &&
 		!request.nextUrl.pathname.startsWith("/signup") &&
+		!request.nextUrl.pathname.startsWith("/auth/setup-password") &&
 		!request.nextUrl.pathname.startsWith("/error") &&
 		!request.nextUrl.pathname.startsWith("/api/auth/callback") &&
 		!request.nextUrl.pathname.startsWith("/api/auth/confirm") &&
@@ -127,6 +128,7 @@ export async function updateSession(request: NextRequest) {
 		}
 
 		// 2. Redirect authorized users away from auth pages and the landing page
+		// (but NOT from /auth/setup-password — invite recipients need to set their password first)
 		if (
 			isAuthorized &&
 			(request.nextUrl.pathname.startsWith("/signin") ||

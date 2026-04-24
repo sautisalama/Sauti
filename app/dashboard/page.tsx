@@ -27,11 +27,14 @@ export default async function Dashboard() {
 		return <AnonymousSurvivorView userId={user.id} profileDetails={user} />;
 	}
 
-	// If user exists but has no user_type, or is a pro without a title (incomplete onboarding), or hasn't accepted policies
+	// If user exists but has no user_type, or is a pro without a title (incomplete onboarding), or hasn't accepted policies,
+	// or was admin-invited and still needs to verify their pre-filled data and accept T&C
+	const isAdminInvited = !!(user as any).onboarded_by_admin;
 	const needsOnboarding = 
 		!user.user_type || 
 		!hasAcceptedPolicies ||
-		((user.user_type === 'professional' || user.user_type === 'ngo') && !user.professional_title);
+		((user.user_type === 'professional' || user.user_type === 'ngo') && !user.professional_title) ||
+		isAdminInvited;
 
 	if (needsOnboarding) {
 		return <OnboardingFlow />;
