@@ -22,14 +22,17 @@ const hyper = Atkinson_Hyperlegible({
 
 export const metadata: Metadata = {
 	metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || "https://sautisalama.org"),
-	title: "Sauti Salama",
-	description: "Breaking the Silence, Building a Brighter Future",
+	title: {
+		default: "Sauti Salama | Breaking the Silence",
+		template: "%s | Sauti Salama"
+	},
+	description: "Breaking the Silence, Building a Brighter Future. A platform dedicated to supporting survivors of gender-based violence (GBV) through technology, care, and legal access.",
 	manifest: "/manifest.json",
 	icons: {
 		icon: "/icons/icons-512.png",
 		apple: "/icons/icons-512.png",
 	},
-	keywords: ["GBV", "Gender Based Violence", "Gender", "Sauti Salama"],
+	keywords: ["GBV", "Gender Based Violence", "Gender", "Sauti Salama", "Kenya", "Abuse Reporting", "Support Services"],
 	authors: [
 		{
 			name: "Cashcade",
@@ -54,8 +57,8 @@ export const metadata: Metadata = {
 		],
 	},
 	openGraph: {
-		title: "Sauti Salama",
-		description: "Breaking the Silence, Building a Brighter Future",
+		title: "Sauti Salama | Breaking the Silence",
+		description: "Breaking the Silence, Building a Brighter Future. Supporting survivors of GBV through secure reporting and care access.",
 		url: process.env.NEXT_PUBLIC_APP_URL || "https://sautisalama.org",
 		siteName: "Sauti Salama",
 		images: [
@@ -63,16 +66,32 @@ export const metadata: Metadata = {
 				url: "/dashboard/featured.png",
 				width: 1200,
 				height: 630,
-				alt: "Sauti Salama",
+				alt: "Sauti Salama - Breaking the Silence",
 			},
 		],
+		locale: "en_US",
 		type: "website",
 	},
 	twitter: {
 		card: "summary_large_image",
-		title: "Sauti Salama",
-		description: "Breaking the Silence, Building a Brighter Future",
+		title: "Sauti Salama | Breaking the Silence",
+		description: "Breaking the Silence, Building a Brighter Future. Supporting survivors of GBV.",
 		images: ["/dashboard/featured.png"],
+		creator: "@SautiSalama",
+	},
+	alternates: {
+		canonical: "/",
+	},
+	robots: {
+		index: true,
+		follow: true,
+		googleBot: {
+			index: true,
+			follow: true,
+			'max-video-preview': -1,
+			'max-image-preview': 'large',
+			'max-snippet': -1,
+		},
 	},
 };
 
@@ -111,6 +130,88 @@ export default function RootLayout({
 								} catch (e) {}
 							})();
 						`,
+					}}
+				/>
+				<script
+					type="application/ld+json"
+					dangerouslySetInnerHTML={{
+						__html: JSON.stringify({
+							"@context": "https://schema.org",
+							"@graph": [
+								{
+									"@type": "WebSite",
+									"@id": "https://sautisalama.org/#website",
+									"url": "https://sautisalama.org",
+									"name": "Sauti Salama",
+									"description": "Breaking the Silence, Building a Brighter Future",
+									"potentialAction": {
+										"@type": "SearchAction",
+										"target": {
+											"@type": "EntryPoint",
+											"urlTemplate": "https://sautisalama.org/learn?q={search_term_string}"
+										},
+										"query-input": "required name=search_term_string"
+									}
+								},
+								{
+									"@type": "Organization",
+									"@id": "https://sautisalama.org/#organization",
+									"name": "Sauti Salama",
+									"url": "https://sautisalama.org",
+									"logo": {
+										"@type": "ImageObject",
+										"url": "https://sautisalama.org/logo.webp",
+										"width": 200,
+										"height": 60
+									},
+									"sameAs": [
+										"https://www.linkedin.com/company/sauti-salama/"
+									]
+								},
+								{
+									"@type": "ItemList",
+									"name": "Quick Links",
+									"itemListElement": [
+										{
+											"@type": "ListItem",
+											"position": 1,
+											"name": "Report Abuse",
+											"url": "https://sautisalama.org/report-abuse"
+										},
+										{
+											"@type": "ListItem",
+											"position": 2,
+											"name": "Log In",
+											"url": "https://sautisalama.org/signin"
+										},
+										{
+											"@type": "ListItem",
+											"position": 3,
+											"name": "Our Impact",
+											"url": "https://sautisalama.org/impact"
+										},
+										{
+											"@type": "ListItem",
+											"position": 4,
+											"name": "Programs",
+											"url": "https://sautisalama.org/programs"
+										},
+										{
+											"@type": "ListItem",
+											"position": 5,
+											"name": "Learn",
+											"url": "https://sautisalama.org/learn"
+										},
+										{
+											"@type": "ListItem",
+											"position": 6,
+											"name": "Get Involved",
+											"url": "https://sautisalama.org/volunteer"
+										}
+									]
+								}
+							]
+						}).replace(/</g, '\\u003c')
 					}}
 				/>
 			</head>

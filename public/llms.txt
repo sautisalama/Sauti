@@ -1,0 +1,27 @@
+# Sauti Salama
+
+Breaking the Silence, Building a Brighter Future. Sauti Salama is a platform dedicated to supporting survivors of gender-based violence (GBV) through technology, care, and legal access.
+
+## Core Pages
+- Home: https://sautisalama.org/
+- About Our Story: https://sautisalama.org/about
+- Our Impact: https://sautisalama.org/impact
+- Learning Hub: https://sautisalama.org/learn
+- Programs: https://sautisalama.org/programs
+- Get Involved: https://sautisalama.org/volunteer
+- Report Abuse: https://sautisalama.org/report-abuse
+- FAQ: https://sautisalama.org/faq
+
+## Programs
+- Access to Care: https://sautisalama.org/programs/access-to-care
+- Prevention: https://sautisalama.org/programs/prevention
+- Legal Access: https://sautisalama.org/programs/legal-access
+- Feminist Tech: https://sautisalama.org/programs/feminist-tech
+
+## Support & Resources
+- Privacy Policy: https://sautisalama.org/privacy-policy
+- Terms of Service: https://sautisalama.org/terms-conditions
+- Data Privacy: https://sautisalama.org/data-privacy
+
+## Documentation & AI Indexing
+This file serves as a guide for LLM-based crawlers and AI agents to understand the structure and purpose of the Sauti Salama platform. All pages listed above are public and can be indexed. Dashboard and authenticated areas are restricted.
