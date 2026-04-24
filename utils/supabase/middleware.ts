@@ -68,6 +68,7 @@ export async function updateSession(request: NextRequest) {
 		!request.nextUrl.pathname.startsWith("/impact") &&
 		!request.nextUrl.pathname.startsWith("/volunteer") &&
 		!request.nextUrl.pathname.startsWith("/learn") &&
+		!request.nextUrl.pathname.startsWith("/report-abuse") &&
 		!request.nextUrl.pathname.startsWith("/api") &&
 		request.nextUrl.pathname !== "/"
 	) {
