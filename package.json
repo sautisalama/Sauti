@@ -7,7 +7,7 @@
 		"dev": "next dev",
 		"dev:ngrok": "npx concurrently \"npm run dev\" \"ngrok http --url=historiographical-baffledly-isadora.ngrok-free.dev 3000\"",
 		"dev:tunnel": "npx concurrently \"npm run dev\" \"npx localtunnel --port 3000\"",
-		"build": "next build",
+		"build": "set NODE_OPTIONS=--max-old-space-size=4096 && next build",
 		"start": "next start",
 		"lint": "next lint",
 		"type-check": "tsc --noEmit"

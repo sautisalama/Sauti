@@ -56,7 +56,7 @@ export async function POST(request: NextRequest) {
         id,
         email,
         verification_status,
-        support_services(id)
+        support_services!user_id(id)
       `)
       .eq("id", userId)
       .single();
@@ -73,7 +73,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const serviceCount = (targetProfile.support_services as any[])?.length || 0;
+    const serviceCount = (targetProfile.support_services as unknown as any[])?.length || 0;
     if (serviceCount > 0) {
       return NextResponse.json(
         { error: `Cannot delete user: ${serviceCount} support service(s) already linked.` },
