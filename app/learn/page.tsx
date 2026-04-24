@@ -55,6 +55,14 @@ export default function LearnPage() {
 
 						<div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-12">
 							<LearnCard 
+                                image="/learn/amina.png"
+                                date="24 Apr, 2026"
+                                category="Interactive"
+                                title="Amina's Story: GBV Response"
+                                description="An interactive group exercise exploring the intersections of climate change, care, and safety."
+                                href="/learn/climate-care"
+                            />
+							<LearnCard 
                                 image="/dashboard/activism-image-woman-with-megaphone.png"
                                 date="12 Dec, 2025"
                                 category="Survival Skills"
