@@ -544,7 +544,7 @@ export default function ClimateCarePage() {
                     <div className="result-item-text">
                       <p>{c.text}</p>
                       <div className="why">
-                        {!isCorrect && <strong>Correct: {bucketLabel[c.answer]}. </strong>}
+                        {!isCorrect && <strong>Correct: {bucketLabel[c.answer as Bucket]}. </strong>}
                         {c.why}
                       </div>
                     </div>
