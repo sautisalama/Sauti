@@ -199,7 +199,7 @@ export default function AdminDashboard() {
 	};
 
 	return (
-		<div className="max-w-7xl mx-auto p-4 md:p-6 lg:p-8 space-y-8 pb-20">
+		<div className="max-w-4xl mx-auto px-4 lg:px-6 pt-4 lg:pt-8 space-y-8 pb-20 w-full">
             {/* Welcome Header */}
             <SereneWelcomeHeader 
                 name={adminProfile?.first_name || "Admin"}
