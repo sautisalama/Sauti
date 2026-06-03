@@ -84,15 +84,15 @@ export function Nav() {
 
 	return (
 		<header className={`${pathname.startsWith("/learn") ? "relative" : "sticky top-0"} z-50 w-full border-b-2 border-gray-100 bg-white/98 backdrop-blur h-20 md:h-24 flex items-center shadow-sm`}>
-			<div className="container w-full max-w-[100vw] flex items-center justify-between px-6 md:px-12 relative">
+			<div className="container w-full max-w-[100vw] flex items-center justify-between px-6 xl:px-8 2xl:px-12 relative">
 				{/* Extreme Left: Logo */}
 				<Link href="/" className="flex items-center gap-2 shrink-0">
-					<Image src="/logo.webp" alt="logo" width={200} height={60} className="w-auto h-12 md:h-16" />
+					<Image src="/logo.webp" alt="logo" width={200} height={60} className="w-auto h-12 xl:h-14 2xl:h-16" />
 					<span className="sr-only">Sauti Salama</span>
 				</Link>
 
 				{/* Center: Menu Items */}
-				<nav className="hidden lg:flex items-center gap-6 text-sm font-bold absolute left-1/2 -translate-x-1/2">
+				<nav className="hidden xl:flex items-center gap-4 2xl:gap-6 text-sm font-bold absolute left-1/2 -translate-x-1/2 whitespace-nowrap">
 					<Link
 						href="/"
 						className={`px-3 py-1.5 rounded-full transition-colors ${
@@ -262,11 +262,11 @@ export function Nav() {
 				</nav>
 
 				{/* Extreme Right: Buttons (Desktop) & Hamburger (Mobile) */}
-				<div className="flex items-center gap-4 shrink-0">
+				<div className="flex items-center gap-2 xl:gap-4 shrink-0">
 					<Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
 						<DialogTrigger asChild>
 							<Button 
-								className="hidden lg:flex rounded-full bg-sauti-yellow text-sauti-dark hover:bg-sauti-yellow/90 items-center gap-2 font-bold px-8 h-12"
+								className="hidden xl:flex rounded-full bg-sauti-yellow text-sauti-dark hover:bg-sauti-yellow/90 items-center gap-2 font-bold px-4 xl:px-6 2xl:px-8 h-12 whitespace-nowrap"
 							>
 								<Megaphone className="h-5 w-5" /> Report Abuse
 							</Button>
@@ -281,19 +281,19 @@ export function Nav() {
 					</Dialog>
 
 					{isAuthenticated ? (
-						<Link href="/dashboard" className="hidden lg:block">
-							<Button variant="outline" className="rounded-full border-2 border-sauti-blue text-sauti-blue font-black px-8 h-12 shadow-sm hover:bg-sauti-blue hover:text-white transition-all">Dashboard</Button>
+						<Link href="/dashboard" className="hidden xl:block">
+							<Button variant="outline" className="rounded-full border-2 border-sauti-blue text-sauti-blue font-black px-4 xl:px-6 2xl:px-8 h-12 shadow-sm hover:bg-sauti-blue hover:text-white transition-all whitespace-nowrap">Dashboard</Button>
 						</Link>
 					) : (
-						<Link href="/signin" className="hidden lg:block">
-							<Button className="rounded-full bg-sauti-teal text-white font-black px-8 h-12 shadow-sm hover:shadow-lg hover:bg-sauti-teal/90 transition-all">Log In</Button>
+						<Link href="/signin" className="hidden xl:block">
+							<Button className="rounded-full bg-sauti-teal text-white font-black px-4 xl:px-6 2xl:px-8 h-12 shadow-sm hover:shadow-lg hover:bg-sauti-teal/90 transition-all whitespace-nowrap">Log In</Button>
 						</Link>
 					)}
 
 					{/* Hamburger Menu for Mobile */}
 					<Sheet>
 						<SheetTrigger asChild>
-							<Button variant="outline" size="icon" className="lg:hidden h-12 w-12 rounded-full border-2 border-sauti-blue text-sauti-blue hover:bg-sauti-blue hover:text-white transition-all">
+							<Button variant="outline" size="icon" className="xl:hidden h-12 w-12 rounded-full border-2 border-sauti-blue text-sauti-blue hover:bg-sauti-blue hover:text-white transition-all">
 								<Menu className="h-6 w-6" />
 								<span className="sr-only">Open menu</span>
 							</Button>

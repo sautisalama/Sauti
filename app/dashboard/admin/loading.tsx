@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 
 export default function Loading() {
   return (
-    <div className="max-w-7xl mx-auto p-4 md:p-6 lg:p-8 space-y-8 pb-20">
+    <div className="max-w-4xl mx-auto px-4 lg:px-6 pt-4 lg:pt-8 space-y-8 pb-20 w-full">
       {/* Welcome Header Skeleton */}
       <div className="p-6 md:p-8 rounded-2xl mb-8 border border-gray-100 bg-white">
         <Skeleton className="h-10 w-2/3 md:w-1/3 mb-4 rounded-xl" />
