@@ -27,7 +27,8 @@ import {
 	Shield,
 	BookOpen, 
 	Building2,
-    Network
+    Network,
+	GraduationCap
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -59,7 +60,7 @@ import { signOut } from "@/app/(auth)/actions/auth";
 import ReportAbuseForm from "@/components/ReportAbuseForm";
 import { cn } from "@/lib/utils";
 import { useDashboardData } from "@/components/providers/DashboardDataProvider";
-import { RoleSwitcher } from "@/components/RoleSwitcher";
+import { useRoleSwitcher } from "@/hooks/useRoleSwitcher";
 import AuthenticatedReportAbuseForm from "@/components/AuthenticatedReportAbuseForm";
 
 interface SidebarItem {
@@ -101,10 +102,20 @@ export function EnhancedSidebar({
 	const setReportDialogOpen = dash?.setIsReportDialogOpen || (() => {});
 	const [notifications, setNotifications] = useState(0);
 	const [casesCount, setCasesCount] = useState<number>(0);
+	const { roleContext, switchToAdmin, switchToUser } = useRoleSwitcher();
 	const isAdminMode = dash?.isAdminMode || false;
 	const supabase = useMemo(() => createClient(), []);
 	const userType = dash?.data?.profile?.user_type || user?.profile?.user_type || null;
 	const role = isAdminMode ? "admin" : userType;
+
+	const getRoleLabel = (userType: string) => {
+		switch (userType) {
+			case "professional": return "Professional";
+			case "ngo": return "NGO";
+			case "survivor": return "Survivor";
+			default: return "User";
+		}
+	};
     
     const profile = dash?.data?.profile || user?.profile;
     const hasAcceptedPolicies = !!(profile?.policies as any)?.all_policies_accepted;
@@ -691,6 +702,38 @@ export function EnhancedSidebar({
 											</Link>
 										</DropdownMenuItem>
 									)}
+									{roleContext?.can_switch_to_admin && (
+										<>
+											<DropdownMenuSeparator className="bg-serene-neutral-100 my-1" />
+											{!isAdminMode ? (
+												<DropdownMenuItem 
+													onClick={switchToAdmin} 
+													className="flex items-center gap-3 cursor-pointer rounded-xl focus:bg-blue-50 focus:text-blue-700 m-1 p-2"
+												>
+													<div className="h-8 w-8 rounded-lg bg-blue-50 flex items-center justify-center text-blue-600">
+														<Shield className="h-4 w-4" />
+													</div>
+													<div className="flex flex-col">
+														<span className="font-semibold text-xs text-neutral-800">Switch to Admin Mode</span>
+														<span className="text-[9px] text-gray-500">Platform management</span>
+													</div>
+												</DropdownMenuItem>
+											) : (
+												<DropdownMenuItem 
+													onClick={switchToUser} 
+													className="flex items-center gap-3 cursor-pointer rounded-xl focus:bg-serene-neutral-50 focus:text-serene-neutral-900 m-1 p-2"
+												>
+													<div className="h-8 w-8 rounded-lg bg-serene-neutral-50 flex items-center justify-center text-serene-neutral-600">
+														{roleContext.primary_role === 'ngo' ? <Building2 className="h-4 w-4" /> : <GraduationCap className="h-6 w-6" />}
+													</div>
+													<div className="flex flex-col">
+														<span className="font-semibold text-xs text-neutral-800">Switch to {getRoleLabel(roleContext.primary_role)} Mode</span>
+														<span className="text-[9px] text-gray-500">Regular dashboard</span>
+													</div>
+												</DropdownMenuItem>
+											)}
+										</>
+									)}
 								</>
 							)}
 
@@ -710,12 +753,7 @@ export function EnhancedSidebar({
 					</DropdownMenu>
 				</div>
 
-				{/* Role Switcher */}
-				{!isCollapsed && !needsOnboarding && (
-					<div className="px-4 py-2 border-b border-neutral-200 dark:border-neutral-800">
-						<RoleSwitcher />
-					</div>
-				)}
+
 
 				{/* Navigation */}
 				<div className="flex-1 flex flex-col justify-between px-2 py-4">
