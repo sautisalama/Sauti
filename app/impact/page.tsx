@@ -136,7 +136,7 @@ export default function ImpactPage() {
                                  <ImpactCard
                                     title="Integrating Care and Climate for GBV Prevention"
                                     category="Climate & Care"
-                                    image="/events/impact/climate-care/group-distribution.jpg"
+                                    image="/events/impact/climate-care/solar-demo.jpeg"
                                     link="/impact/climate-and-care"
                                     className="h-full"
                                     description="200 households in Kitui and Isiolo equipped with solar lighting—building climate resilience through clean energy, care, and women's leadership"

@@ -27,7 +27,7 @@ export default function ClimateAndCarePage() {
 				{/* Hero */}
 				<section className="relative min-h-[70vh] md:min-h-[80vh] flex items-end pb-20 overflow-hidden">
 					<Image
-						src="/events/impact/climate-care/solar-demo.jpg"
+						src="/events/impact/climate-care/solar-demo.jpeg"
 						alt="Sauti Salama team demonstrating a solar lighting system to community members in Kitui County"
 						fill
 						className="object-cover"
@@ -98,7 +98,7 @@ export default function ClimateAndCarePage() {
 							</div>
 							<div className="relative aspect-[3/4] max-h-[640px] rounded-[32px] md:rounded-[60px] overflow-hidden shadow-2xl">
 								<Image
-									src="/events/impact/climate-care/women-solar-kits.jpg"
+									src="/events/impact/climate-care/women-solar-kits.jpeg"
 									alt="Women in Kitui County holding their new household solar lighting systems"
 									fill
 									className="object-cover"
@@ -156,7 +156,7 @@ export default function ClimateAndCarePage() {
 						<div className="grid lg:grid-cols-2 gap-12 lg:gap-24 items-center">
 							<div className="relative aspect-[4/3] rounded-[32px] md:rounded-[60px] overflow-hidden shadow-2xl order-2 lg:order-1">
 								<Image
-									src="/events/impact/climate-care/community-mobilisation.jpg"
+									src="/events/impact/climate-care/community-mobilisation.jpeg"
 									alt="Sauti Salama team engaging community members during a renewable energy demonstration"
 									fill
 									className="object-cover"
@@ -267,7 +267,7 @@ export default function ClimateAndCarePage() {
 							</div>
 							<div className="relative aspect-[4/3] rounded-[32px] md:rounded-[60px] overflow-hidden shadow-2xl">
 								<Image
-									src="/events/impact/climate-care/group-distribution.jpg"
+									src="/events/impact/climate-care/group-distribution.jpeg"
 									alt="Women holding their household solar lighting systems after a distribution in Kitui County"
 									fill
 									className="object-cover"
@@ -397,7 +397,7 @@ export default function ClimateAndCarePage() {
 							</div>
 							<div className="relative aspect-[4/3] rounded-[32px] md:rounded-[60px] overflow-hidden shadow-2xl">
 								<Image
-									src="/events/impact/climate-care/solar-demo.jpg"
+									src="/events/impact/climate-care/solar-demo.jpeg"
 									alt="Renewable energy demonstration during a community distribution session"
 									fill
 									className="object-cover"
