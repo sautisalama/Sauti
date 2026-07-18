@@ -6,6 +6,7 @@ import {
 	Megaphone,
 	Home,
 	Cloud,
+	Droplets,
 	LayoutDashboard,
 	LogIn,
 	UsersRound,
@@ -159,6 +160,12 @@ export function Nav() {
 								</Link>
 							</DropdownMenuItem>
 							<DropdownMenuItem asChild>
+								<Link href="/programs/kiwu" className="flex items-center gap-3 rounded-xl px-4 py-3 hover:bg-gray-50 font-bold text-sauti-blue cursor-pointer outline-none transition-colors group">
+									<Droplets className="h-5 w-5 text-sky-500" />
+									<span>Kiwu – Water Systems</span>
+								</Link>
+							</DropdownMenuItem>
+							<DropdownMenuItem asChild>
 								<Link href="/learn" className="flex items-center gap-3 rounded-xl px-4 py-3 hover:bg-gray-50 font-bold text-sauti-blue cursor-pointer outline-none transition-colors group">
 									<GraduationCap className="h-5 w-5 text-sauti-blue" />
 									<span>Capacity Building</span>
@@ -170,14 +177,14 @@ export function Nav() {
 					<Link
 						href="/impact"
 						className={`px-3 py-1.5 rounded-full transition-colors ${
-							pathname.startsWith("/impact") 
-								? "bg-sauti-teal text-white" 
+							pathname.startsWith("/impact")
+								? "bg-sauti-teal text-white"
 								: "text-gray-900 hover:text-sauti-teal underline-offset-4 hover:underline"
 						}`}
 					>
 						Our Impact
 					</Link>
-					
+
 					<DropdownMenu>
 						<DropdownMenuTrigger asChild>
 							<button 
@@ -388,14 +395,23 @@ export function Nav() {
 														<Scale className="h-4 w-4 text-amber-600" />
 														<span>Legal Access</span>
 													</Link>
-													<Link 
-														href="/programs/feminist-tech" 
+													<Link
+														href="/programs/feminist-tech"
 														className={`flex items-center gap-3 rounded-xl px-4 py-3 font-bold transition-all ${
 															isActive("/programs/feminist-tech") ? "bg-indigo-50 text-indigo-600" : "text-gray-600 hover:bg-gray-50 hover:text-sauti-blue"
 														}`}
 													>
 														<Cpu className="h-4 w-4 text-indigo-500" />
 														<span>Feminist Tech</span>
+													</Link>
+													<Link
+														href="/programs/kiwu"
+														className={`flex items-center gap-3 rounded-xl px-4 py-3 font-bold transition-all ${
+															isActive("/programs/kiwu") ? "bg-sky-50 text-sky-600" : "text-gray-600 hover:bg-gray-50 hover:text-sauti-blue"
+														}`}
+													>
+														<Droplets className="h-4 w-4 text-sky-500" />
+														<span>Kiwu – Water Systems</span>
 													</Link>
 												</div>
 											)}

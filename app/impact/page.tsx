@@ -131,7 +131,19 @@ export default function ImpactPage() {
                                 description="Empowering 748+ learners with AI skills and digital literacy for financial independence"
                             />
 
-                            {/* 6. 16 Days - Wide filler if needed, or just standard */}
+                            {/* 6. Climate & Care - Wide feature */}
+                            <div className="md:col-span-3">
+                                 <ImpactCard
+                                    title="Integrating Care and Climate for GBV Prevention"
+                                    category="Climate & Care"
+                                    image="/events/impact/climate-care/group-distribution.jpg"
+                                    link="/impact/climate-and-care"
+                                    className="h-full"
+                                    description="200 households in Kitui and Isiolo equipped with solar lighting—building climate resilience through clean energy, care, and women's leadership"
+                                />
+                            </div>
+
+                            {/* 7. 16 Days - Wide filler if needed, or just standard */}
                             <div className="md:col-span-3">
                                  <ImpactCard 
                                     title="16 Days of Activism"
@@ -199,6 +211,7 @@ function ImpactCard({ title, category, image, link, className, largeTitle, descr
         if (cat.includes('Global') || cat.includes('Advocacy')) return 'from-sauti-yellow/80 to-sauti-yellow/60';
         if (cat.includes('Safe') || cat.includes('Spaces')) return 'from-purple-500/80 to-purple-400/60';
         if (cat.includes('Movement')) return 'from-sauti-red/80 to-sauti-red/60';
+        if (cat.includes('Climate')) return 'from-emerald-600/80 to-emerald-500/60';
         if (cat.includes('Education')) return 'from-blue-500/80 to-blue-400/60';
         if (cat.includes('Campaign')) return 'from-sauti-yellow/80 to-orange-400/60';
         return 'from-sauti-dark/80 to-sauti-dark/60';
@@ -223,6 +236,7 @@ function ImpactCard({ title, category, image, link, className, largeTitle, descr
                             category.includes('Global') || category.includes('Advocacy') ? 'rgba(244, 180, 0, 0.8)' :
                             category.includes('Safe') || category.includes('Spaces') ? 'rgba(168, 85, 247, 0.8)' :
                             category.includes('Movement') ? 'rgba(239, 68, 68, 0.8)' :
+                            category.includes('Climate') ? 'rgba(5, 150, 105, 0.8)' :
                             category.includes('Education') ? 'rgba(59, 130, 246, 0.8)' :
                             category.includes('Campaign') ? 'rgba(251, 146, 60, 0.8)' :
                             'rgba(26, 54, 93, 0.8)'

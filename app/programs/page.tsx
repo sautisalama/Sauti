@@ -5,7 +5,7 @@ import { motion } from "framer-motion";
 import Image from "next/image";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { Heart, Scale, Shield, Landmark, ArrowRight, BookOpen } from "lucide-react";
+import { Heart, Scale, Shield, Landmark, ArrowRight, BookOpen, Droplets } from "lucide-react";
 import { CircledText } from "@/components/ui/CircledText";
 
 export default function ProgramsPage() {
@@ -102,6 +102,20 @@ export default function ProgramsPage() {
                                     "AI for Social Impact courses",
                                     "Survivor-led facilitator training",
                                     "Resource library access"
+                                ]}
+							/>
+							<ProgramSection
+								number="06"
+								icon={<Droplets className="w-10 h-10" />}
+								title="Kiwu"
+								subtitle="Climate-Resilient Water Systems"
+								description="Kiwu is our climate resilience and WASH enterprise, building decentralized water systems that bring safe, affordable water closer to communities in Kenya's drylands. Starting in Mwingi, Kitui County, Kiwu combines community water kiosks, clean distribution, renewable energy, and local ownership."
+                                image="/Kiwu Water lorry.png"
+                                slug="kiwu"
+                                benefits={[
+                                    "Community water kiosks",
+                                    "Solar-powered water production",
+                                    "Clean last-mile distribution"
                                 ]}
 							/>
 						</div>

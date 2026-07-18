@@ -76,6 +76,9 @@ export function Footer() {
                         <Link href="/impact" className="hover:text-white transition-colors">Impact</Link>
                     </div>
                 </div>
+                <p className="mt-6 text-center md:text-left text-xs text-white/40 font-medium normal-case tracking-normal">
+                    Copyright © Sauti Salama is a Not for Profit registered in Kenya. Registration number CLG-LMTY83V9.
+                </p>
 			</div>
 		</footer>
 	);
