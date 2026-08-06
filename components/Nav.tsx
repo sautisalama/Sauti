@@ -21,6 +21,7 @@ import {
 	Handshake,
 	Info,
 	Leaf,
+	FileText,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger, SheetTitle, SheetDescription } from "@/components/ui/sheet";
@@ -205,6 +206,12 @@ export function Nav() {
 								</Link>
 							</DropdownMenuItem>
 							<div className="h-px bg-gray-100 my-1 mx-2" />
+							<DropdownMenuItem asChild>
+								<Link href="/publications" className="flex items-center gap-3 rounded-xl px-4 py-3 hover:bg-gray-50 font-bold text-sauti-blue cursor-pointer outline-none transition-colors group">
+									<FileText className="h-5 w-5 text-sauti-teal" />
+									<span>Publications</span>
+								</Link>
+							</DropdownMenuItem>
 							<DropdownMenuItem asChild>
 								<Link href="/learn?type=courses" className="flex items-center gap-3 rounded-xl px-4 py-3 hover:bg-gray-50 font-bold text-sauti-blue cursor-pointer outline-none transition-colors group">
 									<GraduationCap className="h-5 w-5 text-amber-600" />
@@ -451,6 +458,15 @@ export function Nav() {
 													>
 														<Info className="h-4 w-4 text-sauti-teal" />
 														<span>Learning Hub</span>
+													</Link>
+													<Link
+														href="/publications"
+														className={`flex items-center gap-3 rounded-xl px-4 py-3 font-bold transition-all ${
+															isActive("/publications") ? "bg-sauti-teal/10 text-sauti-teal" : "text-gray-600 hover:bg-gray-50 hover:text-sauti-blue"
+														}`}
+													>
+														<FileText className="h-4 w-4 text-sauti-teal" />
+														<span>Publications</span>
 													</Link>
 													<Link 
 														href="/learn?type=courses" 

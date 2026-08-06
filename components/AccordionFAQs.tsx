@@ -16,8 +16,14 @@ export function AccordionFAQs() {
 					<p>You can report GBV incidents through several channels:</p>
 					<ul className="list-disc pl-6 space-y-1">
 						<li>Contact local law enforcement</li>
-						<li>Call national GBV hotlines (available 24/7)</li>
-						<li>Visit women's shelters or crisis centers</li>
+						<li>Call the national GBV hotline 1195 (available 24/7)</li>
+						<li>Visit women&apos;s shelters or crisis centers</li>
+						<li>
+							File a confidential report on{" "}
+							<a href="/report-abuse" className="underline font-semibold">
+								sautisalama.org/report-abuse
+							</a>
+						</li>
 					</ul>
 					<p className="mt-2">You can receive:</p>
 					<ul className="list-disc pl-6 space-y-1">
@@ -48,8 +54,16 @@ export function AccordionFAQs() {
 						<li>Referrals to partner organizations</li>
 					</ul>
 					<p className="mt-2">
-						All services are free and confidential. Contact us through our helpline or
-						visit our center during business hours to access these resources.
+						All services are free and confidential. Call us on{" "}
+						<a href="tel:+254725668148" className="underline font-semibold">
+							+254 725 668148
+						</a>
+						, email{" "}
+						<a href="mailto:info@sautisalama.org" className="underline font-semibold">
+							info@sautisalama.org
+						</a>
+						, or visit our centre at Lunga Lunga Square, Lunga Lunga Road, Industrial
+						Area, Nairobi during business hours.
 					</p>
 				</AccordionContent>
 			</AccordionItem>
@@ -72,6 +86,47 @@ export function AccordionFAQs() {
 					<p className="mt-2">
 						Remember: Let them make their own decisions and maintain control over
 						their situation.
+					</p>
+				</AccordionContent>
+			</AccordionItem>
+			<AccordionItem value="item-4">
+				<AccordionTrigger className="text-left">
+					Is Sauti Salama&apos;s support free?
+				</AccordionTrigger>
+				<AccordionContent>
+					<p>
+						Yes. Every service Sauti Salama offers — counselling, safe shelter
+						referral, legal aid, safety planning and confidential reporting — is free
+						of charge to survivors in Kenya.
+					</p>
+				</AccordionContent>
+			</AccordionItem>
+			<AccordionItem value="item-5">
+				<AccordionTrigger className="text-left">
+					Where is Sauti Salama located?
+				</AccordionTrigger>
+				<AccordionContent>
+					<p>
+						Sauti Salama Safe Haven is based at Lunga Lunga Square, Lunga Lunga Road,
+						Industrial Area, Makadara District, Nairobi, Kenya (P.O. Box 8786 - 00100,
+						G.P.O. Nairobi). We serve survivors across Kenya in person, by phone on{" "}
+						<a href="tel:+254725668148" className="underline font-semibold">
+							+254 725 668148
+						</a>
+						, and online.
+					</p>
+				</AccordionContent>
+			</AccordionItem>
+			<AccordionItem value="item-6">
+				<AccordionTrigger className="text-left">
+					Can I report abuse anonymously?
+				</AccordionTrigger>
+				<AccordionContent>
+					<p>
+						Yes. Sauti Salama&apos;s platform supports fully anonymous reporting — you
+						do not need to create an account or give your name to get matched with
+						support. Reports are encrypted, and you control what is shared and with
+						whom.
 					</p>
 				</AccordionContent>
 			</AccordionItem>

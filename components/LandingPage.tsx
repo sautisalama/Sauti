@@ -41,6 +41,7 @@ import { Footer } from "./Footer";
 import { createClient } from "@/utils/supabase/client";
 import { motion } from "framer-motion";
 import { CircledText } from "@/components/ui/CircledText";
+import { PublicationsSection } from "./PublicationsSection";
 
 export function LandingPage() {
 	const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -77,7 +78,7 @@ export function LandingPage() {
 								<div className="bg-sauti-dark rounded-2xl md:rounded-2xl px-6 py-10 md:px-8 md:py-16 flex flex-col justify-center flex-1 min-h-[400px] md:min-h-[500px] relative overflow-hidden">
                                     <div className="absolute top-0 right-0 w-64 h-64 bg-sauti-teal/20 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
 									<span className="relative z-10 inline-flex w-fit px-4 py-2 rounded-full bg-sauti-teal/20 text-white text-sm font-bold mb-8 uppercase tracking-wider mx-auto lg:mx-0 border border-sauti-teal/30">
-										Safety, Care, and Justice.
+										GBV Support in Kenya — Safety, Care, and Justice.
 									</span>
 									<h1 className="relative z-10 font-sans text-3xl md:text-5xl lg:text-6xl font-black text-white leading-tight mb-6 md:mb-8 tracking-tight">
 										We are here for you.
@@ -196,7 +197,7 @@ export function LandingPage() {
 									</h2>
                                     <div className="text-lg md:text-xl font-bold text-sauti-red uppercase tracking-widest mb-6 md:mb-10">in Kenya due to GBV</div>
                                     <p className="text-base md:text-xl lg:text-2xl text-gray-700 leading-relaxed font-medium max-w-xl mb-8 md:mb-12">
-                                        Sauti Salama is a Kenyan feminist organisation founded and led by survivors who understand the challenges of getting help. We work to bridge gaps in access to care, safety, and justice for women and girls.
+                                        Sauti Salama is a survivor-led Kenyan feminist organisation based in Nairobi. We provide free, confidential gender-based violence support across Kenya — trauma-informed counselling, safe shelter referrals, legal aid and anonymous reporting — bridging the gaps in access to care, safety and justice for women and girls.
 									</p>
                                     <Link href="/about">
                                         <Button id="aboutUsButton" className="rounded-full bg-sauti-dark text-white px-6 md:px-10 py-5 md:py-8 text-base md:text-xl font-black group shadow-xl hover:shadow-sauti-dark/20 transition-all">
@@ -236,7 +237,10 @@ export function LandingPage() {
 					</div>
 				</section>
 
-                {/* 3. WHAT WE DO (PROGRAMS) */}
+                {/* 3. PUBLICATIONS */}
+                <PublicationsSection />
+
+                {/* 4. WHAT WE DO (PROGRAMS) */}
 				<section id="programs" className="py-12 md:py-24 bg-white relative overflow-hidden">
 					<div className="container max-w-7xl mx-auto px-4 md:px-6">
 						<div className="text-center mb-12 md:mb-20 relative">

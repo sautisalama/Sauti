@@ -12,6 +12,8 @@ import AccessibilityFAB from "@/components/a11y/AccessibilityFAB";
 import { OrientationGuard } from "@/components/OrientationGuard";
 import { Suspense } from "react";
 import { DeviceInitializer } from "@/components/auth/DeviceInitializer";
+import { ORGANIZATION } from "@/lib/organization";
+import { SITE_GRAPH, jsonLd } from "@/lib/seo";
 
 const inter = Inter({ subsets: ["latin"] });
 const hyper = Atkinson_Hyperlegible({
@@ -23,22 +25,48 @@ const hyper = Atkinson_Hyperlegible({
 export const metadata: Metadata = {
 	metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || "https://sautisalama.org"),
 	title: {
-		default: "Sauti Salama | Breaking the Silence",
-		template: "%s | Sauti Salama"
+		default: "Sauti Salama | GBV Support in Kenya — Free, Confidential Help for Survivors",
+		template: "%s | Sauti Salama — GBV Support Kenya"
 	},
-	description: "Breaking the Silence, Building a Brighter Future. A platform dedicated to supporting survivors of gender-based violence (GBV) through technology, care, and legal access.",
+	description:
+		"Sauti Salama is a survivor-led Kenyan non-profit offering free, confidential gender-based violence (GBV) support in Nairobi and across Kenya: counselling, safe shelter referrals, legal aid and anonymous reporting. Get help today.",
 	manifest: "/manifest.json",
 	icons: {
 		icon: "/icons/icons-512.png",
 		apple: "/icons/icons-512.png",
 	},
-	keywords: ["GBV", "Gender Based Violence", "Gender", "Sauti Salama", "Kenya", "Abuse Reporting", "Support Services"],
+	keywords: [
+		"GBV support Kenya",
+		"gender based violence Kenya",
+		"GBV help Nairobi",
+		"report GBV Kenya",
+		"GBV organisations in Kenya",
+		"sexual violence support Kenya",
+		"domestic violence help Kenya",
+		"GBV counselling Nairobi",
+		"safe house for survivors Kenya",
+		"legal aid for GBV survivors Kenya",
+		"GBV hotline Kenya",
+		"survivor support Nairobi",
+		"femicide Kenya",
+		"anonymous abuse reporting Kenya",
+		"Sauti Salama",
+	],
+	category: "Nonprofit",
+	applicationName: "Sauti Salama",
 	authors: [
 		{
-			name: "Cashcade",
+			name: "Sauti Salama",
 			url: "https://www.linkedin.com/company/sauti-salama/",
 		},
 	],
+	publisher: "Sauti Salama Safe Haven",
+	other: {
+		"geo.region": "KE-30",
+		"geo.placename": "Nairobi, Kenya",
+		"geo.position": `${ORGANIZATION.geo.latitude};${ORGANIZATION.geo.longitude}`,
+		ICBM: `${ORGANIZATION.geo.latitude}, ${ORGANIZATION.geo.longitude}`,
+	},
 	appleWebApp: {
 		capable: true,
 		statusBarStyle: "default",
@@ -57,8 +85,9 @@ export const metadata: Metadata = {
 		],
 	},
 	openGraph: {
-		title: "Sauti Salama | Breaking the Silence",
-		description: "Breaking the Silence, Building a Brighter Future. Supporting survivors of GBV through secure reporting and care access.",
+		title: "Sauti Salama | GBV Support in Kenya — Free, Confidential Help",
+		description:
+			"Survivor-led GBV support in Nairobi and across Kenya. Counselling, safe shelter referrals, legal aid and confidential reporting — free and confidential.",
 		url: process.env.NEXT_PUBLIC_APP_URL || "https://sautisalama.org",
 		siteName: "Sauti Salama",
 		images: [
@@ -74,8 +103,9 @@ export const metadata: Metadata = {
 	},
 	twitter: {
 		card: "summary_large_image",
-		title: "Sauti Salama | Breaking the Silence",
-		description: "Breaking the Silence, Building a Brighter Future. Supporting survivors of GBV.",
+		title: "Sauti Salama | GBV Support in Kenya",
+		description:
+			"Free, confidential gender-based violence support for survivors in Nairobi and across Kenya.",
 		images: ["/dashboard/featured.png"],
 		creator: "@SautiSalama",
 	},
@@ -134,85 +164,7 @@ export default function RootLayout({
 				/>
 				<script
 					type="application/ld+json"
-					dangerouslySetInnerHTML={{
-						__html: JSON.stringify({
-							"@context": "https://schema.org",
-							"@graph": [
-								{
-									"@type": "WebSite",
-									"@id": "https://sautisalama.org/#website",
-									"url": "https://sautisalama.org",
-									"name": "Sauti Salama",
-									"description": "Breaking the Silence, Building a Brighter Future",
-									"potentialAction": {
-										"@type": "SearchAction",
-										"target": {
-											"@type": "EntryPoint",
-											"urlTemplate": "https://sautisalama.org/learn?q={search_term_string}"
-										},
-										"query-input": "required name=search_term_string"
-									}
-								},
-								{
-									"@type": "Organization",
-									"@id": "https://sautisalama.org/#organization",
-									"name": "Sauti Salama",
-									"url": "https://sautisalama.org",
-									"logo": {
-										"@type": "ImageObject",
-										"url": "https://sautisalama.org/logo.webp",
-										"width": 200,
-										"height": 60
-									},
-									"sameAs": [
-										"https://www.linkedin.com/company/sauti-salama/"
-									]
-								},
-								{
-									"@type": "ItemList",
-									"name": "Quick Links",
-									"itemListElement": [
-										{
-											"@type": "ListItem",
-											"position": 1,
-											"name": "Report Abuse",
-											"url": "https://sautisalama.org/report-abuse"
-										},
-										{
-											"@type": "ListItem",
-											"position": 2,
-											"name": "Log In",
-											"url": "https://sautisalama.org/signin"
-										},
-										{
-											"@type": "ListItem",
-											"position": 3,
-											"name": "Our Impact",
-											"url": "https://sautisalama.org/impact"
-										},
-										{
-											"@type": "ListItem",
-											"position": 4,
-											"name": "Programs",
-											"url": "https://sautisalama.org/programs"
-										},
-										{
-											"@type": "ListItem",
-											"position": 5,
-											"name": "Learn",
-											"url": "https://sautisalama.org/learn"
-										},
-										{
-											"@type": "ListItem",
-											"position": 6,
-											"name": "Get Involved",
-											"url": "https://sautisalama.org/volunteer"
-										}
-									]
-								}
-							]
-						}).replace(/</g, '\\u003c')
-					}}
+					dangerouslySetInnerHTML={{ __html: jsonLd(SITE_GRAPH) }}
 				/>
 			</head>
 			<body className={`${inter.className} ${hyper.variable}`} suppressHydrationWarning>
