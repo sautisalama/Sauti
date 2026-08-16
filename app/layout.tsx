@@ -4,7 +4,7 @@ import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
 
 import { PWAInstallPrompt } from "@/components/PWAInstallPrompt";
-// import { SafetyBar } from "@/components/SafetyBar";
+import { EmergencyExit } from "@/components/EmergencyExit";
 import { AccessibilityProvider } from "@/components/a11y/AccessibilityProvider";
 import { KeyboardFocusScript } from "@/components/a11y/KeyboardFocusScript";
 import AccessibilityFAB from "@/components/a11y/AccessibilityFAB";
@@ -111,6 +111,10 @@ export const metadata: Metadata = {
 	},
 	alternates: {
 		canonical: "/",
+		languages: {
+			"en": "https://sautisalama.org",
+			"sw": "https://sautisalama.org?lang=sw",
+		},
 	},
 	robots: {
 		index: true,
@@ -163,11 +167,44 @@ export default function RootLayout({
 					}}
 				/>
 				<script
+					suppressHydrationWarning
 					type="application/ld+json"
 					dangerouslySetInnerHTML={{ __html: jsonLd(SITE_GRAPH) }}
 				/>
+				<script
+					suppressHydrationWarning
+					type="application/ld+json"
+					dangerouslySetInnerHTML={{
+						__html: JSON.stringify({
+							"@context": "https://schema.org",
+							"@graph": [
+								{
+									"@type": "WebSite",
+									"@id": "https://sautisalama.org/?lang=sw#website",
+									"url": "https://sautisalama.org/?lang=sw",
+									"inLanguage": "sw",
+									"name": "Sauti Salama",
+									"description": "Kuvunja Kimya, Kujenga Mustakabali Bora"
+								},
+								{
+									"@type": "Organization",
+									"@id": "https://sautisalama.org/?lang=sw#organization",
+									"name": "Sauti Salama",
+									"url": "https://sautisalama.org/?lang=sw",
+									"logo": {
+										"@type": "ImageObject",
+										"url": "https://sautisalama.org/logo.webp",
+										"width": 200,
+										"height": 60
+									}
+								}
+							]
+						}).replace(/</g, '\\u003c')
+					}}
+				/>
 			</head>
 			<body className={`${inter.className} ${hyper.variable}`} suppressHydrationWarning>
+				<EmergencyExit />
 				<DeviceInitializer />
 				{/* <SafetyBar /> */}
 				<a

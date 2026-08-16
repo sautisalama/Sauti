@@ -5,6 +5,7 @@ import { TablesInsert } from "@/types/db-schema";
 import { matchReportWithServices } from "@/app/actions/match-services";
 import { cookies, headers } from "next/headers";
 import { registerDevice, parseSettings, TrackedDevice } from "@/lib/user-settings";
+import { validateReportPayload } from "@/lib/sanitize";
 
 // Word lists for generating human-readable usernames
 const ADJECTIVES = [
@@ -69,6 +70,15 @@ export async function POST(request: Request) {
 			return NextResponse.json({ error: "Invalid request data" }, { status: 400 });
 		}
 
+		const validation = validateReportPayload(formData);
+		if (!validation.valid) {
+			return NextResponse.json(
+				{ error: "Validation failed", details: validation.errors.join("; ") },
+				{ status: 400 }
+			);
+		}
+		const sanitized = validation.sanitized;
+
 		// Initialize Supabase Admin Client directly
 		// This bypasses cookies() and auth context issues, running as a privileged backend process
 		const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -92,7 +102,7 @@ export async function POST(request: Request) {
 		let anonEmail: string | null = null;
 
 		// 1. Account Creation (if password provided)
-		if (formData.password && formData.password.length >= 6) {
+		if (sanitized.password && (sanitized.password as string).length >= 6) {
 			try {
 				let username = generateAnonymousUsername();
 				// Ensure uniqueness
@@ -119,10 +129,10 @@ export async function POST(request: Request) {
 
 				const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
 					email,
-					password: formData.password,
+					password: sanitized.password as string,
 					email_confirm: true,
 					user_metadata: {
-						first_name: formData.first_name || "Anonymous",
+						first_name: sanitized.first_name || "Anonymous",
 						user_type: "survivor",
 						is_anonymous: true,
 						anon_username: username,
@@ -147,9 +157,9 @@ export async function POST(request: Request) {
 					let updatedDevices: TrackedDevice[] = [];
 					if (deviceId) {
 						// Pass screen dimensions if provided in formData
-						const screenHint = formData.screen ? { 
-							width: formData.screen.width, 
-							height: formData.screen.height 
+					const screenHint = sanitized.screen ? { 
+						width: (sanitized.screen as any).width, 
+						height: (sanitized.screen as any).height 
 						} : undefined;
 						
 						updatedDevices = registerDevice([], deviceId, userAgent, screenHint);
@@ -182,33 +192,33 @@ export async function POST(request: Request) {
 
 		// 2. Report Insertion
 		const reportData: TablesInsert<"reports"> = {
-			first_name: formData.first_name || "Anonymous",
-			last_name: formData.last_name || null,
-			email: formData.email,
-			phone: formData.phone || null,
-			type_of_incident: formData.type_of_incident,
-			incident_description: formData.incident_description,
-			urgency: formData.urgency,
-			consent: formData.consent,
-			contact_preference: formData.contact_preference,
-			required_services: formData.required_services || [],
-			latitude: formData.latitude || null,
-			longitude: formData.longitude || null,
-			submission_timestamp: formData.submission_timestamp,
+			first_name: (sanitized.first_name as string) || "Anonymous",
+			last_name: (sanitized.last_name as string) || null,
+			email: sanitized.email as string | null,
+			phone: sanitized.phone as string | null,
+			type_of_incident: sanitized.type_of_incident as TablesInsert<"reports">["type_of_incident"],
+			incident_description: sanitized.incident_description as string | null,
+			urgency: sanitized.urgency as TablesInsert<"reports">["urgency"],
+			consent: sanitized.consent as TablesInsert<"reports">["consent"],
+			contact_preference: sanitized.contact_preference as TablesInsert<"reports">["contact_preference"],
+			required_services: sanitized.required_services as string[],
+			latitude: sanitized.latitude as number | null,
+			longitude: sanitized.longitude as number | null,
+			submission_timestamp: sanitized.submission_timestamp as string,
 			ismatched: false,
 			match_status: "pending",
 			user_id: userId,
-			media: formData.media || null,
-			is_onBehalf: !!formData.is_onBehalf,
-			additional_info: formData.additional_info || null,
-			gender: formData.gender || null,
-			preferred_language: formData.preferred_language || null,
-			dob: formData.dob || null,
-			city: formData.city || null,
-			state: formData.state || null,
-			country: formData.country || null,
-			record_only: !!formData.record_only,
-			is_workplace_incident: !!formData.is_workplace_incident,
+			media: sanitized.media as any,
+			is_onBehalf: !!sanitized.is_onBehalf,
+			additional_info: sanitized.additional_info as any,
+			gender: null,
+			preferred_language: null,
+			dob: null,
+			city: null,
+			state: null,
+			country: null,
+			record_only: !!sanitized.record_only,
+			is_workplace_incident: !!sanitized.is_workplace_incident,
 		};
 
 		console.log("Inserting report...");
