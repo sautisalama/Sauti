@@ -9,12 +9,12 @@ import { Button } from "@/components/ui/button";
 import { CircledText } from "@/components/ui/CircledText";
 
 export default function LearnPage() {
-	return (
-		<div className="flex min-h-screen flex-col bg-white">
-			<Nav />
-			<main id="main-content" className="flex-1">
-				<section className="py-12 md:py-24 lg:py-32">
-					<div className="container px-4 max-w-7xl mx-auto text-left">
+    return (
+        <div className="flex min-h-screen flex-col bg-white">
+            <Nav />
+            <main id="main-content" className="flex-1">
+                <section className="py-12 md:py-24 lg:py-32">
+                    <div className="container px-4 max-w-7xl mx-auto text-left">
                         <div className="mb-12 md:mb-20">
                             <h1 className="text-3xl md:text-5xl lg:text-8xl font-black text-sauti-dark leading-tight relative z-10">
                                 Knowledge is <CircledText circleColor="#F4B400">Power</CircledText>.
@@ -42,27 +42,27 @@ export default function LearnPage() {
                                 </div>
                                 <div className="order-1 lg:order-2">
                                     <div className="rounded-xl md:rounded-2xl overflow-hidden aspect-[4/3] bg-white/10 relative shadow-2xl border-4 border-white/10">
-                                        <Image 
-                                            src="/events/programs/AI course.png" 
-                                            alt="Visual representation of AI for Impact course modules" 
-                                            fill 
-                                            className="object-cover group-hover:scale-105 transition-transform duration-700" 
+                                        <Image
+                                            src="/events/programs/AI course.png"
+                                            alt="Visual representation of AI for Impact course modules"
+                                            fill
+                                            className="object-cover group-hover:scale-105 transition-transform duration-700"
                                         />
                                     </div>
                                 </div>
                             </div>
                         </div>
 
-						<div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-12">
-							<LearnCard 
-                                image="/learn/amina.png"
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-12">
+                            <LearnCard
+                                image="/learn/amina.jpg"
                                 date="24 Apr, 2026"
                                 category="Interactive"
                                 title="Amina's Story: GBV Response"
                                 description="An interactive group exercise exploring the intersections of climate change, care, and safety."
                                 href="/learn/climate-care"
                             />
-							<LearnCard 
+                            <LearnCard
                                 image="/dashboard/activism-image-woman-with-megaphone.png"
                                 date="12 Dec, 2025"
                                 category="Survival Skills"
@@ -70,7 +70,7 @@ export default function LearnPage() {
                                 description="Comprehensive guide on how to use Sauti tools for discreet reporting."
                                 href="/impact/platform"
                             />
-							<LearnCard 
+                            <LearnCard
                                 image="/dashboard/featured.png"
                                 date="24 Dec, 2025"
                                 category="Advocacy"
@@ -78,7 +78,7 @@ export default function LearnPage() {
                                 description="Understanding your rights within the Kenyan legal framework."
                                 href="/impact/advocacy-and-justice"
                             />
-							<LearnCard 
+                            <LearnCard
                                 image="/dashboard/activism-image-woman-with-megaphone.png"
                                 date="02 Jan, 2026"
                                 category="Community"
@@ -86,13 +86,13 @@ export default function LearnPage() {
                                 description="Building community resilience through shared responsibility."
                                 href="/impact/survivor-cafe"
                             />
-						</div>
-					</div>
-				</section>
-			</main>
-			<Footer />
-		</div>
-	);
+                        </div>
+                    </div>
+                </section>
+            </main>
+            <Footer />
+        </div>
+    );
 }
 
 function LearnCard({ image, date, category, title, description, href }: { image: string, date: string, category: string, title: string, description: string, href: string }) {

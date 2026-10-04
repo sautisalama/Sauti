@@ -24,7 +24,7 @@ const blogPosts: BlogPost[] = [
 		excerpt:
 			"We are pleased to inform you that we have completed the ED certification process. This certification recognizes our commitment to transparency and excellence in our mission.",
 		category: "News",
-		imageUrl: "/blog/certification.png",
+		imageUrl: "/blog/certification.jpeg",
 	},
 	{
 		title: "SV Casestudy: Mobile App Documentation",
@@ -40,7 +40,7 @@ const blogPosts: BlogPost[] = [
 		excerpt:
 			"With no way of supporting their children, many women are trapped in abusive relationships they can't afford to leave. But a new initiative is changing lives through economic empowerment.",
 		category: "Women Empowerment",
-		imageUrl: "/blog/empowerment.png",
+		imageUrl: "/blog/empowerment.jpeg",
 	},
 	{
 		title: "Where rape survivors fight for justice amid stigma, trauma",
@@ -48,7 +48,7 @@ const blogPosts: BlogPost[] = [
 		excerpt:
 			"The #metoo campaign was covered extensively by the media internationally, with reputable titles such as TIME magazine honouring the 'Silence Breakers' who spoke out against sexual harassment.",
 		category: "Justice",
-		imageUrl: "/blog/justice.png",
+		imageUrl: "/blog/justice.jpg",
 	},
 ];
 
@@ -101,11 +101,10 @@ export default function BlogPage() {
 							variant={selectedCategory === category ? "default" : "outline"}
 							onClick={() => setSelectedCategory(category)}
 							className={`
-                                ${
-                                    selectedCategory === category
-                                        ? "bg-serene-blue-600 hover:bg-serene-blue-700 text-white"
-                                        : "text-serene-blue-600 border-serene-blue-200 hover:bg-serene-blue-50"
-                                }
+                                ${selectedCategory === category
+									? "bg-serene-blue-600 hover:bg-serene-blue-700 text-white"
+									: "text-serene-blue-600 border-serene-blue-200 hover:bg-serene-blue-50"
+								}
                             `}
 						>
 							{category}
@@ -136,7 +135,7 @@ export default function BlogPage() {
 								</Badge>
 								<span className="text-sm text-serene-neutral-500">{post.date}</span>
 							</div>
-						<CardTitle className="text-xl font-bold text-serene-neutral-900 line-clamp-2 leading-snug">
+							<CardTitle className="text-xl font-bold text-serene-neutral-900 line-clamp-2 leading-snug">
 								{post.title}
 							</CardTitle>
 						</CardHeader>

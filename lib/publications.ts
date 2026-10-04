@@ -40,7 +40,7 @@ export const PUBLICATIONS: Publication[] = [
 		date: "2026-04-24",
 		dateLabel: "24 April 2026",
 		href: "/learn/climate-care",
-		image: "/learn/amina.png",
+		image: "/learn/amina.jpg",
 		imageAlt:
 			"Illustration of a Kenyan woman being supported by a community responder",
 		readTime: "20 min exercise",
@@ -63,7 +63,7 @@ export const PUBLICATIONS: Publication[] = [
 		date: "2025-12-24",
 		dateLabel: "24 December 2025",
 		href: "/impact/advocacy-and-justice",
-		image: "/blog/justice.png",
+		image: "/blog/justice.jpg",
 		imageAlt: "Scales of justice representing legal aid for GBV survivors in Kenya",
 		readTime: "12 min read",
 		keywords: [
@@ -86,7 +86,7 @@ export const PUBLICATIONS: Publication[] = [
 		date: "2026-01-02",
 		dateLabel: "2 January 2026",
 		href: "/impact/survivor-cafe",
-		image: "/blog/empowerment.png",
+		image: "/blog/empowerment.jpeg",
 		imageAlt: "Women gathered in a peer support circle",
 		readTime: "9 min read",
 		keywords: [

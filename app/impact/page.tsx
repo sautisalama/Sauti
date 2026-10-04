@@ -9,60 +9,60 @@ import { CheckCircle2 } from "lucide-react";
 import { CircledText } from "@/components/ui/CircledText";
 
 export default function ImpactPage() {
-	return (
-		<div className="flex min-h-screen flex-col bg-white">
-			<Nav />
-			<main id="main-content" className="flex-1">
-				{/* Full-Width Hero - Gradient overlay for text contrast */}
-				<section className="relative min-h-[80vh] flex items-start pt-16 md:pt-24 overflow-hidden">
-					{/* Background Image */}
-					<div className="absolute inset-0 z-0">
-						<Image
-							src="/impact-image.png"
-							alt="Group of people participating in community impact session"
-							fill
-							className="object-cover"
-							priority
-						/>
-					</div>
+    return (
+        <div className="flex min-h-screen flex-col bg-white">
+            <Nav />
+            <main id="main-content" className="flex-1">
+                {/* Full-Width Hero - Gradient overlay for text contrast */}
+                <section className="relative min-h-[80vh] flex items-start pt-16 md:pt-24 overflow-hidden">
+                    {/* Background Image */}
+                    <div className="absolute inset-0 z-0">
+                        <Image
+                            src="/impact-image.jpeg"
+                            alt="Group of people participating in community impact session"
+                            fill
+                            className="object-cover"
+                            priority
+                        />
+                    </div>
 
-					{/* Gradient Overlay - Only where text is (top portion) */}
-					<div className="absolute inset-0 bg-gradient-to-b from-black/80 via-black/40 to-transparent z-[1]" style={{ backgroundImage: 'linear-gradient(to bottom, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.6) 40%, rgba(0,0,0,0.3) 60%, transparent 80%)' }} />
+                    {/* Gradient Overlay - Only where text is (top portion) */}
+                    <div className="absolute inset-0 bg-gradient-to-b from-black/80 via-black/40 to-transparent z-[1]" style={{ backgroundImage: 'linear-gradient(to bottom, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.6) 40%, rgba(0,0,0,0.3) 60%, transparent 80%)' }} />
 
-					<div className="container mx-auto px-4 md:px-12 max-w-[1400px] relative z-10">
-						<div className="text-center max-w-5xl mx-auto">
-							<span className="inline-flex px-6 py-2 rounded-full bg-sauti-yellow text-sauti-dark text-xs md:text-sm font-bold mb-6 uppercase tracking-wider shadow-xl">
-								Measured in Lives Changed
-							</span>
-							<h1 className="text-4xl md:text-6xl lg:text-8xl font-black text-white leading-tight mb-6 drop-shadow-2xl">
-								Real Impact.<br/>Real <CircledText circleColor="#F4B400">Stories</CircledText>.
-							</h1>
-							<p className="text-white text-lg md:text-2xl leading-relaxed mb-10 max-w-3xl mx-auto font-light drop-shadow-xl">
-								From connecting 500+ survivors to care, to influencing national policy—every number represents a life transformed.
-							</p>
+                    <div className="container mx-auto px-4 md:px-12 max-w-[1400px] relative z-10">
+                        <div className="text-center max-w-5xl mx-auto">
+                            <span className="inline-flex px-6 py-2 rounded-full bg-sauti-yellow text-sauti-dark text-xs md:text-sm font-bold mb-6 uppercase tracking-wider shadow-xl">
+                                Measured in Lives Changed
+                            </span>
+                            <h1 className="text-4xl md:text-6xl lg:text-8xl font-black text-white leading-tight mb-6 drop-shadow-2xl">
+                                Real Impact.<br />Real <CircledText circleColor="#F4B400">Stories</CircledText>.
+                            </h1>
+                            <p className="text-white text-lg md:text-2xl leading-relaxed mb-10 max-w-3xl mx-auto font-light drop-shadow-xl">
+                                From connecting 500+ survivors to care, to influencing national policy—every number represents a life transformed.
+                            </p>
 
-							{/* Inline Stats - No backgrounds, crowded */}
-							<div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 max-w-4xl mx-auto">
-								<div className="flex flex-col items-center">
-									<div className="text-4xl md:text-6xl font-black text-sauti-yellow mb-2 drop-shadow-lg">500+</div>
-									<div className="text-white font-bold uppercase tracking-widest text-[10px] md:text-xs drop-shadow-md">Survivors Reached</div>
-								</div>
-								<div className="flex flex-col items-center">
-									<div className="text-4xl md:text-6xl font-black text-sauti-yellow mb-2 drop-shadow-lg">1000+</div>
-									<div className="text-white font-bold uppercase tracking-widest text-[10px] md:text-xs drop-shadow-md">Educated</div>
-								</div>
-								<div className="flex flex-col items-center">
-									<div className="text-4xl md:text-6xl font-black text-sauti-yellow mb-2 drop-shadow-lg">95%</div>
-									<div className="text-white font-bold uppercase tracking-widest text-[10px] md:text-xs drop-shadow-md">Impact Rate</div>
-								</div>
-								<div className="flex flex-col items-center">
-									<div className="text-4xl md:text-6xl font-black text-sauti-yellow mb-2 drop-shadow-lg">10+</div>
-									<div className="text-white font-bold uppercase tracking-widest text-[10px] md:text-xs drop-shadow-md">Active Programs</div>
-								</div>
-							</div>
-						</div>
-					</div>
-				</section>
+                            {/* Inline Stats - No backgrounds, crowded */}
+                            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 max-w-4xl mx-auto">
+                                <div className="flex flex-col items-center">
+                                    <div className="text-4xl md:text-6xl font-black text-sauti-yellow mb-2 drop-shadow-lg">500+</div>
+                                    <div className="text-white font-bold uppercase tracking-widest text-[10px] md:text-xs drop-shadow-md">Survivors Reached</div>
+                                </div>
+                                <div className="flex flex-col items-center">
+                                    <div className="text-4xl md:text-6xl font-black text-sauti-yellow mb-2 drop-shadow-lg">1000+</div>
+                                    <div className="text-white font-bold uppercase tracking-widest text-[10px] md:text-xs drop-shadow-md">Educated</div>
+                                </div>
+                                <div className="flex flex-col items-center">
+                                    <div className="text-4xl md:text-6xl font-black text-sauti-yellow mb-2 drop-shadow-lg">95%</div>
+                                    <div className="text-white font-bold uppercase tracking-widest text-[10px] md:text-xs drop-shadow-md">Impact Rate</div>
+                                </div>
+                                <div className="flex flex-col items-center">
+                                    <div className="text-4xl md:text-6xl font-black text-sauti-yellow mb-2 drop-shadow-lg">10+</div>
+                                    <div className="text-white font-bold uppercase tracking-widest text-[10px] md:text-xs drop-shadow-md">Active Programs</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
 
                 {/* Initiatives in Action Grid - PRIMARY FOCUS */}
                 <section className="py-12 md:py-20 lg:py-32 bg-white border-t border-gray-100">
@@ -78,7 +78,7 @@ export default function ImpactPage() {
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6 auto-rows-[280px] md:auto-rows-[300px]">
                             {/* 1. Platform - Large Hero Feature */}
                             <div className="md:col-span-2 md:row-span-2">
-                                <ImpactCard 
+                                <ImpactCard
                                     title="The Sauti Platform"
                                     category="Technology"
                                     image="/platform/sauti salama - survivor dashboard - desktop.png"
@@ -91,7 +91,7 @@ export default function ImpactPage() {
 
                             {/* 2. COP30 - Tall Feature */}
                             <div className="md:row-span-2">
-                                <ImpactCard 
+                                <ImpactCard
                                     title="Sauti Salama at COP30"
                                     category="Global Advocacy"
                                     image="/events/impact/at cop30.png"
@@ -102,7 +102,7 @@ export default function ImpactPage() {
                             </div>
 
                             {/* 3. Survivor Cafe */}
-                            <ImpactCard 
+                            <ImpactCard
                                 title="Survivor Cafe"
                                 category="Safe Spaces"
                                 image="/events/programs/survivors cafe program.png"
@@ -112,7 +112,7 @@ export default function ImpactPage() {
                             />
 
                             {/* 4. End Femicide */}
-                            <ImpactCard 
+                            <ImpactCard
                                 title="End Femicide KE"
                                 category="Movement"
                                 image="/events/impact/end femicide march.jpeg"
@@ -122,7 +122,7 @@ export default function ImpactPage() {
                             />
 
                             {/* 5. Capacity Building */}
-                            <ImpactCard 
+                            <ImpactCard
                                 title="Capacity Building"
                                 category="Education"
                                 image="/events/impact/malkia teaching child.jpeg"
@@ -133,7 +133,7 @@ export default function ImpactPage() {
 
                             {/* 6. Climate & Care - Wide feature */}
                             <div className="md:col-span-3">
-                                 <ImpactCard
+                                <ImpactCard
                                     title="Integrating Care and Climate for GBV Prevention"
                                     category="Climate & Care"
                                     image="/events/impact/climate-care/solar-demo.jpeg"
@@ -145,7 +145,7 @@ export default function ImpactPage() {
 
                             {/* 7. 16 Days - Wide filler if needed, or just standard */}
                             <div className="md:col-span-3">
-                                 <ImpactCard 
+                                <ImpactCard
                                     title="16 Days of Activism"
                                     category="Campaign"
                                     image="/events/impact/16-days of activism 2.jpeg"
@@ -190,20 +190,20 @@ export default function ImpactPage() {
                         </div>
                     </div>
                 </section>
-			</main>
-			<Footer />
-		</div>
-	);
+            </main>
+            <Footer />
+        </div>
+    );
 }
 
-function ImpactCard({ title, category, image, link, className, largeTitle, description }: { 
-    title: string, 
-    category: string, 
-    image: string, 
-    link: string, 
-    className?: string, 
+function ImpactCard({ title, category, image, link, className, largeTitle, description }: {
+    title: string,
+    category: string,
+    image: string,
+    link: string,
+    className?: string,
     largeTitle?: boolean,
-    description?: string 
+    description?: string
 }) {
     // Determine category color
     const getCategoryColor = (cat: string) => {
@@ -221,44 +221,43 @@ function ImpactCard({ title, category, image, link, className, largeTitle, descr
         <Link href={link} className={`group block overflow-hidden rounded-xl md:rounded-2xl ${className}`}>
             <div className="bg-white h-full relative overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-500">
                 {/* Image fills the card */}
-                <Image 
-                    src={image} 
-                    alt={title} 
-                    fill 
-                    className="object-cover group-hover:scale-110 transition-transform duration-700 brightness-90" 
+                <Image
+                    src={image}
+                    alt={title}
+                    fill
+                    className="object-cover group-hover:scale-110 transition-transform duration-700 brightness-90"
                 />
-                 {/* Vibrant gradient overlay - clear top-right, colored bottom-left */}
-                <div 
+                {/* Vibrant gradient overlay - clear top-right, colored bottom-left */}
+                <div
                     className={`absolute inset-0 opacity-70 group-hover:opacity-80 transition-opacity`}
                     style={{
-                        background: `radial-gradient(circle at top right, transparent 0%, transparent 30%, ${
-                            category.includes('Technology') ? 'rgba(0, 207, 141, 0.8)' :
-                            category.includes('Global') || category.includes('Advocacy') ? 'rgba(244, 180, 0, 0.8)' :
-                            category.includes('Safe') || category.includes('Spaces') ? 'rgba(168, 85, 247, 0.8)' :
-                            category.includes('Movement') ? 'rgba(239, 68, 68, 0.8)' :
-                            category.includes('Climate') ? 'rgba(5, 150, 105, 0.8)' :
-                            category.includes('Education') ? 'rgba(59, 130, 246, 0.8)' :
-                            category.includes('Campaign') ? 'rgba(251, 146, 60, 0.8)' :
-                            'rgba(26, 54, 93, 0.8)'
-                        } 100%)`
+                        background: `radial-gradient(circle at top right, transparent 0%, transparent 30%, ${category.includes('Technology') ? 'rgba(0, 207, 141, 0.8)' :
+                                category.includes('Global') || category.includes('Advocacy') ? 'rgba(244, 180, 0, 0.8)' :
+                                    category.includes('Safe') || category.includes('Spaces') ? 'rgba(168, 85, 247, 0.8)' :
+                                        category.includes('Movement') ? 'rgba(239, 68, 68, 0.8)' :
+                                            category.includes('Climate') ? 'rgba(5, 150, 105, 0.8)' :
+                                                category.includes('Education') ? 'rgba(59, 130, 246, 0.8)' :
+                                                    category.includes('Campaign') ? 'rgba(251, 146, 60, 0.8)' :
+                                                        'rgba(26, 54, 93, 0.8)'
+                            } 100%)`
                     }}
                 />
 
                 <div className="absolute inset-0 p-4 md:p-6 lg:p-8 flex flex-col justify-end">
-                     <div className="inline-flex self-start px-2 py-1 md:px-3 md:py-1 rounded-full bg-white/90 backdrop-blur-sm text-sauti-dark text-[10px] md:text-xs font-bold uppercase tracking-wider mb-3 md:mb-4 shadow-lg">
+                    <div className="inline-flex self-start px-2 py-1 md:px-3 md:py-1 rounded-full bg-white/90 backdrop-blur-sm text-sauti-dark text-[10px] md:text-xs font-bold uppercase tracking-wider mb-3 md:mb-4 shadow-lg">
                         {category}
                     </div>
                     <h3 className={`${largeTitle ? 'text-2xl md:text-3xl lg:text-4xl' : 'text-xl md:text-2xl lg:text-3xl'} font-black text-white mb-2 md:mb-3 leading-tight drop-shadow-lg`}>
                         {title}
                     </h3>
-                     
-                     {description && (
+
+                    {description && (
                         <p className="text-white/90 text-xs md:text-sm lg:text-base leading-relaxed mb-3 md:mb-4 line-clamp-2 drop-shadow-md">
                             {description}...
                         </p>
-                     )}
-                     
-                     <div className="flex items-center text-white font-bold text-xs md:text-sm uppercase tracking-wider mt-2 translate-y-4 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all duration-300">
+                    )}
+
+                    <div className="flex items-center text-white font-bold text-xs md:text-sm uppercase tracking-wider mt-2 translate-y-4 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all duration-300">
                         Read Full Story <CheckCircle2 className="w-3 h-3 md:w-4 md:h-4 ml-2" />
                     </div>
                 </div>
