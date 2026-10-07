@@ -69,7 +69,7 @@ export default function ReportAbuseInlineForm() {
 	const [needsQueer, setNeedsQueer] = useState(false);
 	const [consent, setConsent] = useState<string>("");
 	const [urgency, setUrgency] = useState<string>("");
-	const [supportServices, setSupportServices] = useState<string>("");
+	const [supportServices, setSupportServices] = useState<string[]>([]);
 
 	const isChildCase = incidentTypes.includes('child_abuse') || incidentTypes.includes('child_labor') || reportingFor === 'child';
 	const [autofilledPhone, setAutofilledPhone] = useState<string | null>(null);
@@ -228,6 +228,16 @@ export default function ReportAbuseInlineForm() {
 				reporting_for: reportingFor
 			};
 
+			if (supportServices.length === 0) {
+				toast({
+					title: "Missing Information",
+					description: "Please choose at least one kind of help you need.",
+					variant: "destructive",
+				});
+				setLoading(false);
+				return;
+			}
+
 			const urgencyValue = formData.get("urgency");
 			if (!urgencyValue) {
 				toast({
@@ -248,7 +258,7 @@ export default function ReportAbuseInlineForm() {
 				urgency: isChildCase ? "high" : urgencyValue,
 				consent: isChildCase ? "yes" : (formData.get("consent") || null),
 				contact_preference: "do_not_contact",
-				required_services: [],
+				required_services: supportServices,
 				latitude: allowLocation ? (location?.latitude || null) : null,
 				longitude: allowLocation ? (location?.longitude || null) : null,
 				submission_timestamp: new Date().toISOString(),
@@ -256,7 +266,7 @@ export default function ReportAbuseInlineForm() {
 				is_onBehalf: reportingFor !== 'self',
 				additional_info,
 				is_workplace_incident: isWorkplace,
-				support_services: formData.get("support_services") || null,
+				support_services: supportServices[0] ?? null,
 				password: password,
 				screen: typeof window !== "undefined" ? {
 					width: window.innerWidth,
@@ -441,29 +451,14 @@ export default function ReportAbuseInlineForm() {
 							</div>
 						)}
 						attention. I most urgently need{" "}
-						<EnhancedSelect
-							options={SUPPORT_SERVICE_OPTIONS as any}
-							value={supportServices}
-							onChange={(value) => {
-								setSupportServices(value);
-								const form = document.querySelector("form") as HTMLFormElement;
-								const select = form?.querySelector(
-									'select[name="support_services"]'
-								) as HTMLSelectElement;
-								if (select) select.value = value;
-							}}
-							placeholder="select type of help"
-							required
-							name="support_services"
-						/>
-						<select name="support_services" className="hidden">
-							<option value="">select type of help</option>
-							{SUPPORT_SERVICE_OPTIONS.map(({ value, label }) => (
-								<option key={value} value={value}>
-									{label}
-								</option>
-							))}
-						</select>
+						<span className="inline-flex align-middle w-full sm:w-auto mt-2 mb-2 sm:mt-0 sm:mb-0">
+							<MultiSelect
+								selected={supportServices}
+								onChange={setSupportServices}
+								options={SUPPORT_SERVICE_OPTIONS}
+								placeholder="select the help you need (you can pick several)"
+							/>
+						</span>
 						.
 					</div>
 
@@ -653,6 +648,10 @@ export default function ReportAbuseInlineForm() {
 					<div className="relative">
 						<input
 							type={showPassword ? "text" : "password"}
+						id="report-password"
+						name="password"
+						autoComplete="new-password"
+						aria-label="Create a password"
 							className="w-full border-2 border-blue-300 focus:border-blue-500 focus:outline-none rounded-lg px-4 py-3 pr-12 bg-white"
 							placeholder="Create a password (min. 6 characters)"
 							value={password}

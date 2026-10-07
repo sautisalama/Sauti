@@ -1,5 +1,6 @@
 "use client";
 
+import { useSignedAudioUrl } from "@/lib/audio/use-signed-audio-url";
 import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
@@ -18,6 +19,7 @@ interface AudioPlayerProps {
  */
 export function AudioPlayer({ src, title = "Voice Recording", className }: AudioPlayerProps) {
 	const audioRef = useRef<HTMLAudioElement>(null);
+		const playSrc = useSignedAudioUrl(src);
 	const [isPlaying, setIsPlaying] = useState(false);
 	const [progress, setProgress] = useState(0);
 	const [duration, setDuration] = useState(0);
@@ -118,7 +120,7 @@ export function AudioPlayer({ src, title = "Voice Recording", className }: Audio
 			"transition-all duration-300 hover:shadow-md",
 			className
 		)}>
-			<audio ref={audioRef} src={src} preload="metadata" />
+			<audio ref={audioRef} src={playSrc} preload="metadata" />
 
 			{/* Title */}
 			<div className="flex items-center gap-3 mb-4">

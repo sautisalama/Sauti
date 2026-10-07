@@ -1,232 +1,104 @@
 "use server";
 
 import { createClient } from "@/utils/supabase/server";
-import { Database } from "@/types/db-schema";
-import { SupabaseClient } from "@supabase/supabase-js";
-import { sendNotification } from "@/lib/notifications";
-import {
-	matchFoundProfessionalEmail,
-	matchFoundSurvivorEmail,
-} from "@/lib/notifications/templates";
-
-import {
-	runMatchingPipeline,
-	type MatchResult,
-} from "@/lib/matching-engine";
+import { createAdminClient } from "@/utils/supabase/admin-client";
+import { requireAdmin } from "@/lib/auth/require-admin";
+import { backfillUnmatched, matchReport } from "@/lib/matching-engine/service";
+import type { MatchResult } from "@/lib/matching-engine";
 
 /**
- * Matches a report with appropriate support services.
+ * Client-callable matching actions.
  *
- * Delegates completely to the shared matching engine pipeline.
- * Handles post-match notification dispatch.
+ * These are reachable by any browser, so each one authorises the caller before running
+ * the (trusted, service-role) matching service in `lib/matching-engine/service.ts`.
+ * Server code that has already authorised the request (API routes, other actions)
+ * should call that service directly instead.
  */
-export async function matchReportWithServices(
-	reportId: string,
-	customClient?: SupabaseClient<Database>,
-) {
-	const supabase = customClient || (await createClient());
 
-	try {
-		// Run the shared matching pipeline
-		const matches = await runMatchingPipeline(reportId, supabase);
+/** Match one report. Allowed for the reporter or an admin. */
+export async function matchReportWithServices(reportId: string): Promise<MatchResult[]> {
+	const supabase = await createClient();
+	const {
+		data: { user },
+	} = await supabase.auth.getUser();
+	if (!user) throw new Error("Unauthorized");
 
-		if (matches.length === 0) {
-			return [];
-		}
-
-		// Fetch report details for notifications
-		const { data: report } = await supabase
-			.from("reports")
-			.select("user_id, type_of_incident")
-			.eq("report_id", reportId)
-			.single();
-
-		const isChildCase =
-			report?.type_of_incident === "child_abuse" ||
-			report?.type_of_incident === "child_labor";
-
-		// Send notifications to matched professionals
-		for (const m of matches) {
-			if (m.candidate.owner_user_id) {
-				await sendNotification({
-					userId: m.candidate.owner_user_id,
-					type: "match_found",
-					title: isChildCase
-						? "URGENT: Child Case Escalation"
-						: "New Case Assignment",
-					message: isChildCase
-						? `Mandatory alert: You have been matched with a child-related case (${report?.type_of_incident || "incident"}).`
-						: `You have been matched with a new case requiring ${m.candidate.service_capabilities[0] || "support"} services.`,
-					link: "/dashboard/cases",
-					metadata: { report_id: reportId },
-					sendEmail: true,
-					emailHtml: matchFoundProfessionalEmail(
-						m.candidate.service_capabilities[0] || "Support",
-					),
-				});
-			}
-		}
-
-		// Send notification to survivor
-		if (report?.user_id) {
-			await sendNotification({
-				userId: report.user_id,
-				type: "match_found",
-				title: "Help is on the way",
-				message: `We've matched your report with verified specialists. View them in your dashboard.`,
-				link: "/dashboard/cases",
-				metadata: { report_id: reportId },
-				sendEmail: true,
-				emailHtml: matchFoundSurvivorEmail(
-					matches[0].candidate.display_name || "Specialist",
-					matches[0].candidate.service_capabilities[0],
-				),
-			});
-		}
-
-		return matches;
-	} catch (error) {
-		console.error("Critical matching engine error:", error);
-		throw error;
+	const admin = createAdminClient();
+	const { data: report } = await admin.from("reports").select("user_id").eq("report_id", reportId).maybeSingle();
+	if (!report) throw new Error("Report not found");
+	if (report.user_id !== user.id) {
+		const { data: me } = await admin.from("profiles").select("is_admin").eq("id", user.id).maybeSingle();
+		if (!me?.is_admin) throw new Error("Unauthorized");
 	}
+	return matchReport(reportId, admin);
 }
 
 /**
- * BACKFILL MATCHING
- * Searches for reports that currently have no matches and attempts to match them.
- * Usually triggered when a new professional or service is verified.
+ * Match every waiting report (run when a provider is verified). Admin only.
+ * (Previously callable by anyone, and it ran with the caller's permissions, so for an
+ * admin it silently found no reports at all.)
  */
 export async function backfillUnmatchedReports() {
-	const supabase = await createClient();
-
-	try {
-		// Find all reports that are not record-only and haven't been matched yet
-		const { data: unmatchedReports, error } = await supabase
-			.from("reports")
-			.select("report_id")
-			.eq("ismatched", false)
-			.eq("record_only", false);
-
-		if (error) throw error;
-		if (!unmatchedReports || unmatchedReports.length === 0) return;
-
-		console.log(
-			`Starting backfill for ${unmatchedReports.length} unmatched reports...`,
-		);
-
-		// Process each unmatched report sequentially to avoid rate limits
-		for (const report of unmatchedReports) {
-			try {
-				await matchReportWithServices(report.report_id);
-			} catch (matchErr) {
-				console.error(
-					`Backfill failed for report ${report.report_id}:`,
-					matchErr,
-				);
-			}
-		}
-
-		return { processed: unmatchedReports.length };
-	} catch (error) {
-		console.error("Backfill matching error:", error);
-		throw error;
-	}
+	const auth = await requireAdmin();
+	if (!auth.ok) throw new Error(auth.error);
+	return backfillUnmatched(createAdminClient());
 }
 
 /**
- * REVERSE MATCHING (Proactive matching for a professional)
- * Triggered when a professional who has no cases refreshes their dashboard.
- * Finds reports that match this professional's specific services.
+ * A professional with no active cases asks to be matched with waiting reports.
+ * The caller can only do this for themselves.
  */
-export async function matchProfessionalWithUnmatchedReports(
-	professionalUserId: string,
-) {
+export async function matchProfessionalWithUnmatchedReports(professionalUserId: string) {
 	const supabase = await createClient();
+	const {
+		data: { user },
+	} = await supabase.auth.getUser();
+	if (!user || user.id !== professionalUserId) throw new Error("Unauthorized");
 
-	try {
-		// 1. Check if the professional has verified services
-		const { data: services } = await supabase
-			.from("support_services")
-			.select("id, verification_status")
-			.eq("user_id", professionalUserId)
-			.eq("verification_status", "verified");
+	const admin = createAdminClient();
+	const { data: services } = await admin
+		.from("support_services")
+		.select("id")
+		.eq("user_id", professionalUserId)
+		.eq("verification_status", "verified")
+		.eq("is_active", true);
+	if (!services?.length) return { matched: 0 };
+	const serviceIds = services.map((s) => s.id);
 
-		if (!services || services.length === 0) return { matched: 0 };
-
-		const serviceIds = services.map((s) => s.id);
-
-		// 2. Check current active matches
-		const { data: activeMatches } = await supabase
-			.from("matched_services")
-			.select("id, feedback, match_status_type")
-			.in("service_id", serviceIds)
-			.not("match_status_type", "eq", "completed")
-			.not("match_status_type", "eq", "declined");
-
-		// Filter out truly complete cases
-		const trulyActiveMatches = (activeMatches || []).filter((m) => {
-			try {
-				if (m.feedback && typeof m.feedback === "object") {
-					return !(m.feedback as Record<string, unknown>).is_prof_complete;
-				}
-				if (
-					m.feedback &&
-					typeof m.feedback === "string" &&
-					(m.feedback as string).startsWith("{")
-				) {
-					const status = JSON.parse(m.feedback as string);
-					return !status.is_prof_complete;
-				}
-			} catch { /* ignore */ }
-			return true;
-		});
-
-		// Rule: Only proactive match if they have NO truly active cases
-		if (trulyActiveMatches.length > 0)
-			return { status: "has_cases", count: trulyActiveMatches.length };
-
-		// 3. Find unmatched reports that are not record-only
-		const { data: unmatchedReports } = await supabase
-			.from("reports")
-			.select("report_id")
-			.eq("ismatched", false)
-			.eq("record_only", false)
-			.order("submission_timestamp", { ascending: false })
-			.limit(15);
-
-		if (!unmatchedReports || unmatchedReports.length === 0)
-			return { status: "no_unmatched_reports" };
-
-		console.log(
-			`[Proactive Matching] Checking ${unmatchedReports.length} reports for professional ${professionalUserId}...`,
-		);
-
-		let newlyMatchedCount = 0;
-
-		for (const report of unmatchedReports) {
-			try {
-				const matches = await matchReportWithServices(
-					report.report_id,
-					supabase,
-				);
-				if (
-					matches &&
-					Array.isArray(matches) &&
-					matches.some((m: MatchResult) => serviceIds.includes(m.candidate.entity_id))
-				) {
-					newlyMatchedCount++;
-				}
-			} catch (err) {
-				console.error(
-					`Proactive match failed for report ${report.report_id}:`,
-					err,
-				);
-			}
+	// Only proactively match someone who has no truly active cases.
+	const { data: activeMatches } = await admin
+		.from("matched_services")
+		.select("id, feedback, match_status_type")
+		.in("service_id", serviceIds)
+		.not("match_status_type", "in", "(completed,declined,cancelled)");
+	const trulyActive = (activeMatches ?? []).filter((m) => {
+		try {
+			const fb = typeof m.feedback === "string" && m.feedback.startsWith("{") ? JSON.parse(m.feedback) : m.feedback;
+			if (fb && typeof fb === "object") return !(fb as Record<string, unknown>).is_prof_complete;
+		} catch {
+			/* ignore */
 		}
+		return true;
+	});
+	if (trulyActive.length > 0) return { status: "has_cases", count: trulyActive.length };
 
-		return { status: "success", matched: newlyMatchedCount };
-	} catch (error) {
-		console.error("Proactive matching critical error:", error);
-		throw error;
+	const { data: unmatched } = await admin
+		.from("reports")
+		.select("report_id")
+		.eq("ismatched", false)
+		.eq("record_only", false)
+		.order("submission_timestamp", { ascending: false })
+		.limit(15);
+	if (!unmatched?.length) return { status: "no_unmatched_reports" };
+
+	let matched = 0;
+	for (const r of unmatched) {
+		try {
+			const res = await matchReport(r.report_id, admin);
+			if (res.some((m) => serviceIds.includes(m.candidate.entity_id))) matched++;
+		} catch (e) {
+			console.error(`[matching] proactive match failed for ${r.report_id}:`, e);
+		}
 	}
+	return { status: "success", matched };
 }

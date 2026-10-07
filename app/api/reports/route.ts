@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
+import { notifyTeamOfNewReport } from "@/lib/notifications/new-report";
 import { REPORT_EMAIL_RECIPIENTS, REPORT_EMAIL_SENDER } from "@/lib/constants";
 import { createClient } from "@/utils/supabase/server";
 import { Database, TablesInsert } from "@/types/db-schema";
-import { matchReportWithServices } from "@/app/actions/match-services";
+import { matchReport } from "@/lib/matching-engine/service";
+import { createAdminClient } from "@/utils/supabase/admin-client";
 import { sendEmail } from "@/lib/notifications/email";
 import { sendNotification } from "@/lib/notifications";
 import { newReportAdminEmail } from "@/lib/notifications/templates";
@@ -12,6 +14,12 @@ export const dynamic = "force-dynamic";
 export async function POST(request: Request) {
 	try {
 		const supabase = await createClient();
+		const {
+			data: { user },
+		} = await supabase.auth.getUser();
+		if (!user) {
+			return NextResponse.json({ error: "Please sign in to submit a report." }, { status: 401 });
+		}
 		let formData;
 		try {
 			formData = await request.json();
@@ -23,7 +31,8 @@ export async function POST(request: Request) {
 		const reportData: TablesInsert<"reports"> = {
 			first_name: formData.first_name || "Anonymous",
 			last_name: formData.last_name || null,
-			user_id: formData.user_id,
+			// Never trust a user_id from the request body: a report always belongs to the signed-in user.
+			user_id: user.id,
 			phone: formData.phone,
 			type_of_incident: formData.type_of_incident,
 			incident_description: formData.incident_description || null,
@@ -61,7 +70,7 @@ export async function POST(request: Request) {
 
 		// Match the report with support services
 		try {
-			await matchReportWithServices(insertedReport.report_id);
+			await matchReport(insertedReport.report_id, createAdminClient());
 		} catch (matchError) {
 			console.error("Error matching services:", matchError);
 			// Continue with the process even if matching fails
@@ -88,19 +97,13 @@ export async function POST(request: Request) {
 
 		// Send Notifications
 		try {
-            // 1. Notify Admins (Email only)
-            const adminEmailHtml = newReportAdminEmail(
-                insertedReport.report_id,
-                formData.type_of_incident,
-                formData.urgency,
-                Array.isArray(formData.required_services) ? formData.required_services : [formData.required_services || 'None']
-            );
-            
-			await sendEmail(
-				REPORT_EMAIL_RECIPIENTS.map((r) => r.email),
-				`New Abuse Report: ${formData.type_of_incident} (${formData.urgency})`,
-				adminEmailHtml
-			);
+            // 1. Notify the response team (email only)
+			await notifyTeamOfNewReport({
+				reportId: insertedReport.report_id,
+				incident: formData.type_of_incident,
+				urgency: formData.urgency,
+				services: formData.required_services,
+			});
 
             // 2. Notify Reporter (if authenticated)
             if (insertedReport.user_id) {

@@ -195,6 +195,10 @@ export async function runMatchingPipeline(
 
   const selection = selectTopCandidates(scoredResults);
 
+  // A provider who already has a match on this report (any status) is never matched or notified
+  // again — re-running the pipeline used to pile up duplicate matches (11 for one report).
+  const fresh = selection.selected.filter(m => !existingMatchMap.has(m.candidate.entity_id));
+
   // ─── Persistence (skip in dry_run mode) ────────────────────────────────────
 
   if (options.dry_run) {
@@ -209,7 +213,7 @@ export async function runMatchingPipeline(
     return [];
   }
 
-  if (selection.selected.length > 0) {
+  if (fresh.length > 0) {
     // Update report status
     await supabase.from('reports').update({
       ismatched: true,
@@ -217,7 +221,7 @@ export async function runMatchingPipeline(
     }).eq('report_id', reportId);
 
     // Build match inserts
-    const matchInserts = selection.selected.map(m => ({
+    const matchInserts = fresh.map(m => ({
       report_id: reportId,
       service_id: m.candidate.source_type === 'service' ? m.candidate.entity_id : null,
       hrd_profile_id: m.candidate.source_type === 'profile' ? m.candidate.entity_id : null,
@@ -246,7 +250,7 @@ export async function runMatchingPipeline(
     }
   }
 
-  return selection.selected;
+  return fresh;
 }
 
 

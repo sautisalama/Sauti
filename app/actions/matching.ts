@@ -3,7 +3,8 @@
 import { createClient } from '@/utils/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { MatchStatusType, TimeSlot } from '@/types/chat'
-import { matchReportWithServices } from './match-services'
+import { matchReport, nextCascadeLevel } from '@/lib/matching-engine/service'
+import { createAdminClient } from '@/utils/supabase/admin-client'
 import { createAppointment } from '../dashboard/_views/actions/appointments'
 import { getCaseChat, sendMessage } from './chat'
 import { format } from 'date-fns'
@@ -60,7 +61,8 @@ export async function acceptMatchRequest(matchId: string, proposedTimes?: TimeSl
   }
 
   // Create notification for survivor
-  await supabase.from('notifications').insert({
+  // cross-user notification: written with the service role (RLS only lets people notify themselves)
+  await createAdminClient().from('notifications').insert({
     user_id: match.survivor_id!,
     title: 'Match Accepted',
     message: 'A professional has accepted your case and proposed meeting times.',
@@ -142,7 +144,8 @@ export async function rejectMatchRequest(matchId: string, reason?: string) {
   // This ensures the next best candidate is found immediately
   try {
     if (match.report_id) {
-      await matchReportWithServices(match.report_id)
+      const admin = createAdminClient()
+      await matchReport(match.report_id, admin, { cascade_level: await nextCascadeLevel(match.report_id, admin) })
     }
   } catch (reMatchError) {
     console.error(`Re-matching after decline failed for report ${match.report_id}:`, reMatchError)
@@ -244,7 +247,8 @@ export async function confirmMatch(matchId: string, selectedTime?: TimeSlot) {
   // 4. Notify Survivor
   const survivorId = match.survivor_id || (match.report as any)?.user_id;
   if (survivorId) {
-    await supabase.from('notifications').insert({
+    // cross-user notification: written with the service role (RLS only lets people notify themselves)
+  await createAdminClient().from('notifications').insert({
       user_id: survivorId,
       title: 'Match Accepted & Scheduled',
       message: `A professional has accepted your case and scheduled a session.`,
@@ -283,7 +287,8 @@ export async function confirmMatch(matchId: string, selectedTime?: TimeSlot) {
 
   // 6. Notify professional
   if (professionalId) {
-    await supabase.from('notifications').insert({
+    // cross-user notification: written with the service role (RLS only lets people notify themselves)
+  await createAdminClient().from('notifications').insert({
       user_id: professionalId!,
       title: 'Match Confirmed',
       message: 'A survivor has confirmed the match. You can now start chatting.',
@@ -426,10 +431,30 @@ export async function acceptAndScheduleCase(
     }
   }
 
+  // The scheduler promises the greeting is "sent as first chat" — actually send it.
+  const greeting = appointmentData?.notes?.trim();
+  if (chatId && greeting) {
+    const { error: greetError } = await supabase.from('messages').insert({ chat_id: chatId, sender_id: user.id, content: greeting, type: 'text' })
+    if (greetError) console.error('acceptAndScheduleCase: could not send greeting:', greetError)
+  }
+
   // 5. Case Exclusivity (Decline others)
   const reportId = match.report_id || (match.report as any)?.report_id;
   if (reportId) {
     await markCaseAsExclusive(reportId, matchId)
+
+    // Tell the survivor (in-app only: anonymous survivors have no real inbox).
+    if (survivorId) {
+      await createAdminClient().from('notifications').insert({
+        user_id: survivorId,
+        type: 'match_accepted',
+        title: 'A professional accepted your case',
+        message: `${serviceData?.name || 'A verified professional'} has accepted your case and is ready to support you. Open your messages to continue.`,
+        link: '/dashboard/chat',
+        metadata: { report_id: reportId, match_id: matchId },
+        read: false
+      })
+    }
     
     // 6. Sync Report Status
     await supabase
@@ -437,7 +462,6 @@ export async function acceptAndScheduleCase(
       .update({ 
         match_status: 'accepted',
         ismatched: true,
-        updated_at: new Date().toISOString()
       })
       .eq('report_id', reportId)
   }
@@ -515,7 +539,8 @@ export async function ensureChatForMatch(matchId: string) {
   });
 
   // Notify both parties
-  await supabase.from('notifications').insert([
+  // cross-user notification: written with the service role (RLS only lets people notify themselves)
+  await createAdminClient().from('notifications').insert([
     {
       user_id: match.survivor_id,
       title: 'Chat Available',
@@ -574,7 +599,8 @@ export async function requestReschedule(matchId: string, preferredTimes: TimeSlo
   // Notify professional
   const professionalId = (match?.support_services as any)?.user_id
   if (professionalId) {
-    await supabase.from('notifications').insert({
+    // cross-user notification: written with the service role (RLS only lets people notify themselves)
+  await createAdminClient().from('notifications').insert({
       user_id: professionalId,
       title: 'Reschedule Requested',
       message: 'A survivor has requested to reschedule the meeting.',
@@ -621,7 +647,8 @@ export async function respondToReschedule(matchId: string, accept: boolean, newT
       .single()
 
     if (match?.survivor_id) {
-      await supabase.from('notifications').insert({
+      // cross-user notification: written with the service role (RLS only lets people notify themselves)
+  await createAdminClient().from('notifications').insert({
         user_id: match.survivor_id,
         title: 'New Time Proposed',
         message: 'The professional has proposed a new meeting time.',
@@ -725,7 +752,20 @@ export async function markCaseAsExclusive(reportId: string, acceptedMatchId: str
 
   if (!user) throw new Error('Unauthorized')
 
-  const { error } = await supabase
+  // Declining the OTHER providers' matches is beyond the caller's own rows, so it runs with the
+  // service role — but only after proving the caller owns the accepted match for this report.
+  const admin = createAdminClient()
+  const { data: accepted } = await admin
+    .from('matched_services')
+    .select('id, report_id, hrd_profile_id, match_status_type, support_services:service_id(user_id)')
+    .eq('id', acceptedMatchId)
+    .maybeSingle()
+  const ownerId = (accepted?.support_services as unknown as { user_id: string | null } | null)?.user_id ?? accepted?.hrd_profile_id
+  if (!accepted || accepted.report_id !== reportId || accepted.match_status_type !== 'accepted' || ownerId !== user.id) {
+    throw new Error('Unauthorized - you have not accepted this case')
+  }
+
+  const { error } = await admin
     .from('matched_services')
     .update({
       match_status_type: 'declined', // Use 'declined' so it drops out of pending lists
@@ -735,8 +775,7 @@ export async function markCaseAsExclusive(reportId: string, acceptedMatchId: str
     })
     .eq('report_id', reportId)
     .neq('id', acceptedMatchId)
-    .neq('match_status_type', 'accepted')
-    .neq('match_status_type', 'completed')
+    .not('match_status_type', 'in', '(accepted,completed,completion_pending,completed_auto)')
 
   if (error) {
     console.error('Failed to make case exclusive:', error)
@@ -760,7 +799,6 @@ export async function syncReportStatus(reportId: string, matchId: string, status
     .update({ 
       match_status: status,
       ismatched: status === 'accepted' || status === 'completed',
-      updated_at: new Date().toISOString()
     })
     .eq('report_id', reportId)
 

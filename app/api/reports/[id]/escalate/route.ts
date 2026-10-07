@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
-import { matchReportWithServices } from "@/app/actions/match-services";
+import { matchReport } from "@/lib/matching-engine/service";
+import { createAdminClient } from "@/utils/supabase/admin-client";
 
 export async function POST(
 	request: Request,
@@ -40,7 +41,7 @@ export async function POST(
 		if (updateError) throw updateError;
 
 		// Trigger matching
-		await matchReportWithServices(reportId);
+		await matchReport(reportId, createAdminClient());
 
 		return NextResponse.json({ message: "Report escalated successfully" });
 	} catch (error) {

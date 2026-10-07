@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
+import { notifyTeamOfNewReport } from "@/lib/notifications/new-report";
 import { createClient } from "@/utils/supabase/server";
 import { createClient as createAdminClient } from "@supabase/supabase-js";
 import { TablesInsert } from "@/types/db-schema";
-import { matchReportWithServices } from "@/app/actions/match-services";
+import { matchReport } from "@/lib/matching-engine/service";
 import { cookies, headers } from "next/headers";
 import { registerDevice, parseSettings, TrackedDevice } from "@/lib/user-settings";
 
@@ -73,7 +74,7 @@ export async function POST(request: Request) {
 		// This bypasses cookies() and auth context issues, running as a privileged backend process
 		const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 		// Try multiple env var names for the service key
-		const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SERVICE_ROLE_KEY;
+		const supabaseServiceKey = process.env.SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SERVICE_ROLE_KEY;
 
 		if (!supabaseUrl || !supabaseServiceKey) {
 			console.error("Missing Supabase credentials in env");
@@ -226,10 +227,18 @@ export async function POST(request: Request) {
 		// 3. Post-Submission Actions (Matching & Linking)
 		try {
 			// Trigger matching (async, don't block response too long)
-			matchReportWithServices(insertedReport.report_id, supabaseAdmin).catch(err => 
+			matchReport(insertedReport.report_id, supabaseAdmin).catch(err => 
 				console.error("Background matching failed:", err)
 			);
 			
+			// Tell the response team (this path used to send nothing).
+			notifyTeamOfNewReport({
+				reportId: insertedReport.report_id,
+				incident: formData.type_of_incident,
+				urgency: formData.urgency,
+				services: formData.required_services,
+			}).catch((err) => console.error("Team notification failed:", err));
+
 			// Auto-link by phone if needed
 			if (!userId && insertedReport.phone) {
 				const { data: profile } = await supabaseAdmin

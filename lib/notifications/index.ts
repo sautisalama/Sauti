@@ -1,5 +1,5 @@
 
-import { createClient } from '@/utils/supabase/server';
+import { createAdminClient } from '@/utils/supabase/admin-client';
 import { sendEmail } from './email';
 import { sendInAppNotification } from './in-app';
 import { NotificationPayload, NotificationType } from './types';
@@ -26,7 +26,10 @@ const CRITICAL_TYPES: NotificationType[] = [
  * Handles both In-App and Email notifications based on type and priority.
  */
 export async function sendNotification(payload: NotificationPayload) {
-  const supabase = await createClient();
+  // Notifications are written for, and addressed to, OTHER users, so this runs with the
+  // service role. (As the sender it was blocked by RLS: in-app rows were not created and
+  // the recipient's email address could not be read.)
+  const supabase = createAdminClient();
   
   // 1. Send In-App Notification (Always)
   const inAppResult = await sendInAppNotification(
@@ -55,6 +58,11 @@ export async function sendNotification(payload: NotificationPayload) {
         .select('email, first_name')
         .eq('id', payload.userId)
         .single();
+
+      // Anonymous survivors have a placeholder address with no inbox — never email it.
+      if (user?.email?.endsWith('@anon.sautisalama.org')) {
+        return { inApp: inAppResult, email: { success: false, error: 'anonymous account (no inbox)' } };
+      }
 
       if (error || !user?.email) {
         console.warn(`Could not fetch email for user ${payload.userId}. Email skipped.`);
@@ -85,7 +93,8 @@ export async function sendNotification(payload: NotificationPayload) {
  * Currently supports In-App notifications only to avoid mass email spam.
  */
 export async function broadcastNotification(payload: Omit<NotificationPayload, 'userId' | 'sendEmail' | 'emailHtml'>) {
-    const supabase = await createClient();
+    // Trusted server code: reads every user and writes a row per user (service role).
+    const supabase = createAdminClient();
     
     // 1. Fetch all users (batching might be needed for large datasets)
     const { data: users, error: userError } = await supabase

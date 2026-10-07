@@ -9,6 +9,7 @@
  * Also applies the OOO hard filter at source level.
  */
 
+import { radiusToKm } from '@/lib/geo/radius';
 import { SupabaseClient } from '@supabase/supabase-js';
 import { Database } from '@/types/db-schema';
 import { CandidateObject, MatchingTraits } from './types';
@@ -105,7 +106,8 @@ export async function buildCandidatePool(
       professional_title: profile?.professional_title || null,
       latitude: s.latitude,
       longitude: s.longitude,
-      coverage_radius_km: s.coverage_area_radius || 50,
+      // stored in metres by the profile form (see lib/geo/radius.ts); the engine works in km
+      coverage_radius_km: radiusToKm(s.coverage_area_radius) ?? 50,
       is_remote: s.coverage_area_radius === null,
       availability_profile: s.availability || 'flexible',
       specialises_disability: s.specialises_in_disability || false,

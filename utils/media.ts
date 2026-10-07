@@ -16,6 +16,11 @@ export interface AudioUploadResult {
 	error?: string;
 }
 
+/** "audio/webm;codecs=opus" -> "audio/webm" */
+export function baseMime(type: string): string {
+	return (type || "").split(";")[0].trim().toLowerCase();
+}
+
 /**
  * Validates audio blob before upload
  */
@@ -37,9 +42,10 @@ export function validateAudioBlob(blob: Blob): {
 		return { valid: false, error: "Audio file is too large (max 50MB)" };
 	}
 
-	// Check MIME type
-	const allowedTypes = ["audio/webm", "audio/mp4", "audio/wav", "audio/ogg"];
-	if (!allowedTypes.includes(blob.type)) {
+	// Check MIME type. MediaRecorder reports codec-qualified types such as
+	// "audio/webm;codecs=opus", so compare only the base type.
+	const allowedTypes = ["audio/webm", "audio/mp4", "audio/wav", "audio/ogg", "audio/mpeg"];
+	if (!allowedTypes.includes(baseMime(blob.type))) {
 		return { valid: false, error: "Unsupported audio format" };
 	}
 
@@ -52,7 +58,7 @@ export function validateAudioBlob(blob: Blob): {
 export function generateAudioFilename(blob: Blob): string {
 	const timestamp = Date.now();
 	const random = Math.random().toString(36).slice(2);
-	const extension = blob.type.split("/")[1] || "webm";
+	const extension = (baseMime(blob.type).split("/")[1] || "webm").replace("mpeg", "mp3");
 	return `reports/${timestamp}-${random}.${extension}`;
 }
 
@@ -67,7 +73,7 @@ export function createAudioMediaObject(
 	return {
 		title,
 		url,
-		type: blob.type || "audio/webm",
+		type: baseMime(blob.type) || "audio/webm",
 		size: blob.size,
 		uploadedAt: new Date().toISOString(),
 	};
