@@ -1,0 +1,14 @@
+import { BASE, launch, newPage, signIn } from "./lib.mjs";
+const [role, path, clickText, clickText2 = ""] = process.argv.slice(2);
+const b = await launch(); const p = await newPage(b);
+await signIn(p, role);
+await p.goto(`${BASE}${path}`, { waitUntil: "networkidle", timeout: 120000 });
+await p.waitForTimeout(2500);
+await p.getByText(clickText, { exact: false }).first().click();
+await p.getByRole("button", { name: /ACCEPT & SCHEDULE/i }).waitFor({ timeout: 60000 });
+await p.getByRole("button", { name: /ACCEPT & SCHEDULE/i }).click();
+await p.waitForTimeout(3000);
+console.log((await p.locator("[role=dialog], dialog").first().innerText().catch(() => "(no dialog)")).slice(0, 2500));
+console.log("BUTTONS:", await p.getByRole("button").evaluateAll((els) => els.map((e) => (e.getAttribute("aria-label") || e.innerText || "").trim().replace(/\s+/g, " ")).filter(Boolean).slice(0, 60)));
+console.log("INPUTS:", await p.locator("input,textarea,select").evaluateAll((els) => els.map((e) => `${e.tagName}:${e.type}:${e.name||e.id||e.placeholder||e.getAttribute("aria-label")}`).slice(0,30)));
+await b.close();

@@ -1,0 +1,10 @@
+import { BASE, launch, newPage, signIn } from "./lib.mjs";
+const b = await launch(); const p = await newPage(b);
+await signIn(p, "survivor");
+await p.goto(`${BASE}/dashboard/chat`, { waitUntil: "networkidle", timeout: 120000 });
+await p.waitForTimeout(3000);
+await p.getByText("Communities", { exact: true }).first().click();
+await p.waitForTimeout(2500);
+console.log((await p.locator("body").innerText()).replace(/\n{3,}/g, "\n\n").slice(0, 900));
+console.log("BUTTONS:", await p.getByRole("button").evaluateAll((els) => els.map((e) => (e.getAttribute("aria-label") || e.innerText || "").trim().replace(/\s+/g, " ")).filter(Boolean).slice(0, 25)));
+await b.close();

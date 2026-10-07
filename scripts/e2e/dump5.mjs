@@ -1,0 +1,11 @@
+import { BASE, launch, newPage, signIn } from "./lib.mjs";
+const [role, path, tab] = process.argv.slice(2);
+const b = await launch(); const p = await newPage(b);
+await signIn(p, role);
+await p.goto(`${BASE}${path}`, { waitUntil: "networkidle", timeout: 120000 });
+await p.waitForTimeout(6000);
+await p.getByText(tab, { exact: false }).first().click();
+await p.waitForTimeout(2500);
+console.log((await p.locator("main, body").first().innerText()).replace(/\n{3,}/g, "\n\n").slice(300, 2200));
+console.log("BUTTONS:", await p.getByRole("button").evaluateAll((els) => els.map((e) => (e.getAttribute("aria-label") || e.innerText || "").trim().replace(/\s+/g, " ")).filter(Boolean).slice(0, 30)));
+await b.close();

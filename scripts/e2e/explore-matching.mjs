@@ -1,0 +1,16 @@
+import { createClient } from "@supabase/supabase-js";
+import { BASE, accounts, launch, newPage, signIn } from "./lib.mjs";
+const db = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SERVICE_ROLE_KEY, { auth: { persistSession: false } });
+const b = await launch();
+const p = await newPage(b);
+await signIn(p, "survivor");
+const sid = accounts.accounts.survivor.id;
+const body = { first_name: "E2E-Auth", user_id: sid, type_of_incident: "physical", incident_description: "e2e explore", urgency: "high", consent: "yes", contact_preference: "do_not_contact", required_services: ["legal", "medical"], latitude: -1.29, longitude: 36.82, submission_timestamp: new Date().toISOString(), record_only: false };
+const r = await p.request.post(`${BASE}/api/reports`, { data: body });
+console.log("POST /api/reports ->", r.status(), (await r.text()).slice(0, 200));
+await new Promise((x) => setTimeout(x, 4000));
+const { data: reps } = await db.from("reports").select("report_id, ismatched, match_status, requires_manual_review").eq("first_name", "E2E-Auth");
+console.log("report:", JSON.stringify(reps));
+const { data: ms } = await db.from("matched_services").select("service_id, match_status_type, match_score, support_service").in("report_id", (reps ?? []).map((x) => x.report_id));
+console.log("matches:", JSON.stringify(ms));
+await b.close();
