@@ -14,6 +14,7 @@ export type DashboardData = {
   appointments: AppointmentWithDetails[];
   casesCount: number;
   unreadChatCount: number;
+  calendarConnected?: boolean;
   preloaded: boolean;
   verification?: {
     overallStatus: string;

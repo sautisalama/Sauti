@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { saveCalendarTokens } from "@/lib/calendar/tokens";
 import { createClient } from "@/utils/supabase/server";
 import { exchangeCodeForTokens } from "@/lib/google-calendar-oauth";
 
@@ -80,17 +81,19 @@ export async function GET(request: Request) {
 		// Exchange code for tokens
 		const tokens = await exchangeCodeForTokens(code);
 
-		// Store tokens in the user's profile
-		// Note: In production, encrypt tokens before storage
-		const { error: updateError } = await supabase
-			.from("profiles")
-			.update({
-				google_calendar_token: tokens.access_token,
-				google_calendar_refresh_token: tokens.refresh_token || null,
-				google_calendar_token_expiry: tokens.expiry_date || null,
-				calendar_sync_enabled: true,
-			})
-			.eq("id", user.id);
+		// Tokens go to the server-only, encrypted token table (never on `profiles`).
+		let updateError: { message?: string } | null = null;
+		try {
+			await saveCalendarTokens(user.id, {
+				access_token: tokens.access_token ?? null,
+				refresh_token: tokens.refresh_token ?? undefined,
+				expiry_date: tokens.expiry_date ?? null,
+			});
+			const { error } = await supabase.from("profiles").update({ calendar_sync_enabled: true }).eq("id", user.id);
+			updateError = error;
+		} catch (e) {
+			updateError = { message: e instanceof Error ? e.message : String(e) };
+		}
 
 		if (updateError) {
 			console.error("Error storing calendar tokens:", updateError);

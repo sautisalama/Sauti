@@ -114,19 +114,17 @@ export function CalendarIntegrationSettings({
 		if (!userId) return;
 
 		try {
-			const { data: profile, error } = await supabase
-				.from("profiles")
-				.select("google_calendar_token, google_calendar_refresh_token, google_calendar_token_expiry, calendar_sync_enabled")
-				.eq("id", userId)
-				.single();
+			const [{ data: profile, error }, { data: conn }] = await Promise.all([
+				supabase.from("profiles").select("calendar_sync_enabled").eq("id", userId).single(),
+				supabase.rpc("get_calendar_connection"),
+			]);
 
 			if (error) {
-				// Column may not exist — that's OK
 				setState((prev) => ({ ...prev, isLoading: false, connected: false }));
 				return;
 			}
 
-			const hasTokens = !!profile?.google_calendar_token;
+			const hasTokens = !!(Array.isArray(conn) ? conn[0] : conn)?.connected;
 
 			setState({
 				connected: hasTokens,
@@ -179,15 +177,9 @@ export function CalendarIntegrationSettings({
 	const handleDisconnect = async () => {
 		setDisconnecting(true);
 		try {
-			const { error } = await supabase
-				.from("profiles")
-				.update({
-					google_calendar_token: null,
-					google_calendar_refresh_token: null,
-					google_calendar_token_expiry: null,
-					calendar_sync_enabled: false,
-				})
-				.eq("id", userId);
+			const { error: rpcError } = await supabase.rpc("disconnect_calendar");
+			if (rpcError) throw rpcError;
+			const { error } = await supabase.from("profiles").update({ calendar_sync_enabled: false }).eq("id", userId);
 
 			if (error) throw error;
 

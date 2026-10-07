@@ -20,6 +20,7 @@ export type AggregatedDashboardData = {
 	appointments: AppointmentWithDetails[];
 	casesCount: number;
 	unreadChatCount: number; // to be filled client-side quickly
+	calendarConnected: boolean;
 	preloaded: boolean;
 	verification?: {
 		overallStatus: string;
@@ -190,6 +191,9 @@ export async function fetchDashboardData(): Promise<AggregatedDashboardData | nu
 			verificationPromise,
 		]);
 
+		const { data: calendarConn } = await supabase.rpc("get_calendar_connection");
+		const calendarConnected = !!(Array.isArray(calendarConn) ? calendarConn[0] : calendarConn)?.connected;
+
 		const result = {
 			userId,
 			profile,
@@ -200,6 +204,7 @@ export async function fetchDashboardData(): Promise<AggregatedDashboardData | nu
 			appointments: (appointments as any) || [],
 			casesCount: casesCount || 0,
 			unreadChatCount: 0, // computed on client quickly
+			calendarConnected,
 			preloaded: true,
 			verification,
 		};

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { getCalendarTokens, saveCalendarTokens } from "@/lib/calendar/tokens";
 import { createClient } from "@/utils/supabase/server";
 import {
 	isGoogleCalendarConfigured,
@@ -38,14 +39,9 @@ export async function POST(request: Request) {
 			);
 		}
 
-		// Fetch user's Google Calendar tokens from separate columns
-		const { data: profile, error: profileError } = await supabase
-			.from("profiles")
-			.select("google_calendar_token, google_calendar_refresh_token, google_calendar_token_expiry")
-			.eq("id", user.id)
-			.single();
-
-		if (profileError || !profile?.google_calendar_token) {
+		// Tokens live in the server-only, encrypted token table
+		const stored = await getCalendarTokens(user.id);
+		if (!stored?.access_token) {
 			return NextResponse.json(
 				{ error: "Google Calendar not connected" },
 				{ status: 400 }
@@ -53,9 +49,9 @@ export async function POST(request: Request) {
 		}
 
 		const tokens = {
-			access_token: profile.google_calendar_token,
-			refresh_token: profile.google_calendar_refresh_token || undefined,
-			expiry_date: profile.google_calendar_token_expiry || undefined,
+			access_token: stored.access_token,
+			refresh_token: stored.refresh_token || undefined,
+			expiry_date: stored.expiry_date || undefined,
 		};
 
 		// Create OAuth2 client with the user's tokens
@@ -65,15 +61,11 @@ export async function POST(request: Request) {
 		if (tokens.expiry_date && tokens.expiry_date < Date.now()) {
 			try {
 				const { credentials } = await oauth2Client.refreshAccessToken();
-				// Update stored tokens in separate columns
-				await supabase
-					.from("profiles")
-					.update({
-						google_calendar_token: credentials.access_token || tokens.access_token,
-						google_calendar_refresh_token: credentials.refresh_token || tokens.refresh_token || null,
-						google_calendar_token_expiry: credentials.expiry_date || null,
-					})
-					.eq("id", user.id);
+				await saveCalendarTokens(user.id, {
+					access_token: credentials.access_token || tokens.access_token,
+					refresh_token: credentials.refresh_token || tokens.refresh_token,
+					expiry_date: credentials.expiry_date ?? null,
+				});
 				oauth2Client.setCredentials(credentials);
 			} catch {
 				return NextResponse.json(

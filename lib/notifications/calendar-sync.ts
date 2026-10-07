@@ -1,4 +1,5 @@
 import { createClient } from "@/utils/supabase/server";
+import { getCalendarTokens, saveCalendarTokens } from "@/lib/calendar/tokens";
 import { 
     createOAuth2ClientFromTokens, 
     createGoogleCalendarEvent, 
@@ -16,14 +17,15 @@ import { format } from "date-fns";
 export async function syncAppointmentToGoogleCalendar(appointmentId: string, userId: string) {
     const supabase = await createClient();
 
-    // 1. Fetch user tokens and sync status
+    // 1. Fetch user tokens (server-only, encrypted) and sync status
     const { data: profile, error: profileError } = await supabase
         .from('profiles')
-        .select('google_calendar_token, google_calendar_refresh_token, google_calendar_token_expiry, calendar_sync_enabled')
+        .select('calendar_sync_enabled')
         .eq('id', userId)
         .single();
+    const stored = await getCalendarTokens(userId);
 
-    if (profileError || !profile?.calendar_sync_enabled || !profile?.google_calendar_token) {
+    if (profileError || !profile?.calendar_sync_enabled || !stored?.access_token) {
         console.log(`Sync skipped for user ${userId}: Calendar not linked or enabled.`);
         return { success: false, reason: 'unlinked' };
     }
@@ -46,20 +48,20 @@ export async function syncAppointmentToGoogleCalendar(appointmentId: string, use
 
     // 3. Prepare Tokens (Refresh if needed)
     let tokens: GoogleCalendarTokens = {
-        access_token: profile.google_calendar_token,
-        refresh_token: profile.google_calendar_refresh_token || undefined,
-        expiry_date: profile.google_calendar_token_expiry || undefined
+        access_token: stored.access_token,
+        refresh_token: stored.refresh_token || undefined,
+        expiry_date: stored.expiry_date || undefined
     };
 
     if (tokens.expiry_date && tokens.expiry_date < Date.now() && tokens.refresh_token) {
         try {
             const newTokens = await refreshGoogleAccessToken(tokens.refresh_token);
             tokens = newTokens;
-            // Update DB with new tokens
-            await supabase.from('profiles').update({
-                google_calendar_token: tokens.access_token,
-                google_calendar_token_expiry: tokens.expiry_date
-            }).eq('id', userId);
+            // Update stored tokens
+            await saveCalendarTokens(userId, {
+                access_token: tokens.access_token,
+                expiry_date: tokens.expiry_date ?? null
+            });
         } catch (refreshErr) {
             console.error('Failed to refresh Google token:', refreshErr);
             return { success: false, reason: 'refresh_failed' };

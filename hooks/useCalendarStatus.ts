@@ -27,30 +27,24 @@ export function useCalendarStatus(userId: string) {
 
 		setIsRefreshing(true);
 		try {
-			const { data: profile, error } = await supabase
-				.from("profiles")
-				.select("google_calendar_token, google_calendar_refresh_token, google_calendar_token_expiry, calendar_sync_enabled")
-				.eq("id", userId)
-				.single();
+			const [{ data: profile, error }, { data: conn }] = await Promise.all([
+				supabase.from("profiles").select("calendar_sync_enabled").eq("id", userId).single(),
+				supabase.rpc("get_calendar_connection"),
+			]);
 
 			if (error) {
-				// Column may not exist yet — handle gracefully
-				setStatus({
-					connected: false,
-					syncEnabled: false,
-					isLoading: false,
-					error: undefined,
-				});
+				setStatus({ connected: false, syncEnabled: false, isLoading: false, error: undefined });
 				return;
 			}
 
-			const hasValidTokens = !!profile?.google_calendar_token;
+			const connection = Array.isArray(conn) ? conn[0] : conn;
+			const hasValidTokens = !!connection?.connected;
 
 			setStatus({
 				connected: hasValidTokens,
 				syncEnabled: profile?.calendar_sync_enabled ?? false,
 				lastSync: undefined,
-				tokenExpiry: hasValidTokens ? (profile?.google_calendar_token_expiry ?? undefined) : undefined,
+				tokenExpiry: hasValidTokens ? (connection?.expiry_date ?? undefined) : undefined,
 				calendarsCount: 0,
 				isLoading: false,
 				error: undefined,
@@ -103,15 +97,9 @@ export function useCalendarStatus(userId: string) {
 		if (!userId) return;
 
 		try {
-			const { error } = await supabase
-				.from("profiles")
-				.update({
-					google_calendar_token: null,
-					google_calendar_refresh_token: null,
-					google_calendar_token_expiry: null,
-					calendar_sync_enabled: false,
-				})
-				.eq("id", userId);
+			const { error: rpcError } = await supabase.rpc("disconnect_calendar");
+			if (rpcError) throw rpcError;
+			const { error } = await supabase.from("profiles").update({ calendar_sync_enabled: false }).eq("id", userId);
 
 			if (error) throw error;
 
