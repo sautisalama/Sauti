@@ -34,6 +34,7 @@ export default async function DashboardLayout({
 		appointments: [],
 		casesCount: 0,
 		unreadChatCount: 0,
+		calendarConnected: false,
 		preloaded: false,
 	};
 

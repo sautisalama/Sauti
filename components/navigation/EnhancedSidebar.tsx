@@ -284,6 +284,20 @@ export function EnhancedSidebar({
 					section: "main",
 				},
 				{
+					id: "publications",
+					label: "Publications",
+					icon: BookOpen,
+					href: "/dashboard/admin/publications",
+					section: "main",
+				},
+				{
+					id: "courses",
+					label: "Courses",
+					icon: GraduationCap,
+					href: "/dashboard/admin/courses",
+					section: "main",
+				},
+				{
 					id: "matching",
 					label: "Matching Engine",
 					icon: Network,
@@ -308,7 +322,7 @@ export function EnhancedSidebar({
 					icon: Calendar,
 					href: "/dashboard/profile?section=calendar", // Link to calendar settings for now
 					section: "main",
-					showDot: !dash?.data?.profile?.google_calendar_token,
+					showDot: !dash?.data?.calendarConnected,
 				},
 				{
 					id: "report",
@@ -361,12 +375,19 @@ export function EnhancedSidebar({
 					section: "main",
 				},
 				{
+					id: "learning",
+					label: "My learning",
+					icon: GraduationCap,
+					href: "/dashboard/learning",
+					section: "main",
+				},
+				{
 					id: "calendar",
 					label: "Calendar",
 					icon: Calendar,
 					href: "/dashboard/profile?section=calendar",
 					section: "main",
-					showDot: !dash?.data?.profile?.google_calendar_token,
+					showDot: !dash?.data?.calendarConnected,
 				},
 			];
 			return [
@@ -413,12 +434,19 @@ export function EnhancedSidebar({
 					section: "main",
 				},
 				{
+					id: "learning",
+					label: "My learning",
+					icon: GraduationCap,
+					href: "/dashboard/learning",
+					section: "main",
+				},
+				{
 					id: "calendar",
 					label: "Calendar",
 					icon: Calendar,
 					href: "/dashboard/profile?section=calendar",
 					section: "main",
-					showDot: !dash?.data?.profile?.google_calendar_token,
+					showDot: !dash?.data?.calendarConnected,
 				},
 				{
 					id: "services",

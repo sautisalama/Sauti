@@ -170,7 +170,6 @@ export function MobileSupportServicesSidepanel({
 				.from("support_services")
 				.update({
 					accreditation_files_metadata: metadata,
-					updated_at: new Date().toISOString(),
 				})
 				.eq("id", serviceId)
 				.eq("user_id", userId);

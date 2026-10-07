@@ -192,8 +192,6 @@ export type Database = {
       }
       blogs: {
         Row: {
-          excerpt: string | null
-          rejection_reason: string | null
           admin_notes: string | null
           author_id: string | null
           category: string | null
@@ -201,9 +199,11 @@ export type Database = {
           cover_image_url: string | null
           created_at: string | null
           event_details: Json | null
+          excerpt: string | null
           id: string
           is_event: boolean | null
           published_at: string | null
+          rejection_reason: string | null
           reviewed_at: string | null
           reviewed_by: string | null
           slug: string | null
@@ -214,8 +214,6 @@ export type Database = {
           view_count: number | null
         }
         Insert: {
-          excerpt?: string | null
-          rejection_reason?: string | null
           admin_notes?: string | null
           author_id?: string | null
           category?: string | null
@@ -223,9 +221,11 @@ export type Database = {
           cover_image_url?: string | null
           created_at?: string | null
           event_details?: Json | null
+          excerpt?: string | null
           id?: string
           is_event?: boolean | null
           published_at?: string | null
+          rejection_reason?: string | null
           reviewed_at?: string | null
           reviewed_by?: string | null
           slug?: string | null
@@ -236,8 +236,6 @@ export type Database = {
           view_count?: number | null
         }
         Update: {
-          excerpt?: string | null
-          rejection_reason?: string | null
           admin_notes?: string | null
           author_id?: string | null
           category?: string | null
@@ -245,9 +243,11 @@ export type Database = {
           cover_image_url?: string | null
           created_at?: string | null
           event_details?: Json | null
+          excerpt?: string | null
           id?: string
           is_event?: boolean | null
           published_at?: string | null
+          rejection_reason?: string | null
           reviewed_at?: string | null
           reviewed_by?: string | null
           slug?: string | null
@@ -273,6 +273,30 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      case_escalation_alerts: {
+        Row: {
+          id: string
+          kind: string
+          ref_id: string
+          report_id: string | null
+          sent_at: string
+        }
+        Insert: {
+          id?: string
+          kind: string
+          ref_id: string
+          report_id?: string | null
+          sent_at?: string
+        }
+        Update: {
+          id?: string
+          kind?: string
+          ref_id?: string
+          report_id?: string | null
+          sent_at?: string
+        }
+        Relationships: []
       }
       case_recommendations: {
         Row: {
@@ -479,6 +503,7 @@ export type Database = {
       communities: {
         Row: {
           avatar_url: string | null
+          chat_id: string | null
           created_at: string | null
           creator_id: string | null
           description: string | null
@@ -490,6 +515,7 @@ export type Database = {
         }
         Insert: {
           avatar_url?: string | null
+          chat_id?: string | null
           created_at?: string | null
           creator_id?: string | null
           description?: string | null
@@ -501,6 +527,7 @@ export type Database = {
         }
         Update: {
           avatar_url?: string | null
+          chat_id?: string | null
           created_at?: string | null
           creator_id?: string | null
           description?: string | null
@@ -511,6 +538,13 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "communities_chat_id_fkey"
+            columns: ["chat_id"]
+            isOneToOne: false
+            referencedRelation: "chats"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "communities_creator_id_fkey"
             columns: ["creator_id"]
@@ -607,6 +641,252 @@ export type Database = {
           },
           {
             foreignKeyName: "community_members_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      course_enrollments: {
+        Row: {
+          completed_at: string | null
+          course_id: string
+          enrolled_at: string
+          id: string
+          last_active_at: string
+          last_lesson_id: string | null
+          user_id: string
+        }
+        Insert: {
+          completed_at?: string | null
+          course_id: string
+          enrolled_at?: string
+          id?: string
+          last_active_at?: string
+          last_lesson_id?: string | null
+          user_id: string
+        }
+        Update: {
+          completed_at?: string | null
+          course_id?: string
+          enrolled_at?: string
+          id?: string
+          last_active_at?: string
+          last_lesson_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "course_enrollments_course_id_fkey"
+            columns: ["course_id"]
+            isOneToOne: false
+            referencedRelation: "courses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "course_enrollments_last_lesson_id_fkey"
+            columns: ["last_lesson_id"]
+            isOneToOne: false
+            referencedRelation: "course_lessons"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "course_enrollments_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      course_lessons: {
+        Row: {
+          content: string
+          course_id: string
+          created_at: string
+          estimated_minutes: number | null
+          id: string
+          module_id: string
+          position: number
+          title: string
+          updated_at: string
+          video_url: string | null
+        }
+        Insert: {
+          content?: string
+          course_id: string
+          created_at?: string
+          estimated_minutes?: number | null
+          id?: string
+          module_id: string
+          position?: number
+          title: string
+          updated_at?: string
+          video_url?: string | null
+        }
+        Update: {
+          content?: string
+          course_id?: string
+          created_at?: string
+          estimated_minutes?: number | null
+          id?: string
+          module_id?: string
+          position?: number
+          title?: string
+          updated_at?: string
+          video_url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "course_lessons_course_id_fkey"
+            columns: ["course_id"]
+            isOneToOne: false
+            referencedRelation: "courses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "course_lessons_module_id_fkey"
+            columns: ["module_id"]
+            isOneToOne: false
+            referencedRelation: "course_modules"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      course_modules: {
+        Row: {
+          course_id: string
+          created_at: string
+          id: string
+          position: number
+          summary: string | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          course_id: string
+          created_at?: string
+          id?: string
+          position?: number
+          summary?: string | null
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          course_id?: string
+          created_at?: string
+          id?: string
+          position?: number
+          summary?: string | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "course_modules_course_id_fkey"
+            columns: ["course_id"]
+            isOneToOne: false
+            referencedRelation: "courses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      courses: {
+        Row: {
+          cover_image_url: string | null
+          created_at: string
+          created_by: string | null
+          description: string | null
+          estimated_minutes: number | null
+          id: string
+          level: string
+          published_at: string | null
+          slug: string
+          status: string
+          summary: string | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          cover_image_url?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          estimated_minutes?: number | null
+          id?: string
+          level?: string
+          published_at?: string | null
+          slug: string
+          status?: string
+          summary?: string | null
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          cover_image_url?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          estimated_minutes?: number | null
+          id?: string
+          level?: string
+          published_at?: string | null
+          slug?: string
+          status?: string
+          summary?: string | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "courses_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lesson_progress: {
+        Row: {
+          completed_at: string
+          course_id: string
+          id: string
+          lesson_id: string
+          user_id: string
+        }
+        Insert: {
+          completed_at?: string
+          course_id: string
+          id?: string
+          lesson_id: string
+          user_id: string
+        }
+        Update: {
+          completed_at?: string
+          course_id?: string
+          id?: string
+          lesson_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lesson_progress_course_id_fkey"
+            columns: ["course_id"]
+            isOneToOne: false
+            referencedRelation: "courses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lesson_progress_lesson_id_fkey"
+            columns: ["lesson_id"]
+            isOneToOne: false
+            referencedRelation: "course_lessons"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lesson_progress_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "profiles"
@@ -876,6 +1156,38 @@ export type Database = {
           },
         ]
       }
+      profile_calendar_tokens: {
+        Row: {
+          access_token: string | null
+          expiry_date: number | null
+          refresh_token: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          access_token?: string | null
+          expiry_date?: number | null
+          refresh_token?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          access_token?: string | null
+          expiry_date?: number | null
+          refresh_token?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "profile_calendar_tokens_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           accreditation_files: Json | null
@@ -1038,9 +1350,152 @@ export type Database = {
           },
         ]
       }
+      publication_events: {
+        Row: {
+          action: string
+          actor_id: string | null
+          created_at: string
+          detail: string | null
+          id: string
+          publication_id: string
+        }
+        Insert: {
+          action: string
+          actor_id?: string | null
+          created_at?: string
+          detail?: string | null
+          id?: string
+          publication_id: string
+        }
+        Update: {
+          action?: string
+          actor_id?: string | null
+          created_at?: string
+          detail?: string | null
+          id?: string
+          publication_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "publication_events_actor_id_fkey"
+            columns: ["actor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "publication_events_publication_id_fkey"
+            columns: ["publication_id"]
+            isOneToOne: false
+            referencedRelation: "publications"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      publications: {
+        Row: {
+          author_id: string | null
+          body: string
+          category: string | null
+          cover_image_alt: string | null
+          cover_image_url: string | null
+          created_at: string
+          email_status: string | null
+          emailed_at: string | null
+          external_links: Json
+          featured: boolean
+          id: string
+          kind: string
+          preview_token: string
+          published_at: string | null
+          published_by: string | null
+          read_minutes: number | null
+          slug: string
+          source_file_name: string | null
+          source_file_type: string | null
+          source_file_url: string | null
+          status: string
+          summary: string | null
+          tags: string[]
+          title: string
+          updated_at: string
+          view_count: number
+        }
+        Insert: {
+          author_id?: string | null
+          body?: string
+          category?: string | null
+          cover_image_alt?: string | null
+          cover_image_url?: string | null
+          created_at?: string
+          email_status?: string | null
+          emailed_at?: string | null
+          external_links?: Json
+          featured?: boolean
+          id?: string
+          kind?: string
+          preview_token?: string
+          published_at?: string | null
+          published_by?: string | null
+          read_minutes?: number | null
+          slug: string
+          source_file_name?: string | null
+          source_file_type?: string | null
+          source_file_url?: string | null
+          status?: string
+          summary?: string | null
+          tags?: string[]
+          title: string
+          updated_at?: string
+          view_count?: number
+        }
+        Update: {
+          author_id?: string | null
+          body?: string
+          category?: string | null
+          cover_image_alt?: string | null
+          cover_image_url?: string | null
+          created_at?: string
+          email_status?: string | null
+          emailed_at?: string | null
+          external_links?: Json
+          featured?: boolean
+          id?: string
+          kind?: string
+          preview_token?: string
+          published_at?: string | null
+          published_by?: string | null
+          read_minutes?: number | null
+          slug?: string
+          source_file_name?: string | null
+          source_file_type?: string | null
+          source_file_url?: string | null
+          status?: string
+          summary?: string | null
+          tags?: string[]
+          title?: string
+          updated_at?: string
+          view_count?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "publications_author_id_fkey"
+            columns: ["author_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "publications_published_by_fkey"
+            columns: ["published_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       reports: {
         Row: {
-          updated_at: string | null
           additional_info: Json | null
           administrative: Json | null
           city: string | null
@@ -1090,7 +1545,6 @@ export type Database = {
           user_id: string | null
         }
         Insert: {
-          updated_at?: string | null
           additional_info?: Json | null
           administrative?: Json | null
           city?: string | null
@@ -1140,7 +1594,6 @@ export type Database = {
           user_id?: string | null
         }
         Update: {
-          updated_at?: string | null
           additional_info?: Json | null
           administrative?: Json | null
           city?: string | null
@@ -1253,7 +1706,6 @@ export type Database = {
       }
       support_services: {
         Row: {
-          updated_at: string | null
           accreditation_files_metadata: Json | null
           auto_inactive_when_ooo: boolean | null
           availability: string | null
@@ -1292,7 +1744,6 @@ export type Database = {
           website: string | null
         }
         Insert: {
-          updated_at?: string | null
           accreditation_files_metadata?: Json | null
           auto_inactive_when_ooo?: boolean | null
           availability?: string | null
@@ -1331,7 +1782,6 @@ export type Database = {
           website?: string | null
         }
         Update: {
-          updated_at?: string | null
           accreditation_files_metadata?: Json | null
           auto_inactive_when_ooo?: boolean | null
           availability?: string | null
@@ -1414,12 +1864,17 @@ export type Database = {
       }
     }
     Functions: {
+      can_view_community: {
+        Args: { p_community: string; p_user?: string }
+        Returns: boolean
+      }
       check_user_is_chat_participant: {
         Args: { _chat_id: string; _user_id?: string }
         Returns: boolean
       }
       cleanup_expired_calendar_tokens: { Args: never; Returns: undefined }
       cleanup_orphaned_files: { Args: never; Returns: number }
+      disconnect_calendar: { Args: never; Returns: undefined }
       get_active_case_count: {
         Args: { provider_user_id: string }
         Returns: number
@@ -1433,6 +1888,25 @@ export type Database = {
         Returns: {
           slot_end: string
           slot_start: string
+        }[]
+      }
+      get_calendar_connection: {
+        Args: never
+        Returns: {
+          connected: boolean
+          expiry_date: number
+        }[]
+      }
+      get_chat_participant_profiles: {
+        Args: { p_chat_ids: string[] }
+        Returns: {
+          avatar_url: string
+          first_name: string
+          id: string
+          last_name: string
+          out_of_office: boolean
+          profile_image_url: string
+          user_type: Database["public"]["Enums"]["user_type"]
         }[]
       }
       get_coverage_map_data: {
@@ -1458,9 +1932,26 @@ export type Database = {
           user_id: string
         }[]
       }
+      increment_blog_views: { Args: { p_id: string }; Returns: undefined }
+      increment_publication_views: {
+        Args: { p_slug: string }
+        Returns: undefined
+      }
       is_admin: { Args: { user_id?: string }; Returns: boolean }
+      is_community_manager: {
+        Args: { p_community: string; p_user?: string }
+        Returns: boolean
+      }
+      is_community_member: {
+        Args: { p_community: string; p_user?: string }
+        Returns: boolean
+      }
       is_device_session_valid: {
         Args: { p_device_id: string; p_user_id: string }
+        Returns: boolean
+      }
+      is_match_party: {
+        Args: { p_match: string; p_user?: string }
         Returns: boolean
       }
       is_time_slot_available: {
@@ -1572,12 +2063,12 @@ export type Tables<
   DefaultSchemaTableNameOrOptions extends
     | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
         DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -1601,11 +2092,11 @@ export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -1626,11 +2117,11 @@ export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -1651,11 +2142,11 @@ export type Enums<
   DefaultSchemaEnumNameOrOptions extends
     | keyof DefaultSchema["Enums"]
     | { schema: keyof DatabaseWithoutInternals },
-  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+  EnumName extends (DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaEnumNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -1668,11 +2159,11 @@ export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
     | keyof DefaultSchema["CompositeTypes"]
     | { schema: keyof DatabaseWithoutInternals },
-  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+  CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-    : never = never,
+    : never) = never,
 > = PublicCompositeTypeNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }

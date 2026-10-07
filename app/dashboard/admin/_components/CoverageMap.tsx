@@ -1,5 +1,6 @@
 "use client";
 
+import { radiusToKm } from "@/lib/geo/radius";
 import { useState, useEffect, useCallback } from "react";
 import { createClient } from "@/utils/supabase/client";
 import {
@@ -269,7 +270,7 @@ export function CoverageMap(_props: CoverageMapProps) {
 											{service.verification_status.replace("_", " ")}
 										</Badge>
 										<div className="text-xs text-gray-500">
-											{service.coverage_area_radius}km
+											{radiusToKm(service.coverage_area_radius)?.toFixed(1) ?? "—"} km
 										</div>
 									</div>
 								</div>

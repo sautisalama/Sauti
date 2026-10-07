@@ -285,3 +285,90 @@ html[data-a11y-high-contrast="1"] {
 	0% { transform: translateX(-100%); }
 	100% { transform: translateX(200%); }
 }
+
+/* ── Rich content (Tiptap editor + published articles) ──────────────────── */
+.rich-content { color: #1f2937; line-height: 1.75; font-size: 1.0625rem; overflow-wrap: anywhere; }
+.rich-content > * + * { margin-top: 1rem; }
+.rich-content h1 { font-size: 2rem; font-weight: 800; line-height: 1.2; color: #1a365d; margin-top: 2rem; }
+.rich-content h2 { font-size: 1.6rem; font-weight: 800; line-height: 1.25; color: #1a365d; margin-top: 2rem; }
+.rich-content h3 { font-size: 1.3rem; font-weight: 700; color: #1a365d; margin-top: 1.5rem; }
+.rich-content h4 { font-size: 1.1rem; font-weight: 700; color: #1a365d; margin-top: 1.25rem; }
+.rich-content a { color: #008080; text-decoration: underline; text-underline-offset: 3px; font-weight: 600; }
+.rich-content a:hover { color: #b45309; }
+.rich-content ul { list-style: disc; padding-left: 1.5rem; }
+.rich-content ol { list-style: decimal; padding-left: 1.5rem; }
+.rich-content li + li { margin-top: 0.35rem; }
+.rich-content li > p { margin: 0; }
+.rich-content ul[data-type="taskList"] { list-style: none; padding-left: 0.25rem; }
+.rich-content ul[data-type="taskList"] li { display: flex; gap: 0.6rem; align-items: flex-start; }
+.rich-content ul[data-type="taskList"] li > label { margin-top: 0.4rem; }
+.rich-content blockquote { border-left: 4px solid #008080; background: #f0fafa; padding: 0.75rem 1.25rem; border-radius: 0 0.75rem 0.75rem 0; font-style: italic; color: #374151; }
+.rich-content hr { border: 0; border-top: 2px solid #e5e7eb; margin: 2rem 0; }
+.rich-content code { background: #f3f4f6; padding: 0.15rem 0.4rem; border-radius: 0.375rem; font-size: 0.9em; }
+.rich-content pre { background: #111827; color: #f9fafb; padding: 1rem 1.25rem; border-radius: 0.75rem; overflow-x: auto; }
+.rich-content pre code { background: transparent; padding: 0; color: inherit; }
+.rich-content img { max-width: 100%; height: auto; border-radius: 0.75rem; margin: 1.25rem auto; display: block; }
+.rich-content mark { background: #fde68a; padding: 0 0.15rem; border-radius: 0.2rem; }
+.rich-content table { width: 100%; border-collapse: collapse; margin: 1.25rem 0; display: block; overflow-x: auto; }
+.rich-content th, .rich-content td { border: 1px solid #d1d5db; padding: 0.5rem 0.75rem; text-align: left; vertical-align: top; min-width: 5rem; }
+.rich-content th { background: #f3f4f6; font-weight: 700; }
+.rich-content div[data-youtube-video], .rich-content iframe { max-width: 100%; }
+.rich-content iframe { aspect-ratio: 16 / 9; width: 100%; height: auto; border-radius: 0.75rem; border: 0; }
+.rich-content .tiptap-placeholder::before, .rich-content p.is-editor-empty:first-child::before { content: attr(data-placeholder); color: #9ca3af; float: left; height: 0; pointer-events: none; }
+.rich-content .selectedCell { background: #cffafe; }
+.rich-content .ProseMirror-selectednode { outline: 2px solid #008080; }
+
+/* ── Mobile-first interaction layer ─────────────────────────────────────────
+   Press feedback, tap behaviour and motion curves, following
+   github.com/emilkowalski/skills (emil-design-eng + mobile-native):
+   custom ease-out for entering elements, <300ms UI motion, scale(0.97) on press,
+   hover styles only where hover exists, 16px inputs so iOS never zooms. */
+:root {
+	--ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+	--ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+	--ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+}
+html {
+	-webkit-tap-highlight-color: transparent;
+	overscroll-behavior-y: none;
+}
+:where(button, a, [role="button"], summary, select, label) {
+	touch-action: manipulation;
+}
+:where(button, [role="button"]) {
+	-webkit-user-select: none;
+	user-select: none;
+	-webkit-touch-callout: none;
+}
+:where(button:not(:disabled), [role="button"]) {
+	transition: transform 160ms var(--ease-out);
+}
+:where(button:not(:disabled), [role="button"]):active {
+	transform: scale(0.97);
+}
+@media (max-width: 767px) {
+	input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]),
+	textarea,
+	select {
+		font-size: 16px !important;
+	}
+}
+/* Entering popovers/dropdowns: ease-out, never from scale(0), origin at the trigger. */
+@keyframes pop-in {
+	from { opacity: 0; transform: translateY(-4px) scale(0.97); }
+	to { opacity: 1; transform: none; }
+}
+.pop-in {
+	transform-origin: top center;
+	animation: pop-in 160ms var(--ease-out) both;
+}
+@keyframes chip-in {
+	from { opacity: 0; transform: scale(0.9); }
+	to { opacity: 1; transform: none; }
+}
+.chip-in { animation: chip-in 150ms var(--ease-out) both; }
+@media (prefers-reduced-motion: reduce) {
+	.pop-in, .chip-in { animation: fade-only 120ms ease both; }
+	@keyframes fade-only { from { opacity: 0; } to { opacity: 1; } }
+	:where(button:not(:disabled), [role="button"]):active { transform: none; }
+}

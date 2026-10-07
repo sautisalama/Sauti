@@ -1,5 +1,6 @@
 "use client";
 
+import { useSignedAudioUrl } from "@/lib/audio/use-signed-audio-url";
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { createClient } from "@/utils/supabase/client";
 import { Card } from "@/components/ui/card";
@@ -726,6 +727,7 @@ export default function ReportsMasterDetail({ userId }: { userId: string }) {
 		const [currentTime, setCurrentTime] = useState(0);
 		const [isSeeking, setIsSeeking] = useState(false);
 		const audioRef = useRef<HTMLAudioElement>(null);
+		const playSrc = useSignedAudioUrl(src);
 
 		useEffect(() => {
 			const audio = audioRef.current;
@@ -833,7 +835,7 @@ export default function ReportsMasterDetail({ userId }: { userId: string }) {
 						</Button>
 					</div>
 
-					<audio ref={audioRef} src={src} className="hidden" />
+					<audio ref={audioRef} src={playSrc} className="hidden" />
 				</div>
 			</div>
 		);

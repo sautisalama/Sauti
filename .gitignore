@@ -53,3 +53,9 @@ next-env.d.ts
 
 # Build folder
 *.build/
+
+# e2e test credentials (generated, never commit)
+.e2e-accounts.local.json
+.e2e-outbox.jsonl
+.e2e-dev.log
+.e2e-dek.local
