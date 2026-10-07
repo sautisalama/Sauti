@@ -56,7 +56,8 @@ export async function POST(request: Request) {
 
 		const { error: updateError } = await supabase
 			.from(table)
-			.update(updateData)
+			// table name is dynamic (profiles | support_services), so the union payload type can't be inferred
+			.update(updateData as never)
 			.eq("id", targetId);
 
 		if (updateError) throw updateError;

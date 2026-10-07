@@ -35,7 +35,7 @@ import {
 } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { Database, Tables } from "@/types/db-schema";
+import { Database, Tables, TablesUpdate } from "@/types/db-schema";
 import { fileUploadService } from "@/lib/file-upload";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -573,7 +573,7 @@ export function SupportServiceSidepanel({
 
 			const { error: fieldsError } = await supabase
 				.from("support_services")
-				.update(suspensionFields)
+				.update(suspensionFields as TablesUpdate<"support_services">)
 				.eq("id", service.id);
 
 			if (fieldsError) throw fieldsError;

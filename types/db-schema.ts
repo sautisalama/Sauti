@@ -192,6 +192,8 @@ export type Database = {
       }
       blogs: {
         Row: {
+          excerpt: string | null
+          rejection_reason: string | null
           admin_notes: string | null
           author_id: string | null
           category: string | null
@@ -212,6 +214,8 @@ export type Database = {
           view_count: number | null
         }
         Insert: {
+          excerpt?: string | null
+          rejection_reason?: string | null
           admin_notes?: string | null
           author_id?: string | null
           category?: string | null
@@ -232,6 +236,8 @@ export type Database = {
           view_count?: number | null
         }
         Update: {
+          excerpt?: string | null
+          rejection_reason?: string | null
           admin_notes?: string | null
           author_id?: string | null
           category?: string | null
@@ -1034,6 +1040,7 @@ export type Database = {
       }
       reports: {
         Row: {
+          updated_at: string | null
           additional_info: Json | null
           administrative: Json | null
           city: string | null
@@ -1083,6 +1090,7 @@ export type Database = {
           user_id: string | null
         }
         Insert: {
+          updated_at?: string | null
           additional_info?: Json | null
           administrative?: Json | null
           city?: string | null
@@ -1132,6 +1140,7 @@ export type Database = {
           user_id?: string | null
         }
         Update: {
+          updated_at?: string | null
           additional_info?: Json | null
           administrative?: Json | null
           city?: string | null
@@ -1244,6 +1253,7 @@ export type Database = {
       }
       support_services: {
         Row: {
+          updated_at: string | null
           accreditation_files_metadata: Json | null
           auto_inactive_when_ooo: boolean | null
           availability: string | null
@@ -1282,6 +1292,7 @@ export type Database = {
           website: string | null
         }
         Insert: {
+          updated_at?: string | null
           accreditation_files_metadata?: Json | null
           auto_inactive_when_ooo?: boolean | null
           availability?: string | null
@@ -1320,6 +1331,7 @@ export type Database = {
           website?: string | null
         }
         Update: {
+          updated_at?: string | null
           accreditation_files_metadata?: Json | null
           auto_inactive_when_ooo?: boolean | null
           availability?: string | null

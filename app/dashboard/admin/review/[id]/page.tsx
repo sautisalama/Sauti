@@ -252,7 +252,7 @@ export default function ReviewPage() {
             const table = targetType === 'profile' ? 'profiles' : 'support_services';
             const { error: updateError } = await supabase
                 .from(table)
-                .update(updatePayload)
+                .update(updatePayload as never)
                 .eq('id', targetId);
 
             if (updateError) throw updateError;

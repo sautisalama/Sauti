@@ -1,3 +1,4 @@
+import type { TablesUpdate } from "@/types/db-schema";
 import { createClient } from "@/utils/supabase/server";
 import { NextResponse } from "next/server";
 
@@ -41,7 +42,7 @@ export async function PATCH(
 
 		const { data, error } = await supabase
 			.from("support_services")
-			.update(updateData)
+			.update(updateData as TablesUpdate<"support_services">)
 			.eq("id", id)
 			.select()
 			.single();

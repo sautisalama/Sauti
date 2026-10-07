@@ -7,7 +7,6 @@ export interface MatchedServiceWithRelations extends Tables<"matched_services"> 
 }
 
 export interface ReportWithRelations extends Tables<"reports"> {
-    updated_at?: string | null; // fallbacks to submission_timestamp if null
 	matched_services?: MatchedServiceWithRelations[];
 }
 
