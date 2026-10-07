@@ -68,3 +68,15 @@ export const MATCH_STATUS_OPTIONS = [
 export type MatchStatusType = (typeof MATCH_STATUS_OPTIONS)[number]["value"];
 
 // 2c3c19b9-7bae-4aab-b3c1-5eeefa123d40
+
+/** Receive the urgent digest when a case sits unmatched or inactive for 24h+. */
+const DEFAULT_ESCALATION_EMAILS = ["malkia@sautisalama.org", "oliver@sautisalama.org"];
+const envEscalation = (process.env.ESCALATION_EMAILS ?? "")
+	.split(",")
+	.map((e) => e.trim())
+	.filter(Boolean);
+/** `ESCALATION_EMAILS` (comma separated) overrides the defaults — used for staging/tests. */
+export const ESCALATION_EMAIL_RECIPIENTS = envEscalation.length ? envEscalation : DEFAULT_ESCALATION_EMAILS;
+
+/** Hours a case may wait (unmatched, or matched with no activity) before escalation. */
+export const ESCALATION_AFTER_HOURS = 24;
