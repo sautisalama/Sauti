@@ -15,6 +15,7 @@ import { AttachmentMenu } from './AttachmentMenu';
 import { FilePreviewModal } from './FilePreviewModal';
 import { format } from 'date-fns';
 import { usePathname } from 'next/navigation';
+import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
 import {
   DropdownMenu,
@@ -59,6 +60,10 @@ export function ChatWindow({ chat, onBack }: ChatWindowProps) {
   const [isUploading, setIsUploading] = useState(false);
   
   const supabase = createClient();
+  const { toast } = useToast();
+  const loadToken = useRef(0);
+  const aiAbort = useRef<AbortController | null>(null);
+  const isBot = chat.id === 'salama-ai-bot';
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [currentUserName, setCurrentUserName] = useState<string>('there');
   const [isTyping, setIsTyping] = useState(false);
@@ -134,12 +139,17 @@ export function ChatWindow({ chat, onBack }: ChatWindowProps) {
 
   // Load messages and subscribe
   useEffect(() => {
+    // Never show the previous chat's messages while the next one loads.
+    setMessages([]);
+    aiAbort.current?.abort();
+    setIsTyping(false);
     loadMessages();
+    if (isBot) return;
 
     const ids = chat.metadata?.all_chat_ids || [chat.id];
     const channels = ids.map(id => {
         return supabase
-          .channel(`chat:${id}`)
+          .channel(`chat:${id}:${Math.random().toString(36).slice(2)}`)
           .on(
             'postgres_changes',
             {
@@ -150,12 +160,12 @@ export function ChatWindow({ chat, onBack }: ChatWindowProps) {
             },
             (payload) => {
               const newMsg = payload.new as Message;
-              // Check if message ID already exists (optimistic update handling)
-              setMessages(prev => {
-                 if (prev.find(m => m.id === newMsg.id)) return prev;
-                 return [...prev, newMsg];
-              });
+              // Dedupe: our own sends are added when the server action resolves.
+              setMessages(prev => (prev.some(m => m.id === newMsg.id) ? prev : [...prev, newMsg]));
               scrollToBottom();
+              if (newMsg.sender_id !== currentUserIdRef.current) {
+                markMessagesAsRead(id).catch(() => undefined);
+              }
             }
           )
           .subscribe();
@@ -163,19 +173,22 @@ export function ChatWindow({ chat, onBack }: ChatWindowProps) {
 
     return () => {
       channels.forEach(channel => supabase.removeChannel(channel));
+      aiAbort.current?.abort();
     };
-  }, [chat.id, chat.metadata?.all_chat_ids]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chat.id, JSON.stringify(chat.metadata?.all_chat_ids ?? null)]);
 
   const loadMessages = async () => {
+    const token = ++loadToken.current;
     setIsLoading(true);
     try {
-      if (chat.id === 'salama-ai-bot') {
-          // Fake AI Bot logic preserved
+      if (isBot) {
           setMessages([]);
       } else {
           // Use all_chat_ids if available to get full consolidated history
           const idsToFetch = chat.metadata?.all_chat_ids || chat.id;
           const data = await getMessages(idsToFetch);
+          if (token !== loadToken.current) return; // a newer load superseded this one
           setMessages(data);
           // Mark as read immediately on load
           if (Array.isArray(idsToFetch)) {
@@ -186,70 +199,82 @@ export function ChatWindow({ chat, onBack }: ChatWindowProps) {
       }
       scrollToBottom();
     } catch (error) {
+      if (token !== loadToken.current) return;
       console.error('Failed to load messages', error);
+      toast({ title: "Couldn't load messages", description: 'Check your connection and try again.', variant: 'destructive' });
     } finally {
-      setIsLoading(false);
+      if (token === loadToken.current) setIsLoading(false);
     }
   };
 
-  // Bot Logic State
-  const botSequenceStarted = useRef(false);
-
-  // Reset bot sequence on chat change
+  // Salama (AI assistant): greet once per open.
+  const botGreeted = useRef(false);
   useEffect(() => {
-     botSequenceStarted.current = false;
+    botGreeted.current = false;
   }, [chat.id]);
-
-  // Bot Logic preserved...
   useEffect(() => {
-      if (chat.id === 'salama-ai-bot' && messages.length === 0 && !isLoading && !botSequenceStarted.current) {
-          botSequenceStarted.current = true;
-          const runSequence = async () => {
-             setIsTyping(true);
-             scrollToBottom();
-             await new Promise(r => setTimeout(r, 6000));
-             
-             const welcomeMsg: Message = {
-                 id: 'bot-welcome',
-                 chat_id: 'salama-ai-bot',
-                 sender_id: 'system',
-                 content: `Hello ${currentUserName}, Welcome to Sauti Salama AI Chat.`,
-                 type: 'text',
-                 created_at: new Date().toISOString(),
-                 metadata: {}
-             };
-             
-             setMessages(prev => {
-                 if (prev.some(m => m.id === 'bot-welcome')) return prev;
-                 return [...prev, welcomeMsg];
-             });
-             
-             setIsTyping(false); 
-             scrollToBottom();
+    if (!isBot || isLoading || botGreeted.current || messages.length > 0) return;
+    botGreeted.current = true;
+    setMessages([{
+      id: 'bot-welcome',
+      chat_id: 'salama-ai-bot',
+      sender_id: 'system',
+      content: `Hello ${currentUserName}, I'm Salama, an AI assistant. I can share information about your options, rights and safety, and help you prepare for a counsellor, clinic or police visit. I'm not a replacement for a professional.\n\nIf you are in danger right now, call **999** or the free GBV helpline **1195**.`,
+      type: 'text',
+      created_at: new Date().toISOString(),
+      metadata: {}
+    } as Message]);
+  }, [isBot, isLoading, messages.length, currentUserName, chat.id]);
 
-             setIsTyping(true);
-             await new Promise(r => setTimeout(r, 1500)); 
-             
-             const infoMsg: Message = {
-                 id: 'bot-info',
-                 chat_id: 'salama-ai-bot',
-                 sender_id: 'system',
-                 content: `This feature is under development and is coming soon. Stay tuned!`,
-                 type: 'text',
-                 created_at: new Date().toISOString(),
-                 metadata: {}
-             };
-             
-             setMessages(prev => {
-                if (prev.some(m => m.id === 'bot-info')) return prev;
-                return [...prev, infoMsg];
-             });
-             setIsTyping(false);
-             scrollToBottom();
-          };
-          runSequence();
+  const currentUserIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    currentUserIdRef.current = currentUserId;
+  }, [currentUserId]);
+
+  /** Stream a reply from /api/assistant into a single growing message. */
+  const askAssistant = async (history: Message[]) => {
+    aiAbort.current?.abort();
+    const controller = new AbortController();
+    aiAbort.current = controller;
+    const replyId = `bot-${Date.now()}`;
+    setIsTyping(true);
+    try {
+      const res = await fetch('/api/assistant', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        signal: controller.signal,
+        body: JSON.stringify({
+          messages: history
+            .filter(m => m.id !== 'bot-welcome' && m.content)
+            .map(m => ({ role: m.sender_id === 'system' ? 'assistant' : 'user', content: m.content }))
+        })
+      });
+      if (!res.ok || !res.body) {
+        const err = await res.json().catch(() => null);
+        throw new Error(err?.error || 'Salama is unavailable right now.');
       }
-  }, [chat.id, isLoading, messages.length, currentUserName]);
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let text = '';
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        text += decoder.decode(value, { stream: true });
+        setIsTyping(false);
+        setMessages(prev => {
+          const reply = { id: replyId, chat_id: 'salama-ai-bot', sender_id: 'system', content: text, type: 'text', created_at: new Date().toISOString(), metadata: {} } as Message;
+          return prev.some(m => m.id === replyId) ? prev.map(m => (m.id === replyId ? reply : m)) : [...prev, reply];
+        });
+        scrollToBottom();
+      }
+      if (!text.trim()) throw new Error('Salama did not reply. Please try again.');
+    } catch (e) {
+      if ((e as Error).name === 'AbortError') return;
+      toast({ title: 'Salama could not reply', description: e instanceof Error ? e.message : 'Please try again.', variant: 'destructive' });
+    } finally {
+      setIsTyping(false);
+    }
+  };
 
   const scrollToBottom = () => {
     setTimeout(() => {
@@ -258,67 +283,49 @@ export function ChatWindow({ chat, onBack }: ChatWindowProps) {
   };
 
   const handleSend = async () => {
-    if ((!inputText.trim() && !linkPreview) || sending) return;
-    
+    const text = inputText.trim();
+    if ((!text && !linkPreview) || sending) return;
+
+    const previousInput = inputText;
+    const previousPreview = linkPreview;
     const tempId = `temp-${Date.now()}`;
     const pendingMsg: Message = {
         id: tempId,
         chat_id: chat.id,
         sender_id: currentUserId || 'user',
-        content: inputText,
+        content: text,
         type: 'text',
         created_at: new Date().toISOString(),
-        metadata: linkPreview ? { link_preview: linkPreview } : {},
+        metadata: previousPreview ? { link_preview: previousPreview } : {},
         is_read: true
     };
 
-    // Store state for rollback if needed (though useOptimistic handles this by nature of re-renders)
-    const previousInput = inputText;
-    const previousPreview = linkPreview;
-
-    // Reset inputs immediately
+    // Clear the composer immediately (restored below if sending fails).
     setInputText('');
     setLinkPreview(null);
     scrollToBottom();
-    
-    try {
-      if (chat.id === 'salama-ai-bot') {
-          // AI Bot logic
-          startTransition(() => {
-            addOptimisticMessage(pendingMsg);
-          });
-          
-          setTimeout(async () => {
-              setIsTyping(true);
-              scrollToBottom();
-              await new Promise(r => setTimeout(r, 2000));
-              
-              const replyMsg: Message = {
-                  id: Date.now().toString() + '-reply',
-                  chat_id: 'salama-ai-bot',
-                  sender_id: 'system',
-                  content: `This feature is under development and is coming soon.`,
-                  type: 'text',
-                  created_at: new Date().toISOString(),
-                  metadata: {}
-              };
-              setMessages(prev => [...prev, pendingMsg, replyMsg]); // Commit both
-              setIsTyping(false);
-              scrollToBottom();
-          }, 500);
 
-      } else {
-        startTransition(async () => {
-          addOptimisticMessage(pendingMsg);
-          const metadata = previousPreview ? { link_preview: previousPreview } : {};
-          await sendMessage(chat.id, previousInput, 'text', metadata);
-        });
-      }
+    if (isBot) {
+      const userMsg = { ...pendingMsg, id: `user-${Date.now()}` } as Message;
+      const history = [...messages, userMsg];
+      setMessages(history);
+      void askAssistant(history);
+      return;
+    }
+
+    setSending(true);
+    startTransition(() => addOptimisticMessage(pendingMsg));
+    try {
+      const saved = await sendMessage(chat.id, text, 'text', pendingMsg.metadata);
+      // Commit the real row now; the realtime event for it is deduped by id.
+      setMessages(prev => (prev.some(m => m.id === saved.id) ? prev : [...prev, saved]));
     } catch (error) {
       console.error('Failed to send', error);
-      // Rollback inputs so user doesn't lose text
       setInputText(previousInput);
       setLinkPreview(previousPreview);
+      toast({ title: 'Message not sent', description: 'Check your connection and try again. Your text is still in the box.', variant: 'destructive' });
+    } finally {
+      setSending(false);
     }
   };
 
@@ -364,7 +371,7 @@ export function ChatWindow({ chat, onBack }: ChatWindowProps) {
           setSelectedFile(null);
       } catch (err) {
           console.error('Upload failed', err);
-          alert('Upload failed. Please try again.');
+          toast({ title: 'Upload failed', description: 'Please try again.', variant: 'destructive' });
       } finally {
           setIsUploading(false);
       }
@@ -412,7 +419,7 @@ export function ChatWindow({ chat, onBack }: ChatWindowProps) {
                  <span className="w-2 h-2 rounded-full bg-serene-blue-500 animate-pulse"/> AI Assistant
                </span>
              ) : (
-               <span className="text-xs text-serene-neutral-400">Click for contact info</span>
+               <span className="text-xs text-serene-neutral-400">{(otherParticipant?.user as any)?.user_type ? String((otherParticipant?.user as any).user_type).replace(/_/g, ' ') : 'Secure chat'}</span>
              )}
            </div>
          </div>
@@ -604,7 +611,7 @@ export function ChatWindow({ chat, onBack }: ChatWindowProps) {
                     el.style.height = el.scrollHeight + 'px';
                 }
              }}
-             className="flex-1 bg-transparent border-none outline-none text-serene-neutral-900 placeholder-serene-neutral-400 text-[15px] resize-none max-h-[120px] py-0.5 leading-relaxed"
+             className="flex-1 bg-transparent border-none outline-none text-serene-neutral-900 placeholder-serene-neutral-400 text-base md:text-[15px] resize-none max-h-[120px] py-0.5 leading-relaxed"
              onFocus={() => setShowEmojiPicker(false)} 
              placeholder="Type a message..."
              rows={1}
@@ -627,19 +634,12 @@ export function ChatWindow({ chat, onBack }: ChatWindowProps) {
            <Button 
              onClick={handleSend} 
              disabled={sending}
+             aria-label="Send message"
              className="bg-gradient-to-r from-serene-blue-600 to-serene-blue-500 hover:from-serene-blue-700 hover:to-serene-blue-600 text-white rounded-full h-11 w-11 flex items-center justify-center p-0 shadow-lg shadow-serene-blue-200/50 transition-all hover:scale-105 active:scale-95 flex-shrink-0"
            >
              <Send className="h-5 w-5 ml-0.5" />
            </Button>
-         ) : (
-           <Button 
-             variant="ghost" 
-             size="icon" 
-             className="text-serene-neutral-400 hover:text-serene-blue-600 hover:bg-serene-blue-50 rounded-full h-10 w-10 transition-all flex-shrink-0"
-           >
-             <Mic className="h-5 w-5" />
-           </Button>
-         )}
+         ) : null}
        </div>
 
        <ChatMediaDrawer 

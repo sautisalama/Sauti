@@ -95,7 +95,7 @@ export function CaseInlineChat({
     if (!chatId) return;
 
     const channel = supabase
-      .channel(`inline-chat:${chatId}`)
+      .channel(`inline-chat:${chatId}:${Math.random().toString(36).slice(2)}`)
       .on(
         'postgres_changes',
         {

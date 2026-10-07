@@ -72,7 +72,7 @@ export default function CommunityChat({
     
     // Subscribe to new messages
     const channel = supabase
-      .channel(`community:${communityId}`)
+      .channel(`community:${communityId}:${Math.random().toString(36).slice(2)}`)
       .on(
         'postgres_changes',
         {

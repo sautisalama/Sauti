@@ -1,6 +1,7 @@
 'use server';
 
 import { createClient } from '@/utils/supabase/server';
+import { withParticipantProfiles } from '@/utils/chat/participants';
 import { Chat, Message, ChatType, MessageType, transformChat, transformMessage, MessageReactions, ChatMetadata } from '@/types/chat';
 
 export async function getChats() {
@@ -22,7 +23,7 @@ export async function getChats() {
 
   if (error) throw error;
   
-  return (data || []).map(transformChat);
+  return (await withParticipantProfiles(supabase, data || [])).map(transformChat);
 }
 
 export async function getMessages(chatId: string | string[], limit = 50, before?: string) {
@@ -179,13 +180,20 @@ export async function markChatAsRead(chatId: string) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Unauthorized');
 
+  // `status` also carries the participant's role. Merge into it — replacing it
+  // wholesale used to wipe the role the first time a chat was opened.
+  const { data: row, error: readError } = await supabase
+    .from('chat_participants')
+    .select('status')
+    .eq('chat_id', chatId)
+    .eq('user_id', user.id)
+    .maybeSingle();
+  if (readError) throw readError;
+  if (!row) return;
+
   const { error } = await supabase
     .from('chat_participants')
-    .update({ 
-      status: {
-        last_read_at: new Date().toISOString()
-      } as any 
-    })
+    .update({ status: { ...asRecord(row.status), last_read_at: new Date().toISOString() } as any })
     .eq('chat_id', chatId)
     .eq('user_id', user.id);
 
@@ -197,16 +205,28 @@ export async function markAllChatsAsRead() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Unauthorized');
 
-  const { error } = await supabase
+  const { data: rows, error: readError } = await supabase
     .from('chat_participants')
-    .update({ 
-      status: {
-        last_read_at: new Date().toISOString()
-      } as any 
-    })
+    .select('chat_id, status')
     .eq('user_id', user.id);
+  if (readError) throw readError;
 
-  if (error) throw error;
+  const now = new Date().toISOString();
+  const results = await Promise.all(
+    (rows ?? []).map((r) =>
+      supabase
+        .from('chat_participants')
+        .update({ status: { ...asRecord(r.status), last_read_at: now } as any })
+        .eq('chat_id', r.chat_id)
+        .eq('user_id', user.id)
+    )
+  );
+  const failed = results.find((r) => r.error);
+  if (failed?.error) throw failed.error;
+}
+
+function asRecord(v: unknown): Record<string, unknown> {
+  return v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : {};
 }
 
 export async function searchUsers(query: string) {
@@ -214,10 +234,15 @@ export async function searchUsers(query: string) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Unauthorized');
 
+  // Escape characters that are meaningful in a PostgREST `or()` filter / LIKE pattern,
+  // so user input can never add its own filter clauses.
+  const term = query.trim().slice(0, 60).replace(/[%_\\,()*"']/g, ' ').replace(/\s+/g, ' ').trim();
+  if (term.length < 2) return [];
+
   const { data, error } = await supabase
     .from('profiles')
     .select('id, first_name, last_name, avatar_url, user_type')
-    .or(`first_name.ilike.%${query}%,last_name.ilike.%${query}%,email.ilike.%${query}%`)
+    .or(`first_name.ilike.%${term}%,last_name.ilike.%${term}%,email.ilike.%${term}%`)
     .neq('id', user.id)
     .limit(20);
 
@@ -251,7 +276,7 @@ export async function getCaseChat(caseId: string, survivorId: string) {
       .eq('id', matchData.chat_id)
       .single();
     
-    if (linkedChat) return transformChat(linkedChat);
+    if (linkedChat) return transformChat((await withParticipantProfiles(supabase, [linkedChat]))[0]);
   }
 
   const actualSurvId = matchData?.survivor_id || survivorId;
@@ -269,6 +294,12 @@ export async function getCaseChat(caseId: string, survivorId: string) {
   // Fallback to caller if no professional found (edge case)
   if (!profId) profId = user.id;
 
+  // Only the two parties to a case may open (or create) its chat.
+  if (matchData && user.id !== actualSurvId && user.id !== profId) {
+    const { data: me } = await supabase.from('profiles').select('is_admin').eq('id', user.id).maybeSingle();
+    if (!me?.is_admin) throw new Error('You are not part of this case.');
+  }
+
   // 1.5. Safety: Don't create DM with self if we can avoid it by resolving correctly
   // If I am the professional, the "other" must be the survivor.
   // If I am the survivor, the "other" must be the professional.
@@ -285,7 +316,20 @@ export async function getCaseChat(caseId: string, survivorId: string) {
     const myChatIds = new Set(allParticipants.filter(p => p.user_id === user.id).map(p => p.chat_id));
     const targetChatIds = allParticipants.filter(p => p.user_id === targetOtherId).map(p => p.chat_id);
     
-    const sharedChatId = targetChatIds.find(cid => myChatIds.has(cid));
+    // Two people can also share a community/group chat; only a direct or
+    // support-match chat is a valid "case chat".
+    const sharedCandidates = targetChatIds.filter(cid => myChatIds.has(cid));
+    let sharedChatId: string | undefined;
+    if (sharedCandidates.length) {
+      const { data: direct } = await supabase
+        .from('chats')
+        .select('id')
+        .in('id', sharedCandidates)
+        .in('type', ['dm', 'support_match'])
+        .order('last_message_at', { ascending: false, nullsFirst: false })
+        .limit(1);
+      sharedChatId = direct?.[0]?.id;
+    }
 
     if (sharedChatId) {
       // If we found a shared chat, link it to the match for future direct access
@@ -318,7 +362,7 @@ export async function getCaseChat(caseId: string, survivorId: string) {
           })
           .eq('id', sharedChatId);
           
-        return transformChat(fullChat);
+        return transformChat((await withParticipantProfiles(supabase, [fullChat]))[0]);
       }
     }
   }
@@ -377,5 +421,47 @@ export async function getCaseChat(caseId: string, survivorId: string) {
 
   if (fetchError) throw fetchError;
 
-  return transformChat(fullChat);
+  return transformChat((await withParticipantProfiles(supabase, [fullChat]))[0]);
+}
+
+/**
+ * Open a community's chat, joining the community first when the viewer is allowed to
+ * (public communities, or one they were invited to — enforced by row-level security).
+ * Membership drives chat participation (see 20261010_community_chats.sql), so after joining
+ * the real, UUID-backed chat is readable and messages/realtime work like any other chat.
+ */
+export async function openCommunityChat(communityId: string) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Unauthorized');
+
+  const { data: community, error: cErr } = await supabase
+    .from('communities')
+    .select('id, chat_id')
+    .eq('id', communityId)
+    .maybeSingle();
+  if (cErr) throw cErr;
+  if (!community?.chat_id) throw new Error('This community is not available.');
+
+  const { data: membership } = await supabase
+    .from('community_members')
+    .select('id')
+    .eq('community_id', communityId)
+    .eq('user_id', user.id)
+    .maybeSingle();
+  if (!membership) {
+    const { error: joinError } = await supabase
+      .from('community_members')
+      .insert({ community_id: communityId, user_id: user.id, role: 'member' });
+    if (joinError) throw new Error('You cannot join this community.');
+  }
+
+  const { data: chat, error } = await supabase
+    .from('chats')
+    .select('*, participants:chat_participants(*, user:profiles(*))')
+    .eq('id', community.chat_id)
+    .single();
+  if (error) throw error;
+  const [withProfiles] = await withParticipantProfiles(supabase, [chat]);
+  return transformChat(withProfiles);
 }

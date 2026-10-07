@@ -44,7 +44,10 @@ export function NotificationDropdown() {
 
         // Subscribe to changes
         const channel = supabase
-            .channel('notifications-changes')
+            // Unique per instance: the desktop header and the mobile top bar both render this
+            // component, and re-using one channel name throws ("cannot add callbacks after subscribe()"),
+            // which crashed the whole dashboard.
+            .channel(`notifications-changes-${Math.random().toString(36).slice(2)}`)
             .on(
                 'postgres_changes',
                 {

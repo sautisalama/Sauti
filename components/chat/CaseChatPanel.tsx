@@ -1,5 +1,6 @@
 'use client';
 
+import { withParticipantProfiles } from '@/utils/chat/participants';
 import { useState, useEffect, useRef, useOptimistic, startTransition } from 'react';
 import { Chat, Message, MessageType, transformChat } from '@/types/chat';
 import { getMessages, sendMessage, markMessagesAsRead, getCaseChat } from '@/app/actions/chat';
@@ -117,7 +118,7 @@ export function CaseChatPanel({
             .single();
 
           if (chatData) {
-            setChat(transformChat(chatData));
+            setChat(transformChat((await withParticipantProfiles(supabase, [chatData]))[0]));
             const msgs = await getMessages(existingChatId);
             setMessages(msgs);
             markMessagesAsRead(existingChatId);
@@ -147,7 +148,7 @@ export function CaseChatPanel({
     if (!chat?.id) return;
 
     const channel = supabase
-      .channel(`case-chat:${chat.id}`)
+      .channel(`case-chat:${chat.id}:${Math.random().toString(36).slice(2)}`)
       .on(
         'postgres_changes',
         {

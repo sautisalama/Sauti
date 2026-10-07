@@ -307,7 +307,6 @@ export default function CaseDetailPage({ params }: { params: Promise<{ id: strin
                     .from("reports")
                     .update({ 
                         match_status: "completed",
-                        updated_at: new Date().toISOString()
                     })
                     .eq("report_id", targetReportId);
             }

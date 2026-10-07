@@ -1,25 +1,7 @@
-import { getUser } from "@/utils/supabase/server";
 import { redirect } from "next/navigation";
-import CommunityChat from "@/app/dashboard/chat/_components/CommunityChat";
-import { SereneBreadcrumb } from "@/components/ui/SereneBreadcrumb";
 
-export default async function CommunityChatPage() {
-  const user = await getUser();
-  if (!user) redirect("/signin");
-
-  return (
-    <div className="h-screen flex flex-col">
-      <div className="px-4 py-2 bg-serene-neutral-50/50">
-         <SereneBreadcrumb items={[{ label: "Community", active: true }]} className="mb-0" />
-      </div>
-      <div className="flex-1">
-         <CommunityChat 
-            communityId="general"
-            communityName="General Community"
-            currentUserId={user.id} 
-          />
-      </div>
-    </div>
-  );
+// The old standalone community screen wrote messages to a non-existent chat. Communities now live
+// in the main messaging view (Messages → Communities).
+export default function CommunityChatPage() {
+	redirect("/dashboard/chat");
 }
-

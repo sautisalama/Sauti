@@ -1,5 +1,8 @@
 'use client';
 
+import { openCommunityChat } from '@/app/actions/chat';
+import { useToast } from '@/hooks/use-toast';
+import { SALAMA_BOT_ID, salamaBotChat } from '@/utils/chat/bot';
 import { Chat } from '@/types/chat';
 import { Search, MessageSquare, Filter, Users, Plus } from 'lucide-react';
 import { format } from 'date-fns';
@@ -38,6 +41,7 @@ export function ChatSidebar({ chats, selectedChatId, onSelectChat, isLoading, cu
   const [activeTab, setActiveTab] = useState<'chats' | 'communities'>('chats');
   const [isNewChatOpen, setIsNewChatOpen] = useState(false);
   const [isCreateCommunityOpen, setIsCreateCommunityOpen] = useState(false);
+  const { toast } = useToast();
   const [communities, setCommunities] = useState<Community[]>([]);
   const [isLoadingCommunities, setIsLoadingCommunities] = useState(false);
 
@@ -148,25 +152,19 @@ export function ChatSidebar({ chats, selectedChatId, onSelectChat, isLoading, cu
     community.name.toLowerCase().includes(search.toLowerCase())
   );
 
-  const handleCommunityClick = (community: Community) => {
-    // Create a chat-like object for community
-    onSelectChat({
-      id: `community-${community.id}`,
-      type: 'community' as any,
-      last_message_at: community.created_at,
-      created_by: community.creator_id,
-      created_at: community.created_at,
-      metadata: {
-        name: community.name,
-        description: community.description ?? undefined,
-        image_url: community.avatar_url ?? undefined,
-        is_community: true,
-        community_id: community.id,
-        member_count: community.member_count
-      },
-      participants: [],
-      unread_count: 0
-    });
+  const [openingCommunity, setOpeningCommunity] = useState<string | null>(null);
+  const handleCommunityClick = async (community: Community) => {
+    if (openingCommunity) return;
+    setOpeningCommunity(community.id);
+    try {
+      // Joins if needed, then returns the community's real chat.
+      onSelectChat(await openCommunityChat(community.id));
+    } catch (e) {
+      console.error('Could not open community:', e);
+      toast({ title: 'Could not open this community', description: e instanceof Error ? e.message : 'Please try again.', variant: 'destructive' });
+    } finally {
+      setOpeningCommunity(null);
+    }
   };
 
   const isProfessional = user?.profile?.user_type === 'professional' || user?.profile?.user_type === 'ngo';
@@ -302,27 +300,9 @@ export function ChatSidebar({ chats, selectedChatId, onSelectChat, isLoading, cu
                {/* Salama AI Item */}
                {search === '' && filter === 'all' && (
                  <div 
-                    onClick={() => onSelectChat({
-                      id: 'salama-ai-bot',
-                      type: 'dm',
-                      last_message_at: new Date().toISOString(),
-                      created_by: 'system',
-                      created_at: new Date().toISOString(),
-                      metadata: {
-                        name: 'Salama AI',
-                        is_official: true,
-                        last_message_preview: {
-                          content: "Hello! I'm Salama, your AI assistant.",
-                          sender_id: 'system',
-                          type: 'text',
-                          created_at: new Date().toISOString()
-                        }
-                      },
-                      participants: [],
-                      unread_count: 1
-                    })}
+                    onClick={() => onSelectChat(salamaBotChat())}
                     className={`flex items-center gap-3 p-3 cursor-pointer border-b border-[#f0f2f5] hover:bg-[#f5f6f6] transition-colors relative ${
-                      selectedChatId === 'salama-ai-bot' ? 'bg-[#f0f2f5]' : ''
+                      selectedChatId === SALAMA_BOT_ID ? 'bg-[#f0f2f5]' : ''
                     }`}
                  >
                    <div className="relative">
@@ -336,14 +316,10 @@ export function ChatSidebar({ chats, selectedChatId, onSelectChat, isLoading, cu
                    <div className="flex-1 min-w-0 flex flex-col justify-center">
                      <div className="flex justify-between items-baseline">
                        <span className="font-semibold text-[#111b21] truncate text-[17px]">Salama AI</span>
-                       <span className="text-xs text-[#667781] whitespace-nowrap ml-2">Just now</span>
                      </div>
                      <div className="flex justify-between items-center mt-0.5">
                        <span className="text-[14px] text-[#667781] truncate flex-1 block">
-                          Hello! I'm Salama, your AI assistant.
-                       </span>
-                       <span className="ml-2 bg-[#25d366] text-white text-[11px] font-bold rounded-full h-5 min-w-[20px] flex items-center justify-center px-1">
-                         1
+                          Ask about your options, rights and safety.
                        </span>
                      </div>
                    </div>

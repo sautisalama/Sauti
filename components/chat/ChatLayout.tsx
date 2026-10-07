@@ -1,12 +1,13 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { ChatSidebar } from './ChatSidebar';
 import { ChatWindow } from './ChatWindow';
 import { Chat } from '@/types/chat';
 import { getChats, markAllChatsAsRead } from '@/app/actions/chat';
 import { createClient } from '@/utils/supabase/client';
+import { SALAMA_BOT_ID, salamaBotChat } from '@/utils/chat/bot';
 
 export function ChatLayout() {
   const [selectedChat, setSelectedChat] = useState<Chat | null>(null);
@@ -18,6 +19,8 @@ export function ChatLayout() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const chatId = searchParams.get('id');
+  // The chat the user just tapped, until the URL catches up (avoids the effect below deselecting it).
+  const pendingSelect = useRef<string | null>(null);
 
   useEffect(() => {
     // Reset unread count when opening the messages page
@@ -25,17 +28,22 @@ export function ChatLayout() {
   }, []);
 
   useEffect(() => {
-    if (chatId && chats.length > 0) {
+    if (chatId === pendingSelect.current) pendingSelect.current = null;
+
+    if (chatId === SALAMA_BOT_ID) {
+        if (selectedChat?.id !== SALAMA_BOT_ID) setSelectedChat(salamaBotChat());
+    } else if (chatId && chats.length > 0) {
         const found = chats.find(c => c.id === chatId);
         if (found && found.id !== selectedChat?.id) {
             setSelectedChat(found);
         }
-    } else if (!chatId && selectedChat) {
+    } else if (!chatId && selectedChat && pendingSelect.current !== selectedChat.id) {
         setSelectedChat(null);
     }
   }, [chatId, chats, selectedChat]);
 
   const handleSelectChat = (chat: Chat) => {
+    pendingSelect.current = chat.id;
     setSelectedChat(chat);
     try {
       const params = new URLSearchParams(searchParams.toString());
@@ -72,7 +80,7 @@ export function ChatLayout() {
   useEffect(() => {
     const supabase = createClient();
     const channel = supabase
-      .channel('chat_updates')
+      .channel(`chat_updates:${Math.random().toString(36).slice(2)}`)
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'chats' },

@@ -86,7 +86,9 @@ export function CommunityCreateModal({
           creator_id: currentUserId,
           avatar_url: avatarUrl,
           is_public: isPublic,
-          member_count: 1
+          // The member-count trigger adds the creator when they join below;
+          // starting at 1 here used to count them twice.
+          member_count: 0
         })
         .select()
         .single();

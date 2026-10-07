@@ -63,10 +63,8 @@ export function BlogPage({ slug }: BlogPageProps) {
           setBlog(processedBlog);
           
           // Increment view count
-          await supabase
-            .from('blogs')
-            .update({ view_count: (blogData.view_count || 0) + 1 })
-            .eq('id', blogData.id);
+          // (atomic RPC: visitors can't update the table directly under RLS)
+          await supabase.rpc('increment_blog_views', { p_id: blogData.id });
 
           // Load related blogs by same author
           const { data: related } = await supabase
