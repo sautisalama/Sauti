@@ -7,7 +7,8 @@ import { Label } from "@/components/ui/label";
 
 import { signIn, signInWithGoogle } from "@/app/(auth)/actions/auth";
 
-export default function SignIn() {
+export default async function SignIn({ searchParams }: { searchParams: Promise<{ next?: string }> }) {
+	const { next } = await searchParams;
 	return (
 		<div className="flex flex-col min-h-screen bg-serene-neutral-50">
 			<div className="w-full lg:grid lg:min-h-screen lg:grid-cols-2">
@@ -33,6 +34,7 @@ export default function SignIn() {
                         
                         <div className="bg-white/80 backdrop-blur-sm p-8 rounded-2xl border border-serene-neutral-100 shadow-xl shadow-serene-neutral-200/50 space-y-6">
                             <form action={signIn} className="space-y-5">
+                                {next && <input type="hidden" name="next" value={next} />}
                                 <div className="space-y-2">
                                     <Label htmlFor="email" className="text-sm font-semibold text-serene-neutral-700 ml-1">
                                         Email Address
@@ -40,6 +42,7 @@ export default function SignIn() {
                                     <Input
                                         id="email"
                                         name="email"
+                                        autoComplete="username"
                                         type="email"
                                         placeholder="name@example.com"
                                         required
@@ -60,7 +63,8 @@ export default function SignIn() {
                                     </div>
                                     <Input 
                                         id="password" 
-                                        name="password" 
+                                        name="password"
+                                        autoComplete="current-password" 
                                         type="password" 
                                         required 
                                         className="h-12 bg-serene-neutral-50 border-sauti-teal/50 rounded-xl focus-visible:ring-sauti-blue/20 focus-visible:border-sauti-blue transition-all"

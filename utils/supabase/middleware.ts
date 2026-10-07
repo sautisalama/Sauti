@@ -51,29 +51,42 @@ export async function updateSession(request: NextRequest) {
 		data: { user },
 	} = await supabase.auth.getUser();
 
-	if (
-		!user &&
-		!request.nextUrl.pathname.startsWith("/signin") &&
-		!request.nextUrl.pathname.startsWith("/signup") &&
-		!request.nextUrl.pathname.startsWith("/auth/setup-password") &&
-		!request.nextUrl.pathname.startsWith("/error") &&
-		!request.nextUrl.pathname.startsWith("/api/auth/callback") &&
-		!request.nextUrl.pathname.startsWith("/api/auth/confirm") &&
-		!request.nextUrl.pathname.startsWith("/privacy-policy") &&
-		!request.nextUrl.pathname.startsWith("/terms-conditions") &&
-		!request.nextUrl.pathname.startsWith("/data-privacy") &&
-		!request.nextUrl.pathname.startsWith("/faq") &&
-		!request.nextUrl.pathname.startsWith("/about") &&
-		!request.nextUrl.pathname.startsWith("/programs") &&
-		!request.nextUrl.pathname.startsWith("/impact") &&
-		!request.nextUrl.pathname.startsWith("/volunteer") &&
-		!request.nextUrl.pathname.startsWith("/learn") &&
-		!request.nextUrl.pathname.startsWith("/report-abuse") &&
-		!request.nextUrl.pathname.startsWith("/api") &&
-		request.nextUrl.pathname !== "/"
-	) {
+	// Everything not listed here requires a signed-in user. Search engines and
+	// logged-out visitors must be able to reach marketing pages, the sitemap,
+	// robots.txt and the PWA manifest — these were previously redirected to /signin.
+	const PUBLIC_PREFIXES = [
+		"/signin",
+		"/signup",
+		"/auth/setup-password",
+		"/error",
+		"/api",
+		"/privacy-policy",
+		"/terms-conditions",
+		"/data-privacy",
+		"/faq",
+		"/about",
+		"/contact",
+		"/programs",
+		"/impact",
+		"/volunteer",
+		"/learn",
+		"/publications",
+		"/report-abuse",
+		"/schedule",
+		"/sitemap.xml",
+		"/robots.txt",
+		"/manifest.webmanifest",
+		"/~offline",
+	];
+	const path = request.nextUrl.pathname;
+	const isPublic = path === "/" || PUBLIC_PREFIXES.some((p) => path === p || path.startsWith(p.endsWith("/") ? p : `${p}/`) || (p === "/api" && path.startsWith("/api")));
+
+	if (!user && !isPublic) {
 		const url = request.nextUrl.clone();
 		url.pathname = "/signin";
+		// Bring the visitor back to where they were going after they sign in.
+		url.search = "";
+		if (path.startsWith("/dashboard")) url.searchParams.set("next", path + request.nextUrl.search);
 		return NextResponse.redirect(url);
 	}
 

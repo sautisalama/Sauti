@@ -1,5 +1,6 @@
 "use server";
 
+import { requireAdmin } from "@/lib/auth/require-admin";
 import { createClient } from "@/utils/supabase/server";
 import { Database } from "@/types/db-schema";
 import { SupabaseClient, createClient as createAdminClient } from "@supabase/supabase-js";
@@ -12,7 +13,7 @@ function getSupabaseAdmin(): SupabaseClient<Database> {
 
     _supabaseAdmin = createAdminClient<Database>(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SERVICE_ROLE_KEY!,
+        (process.env.SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SERVICE_ROLE_KEY)!,
         {
             auth: {
                 persistSession: false,
@@ -28,6 +29,9 @@ function getSupabaseAdmin(): SupabaseClient<Database> {
 // ─── Data Fetchers ──────────────────────────────────────────────────────────
 
 export async function getReportedCases() {
+    // These run with the service role, so the caller must be an admin.
+    const auth = await requireAdmin();
+    if (!auth.ok) throw new Error(auth.error);
     try {
         const { data, error } = await getSupabaseAdmin()
             .from("reports")
@@ -48,6 +52,9 @@ export async function getReportedCases() {
 }
 
 export async function getProfessionalMatchStatus() {
+    // These run with the service role, so the caller must be an admin.
+    const auth = await requireAdmin();
+    if (!auth.ok) throw new Error(auth.error);
     try {
         // 1. Fetch all professional profiles
         const { data: profiles, error: profileError } = await getSupabaseAdmin()
@@ -118,6 +125,9 @@ export async function getProfessionalMatchStatus() {
  * Returns the report and all evaluated candidates with full scoring breakdowns.
  */
 export async function simulateMatch(reportId: string) {
+    // These run with the service role, so the caller must be an admin.
+    const auth = await requireAdmin();
+    if (!auth.ok) throw new Error(auth.error);
     const admin = getSupabaseAdmin();
     const result: SimulationResult = await runSharedSimulation(reportId, admin);
 
@@ -165,6 +175,9 @@ export async function simulateMatch(reportId: string) {
  * This is the admin-driven version of the Temporal Cascade Protocol.
  */
 export async function triggerCascadePhase(reportId: string) {
+    // These run with the service role, so the caller must be an admin.
+    const auth = await requireAdmin();
+    if (!auth.ok) throw new Error(auth.error);
     const admin = getSupabaseAdmin();
 
     // Get current cascade state

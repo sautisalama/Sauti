@@ -1,5 +1,6 @@
 "use client";
 
+import { performAdminAction } from "@/app/actions/admin-actions";
 import { useEffect, useState } from "react";
 import { useParams, useSearchParams, useRouter } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
@@ -218,84 +219,9 @@ export default function ReviewPage() {
         const status = action === 'verify' ? 'verified' : (action === 'ban' ? 'suspended' : 'rejected');
 
         try {
-            const { data: { user } } = await supabase.auth.getUser();
-            if (!user) {
-                toast({ title: "Error", description: "You must be logged in.", variant: "destructive" });
-                return;
-            }
-
-            // 1. Update Target Status
-            const updatePayload: Record<string, unknown> = {
-                verification_status: status,
-                verification_notes: notes,
-                verification_updated_at: new Date().toISOString(),
-                reviewed_by: {
-                    reviewer_id: user.id,
-                    reviewed_at: new Date().toISOString(),
-                    action: action,
-                    notes: notes
-                }
-            };
-
-            // Schema-specific fields for verification
-            if (action === 'verify') {
-                if (targetType === 'profile') {
-                    updatePayload.admin_verified_by = user.id;
-                    updatePayload.admin_verified_at = new Date().toISOString(); 
-                    updatePayload.isVerified = true;
-                } else if (targetType === 'service') {
-                    updatePayload.verified_by = user.id;
-                    updatePayload.verified_at = new Date().toISOString();
-                }
-            }
-
-            const table = targetType === 'profile' ? 'profiles' : 'support_services';
-            const { error: updateError } = await supabase
-                .from(table)
-                .update(updatePayload as never)
-                .eq('id', targetId);
-
-            if (updateError) throw updateError;
-
-            // 2. Log Action
-            const actionTypeSuffix = targetType === 'profile' ? 'user' : 'service';
-            await supabase.from('admin_actions').insert({
-                admin_id: user.id,
-                action_type: `${action}_${actionTypeSuffix}`,
-                target_id: targetId,
-                target_type: targetType === 'profile' ? 'user' : 'service',
-                details: { notes, previous_status: targetType === 'profile' ? profile?.verification_status : services.find(s => s.id === targetId)?.verification_status }
-            });
-
-            // 3. Send Notification to User
-            const notificationTitle = targetType === 'profile' 
-                ? "Profile Verification Update"
-                : "Service Verification Update";
-            
-            const notificationMessage = targetType === 'profile' 
-                ? `Your profile verification status has been updated to ${status}.`
-                : `Your service "${services.find(s => s.id === targetId)?.name || 'Service'}" verification status has been updated to ${status}.`;
-
-            const notificationLink = targetType === 'profile' 
-                ? '/dashboard/profile?section=account'
-                : '/dashboard/profile?section=services';
-
-            if (!profile) throw new Error("Profile not loaded");
-
-            await supabase.from('notifications').insert({
-                user_id: profile.id, // The profile owner
-                type: `verification_${status}`,
-                title: notificationTitle,
-                message: notificationMessage,
-                link: notificationLink,
-                read: false,
-                metadata: { 
-                    target_type: targetType, 
-                    target_id: targetId,
-                    notes: notes,
-                    action_by: user.id
-                }
-            });
+            // One audited path for every verification: updates the record, logs it, notifies the
+            // owner (in-app + email) and re-runs matching for reports that were waiting.
+            await performAdminAction({ targetId, targetType, action, notes });
 
             toast({ title: "Success", description: `${targetType === 'profile' ? 'Profile' : 'Service'} marked as ${status}.` });
             setActionDialog(prev => ({ ...prev, isOpen: false, notes: '' }));
@@ -303,7 +229,7 @@ export default function ReviewPage() {
 
         } catch (error) {
             console.error("Action error:", error);
-            toast({ title: "Error", description: "Failed to update status", variant: "destructive" });
+            toast({ title: "Error", description: error instanceof Error ? error.message : "Failed to update status", variant: "destructive" });
         }
     };
 

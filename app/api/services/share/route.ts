@@ -1,4 +1,5 @@
 import { createClient } from "@/utils/supabase/server";
+import { createAdminClient } from "@/utils/supabase/admin-client";
 import { NextResponse } from "next/server";
 
 export async function POST(request: Request) {
@@ -73,7 +74,8 @@ export async function POST(request: Request) {
     
     const senderName = senderProfile ? `${senderProfile.first_name || ''} ${senderProfile.last_name || ''}`.trim() : "A colleague";
 
-    await supabase
+    // Notifying another user needs the service role (RLS only lets people notify themselves).
+    await createAdminClient()
       .from("notifications")
       .insert({
         user_id: toUserId,

@@ -10,11 +10,11 @@ export function createAdminClient() {
   const supabaseUrl =
     process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
   const serviceRoleKey =
-    process.env.NEXT_PUBLIC_SERVICE_ROLE_KEY || process.env.SERVICE_ROLE_KEY;
+    process.env.SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SERVICE_ROLE_KEY;
 
   if (!supabaseUrl || !serviceRoleKey) {
     throw new Error(
-      "Supabase admin env vars are missing. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SERVICE_ROLE_KEY."
+      "Supabase admin env vars are missing. Set NEXT_PUBLIC_SUPABASE_URL and SERVICE_ROLE_KEY."
     );
   }
 

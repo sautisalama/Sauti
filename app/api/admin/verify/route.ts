@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
 import { VerificationRequest } from "@/types/admin-types";
-import { backfillUnmatchedReports } from "@/app/actions/match-services";
+import { backfillUnmatched } from "@/lib/matching-engine/service";
+import { createAdminClient } from "@/utils/supabase/admin-client";
 
 export async function POST(request: Request) {
 	try {
@@ -80,7 +81,7 @@ export async function POST(request: Request) {
         // Trigger proactive backfill matching for unmatched reports
         if (action === "verify") {
             // Run in background (don't wait for it to finish to respond to admin)
-            backfillUnmatchedReports().catch(err => 
+            backfillUnmatched(createAdminClient()).catch(err => 
                 console.error("Proactive backfill matching failed:", err)
             );
         }

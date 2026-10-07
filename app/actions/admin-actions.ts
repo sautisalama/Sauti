@@ -9,6 +9,9 @@ import {
     profileRejectedEmail
 } from "@/lib/notifications/templates";
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
+import { createAdminClient } from "@/utils/supabase/admin-client";
+import { backfillUnmatched } from "@/lib/matching-engine/service";
 import { Database } from "@/types/db-schema";
 
 export type AdminActionParams = {
@@ -26,8 +29,22 @@ export async function performAdminAction({ targetId, targetType, action, notes }
         throw new Error("Unauthorized");
     }
 
+    // Verifying/rejecting/banning is an admin power (RLS also enforces it, but fail early and clearly).
+    const { data: actor } = await supabase.from('profiles').select('is_admin').eq('id', user.id).maybeSingle();
+    if (!actor?.is_admin) {
+        throw new Error("Forbidden");
+    }
+
     // Determine status
     const status = action === 'verify' ? 'verified' : (action === 'ban' ? 'suspended' : 'rejected');
+
+    // Remember where it was, for the audit trail.
+    const { data: before } = await supabase
+        .from(targetType === 'profile' ? 'profiles' : 'support_services')
+        .select('verification_status')
+        .eq('id', targetId)
+        .maybeSingle();
+    const previousStatus = before?.verification_status ?? 'unknown';
 
     // 1. Update Target Status
     const updatePayload: any = {
@@ -46,6 +63,12 @@ export async function performAdminAction({ targetId, targetType, action, notes }
         updatePayload.isVerified = true;
         updatePayload.admin_verified_by = user.id;
         updatePayload.admin_verified_at = new Date().toISOString();
+    }
+
+    if (action === 'verify' && targetType === 'service') {
+        updatePayload.verified_by = user.id;
+        updatePayload.verified_at = new Date().toISOString();
+        updatePayload.is_active = true; // a verified service is matchable
     }
 
     const table = targetType === 'profile' ? 'profiles' : 'support_services';
@@ -80,7 +103,7 @@ export async function performAdminAction({ targetId, targetType, action, notes }
         action_type: dbActionType,
         target_id: targetId,
         target_type: targetType === 'profile' ? 'user' : 'service',
-        details: { notes, previous_status: 'unknown' } as any
+        details: { notes, previous_status: previousStatus } as any
     });
 
     // 4. Send Notification
@@ -125,6 +148,18 @@ export async function performAdminAction({ targetId, targetType, action, notes }
         });
     }
 
+    // A newly verified provider/service may be the answer to reports that are still waiting.
+    if (action === 'verify') {
+        after(async () => {
+            try {
+                await backfillUnmatched(createAdminClient());
+            } catch (err) {
+                console.error('Post-verification matching failed:', err);
+            }
+        });
+    }
+
     revalidatePath('/dashboard/admin');
+    revalidatePath('/dashboard/admin/review');
     return { success: true };
 }

@@ -6,6 +6,12 @@ import { revalidatePath } from "next/cache";
 import { cookies, headers } from "next/headers";
 import { registerDevice, parseSettings, TrackedDevice } from "@/lib/user-settings";
 
+/** Only allow same-site relative paths, so `?next=` can never become an open redirect. */
+function safeNext(value: FormDataEntryValue | null): string | null {
+	if (typeof value !== "string") return null;
+	return /^\/(?![/\\])[\w\-./?=&%#]*$/.test(value) ? value : null;
+}
+
 export async function signUp(formData: FormData) {
 	const supabase = await createClient();
 	const email = formData.get("email") as string;
@@ -76,7 +82,8 @@ export async function signUp(formData: FormData) {
 	}
 
 	revalidatePath("/", "layout");
-	return redirect("/dashboard?message=signup_success");
+	const next = safeNext(formData.get("next"));
+	return redirect(next ?? "/dashboard?message=signup_success");
 }
 
 export async function signIn(formData: FormData) {
@@ -118,7 +125,7 @@ export async function signIn(formData: FormData) {
 	}
 
 	revalidatePath("/", "layout");
-	return redirect("/dashboard");
+	return redirect(safeNext(formData.get("next")) ?? "/dashboard");
 }
 
 export async function signInWithGoogle() {

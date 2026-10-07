@@ -12,7 +12,8 @@ import {
 	SelectValue,
 } from "@/components/ui/select";
 
-export default function SignUp() {
+export default async function SignUp({ searchParams }: { searchParams: Promise<{ next?: string }> }) {
+	const { next } = await searchParams;
 	return (
 		<div className="flex flex-col min-h-screen bg-serene-neutral-50">
 			<div className="w-full lg:grid lg:min-h-screen lg:grid-cols-2">
@@ -54,13 +55,14 @@ export default function SignUp() {
 
                         <div className="bg-white/80 backdrop-blur-sm p-8 rounded-2xl border border-serene-neutral-100 shadow-xl shadow-serene-neutral-200/50 space-y-6">
                             <form action={signUp} className="space-y-5">
+                                {next && <input type="hidden" name="next" value={next} />}
                                 <div className="grid grid-cols-2 gap-4">
                                     <div className="space-y-2">
                                         <Label htmlFor="firstName" className="text-sm font-semibold text-serene-neutral-700 ml-1">
                                             First Name
                                         </Label>
                                         <Input 
-                                            name="firstName" 
+                                            name="firstName" autoComplete="given-name" 
                                             id="firstName" 
                                             type="text" 
                                             required 
@@ -72,7 +74,7 @@ export default function SignUp() {
                                             Last Name
                                         </Label>
                                         <Input 
-                                            name="lastName" 
+                                            name="lastName" autoComplete="family-name" 
                                             id="lastName" 
                                             type="text" 
                                             required 
@@ -86,7 +88,7 @@ export default function SignUp() {
                                         Email Address
                                     </Label>
                                     <Input
-                                        name="email"
+                                        name="email" autoComplete="email"
                                         id="email"
                                         type="email"
                                         placeholder="name@example.com"
@@ -99,7 +101,7 @@ export default function SignUp() {
                                         Password
                                     </Label>
                                     <Input 
-                                        name="password" 
+                                        name="password" autoComplete="new-password" 
                                         id="password" 
                                         type="password" 
                                         required 
