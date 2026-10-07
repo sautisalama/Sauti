@@ -1,5 +1,6 @@
 import { MetadataRoute } from 'next'
 import { PUBLICATIONS } from '@/lib/publications'
+import { getFeed } from '@/lib/content/feed'
 
 const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://sautisalama.org'
 
@@ -45,10 +46,11 @@ const routes = [
   '/impact/cop-30',
 ]
 
-export default function sitemap(): MetadataRoute.Sitemap {
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const lastModified = new Date()
+  const feed = await getFeed()
 
-  const pages = Array.from(new Set([...routes, ...PUBLICATIONS.map((p) => p.href)])).map(
+  const pages = Array.from(new Set([...routes, ...PUBLICATIONS.map((p) => p.href), ...feed.map((p) => p.href)])).map(
     (route) => ({
       url: `${baseUrl}${route}`,
       lastModified,

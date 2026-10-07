@@ -42,8 +42,9 @@ import { createClient } from "@/utils/supabase/client";
 import { motion } from "framer-motion";
 import { CircledText } from "@/components/ui/CircledText";
 import { PublicationsSection } from "./PublicationsSection";
+import type { FeedItem } from "@/lib/content/feed";
 
-export function LandingPage() {
+export function LandingPage({ publications = [] }: { publications?: FeedItem[] }) {
 	const [isAuthenticated, setIsAuthenticated] = useState(false);
 	const supabase = createClient();
 	useEffect(() => {
@@ -238,7 +239,7 @@ export function LandingPage() {
 				</section>
 
 				{/* 3. PUBLICATIONS */}
-				<PublicationsSection />
+				<PublicationsSection items={publications} />
 
 				{/* 4. WHAT WE DO (PROGRAMS) */}
 				<section id="programs" className="py-12 md:py-24 bg-white relative overflow-hidden">

@@ -1,17 +1,19 @@
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, BookOpen } from "lucide-react";
 import { CircledText } from "@/components/ui/CircledText";
-import { FEATURED_PUBLICATIONS } from "@/lib/publications";
+import type { FeedItem } from "@/lib/content/feed";
 
 /**
  * Homepage Publications bento.
  *
- * Deliberately mirrors the "Collective Change" section: three columns, the
- * middle one offset downwards, alternating image tile / white text card.
+ * Mirrors the "Collective Change" section: three columns, the middle one
+ * offset downwards, alternating image tile / white text card. Items arrive
+ * newest first, so the most recent publication always leads (top-left).
  */
-export function PublicationsSection() {
-	const [first, second, third] = FEATURED_PUBLICATIONS;
+export function PublicationsSection({ items }: { items: FeedItem[] }) {
+	const [first, second, third] = items;
+	if (!first) return null;
 
 	return (
 		<section id="publications" className="py-12 md:py-24 bg-[#f8f9fb]">
@@ -27,35 +29,24 @@ export function PublicationsSection() {
 				</p>
 
 				<div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-10 items-stretch">
-					{/* Column 1 — image on top */}
 					<div className="flex flex-col gap-6 md:gap-10">
-						<PublicationImage
-							src={first.image}
-							alt={first.imageAlt}
-							href={first.href}
-						/>
-						<PublicationCard publication={first} />
+						<PublicationImage item={first} priority />
+						<PublicationCard item={first} latest />
 					</div>
 
-					{/* Column 2 — offset, card on top */}
-					<div className="flex flex-col gap-6 md:gap-10 md:pt-16">
-						<PublicationCard publication={second} />
-						<PublicationImage
-							src={second.image}
-							alt={second.imageAlt}
-							href={second.href}
-						/>
-					</div>
+					{second && (
+						<div className="flex flex-col gap-6 md:gap-10 md:pt-16">
+							<PublicationCard item={second} />
+							<PublicationImage item={second} />
+						</div>
+					)}
 
-					{/* Column 3 — image on top */}
-					<div className="flex flex-col gap-6 md:gap-10">
-						<PublicationImage
-							src={third.image}
-							alt={third.imageAlt}
-							href={third.href}
-						/>
-						<PublicationCard publication={third} />
-					</div>
+					{third && (
+						<div className="flex flex-col gap-6 md:gap-10">
+							<PublicationImage item={third} />
+							<PublicationCard item={third} />
+						</div>
+					)}
 				</div>
 
 				<div className="flex justify-center mt-12 md:mt-20">
@@ -72,56 +63,47 @@ export function PublicationsSection() {
 	);
 }
 
-function PublicationImage({
-	src,
-	alt,
-	href,
-}: {
-	src: string;
-	alt: string;
-	href: string;
-}) {
+function PublicationImage({ item, priority }: { item: FeedItem; priority?: boolean }) {
 	return (
 		<Link
-			href={href}
+			href={item.href}
 			tabIndex={-1}
 			aria-hidden="true"
-			className="rounded-xl md:rounded-2xl overflow-hidden aspect-video relative shadow-2xl hover:scale-[1.02] transition-transform duration-500"
+			className="rounded-xl md:rounded-2xl overflow-hidden aspect-video relative shadow-2xl hover:scale-[1.02] transition-transform duration-500 bg-gradient-to-br from-[#1a365d] to-sauti-teal flex items-center justify-center"
 		>
-			<Image src={src} alt={alt} fill className="object-cover" />
+			{item.image ? (
+				<Image src={item.image} alt={item.imageAlt} fill priority={priority} sizes="(min-width: 768px) 33vw, 100vw" className="object-cover" />
+			) : (
+				<BookOpen className="w-12 h-12 text-white/70" />
+			)}
 		</Link>
 	);
 }
 
-function PublicationCard({
-	publication,
-}: {
-	publication: (typeof FEATURED_PUBLICATIONS)[number];
-}) {
+function PublicationCard({ item, latest }: { item: FeedItem; latest?: boolean }) {
 	return (
 		<article className="bg-white rounded-xl md:rounded-2xl p-6 md:p-10 shadow-xl flex-1 flex flex-col">
 			<div className="flex flex-wrap items-center gap-x-3 gap-y-1 mb-4 md:mb-6 text-[11px] md:text-xs font-black uppercase tracking-widest">
-				<span className="text-sauti-teal">{publication.category}</span>
+				{latest && (
+					<span className="rounded-full bg-sauti-orange/15 px-2.5 py-0.5 text-sauti-orange">Latest</span>
+				)}
+				<span className="text-sauti-teal">{item.category}</span>
 				<span className="text-gray-300" aria-hidden="true">
 					•
 				</span>
-				<time dateTime={publication.date} className="text-gray-400">
-					{publication.dateLabel}
+				<time dateTime={item.date} className="text-gray-400">
+					{item.dateLabel}
 				</time>
 			</div>
-			<h3 className="text-2xl md:text-3xl font-bold text-[#1a365d] mb-4 md:mb-6">
-				{publication.title}
-			</h3>
-			<p className="text-gray-500 text-base md:text-lg leading-relaxed mb-6 md:mb-10 flex-1">
-				{publication.summary}
-			</p>
+			<h3 className="text-2xl md:text-3xl font-bold text-[#1a365d] mb-4 md:mb-6">{item.title}</h3>
+			<p className="text-gray-500 text-base md:text-lg leading-relaxed mb-6 md:mb-10 flex-1">{item.summary}</p>
 			<Link
-				href={publication.href}
+				href={item.href}
 				className="text-[#1a365d] font-bold border-b-2 border-[#1a365d] w-fit pb-1 hover:text-sauti-orange hover:border-sauti-orange transition-all flex items-center gap-2 group/link"
 			>
 				<span>
 					Read
-					<span className="sr-only"> {publication.title}</span>
+					<span className="sr-only"> {item.title}</span>
 				</span>
 				<ArrowRight className="w-4 h-4 group-hover/link:translate-x-1 transition-transform" />
 			</Link>

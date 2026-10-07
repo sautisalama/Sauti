@@ -436,7 +436,6 @@ export class FileUploadService {
 				.from("support_services")
 				.update({
 					accreditation_files_metadata: updatedDocs as unknown as Json,
-					updated_at: new Date().toISOString(),
 				})
 
 				.eq("id", serviceId)

@@ -1,5 +1,9 @@
 import type { Metadata } from "next";
 import { LandingPage } from "@/components/LandingPage";
+import { getFeed } from "@/lib/content/feed";
+
+// Re-render at most every 5 minutes; publishing also revalidates "/" immediately.
+export const revalidate = 300;
 
 /**
  * NOTE: this page previously used `dynamic(..., { ssr: false })`, which meant
@@ -14,6 +18,7 @@ export const metadata: Metadata = {
 	alternates: { canonical: "/" },
 };
 
-export default function Home() {
-	return <LandingPage />;
+export default async function Home() {
+	const publications = await getFeed({ limit: 3 });
+	return <LandingPage publications={publications} />;
 }
