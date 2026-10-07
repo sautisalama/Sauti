@@ -1,4 +1,4 @@
-import { createClient } from '@/utils/supabase/server';
+import { getBookableProfessional } from '@/lib/scheduling/public-professional';
 import { EnhancedPublicScheduler } from '../../_components/EnhancedPublicScheduler';
 import { notFound } from 'next/navigation';
 
@@ -10,48 +10,13 @@ interface SchedulePageProps {
 
 export default async function ProfessionalSchedulePage({ params }: SchedulePageProps) {
   const { professional } = await params;
-  const supabase = await createClient();
-  
-  // Extract professional ID from the format: sauti-{professionalId} or custom link
-  let professionalId = professional;
-  if (professional.startsWith('sauti-')) {
-    professionalId = professional.replace('sauti-', '');
-  }
-
-  // Fetch professional details
-  const { data: profile, error } = await supabase
-    .from('profiles')
-    .select(`
-      id,
-      first_name,
-      last_name,
-      email,
-      bio,
-      profile_image_url,
-      professional_title,
-      cal_link,
-      support_services (
-        name,
-        service_types,
-        description
-      )
-    `)
-    .eq('id', professionalId)
-    .single();
-
-  if (error || !profile) {
-    notFound();
-  }
-
-  // Check if this is actually a professional (has support services)
-  const { data: supportServices } = await supabase
-    .from('support_services')
-    .select('*')
-    .eq('user_id', professionalId);
-
-  if (!supportServices || supportServices.length === 0) {
-    notFound();
-  }
+  // Visitors are not signed in, so this goes through the safe public lookup (verified, public-booking
+  // professionals only; never email or phone).
+  const bookable = await getBookableProfessional(professional);
+  if (!bookable) notFound();
+  const professionalId = bookable.id;
+  const profile = bookable;
+  const supportServices = bookable.services;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50">

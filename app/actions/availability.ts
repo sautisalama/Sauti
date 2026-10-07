@@ -1,6 +1,7 @@
 'use server'
 
 import { createClient } from '@/utils/supabase/server'
+import { createAdminClient } from '@/utils/supabase/admin-client'
 import { revalidatePath } from 'next/cache'
 import { TimeSlot, AvailabilityBlock } from '@/types/chat'
 
@@ -92,12 +93,26 @@ export async function removeAvailabilityBlock(blockId: string) {
     return { success: true }
 }
 
-export async function getAvailabilityBlocks(userId: string, start: Date, end: Date): Promise<AvailabilityBlock[]> {
+/**
+ * Availability blocks are private to their owner (reason text included). Anyone signed in may see
+ * WHEN a professional is busy, so for other people's calendars we read with the service role and
+ * only ever expose time ranges.
+ */
+async function busyReader(userId: string) {
     const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) throw new Error('Unauthorized')
+    return { client: userId === user.id ? supabase : createAdminClient(), isSelf: userId === user.id }
+}
+
+const BUSY_STATUSES: ('pending' | 'requested' | 'confirmed')[] = ['pending', 'requested', 'confirmed']
+
+export async function getAvailabilityBlocks(userId: string, start: Date, end: Date): Promise<AvailabilityBlock[]> {
+    const { client: supabase, isSelf } = await busyReader(userId)
     
     const { data, error } = await supabase
         .from('availability_blocks')
-        .select('*')
+        .select(isSelf ? '*' : 'id, user_id, start_time, end_time')
         .eq('user_id', userId)
         .gte('end_time', start.toISOString())
         .lte('start_time', end.toISOString())
@@ -105,7 +120,7 @@ export async function getAvailabilityBlocks(userId: string, start: Date, end: Da
         
     if (error) throw new Error('Failed to fetch availability')
     
-    return (data || []) as AvailabilityBlock[]
+    return (data || []).map((b: any) => (isSelf ? b : { ...b, reason: null })) as AvailabilityBlock[]
 }
 
 /**
@@ -117,7 +132,7 @@ export async function checkTimeSlotAvailability(
     startTime: Date,
     endTime: Date
 ): Promise<boolean> {
-    const supabase = await createClient()
+    const { client: supabase } = await busyReader(userId)
     
     // Check availability blocks
     const { data: blocks } = await supabase
@@ -137,7 +152,7 @@ export async function checkTimeSlotAvailability(
         .from('appointments')
         .select('appointment_id')
         .or(`professional_id.eq.${userId},survivor_id.eq.${userId}`)
-        .in('status', ['pending', 'confirmed'])
+        .in('status', BUSY_STATUSES)
         .lt('appointment_date', endTime.toISOString())
         .limit(1)
     
@@ -160,7 +175,7 @@ export async function getAvailableSlotsForDate(
     date: Date,
     slotDurationMinutes: number = 60
 ): Promise<TimeSlot[]> {
-    const supabase = await createClient()
+    const { client: supabase } = await busyReader(userId)
     
     // Set working hours (8 AM to 6 PM)
     const dayStart = new Date(date)
@@ -181,7 +196,7 @@ export async function getAvailableSlotsForDate(
         .from('appointments')
         .select('appointment_date, duration_minutes')
         .or(`professional_id.eq.${userId},survivor_id.eq.${userId}`)
-        .in('status', ['pending', 'confirmed'])
+        .in('status', BUSY_STATUSES)
         .gte('appointment_date', dayStart.toISOString())
         .lte('appointment_date', dayEnd.toISOString())
     
