@@ -648,6 +648,54 @@ export type Database = {
           },
         ]
       }
+      course_certificates: {
+        Row: {
+          certificate_number: string
+          course_id: string
+          course_title: string
+          id: string
+          issued_at: string
+          learner_name: string
+          lessons_completed: number
+          user_id: string
+        }
+        Insert: {
+          certificate_number: string
+          course_id: string
+          course_title: string
+          id?: string
+          issued_at?: string
+          learner_name: string
+          lessons_completed?: number
+          user_id: string
+        }
+        Update: {
+          certificate_number?: string
+          course_id?: string
+          course_title?: string
+          id?: string
+          issued_at?: string
+          learner_name?: string
+          lessons_completed?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "course_certificates_course_id_fkey"
+            columns: ["course_id"]
+            isOneToOne: false
+            referencedRelation: "courses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "course_certificates_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       course_enrollments: {
         Row: {
           completed_at: string | null
@@ -1843,6 +1891,36 @@ export type Database = {
           },
         ]
       }
+      verification_submissions: {
+        Row: {
+          document_count: number
+          id: string
+          kind: string
+          notified_at: string | null
+          owner_id: string | null
+          subject_id: string
+          submitted_at: string
+        }
+        Insert: {
+          document_count?: number
+          id?: string
+          kind: string
+          notified_at?: string | null
+          owner_id?: string | null
+          subject_id: string
+          submitted_at?: string
+        }
+        Update: {
+          document_count?: number
+          id?: string
+          kind?: string
+          notified_at?: string | null
+          owner_id?: string | null
+          subject_id?: string
+          submitted_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       admin_dashboard_stats: {
@@ -1868,6 +1946,7 @@ export type Database = {
         Args: { p_community: string; p_user?: string }
         Returns: boolean
       }
+      can_view_provider_profile: { Args: { target: string }; Returns: boolean }
       check_user_is_chat_participant: {
         Args: { _chat_id: string; _user_id?: string }
         Returns: boolean

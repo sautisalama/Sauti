@@ -1,5 +1,6 @@
 "use client";
 
+import { pingVerificationAlerts } from "@/lib/verification/ping";
 import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -177,6 +178,7 @@ export function MobileSupportServicesSidepanel({
 			if (error) {
 				throw error;
 			}
+			pingVerificationAlerts();
 
 			toast({
 				title: "Documents Saved",

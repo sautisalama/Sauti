@@ -1,5 +1,6 @@
 "use client";
 
+import { pingVerificationAlerts } from "@/lib/verification/ping";
 import { useState, useCallback, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -236,6 +237,7 @@ export function VerificationSection({
                 .eq("id", userId);
 
             if (saveError) throw new Error("Failed to save document metadata");
+            pingVerificationAlerts();
 
 			setDocuments(updatedDocs);
 			onUpdate();

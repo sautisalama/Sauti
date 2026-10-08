@@ -1,6 +1,7 @@
 import type { TablesUpdate } from "@/types/db-schema";
 import { createClient } from "@/utils/supabase/server";
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
+import { flushVerificationAlerts } from "@/lib/notifications/verification-alerts";
 
 export async function PATCH(
 	request: Request,
@@ -48,6 +49,12 @@ export async function PATCH(
 			.single();
 
 		if (error) throw error;
+
+		// New documents are recorded by a database trigger; tell the team right away (after responding).
+		if (accreditation_files_metadata !== undefined) {
+			const appUrl = (process.env.NEXT_PUBLIC_APP_URL || "https://sautisalama.org").replace(/\/$/, "");
+			after(() => flushVerificationAlerts(appUrl.startsWith("http") ? appUrl : `https://${appUrl}`).catch((e) => console.error("[verification-alerts]", e)));
+		}
 
 		return NextResponse.json(data);
 	} catch (error) {

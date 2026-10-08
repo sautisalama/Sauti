@@ -1,5 +1,6 @@
 "use client";
 
+import { pingVerificationAlerts } from "@/lib/verification/ping";
 import { useState, useCallback, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -159,6 +160,7 @@ export function MobileVerificationSection({
 				.eq("id", userId);
 
 			if (error) throw error;
+			pingVerificationAlerts();
 
 			setDocuments(updatedDocs);
 			onUpdate();

@@ -1,5 +1,6 @@
 "use client";
 
+import { pingVerificationAlerts } from "@/lib/verification/ping";
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -804,6 +805,7 @@ export function SupportServiceSidepanel({
 			.eq("id", service.id);
 
 		if (error) throw error;
+		pingVerificationAlerts();
 		setDocuments(newDocuments);
 		onUpdate();
 	};
