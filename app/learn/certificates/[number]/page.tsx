@@ -41,28 +41,28 @@ export default async function CertificatePage({ params }: Props) {
 				<div className="mx-auto max-w-4xl">
 					<div className="mb-4 flex flex-wrap items-center justify-between gap-3 print:hidden">
 						<p className="flex items-center gap-2 text-sm font-semibold text-serene-green-700"><ShieldCheck className="size-4" aria-hidden /> Verified by Sauti Salama</p>
-						<div className="flex gap-2">
+						<div className="flex flex-wrap gap-2">
 							{!cert.anonymous && (
 								<>
-									<a href={linkedInAddToProfileUrl(cert)} target="_blank" rel="noopener noreferrer" className="inline-flex h-10 items-center gap-2 rounded-xl bg-[#0a66c2] px-4 text-sm font-semibold text-white transition-[transform,filter] duration-150 ease-out hover:brightness-110 active:scale-[0.98]">
+									<a href={linkedInAddToProfileUrl(cert)} target="_blank" rel="noopener noreferrer" className="inline-flex h-10 items-center gap-2 whitespace-nowrap rounded-xl bg-[#0a66c2] px-4 text-sm font-semibold text-white transition-[transform,filter] duration-150 ease-out hover:brightness-110 active:scale-[0.98]">
 										<Linkedin className="size-4" aria-hidden /> Add to LinkedIn profile
 									</a>
-									<a href={linkedInShareUrl(cert.number)} target="_blank" rel="noopener noreferrer" className="inline-flex h-10 items-center gap-2 rounded-xl border border-serene-neutral-200 bg-white px-4 text-sm font-semibold text-serene-neutral-800 transition-[transform,background-color] duration-150 ease-out hover:bg-serene-neutral-50 active:scale-[0.98]">
+									<a href={linkedInShareUrl(cert.number)} target="_blank" rel="noopener noreferrer" className="inline-flex h-10 items-center gap-2 whitespace-nowrap rounded-xl border border-serene-neutral-200 bg-white px-4 text-sm font-semibold text-serene-neutral-800 transition-[transform,background-color] duration-150 ease-out hover:bg-serene-neutral-50 active:scale-[0.98]">
 										<Linkedin className="size-4" aria-hidden /> Share post
 									</a>
-									<a href={whatsAppShareUrl(cert)} target="_blank" rel="noopener noreferrer" className="inline-flex h-10 items-center gap-2 rounded-xl bg-[#25d366] px-4 text-sm font-semibold text-white transition-[transform,filter] duration-150 ease-out hover:brightness-95 active:scale-[0.98]">
+									<a href={whatsAppShareUrl(cert)} target="_blank" rel="noopener noreferrer" className="inline-flex h-10 items-center gap-2 whitespace-nowrap rounded-xl bg-[#25d366] px-4 text-sm font-semibold text-white transition-[transform,filter] duration-150 ease-out hover:brightness-95 active:scale-[0.98]">
 										<MessageCircle className="size-4" aria-hidden /> WhatsApp
 									</a>
-									<a href={xShareUrl(cert)} target="_blank" rel="noopener noreferrer" className="inline-flex h-10 items-center gap-2 rounded-xl bg-black px-4 text-sm font-semibold text-white transition-[transform,filter] duration-150 ease-out hover:brightness-125 active:scale-[0.98]">
+									<a href={xShareUrl(cert)} target="_blank" rel="noopener noreferrer" className="inline-flex h-10 items-center gap-2 whitespace-nowrap rounded-xl bg-black px-4 text-sm font-semibold text-white transition-[transform,filter] duration-150 ease-out hover:brightness-125 active:scale-[0.98]">
 										<svg viewBox="0 0 24 24" className="size-3.5 fill-current" aria-hidden><path d="M18.9 2H22l-7.5 8.6L23 22h-6.8l-5.3-6.9L4.8 22H1.7l8-9.2L1.3 2h7l4.8 6.3L18.9 2Zm-1.2 18h1.9L6.7 3.9H4.6L17.7 20Z" /></svg> Post on X
 									</a>
-									<a href={`/api/certificates/${cert.number}/badge?download=1`} className="inline-flex h-10 items-center gap-2 rounded-xl border border-serene-neutral-200 bg-white px-4 text-sm font-semibold text-serene-neutral-800 transition-[transform,background-color] duration-150 ease-out hover:bg-serene-neutral-50 active:scale-[0.98]">
+									<a href={`/api/certificates/${cert.number}/badge?download=1`} className="inline-flex h-10 items-center gap-2 whitespace-nowrap rounded-xl border border-serene-neutral-200 bg-white px-4 text-sm font-semibold text-serene-neutral-800 transition-[transform,background-color] duration-150 ease-out hover:bg-serene-neutral-50 active:scale-[0.98]">
 										<ImageDown className="size-4" aria-hidden /> Badge image
 									</a>
 								</>
 							)}
 							<PrintButton />
-							<a href={`/api/certificates/${cert.number}/pdf`} className="inline-flex h-10 items-center gap-2 rounded-xl bg-sauti-teal px-4 text-sm font-semibold text-white transition-[transform,background-color] duration-150 ease-out hover:bg-sauti-dark active:scale-[0.98]">
+							<a href={`/api/certificates/${cert.number}/pdf`} className="inline-flex h-10 items-center gap-2 whitespace-nowrap rounded-xl bg-sauti-teal px-4 text-sm font-semibold text-white transition-[transform,background-color] duration-150 ease-out hover:bg-sauti-dark active:scale-[0.98]">
 								<Download className="size-4" aria-hidden /> Download PDF
 							</a>
 						</div>
