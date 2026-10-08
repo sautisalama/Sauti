@@ -1,6 +1,7 @@
 import { getBookableProfessional } from '@/lib/scheduling/public-professional';
 import { EnhancedPublicScheduler } from '../../_components/EnhancedPublicScheduler';
 import { notFound } from 'next/navigation';
+import { BadgeCheck, LifeBuoy, Lock, MessageCircle } from 'lucide-react';
 
 interface SchedulePageProps {
   params: Promise<{
@@ -8,110 +9,80 @@ interface SchedulePageProps {
   }>;
 }
 
+const card = 'rounded-2xl border border-serene-neutral-100 bg-white p-5 shadow-sm sm:p-6';
+
 export default async function ProfessionalSchedulePage({ params }: SchedulePageProps) {
   const { professional } = await params;
   // Visitors are not signed in, so this goes through the safe public lookup (verified, public-booking
   // professionals only; never email or phone).
   const bookable = await getBookableProfessional(professional);
   if (!bookable) notFound();
-  const professionalId = bookable.id;
   const profile = bookable;
   const supportServices = bookable.services;
+  const fullName = `${profile.first_name ?? ''} ${profile.last_name ?? ''}`.trim();
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50">
-      <div className="container mx-auto px-4 py-8">
-        {/* Professional Header */}
-        <div className="bg-white rounded-2xl shadow-lg p-8 mb-8">
-          <div className="flex items-start gap-6">
-            <div className="relative">
-              <div className="w-24 h-24 rounded-full bg-[#1A3434] text-white flex items-center justify-center text-2xl font-bold">
+    <main className="min-h-screen bg-serene-neutral-50">
+      <div className="mx-auto max-w-5xl space-y-5 px-4 py-6 sm:px-6 sm:py-10 lg:space-y-6">
+        {/* Professional header */}
+        <header className={card}>
+          <div className="flex items-start gap-4 sm:gap-5">
+            <div className="relative shrink-0">
+              <div className="flex size-16 items-center justify-center rounded-full bg-sauti-teal text-xl font-semibold text-white sm:size-20 sm:text-2xl">
                 {profile.first_name?.[0]?.toUpperCase() || 'P'}
               </div>
-              <div className="absolute -bottom-2 -right-2 bg-green-500 w-8 h-8 rounded-full flex items-center justify-center">
-                <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                </svg>
-              </div>
+              <span className="absolute -bottom-1 -right-1 flex size-6 items-center justify-center rounded-full bg-white shadow-sm" title="Verified by Sauti Salama">
+                <BadgeCheck className="size-5 text-serene-green-600" />
+              </span>
             </div>
-            
-            <div className="flex-1">
-              <h1 className="text-3xl font-bold text-gray-900 mb-2">
-                {profile.first_name} {profile.last_name}
-              </h1>
-              {profile.professional_title && (
-                <p className="text-lg text-blue-600 font-medium mb-3">
-                  {profile.professional_title}
-                </p>
-              )}
-              {profile.bio && (
-                <p className="text-gray-600 leading-relaxed">
-                  {profile.bio}
-                </p>
-              )}
-              
-              {/* Services */}
-              {supportServices && supportServices.length > 0 && (
-                <div className="mt-4">
-                  <h3 className="text-sm font-medium text-gray-700 mb-2">Specialized Services:</h3>
-                  <div className="flex flex-wrap gap-2">
-                    {supportServices.map((service) => (
-                      <div key={service.id} className="px-3 py-1 bg-blue-100 text-blue-800 text-sm rounded-full">
-                        {service.name}
-                      </div>
-                    ))}
-                  </div>
-                </div>
+            <div className="min-w-0 flex-1">
+              <h1 className="text-xl font-semibold text-serene-neutral-900 sm:text-2xl">{fullName}</h1>
+              {profile.professional_title && <p className="mt-0.5 text-sm font-medium text-sauti-teal">{profile.professional_title}</p>}
+              {profile.bio && <p className="mt-2 text-sm leading-relaxed text-serene-neutral-600">{profile.bio}</p>}
+              {supportServices.length > 0 && (
+                <ul className="mt-3 flex flex-wrap gap-2" aria-label="Services">
+                  {supportServices.map((service) => (
+                    <li key={service.id} className="rounded-lg bg-serene-neutral-100 px-2.5 py-1 text-xs font-medium text-serene-neutral-700">
+                      {service.name}
+                    </li>
+                  ))}
+                </ul>
               )}
             </div>
           </div>
-        </div>
+        </header>
 
-        {/* Scheduling Component */}
-        <EnhancedPublicScheduler 
-          professionalId={professionalId}
-          professionalName={`${profile.first_name} ${profile.last_name}`}
+        <EnhancedPublicScheduler
+          professionalId={profile.id}
+          professionalName={fullName}
           calLink={profile.cal_link || undefined}
         />
 
-        {/* Trust & Safety */}
-        <div className="mt-8 bg-white rounded-2xl shadow-lg p-6">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
-              <svg className="w-5 h-5 text-green-600" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M2.166 4.999A11.954 11.954 0 0010 1.944 11.954 11.954 0 0017.834 5c.11.65.166 1.32.166 2.001 0 5.225-3.34 9.67-8 11.317C5.34 16.67 2 12.225 2 7c0-.682.057-1.35.166-2.001zm11.541 3.708a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-              </svg>
-            </div>
-            <h3 className="text-lg font-semibold text-gray-900">Your Safety & Privacy</h3>
+        {/* Trust and safety */}
+        <section className={card} aria-labelledby="safety-title">
+          <h2 id="safety-title" className="text-base font-semibold text-serene-neutral-900">Your safety and privacy</h2>
+          <div className="mt-4 grid gap-5 text-sm text-serene-neutral-600 sm:grid-cols-2">
+            {[
+              { icon: Lock, title: 'Private and confidential', text: 'Your request goes only to this provider. Your details are never shown publicly.' },
+              { icon: BadgeCheck, title: 'Verified provider', text: 'Sauti Salama has checked this provider’s documents and service.' },
+              { icon: LifeBuoy, title: 'In danger now?', text: 'Call 999, or the national GBV helpline on 1195 (free, 24 hours).' },
+              { icon: MessageCircle, title: 'Your choice', text: 'The provider will confirm by email. You can ask for a call, video or messages.' },
+            ].map(({ icon: Icon, title, text }) => (
+              <div key={title} className="flex gap-3">
+                <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-sauti-teal/10"><Icon className="size-4 text-sauti-teal" /></span>
+                <div>
+                  <h3 className="font-medium text-serene-neutral-900">{title}</h3>
+                  <p className="mt-0.5">{text}</p>
+                </div>
+              </div>
+            ))}
           </div>
-          
-          <div className="grid md:grid-cols-2 gap-6 text-sm text-gray-600">
-            <div>
-              <h4 className="font-medium text-gray-900 mb-2">🔒 Secure & Confidential</h4>
-              <p>All appointments are conducted in secure, private environments with full confidentiality protection.</p>
-            </div>
-            <div>
-              <h4 className="font-medium text-gray-900 mb-2">✅ Verified Professional</h4>
-              <p>This professional has been verified and is part of our trusted network of support providers.</p>
-            </div>
-            <div>
-              <h4 className="font-medium text-gray-900 mb-2">🛡️ Crisis Support Available</h4>
-              <p>If you're in immediate danger, please call emergency services. Crisis support is available 24/7.</p>
-            </div>
-            <div>
-              <h4 className="font-medium text-gray-900 mb-2">📞 Flexible Communication</h4>
-              <p>Choose from video calls, phone calls, or secure messaging based on your comfort level.</p>
-            </div>
-          </div>
-        </div>
+        </section>
 
-        {/* Footer */}
-        <div className="text-center mt-8 py-6 text-gray-500">
-          <p className="text-sm">
-            Powered by <span className="font-medium text-[#1A3434]">Sauti</span> - Supporting survivors with professional care
-          </p>
-        </div>
+        <p className="py-4 text-center text-xs text-serene-neutral-500">
+          Powered by <span className="font-medium text-sauti-teal">Sauti Salama</span>, supporting survivors with professional care
+        </p>
       </div>
-    </div>
+    </main>
   );
 }

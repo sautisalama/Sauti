@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "@/utils/supabase/admin-client";
 import { getBookableProfessional } from "@/lib/scheduling/public-professional";
 import { sendNotification } from "@/lib/notifications";
+import { sendEmail } from "@/lib/notifications/email";
+import { BOOKING_TZ_LABEL } from "@/lib/scheduling/slots";
 
 export const dynamic = "force-dynamic";
 
@@ -121,6 +123,23 @@ export async function POST(request: Request) {
 		metadata: { appointment_id: appointment.appointment_id },
 		sendEmail: true,
 	}).catch((e) => console.error("Booking: professional notification failed:", e));
+
+	// Acknowledge the request to the visitor. Nothing is confirmed until the provider accepts, and we say so.
+	const escHtml = (v: string) => v.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+	const when = start.toLocaleString("en-GB", { dateStyle: "full", timeStyle: "short", timeZone: "Africa/Nairobi" });
+	await sendEmail(
+		email,
+		"We received your appointment request",
+		`<div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;color:#1f2937">
+			<h2 style="color:#0f4c81">Request received</h2>
+			<p>Hello ${escHtml(firstName)},</p>
+			<p>We have sent your request for a <b>${escHtml(apptType.replace(/_/g, " "))}</b> with <b>${escHtml(`${pro.first_name ?? ""} ${pro.last_name ?? ""}`.trim() || "your provider")}</b> on <b>${escHtml(when)}</b> (${BOOKING_TZ_LABEL}).</p>
+			<p>It is a <b>request</b>: it is not confirmed until the provider accepts it. You will hear back by email.</p>
+			<p style="color:#6b7280;font-size:12px">If you are in immediate danger, call 999 or the national GBV helpline on 1195.</p>
+		</div>`,
+		undefined,
+		{ category: "Appointment request" }
+	).catch((e) => console.error("Booking: visitor acknowledgement failed:", e));
 
 	return NextResponse.json({ success: true, appointmentId: appointment.appointment_id, message: "Appointment request submitted successfully" });
 }

@@ -83,6 +83,44 @@ check("SCH-24 an unrelated user cannot cancel it", (upd.data?.length ?? 0) === 0
 const mine = await proApi.from("appointments").update({ status: "confirmed" }).eq("appointment_id", okJson.appointmentId).select("appointment_id");
 check("SCH-25 the professional can confirm the request", (mine.data?.length ?? 0) === 1, mine.error?.message ?? "");
 
+
+// ═════ E. Real availability (the booking page's time list) ═════
+const ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+let off = 9;
+while ([0, 6].includes(day(off, 12).getDay()) || off < 9) off++;
+const weekday = ymd(day(off, 12));
+const sat = ymd(day(off + ((6 - day(off, 12).getDay() + 7) % 7 || 7), 12));
+const slotsOf = async (date, dur = 45, pid = proId) => {
+	const res = await api.get(`${BASE}/api/appointments/slots?professionalId=${pid}&date=${date}&duration=${dur}`);
+	return { status: res.status(), json: await res.json().catch(() => ({})) };
+};
+let sl = await slotsOf(weekday);
+const labels = (sl.json.slots ?? []).map((x) => x.label);
+check("SCH-26 a weekday offers real half-hour times inside working hours", sl.status === 200 && labels[0] === "09:00" && labels.at(-1) <= "16:15" && labels.length >= 10, `${labels.length} slots ${labels[0]}..${labels.at(-1)}`);
+check("SCH-27 weekends offer nothing", ((await slotsOf(sat)).json.slots ?? []).length === 0);
+check("SCH-28 the response reveals nothing but times (no reasons, names or ids)", JSON.stringify(Object.keys(sl.json).sort()) === JSON.stringify(["slots", "timezone"]) && !/e2e training|survivor|appointment/i.test(JSON.stringify(sl.json)));
+const bookedAt = new Date(`${weekday}T10:00:00+03:00`);
+const bk = await book({ date: bookedAt.toISOString(), duration: 45 }, "10.2.2.2");
+sl = await slotsOf(weekday);
+const after2 = (sl.json.slots ?? []).map((x) => x.label);
+check("SCH-29 a requested time disappears from the list (and overlapping times with it)", bk.status() === 200 && !after2.includes("10:00") && !after2.includes("10:30") && after2.includes("09:00") && after2.includes("11:00"), after2.join(","));
+const blk2 = await proApi.from("availability_blocks").insert({ user_id: proId, start_time: new Date(`${weekday}T13:00:00+03:00`).toISOString(), end_time: new Date(`${weekday}T15:00:00+03:00`).toISOString(), reason: "e2e private reason" }).select("id").single();
+sl = await slotsOf(weekday);
+const after3 = (sl.json.slots ?? []).map((x) => x.label);
+check("SCH-30 blocked time is not offered", !blk2.error && !after3.some((l) => l >= "13:00" && l < "15:00") && after3.includes("15:00"), after3.join(","));
+check("SCH-31 a longer session leaves fewer times", ((await slotsOf(weekday, 90)).json.slots ?? []).length < after3.length);
+await db.from("profiles").update({ out_of_office: true }).eq("id", proId);
+const oooSlots = await slotsOf(weekday);
+check("SCH-32 an out-of-office provider offers no times", oooSlots.status === 404 || (oooSlots.json.slots ?? []).length === 0, String(oooSlots.status));
+await db.from("profiles").update({ out_of_office: false }).eq("id", proId);
+check("SCH-33 unknown or non-bookable providers and bad dates are refused", (await slotsOf(weekday, 45, "00000000-0000-0000-0000-000000000000")).status === 404 && (await slotsOf(weekday, 45, acc("medic").id)).status === 404 && (await slotsOf("2026-13-45")).status === 400 && (await slotsOf(weekday, 5)).status === 400);
+// the booking page itself uses these times
+await visitor.goto(`${BASE}/schedule/${proId}`, { waitUntil: "networkidle", timeout: 120000 });
+await visitor.getByRole("gridcell").filter({ hasText: new RegExp(`^${Number(weekday.slice(8))}$`) }).first().click().catch(() => undefined);
+await visitor.waitForTimeout(2500);
+const pageSlots = await visitor.getByRole("radio").count();
+check("SCH-34 the booking page shows the provider's real free times for a chosen day", pageSlots >= 3, `radios=${pageSlots}`);
+await db.from("availability_blocks").delete().eq("user_id", proId);
 // cleanup
 await db.from("availability_blocks").delete().eq("user_id", proId);
 await db.from("appointments").delete().eq("created_via", "public_booking");

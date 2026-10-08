@@ -12,6 +12,7 @@ import { VerificationSection } from "./verification-section";
 import { SupportServicesManager } from "./support-services-manager";
 import { PrivacySecuritySettings } from "./privacy-security-settings";
 import { CalendarIntegrationSettings } from "./calendar-integration-settings";
+import { CalendarSettings } from "@/components/dashboard/CalendarSettings";
 import { AppSettingsSection } from "./app-settings-section";
 import { signOut } from "@/app/(auth)/actions/auth";
 import { createClient } from "@/utils/supabase/client";
@@ -525,10 +526,13 @@ export default function ProfilePage() {
 
 							{/* Section: Calendar Integration */}
 							{activeSection === 'calendar' && (
-								<CalendarIntegrationSettings
-									userId={userId || ""}
-									isProfessional={isProfessional}
-								/>
+								<div className="space-y-5">
+									{isProfessional && <CalendarSettings />}
+									<CalendarIntegrationSettings
+										userId={userId || ""}
+										isProfessional={isProfessional}
+									/>
+								</div>
 							)}
 
 							{/* Section: App Settings */}
