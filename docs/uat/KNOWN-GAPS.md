@@ -8,7 +8,7 @@ These were found while building the test suite. They are documented rather than 
 | 5 | Reports are stored unencrypted (protected by row-level security). | Database admins / backups can read stories. | Phase field-level encryption (narrative, contact) with `lib/security/crypto.ts`; keep matching fields plaintext. |
 | 6 | Calendar token columns still exist on `profiles`. | Old tokens remain until phase 2. | Apply `20261009_drop_profile_calendar_token_columns.sql` after deploy. |
 | 7 | Public booking rate limit is per server instance. | Spread across instances it is looser. | Move to Redis/Upstash if abused. |
-| 8 | Vercel hourly cron needs a Pro plan. | Monitor won't run on Hobby. | Use an external scheduler hitting the route. |
+| 8 | The monitor runs once a day (05:00 UTC) so it works on the free hosting plan. | A case that crosses 24 hours just after a run is reported up to a day later. | Shorten the 24-hour limit, or run more often on a paid plan. |
 | 9 | Private voice-note bucket (`20261008_private_report_audio.sql`), restricted notifications insert, dropped token columns, private `availability_blocks` (`20261010_availability_blocks_private.sql`) are **dev only** until the code is deployed. | Prod voice notes remain public until applied. | Apply after deploy. |
 | 10 | Dashboard security settings: OTP expiry, leaked-password protection, Postgres upgrade. | Advisor warnings. | Change in Supabase dashboard. |
 

@@ -5,7 +5,7 @@ import { motion } from "framer-motion";
 import Image from "next/image";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { Heart, Scale, Shield, Landmark, ArrowRight, BookOpen, Droplets } from "lucide-react";
+import { Heart, Scale, Shield, Landmark, ArrowRight, BookOpen, Droplets, Leaf } from "lucide-react";
 import { CircledText } from "@/components/ui/CircledText";
 
 export default function ProgramsPage() {
@@ -118,6 +118,20 @@ export default function ProgramsPage() {
                                     "Clean last-mile distribution"
                                 ]}
 							/>
+							<ProgramSection
+								number="07"
+								icon={<Leaf className="w-10 h-10" />}
+								title="Climate & Care"
+								subtitle="Where Climate Action Meets Safety"
+								description="Climate change deepens gender-based violence: scarcity, displacement and loss of income raise risk for women and girls. Climate & Care brings care and climate resilience together, from solar lighting for households in Kitui and Isiolo to a group exercise that helps communities map where climate harm and safety meet."
+                                image="/events/impact/climate-care/solar-demo.jpeg"
+                                customLink="/learn/climate-care"
+                                benefits={[
+                                    "Solar lighting for safer homes",
+                                    "Community mobilisation",
+                                    "Climate and care group exercise"
+                                ]}
+	/>
 						</div>
 					</div>
 				</section>

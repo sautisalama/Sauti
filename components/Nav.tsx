@@ -167,6 +167,12 @@ export function Nav() {
 								</Link>
 							</DropdownMenuItem>
 							<DropdownMenuItem asChild>
+								<Link href="/learn/climate-care" className="flex items-center gap-3 rounded-xl px-4 py-3 hover:bg-gray-50 font-bold text-sauti-blue cursor-pointer outline-none transition-colors group">
+									<Leaf className="h-5 w-5 text-sauti-teal" />
+									<span>Climate & Care</span>
+								</Link>
+							</DropdownMenuItem>
+							<DropdownMenuItem asChild>
 								<Link href="/learn" className="flex items-center gap-3 rounded-xl px-4 py-3 hover:bg-gray-50 font-bold text-sauti-blue cursor-pointer outline-none transition-colors group">
 									<GraduationCap className="h-5 w-5 text-sauti-blue" />
 									<span>Capacity Building</span>
@@ -222,12 +228,6 @@ export function Nav() {
 								<Link href="/learn?type=resources" className="flex items-center gap-3 rounded-xl px-4 py-3 hover:bg-gray-50 font-bold text-sauti-blue cursor-pointer outline-none transition-colors group">
 									<BookOpen className="h-5 w-5 text-indigo-500" />
 									<span>Resources</span>
-								</Link>
-							</DropdownMenuItem>
-							<DropdownMenuItem asChild>
-								<Link href="/learn/climate-care" className="flex items-center gap-3 rounded-xl px-4 py-3 hover:bg-gray-50 font-bold text-sauti-blue cursor-pointer outline-none transition-colors group">
-									<Leaf className="h-5 w-5 text-sauti-teal" />
-									<span>Climate & Care</span>
 								</Link>
 							</DropdownMenuItem>
 						</DropdownMenuContent>
@@ -420,6 +420,15 @@ export function Nav() {
 														<Droplets className="h-4 w-4 text-sky-500" />
 														<span>Kiwu – Water Systems</span>
 													</Link>
+													<Link 
+														href="/learn/climate-care" 
+														className={`flex items-center gap-3 rounded-xl px-4 py-3 font-bold transition-all ${
+															isActive("/learn/climate-care") ? "bg-emerald-50 text-emerald-600" : "text-gray-600 hover:bg-gray-50 hover:text-sauti-blue"
+														}`}
+													>
+														<Leaf className="h-4 w-4 text-emerald-500" />
+														<span>Climate & Care</span>
+													</Link>
 												</div>
 											)}
 										</div>
@@ -485,15 +494,6 @@ export function Nav() {
 													>
 														<BookOpen className="h-4 w-4 text-indigo-500" />
 														<span>Resources</span>
-													</Link>
-													<Link 
-														href="/learn/climate-care" 
-														className={`flex items-center gap-3 rounded-xl px-4 py-3 font-bold transition-all ${
-															isActive("/learn/climate-care") ? "bg-sauti-teal/10 text-sauti-teal" : "text-gray-600 hover:bg-gray-50 hover:text-sauti-blue"
-														}`}
-													>
-														<Leaf className="h-4 w-4 text-sauti-teal" />
-														<span>Climate & Care</span>
 													</Link>
 												</div>
 											)}

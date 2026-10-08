@@ -2,7 +2,7 @@
 
 ## 24-hour "Delayed Support" escalation (OPS)
 
-The monitor runs hourly (`/api/cron/escalate-stale-cases`, Vercel cron + `CRON_SECRET`).
+The monitor runs once a day at 05:00 UTC (08:00 East Africa Time) (`/api/cron/escalate-stale-cases`, Vercel cron + `CRON_SECRET`).
 
 | ID | P | Scenario | Expected |
 |---|---|---|---|
@@ -34,4 +34,4 @@ Covered by `scripts/e2e/security.mjs` (36 attacks, run with signed-in test users
 |---|---|---|---|
 | OPS-09 | M | A provider adds documents to a service or profile. | One email "Verification documents submitted" to malkia@ and oliver@sautisalama.org, a link to review, and an in-app notice to admins |
 | OPS-10 | M | The same submission is flushed twice, or a document is removed. | No second email and no email for a removal |
-| OPS-11 | M | The email cannot be sent. | The submission is not marked as sent; the hourly monitor retries |
+| OPS-11 | M | The email cannot be sent. | The submission is not marked as sent; the next daily check retries |
