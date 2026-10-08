@@ -113,6 +113,8 @@ export async function updateSession(request: NextRequest) {
 			!('device_tracking_enabled' in settings) ||
 			!settings.device_tracking_enabled ||
 			!deviceId || // Lenient if cookie is missing (client-side heartbeat will re-sync)
+			activeDevices.length === 0 || // Nothing registered yet: getUser() registers this device
+			Date.now() - (user.last_sign_in_at ? new Date(user.last_sign_in_at).getTime() : 0) < 10 * 60 * 1000 || // Just signed in
 			activeDevices.some((d) => d.id === deviceId);
 
 		// 1. Block dashboard access for unauthorized devices

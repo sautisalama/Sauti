@@ -1,6 +1,8 @@
 import { Database, Tables } from "@/types/db-schema";
 import { createServerClient } from "@supabase/ssr";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
+import { registerDevice, type TrackedDevice } from "@/lib/user-settings";
+import type { Json } from "@/types/db-schema";
 import { Session } from "@supabase/supabase-js";
 
 export async function createClient() {
@@ -79,7 +81,21 @@ export async function getUser(): Promise<Tables<"profiles"> | null> {
 
 			if (settings && typeof settings === 'object' && 'device_tracking_enabled' in settings && settings.device_tracking_enabled && deviceId) {
 				const activeDevices = (data.devices || []) as { id: string }[];
-				const isAuthorized = activeDevices.some((d) => d.id === deviceId);
+				let isAuthorized = activeDevices.some((d) => d.id === deviceId);
+
+				// A device that has just signed in (Google, magic link, ...) is the user's own: register it
+				// instead of treating it as revoked. Revocation only applies to older sessions.
+				const signedInAt = user.last_sign_in_at ? new Date(user.last_sign_in_at).getTime() : 0;
+				const freshSignIn = Date.now() - signedInAt < 10 * 60 * 1000;
+				if (!isAuthorized && (freshSignIn || activeDevices.length === 0)) {
+					const userAgent = (await headers()).get("user-agent") || "";
+					const updated = registerDevice(data.devices as TrackedDevice[] | null, deviceId, userAgent);
+					const { error: regError } = await supabase
+						.from("profiles")
+						.update({ devices: updated as unknown as Json })
+						.eq("id", user.id);
+					if (!regError) isAuthorized = true;
+				}
 
 				if (!isAuthorized) {
 					console.warn(
