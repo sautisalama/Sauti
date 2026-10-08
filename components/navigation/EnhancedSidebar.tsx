@@ -62,6 +62,7 @@ import { cn } from "@/lib/utils";
 import { useDashboardData } from "@/components/providers/DashboardDataProvider";
 import { useRoleSwitcher } from "@/hooks/useRoleSwitcher";
 import AuthenticatedReportAbuseForm from "@/components/AuthenticatedReportAbuseForm";
+import { profileNeedsOnboarding } from "@/lib/onboarding";
 
 interface SidebarItem {
 	id: string;
@@ -119,9 +120,7 @@ export function EnhancedSidebar({
     
     const profile = dash?.data?.profile || user?.profile;
     const hasAcceptedPolicies = !!(profile?.policies as any)?.all_policies_accepted;
-    const needsOnboarding = !profile?.user_type || 
-        !hasAcceptedPolicies ||
-        ((profile?.user_type === 'professional' || profile?.user_type === 'ngo') && !profile?.professional_title);
+    const needsOnboarding = profileNeedsOnboarding(profile);
 
     let setupProgress = 25;
     if (needsOnboarding && profile) {

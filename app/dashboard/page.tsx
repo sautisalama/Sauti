@@ -6,6 +6,7 @@ import AnonymousSurvivorView from "./_views/AnonymousSurvivorView";
 import ProfessionalView from "./_views/ProfessionalView";
 import OnboardingFlow from "./_views/OnboardingFlow";
 import { Suspense } from "react";
+import { profileNeedsOnboarding } from "@/lib/onboarding";
 
 export default async function Dashboard() {
 	const user = await getUser();
@@ -30,11 +31,7 @@ export default async function Dashboard() {
 	// If user exists but has no user_type, or is a pro without a title (incomplete onboarding), or hasn't accepted policies,
 	// or was admin-invited and still needs to verify their pre-filled data and accept T&C
 	const isAdminInvited = !!(user as any).onboarded_by_admin;
-	const needsOnboarding = 
-		!user.user_type || 
-		!hasAcceptedPolicies ||
-		((user.user_type === 'professional' || user.user_type === 'ngo') && !user.professional_title) ||
-		isAdminInvited;
+	const needsOnboarding = profileNeedsOnboarding(user as any, { includeAdminInvited: true }) || isAdminInvited;
 
 	if (needsOnboarding) {
 		return <OnboardingFlow />;

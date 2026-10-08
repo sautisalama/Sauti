@@ -22,6 +22,7 @@ import { useRoleSwitcher } from "@/hooks/useRoleSwitcher";
 import { Badge } from "@/components/ui/badge";
 import { NotificationDropdown } from "./NotificationDropdown";
 import { useDashboardData } from "@/components/providers/DashboardDataProvider";
+import { profileNeedsOnboarding } from "@/lib/onboarding";
 
 export function MobileTopBar() {
   const user = useUser();
@@ -60,9 +61,7 @@ export function MobileTopBar() {
 
   const profile = user?.profile;
   const hasAcceptedPolicies = !!(profile?.policies as any)?.all_policies_accepted;
-  const needsOnboarding = !profile?.user_type || 
-    !hasAcceptedPolicies ||
-    ((profile.user_type === 'professional' || profile.user_type === 'ngo') && !profile.professional_title);
+  const needsOnboarding = profileNeedsOnboarding(profile);
 
   if (needsOnboarding) return null;
 

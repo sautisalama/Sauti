@@ -5,6 +5,7 @@ import { useDashboardData } from "@/components/providers/DashboardDataProvider";
 import { usePathname, useSearchParams } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { DesktopHeader } from "@/components/navigation/DesktopHeader";
+import { profileNeedsOnboarding } from "@/lib/onboarding";
 
 interface DashboardContentProps {
   children: React.ReactNode;
@@ -33,9 +34,7 @@ export function DashboardContent({ children }: DashboardContentProps) {
   const profile = dash?.data?.profile;
   const hasAcceptedPolicies = !!(profile?.policies as any)?.all_policies_accepted;
   const isOnboardingRoute = pathname === "/dashboard/onboarding" || pathname?.startsWith("/dashboard/onboarding");
-  const needsOnboarding = isOnboardingRoute || (!profile?.user_type || 
-    !hasAcceptedPolicies ||
-    ((profile.user_type === 'professional' || profile.user_type === 'ngo') && !profile.professional_title));
+  const needsOnboarding = isOnboardingRoute || profileNeedsOnboarding(profile);
 
   const showTopPadding = !isChat && !needsOnboarding;
 
