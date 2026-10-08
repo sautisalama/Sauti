@@ -18,6 +18,8 @@ export interface Certificate {
 	courseSlug: string | null;
 	lessonsCompleted: number;
 	issuedAt: string;
+	/** The learner is anonymous: their certificate carries a private username, so it is not offered for sharing. */
+	anonymous?: boolean;
 }
 
 /**
@@ -65,8 +67,11 @@ export async function getCertificateByNumber(raw: string): Promise<Certificate |
 	const admin = createAdminClient();
 	const { data } = await admin.from("course_certificates").select("*").eq("certificate_number", number).maybeSingle();
 	if (!data) return null;
-	const slug = (await admin.from("courses").select("slug").eq("id", data.course_id).maybeSingle()).data?.slug ?? null;
-	return toCertificate(data, slug);
+	const [slug, owner] = await Promise.all([
+		admin.from("courses").select("slug").eq("id", data.course_id).maybeSingle().then((r) => r.data?.slug ?? null),
+		admin.from("profiles").select("is_anonymous").eq("id", data.user_id).maybeSingle().then((r) => !!r.data?.is_anonymous),
+	]);
+	return { ...toCertificate(data, slug), anonymous: owner };
 }
 
 function toCertificate(row: { certificate_number: string; learner_name: string; course_title: string; lessons_completed: number; issued_at: string }, slug: string | null): Certificate {

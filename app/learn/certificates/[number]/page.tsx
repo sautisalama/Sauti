@@ -2,16 +2,30 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Download, ShieldCheck } from "lucide-react";
+import { Download, ImageDown, Linkedin, Share2, ShieldCheck } from "lucide-react";
 import { Nav } from "@/components/Nav";
 import { Footer } from "@/components/Footer";
 import { getCertificateByNumber } from "@/lib/courses/certificates";
 import { PrintButton } from "@/components/courses/PrintButton";
+import { certificateUrl, linkedInAddToProfileUrl, linkedInShareUrl, siteUrl } from "@/lib/courses/linkedin";
 
 type Props = { params: Promise<{ number: string }> };
 
-// Certificates are verified by number, not indexed by search engines.
-export const metadata: Metadata = { title: "Certificate of completion", robots: { index: false, follow: false } };
+// Certificates are verified by number, not indexed by search engines. Link previews (LinkedIn, WhatsApp) still work from these tags.
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+	const { number } = await params;
+	const cert = await getCertificateByNumber(decodeURIComponent(number));
+	if (!cert) return { title: "Certificate of completion", robots: { index: false, follow: false } };
+	const title = `${cert.learnerName} completed ${cert.courseTitle}`;
+	const description = `Certificate of completion from Sauti Salama. Certificate number ${cert.number}.`;
+	const image = `${siteUrl()}/api/certificates/${cert.number}/badge`;
+	return {
+		title: "Certificate of completion",
+		robots: { index: false, follow: false },
+		openGraph: { title, description, url: certificateUrl(cert.number), type: "website", siteName: "Sauti Salama", images: [{ url: image, width: 1200, height: 630, alt: title }] },
+		twitter: { card: "summary_large_image", title, description, images: [image] },
+	};
+}
 
 const fmt = (iso: string) => new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric", timeZone: "Africa/Nairobi" });
 
@@ -28,6 +42,19 @@ export default async function CertificatePage({ params }: Props) {
 					<div className="mb-4 flex flex-wrap items-center justify-between gap-3 print:hidden">
 						<p className="flex items-center gap-2 text-sm font-semibold text-serene-green-700"><ShieldCheck className="size-4" aria-hidden /> Verified by Sauti Salama</p>
 						<div className="flex gap-2">
+							{!cert.anonymous && (
+								<>
+									<a href={linkedInAddToProfileUrl(cert)} target="_blank" rel="noopener noreferrer" className="inline-flex h-10 items-center gap-2 rounded-xl bg-[#0a66c2] px-4 text-sm font-semibold text-white transition-[transform,filter] duration-150 ease-out hover:brightness-110 active:scale-[0.98]">
+										<Linkedin className="size-4" aria-hidden /> Add to LinkedIn profile
+									</a>
+									<a href={linkedInShareUrl(cert.number)} target="_blank" rel="noopener noreferrer" className="inline-flex h-10 items-center gap-2 rounded-xl border border-serene-neutral-200 bg-white px-4 text-sm font-semibold text-serene-neutral-800 transition-[transform,background-color] duration-150 ease-out hover:bg-serene-neutral-50 active:scale-[0.98]">
+										<Share2 className="size-4" aria-hidden /> Share
+									</a>
+									<a href={`/api/certificates/${cert.number}/badge?download=1`} className="inline-flex h-10 items-center gap-2 rounded-xl border border-serene-neutral-200 bg-white px-4 text-sm font-semibold text-serene-neutral-800 transition-[transform,background-color] duration-150 ease-out hover:bg-serene-neutral-50 active:scale-[0.98]">
+										<ImageDown className="size-4" aria-hidden /> Badge image
+									</a>
+								</>
+							)}
 							<PrintButton />
 							<a href={`/api/certificates/${cert.number}/pdf`} className="inline-flex h-10 items-center gap-2 rounded-xl bg-sauti-teal px-4 text-sm font-semibold text-white transition-[transform,background-color] duration-150 ease-out hover:bg-sauti-dark active:scale-[0.98]">
 								<Download className="size-4" aria-hidden /> Download PDF
