@@ -28,4 +28,7 @@ export function linkedInAddToProfileUrl(c: { number: string; courseTitle: string
 	return `https://www.linkedin.com/profile/add?${params.toString()}`;
 }
 
+const shareText = (title: string) => `I completed "${title}" with Sauti Salama.`;
+export const whatsAppShareUrl = (c: { number: string; courseTitle: string }) => `https://wa.me/?text=${encodeURIComponent(`${shareText(c.courseTitle)} ${certificateUrl(c.number)}`)}`;
+export const xShareUrl = (c: { number: string; courseTitle: string }) => `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText(c.courseTitle))}&url=${encodeURIComponent(certificateUrl(c.number))}`;
 export const linkedInShareUrl = (number: string) => `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(certificateUrl(number))}`;
