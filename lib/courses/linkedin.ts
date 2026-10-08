@@ -2,9 +2,11 @@
  * LinkedIn sharing for certificates.
  *  - "Add to profile" opens LinkedIn's own Licenses & certifications form, prefilled.
  *  - "Share" opens a ready post for the public certificate page (its preview image is the badge).
- * Set NEXT_PUBLIC_LINKEDIN_ORG_ID (the numeric id of the Sauti Salama LinkedIn page) so the entry shows our logo and links to the page.
+ * NEXT_PUBLIC_LINKEDIN_ORG_ID can override the page id, so the entry shows our logo and links to the page.
  */
 export const ISSUER_NAME = "Sauti Salama";
+/** linkedin.com/company/sauti-salama. A company page id is public; the env variable overrides it. */
+export const SAUTI_LINKEDIN_ORG_ID = "102253501";
 
 export function siteUrl(): string {
 	const raw = (process.env.NEXT_PUBLIC_APP_URL || "https://sautisalama.org").replace(/\/$/, "");
@@ -15,7 +17,7 @@ export const certificateUrl = (number: string) => `${siteUrl()}/learn/certificat
 
 export function linkedInAddToProfileUrl(c: { number: string; courseTitle: string; issuedAt: string }): string {
 	const d = new Date(c.issuedAt);
-	const orgId = process.env.NEXT_PUBLIC_LINKEDIN_ORG_ID;
+	const orgId = process.env.NEXT_PUBLIC_LINKEDIN_ORG_ID || SAUTI_LINKEDIN_ORG_ID;
 	const params = new URLSearchParams({
 		startTask: "CERTIFICATION_NAME",
 		name: c.courseTitle.slice(0, 100),
