@@ -21,6 +21,9 @@ export function ChatLayout() {
   const chatId = searchParams.get('id');
   // The chat the user just tapped, until the URL catches up (avoids the effect below deselecting it).
   const pendingSelect = useRef<string | null>(null);
+  // Set while a community is being opened (it needs a round trip). The old conversation is deselected for that time,
+  // otherwise the user could type into it believing they are in the community.
+  const OPENING = '__opening__';
 
   useEffect(() => {
     // Reset unread count when opening the messages page
@@ -28,7 +31,12 @@ export function ChatLayout() {
   }, []);
 
   useEffect(() => {
-    if (chatId === pendingSelect.current) pendingSelect.current = null;
+    if (pendingSelect.current) {
+      // A selection the user just made is still travelling into the URL: do not let the OLD id in the URL
+      // pull the old conversation back (it used to flash up, and a message typed then went to the wrong chat).
+      if (pendingSelect.current === OPENING || chatId !== pendingSelect.current) return;
+      pendingSelect.current = null;
+    }
 
     if (chatId === SALAMA_BOT_ID) {
         if (selectedChat?.id !== SALAMA_BOT_ID) setSelectedChat(salamaBotChat());
@@ -122,6 +130,8 @@ export function ChatLayout() {
             chats={chats} 
             selectedChatId={selectedChat?.id} 
             onSelectChat={handleSelectChat}
+            onOpeningChat={() => { pendingSelect.current = OPENING; setSelectedChat(null); }}
+            onOpenFailed={() => { pendingSelect.current = null; }}
             isLoading={isLoading}
             currentUserId={currentUserId}
           />

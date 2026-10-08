@@ -88,7 +88,9 @@ export function PWAInstallPrompt({ onHandlersReady }: { onHandlersReady?: (handl
     }
   }, [showInstallPrompt, onHandlersReady, handleInstallClick]);
 
-  if (!showInstallPrompt) return null;
+  // The navigation bar mounts one of these only to reuse the install handlers for its own button;
+  // the banner belongs to the single instance in the root layout (otherwise it showed twice).
+  if (!showInstallPrompt || onHandlersReady) return null;
 
   return (
     <div className="fixed bottom-4 left-4 right-4 md:right-auto md:w-96 z-50 flex flex-col md:flex-row items-center gap-4 rounded-lg bg-white p-4 shadow-xl border border-gray-100">

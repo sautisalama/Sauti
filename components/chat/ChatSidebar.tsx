@@ -32,9 +32,13 @@ interface ChatSidebarProps {
   onSelectChat: (chat: Chat) => void;
   isLoading: boolean;
   currentUserId?: string;
+  /** Called as soon as a community starts opening, so the previous chat cannot receive what the user types meanwhile. */
+  onOpeningChat?: () => void;
+  /** Called if the community could not be opened. */
+  onOpenFailed?: () => void;
 }
 
-export function ChatSidebar({ chats, selectedChatId, onSelectChat, isLoading, currentUserId }: ChatSidebarProps) {
+export function ChatSidebar({ chats, selectedChatId, onSelectChat, isLoading, currentUserId, onOpeningChat, onOpenFailed }: ChatSidebarProps) {
   const user = useUser();
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<'all' | 'unread' | 'groups'>('all');
@@ -156,11 +160,13 @@ export function ChatSidebar({ chats, selectedChatId, onSelectChat, isLoading, cu
   const handleCommunityClick = async (community: Community) => {
     if (openingCommunity) return;
     setOpeningCommunity(community.id);
+    onOpeningChat?.();
     try {
       // Joins if needed, then returns the community's real chat.
       onSelectChat(await openCommunityChat(community.id));
     } catch (e) {
       console.error('Could not open community:', e);
+      onOpenFailed?.();
       toast({ title: 'Could not open this community', description: e instanceof Error ? e.message : 'Please try again.', variant: 'destructive' });
     } finally {
       setOpeningCommunity(null);

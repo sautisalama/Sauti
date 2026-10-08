@@ -55,7 +55,7 @@ await survivor.getByPlaceholder("Type a message...").fill(post);
 await survivor.keyboard.press("Enter");
 await survivor.getByText(post).first().waitFor({ timeout: 20000 });
 const stored = await poll(async () => (await db.from("messages").select("chat_id, sender_id").eq("content", post)).data?.[0]);
-check("COM-10 a member's message is stored in the community chat", stored?.chat_id === chat.id && stored?.sender_id === acc("survivor").id);
+check("COM-10 a member's message is stored in the community chat", stored?.chat_id === chat.id && stored?.sender_id === acc("survivor").id, JSON.stringify({ stored, expectChat: chat.id, expectSender: acc("survivor").id }));
 
 await pro.getByText(NAME).first().click();
 await pro.getByText(post).first().waitFor({ timeout: 25000 }).catch(() => undefined);
