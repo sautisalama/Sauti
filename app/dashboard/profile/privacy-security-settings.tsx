@@ -1,5 +1,6 @@
 "use client";
 
+import { ChangePasswordRow, DeleteAccountCard } from "@/components/account/AccountActions";
 import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -239,6 +240,10 @@ export function PrivacySecuritySettings() {
 				.eq("id", userId);
 
 			if (error) throw error;
+
+			// Really end the other sessions (this device stays signed in). The list above is only our record.
+			const { error: signOutError } = await supabase.auth.signOut({ scope: "others" });
+			if (signOutError) throw signOutError;
 
 			if (dash && profile) {
 				dash.updatePartial({
@@ -664,19 +669,12 @@ export function PrivacySecuritySettings() {
 							/>
 						</div>
 
-						<div className="p-4 flex items-center justify-between opacity-60">
-							<div className="space-y-0.5">
-								<div className="font-medium text-sm flex items-center gap-2">
-									Change Password
-									<Badge className="bg-amber-50 text-amber-600 border-amber-100 text-[10px] uppercase font-bold px-1.5 py-0">Coming Soon</Badge>
-								</div>
-								<p className="text-xs text-neutral-500">Update your password periodically.</p>
-							</div>
-							<ChevronRight className="h-4 w-4 text-neutral-300" />
-						</div>
+						<ChangePasswordRow email={profile?.email ?? null} />
 					</div>
 				</CardContent>
 			</Card>
+
+			<DeleteAccountCard isAnonymous={!!profile?.is_anonymous} isProvider={profile?.user_type === "professional" || profile?.user_type === "ngo"} />
 
 			<div className="flex justify-center pt-4">
 				<button className="text-xs text-neutral-400 hover:underline flex items-center gap-1">

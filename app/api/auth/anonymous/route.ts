@@ -68,10 +68,10 @@ export async function POST(request: Request) {
 
 		// Create Supabase admin client for user creation
 		const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-		const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+		const supabaseServiceKey = process.env.SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SERVICE_ROLE_KEY;
 
 		if (!supabaseServiceKey) {
-			console.error("SUPABASE_SERVICE_ROLE_KEY is not configured");
+			console.error("SERVICE_ROLE_KEY is not configured");
 			return NextResponse.json(
 				{ error: "Server configuration error" },
 				{ status: 500 },

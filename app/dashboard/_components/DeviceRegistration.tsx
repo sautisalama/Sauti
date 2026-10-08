@@ -47,8 +47,9 @@ export function DeviceRegistration() {
 			.eq("id", userId)
 			.then(({ error }) => {
 				if (!error) {
-					// Mark this session as registered
+					// Mark this session as registered (and remember on this device that it was, so a later removal can be noticed)
 					sessionStorage.setItem(sessionKey, "1");
+					try { localStorage.setItem(`ss_device_known_${userId}`, "1"); } catch { /* private mode */ }
 					hasRun.current = true;
 
 					// Update the provider so the settings page shows updated data
@@ -63,6 +64,33 @@ export function DeviceRegistration() {
 				}
 			});
 	}, [userId, profile, dash]);
+
+	// "Revoke" in Privacy & Security removes a device from the list. A device that finds itself missing
+	// signs out, so revoking actually ends that session (checked when the app opens or regains focus).
+	useEffect(() => {
+		if (!userId) return;
+		let stopped = false;
+		const supabase = createClient();
+		const check = async () => {
+			try {
+				if (localStorage.getItem(`ss_device_known_${userId}`) !== "1") return;
+				const { data } = await supabase.from("profiles").select("devices, settings").eq("id", userId).maybeSingle();
+				if (stopped || !data) return;
+				if (parseSettings(data.settings).device_tracking_enabled === false) return;
+				const list = Array.isArray(data.devices) ? (data.devices as { id?: string }[]) : [];
+				if (list.length && !list.some((d) => d.id === getOrCreateDeviceId())) {
+					await supabase.auth.signOut();
+					try { localStorage.removeItem(`ss_device_known_${userId}`); } catch { /* ignore */ }
+					window.location.replace("/signin?reason=signed-out-remotely");
+				}
+			} catch { /* never block the app on this */ }
+		};
+		const onVisible = () => document.visibilityState === "visible" && check();
+		const t = window.setTimeout(check, 4000);
+		document.addEventListener("visibilitychange", onVisible);
+		window.addEventListener("focus", check);
+		return () => { stopped = true; window.clearTimeout(t); document.removeEventListener("visibilitychange", onVisible); window.removeEventListener("focus", check); };
+	}, [userId]);
 
 	return null;
 }
