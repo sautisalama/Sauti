@@ -22,6 +22,7 @@ import { Input } from "@/components/ui/input";
 import { useState, useEffect, useCallback, use, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
+import { CaseOutcomeDialog } from "@/components/cases/CaseOutcomeDialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import Link from "next/link";
@@ -123,6 +124,8 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
 	const [allMatches, setAllMatches] = useState<ProviderMatch[]>([]);
 	const [matchIndex, setMatchIndex] = useState(0);
 	const [acceptedMatch, setAcceptedMatch] = useState<ProviderMatch | null>(null);
+	const [outcomeOpen, setOutcomeOpen] = useState(false);
+	const [outcomeDone, setOutcomeDone] = useState(false);
 	
 	const [loading, setLoading] = useState(true);
 	const [errorState, setErrorState] = useState<string | null>(null);
@@ -312,7 +315,6 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
 		}
 	};
 	const [isChatLoading, setIsChatLoading] = useState(false);
-	const [completing, setCompleting] = useState(false);
 	const [respondingTo, setRespondingTo] = useState<AppointmentData | null>(null);
 	const [showResponseModal, setShowResponseModal] = useState(false);
 	const [showMobileChat, setShowMobileChat] = useState(false);
@@ -661,31 +663,6 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
 		} else {
 			toast({ title: "Notes saved", description: "Your private notes have been saved securely." });
 			fetchReport();
-		}
-	};
-
-	const handleComplete = async () => {
-		if (!acceptedMatch || !report) return;
-		setCompleting(true);
-		try {
-			const { error } = await supabase
-				.from("matched_services")
-				.update({ match_status_type: "completed", completed_at: new Date().toISOString() })
-				.eq("id", acceptedMatch.id);
-			if (error) throw error;
-            
-            // Sync report status
-            await supabase
-                .from("reports")
-                .update({ match_status: "completed" })
-                .eq("report_id", reportId);
-
-			toast({ title: "Case Completed", description: "You have finalized this healing journey." });
-			fetchReport();
-		} catch (err: any) {
-			toast({ title: "Update failed", description: err.message, variant: "destructive" });
-		} finally {
-			setCompleting(false);
 		}
 	};
 
@@ -1158,6 +1135,29 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
 						{/* COORDINATION FLOW */}
 						{acceptedMatch ? (
 							<div className="space-y-8">
+								{/* 0. CASE OUTCOME - all screen sizes */}
+								{(() => {
+									let confirmed = outcomeDone;
+									try {
+										if (acceptedMatch.feedback?.startsWith("{")) confirmed = confirmed || JSON.parse(acceptedMatch.feedback).is_surv_complete === true;
+									} catch {}
+									return confirmed ? (
+										<p className="px-2 text-sm text-slate-500">You confirmed this case is complete. Thank you.</p>
+									) : (
+										<Button variant="outline" className="w-full h-12 rounded-xl border-teal-200 text-teal-700 hover:bg-teal-50 font-semibold" onClick={() => setOutcomeOpen(true)}>
+											{acceptedMatch.status === "completed" ? "Rate your support" : "My support is complete"}
+										</Button>
+									);
+								})()}
+								<CaseOutcomeDialog
+									matchId={acceptedMatch.id}
+									open={outcomeOpen}
+									onOpenChange={setOutcomeOpen}
+									onDone={() => {
+										setOutcomeDone(true);
+										fetchReport();
+									}}
+								/>
 								{/* 1. SECURE CHANNEL - Desktop Only */}
 								<div className="hidden lg:flex flex-col space-y-4 mb-8">
 									<div className="flex flex-col gap-1 px-2">

@@ -41,11 +41,13 @@ import {
 	Plus,
 	CheckSquare,
 	Trash2,
-	PenLine
+	PenLine,
+	CheckCircle
 } from "lucide-react";
 import { Tables } from "@/types/db-schema";
 import RichTextNotesEditor from "./rich-text-notes-editor";
 import { useToast } from "@/hooks/use-toast";
+import { CaseOutcomeDialog } from "@/components/cases/CaseOutcomeDialog";
 import { useDashboardData } from "@/components/providers/DashboardDataProvider";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -72,6 +74,7 @@ interface ReportItem extends Tables<"reports"> {
 	matched_services?: Array<{
 		id: string;
 		chat_id?: string | null;
+		feedback?: string | null;
 		match_status_type: any;
 		support_services: {
 			id: string;
@@ -286,6 +289,14 @@ function SidepanelChecklist({
 	);
 }
 
+function surveyDone(feedback?: string | null): boolean {
+	try {
+		return !!feedback && feedback.startsWith("{") && JSON.parse(feedback).is_surv_complete === true;
+	} catch {
+		return false;
+	}
+}
+
 export default function ReportsMasterDetail({ userId }: { userId: string }) {
 	const { toast } = useToast();
 	const dash = useDashboardData();
@@ -296,6 +307,7 @@ export default function ReportsMasterDetail({ userId }: { userId: string }) {
 	const [q, setQ] = useState("");
 	const [selectedId, setSelectedId] = useState<string | null>(null);
 	const [showProfile, setShowProfile] = useState(false);
+	const [outcomeMatchId, setOutcomeMatchId] = useState<string | null>(null);
 	const [loading, setLoading] = useState(true);
 	// Mobile view toggle between list and calendar
 	const [mobileView, setMobileView] = useState<"list" | "calendar">("list");
@@ -466,6 +478,8 @@ export default function ReportsMasterDetail({ userId }: { userId: string }) {
 							*,
 							matched_services (
 								id,
+								chat_id,
+								feedback,
 								match_status_type,
 								service_details:support_services (
 									id,
@@ -577,6 +591,8 @@ export default function ReportsMasterDetail({ userId }: { userId: string }) {
 					*,
 					matched_services (
 						id,
+						chat_id,
+						feedback,
 						match_status_type,
 						service_details:support_services (
 							id,
@@ -1651,7 +1667,7 @@ export default function ReportsMasterDetail({ userId }: { userId: string }) {
 											<div className="grid grid-cols-2 gap-3">
 												<Button 
 													className="bg-sauti-teal hover:bg-sauti-dark text-white shadow-sm"
-													onClick={() => window.location.href = `/dashboard/chat?id=${activeMatch.appointments?.[0]?.appointment_id || activeMatch.chat_id || 'new'}`}
+													onClick={() => window.location.href = `/dashboard/chat?id=${activeMatch.chat_id || ''}`}
 												>
 													<MessageCircle className="h-4 w-4 mr-2" /> Message
 												</Button>
@@ -1666,6 +1682,18 @@ export default function ReportsMasterDetail({ userId }: { userId: string }) {
 													View Profile
 												</Button>
 											</div>
+											{(activeMatch.match_status_type === 'accepted' || activeMatch.match_status_type === 'completed') && !surveyDone(activeMatch.feedback) && (
+												<Button
+													variant="outline"
+													className="w-full mt-3 border-serene-green-200 text-serene-green-700 hover:bg-serene-green-50"
+													onClick={() => setOutcomeMatchId(activeMatch.id)}
+												>
+													<CheckCircle className="h-4 w-4 mr-2" /> {activeMatch.match_status_type === 'completed' ? 'Rate your support' : 'My support is complete'}
+												</Button>
+											)}
+											{activeMatch.match_status_type === 'accepted' && surveyDone(activeMatch.feedback) && (
+												<p className="mt-3 text-xs text-center text-serene-neutral-500">You confirmed this case is complete. It will close once your professional confirms too.</p>
+											)}
 										</div>
 									);
 								})()}
@@ -1877,6 +1905,26 @@ export default function ReportsMasterDetail({ userId }: { userId: string }) {
 				</Dialog>
 
 				{/* Edit Report Dialog */}
+				{outcomeMatchId && (
+					<CaseOutcomeDialog
+						matchId={outcomeMatchId}
+						open
+						onOpenChange={(o) => !o && setOutcomeMatchId(null)}
+						onDone={({ completed }) => {
+							const id = outcomeMatchId;
+							setReports((prev) =>
+								prev.map((r) => ({
+									...r,
+									matched_services: r.matched_services?.map((m) =>
+										m.id === id
+											? { ...m, feedback: JSON.stringify({ is_surv_complete: true }), match_status_type: completed ? "completed" : m.match_status_type }
+											: m
+									),
+								}))
+							);
+						}}
+					/>
+				)}
 				<Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
 					<DialogContent className="sm:max-w-lg bg-white rounded-2xl p-0 overflow-hidden">
 						<div className="p-6 pb-0">
