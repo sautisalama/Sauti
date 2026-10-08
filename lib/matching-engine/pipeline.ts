@@ -93,8 +93,14 @@ async function getActiveCaseCount(
     return true;
   });
 
-  return trulyActive.length;
+  // Offers nobody has answered yet must not lock a provider out of new matches: the first
+  // UNANSWERED_OFFER_ALLOWANCE pending offers are free, beyond that they count like active cases.
+  const pending = trulyActive.filter(m => m.match_status_type === 'pending').length;
+  const inProgress = trulyActive.length - pending;
+  return inProgress + Math.max(0, pending - UNANSWERED_OFFER_ALLOWANCE);
 }
+
+const UNANSWERED_OFFER_ALLOWANCE = 5;
 
 
 // ─── Main Pipeline ──────────────────────────────────────────────────────────
