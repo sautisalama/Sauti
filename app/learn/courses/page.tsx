@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { coverFor } from "@/lib/courses/covers";
 import Image from "next/image";
 import Link from "next/link";
 import { ArrowRight, GraduationCap } from "lucide-react";
@@ -44,7 +45,7 @@ export default async function CoursesPage() {
 								<li key={c.id}>
 									<Link href={`/learn/courses/${c.slug}`} className="group flex h-full flex-col overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-xl transition-shadow hover:shadow-2xl">
 										<div className="relative flex aspect-video items-center justify-center overflow-hidden bg-gradient-to-br from-[#1a365d] to-sauti-teal">
-											{c.cover_image_url ? <Image src={c.cover_image_url} alt="" fill sizes="(min-width:1024px) 33vw, (min-width:640px) 50vw, 100vw" className="object-cover transition-transform duration-700 group-hover:scale-105" /> : <GraduationCap className="h-12 w-12 text-white/70" aria-hidden />}
+											<Image src={coverFor(c)} alt="" fill sizes="(min-width:1024px) 33vw, (min-width:640px) 50vw, 100vw" className="object-cover transition-transform duration-700 group-hover:scale-105" />
 										</div>
 										<div className="flex flex-1 flex-col p-6">
 											<p className="mb-2 text-[11px] font-black uppercase tracking-widest text-sauti-teal">{c.level} · {modules.get(c.id) ?? 0} modules{c.estimated_minutes ? ` · ${c.estimated_minutes} min` : ""}</p>

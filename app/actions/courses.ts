@@ -1,5 +1,6 @@
 "use server";
 
+import { issueCertificate } from "@/lib/courses/certificates";
 import { revalidatePath } from "next/cache";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { requireAdmin } from "@/lib/auth/require-admin";
@@ -231,7 +232,7 @@ export async function enrollInCourse(courseId: string): Promise<Result> {
 }
 
 /** Mark a lesson done (or undo). Marks the course complete when every lesson is done. */
-export async function setLessonComplete(lessonId: string, done: boolean): Promise<Result<{ completedCourse: boolean; completed: number; total: number }>> {
+export async function setLessonComplete(lessonId: string, done: boolean): Promise<Result<{ completedCourse: boolean; completed: number; total: number; certificateNumber?: string }>> {
 	const { supabase, user } = await currentUser();
 	if (!user) return { ok: false, error: "Please sign in." };
 
@@ -262,8 +263,11 @@ export async function setLessonComplete(lessonId: string, done: boolean): Promis
 		.eq("course_id", lesson.course_id)
 		.eq("user_id", user.id);
 
+	// Finishing the last lesson earns a certificate (issued by the server after it re-checks every lesson).
+	const certificate = finished ? await issueCertificate(lesson.course_id, user.id).catch(() => null) : null;
+
 	refresh();
-	return { ok: true, completedCourse: finished, completed: c, total: t };
+	return { ok: true, completedCourse: finished, completed: c, total: t, certificateNumber: certificate?.number };
 }
 
 /** Remember where the learner was, so "Continue" resumes there. */

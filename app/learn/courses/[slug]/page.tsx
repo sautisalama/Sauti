@@ -1,13 +1,16 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { CheckCircle2, Circle, PlayCircle } from "lucide-react";
+import Image from "next/image";
+import { Award, CheckCircle2, Circle, PlayCircle } from "lucide-react";
 import { Nav } from "@/components/Nav";
 import { Footer } from "@/components/Footer";
 import { createClient } from "@/utils/supabase/server";
 import { sanitizeContent } from "@/lib/content/sanitize";
 import { pct } from "@/lib/courses/video";
 import { EnrollButton } from "@/components/courses/EnrollButton";
+import { coverFor } from "@/lib/courses/covers";
+import { issueCertificate } from "@/lib/courses/certificates";
 
 type Props = { params: Promise<{ slug: string }> };
 
@@ -45,6 +48,8 @@ export default async function CoursePage({ params }: Props) {
 		enrollment = enr;
 	}
 
+	const certificate = user && enrollment?.completed_at ? await issueCertificate(course.id, user.id).catch(() => null) : null;
+
 	const all = lessons ?? [];
 	const ordered = (modules ?? []).flatMap((m) => all.filter((l) => l.module_id === m.id));
 	const firstUndone = ordered.find((l) => !done.has(l.id)) ?? ordered[0];
@@ -59,6 +64,9 @@ export default async function CoursePage({ params }: Props) {
 				<div className="mx-auto grid max-w-6xl gap-10 lg:grid-cols-[1fr_22rem]">
 					<div>
 						<Link href="/learn/courses" className="text-sm font-bold text-[#1a365d] hover:text-sauti-orange">← All courses</Link>
+						<div className="relative mt-5 aspect-[21/9] overflow-hidden rounded-2xl bg-gradient-to-br from-[#1a365d] to-sauti-teal">
+							<Image src={coverFor(course)} alt="" fill priority sizes="(min-width:1024px) 60vw, 100vw" className="object-cover" />
+						</div>
 						<p className="mt-6 text-[11px] font-black uppercase tracking-widest text-sauti-teal">{course.level}{course.estimated_minutes ? ` · ${course.estimated_minutes} min` : ""}</p>
 						<h1 className="mb-4 mt-2 text-3xl font-black text-[#1a365d] md:text-5xl">{course.title}</h1>
 						{course.summary && <p className="mb-6 text-lg text-gray-600">{course.summary}</p>}
@@ -93,6 +101,11 @@ export default async function CoursePage({ params }: Props) {
 										<div className="h-full rounded-full bg-sauti-teal transition-all duration-500" style={{ width: `${percent}%` }} />
 									</div>
 									<p className="mb-4 text-sm text-gray-600">{done.size} of {all.length} lessons · {percent}%</p>
+									{certificate && (
+										<Link href={`/learn/certificates/${certificate.number}`} className="mb-3 flex w-full items-center justify-center gap-2 rounded-full bg-sauti-yellow px-6 py-3.5 text-base font-black text-[#1a365d] transition-[transform,filter] duration-150 ease-out hover:brightness-95 active:scale-[0.98]">
+											<Award className="h-5 w-5" aria-hidden /> View your certificate
+										</Link>
+									)}
 									{resume && (
 										<Link href={`/learn/courses/${slug}/lessons/${resume.id}`} className="flex w-full items-center justify-center gap-2 rounded-full bg-[#1a365d] px-6 py-3.5 text-base font-black text-white transition-colors hover:bg-sauti-teal active:scale-[0.98]">
 											<PlayCircle className="h-5 w-5" aria-hidden /> {done.size ? "Continue" : "Start"} learning

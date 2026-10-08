@@ -16,11 +16,13 @@ export default async function CourseProgressPage({ params }: { params: Promise<{
 	const { data: course } = await auth.supabase.from("courses").select("id, title").eq("id", id).maybeSingle();
 	if (!course) notFound();
 
-	const [{ count: total }, { data: enrollments }, { data: progress }] = await Promise.all([
+	const [{ count: total }, { data: enrollments }, { data: progress }, { data: certs }] = await Promise.all([
 		auth.supabase.from("course_lessons").select("id", { count: "exact", head: true }).eq("course_id", id),
 		auth.supabase.from("course_enrollments").select("user_id, enrolled_at, last_active_at, completed_at").eq("course_id", id).order("last_active_at", { ascending: false }),
 		auth.supabase.from("lesson_progress").select("user_id").eq("course_id", id),
+		auth.supabase.from("course_certificates").select("user_id, certificate_number").eq("course_id", id),
 	]);
+	const certOf = new Map((certs ?? []).map((c) => [c.user_id, c.certificate_number]));
 	const doneBy = new Map<string, number>();
 	for (const p of progress ?? []) doneBy.set(p.user_id, (doneBy.get(p.user_id) ?? 0) + 1);
 
@@ -56,7 +58,7 @@ export default async function CourseProgressPage({ params }: { params: Promise<{
 				<div className="overflow-x-auto rounded-2xl border border-gray-200 bg-white">
 					<table className="w-full min-w-[34rem] text-left text-sm">
 						<thead className="bg-gray-50 text-xs uppercase tracking-wider text-gray-500">
-							<tr><th className="px-4 py-3">Learner</th><th className="px-4 py-3">Progress</th><th className="px-4 py-3">Started</th><th className="px-4 py-3">Last active</th><th className="px-4 py-3">Completed</th></tr>
+							<tr><th className="px-4 py-3">Learner</th><th className="px-4 py-3">Progress</th><th className="px-4 py-3">Started</th><th className="px-4 py-3">Last active</th><th className="px-4 py-3">Completed</th><th className="px-4 py-3">Certificate</th></tr>
 						</thead>
 						<tbody className="divide-y divide-gray-100">
 							{rows.map((r) => (
@@ -73,6 +75,7 @@ export default async function CourseProgressPage({ params }: { params: Promise<{
 									<td className="px-4 py-3 text-gray-600">{when(r.enrolled_at)}</td>
 									<td className="px-4 py-3 text-gray-600">{when(r.last_active_at)}</td>
 									<td className="px-4 py-3 text-gray-600">{when(r.completed_at)}</td>
+									<td className="px-4 py-3 font-mono text-xs text-gray-600">{certOf.get(r.user_id) ?? (r.completed_at ? "pending" : "n/a")}</td>
 								</tr>
 							))}
 						</tbody>

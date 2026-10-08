@@ -1,5 +1,6 @@
 "use client";
 
+import { COURSE_COVERS } from "@/lib/courses/covers";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -163,6 +164,20 @@ function CourseDetails({ course, run, busy }: { course: CourseRow; run: Run; bus
 				<label className="block text-sm font-bold text-[#1a365d]">Minutes<input className="input mt-1 font-normal" inputMode="numeric" value={f.minutes} onChange={(e) => setF({ ...f, minutes: e.target.value.replace(/\D/g, "") })} /></label>
 			</div>
 			<label className="block text-sm font-bold text-[#1a365d]">Short summary<textarea className="input mt-1 font-normal" rows={2} maxLength={300} value={f.summary} onChange={(e) => setF({ ...f, summary: e.target.value })} /></label>
+			<div>
+				<p className="mb-1 text-sm font-bold text-[#1a365d]">Feature photo</p>
+				<p className="mb-2 text-xs text-gray-500">Choose a photo from the library, or upload your own below. If you choose nothing, a photo is picked for you.</p>
+				<div className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-6" role="radiogroup" aria-label="Feature photo">
+					{COURSE_COVERS.map((c) => (
+						<button key={c.url} type="button" role="radio" aria-checked={f.cover === c.url} onClick={() => setF({ ...f, cover: f.cover === c.url ? "" : c.url })}
+							className={`group relative aspect-video overflow-hidden rounded-lg border-2 transition-[border-color,transform] duration-150 ease-out active:scale-[0.97] ${f.cover === c.url ? "border-[#008080]" : "border-transparent hover:border-gray-300"}`}>
+							{/* eslint-disable-next-line @next/next/no-img-element */}
+							<img src={c.url} alt="" loading="lazy" className="h-full w-full object-cover" />
+							<span className="absolute inset-x-0 bottom-0 bg-black/55 px-1.5 py-0.5 text-left text-[10px] font-semibold text-white">{c.label}</span>
+						</button>
+					))}
+				</div>
+			</div>
 			<label className="block text-sm font-bold text-[#1a365d]">Cover image link
 				<span className="mt-1 flex gap-2">
 					<input className="input font-normal" value={f.cover} onChange={(e) => setF({ ...f, cover: e.target.value })} placeholder="https://… or upload" />
