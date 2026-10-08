@@ -116,11 +116,20 @@ const prof = async (uid) => (await svc.from("profiles").select("*").eq("id", uid
 	check("SEC-25 anonymous visitors cannot delete a voice note", !still.error, JSON.stringify(del.data?.length ?? del.error));
 	await svc.storage.from("report-audio").remove(["reports/e2e-sec.webm"]);
 
-	// Verified public-booking providers are intentionally readable by signed-in users (see docs/uat/KNOWN-GAPS.md #11).
-	r = await sur.from("profiles").select("id, google_calendar_token, is_public_booking").neq("id", id("survivor")).limit(20);
-	const leaked = (r.data ?? []).filter((p) => !p.is_public_booking);
-	check("SEC-26 a user cannot read other people's private profile rows", leaked.length === 0, `rows=${leaked.length}`);
-	check("SEC-26b …and no calendar token is ever exposed on a readable profile", (r.data ?? []).every((p) => p.google_calendar_token == null));
+	// Provider rows are visible only to related users (match / appointment / private chat) and other verified providers.
+	const stranger = await as("survivor2");
+	r = await stranger.from("profiles").select("id, email, phone").neq("id", id("survivor2")).limit(20);
+	check("SEC-26 an unrelated user cannot read any other profile (incl. email/phone)", (r.data?.length ?? 0) === 0, `rows=${r.data?.length}`);
+	r = await sur.from("profiles").select("id, google_calendar_token").neq("id", id("survivor")).limit(20);
+	const seen = (r.data ?? []).map((p) => p.id);
+	check("SEC-26b a user sees only the providers they are connected to (chat with the lawyer, not the nurse/NGO)", seen.includes(id("professional")) && !seen.includes(id("medic")) && !seen.includes(id("ngo")), `rows=${seen.length}`);
+	check("SEC-26c …and no calendar token is ever exposed on a readable profile", (r.data ?? []).every((p) => p.google_calendar_token == null));
+	const peer = await as("medic");
+	r = await peer.from("profiles").select("id").eq("id", id("professional"));
+	check("SEC-26d verified providers can see each other (forwarding)", r.data?.length === 1);
+	const pend = await as("pending_pro");
+	r = await pend.from("profiles").select("id").eq("id", id("professional"));
+	check("SEC-26e an unverified provider cannot browse other providers", (r.data?.length ?? 0) === 0);
 	r = await a.from("profiles").select("id").limit(1);
 	check("SEC-27 anonymous visitors cannot read profiles", (r.data?.length ?? 0) === 0);
 	r = await a.from("reports").select("report_id").limit(1);
