@@ -17,6 +17,7 @@ const SUITES = [
 	["scripts/e2e/uat/04-communication.mjs", "UAT-COM  Messages, communities, AI assistant"],
 	["scripts/e2e/uat/05-scheduling.mjs", "UAT-SCH  Booking and availability"],
 	["scripts/e2e/uat/06-monitoring.mjs", "UAT-MON  24h escalation monitoring"],
+	["scripts/e2e/uat/08-case-outcome.mjs", "UAT-OUT  Survivor confirms completion and rates support"],
 	["scripts/e2e/uat/07-content.mjs", "UAT-PUB/LRN  Publications, courses, learner progress"],
 ];
 const filter = process.argv[2];

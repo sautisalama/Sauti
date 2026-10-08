@@ -22,3 +22,6 @@ Use a phone-sized browser window (the majority of users). Sign in as `survivor`,
 | SUR-16 | M | Request an appointment. | Saved as **requested**; the professional is notified; booking the same time again is refused; a past time or invalid email is refused. |
 | SUR-17 | S | Request using a service provider's email. | Refused with a message to use another address. |
 | SUR-18 | S | Courses: sign in, enrol, finish lessons. | Progress is saved and shown on **Learning**. |
+| SUR-19 | M | Open an accepted case. Choose **My support is complete**, give 4 stars and a note. | Saved; the professional is notified; the case closes once they confirm too. |
+| SUR-20 | S | The professional already closed the case. | You can still **Rate your support** once; the prompt disappears afterwards. |
+| SUR-21 | M | As an unrelated survivor, try to read another user's profile or email via the app. | Nothing is returned. |

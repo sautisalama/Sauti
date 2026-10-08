@@ -37,6 +37,8 @@ Automated IDs refer to `scripts/e2e/uat/` (suite number in the name) and `script
 | ADM-P1 – P12 | `07-content` publication checks (editor, draft, preview, import, publish, email, sitemap, audit) |
 | ADM-C1 – C3, LRN-01 – 04 | `07-content` course checks |
 | OPS-01 – OPS-08 | `06-monitoring` MON-01 – MON-15 |
+| SUR-19 – SUR-20 | `08-case-outcome` OUT-01 – OUT-07 |
+| SUR-21 | `security.mjs` SEC-26 – SEC-26e |
 | SEC-* | `security.mjs`, `public.mjs` |
 
 Not automated (manual only): real email delivery through Mailtrap, Google Calendar OAuth, real phone microphone, visual/mobile polish.
