@@ -31,9 +31,9 @@ export function RemindDocumentsButton({ target, size = "default", className }: {
 	};
 
 	return (
-		<div className={className}>
-			<p className="mb-2 text-xs font-medium text-amber-700">No documents uploaded yet. Verification needs documents to review.</p>
-			<Button size={size} variant="outline" onClick={send} disabled={busy || sent} className="border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100">
+		<div className={`flex flex-col items-stretch gap-2 rounded-xl border border-amber-200 bg-amber-50/60 p-3 sm:flex-row sm:items-center sm:gap-4 ${className || ""}`}>
+			<p className="flex-1 text-xs font-medium leading-snug text-amber-800">No documents uploaded yet. Verification is only done against documents.</p>
+			<Button size={size} variant="outline" onClick={send} disabled={busy || sent} className="shrink-0 justify-center border-amber-300 bg-white text-amber-800 hover:bg-amber-100">
 				{busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <BellRing className="mr-2 h-4 w-4" />}
 				{sent ? "Reminder sent" : "Remind to upload documents"}
 			</Button>
@@ -42,7 +42,7 @@ export function RemindDocumentsButton({ target, size = "default", className }: {
 }
 
 /** Opens the admin's direct chat with the professional. The same chat is in both people's chat lists. */
-export function MessageProfessionalButton({ chat, size = "default" }: { chat: ChatTarget; size?: "default" | "sm" }) {
+export function MessageProfessionalButton({ chat, size = "default", fullWidth = false }: { chat: ChatTarget; size?: "default" | "sm"; fullWidth?: boolean }) {
 	const { toast } = useToast();
 	const [open, setOpen] = useState(false);
 	const [busy, setBusy] = useState(false);
@@ -63,7 +63,7 @@ export function MessageProfessionalButton({ chat, size = "default" }: { chat: Ch
 
 	return (
 		<>
-			<Button size={size} variant="outline" onClick={start} disabled={busy} className="border-serene-neutral-200 shadow-sm">
+			<Button size={size} variant="outline" onClick={start} disabled={busy} className={`border-serene-neutral-200 shadow-sm ${fullWidth ? "h-11 w-full justify-center rounded-xl" : ""}`}>
 				{busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <MessageSquare className="mr-2 h-4 w-4" />}
 				Message
 			</Button>

@@ -14,6 +14,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 
+import { MessageProfessionalButton } from "../../_components/AdminReachOut";
 import { DocumentSidepanel } from "../../_components/DocumentSidepanel";
 import { 
     InfoBlock,
@@ -323,7 +324,6 @@ export default function ReviewPage() {
                 onAction={(action) => openActionDialog(profile.id, 'profile', action, `${profile.first_name} ${profile.last_name}`)}
                 documentCount={profile.accreditation_files_metadata?.length || 0}
                 remindTarget={{ id: profile.id, type: 'profile' }}
-                chat={{ profileId: profile.id, name: `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || 'Professional', role: profile.user_type }}
                 meta={[
                     <span key="joined">Joined {new Date(profile.created_at || 0).toLocaleDateString()}</span>
                 ]}
@@ -360,6 +360,7 @@ export default function ReviewPage() {
                             </div>
                         </CardContent>
                      </Card>
+                     <MessageProfessionalButton fullWidth chat={{ profileId: profile.id, name: `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || 'Professional', role: profile.user_type }} />
                 </div>
 
                 {/* Right Column: Content */}
@@ -378,14 +379,6 @@ export default function ReviewPage() {
                                     <div className="space-y-1">
                                         <CardTitle className="text-xl text-gray-900 font-bold">Personal Details</CardTitle>
                                         <CardDescription className="text-gray-500">Basic information and identity documents</CardDescription>
-                                    </div>
-                                    <div className="flex gap-2">
-                                        <ActionButtons 
-                                            status={profile.verification_status} 
-                                            onAction={(action) => openActionDialog(profile.id, 'profile', action, `${profile.first_name} ${profile.last_name}`)} 
-                                            documentCount={profile.accreditation_files_metadata?.length || 0}
-                                            remindTarget={{ id: profile.id, type: 'profile' }}
-                                        />
                                     </div>
                                 </CardHeader>
                                 <CardContent className="space-y-6 pt-6">

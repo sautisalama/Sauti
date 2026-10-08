@@ -30,12 +30,49 @@ import { SereneBreadcrumb } from "@/components/ui/SereneBreadcrumb";
 import { PendingUser, PendingService } from "@/types/admin-types";
 import { formatDistanceToNow } from "date-fns";
 import { AdminCasesTable } from "../_components/AdminCasesTable";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+
+type Presence = "all" | "with" | "without";
+type SortKey = "newest" | "oldest" | "updated";
+type Row = { docs: number; services: number };
+const docCountOf = (u: any) => Math.max(
+	Array.isArray(u.accreditation_files_metadata) ? u.accreditation_files_metadata.length : 0,
+	Array.isArray(u.accreditation_files) ? u.accreditation_files.length : 0
+);
+const matchesPresence = (n: number, p: Presence) => p === "all" || (p === "with" ? n > 0 : n === 0);
+const time = (d?: string | null) => (d ? new Date(d).getTime() : 0);
+function sortBy<T extends { created_at: string | null; verification_updated_at: string | null }>(items: T[], key: SortKey) {
+	return [...items].sort((a, b) =>
+		key === "oldest" ? time(a.created_at) - time(b.created_at)
+		: key === "updated" ? time(b.verification_updated_at || b.created_at) - time(a.verification_updated_at || a.created_at)
+		: time(b.created_at) - time(a.created_at));
+}
+
+function RadioFilter<T extends string>({ legend, value, onChange, options }: { legend: string; value: T; onChange: (v: T) => void; options: { value: T; label: string }[] }) {
+	return (
+		<fieldset className="min-w-0">
+			<legend className="mb-1.5 text-[11px] font-bold uppercase tracking-wider text-gray-500">{legend}</legend>
+			<div className="inline-flex flex-wrap gap-1 rounded-lg border border-gray-200 bg-white p-0.5">
+				{options.map((o) => (
+					<label key={o.value} className="cursor-pointer">
+						<input type="radio" name={legend} value={o.value} checked={value === o.value} onChange={() => onChange(o.value)} className="peer sr-only" />
+						<span className="block rounded-md px-3 py-1.5 text-xs font-semibold text-gray-600 transition-colors hover:bg-gray-50 peer-checked:bg-blue-600 peer-checked:text-white peer-focus-visible:ring-2 peer-focus-visible:ring-blue-400">{o.label}</span>
+					</label>
+				))}
+			</div>
+		</fieldset>
+	);
+}
 
 export default function ReviewDashboardPage() {
 	const [pendingUsers, setPendingUsers] = useState<PendingUser[]>([]);
 	const [pendingServices, setPendingServices] = useState<PendingService[]>([]);
     const [matchedCount, setMatchedCount] = useState(0);
 	const [isLoading, setIsLoading] = useState(true);
+	const [userServiceCounts, setUserServiceCounts] = useState<Record<string, number>>({});
+	const [docFilter, setDocFilter] = useState<Presence>("all");
+	const [serviceFilter, setServiceFilter] = useState<Presence>("all");
+	const [sort, setSort] = useState<SortKey>("newest");
 	const [view, setView] = useState<"cards" | "list">("cards");
 	const supabase = createClient();
 
@@ -81,6 +118,15 @@ export default function ReviewDashboardPage() {
                     .select("report_id", { count: 'exact', head: true })
                     .eq("ismatched", true);
 
+				// How many services each applicant has, for the "with services" filter.
+				const userIds = (users || []).map((u: any) => u.id);
+				const counts: Record<string, number> = {};
+				if (userIds.length) {
+					const { data: owned } = await supabase.from("support_services").select("user_id").in("user_id", userIds);
+					(owned || []).forEach((r: any) => { counts[r.user_id] = (counts[r.user_id] || 0) + 1; });
+				}
+				setUserServiceCounts(counts);
+
 				// Everything pending is listed (the same set the admin counters use), including applicants who have not uploaded documents yet.
 				setPendingUsers((users || []) as unknown as PendingUser[]);
 				setPendingServices((services || []) as unknown as PendingService[]);
@@ -109,6 +155,17 @@ export default function ReviewDashboardPage() {
 				return "bg-gray-100 text-gray-800 border-gray-200";
 		}
 	};
+
+	const shownUsers = sortBy(
+		pendingUsers.filter((u) => matchesPresence(docCountOf(u), docFilter) && matchesPresence(userServiceCounts[u.id] || 0, serviceFilter)),
+		sort
+	);
+	const shownServices = sortBy(
+		pendingServices.filter((s) => matchesPresence(docCountOf(s), docFilter)),
+		sort
+	);
+	const filtersActive = docFilter !== "all" || serviceFilter !== "all";
+	const resetFilters = () => { setDocFilter("all"); setServiceFilter("all"); };
 
 	if (isLoading) {
 		return <ReviewDashboardSkeleton />;
@@ -169,19 +226,37 @@ export default function ReviewDashboardPage() {
 				</div>
 				</div>
 
+				<div className="flex flex-wrap items-end gap-x-6 gap-y-3">
+					<RadioFilter legend="Documents" value={docFilter} onChange={setDocFilter} options={[{ value: "all", label: "All" }, { value: "with", label: "With documents" }, { value: "without", label: "No documents" }]} />
+					<RadioFilter legend="Services" value={serviceFilter} onChange={setServiceFilter} options={[{ value: "all", label: "All" }, { value: "with", label: "With services" }, { value: "without", label: "No services" }]} />
+					<div>
+						<label className="mb-1.5 block text-[11px] font-bold uppercase tracking-wider text-gray-500">Order by</label>
+						<Select value={sort} onValueChange={(v) => setSort(v as SortKey)}>
+							<SelectTrigger className="h-9 w-[190px] rounded-lg bg-white text-xs font-semibold"><SelectValue /></SelectTrigger>
+							<SelectContent>
+								<SelectItem value="newest">Newest submitted first</SelectItem>
+								<SelectItem value="oldest">Oldest submitted first</SelectItem>
+								<SelectItem value="updated">Recently updated</SelectItem>
+							</SelectContent>
+						</Select>
+					</div>
+					{filtersActive && <Button type="button" variant="ghost" size="sm" onClick={resetFilters} className="h-9 text-xs text-blue-600">Clear filters</Button>}
+					<p className="ml-auto pb-2 text-xs text-gray-500" aria-live="polite">Showing {shownUsers.length} of {pendingUsers.length} people · {shownServices.length} of {pendingServices.length} services</p>
+				</div>
+
 				<TabsContent value="users" className="space-y-4 animate-in slide-in-from-bottom-2 duration-300">
-					{pendingUsers.length === 0 ? (
-						<EmptyState type="users" />
+					{shownUsers.length === 0 ? (
+						<EmptyState type="users" filtered={pendingUsers.length > 0} />
 					) : (
 						<div className={view === "cards" ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" : "flex flex-col divide-y divide-gray-100 overflow-hidden rounded-2xl border border-gray-200 bg-white"}>
-							{pendingUsers.map((user) => (
+							{shownUsers.map((user) => (
 								<ReviewCard view={view} 
                                     key={user.id} 
                                     title={`${user.first_name || 'Unknown'} ${user.last_name || ''}`}
                                     subtitle={user.user_type || 'Professional'}
                                     status={user.verification_status || 'pending'}
                                     date={user.created_at || new Date().toISOString()}
-                                    docsCount={Array.isArray(user.accreditation_files_metadata) ? user.accreditation_files_metadata.length : 0}
+                                    docsCount={docCountOf(user)}
                                     statusColor={getStatusColor(user.verification_status || 'pending')}
                                     href={`/dashboard/admin/review/${user.id}?type=professional`} 
                                 />
@@ -191,11 +266,11 @@ export default function ReviewDashboardPage() {
 				</TabsContent>
 
 				<TabsContent value="services" className="space-y-4 animate-in slide-in-from-bottom-2 duration-300">
-					{pendingServices.length === 0 ? (
-						<EmptyState type="services" />
+					{shownServices.length === 0 ? (
+						<EmptyState type="services" filtered={pendingServices.length > 0} />
 					) : (
 						<div className={view === "cards" ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" : "flex flex-col divide-y divide-gray-100 overflow-hidden rounded-2xl border border-gray-200 bg-white"}>
-							{pendingServices.map((service) => (
+							{shownServices.map((service) => (
 								<ReviewCard view={view} 
                                     key={service.id} 
                                     title={service.name || 'Untitled Service'}
@@ -293,7 +368,14 @@ function ReviewCard({ view, title, subtitle, status, date, docsCount, statusColo
     )
 }
 
-function EmptyState({ type }: { type: 'users' | 'services' }) {
+function EmptyState({ type, filtered }: { type: 'users' | 'services'; filtered?: boolean }) {
+    if (filtered) {
+        return (
+            <div className="rounded-2xl border border-dashed border-gray-200 bg-gray-50/50 py-12 text-center text-sm text-gray-500">
+                Nobody matches these filters. Clear a filter to see more {type}.
+            </div>
+        );
+    }
     return (
         <div className="flex flex-col items-center justify-center py-16 text-center bg-gray-50/50 rounded-2xl border border-dashed border-gray-200">
             <div className="h-16 w-16 bg-white rounded-full flex items-center justify-center shadow-sm mb-4">
