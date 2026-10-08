@@ -39,6 +39,14 @@ Automated IDs refer to `scripts/e2e/uat/` (suite number in the name) and `script
 | OPS-01 – OPS-08 | `06-monitoring` MON-01 – MON-15 |
 | SUR-19 – SUR-20 | `08-case-outcome` OUT-01 – OUT-07 |
 | SUR-21 | `security.mjs` SEC-26 – SEC-26e |
+| SUR-22 – SUR-23 | `shoot.mjs` walks the flow; `public.mjs` and `02-reporting-matching` REP-01/REP-02 cover creation |
+| SUR-24, SUR-26 | `09-account-and-alerts` ACC-01 – ACC-11 |
+| SUR-25 | `09-account-and-alerts` ACC-12, ACC-13 |
+| SUR-28 | `09-account-and-alerts` CERT-01 – CERT-11 |
+| SUR-30, PRO-18 | `05-scheduling` SCH-26 – SCH-34 |
+| PRO-19, ADM-V13, OPS-09 – OPS-11 | `09-account-and-alerts` VDOC-01 – VDOC-11 |
+| PRO-20 | `09-account-and-alerts` ACC-07 – ACC-10 |
+| ADM-V12, PRO-21 | `security.mjs` SEC-26e and the onboarding probe in the build notes |
 | SEC-* | `security.mjs`, `public.mjs` |
 
 Not automated (manual only): real email delivery through Mailtrap, Google Calendar OAuth, real phone microphone, visual/mobile polish.

@@ -28,3 +28,4 @@
 | LRN-03 | M | **Complete & continue** through the lessons. | Moves to the next lesson; finishing shows **Course completed**. |
 | LRN-04 | M | **Dashboard → Learning**. | Course at 100%. |
 | ADM-C3 | M | **Admin → Courses → Progress**. | Learner shown with 2/2 and 100%. |
+| ADM-C4 | S | In the course builder choose a feature photo. | It shows on the catalogue, the course page and My learning. A course with no photo still gets one |

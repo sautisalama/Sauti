@@ -17,6 +17,8 @@ Sign in as `admin`. Priority: **M** = must pass, **S** = should pass.
 | ADM-V9 | S | Ban a service. File a matching report. | The banned service is not matched. |
 | ADM-V10 | M | Sign in as a non-admin and open the review URL. | You are refused; no queue data is returned. |
 | ADM-V11 | M | As a signed-in user, try to set your own "verified/admin" fields (browser console). | Refused by the database. |
+| ADM-V12 | M | Sign in as an admin whose profile has no professional title. | The admin menu shows, not a "Setup in Progress" card |
+| ADM-V13 | M | A provider attaches documents. | You receive an in-app notification with a link to the application, and the team receives the email |
 
 ## Matching oversight (ADM-M)
 
@@ -27,6 +29,7 @@ Sign in as `admin`. Priority: **M** = must pass, **S** = should pass.
 | ADM-M3 | S | Run **backfill**. | Only recent reports with no live match are processed (max 100); nothing is re-matched twice. |
 | ADM-M4 | S | A report outside all coverage areas. | It is not force-matched and is flagged for you. |
 | ADM-M5 | M | Wait 24 hours with an unmatched report (or use the seeded 30-hour-old one and call the monitor). | See `05-monitoring-and-security.md`. |
+| ADM-M6 | S | **Matching Engine**: pick a report, **Initialize Engine**, read the scores, then **Trigger Cascade**. | Each stage appears in turn; removed providers show the reason in red; the cascade widens the search |
 
 ## Publications & courses
 

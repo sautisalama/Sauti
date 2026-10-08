@@ -21,3 +21,7 @@ Sign in as `professional` (lawyer), `medic`, `ngo`, or `pending_pro`.
 | PRO-15 | S | Connect Google Calendar in **Profile**. | Connected state shows; tokens are never visible in the browser. |
 | PRO-16 | S | Create a community; another user joins and posts. | Member count correct; members see messages; non-members cannot. |
 | PRO-17 | S | Change your service documents. | Your profile returns to "under review" (known behaviour — see KNOWN-GAPS). |
+| PRO-18 | M | **Profile, Calendar**: block a time, with and without weekly repeat; remove it. | The block appears under its day; that time can no longer be booked or offered; removal frees it |
+| PRO-19 | M | Attach a verification document to your profile or service. | The team (malkia@ and oliver@sautisalama.org) receives one email, and admins a notification. Removing a document sends nothing |
+| PRO-20 | M | **Delete account** while you hold an open case. | The case is cancelled, the survivor is told and re-matched, your services are removed |
+| PRO-21 | S | Finish onboarding as a new provider. | The Setup in Progress card is replaced by the full provider menu at once |

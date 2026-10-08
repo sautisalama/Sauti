@@ -25,3 +25,12 @@ Use a phone-sized browser window (the majority of users). Sign in as `survivor`,
 | SUR-19 | M | Open an accepted case. Choose **My support is complete**, give 4 stars and a note. | Saved; the professional is notified; the case closes once they confirm too. |
 | SUR-20 | S | The professional already closed the case. | You can still **Rate your support** once; the prompt disappears afterwards. |
 | SUR-21 | M | As an unrelated survivor, try to read another user's profile or email via the app. | Nothing is returned. |
+| SUR-22 | M | Report without an account (choose a password at the end). | A private account is created, you are signed in, and you must accept the policies before entering. The dashboard shows a Temporary Session banner with your login key |
+| SUR-23 | M | In the banner choose **Move to permanent Account** and enter an email already used by someone else, then a new one. | The first is refused; the second sends a confirmation. History is kept and the banner disappears |
+| SUR-24 | M | **Profile, Privacy & Security, Change password** with a wrong, then the right current password. | The wrong one is refused; the right one changes the password, and the old one stops working |
+| SUR-25 | M | Sign in on two devices; on one choose **Log out of other devices**, or **Revoke** the other from the list. | The other device is signed out (immediately, or the next time it opens) |
+| SUR-26 | M | **Delete account**: type DELETE. | The account, reports, voice notes and notifications are gone; signing in again fails |
+| SUR-27 | S | Open the accessibility button and turn on High contrast, Underline links and a larger text size. | The whole site changes at once and the choice is remembered on the device |
+| SUR-28 | M | Finish the last lesson of a course. | A certificate is issued; **View your certificate** opens it; Print and Download PDF work; the number verifies without signing in |
+| SUR-29 | S | On a phone, open the site and use **Install App**; then switch to airplane mode and open a page not yet visited. | The app installs; offline you see the calm offline page with **Try again** |
+| SUR-30 | S | Open the booking page of a provider, pick a day. | Only genuinely free weekday times are offered; a time just requested disappears from the list |

@@ -27,3 +27,11 @@ Covered by `scripts/e2e/security.mjs` (36 attacks, run with signed-in test users
 * `/api/assistant`, `/api/audio/sign`, cron routes refuse unauthenticated callers.
 * Link previews refuse private network addresses (SSRF).
 * `?next=` redirects only to same-site paths.
+
+## Verification-document alert (OPS-09 to OPS-11)
+
+| ID | P | Scenario | Expected |
+|---|---|---|---|
+| OPS-09 | M | A provider adds documents to a service or profile. | One email "Verification documents submitted" to malkia@ and oliver@sautisalama.org, a link to review, and an in-app notice to admins |
+| OPS-10 | M | The same submission is flushed twice, or a document is removed. | No second email and no email for a removal |
+| OPS-11 | M | The email cannot be sent. | The submission is not marked as sent; the hourly monitor retries |

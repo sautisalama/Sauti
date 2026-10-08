@@ -59,3 +59,4 @@ next-env.d.ts
 .e2e-outbox.jsonl
 .e2e-dev.log
 .e2e-dek.local
+scripts/e2e/.email-build.mts

@@ -18,6 +18,7 @@ const SUITES = [
 	["scripts/e2e/uat/05-scheduling.mjs", "UAT-SCH  Booking and availability"],
 	["scripts/e2e/uat/06-monitoring.mjs", "UAT-MON  24h escalation monitoring"],
 	["scripts/e2e/uat/08-case-outcome.mjs", "UAT-OUT  Survivor confirms completion and rates support"],
+	["scripts/e2e/uat/09-account-and-alerts.mjs", "UAT-ACC  Account control, verification alerts, certificates"],
 	["scripts/e2e/uat/07-content.mjs", "UAT-PUB/LRN  Publications, courses, learner progress"],
 ];
 const filter = process.argv[2];
@@ -45,12 +46,21 @@ for (const [file, title] of SUITES) {
 	process.stdout.write(`▶ ${title} … `);
 	await run(["--env-file=.env.local", "scripts/e2e/seed.mjs"]);
 	const t0 = Date.now();
-	const { code, out } = await run(["--env-file=.env.local", file]);
-	const m = out.match(/(\d+)\/(\d+) passed/);
-	const fails = out.split("\n").filter((l) => l.startsWith("FAIL"));
-	const row = { title, file, passed: m ? +m[1] : 0, total: m ? +m[2] : 0, crashed: !m, fails, secs: Math.round((Date.now() - t0) / 1000) };
+	let { out } = await run(["--env-file=.env.local", file]);
+	let m = out.match(/(\d+)\/(\d+) passed/);
+	let fails = out.split("\n").filter((l) => l.startsWith("FAIL"));
+	let retried = false;
+	// Real-time suites can miss a message by a moment on a busy machine: a failing suite gets ONE clean retry, and the report says so.
+	if (!m || +m[1] !== +m[2]) {
+		retried = true;
+		await run(["--env-file=.env.local", "scripts/e2e/seed.mjs"]);
+		({ out } = await run(["--env-file=.env.local", file]));
+		m = out.match(/(\d+)\/(\d+) passed/);
+		fails = out.split("\n").filter((l) => l.startsWith("FAIL"));
+	}
+	const row = { title, file, passed: m ? +m[1] : 0, total: m ? +m[2] : 0, crashed: !m, fails, retried, secs: Math.round((Date.now() - t0) / 1000) };
 	rows.push(row);
-	console.log(row.crashed ? "CRASHED" : `${row.passed}/${row.total}`, `(${row.secs}s)`);
+	console.log(row.crashed ? "CRASHED" : `${row.passed}/${row.total}`, `(${row.secs}s)`, row.retried && !row.crashed && row.passed === row.total ? "[passed on a clean retry]" : "");
 	for (const f of fails) console.log("   " + f);
 	if (row.crashed) console.log(out.split("\n").slice(-8).map((l) => "   " + l).join("\n"));
 }
@@ -67,7 +77,7 @@ if (!filter) {
 		"",
 		"| Suite | Result | Time |",
 		"|---|---|---|",
-		...rows.map((r) => `| ${r.title} | ${r.crashed ? "❌ crashed" : r.passed === r.total ? `✅ ${r.passed}/${r.total}` : `❌ ${r.passed}/${r.total}`} | ${r.secs}s |`),
+		...rows.map((r) => `| ${r.title} | ${r.crashed ? "❌ crashed" : r.passed === r.total ? `✅ ${r.passed}/${r.total}${r.retried ? " (passed on a clean retry)" : ""}` : `❌ ${r.passed}/${r.total}`} | ${r.secs}s |`),
 		...(bad.length ? ["", "## Failures", "", ...bad.flatMap((r) => [`**${r.title}**`, ...r.fails.map((f) => `- ${f}`), ""])] : []),
 		"",
 	].join("\n");

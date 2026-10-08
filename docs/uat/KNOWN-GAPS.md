@@ -18,3 +18,11 @@ These were found while building the test suite. They are documented rather than 
 * **Pending offers and capacity** — up to 5 unanswered offers no longer count toward the 5-case limit.
 * **Editing service documents** — no longer resets a verified provider to "under review"; only `pending`/`rejected` profiles move to `under_review`, and only when documents actually change.
 * **Provider profile exposure** — profiles of providers are visible only to verified providers and to survivors with a match, appointment or private chat (`20261011_profiles_visibility.sql`).
+
+## Found while building the second documentation pass
+
+* **Policy wording.** The in-app Privacy Policy says identities are protected with "end-to-end encryption". Messages and reports are protected by access rules and encryption in transit, not end-to-end. Reword the policy.
+* **Anonymous accounts** cannot be recovered (no real email) and never expire; an expiry date written by one older route is not enforced.
+* **Booking hours** are fixed (weekdays 09:00 to 17:00 East Africa Time); providers cannot yet set their own.
+* **Certificates** cannot be revoked or expired by an admin.
+* **Fixed in this pass:** admins no longer see the provider setup card; "Revoke device" and "Log out of other devices" now really sign devices out; the booking page offers real availability; Salama AI bullet lists render correctly; the install banner no longer shows twice; the Switch, Checkbox and Slider are visible; form borders are soft instead of black.
