@@ -321,6 +321,9 @@ export default function ReviewPage() {
                 backUrl="/dashboard/admin"
                 status={profile.verification_status}
                 onAction={(action) => openActionDialog(profile.id, 'profile', action, `${profile.first_name} ${profile.last_name}`)}
+                documentCount={profile.accreditation_files_metadata?.length || 0}
+                remindTarget={{ id: profile.id, type: 'profile' }}
+                chat={{ profileId: profile.id, name: `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || 'Professional', role: profile.user_type }}
                 meta={[
                     <span key="joined">Joined {new Date(profile.created_at || 0).toLocaleDateString()}</span>
                 ]}
@@ -380,6 +383,8 @@ export default function ReviewPage() {
                                         <ActionButtons 
                                             status={profile.verification_status} 
                                             onAction={(action) => openActionDialog(profile.id, 'profile', action, `${profile.first_name} ${profile.last_name}`)} 
+                                            documentCount={profile.accreditation_files_metadata?.length || 0}
+                                            remindTarget={{ id: profile.id, type: 'profile' }}
                                         />
                                     </div>
                                 </CardHeader>
@@ -519,6 +524,8 @@ export default function ReviewPage() {
                                                             <ActionButtons 
                                                                 status={service.verification_status}
                                                                 onAction={(action) => openActionDialog(service.id, 'service', action, service.name || 'Service')}
+                                                                documentCount={service.accreditation_files_metadata?.length || 0}
+                                                                remindTarget={{ id: service.id, type: 'service' }}
                                                                 size="sm"
                                                                 className="flex-col items-stretch w-full"
                                                             />

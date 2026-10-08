@@ -21,6 +21,96 @@ export type AdminActionParams = {
     notes?: string;
 };
 
+type DocTarget = 'profile' | 'service';
+
+async function countDocuments(targetType: DocTarget, targetId: string): Promise<number> {
+    const db = createAdminClient();
+    if (targetType === 'service') {
+        const { data } = await db.from('support_services').select('accreditation_files_metadata').eq('id', targetId).maybeSingle();
+        const m = data?.accreditation_files_metadata as unknown;
+        return Array.isArray(m) ? m.length : 0;
+    }
+    const { data } = await db.from('profiles').select('accreditation_files_metadata, accreditation_files').eq('id', targetId).maybeSingle();
+    const m = data?.accreditation_files_metadata as unknown;
+    const f = data?.accreditation_files as unknown;
+    return Math.max(Array.isArray(m) ? m.length : 0, Array.isArray(f) ? f.length : 0);
+}
+
+async function requireAdmin() {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("Unauthorized");
+    const { data: actor } = await supabase.from('profiles').select('is_admin').eq('id', user.id).maybeSingle();
+    if (!actor?.is_admin) throw new Error("Forbidden");
+    return user;
+}
+
+/** Ask a professional/NGO (or the owner of a service) to upload verification documents. */
+export async function remindToUploadDocuments(targetType: DocTarget, targetId: string) {
+    const admin = await requireAdmin();
+    const db = createAdminClient();
+
+    let ownerId: string | null = null;
+    let name = "";
+    let subject = "your profile";
+    if (targetType === 'profile') {
+        const { data } = await db.from('profiles').select('id, first_name').eq('id', targetId).maybeSingle();
+        ownerId = data?.id ?? null;
+        name = data?.first_name || "there";
+    } else {
+        const { data } = await db.from('support_services').select('user_id, name').eq('id', targetId).maybeSingle();
+        ownerId = data?.user_id ?? null;
+        name = data?.name || "there";
+        subject = `your service "${data?.name || "service"}"`;
+    }
+    if (!ownerId) throw new Error("Could not find who to remind.");
+    if ((await countDocuments(targetType, targetId)) > 0) throw new Error("Documents have already been uploaded.");
+
+    const link = targetType === 'profile' ? '/dashboard/profile?section=account' : '/dashboard/profile?section=services';
+    const message = `Please upload your verification documents so we can review ${subject}. We can only verify against documents.`;
+    await sendNotification({
+        userId: ownerId,
+        type: 'system_alert',
+        title: "Please upload your verification documents",
+        message,
+        link,
+        metadata: { reminder: 'upload_documents', target_type: targetType, target_id: targetId, action_by: admin.id },
+        sendEmail: true,
+    });
+    return { success: true };
+}
+
+/** Open (or create) the admin's direct chat with a professional/NGO. It appears in both people's chat lists. */
+export async function openAdminChat(profileId: string): Promise<string> {
+    const admin = await requireAdmin();
+    if (profileId === admin.id) throw new Error("You cannot message yourself.");
+    const db = createAdminClient();
+
+    const { data: shared } = await db.from('chat_participants').select('chat_id, user_id').in('user_id', [admin.id, profileId]);
+    const mine = new Set((shared || []).filter(p => p.user_id === admin.id).map(p => p.chat_id));
+    const both = (shared || []).filter(p => p.user_id === profileId && mine.has(p.chat_id)).map(p => p.chat_id);
+    if (both.length) {
+        const { data: dm } = await db.from('chats').select('id')
+            .in('id', both).eq('type', 'dm')
+            .order('last_message_at', { ascending: false, nullsFirst: false }).limit(1);
+        if (dm?.[0]) return dm[0].id;
+    }
+
+    const { data: chat, error } = await db.from('chats')
+        .insert({ type: 'dm', created_by: admin.id, metadata: { admin_review: true } })
+        .select('id').single();
+    if (error || !chat) throw new Error("Could not start the chat.");
+    const { error: partError } = await db.from('chat_participants').insert([
+        { chat_id: chat.id, user_id: admin.id, status: { role: 'admin' } },
+        { chat_id: chat.id, user_id: profileId, status: { role: 'member' } },
+    ]);
+    if (partError) {
+        await db.from('chats').delete().eq('id', chat.id);
+        throw new Error("Could not start the chat.");
+    }
+    return chat.id;
+}
+
 export async function performAdminAction({ targetId, targetType, action, notes }: AdminActionParams) {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
@@ -33,6 +123,11 @@ export async function performAdminAction({ targetId, targetType, action, notes }
     const { data: actor } = await supabase.from('profiles').select('is_admin').eq('id', user.id).maybeSingle();
     if (!actor?.is_admin) {
         throw new Error("Forbidden");
+    }
+
+    // Verification is decided against documents, so there is nothing to approve or reject until some are uploaded.
+    if ((action === 'verify' || action === 'reject') && (await countDocuments(targetType, targetId)) === 0) {
+        throw new Error("No documents have been uploaded yet. Remind them to upload documents first.");
     }
 
     // Determine status

@@ -6,6 +6,7 @@ import { DocumentPreviewCard } from "./DocumentPreviewCard";
 import { Building2, User, MapPin, Briefcase, FileText, CheckCircle, XCircle, AlertTriangle, ShieldCheck, ArrowLeft } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useRouter } from "next/navigation";
+import { MessageProfessionalButton, RemindDocumentsButton, type ChatTarget, type ReminderTarget } from "./AdminReachOut";
 
 // Types
 export type AccreditationDocument = {
@@ -142,14 +143,22 @@ export function ActionButtons({
     status, 
     onAction, 
     size = "default",
-    className
+    className,
+    documentCount,
+    remindTarget
 }: { 
     status: string | null, 
     onAction: (action: 'verify' | 'reject' | 'ban') => void, 
     size?: "default" | "sm",
-    className?: string
+    className?: string,
+    /** When 0 (and a remindTarget is given) Verify / Reject are replaced by a reminder to upload documents. */
+    documentCount?: number,
+    remindTarget?: ReminderTarget
 }) {
     const isSmall = size === "sm";
+    if (documentCount === 0 && remindTarget && status !== 'verified') {
+        return <RemindDocumentsButton target={remindTarget} size={size} className={className} />;
+    }
     const isVerified = status === 'verified';
     const isRejected = status === 'rejected';
 
@@ -219,14 +228,20 @@ export function DetailHeader({
     backUrl, 
     status, 
     onAction, 
-    meta = [] 
+    meta = [],
+    documentCount,
+    remindTarget,
+    chat
 }: { 
     title: string, 
     type?: string | null, 
     backUrl: string, 
     status: string | null, 
     onAction: (action: 'verify' | 'reject' | 'ban') => void,
-    meta?: React.ReactNode[]
+    meta?: React.ReactNode[],
+    documentCount?: number,
+    remindTarget?: ReminderTarget,
+    chat?: ChatTarget
 }) {
     const router = useRouter();
 
@@ -264,11 +279,15 @@ export function DetailHeader({
                 </div>
             </div>
             
-            <ActionButtons 
-                status={status} 
-                onAction={onAction}
-                className="self-end md:self-auto"
-            />
+            <div className="flex flex-wrap items-center gap-3 self-end md:self-auto">
+                {chat && <MessageProfessionalButton chat={chat} />}
+                <ActionButtons 
+                    status={status} 
+                    onAction={onAction}
+                    documentCount={documentCount}
+                    remindTarget={remindTarget}
+                />
+            </div>
         </div>
     );
 }

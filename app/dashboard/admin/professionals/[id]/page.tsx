@@ -315,6 +315,9 @@ export default function ProfessionalDetailPage() {
                 backUrl="/dashboard/admin/professionals"
                 status={profile.verification_status}
                 onAction={(action) => openActionDialog(profile.id, 'profile', action, `${profile.first_name} ${profile.last_name}`)}
+                documentCount={profile.accreditation_files_metadata?.length || 0}
+                remindTarget={{ id: profile.id, type: 'profile' }}
+                chat={{ profileId: profile.id, name: `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || 'Professional', role: profile.user_type }}
                 meta={[
                     <span key="joined" className="flex items-center gap-1.5"><Clock className="h-3.5 w-3.5" /> Joined {profile.created_at ? new Date(profile.created_at).toLocaleDateString() : "Recently"}</span>
                 ]}
@@ -516,6 +519,8 @@ export default function ProfessionalDetailPage() {
                                                             <ActionButtons 
                                                                 status={service.verification_status}
                                                                 onAction={(action) => openActionDialog(service.id, 'service', action, service.name || 'Service')}
+                                                                documentCount={service.accreditation_files_metadata?.length || 0}
+                                                                remindTarget={{ id: service.id, type: 'service' }}
                                                                 size="sm"
                                                                 className="flex-col items-stretch w-full"
                                                             />

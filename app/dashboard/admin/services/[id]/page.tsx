@@ -300,6 +300,9 @@ export default function ServiceDetailPage() {
                 backUrl="/dashboard/admin/services"
                 status={service.verification_status || 'pending'}
                 onAction={(action) => openActionDialog(service.id, action, service.name || 'Service')}
+                documentCount={service.accreditation_files_metadata?.length || 0}
+                remindTarget={{ id: service.id, type: 'service' }}
+                chat={owner ? { profileId: owner.id, name: `${owner.first_name || ''} ${owner.last_name || ''}`.trim() || 'Service owner', role: owner.user_type } : undefined}
                 meta={[
                     <span key="added" className="flex items-center gap-1.5"><Clock className="h-3.5 w-3.5" /> Added {service.created_at ? new Date(service.created_at).toLocaleDateString() : "Recently"}</span>,
                     owner && (
