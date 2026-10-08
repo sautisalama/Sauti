@@ -21,7 +21,9 @@ import {
 	FileText,
 	MapPin,
     ArrowRight,
-    ClipboardList
+    ClipboardList,
+    LayoutGrid,
+    List
 } from "lucide-react";
 import Link from "next/link";
 import { SereneBreadcrumb } from "@/components/ui/SereneBreadcrumb";
@@ -34,7 +36,20 @@ export default function ReviewDashboardPage() {
 	const [pendingServices, setPendingServices] = useState<PendingService[]>([]);
     const [matchedCount, setMatchedCount] = useState(0);
 	const [isLoading, setIsLoading] = useState(true);
+	const [view, setView] = useState<"cards" | "list">("cards");
 	const supabase = createClient();
+
+	useEffect(() => {
+		try {
+			const saved = localStorage.getItem("ss_review_view");
+			if (saved === "cards" || saved === "list") setView(saved);
+		} catch {}
+	}, []);
+
+	const changeView = (v: "cards" | "list") => {
+		setView(v);
+		try { localStorage.setItem("ss_review_view", v); } catch {}
+	};
 
 	useEffect(() => {
 		const loadPendingVerifications = async () => {
@@ -66,13 +81,9 @@ export default function ReviewDashboardPage() {
                     .select("report_id", { count: 'exact', head: true })
                     .eq("ismatched", true);
 
-				setPendingUsers(((users || []) as any[]).filter(u => 
-					(Array.isArray(u.accreditation_files_metadata) && u.accreditation_files_metadata.length > 0) ||
-					(Array.isArray(u.accreditation_files) && u.accreditation_files.length > 0)
-				) as PendingUser[]);
-				setPendingServices(((services || []) as any[]).filter(s => 
-					(Array.isArray(s.accreditation_files_metadata) && s.accreditation_files_metadata.length > 0)
-				) as PendingService[]);
+				// Everything pending is listed (the same set the admin counters use), including applicants who have not uploaded documents yet.
+				setPendingUsers((users || []) as unknown as PendingUser[]);
+				setPendingServices((services || []) as unknown as PendingService[]);
                 setMatchedCount(casesCount || 0);
 			} catch (error) {
 				console.error("Error loading pending verifications:", error);
@@ -133,7 +144,8 @@ export default function ReviewDashboardPage() {
 			</div>
 
 			<Tabs defaultValue="users" className="space-y-6">
-				<TabsList className="bg-transparent border-b border-gray-200 w-full justify-start rounded-none h-auto p-0 gap-6">
+				<div className="flex items-end justify-between gap-4 border-b border-gray-200">
+				<TabsList className="bg-transparent w-full justify-start rounded-none h-auto p-0 gap-6">
 					<TabsTrigger value="users" className="rounded-none border-b-2 border-transparent data-[state=active]:border-blue-600 data-[state=active]:bg-transparent data-[state=active]:shadow-none py-3 px-1 data-[state=active]:text-blue-700 font-medium">
 						<UserCheck className="h-4 w-4 mr-2" />
 						Professionals & NGOs
@@ -147,14 +159,23 @@ export default function ReviewDashboardPage() {
 						Incident Cases
 					</TabsTrigger>
 				</TabsList>
+				<div className="mb-2 inline-flex shrink-0 rounded-lg border border-gray-200 bg-white p-0.5" role="group" aria-label="Layout">
+					<button type="button" onClick={() => changeView("cards")} aria-pressed={view === "cards"} className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-semibold transition-colors ${view === "cards" ? "bg-blue-600 text-white" : "text-gray-600 hover:bg-gray-50"}`}>
+						<LayoutGrid className="h-3.5 w-3.5" /> Cards
+					</button>
+					<button type="button" onClick={() => changeView("list")} aria-pressed={view === "list"} className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-semibold transition-colors ${view === "list" ? "bg-blue-600 text-white" : "text-gray-600 hover:bg-gray-50"}`}>
+						<List className="h-3.5 w-3.5" /> List
+					</button>
+				</div>
+				</div>
 
 				<TabsContent value="users" className="space-y-4 animate-in slide-in-from-bottom-2 duration-300">
 					{pendingUsers.length === 0 ? (
 						<EmptyState type="users" />
 					) : (
-						<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+						<div className={view === "cards" ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" : "flex flex-col divide-y divide-gray-100 overflow-hidden rounded-2xl border border-gray-200 bg-white"}>
 							{pendingUsers.map((user) => (
-								<ReviewCard 
+								<ReviewCard view={view} 
                                     key={user.id} 
                                     title={`${user.first_name || 'Unknown'} ${user.last_name || ''}`}
                                     subtitle={user.user_type || 'Professional'}
@@ -173,9 +194,9 @@ export default function ReviewDashboardPage() {
 					{pendingServices.length === 0 ? (
 						<EmptyState type="services" />
 					) : (
-						<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+						<div className={view === "cards" ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" : "flex flex-col divide-y divide-gray-100 overflow-hidden rounded-2xl border border-gray-200 bg-white"}>
 							{pendingServices.map((service) => (
-								<ReviewCard 
+								<ReviewCard view={view} 
                                     key={service.id} 
                                     title={service.name || 'Untitled Service'}
                                     subtitle={service.service_types || 'Support Service'}
@@ -200,6 +221,7 @@ export default function ReviewDashboardPage() {
 }
 
 interface ReviewCardProps {
+    view: "cards" | "list";
     title: string;
     subtitle: string | null;
     status: string;
@@ -210,7 +232,22 @@ interface ReviewCardProps {
     href: string;
 }
 
-function ReviewCard({ title, subtitle, status, date, docsCount, statusColor, location, href }: ReviewCardProps) {
+function ReviewCard({ view, title, subtitle, status, date, docsCount, statusColor, location, href }: ReviewCardProps) {
+    if (view === "list") {
+        return (
+            <Link href={href} className="group flex flex-wrap items-center gap-x-4 gap-y-1 px-4 py-3 transition-colors hover:bg-blue-50/40">
+                <div className="min-w-0 flex-1 basis-48">
+                    <p className="truncate font-semibold text-gray-900" title={title}>{title}</p>
+                    <p className="truncate text-xs capitalize text-gray-500">{subtitle}</p>
+                </div>
+                <Badge className={`${statusColor} shrink-0 capitalize`}>{status.replace("_", " ")}</Badge>
+                <span className="flex items-center gap-1.5 text-xs text-gray-500"><FileText className="h-3.5 w-3.5 text-gray-400" />{docsCount} documents</span>
+                <span className="flex items-center gap-1.5 text-xs text-gray-500"><Clock className="h-3.5 w-3.5 text-gray-400" />{formatDistanceToNow(new Date(date), { addSuffix: true })}</span>
+                {location && <span className="flex items-center gap-1.5 text-xs text-gray-500"><MapPin className="h-3.5 w-3.5 text-gray-400" />{location}</span>}
+                <ArrowRight className="h-4 w-4 text-blue-600 transition-transform group-hover:translate-x-1" />
+            </Link>
+        );
+    }
     return (
         <Link href={href} className="group block h-full">
             <Card className="h-full border-gray-200 hover:border-blue-300 hover:shadow-md transition-all duration-300 rounded-2xl overflow-hidden group-hover:scale-[1.01]">

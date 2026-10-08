@@ -86,22 +86,9 @@ export function AdminCasesTable() {
 		try {
 			setIsLoading(true);
 			// Fetch matched cases
-			const { data, error } = await supabase
-				.from("reports")
-				.select(`
-                    report_id, 
-                    type_of_incident, 
-                    urgency, 
-                    submission_timestamp, 
-                    ismatched,
-                    latitude,
-                    longitude,
-                    matched_services(id, match_status_type)
-                `)
-				.eq("ismatched", true)
-				.order("submission_timestamp", { ascending: false });
-
-			if (error) throw error;
+			const res = await fetch("/api/admin/matched-cases");
+			if (!res.ok) throw new Error("Failed to load matched cases");
+			const { data } = await res.json();
 			setCases(data || []);
 		} catch (error) {
 			console.error("Error loading cases:", error);
