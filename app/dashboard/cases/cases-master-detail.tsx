@@ -1115,7 +1115,7 @@ export default function CasesMasterDetail({ userId }: { userId: string }) {
 					}`}
 				>
                     <div className="h-full pb-8">
-                            <Card className="p-6 sm:p-8 shadow-2xl shadow-slate-200/40 border-serene-neutral-100/50 rounded-2xl sm:rounded-[2.5rem] bg-white h-full flex flex-col">
+                            <Card className="p-6 sm:p-8 shadow-2xl shadow-slate-200/40 border-serene-neutral-100/50 rounded-2xl bg-white h-full flex flex-col">
                                 <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-5 gap-3">
                                     <div>
                                         <div className="flex items-center gap-2 mb-1">
@@ -1142,7 +1142,7 @@ export default function CasesMasterDetail({ userId }: { userId: string }) {
                                 />
 
                                 {/* Custom Calendar UI */}
-                                <div className="bg-white rounded-3xl overflow-hidden flex-1 flex flex-col">
+                                <div className="bg-white rounded-2xl overflow-hidden flex-1 flex flex-col">
                                     {/* View Mode Toggle + Navigation */}
                                     <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 gap-4">
                                         <div className="flex bg-slate-50 rounded-xl p-1 border border-slate-100 w-full sm:w-auto">
@@ -1306,7 +1306,7 @@ export default function CasesMasterDetail({ userId }: { userId: string }) {
                                                         {appointments.map((appt, i) => (
                                                             <div 
                                                                 key={i} 
-                                                                className="group flex items-center gap-4 p-4 bg-slate-50/50 hover:bg-white hover:shadow-xl hover:shadow-slate-200/50 rounded-2xl cursor-pointer transition-all duration-300 border border-transparent hover:border-slate-100"
+                                                                className="group flex items-center gap-4 p-4 bg-slate-50/50 hover:bg-white hover:shadow-xl hover:shadow-slate-200/50 rounded-xl cursor-pointer transition-all duration-300 border border-transparent hover:border-slate-100"
                                                                 onClick={() => setSelectedId(appt.case.id)}
                                                             >
                                                                 <div className="h-12 w-12 bg-white rounded-xl flex items-center justify-center text-teal-600 shadow-sm group-hover:bg-teal-600 group-hover:text-white transition-colors duration-300">
@@ -1382,7 +1382,7 @@ export default function CasesMasterDetail({ userId }: { userId: string }) {
                                             }
                                             
                                             return (
-                                                <div className="text-center py-10 bg-slate-50/50 rounded-3xl border border-dashed border-slate-100">
+                                                <div className="text-center py-10 bg-slate-50/50 rounded-2xl border border-dashed border-slate-100">
                                                     <Clock className="h-8 w-8 text-slate-200 mx-auto mb-3" />
                                                     <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">No sessions scheduled</p>
                                                 </div>
@@ -1426,7 +1426,7 @@ export default function CasesMasterDetail({ userId }: { userId: string }) {
 			</div>
 			{/* Search Modal */}
 			<Dialog open={isSearchModalOpen} onOpenChange={setIsSearchModalOpen}>
-				<DialogContent className="sm:max-w-md p-0 overflow-hidden border-0 rounded-3xl">
+				<DialogContent className="sm:max-w-md p-0 overflow-hidden border-0 rounded-2xl">
 					<div className="p-6 bg-sauti-teal">
 						<DialogHeader className="text-left mb-6">
 							<DialogTitle className="text-white text-xl font-bold">Search Cases</DialogTitle>
@@ -1458,7 +1458,7 @@ export default function CasesMasterDetail({ userId }: { userId: string }) {
 											setSelectedId(c.id);
 											setIsSearchModalOpen(false);
 										}}
-										className="p-4 bg-white rounded-2xl border border-serene-neutral-200 hover:border-sauti-teal/30 hover:shadow-md transition-all cursor-pointer group"
+										className="p-4 bg-white rounded-xl border border-serene-neutral-200 hover:border-sauti-teal/30 hover:shadow-md transition-all cursor-pointer group"
 									>
 										<p className="font-bold text-gray-900 group-hover:text-sauti-teal">{c.report?.type_of_incident?.replace(/_/g, " ") || "Case"}</p>
 										<p className="text-xs text-gray-500 mt-1 line-clamp-1">{c.report?.incident_description}</p>

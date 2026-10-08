@@ -91,7 +91,7 @@ export function CalScheduler({ professionalId, calLink }: CalSchedulerProps) {
                   Configure
                 </Button>
               </DialogTrigger>
-              <DialogContent className="max-w-md bg-white rounded-[2rem] p-0 overflow-hidden border-0 shadow-2xl">
+              <DialogContent className="max-w-md bg-white rounded-2xl p-0 overflow-hidden border-0 shadow-2xl">
                 <div className="p-8 pb-0 border-b border-slate-50">
                   <DialogHeader>
                     <DialogTitle className="text-2xl font-bold flex items-center gap-3 text-slate-900">

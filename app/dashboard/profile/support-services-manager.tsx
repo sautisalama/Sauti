@@ -379,7 +379,7 @@ export function SupportServicesManager({
 						{/* Add Service Card - Only if limit not reached */}
 						{canAddService() && (
 							<div
-								className="group flex flex-col items-center justify-center p-8 rounded-2xl border-2 border-dashed border-serene-neutral-300 hover:border-sauti-teal/50 hover:bg-sauti-teal/5 transition-all cursor-pointer min-h-[200px]"
+								className="group flex flex-col items-center justify-center p-8 rounded-xl border-2 border-dashed border-serene-neutral-300 hover:border-sauti-teal/50 hover:bg-sauti-teal/5 transition-all cursor-pointer min-h-[200px]"
 								onClick={() => setShowAddForm(true)}
 							>
 								<div className="h-12 w-12 rounded-full bg-serene-neutral-100 flex items-center justify-center mb-4 group-hover:bg-sauti-teal/20 transition-colors">
@@ -511,7 +511,7 @@ function ServiceCard({
 
 	return (
 		<div
-			className="group bg-white rounded-2xl border border-serene-neutral-200 hover:border-sauti-teal/30 hover:shadow-lg transition-all duration-300 cursor-pointer overflow-hidden relative"
+			className="group bg-white rounded-xl border border-serene-neutral-200 hover:border-sauti-teal/30 hover:shadow-lg transition-all duration-300 cursor-pointer overflow-hidden relative"
 			onClick={onClick}
 		>
 			{service.verification_status === "suspended" && (

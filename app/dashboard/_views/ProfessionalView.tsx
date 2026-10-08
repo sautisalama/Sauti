@@ -232,7 +232,7 @@ export default function ProfessionalView({
 									{filteredCases.length > 0 ? (
 										filteredCases.slice(0, 3).map((match) => (
 											<Link href={`/dashboard/cases/${match.id}`} key={match.id} className="block group">
-												<Card className="overflow-hidden border-serene-neutral-100 hover:border-serene-blue-200 transition-all duration-300 hover:shadow-md cursor-pointer rounded-2xl sm:rounded-3xl">
+												<Card className="overflow-hidden border-serene-neutral-100 hover:border-serene-blue-200 transition-all duration-300 hover:shadow-md cursor-pointer rounded-xl">
 													<CardContent className="p-4 flex items-center gap-4">
 														<div className={cn(
 															"h-12 w-12 rounded-full flex items-center justify-center text-lg font-bold shrink-0 shadow-sm",

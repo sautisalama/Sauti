@@ -110,7 +110,7 @@ export function SereneWelcomeHeader({ name, timeOfDay = "morning", className, co
 
   return (
     <div className={cn(
-      "w-full p-6 md:p-8 bg-gradient-to-br from-serene-blue-50 to-white rounded-2xl sm:rounded-3xl mb-8 relative overflow-hidden shadow-sm border border-serene-blue-100 transition-all duration-500",
+      "w-full p-6 md:p-8 bg-gradient-to-br from-serene-blue-50 to-white rounded-2xl mb-8 relative overflow-hidden shadow-sm border border-serene-blue-100 transition-all duration-500",
       className
     )}>
       <div className="absolute top-0 right-0 w-64 h-64 bg-serene-blue-200/20 rounded-full -translate-y-1/2 translate-x-1/3 blur-3xl pointer-events-none" />
@@ -166,7 +166,7 @@ export function SereneQuickActionCard({
 
   const content = (
     <div className={cn(
-      "group relative overflow-hidden rounded-2xl sm:rounded-3xl p-4 sm:p-5 transition-all duration-300 cursor-pointer border border-transparent hover:border-serene-blue-200/50 shadow-sm hover:shadow-md h-full",
+      "group relative overflow-hidden rounded-2xl p-4 sm:p-5 transition-all duration-300 cursor-pointer border border-transparent hover:border-serene-blue-200/50 shadow-sm hover:shadow-md h-full",
       variants[variant], className
     )}>
       {badge && (
@@ -212,7 +212,7 @@ export function SereneStatsCard({ title, value, icon, trend, trendValue, descrip
     className?: string; 
 }) {
   return (
-    <Card className={cn("overflow-hidden border-serene-neutral-100 hover:border-serene-blue-200 transition-all duration-300 rounded-2xl sm:rounded-3xl", className)}>
+    <Card className={cn("overflow-hidden border-serene-neutral-100 hover:border-serene-blue-200 transition-all duration-300 rounded-2xl", className)}>
       <CardContent className="p-4 sm:p-5">
         <div className="flex items-center justify-between mb-3">
           <p className="text-sm font-semibold text-serene-neutral-500 uppercase tracking-wider">{title}</p>
@@ -246,7 +246,7 @@ export function SereneReportCard({ report, onClick, isSelected, className }: {
     <Card 
         onClick={onClick}
         className={cn(
-            "group relative overflow-hidden transition-all duration-300 cursor-pointer border-serene-neutral-100 hover:border-serene-blue-200 hover:shadow-md rounded-2xl sm:rounded-3xl",
+            "group relative overflow-hidden transition-all duration-300 cursor-pointer border-serene-neutral-100 hover:border-serene-blue-200 hover:shadow-md rounded-2xl",
             isSelected ? "border-serene-blue-600 ring-1 ring-serene-blue-600 shadow-md bg-serene-blue-50/30" : "bg-white",
             className
         )}
@@ -331,7 +331,7 @@ export function SereneProviderCard({ provider, onBook, onChat, className }: {
   className?: string;
 }) {
   return (
-    <Card className={cn("overflow-hidden border-serene-neutral-200 rounded-2xl sm:rounded-3xl shadow-sm hover:shadow-md transition-all", className)}>
+    <Card className={cn("overflow-hidden border-serene-neutral-200 rounded-2xl shadow-sm hover:shadow-md transition-all", className)}>
       <CardContent className="p-5">
         <div className="flex items-start justify-between gap-4">
           <div className="flex items-center gap-3">
@@ -412,7 +412,7 @@ export function SereneActivityCard({ report, href, className }: {
 
   return (
     <Link href={href} className={cn("block group", className)}>
-      <Card className="overflow-hidden border-serene-neutral-100 hover:border-serene-blue-200 transition-all duration-300 hover:shadow-md cursor-pointer rounded-2xl sm:rounded-3xl">
+      <Card className="overflow-hidden border-serene-neutral-100 hover:border-serene-blue-200 transition-all duration-300 hover:shadow-md cursor-pointer rounded-xl">
         <CardContent className="p-4 flex items-center gap-4">
           <div className="h-12 w-12 rounded-full flex items-center justify-center text-lg font-bold shrink-0 bg-serene-blue-50 text-serene-blue-600">
             {report.type_of_incident?.charAt(0).toUpperCase() || "R"}
@@ -793,7 +793,7 @@ export function DashboardSearchOverlay({ query, filteredReports, filteredMatches
             ))}
             {filteredMatches?.map((match: any) => (
                <Link href={`/dashboard/cases/${match.id}`} key={match.id} className="block group">
-                 <Card className="overflow-hidden border-serene-neutral-100 hover:border-serene-blue-200 p-4 flex items-center gap-4 rounded-2xl sm:rounded-3xl">
+                 <Card className="overflow-hidden border-serene-neutral-100 hover:border-serene-blue-200 p-4 flex items-center gap-4 rounded-2xl">
                  <div className="h-12 w-12 rounded-2xl flex items-center justify-center bg-serene-blue-50 text-serene-blue-600"><Shield className="h-5 w-5" /></div>
                  <div className="flex-1 min-w-0">
                     <h4 className="font-semibold text-serene-neutral-900 truncate">{match.report?.type_of_incident?.replace(/_/g, " ") || "Case"}</h4>
@@ -823,7 +823,7 @@ export function DashboardSearchOverlay({ query, filteredReports, filteredMatches
 
 export function DashboardEmptyState({ icon, title, description, action }: any) {
     return (
-        <div className="text-center py-12 bg-white rounded-2xl sm:rounded-3xl border border-dashed border-serene-neutral-200">
+        <div className="text-center py-12 bg-white rounded-2xl border border-dashed border-serene-neutral-200">
             <div className="h-12 w-12 bg-serene-neutral-100 rounded-full flex items-center justify-center mx-auto mb-3 text-serene-neutral-400">
                 {icon}
             </div>

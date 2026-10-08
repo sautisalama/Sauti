@@ -326,7 +326,7 @@ useEffect(() => {
 						{services.map((service) => (
 							<Card
 								key={service.id}
-								className="rounded-2xl border-gray-100 hover:border-blue-200 hover:shadow-md transition-all duration-300 cursor-pointer group bg-white"
+								className="rounded-xl border-gray-100 hover:border-blue-200 hover:shadow-md transition-all duration-300 cursor-pointer group bg-white"
 								onClick={() => setSelectedService(service)}
 							>
 								<CardContent className="p-6">

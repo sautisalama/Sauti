@@ -281,7 +281,7 @@ export function CaseDetailView({
 
 
             {caseItem.match_status_type === 'reschedule_requested' && (
-                <div className="bg-amber-600 shadow-xl shadow-amber-600/20 rounded-2xl xs:rounded-[2rem] p-5 xs:p-8 text-white relative overflow-hidden group">
+                <div className="bg-amber-600 shadow-xl shadow-amber-600/20 rounded-2xl xs:rounded-2xl p-5 xs:p-8 text-white relative overflow-hidden group">
                     <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:rotate-12 transition-transform duration-700">
                         <Calendar className="h-24 w-24" />
                     </div>
@@ -350,7 +350,7 @@ export function CaseDetailView({
                     </div>
                 </CardHeader>
                 <CardContent className="p-4 xs:p-5 sm:p-6 space-y-4 sm:space-y-6">
-                    <div className="bg-slate-50/50 rounded-xl xs:rounded-2xl sm:rounded-3xl p-5 xs:p-6 sm:p-8 border border-slate-50 leading-relaxed text-slate-600 font-medium text-sm sm:text-base italic relative text-center sm:text-left">
+                    <div className="bg-slate-50/50 rounded-xl xs:rounded-2xl p-5 xs:p-6 sm:p-8 border border-slate-50 leading-relaxed text-slate-600 font-medium text-sm sm:text-base italic relative text-center sm:text-left">
                         <div className="absolute top-4 left-4 text-teal-200/20 select-none"><span className="text-6xl font-serif">"</span></div>
                         {isAccepted ? (
                             <MarkdownText content={report?.incident_description || "No description provided."} />
@@ -429,7 +429,7 @@ export function CaseDetailView({
                     </span>
                 </div>
 
-                <Card className="border-0 bg-white shadow-xl shadow-slate-200/50 rounded-2xl sm:rounded-[2.5rem] overflow-hidden">
+                <Card className="border-0 bg-white shadow-xl shadow-slate-200/50 rounded-2xl overflow-hidden">
                     <CardContent className="p-0">
                         {checklists.map((item, idx) => (
                             <div key={item.id} className={cn("group transition-all duration-300", idx < checklists.length - 1 && "border-b border-slate-50")}>
@@ -482,7 +482,7 @@ export function CaseDetailView({
     const sidebarContent = (
         <div className="space-y-6">
             {isAccepted ? 
-                <div className="hidden lg:flex flex-col h-[400px] sm:h-[600px] rounded-2xl sm:rounded-[2.5rem] border border-white shadow-2xl shadow-teal-500/10 overflow-hidden bg-white/70 backdrop-blur-2xl group mt-0">
+                <div className="hidden lg:flex flex-col h-[400px] sm:h-[600px] rounded-2xl border border-white shadow-2xl shadow-teal-500/10 overflow-hidden bg-white/70 backdrop-blur-2xl group mt-0">
                     {isChatLoading ? 
                         <div className="flex-1 flex flex-col items-center justify-center bg-slate-50/10 p-12">
                             <LottieLoader 
@@ -510,11 +510,11 @@ export function CaseDetailView({
                     }
                 </div>
              : 
-                <div className="hidden lg:flex flex-col h-[600px] rounded-[2.5rem] border border-slate-100 bg-slate-100/10 backdrop-blur-md overflow-hidden p-8 group transition-all duration-700 hover:shadow-2xl hover:shadow-blue-500/5">
+                <div className="hidden lg:flex flex-col h-[600px] rounded-2xl border border-slate-100 bg-slate-100/10 backdrop-blur-md overflow-hidden p-8 group transition-all duration-700 hover:shadow-2xl hover:shadow-blue-500/5">
                     <div className="flex-1 flex flex-col items-center justify-center text-center space-y-6">
                         <div className="relative">
                             <div className="absolute inset-0 bg-blue-100/30 blur-3xl rounded-full animate-pulse" />
-                            <div className="w-20 h-20 bg-white rounded-[2rem] shadow-xl border border-slate-50 flex items-center justify-center relative transition-all duration-700 group-hover:scale-110 group-hover:rotate-3">
+                            <div className="w-20 h-20 bg-white rounded-2xl shadow-xl border border-slate-50 flex items-center justify-center relative transition-all duration-700 group-hover:scale-110 group-hover:rotate-3">
                                 <MessageCircle className="h-10 w-10 text-slate-200" />
                                 <div className="absolute -top-1 -right-1 w-8 h-8 bg-blue-500 rounded-xl flex items-center justify-center text-white border-2 border-white shadow-lg animate-in zoom-in-50 duration-500">
                                     <Lock className="h-3.5 w-3.5" />
@@ -571,7 +571,7 @@ export function CaseDetailView({
                 )}>
                     {/* High-importance Action Banner - Collapsed for space optimization */}
                     {!isAccepted ? (
-                        <div className="w-full flex flex-col sm:flex-row items-center justify-between gap-6 mb-6 p-4 sm:p-5 bg-sky-50/50 border border-sky-100/50 rounded-[2rem] backdrop-blur-sm animate-in fade-in slide-in-from-top-4 duration-700">
+                        <div className="w-full flex flex-col sm:flex-row items-center justify-between gap-6 mb-6 p-4 sm:p-5 bg-sky-50/50 border border-sky-100/50 rounded-2xl backdrop-blur-sm animate-in fade-in slide-in-from-top-4 duration-700">
                              <div className="flex items-center gap-5">
                                  <div className="w-12 h-12 bg-white/60 rounded-2xl flex items-center justify-center text-sky-600 shadow-sm border border-white/40 shrink-0">
                                      <Shield className="h-6 w-6" />

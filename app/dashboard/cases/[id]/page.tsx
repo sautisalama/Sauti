@@ -350,9 +350,9 @@ export default function CaseDetailPage({ params }: { params: Promise<{ id: strin
 
             {/* Completion Confirmation Dialog */}
             <Dialog open={isCompletionDialogOpen} onOpenChange={setIsCompletionDialogOpen}>
-                <DialogContent className="w-[95vw] sm:max-w-md rounded-[2rem] border-0 shadow-2xl bg-white p-6 sm:p-8 animate-in fade-in zoom-in-95 duration-300">
+                <DialogContent className="w-[95vw] sm:max-w-md rounded-2xl border-0 shadow-2xl bg-white p-6 sm:p-8 animate-in fade-in zoom-in-95 duration-300">
                     <DialogHeader className="space-y-4">
-                        <div className="w-16 h-16 bg-emerald-50 rounded-[1.5rem] flex items-center justify-center text-emerald-600 mb-2">
+                        <div className="w-16 h-16 bg-emerald-50 rounded-2xl flex items-center justify-center text-emerald-600 mb-2">
                             <ShieldCheck className="h-8 w-8" />
                         </div>
                         <DialogTitle className="text-xl sm:text-2xl font-black text-slate-900 leading-tight">Close this case?</DialogTitle>

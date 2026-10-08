@@ -373,13 +373,13 @@ export default function ReportAbuseForm({ onClose }: { onClose?: () => void }) {
 			<div className="flex-1 overflow-y-auto p-3 sm:p-8 bg-neutral-50/30">
 				<form onSubmit={handleSubmit} className="space-y-8 sm:space-y-10 max-w-2xl mx-auto pb-12">
 					<div className="space-y-4 sm:space-y-6">
-						<div className="bg-white border-2 border-neutral-200 rounded-xl sm:rounded-2xl p-4 sm:p-6 shadow-sm hover:border-sauti-teal/30 transition-all">
+						<div className="rounded-2xl border border-serene-neutral-100 bg-white p-5 sm:p-6 shadow-sm">
 							<p className="text-sm font-black text-sauti-dark uppercase tracking-wider mb-4">Who are you reporting for?</p>
 							<div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
 								<button
 									type="button"
 									onClick={() => setReportingFor('self')}
-									className={`flex items-center justify-center gap-2 px-4 py-3 rounded-2xl border-2 transition-all font-bold ${
+									className={`flex items-center justify-center gap-2 px-4 py-3 rounded-xl border transition-[background-color,border-color,transform] duration-150 ease-out active:scale-[0.98] font-semibold ${
 										reportingFor === 'self' 
 											? "border-sauti-teal bg-sauti-teal/5 text-sauti-teal shadow-inner" 
 											: "border-neutral-100 bg-neutral-50 text-neutral-500 hover:border-neutral-200"
@@ -393,7 +393,7 @@ export default function ReportAbuseForm({ onClose }: { onClose?: () => void }) {
 								<button
 									type="button"
 									onClick={() => setReportingFor('someone_else')}
-									className={`flex items-center justify-center gap-2 px-4 py-3 rounded-2xl border-2 transition-all font-bold ${
+									className={`flex items-center justify-center gap-2 px-4 py-3 rounded-xl border transition-[background-color,border-color,transform] duration-150 ease-out active:scale-[0.98] font-semibold ${
 										reportingFor === 'someone_else' 
 											? "border-sauti-teal bg-sauti-teal/5 text-sauti-teal shadow-inner" 
 											: "border-neutral-100 bg-neutral-50 text-neutral-500 hover:border-neutral-200"
@@ -407,7 +407,7 @@ export default function ReportAbuseForm({ onClose }: { onClose?: () => void }) {
 								<button
 									type="button"
 									onClick={() => setReportingFor('child')}
-									className={`flex items-center justify-center gap-2 px-4 py-3 rounded-2xl border-2 transition-all font-bold ${
+									className={`flex items-center justify-center gap-2 px-4 py-3 rounded-xl border transition-[background-color,border-color,transform] duration-150 ease-out active:scale-[0.98] font-semibold ${
 										reportingFor === 'child' 
 											? "border-sauti-teal bg-sauti-teal/5 text-sauti-teal shadow-inner" 
 											: "border-neutral-100 bg-neutral-50 text-neutral-500 hover:border-neutral-200"
@@ -421,7 +421,7 @@ export default function ReportAbuseForm({ onClose }: { onClose?: () => void }) {
 							</div>
 						</div>
 
-				<div className="leading-relaxed text-gray-800 bg-neutral-100/70 p-5 rounded-2xl border border-neutral-200/50 shadow-sm text-base md:text-lg">
+				<div className="leading-relaxed text-gray-800 rounded-2xl border border-serene-neutral-100 bg-serene-neutral-50 p-5 sm:p-6 text-base md:text-lg">
 						I would like to report {reportingFor !== 'self' ? "a case" : "incident(s)"} of{" "}
 						<span className="inline-flex align-middle w-full sm:w-auto mt-2 mb-2 sm:mt-0 sm:mb-0">
 							<MultiSelect
@@ -486,7 +486,7 @@ export default function ReportAbuseForm({ onClose }: { onClose?: () => void }) {
 						.
 				</div>
 
-				<p className="mt-4 text-base md:text-lg">Here's what happened:</p>
+				<p className="text-base font-semibold text-sauti-dark md:text-lg">Here's what happened:</p>
 				<div className="space-y-3">
 					<div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
 						<span className="text-sm text-gray-600">
@@ -579,7 +579,7 @@ export default function ReportAbuseForm({ onClose }: { onClose?: () => void }) {
 					)}
 				</div>
 
-				<div className="mt-4 flex flex-wrap items-center gap-4">
+				<div className="flex flex-wrap items-center gap-4">
 					<div className="inline-flex flex-wrap items-center gap-4">
 						<label className="inline-flex items-center gap-2 text-sm font-bold text-sauti-dark/80 bg-white px-3 py-2 rounded-xl border border-neutral-200 shadow-sm hover:border-sauti-teal/50 transition-colors cursor-pointer">
 							<input
@@ -639,7 +639,7 @@ export default function ReportAbuseForm({ onClose }: { onClose?: () => void }) {
 					</select>{" "}
 					{!isChildCase ? "to share this information with relevant authorities if needed." : ""}
 					
-					<div className="w-full mt-4">
+					<div className="w-full">
 						<label className="inline-flex items-center gap-2 text-sm font-bold text-sauti-dark/80 bg-white px-3 py-2 rounded-xl border border-neutral-200 shadow-sm hover:border-sauti-teal/50 transition-colors cursor-pointer">
 							<input
 								type="checkbox"
@@ -652,7 +652,7 @@ export default function ReportAbuseForm({ onClose }: { onClose?: () => void }) {
 					</div>
 				</div>
                 
-                <div className="mt-6 flex flex-col gap-1.5 p-4 bg-serene-neutral-50/50 rounded-xl border border-serene-neutral-200/50">
+                <div className="flex flex-col gap-2 rounded-xl border border-serene-neutral-100 bg-serene-neutral-50 p-4">
                     <label className="inline-flex items-center gap-3 cursor-pointer text-sm font-semibold text-neutral-800">
                         <input
                             type="radio"
@@ -680,10 +680,10 @@ export default function ReportAbuseForm({ onClose }: { onClose?: () => void }) {
 				</div>
 
 			{/* Anonymous Account Password Section */}
-			<div className="bg-blue-50/50 border border-blue-200/50 rounded-2xl p-4 sm:p-5 space-y-3">
+			<div className="space-y-4 rounded-2xl border border-serene-neutral-100 bg-sauti-teal/5 p-5 sm:p-6">
 				<div>
-					<h3 className="text-lg font-semibold text-blue-900 mb-1">Create Your Secure Account</h3>
-					<p className="text-sm text-blue-700">
+					<h3 className="text-lg font-semibold text-serene-neutral-900 mb-1">Create Your Secure Account</h3>
+					<p className="text-sm text-serene-neutral-600">
 						Set a password to access your dashboard, track your report, and connect with support services.
 					</p>
 				</div>
@@ -694,7 +694,7 @@ export default function ReportAbuseForm({ onClose }: { onClose?: () => void }) {
 						name="password"
 						autoComplete="new-password"
 						aria-label="Create a password"
-						className="w-full border-2 border-blue-300 focus:border-blue-500 focus:outline-none rounded-lg px-4 py-3 pr-12 bg-white"
+						className="w-full border border-serene-neutral-200 focus:border-sauti-teal focus:ring-2 focus:ring-sauti-teal/20 focus:outline-none rounded-xl px-4 py-3 pr-12 bg-white transition-[border-color,box-shadow] duration-150"
 						placeholder="Create a password (min. 6 characters)"
 						value={password}
 						onChange={(e) => {
@@ -719,7 +719,7 @@ export default function ReportAbuseForm({ onClose }: { onClose?: () => void }) {
 				{passwordError && (
 					<p className="text-sm text-red-600">{passwordError}</p>
 				)}
-				<p className="text-xs text-blue-600">
+				<p className="text-xs text-serene-neutral-500">
 					💡 You&apos;ll use this password to log in later. A unique username will be generated for you.
 				</p>
 			</div>
@@ -727,7 +727,7 @@ export default function ReportAbuseForm({ onClose }: { onClose?: () => void }) {
 				<div className="pt-2">
 					<Button
 						type="submit"
-						className="w-full bg-sauti-teal hover:bg-sauti-dark text-white py-4 text-base sm:text-lg font-bold rounded-2xl shadow-lg hover:shadow-xl transition-all duration-200"
+						className="w-full bg-sauti-teal hover:bg-sauti-dark text-white py-4 text-base sm:text-lg font-bold rounded-xl shadow-sm transition-[background-color,transform] duration-150 ease-out active:scale-[0.98]"
 						disabled={loading || (password.length > 0 && password.length < 6)}
 					>
 						{loading ? "Submitting..." : "Submit Report"}

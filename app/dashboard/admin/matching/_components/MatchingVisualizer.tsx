@@ -473,7 +473,7 @@ function VisualizerContent({ initialCases, initialProStatus }: { initialCases: R
                                 </div>
                             </div>
                         )) : (
-                            <div className="flex flex-col items-center justify-center p-12 text-center opacity-60 bg-serene-neutral-50/50 rounded-3xl border-2 border-dashed border-serene-neutral-100 m-3">
+                            <div className="flex flex-col items-center justify-center p-12 text-center opacity-60 bg-serene-neutral-50/50 rounded-2xl border-2 border-dashed border-serene-neutral-100 m-3">
                                 <ShieldAlert className="w-10 h-10 mb-4 text-serene-neutral-300" />
                                 <p className="text-[10px] font-black text-serene-neutral-400 uppercase tracking-widest leading-loose">No active incident reports discovered in the database pool</p>
                             </div>
@@ -509,7 +509,7 @@ function VisualizerContent({ initialCases, initialProStatus }: { initialCases: R
                                 </div>
                             </div>
                         )) : (
-                            <div className="flex flex-col items-center justify-center p-12 text-center opacity-60 bg-serene-neutral-50/50 rounded-3xl border-2 border-dashed border-serene-neutral-100 m-3">
+                            <div className="flex flex-col items-center justify-center p-12 text-center opacity-60 bg-serene-neutral-50/50 rounded-2xl border-2 border-dashed border-serene-neutral-100 m-3">
                                 <Building2 className="w-10 h-10 mb-4 text-serene-neutral-300" />
                                 <p className="text-[10px] font-black text-serene-neutral-400 uppercase tracking-widest leading-loose">No professionals identified in the registered directory pool</p>
                             </div>

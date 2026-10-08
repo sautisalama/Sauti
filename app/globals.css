@@ -6,6 +6,15 @@
 	--font-serif: "Playfair Display", serif;
 }
 
+/* Shared control tokens. --border/--input/--ring were not resolving at runtime, so every input,
+   textarea and select (Tailwind "border-input") rendered a hard black outline. Soft, consistent
+   values for the whole app (the high-contrast mode below still overrides them). */
+:root {
+	--border: 220 13% 91%;
+	--input: 220 13% 88%;
+	--ring: 189 93% 30%;
+}
+
 .font-serif {
 	font-family: var(--font-serif);
 }

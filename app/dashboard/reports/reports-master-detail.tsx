@@ -56,6 +56,7 @@ import { SereneBreadcrumb } from "@/components/ui/SereneBreadcrumb";
 import { Separator } from "@/components/ui/separator";
 import { useRouter } from "next/navigation";
 import { FloatingChatManager, FloatingChat } from "@/components/chat/FloatingChatManager";
+import { profileNeedsOnboarding } from "@/lib/onboarding";
 
 interface AppointmentLite {
 	id: string;
@@ -346,10 +347,7 @@ export default function ReportsMasterDetail({ userId }: { userId: string }) {
 	const needsOnboarding = useMemo(() => {
 		const profile = dash?.data?.profile;
 		if (!profile) return false;
-		const hasAcceptedPolicies = !!(profile.policies as any)?.all_policies_accepted;
-		return !profile.user_type || 
-			!hasAcceptedPolicies ||
-			((profile.user_type === 'professional' || profile.user_type === 'ngo') && !profile.professional_title);
+		return profileNeedsOnboarding(profile);
 	}, [dash?.data?.profile]);
 
 	// Calendar Helpers
@@ -1179,7 +1177,7 @@ export default function ReportsMasterDetail({ userId }: { userId: string }) {
 						mobileView !== "calendar" ? "hidden lg:block" : ""
 					}`}
 				>
-					<Card className="p-6 sm:p-8 shadow-2xl shadow-slate-200/40 border-serene-neutral-100/50 rounded-2xl sm:rounded-[2.5rem] bg-white h-full flex flex-col">
+					<Card className="p-6 sm:p-8 shadow-2xl shadow-slate-200/40 border-serene-neutral-100/50 rounded-2xl bg-white h-full flex flex-col">
 						<div className="flex flex-col sm:flex-row sm:items-center justify-between mb-5 gap-3">
 							<div>
 								<div className="flex items-center gap-2 mb-1">
@@ -1206,7 +1204,7 @@ export default function ReportsMasterDetail({ userId }: { userId: string }) {
 						/>
 
 						{/* Custom Calendar UI */}
-						<div className="bg-white rounded-3xl overflow-hidden flex-1 flex flex-col">
+						<div className="bg-white rounded-2xl overflow-hidden flex-1 flex flex-col">
 							{/* View Mode Toggle + Navigation */}
 							<div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 gap-4">
 								<div className="flex bg-slate-50 rounded-xl p-1 border border-slate-100 w-full sm:w-auto">

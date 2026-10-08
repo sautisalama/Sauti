@@ -236,7 +236,7 @@ function ActivityCard({ item, isNew }: { item: ActivityItem, isNew: boolean }) {
             className="block group"
         >
             <Card className={cn(
-                "hover:shadow-md transition-all duration-200 overflow-hidden border rounded-2xl sm:rounded-[2.5rem]",
+                "hover:shadow-md transition-all duration-200 overflow-hidden border rounded-2xl",
                 isNew 
                     ? "border-serene-blue-200 bg-white shadow-sm ring-1 ring-serene-blue-50" 
                     : "border-gray-100 bg-gray-50/30 hover:bg-white"

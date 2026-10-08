@@ -118,7 +118,7 @@ export function AppointmentBanner({ appointments, className, onUpdate, isReporte
     return (
         <div className={cn("animate-in fade-in slide-in-from-top-4 duration-700 mb-6", className)}>
             <Card className={cn(
-                "border-0 overflow-hidden rounded-3xl transition-all duration-500",
+                "border-0 overflow-hidden rounded-2xl transition-all duration-500",
                 "bg-[#FFF9EB] border border-[#FDE68A]/30 shadow-sm shadow-amber-900/5"
             )}>
                 <CardContent className="p-0 relative">

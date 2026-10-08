@@ -238,7 +238,7 @@ export function EnhancedAppointmentScheduler({
     }
 
     return (
-      <div className={cn("rounded-[1.5rem] p-3 sm:p-4 flex-1 border border-slate-100/30", COLORS.teal, "bg-opacity-30 backdrop-blur-sm shadow-inner")}>
+      <div className={cn("rounded-2xl p-3 sm:p-4 flex-1 border border-slate-100/30", COLORS.teal, "bg-opacity-30 backdrop-blur-sm shadow-inner")}>
         <div className="flex items-center justify-between mb-4">
           <div className="flex bg-white/40 rounded-lg p-0.5 border border-white/40">
             <button onClick={() => setCalendarViewMode('week')} className={cn("px-2.5 py-1.5 text-[9px] font-bold uppercase tracking-wider rounded-md transition-all", calendarViewMode === 'week' ? "bg-white text-[#105D5D] shadow-sm" : "opacity-50")}>Week</button>
@@ -298,7 +298,7 @@ export function EnhancedAppointmentScheduler({
                 <label className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] leading-none">Set Time</label>
               </div>
 
-              <div className={cn("rounded-[1.5rem] p-3 sm:p-6 flex-1 flex flex-col items-center justify-center gap-4 sm:gap-6", COLORS.blue, "bg-opacity-30 backdrop-blur-sm shadow-inner")}>
+              <div className={cn("rounded-2xl p-3 sm:p-6 flex-1 flex flex-col items-center justify-center gap-4 sm:gap-6", COLORS.blue, "bg-opacity-30 backdrop-blur-sm shadow-inner")}>
               {professionalId ? (
                 <div className="w-full space-y-4">
                   <p className="text-[10px] font-black text-[#004A99] uppercase tracking-widest text-center mb-2">Available Slots</p>
@@ -441,7 +441,7 @@ export function EnhancedAppointmentScheduler({
       {!inline && (
         <div className="px-4 sm:px-10 py-4 sm:py-6 border-t border-slate-50 shrink-0 bg-white/50 backdrop-blur-md">
            {/* Subtle Status Bar */}
-           <div className={cn("flex items-center justify-between p-3 sm:p-5 rounded-[1.5rem] border border-white/50 relative overflow-hidden mb-4", COLORS.muted, "bg-opacity-50 shadow-sm")}>
+           <div className={cn("flex items-center justify-between p-3 sm:p-5 rounded-2xl border border-white/50 relative overflow-hidden mb-4", COLORS.muted, "bg-opacity-50 shadow-sm")}>
               <div className="flex flex-col sm:flex-row sm:items-center gap-3 relative z-10 text-slate-500 font-medium text-[11px]">
                  <div className="flex items-center gap-2">
                     <CheckCircle2 className="h-4 w-4 text-teal-500" />
@@ -489,7 +489,7 @@ export function EnhancedAppointmentScheduler({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="w-[95vw] sm:max-w-[750px] bg-white rounded-2xl sm:rounded-[2.5rem] p-0 overflow-hidden border-0 shadow-2xl max-h-[95vh] flex flex-col focus:outline-none scrollbar-hide">
+      <DialogContent className="w-[95vw] sm:max-w-[750px] bg-white rounded-2xl p-0 overflow-hidden border-0 shadow-2xl max-h-[95vh] flex flex-col focus:outline-none scrollbar-hide">
         {content}
       </DialogContent>
     </Dialog>

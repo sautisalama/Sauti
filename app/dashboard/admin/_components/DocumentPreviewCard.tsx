@@ -40,7 +40,7 @@ export function DocumentPreviewCard({
 	return (
 		<div
 			onClick={onClick}
-			className="group relative aspect-[3/4] rounded-2xl border border-serene-neutral-200 bg-white shadow-sm hover:shadow-md hover:border-sauti-teal/30 transition-all cursor-pointer overflow-hidden flex flex-col duration-300"
+			className="group relative aspect-[3/4] rounded-xl border border-serene-neutral-200 bg-white shadow-sm hover:shadow-md hover:border-sauti-teal/30 transition-all cursor-pointer overflow-hidden flex flex-col duration-300"
 		>
 			{/* Thumbnail Area */}
 			<div

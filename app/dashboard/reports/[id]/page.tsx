@@ -814,7 +814,7 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
 	if (errorState || !report) {
 	    return (
 			<div className="flex items-center justify-center min-h-screen bg-slate-50 p-6">
-				<Card className="max-w-md w-full border-slate-200 rounded-3xl p-10 text-center shadow-xl bg-white">
+				<Card className="max-w-md w-full border-slate-200 rounded-2xl p-10 text-center shadow-xl bg-white">
 					<div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-8">
 						<Lock className="h-10 w-10 text-slate-300" />
 					</div>
@@ -931,7 +931,7 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
 								</span>
 							</div>
 
-							<Card className="border-0 bg-white shadow-xl shadow-slate-200/50 rounded-xl sm:rounded-[2.5rem] overflow-hidden">
+							<Card className="border-0 bg-white shadow-xl shadow-slate-200/50 rounded-2xl overflow-hidden">
 								<CardContent className="p-0">
 									{checklists.map((item, idx) => (
 										<div key={item.id} className={cn("group transition-all duration-300", idx < checklists.length - 1 && "border-b border-slate-100/50")}>
@@ -997,7 +997,7 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
 						<div className="max-w-2xl">
 							<Accordion type="single" collapsible className="w-full">
 								<AccordionItem value="report-details" className="border-0">
-									<Card className="border border-serene-neutral-100 bg-white shadow-sm rounded-xl sm:rounded-[2.5rem] overflow-hidden group/statement transition-all duration-300">
+									<Card className="border border-serene-neutral-100 bg-white shadow-sm rounded-2xl overflow-hidden group/statement transition-all duration-300">
 										<AccordionTrigger className="w-full text-left p-4 sm:p-6 hover:no-underline group/trigger">
 											<div className="flex items-center gap-4 w-full">
 												<div className="w-10 h-10 bg-slate-50 rounded-xl flex items-center justify-center text-slate-400 group-data-[state=open]/trigger:bg-teal-50 group-data-[state=open]/trigger:text-teal-600 transition-all duration-300">
@@ -1122,7 +1122,7 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
 								<h2 className="text-xl font-bold tracking-tight text-slate-800">Your Private Journal</h2>
 							</div>
 							<p className="text-sm text-slate-400 font-medium leading-relaxed px-2">Only you can see these notes. Reflect on your healing, progress, and thoughts here.</p>
-							<div className="bg-white/50 backdrop-blur-sm rounded-xl xs:rounded-xl sm:rounded-[2.5rem] shadow-xl shadow-slate-200/20 border border-white p-2 overflow-hidden">
+							<div className="bg-white/50 backdrop-blur-sm rounded-2xl shadow-xl shadow-slate-200/20 border border-white p-2 overflow-hidden">
 								<RichTextEditor content={report.notes || ""} onSave={handleSaveNotes} placeholder="How are you feeling today?" />
 							</div>
 
@@ -1168,7 +1168,7 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
 										<h3 className="text-2xl font-bold text-slate-900 tracking-tight">Coordination Line</h3>
 									</div>
 									
-									<div className="h-[600px] rounded-xl xs:rounded-xl sm:rounded-[2.5rem] border border-serene-neutral-100 shadow-2xl shadow-slate-200/50 overflow-hidden bg-white flex flex-col group">
+									<div className="h-[600px] rounded-2xl border border-serene-neutral-100 shadow-2xl shadow-slate-200/50 overflow-hidden bg-white flex flex-col group">
 										{isChatLoading ? (
 											<div className="flex-1 flex flex-col items-center justify-center p-12 text-center space-y-4">
 												<div className="w-12 h-12 rounded-xl bg-teal-50 flex items-center justify-center animate-spin">
@@ -1203,7 +1203,7 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
 
 
 										{/* Help Card */}
-										<Card className="bg-violet-600 rounded-xl xs:rounded-xl sm:rounded-[2.5rem] shadow-xl shadow-violet-600/20 border-0 p-5 xs:p-6 sm:p-8 text-white relative overflow-hidden group">
+										<Card className="bg-violet-600 rounded-2xl shadow-xl shadow-violet-600/20 border-0 p-5 xs:p-6 sm:p-8 text-white relative overflow-hidden group">
 											<div className="absolute top-0 right-0 p-4 opacity-10 group-hover:scale-110 transition-transform">
 												<Heart className="h-24 w-24" />
 											</div>
@@ -1217,7 +1217,7 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
 										</Card>
 
 									{/* Supportive Hint Card */}
-									<Card className="border border-slate-100 bg-white shadow-sm rounded-xl xs:rounded-xl sm:rounded-[2.5rem] overflow-hidden">
+									<Card className="border border-slate-100 bg-white shadow-sm rounded-2xl overflow-hidden">
 										<CardContent className="p-5 xs:p-6 sm:p-8 space-y-6">
 											<div className="flex items-center gap-3">
 												<div className="w-10 h-10 rounded-xl bg-teal-50 flex items-center justify-center text-teal-600">
@@ -1235,7 +1235,7 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
 							</div>
 						) : (
 							<div className="space-y-6">
-								<Card className="border-0 bg-teal-600 rounded-xl sm:rounded-[2.5rem] overflow-hidden group">
+								<Card className="border-0 bg-teal-600 rounded-2xl overflow-hidden group">
 									<CardContent className="p-10 relative">
 										<Sparkles className="absolute -top-4 -right-4 h-24 w-24 text-white/5 group-hover:rotate-12 transition-transform duration-700" />
 										<div className="space-y-6 relative">
@@ -1252,9 +1252,9 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
 								</Card>
 
 								{report.record_only ? (
-									<Card className="border-0 bg-white shadow-xl shadow-slate-200/50 rounded-xl sm:rounded-[2.5rem] overflow-hidden">
+									<Card className="border-0 bg-white shadow-xl shadow-slate-200/50 rounded-2xl overflow-hidden">
 										<CardContent className="p-10 text-center space-y-6">
-											<div className="w-20 h-20 bg-amber-50 rounded-[2rem] flex items-center justify-center mx-auto mb-2 text-amber-600">
+											<div className="w-20 h-20 bg-amber-50 rounded-2xl flex items-center justify-center mx-auto mb-2 text-amber-600">
 												<Sparkles className="h-10 w-10" />
 											</div>
 											<div className="space-y-3">
@@ -1293,7 +1293,7 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
 												const isAlreadyMatched = activeProposal.status === 'proposed' || activeProposal.status === 'requested' || activeProposal.status === 'confirmed';
 												
 												return (
-													<Card className="border border-white rounded-xl sm:rounded-[2.5rem] bg-white border-serene-neutral-100 overflow-hidden animate-in fade-in zoom-in-95 duration-500">
+													<Card className="border border-white rounded-2xl bg-white border-serene-neutral-100 overflow-hidden animate-in fade-in zoom-in-95 duration-500">
 														<CardHeader className="p-8 pb-4">
 															<div className="flex items-center justify-between">
 																<Badge className="bg-teal-50 text-teal-600 border-0 font-bold uppercase tracking-widest text-[9px]">
@@ -1347,7 +1347,7 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
 																					Suggest Another Time
 																				</Button>
 																			</DialogTrigger>
-																			<DialogContent className="max-w-2xl bg-white rounded-xl sm:rounded-[2.5rem] p-0 overflow-hidden border-0 shadow-2xl">
+																			<DialogContent className="max-w-2xl bg-white rounded-2xl p-0 overflow-hidden border-0 shadow-2xl">
 																				<div className="p-8 border-b border-slate-50">
 																					<DialogTitle className="text-2xl font-bold flex items-center gap-3">
 																						<Calendar className="h-6 w-6 text-teal-600" />
@@ -1390,7 +1390,7 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
 											}
 											
 											return (
-												<Card className="border border-serene-neutral-100 shadow-2xl rounded-xl sm:rounded-[2.5rem] bg-white overflow-hidden group">
+												<Card className="border border-serene-neutral-100 shadow-2xl rounded-2xl bg-white overflow-hidden group">
 													<CardContent className="p-12 flex flex-col items-center text-center space-y-6">
 														<div className="relative">
 															<div className="w-20 h-20 bg-teal-50 rounded-full flex items-center justify-center text-teal-600">
@@ -1414,7 +1414,7 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
 											);
 										})()}
 									{/* Sauti Salama Tips Card */}
-									<Card className="border-0 bg-gradient-to-br from-teal-600 to-emerald-700 rounded-xl sm:rounded-[2.5rem] overflow-hidden group">
+									<Card className="border-0 bg-gradient-to-br from-teal-600 to-emerald-700 rounded-2xl overflow-hidden group">
 										<CardContent className="p-8 relative">
 											<div className="absolute top-0 right-0 p-4 opacity-10">
 												<ShieldCheck className="h-20 w-20 text-white" />
