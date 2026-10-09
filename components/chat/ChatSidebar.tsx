@@ -307,7 +307,7 @@ export function ChatSidebar({ chats, selectedChatId, onSelectChat, isLoading, cu
                {search === '' && filter === 'all' && (
                  <div 
                     onClick={() => onSelectChat(salamaBotChat())}
-                    className={`flex items-center gap-3 p-3 cursor-pointer border-b border-[#f0f2f5] hover:bg-[#f5f6f6] transition-colors relative ${
+                    className={`flex items-center gap-3 p-3 cursor-pointer touch-manipulation border-b border-[#f0f2f5] hover:bg-[#f5f6f6] active:bg-[#eceff1] transition-colors relative ${
                       selectedChatId === SALAMA_BOT_ID ? 'bg-[#f0f2f5]' : ''
                     }`}
                  >

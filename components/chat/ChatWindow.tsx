@@ -410,12 +410,12 @@ export function ChatWindow({ chat, onBack }: ChatWindowProps) {
        <div className="absolute inset-0 z-0 opacity-[0.02]" style={{ backgroundImage: 'radial-gradient(#374151 0.5px, transparent 0.5px)', backgroundSize: '24px 24px' }}></div>
        
        {/* Header - Premium Glassmorphism */}
-       <div className="flex items-center justify-between px-5 py-3.5 bg-white/70 backdrop-blur-xl border-b border-serene-neutral-100/80 z-10 shadow-sm">
+       <div className="flex items-center justify-between px-3 md:px-5 pb-3.5 pt-[max(0.875rem,env(safe-area-inset-top))] bg-white/70 backdrop-blur-xl border-b border-serene-neutral-100/80 z-10 shadow-sm">
          <div className="flex items-center gap-3">
            <Button 
              variant="ghost" 
              size="icon" 
-             className="md:hidden text-serene-neutral-500 hover:text-serene-neutral-700 hover:bg-serene-neutral-100 rounded-full h-9 w-9" 
+             aria-label="Back to chats" className="md:hidden touch-manipulation text-serene-neutral-500 hover:text-serene-neutral-700 hover:bg-serene-neutral-100 rounded-full h-11 w-11 -ml-1" 
              onClick={(e) => { e.stopPropagation(); onBack(); }}
            >
              <ArrowLeft className="h-5 w-5" />

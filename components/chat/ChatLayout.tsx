@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { ChatSidebar } from './ChatSidebar';
 import { ChatWindow } from './ChatWindow';
@@ -8,6 +8,9 @@ import { Chat } from '@/types/chat';
 import { getChats } from '@/app/actions/chat';
 import { createClient } from '@/utils/supabase/client';
 import { SALAMA_BOT_ID, salamaBotChat } from '@/utils/chat/bot';
+import { CHATS_CHANGED_EVENT } from '@/lib/chat/client-read';
+
+const useIsoLayoutEffect = typeof window !== 'undefined' ? useLayoutEffect : useEffect;
 
 export function ChatLayout() {
   const [selectedChat, setSelectedChat] = useState<Chat | null>(null);
@@ -24,6 +27,9 @@ export function ChatLayout() {
   // Set while a community is being opened (it needs a round trip). The old conversation is deselected for that time,
   // otherwise the user could type into it believing they are in the community.
   const OPENING = '__opening__';
+  // True once this page itself pushed a history entry for an open chat, so "back" can pop it
+  // instead of stacking another entry (which made the phone's back button bounce between list and chat).
+  const pushedRef = useRef(false);
 
   useEffect(() => {
     if (pendingSelect.current) {
@@ -51,7 +57,14 @@ export function ChatLayout() {
     try {
       const params = new URLSearchParams(searchParams.toString());
       params.set('id', chat.id);
-      router.push(`?${params.toString()}`);
+      // Phones: one history entry per opened chat so the system back gesture returns to the list.
+      // Desktop shows both panes, so switching chats shouldn't pile up history.
+      if (isMobile && !chatId) {
+        pushedRef.current = true;
+        router.push(`?${params.toString()}`);
+      } else {
+        router.replace(`?${params.toString()}`);
+      }
     } catch (e) {
       console.error("Nav error", e);
     }
@@ -59,8 +72,19 @@ export function ChatLayout() {
 
   const handleBack = () => {
     setSelectedChat(null);
-    router.push('/dashboard/chat');
+    if (pushedRef.current) {
+      pushedRef.current = false;
+      router.back();
+    } else {
+      router.replace('/dashboard/chat');
+    }
+    loadChats(); // refresh unread badges after reading
   };
+
+  // Decide phone vs desktop layout before the first paint (no flash of the two-pane layout on phones).
+  useIsoLayoutEffect(() => {
+    setIsMobile(window.innerWidth < 768);
+  }, []);
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 768);
@@ -87,21 +111,31 @@ export function ChatLayout() {
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'chats' },
-        () => loadChats() 
+        () => scheduleReload()
       )
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'messages' },
-        (payload) => {
-           loadChats();
-        }
+        () => scheduleReload()
       )
       .subscribe();
 
+    // A chat was opened/read somewhere: its unread badge should clear.
+    window.addEventListener(CHATS_CHANGED_EVENT, scheduleReload);
+
     return () => {
+      window.removeEventListener(CHATS_CHANGED_EVENT, scheduleReload);
       supabase.removeChannel(channel);
     };
   }, []);
+
+  // Many events can arrive together (a burst of messages, read receipts): refetch once.
+  const reloadTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const scheduleReload = () => {
+    if (reloadTimer.current) clearTimeout(reloadTimer.current);
+    reloadTimer.current = setTimeout(() => loadChats(), 350);
+  };
+  useEffect(() => () => { if (reloadTimer.current) clearTimeout(reloadTimer.current); }, []);
 
   const loadChats = async () => {
     try {
