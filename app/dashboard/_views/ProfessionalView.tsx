@@ -35,6 +35,7 @@ import {
 } from "../_components/SereneDashboardUI";
 import { CalendarConnectionStatus } from "../_components/CalendarConnectionStatus";
 import { OutOfOfficeBanner } from "@/components/dashboard/OutOfOfficeBanner";
+import { OutOfOfficeSwitch } from "@/components/dashboard/OutOfOfficeSwitch";
 import { getMatchStatus, getStatusTheme } from "@/lib/utils/case-status";
 
 interface ProfessionalViewProps {
@@ -146,6 +147,7 @@ export default function ProfessionalView({
 						/>
 
 						<OutOfOfficeBanner userId={userId} />
+						<OutOfOfficeSwitch userId={userId} />
 
 						<VerificationBanner 
 							profileDetails={profileDetails} 

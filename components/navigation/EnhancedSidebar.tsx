@@ -33,6 +33,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
+import { OutOfOfficeMenuItem } from "@/components/dashboard/OutOfOfficeMenuItem";
 import {
 	Dialog,
 	DialogContent,
@@ -728,6 +729,9 @@ export function EnhancedSidebar({
 											<span>Profile</span>
 										</Link>
 									</DropdownMenuItem>
+									{(role === "professional" || role === "ngo") && dash?.data?.userId && (
+										<OutOfOfficeMenuItem userId={dash.data.userId} />
+									)}
 									{(role === "professional" || role === "ngo") && (
 										<DropdownMenuItem asChild>
 											<Link href="/dashboard/profile?section=verification" className="cursor-pointer rounded-xl focus:bg-serene-neutral-50 focus:text-serene-blue-600 m-1">

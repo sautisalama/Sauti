@@ -154,8 +154,8 @@ export function MobileTopBar() {
                             </DropdownMenuItem>
                         )}
     
-                        {(user?.profile?.user_type === "professional" || user?.profile?.user_type === "ngo") && user?.id && (
-                            <OutOfOfficeMenuItem userId={user.id} />
+                        {(user?.profile?.user_type === "professional" || user?.profile?.user_type === "ngo") && (user?.id || dash?.data?.userId) && (
+                            <OutOfOfficeMenuItem userId={(user?.id || dash?.data?.userId)!} />
                         )}
 
                         {/* Role Switcher Options */}
