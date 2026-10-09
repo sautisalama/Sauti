@@ -4,6 +4,7 @@ import { createClient } from "@/utils/supabase/server";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { cookies, headers } from "next/headers";
+import { landingFor } from "@/lib/auth/landing";
 import { registerDevice, parseSettings, TrackedDevice } from "@/lib/user-settings";
 
 /** Only allow same-site relative paths, so `?next=` can never become an open redirect. */
@@ -98,7 +99,8 @@ export async function signIn(formData: FormData) {
 
 	if (error) {
 		console.error("Sign in error:", error);
-		return redirect("/?message=account_not_found");
+		const back = safeNext(formData.get("next"));
+		return redirect(`/signin?error=invalid${back ? `&next=${encodeURIComponent(back)}` : ""}`);
 	}
 
 	// Register device on sign in
@@ -125,7 +127,8 @@ export async function signIn(formData: FormData) {
 	}
 
 	revalidatePath("/", "layout");
-	return redirect(safeNext(formData.get("next")) ?? "/dashboard");
+	// Straight in: the page they asked for, else the suite they were last in, else the dashboard.
+	return redirect(await landingFor(supabase, user?.id ?? "", safeNext(formData.get("next"))));
 }
 
 export async function signInWithGoogle() {

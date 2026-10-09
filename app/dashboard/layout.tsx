@@ -9,6 +9,7 @@ import { DashboardDataProvider } from "@/components/providers/DashboardDataProvi
 import { fetchDashboardData } from "./_data/aggregate";
 import { DeviceRegistration } from "./_components/DeviceRegistration";
 import { PushAndBadge } from "@/components/dashboard/PushAndBadge";
+import { SuiteTracker } from "@/components/dashboard/SuiteTracker";
 
 
 export default async function DashboardLayout({
@@ -45,6 +46,7 @@ export default async function DashboardLayout({
 				{/* Device session tracking */}
 				<DeviceRegistration />
 				<PushAndBadge />
+				<SuiteTracker />
 				{/* Desktop Sidebar */}
 				<EnhancedSidebar />
 

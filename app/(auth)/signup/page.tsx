@@ -2,6 +2,8 @@ import Image from "next/image";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
+import { SubmitButton } from "@/components/auth/SubmitButton";
 import { Label } from "@/components/ui/label";
 import { signUp, signInWithGoogle } from "@/app/(auth)/actions/auth";
 import {
@@ -37,10 +39,10 @@ export default async function SignUp({ searchParams }: { searchParams: Promise<{
 					<div className="mx-auto w-full max-w-[450px] space-y-8">
 						<div className="space-y-3 text-center lg:text-left">
                             <div className="inline-flex items-center justify-center h-18 w-18 rounded-2xl bg-sauti-blue/10 mb-2 lg:mb-4">
-                                <Image 
-                                    src="/Logo.png" 
-                                    alt="Sauti Salama" 
-                                    width={100} 
+                                <Image
+                                    src="/Logo.png"
+                                    alt="Sauti Salama"
+                                    width={100}
                                     height={100}
                                     className="object-contain"
                                 />
@@ -61,11 +63,11 @@ export default async function SignUp({ searchParams }: { searchParams: Promise<{
                                         <Label htmlFor="firstName" className="text-sm font-semibold text-serene-neutral-700 ml-1">
                                             First Name
                                         </Label>
-                                        <Input 
-                                            name="firstName" autoComplete="given-name" 
-                                            id="firstName" 
-                                            type="text" 
-                                            required 
+                                        <Input
+                                            name="firstName" autoComplete="given-name"
+                                            id="firstName"
+                                            type="text"
+                                            required
                                             className="h-11 bg-serene-neutral-50 border-sauti-teal/50 rounded-xl focus-visible:ring-sauti-blue/20 focus-visible:border-sauti-blue transition-all"
                                         />
                                     </div>
@@ -73,11 +75,11 @@ export default async function SignUp({ searchParams }: { searchParams: Promise<{
                                         <Label htmlFor="lastName" className="text-sm font-semibold text-serene-neutral-700 ml-1">
                                             Last Name
                                         </Label>
-                                        <Input 
-                                            name="lastName" autoComplete="family-name" 
-                                            id="lastName" 
-                                            type="text" 
-                                            required 
+                                        <Input
+                                            name="lastName" autoComplete="family-name"
+                                            id="lastName"
+                                            type="text"
+                                            required
                                             className="h-11 bg-serene-neutral-50 border-sauti-teal/50 rounded-xl focus-visible:ring-sauti-blue/20 focus-visible:border-sauti-blue transition-all"
                                         />
                                     </div>
@@ -100,20 +102,19 @@ export default async function SignUp({ searchParams }: { searchParams: Promise<{
                                     <Label htmlFor="password" className="text-sm font-semibold text-serene-neutral-700 ml-1">
                                         Password
                                     </Label>
-                                    <Input 
-                                        name="password" autoComplete="new-password" 
-                                        id="password" 
-                                        type="password" 
-                                        required 
+                                    <PasswordInput
+                                        name="password" autoComplete="new-password"
+                                        id="password"
+                                        required
                                         className="h-11 bg-serene-neutral-50 border-sauti-teal/50 rounded-xl focus-visible:ring-sauti-blue/20 focus-visible:border-sauti-blue transition-all"
                                     />
                                 </div>
-                                <Button 
-                                    type="submit" 
+                                <SubmitButton
+                                    pendingText="Creating your account..."
                                     className="w-full h-12 bg-sauti-blue hover:bg-sauti-blue/90 text-white font-bold rounded-xl shadow-lg shadow-sauti-blue/20 transition-all active:scale-[0.98] mt-2"
                                 >
                                     Create Account
-                                </Button>
+                                </SubmitButton>
                             </form>
 
                             <div className="relative">
@@ -126,9 +127,9 @@ export default async function SignUp({ searchParams }: { searchParams: Promise<{
                             </div>
 
                             <form action={signInWithGoogle}>
-                                <Button 
-                                    variant="outline" 
-                                    className="w-full h-12 bg-white border-sauti-teal/50 text-serene-neutral-700 font-semibold rounded-xl hover:bg-serene-neutral-50 transition-all flex items-center justify-center gap-3" 
+                                <Button
+                                    variant="outline"
+                                    className="w-full h-12 bg-white border-sauti-teal/50 text-serene-neutral-700 font-semibold rounded-xl hover:bg-serene-neutral-50 transition-all flex items-center justify-center gap-3"
                                     type="submit"
                                 >
                                     <svg className="h-5 w-5" viewBox="0 0 24 24">

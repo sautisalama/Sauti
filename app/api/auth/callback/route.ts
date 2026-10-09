@@ -5,12 +5,13 @@ import { cookies, headers } from "next/headers";
 import { registerDevice, parseSettings, TrackedDevice } from "@/lib/user-settings";
 import { revalidatePath } from "next/cache";
 import { Json } from "@/types/db-schema";
+import { landingFor } from "@/lib/auth/landing";
 
 export async function GET(request: Request) {
 	const { searchParams, origin } = new URL(request.url);
 	const code = searchParams.get("code");
 
-	const next = searchParams.get("next") ?? "/dashboard";
+	let next = searchParams.get("next") ?? "";
 
 	if (code) {
 		const supabase = await createClient();
@@ -68,6 +69,8 @@ export async function GET(request: Request) {
 			
 			// Revalidate before dashboard redirect
 			revalidatePath("/dashboard", "layout");
+			// No page asked for: resume the suite they were last in.
+			next = await landingFor(supabase, user.id, next.startsWith("/") && !next.startsWith("//") ? next : null);
 		}
 
 		if (!error) {
