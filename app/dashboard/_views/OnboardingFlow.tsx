@@ -10,32 +10,34 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { OtherEntry } from "@/components/ui/other-entry";
 import { Badge } from "@/components/ui/badge";
 import { AddSupportServiceForm } from "@/components/AddSupportServiceForm";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { SereneBreadcrumb } from "@/components/ui/SereneBreadcrumb";
 import { Database } from "@/types/db-schema";
-import { 
-	Stethoscope, 
-	Brain, 
-	Scale, 
-	FileText, 
-	ShieldCheck, 
-	Gavel, 
-	HeartHandshake, 
-	Building2, 
+import {
+	Stethoscope,
+	Brain,
+	Scale,
+	FileText,
+	ShieldCheck,
+	Gavel,
+	HeartHandshake,
+	Building2,
 	Users,
     Shield,
 	Check,
 	AlertTriangle,
-	ArrowRight
+	ArrowRight,
+	X
 } from "lucide-react";
-import { 
-	Accordion, 
-	AccordionContent, 
-	AccordionItem, 
-	AccordionTrigger 
+import {
+	Accordion,
+	AccordionContent,
+	AccordionItem,
+	AccordionTrigger
 } from "@/components/ui/accordion";
 import { POLICIES, Policy, PolicySection } from "./PolicyContent";
 import { cn } from "@/lib/utils";
@@ -145,14 +147,14 @@ export default function OnboardingFlow() {
 			if (user.profile.user_type && stepIndex === 0 && !adminInvited) {
 				const uType = user.profile.user_type;
 				const isProfessionalOrNGO = uType === 'professional' || uType === 'ngo';
-				const hasAcceptedAll = policies.all_policies_accepted; 
+				const hasAcceptedAll = policies.all_policies_accepted;
 
 				if (hasAcceptedAll) {
 					if (isProfessionalOrNGO) {
 						setStepIndex(2); // Skip Role and Policies
 					} else {
 						// Registered survivors who are here somehow
-						setStepIndex(1); 
+						setStepIndex(1);
 					}
 				} else {
 					// Role selected but policies not accepted
@@ -181,13 +183,13 @@ export default function OnboardingFlow() {
 		try {
 			if (!user?.id) return setStepIndex((i) => Math.min(i + 1, filteredSteps.length - 1));
 			setSaving(true);
-			
+
 			const currentPolicies = parsePolicies(user.profile?.policies);
 			const policyUpdate = {
 				accepted_policies: profile.accepted_policies,
 				all_policies_accepted: allPoliciesAccepted,
-				policies_accepted_at: allPoliciesAccepted 
-					? (currentPolicies.policies_accepted_at || new Date().toISOString()) 
+				policies_accepted_at: allPoliciesAccepted
+					? (currentPolicies.policies_accepted_at || new Date().toISOString())
 					: null
 			};
 
@@ -207,7 +209,7 @@ export default function OnboardingFlow() {
 						...(user.profile?.settings as any || {}),
 						matching_traits: {
 							gender: profile.gender || null,
-							languages: profile.languages || []
+							languages: (profile.languages || []).filter((l) => l !== 'other')
 						}
 					}
 				})
@@ -238,7 +240,7 @@ export default function OnboardingFlow() {
 								...(user.profile?.settings as any || {}),
 								matching_traits: {
 									gender: profile.gender || null,
-									languages: profile.languages || []
+									languages: (profile.languages || []).filter((l) => l !== 'other')
 								}
 							}
 						}
@@ -275,8 +277,8 @@ export default function OnboardingFlow() {
 
 	const StepProgressTopBorder = (
 		<div className="h-2 w-full bg-serene-neutral-100 shrink-0 z-10">
-			<div 
-				className="h-full bg-gradient-to-r from-serene-blue-400 to-serene-blue-600 transition-all duration-700 ease-out" 
+			<div
+				className="h-full bg-gradient-to-r from-serene-blue-400 to-serene-blue-600 transition-all duration-700 ease-out"
 				style={{ width: `${((safeStepIndex + 1) / filteredSteps.length) * 100}%` }}
 			/>
 		</div>
@@ -297,9 +299,9 @@ export default function OnboardingFlow() {
 				</p>
 			</CardHeader>
 			<CardContent className="p-3 md:p-6 flex-1 overflow-y-auto no-scrollbar">
-				<Accordion 
-					type="single" 
-					collapsible 
+				<Accordion
+					type="single"
+					collapsible
 					className="w-full space-y-3"
 					value={openPolicy}
 					onValueChange={setOpenPolicy}
@@ -307,9 +309,9 @@ export default function OnboardingFlow() {
 					{relevantPolicies.map((policy) => {
 						const isAccepted = profile.accepted_policies.includes(policy.id);
 						return (
-							<AccordionItem 
-								key={policy.id} 
-								value={policy.id} 
+							<AccordionItem
+								key={policy.id}
+								value={policy.id}
 								className={cn(
 									"border rounded-2xl px-4 transition-all duration-300",
 									isAccepted ? "bg-serene-green-50/30 border-serene-green-100" : "bg-white border-serene-neutral-100"
@@ -366,8 +368,8 @@ export default function OnboardingFlow() {
 										}}
 										className={cn(
 											"w-full rounded-xl transition-all font-bold uppercase tracking-widest text-[10px]",
-											isAccepted 
-												? "bg-serene-green-100 text-serene-green-700 hover:bg-serene-green-100 cursor-default" 
+											isAccepted
+												? "bg-serene-green-100 text-serene-green-700 hover:bg-serene-green-100 cursor-default"
 												: "bg-serene-blue-600 text-white hover:bg-serene-blue-700 shadow-md"
 										)}
 									>
@@ -378,7 +380,7 @@ export default function OnboardingFlow() {
 						);
 					})}
 				</Accordion>
-				
+
 				{!allPoliciesAccepted && (
 					<div className="mt-6 p-4 bg-amber-50 border border-amber-100 rounded-2xl flex items-start gap-3">
 						<AlertTriangle className="h-5 w-5 text-amber-500 shrink-0 mt-0.5" />
@@ -518,8 +520,8 @@ export default function OnboardingFlow() {
 										key={title}
 										variant={profile.professional_title === title ? 'default' : 'outline'}
 										className={`group rounded-xl px-2 py-3 h-auto transition-all duration-300 flex flex-col items-center gap-1.5 border-2 ${
-											profile.professional_title === title 
-												? `${config?.activeColor || 'bg-sauti-teal'} text-white border-transparent shadow-lg` 
+											profile.professional_title === title
+												? `${config?.activeColor || 'bg-sauti-teal'} text-white border-transparent shadow-lg`
 												: `bg-white border-serene-neutral-100 text-serene-neutral-600 hover:border-serene-blue-200 hover:bg-serene-blue-50/30`
 										}`}
 										onClick={() => setProfile(p => ({ ...p, professional_title: title }))}
@@ -542,8 +544,8 @@ export default function OnboardingFlow() {
 										key={title}
 										variant={profile.professional_title === title ? 'default' : 'outline'}
 										className={`group rounded-xl px-2 py-3 h-auto transition-all duration-300 flex flex-col items-center gap-1.5 border-2 ${
-											profile.professional_title === title 
-												? `${config?.activeColor || 'bg-sauti-teal'} text-white border-transparent shadow-lg` 
+											profile.professional_title === title
+												? `${config?.activeColor || 'bg-sauti-teal'} text-white border-transparent shadow-lg`
 												: `bg-white border-serene-neutral-100 text-serene-neutral-600 hover:border-serene-blue-200 hover:bg-serene-blue-50/30`
 										}`}
 										onClick={() => setProfile(p => ({ ...p, professional_title: title }))}
@@ -598,21 +600,42 @@ export default function OnboardingFlow() {
 						<div className="space-y-2">
 							<Label className="text-[10px] font-black text-serene-neutral-600 uppercase tracking-widest px-1">Languages You Speak</Label>
 							<div className="flex flex-wrap gap-2">
+								{profile.languages.filter((l) => l !== 'other' && !['english', 'swahili'].includes(l)).map((lang) => (
+									<Badge
+										key={lang}
+										className="h-9 gap-1 rounded-full border-2 border-serene-blue-300 bg-serene-blue-100 px-4 py-2 font-bold capitalize text-serene-blue-700 hover:bg-serene-blue-200"
+									>
+										{lang.replace(/_/g, ' ')}
+										<button
+											type="button"
+											aria-label={`Remove ${lang.replace(/_/g, ' ')}`}
+											onClick={() => setProfile((p) => ({ ...p, languages: p.languages.filter((l) => l !== lang) }))}
+											className="ml-1 rounded-full p-0.5 hover:bg-serene-blue-300/40"
+										>
+											<X className="h-3 w-3" />
+										</button>
+									</Badge>
+								))}
 								{['english', 'swahili', 'other'].map((lang) => {
-									const isSelected = profile.languages.includes(lang);
+									const isSelected = lang === 'other'
+										? profile.languages.includes('other')
+										: profile.languages.includes(lang);
 									return (
 										<Badge
 											key={lang}
 											variant={isSelected ? 'default' : 'outline'}
 											className={cn(
 												"px-4 py-2 rounded-full cursor-pointer transition-all border-2 capitalize font-bold h-9",
-												isSelected 
-													? "bg-serene-blue-100 border-serene-blue-300 text-serene-blue-700 hover:bg-serene-blue-200" 
+												isSelected
+													? "bg-serene-blue-100 border-serene-blue-300 text-serene-blue-700 hover:bg-serene-blue-200"
 													: "bg-white border-serene-neutral-100 text-serene-neutral-400 hover:border-serene-blue-200"
 											)}
 											onClick={() => {
-												const nextLangs = isSelected 
-													? profile.languages.filter(l => l !== lang)
+												// Un-choosing "Other" also drops the languages typed for it.
+												const nextLangs = isSelected
+													? lang === 'other'
+														? profile.languages.filter((l) => ['english', 'swahili'].includes(l))
+														: profile.languages.filter((l) => l !== lang)
 													: [...profile.languages, lang];
 												setProfile(p => ({ ...p, languages: nextLangs }));
 											}}
@@ -623,6 +646,13 @@ export default function OnboardingFlow() {
 									);
 								})}
 							</div>
+							{profile.languages.includes('other') && (
+								<OtherEntry
+									label="Which other language(s) do you speak?"
+									placeholder="e.g. Kikuyu, Luo, Kalenjin"
+									onAdd={(vals) => setProfile((p) => ({ ...p, languages: [...p.languages.filter((l) => l !== 'other'), ...vals.filter((v) => !p.languages.includes(v)), 'other'] }))}
+								/>
+							)}
 						</div>
 					</div>
 				)}
@@ -681,25 +711,25 @@ export default function OnboardingFlow() {
 			</div>
 
 			<div className="flex flex-col sm:flex-row justify-between items-center gap-3 pt-3 border-t border-serene-neutral-100 bg-white/40 backdrop-blur-sm sticky bottom-0 pb-3 shrink-0 px-2">
-				<Button 
-					variant="ghost" 
-					onClick={back} 
+				<Button
+					variant="ghost"
+					onClick={back}
 					disabled={safeStepIndex === 0 || saving}
 					className="rounded-full px-6 sm:px-8 text-neutral-400 hover:text-sauti-dark hover:bg-neutral-100 transition-colors font-bold text-xs w-full sm:w-auto order-2 sm:order-1"
 				>
 					Back
 				</Button>
-				
+
 				<div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto order-1 sm:order-2">
-					<Button 
-						onClick={next} 
+					<Button
+						onClick={next}
 						disabled={
-							saving || 
+							saving ||
 							(currentStepId === 'policies' && !allPoliciesAccepted) ||
-							(currentStepId === 'role' && !profile.user_type) || 
+							(currentStepId === 'role' && !profile.user_type) ||
 							(currentStepId === 'about' && (
-								!profile.professional_title || 
-								!profile.bio || 
+								!profile.professional_title ||
+								!profile.bio ||
 								(profile.user_type === 'professional' && (!profile.gender || profile.languages.length === 0))
 							))
 						}

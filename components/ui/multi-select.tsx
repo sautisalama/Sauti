@@ -3,6 +3,8 @@
 import * as React from "react";
 import { Check, ChevronDown, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { humanizeOption } from "@/lib/other-option";
+import { OtherEntry } from "@/components/ui/other-entry";
 
 interface Option {
 	value: string;
@@ -19,6 +21,11 @@ interface MultiSelectProps {
 	emptyText?: string;
 	className?: string;
 	disabled?: boolean;
+	/**
+	 * When the option with value "other" is chosen, ask what it is. What they type is added as extra chips in
+	 * the same format as the listed options (e.g. "forced_marriage") and stored alongside "other".
+	 */
+	allowOther?: boolean | { label?: string; placeholder?: string };
 }
 
 /**
@@ -39,6 +46,7 @@ export function MultiSelect({
 	emptyText = "No matches",
 	className,
 	disabled,
+	allowOther,
 }: MultiSelectProps) {
 	const id = React.useId();
 	const rootRef = React.useRef<HTMLDivElement>(null);
@@ -70,7 +78,18 @@ export function MultiSelect({
 		(listRef.current?.children[active] as HTMLElement | undefined)?.scrollIntoView({ block: "nearest" });
 	}, [active, open]);
 
+	const known = React.useMemo(() => new Set(options.map((o) => o.value)), [options]);
+	const hasOther = !!allowOther && options.some((o) => o.value === "other");
+	const otherOn = hasOther && selected.includes("other");
+	const otherCfg = typeof allowOther === "object" ? allowOther : {};
+
 	const toggle = (value: string) => {
+		if (value === "other" && hasOther && selected.includes("other")) {
+			// Turning "Other" off also drops what was typed for it.
+			onChange(selected.filter((s) => s !== "other" && known.has(s)));
+			setQuery("");
+			return;
+		}
 		onChange(selected.includes(value) ? selected.filter((s) => s !== value) : [...selected, value]);
 		setQuery("");
 		inputRef.current?.focus();
@@ -96,7 +115,7 @@ export function MultiSelect({
 		}
 	};
 
-	const labelOf = (v: string) => options.find((o) => o.value === v)?.label ?? v;
+	const labelOf = (v: string) => options.find((o) => o.value === v)?.label ?? humanizeOption(v);
 	const listId = `${id}-list`;
 
 	return (
@@ -164,6 +183,16 @@ export function MultiSelect({
 					<ChevronDown className={cn("h-4 w-4 transition-transform duration-200", open && "rotate-180")} aria-hidden />
 				</button>
 			</div>
+
+			{otherOn && (
+				<OtherEntry
+					className="mt-2"
+					autoFocus={!selected.some((s) => !known.has(s))}
+					label={otherCfg.label ?? "You chose Other. What is it?"}
+					placeholder={otherCfg.placeholder}
+					onAdd={(vals) => onChange([...selected, ...vals.filter((v) => !selected.includes(v))])}
+				/>
+			)}
 
 			{open && (
 				<ul

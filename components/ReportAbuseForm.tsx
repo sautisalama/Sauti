@@ -425,6 +425,7 @@ export default function ReportAbuseForm({ onClose }: { onClose?: () => void }) {
 						I would like to report {reportingFor !== 'self' ? "a case" : "incident(s)"} of{" "}
 						<span className="inline-flex align-middle w-full sm:w-auto mt-2 mb-2 sm:mt-0 sm:mb-0">
 							<MultiSelect
+							allowOther
 								selected={incidentTypes}
 								onChange={setIncidentTypes}
 								options={INCIDENT_OPTIONS}
@@ -477,6 +478,7 @@ export default function ReportAbuseForm({ onClose }: { onClose?: () => void }) {
 						attention. I most urgently need{" "}
 						<span className="inline-flex align-middle w-full sm:w-auto mt-2 mb-2 sm:mt-0 sm:mb-0">
 							<MultiSelect
+							allowOther
 								selected={supportServices}
 								onChange={setSupportServices}
 								options={SUPPORT_SERVICE_OPTIONS}

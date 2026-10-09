@@ -355,6 +355,7 @@ export default function AuthenticatedReportAbuseForm({
 							Incident Type <span className="text-red-500">*</span>
 						</label>
 						<MultiSelect
+							allowOther
 							selected={incidentTypes}
 							onChange={setIncidentTypes}
 							options={[
@@ -511,6 +512,7 @@ export default function AuthenticatedReportAbuseForm({
 				<div className="w-full space-y-2">
 					<p className="text-sm font-medium text-neutral-700">Required Services</p>
 					<MultiSelect
+							allowOther
 						selected={selectedServices}
 						onChange={setSelectedServices}
 						options={SUPPORT_SERVICE_OPTIONS}
