@@ -8,6 +8,18 @@ export type PWAInstallHandlers = {
   handleInstallClick: () => Promise<void>;
 };
 
+/** "Not now" hides the suggestion for a week; after that it is offered again. */
+function isRecentlyDismissed() {
+  try {
+    const v = localStorage.getItem('ss_pwa_dismissed');
+    if (!v) return false;
+    const t = Number(v);
+    return v === 'true' || (t > 0 && Date.now() - t < 7 * 24 * 60 * 60 * 1000);
+  } catch {
+    return false;
+  }
+}
+
 export function PWAInstallPrompt({ onHandlersReady }: { onHandlersReady?: (handlers: PWAInstallHandlers) => void } = {}) {
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [showInstallPrompt, setShowInstallPrompt] = useState(false);
@@ -34,7 +46,7 @@ export function PWAInstallPrompt({ onHandlersReady }: { onHandlersReady?: (handl
 
   useEffect(() => {
     // Don't listen or show prompt if already installed or previously dismissed
-    if (isStandalone || localStorage.getItem('ss_pwa_dismissed') === 'true') {
+    if (isStandalone || isRecentlyDismissed()) {
       return;
     }
 
@@ -63,7 +75,7 @@ export function PWAInstallPrompt({ onHandlersReady }: { onHandlersReady?: (handl
     
     if (outcome === 'accepted') {
       console.log('User accepted the install prompt');
-      localStorage.setItem('ss_pwa_dismissed', 'true'); // Hide completely after installation
+      try { localStorage.setItem('ss_pwa_dismissed', String(Date.now())); } catch {} // Hide completely after installation
     } else {
       console.log('User dismissed the install prompt');
     }
@@ -75,7 +87,7 @@ export function PWAInstallPrompt({ onHandlersReady }: { onHandlersReady?: (handl
 
   const handleDismiss = useCallback(() => {
     setShowInstallPrompt(false);
-    localStorage.setItem('ss_pwa_dismissed', 'true');
+    try { localStorage.setItem('ss_pwa_dismissed', String(Date.now())); } catch {}
   }, []);
 
   useEffect(() => {

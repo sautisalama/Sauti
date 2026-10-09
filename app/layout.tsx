@@ -4,6 +4,7 @@ import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
 
 import { PWAInstallPrompt } from "@/components/PWAInstallPrompt";
+import { ServiceWorkerRegister } from "@/components/ServiceWorkerRegister";
 // import { SafetyBar } from "@/components/SafetyBar";
 import { AccessibilityProvider } from "@/components/a11y/AccessibilityProvider";
 import { KeyboardFocusScript } from "@/components/a11y/KeyboardFocusScript";
@@ -187,6 +188,7 @@ export default function RootLayout({
 				</AccessibilityProvider>
 				<OrientationGuard />
 				<PWAInstallPrompt />
+				<ServiceWorkerRegister />
 				<Toaster />
 			</body>
 		</html>

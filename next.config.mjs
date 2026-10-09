@@ -1,6 +1,3 @@
-import withPWAInit from "@ducanh2912/next-pwa";
-
-const isWindows = process.platform === "win32";
 
 /** @type {import('next').NextConfig} */
 
@@ -43,18 +40,12 @@ const nextConfig = {
 		removeConsole: process.env.NODE_ENV !== "development", // Remove console.log in production
 	},
 	turbopack: {},
+	async headers() {
+		return [
+			// The worker must always be revalidated so updates reach users promptly.
+			{ source: "/sw.js", headers: [{ key: "Cache-Control", value: "no-cache, no-store, must-revalidate" }, { key: "Service-Worker-Allowed", value: "/" }] },
+		];
+	},
 };
 
-const withPWA = withPWAInit({
-	dest: "public",
-	// Disable PWA on Windows to avoid EPERM errors from terser/jest-worker during build
-	disable: isWindows || process.env.NODE_ENV === "development",
-	register: true,
-	skipWaiting: true,
-	fallbacks: {
-		document: "/~offline",
-	},
-	// Other configurations you want...
-});
-
-export default withPWA(nextConfig);
+export default nextConfig;
