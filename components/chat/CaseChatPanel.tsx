@@ -3,7 +3,8 @@
 import { withParticipantProfiles } from '@/utils/chat/participants';
 import { useState, useEffect, useRef, useOptimistic, startTransition } from 'react';
 import { Chat, Message, MessageType, transformChat } from '@/types/chat';
-import { getMessages, sendMessage, markMessagesAsRead, getCaseChat } from '@/app/actions/chat';
+import { getMessages, sendMessage, getCaseChat } from '@/app/actions/chat';
+import { markMessagesAsRead } from '@/lib/chat/client-read';
 import { fetchLinkMetadata } from '@/app/actions/chat-media';
 import { createClient } from '@/utils/supabase/client';
 import { MessageBubble } from './MessageBubble';
@@ -390,6 +391,7 @@ export function CaseChatPanel({
               key={msg.id}
               message={msg}
               isOwn={isOwn}
+              currentUserId={currentUserId || undefined}
               showTail={showTail}
             />
           );

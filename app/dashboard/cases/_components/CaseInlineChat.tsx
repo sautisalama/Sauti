@@ -222,6 +222,7 @@ export function CaseInlineChat({
                   key={msg.id} 
                   message={msg} 
                   isOwn={isOwn} 
+                  currentUserId={currentUserId || undefined}
                   showTail={showTail}
                 />
               );

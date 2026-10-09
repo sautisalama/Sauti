@@ -135,7 +135,7 @@ export function NotificationDropdown() {
                 <Button variant="ghost" size="icon" className="relative rounded-full hover:bg-serene-neutral-100 text-serene-neutral-500 hover:text-serene-blue-600 transition-colors h-10 w-10">
                     <Bell className="h-5 w-5 transition-transform group-active:scale-95" />
                     {unreadCount > 0 && (
-                        <Badge variant="destructive" className="absolute -top-1 -right-1 h-5 w-5 p-0 flex items-center justify-center text-[10px] font-black ring-2 ring-white animate-in zoom-in bg-red-600 text-white shadow-lg shadow-red-500/20">
+                        <Badge variant="destructive" className="absolute -top-1 -right-1 h-5 w-5 p-0 flex items-center justify-center text-[10px] font-black ring-2 ring-white animate-in zoom-in bg-purple-600 text-white shadow-lg shadow-purple-500/20">
                             {unreadCount > 9 ? "9+" : unreadCount}
                         </Badge>
                     )}

@@ -27,7 +27,21 @@ export async function getChats() {
 
   if (error) throw error;
   
-  return (await withParticipantProfiles(supabase, data || [])).map(transformChat);
+  const chats = (await withParticipantProfiles(supabase, data || [])).map(transformChat);
+
+  // Per-chat unread badges (messages from others since this user last opened the chat).
+  const { data: counts } = await supabase.rpc('unread_chat_counts');
+  const unread = new Map((counts ?? []).map((c) => [c.chat_id, Number(c.unread)]));
+  return chats.map((c) => ({ ...c, unread_count: unread.get(c.id) ?? 0 }));
+}
+
+/** Total unread chat messages for the app badges. */
+export async function getUnreadChatTotal(): Promise<number> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return 0;
+  const { data } = await supabase.rpc('unread_chat_counts');
+  return (data ?? []).reduce((n, c) => n + Number(c.unread), 0);
 }
 
 export async function getMessages(chatId: string | string[], limit = 50, before?: string) {

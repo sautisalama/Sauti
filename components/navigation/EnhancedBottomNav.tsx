@@ -224,7 +224,7 @@ export function EnhancedBottomNav({ forceShow = false, className }: EnhancedBott
             <Badge 
               className={cn(
                 "absolute -top-1.5 -right-1.5 h-4 w-4 flex items-center justify-center p-0 text-[9px] font-bold shadow-sm",
-                item.id === 'cases' ? "bg-serene-blue-600 text-white border border-white min-w-[17px] ring-1 ring-serene-blue-200" : "bg-red-600 text-white border border-white min-w-[17px] ring-1 ring-red-200"
+                "bg-purple-600 text-white border border-white min-w-[17px] ring-1 ring-purple-200"
               )}
             >
               {item.badge > 99 ? "99+" : item.badge}

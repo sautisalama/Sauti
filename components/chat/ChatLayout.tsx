@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { ChatSidebar } from './ChatSidebar';
 import { ChatWindow } from './ChatWindow';
 import { Chat } from '@/types/chat';
-import { getChats, markAllChatsAsRead } from '@/app/actions/chat';
+import { getChats } from '@/app/actions/chat';
 import { createClient } from '@/utils/supabase/client';
 import { SALAMA_BOT_ID, salamaBotChat } from '@/utils/chat/bot';
 
@@ -24,11 +24,6 @@ export function ChatLayout() {
   // Set while a community is being opened (it needs a round trip). The old conversation is deselected for that time,
   // otherwise the user could type into it believing they are in the community.
   const OPENING = '__opening__';
-
-  useEffect(() => {
-    // Reset unread count when opening the messages page
-    markAllChatsAsRead().catch(console.error);
-  }, []);
 
   useEffect(() => {
     if (pendingSelect.current) {

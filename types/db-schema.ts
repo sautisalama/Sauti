@@ -2078,6 +2078,10 @@ export type Database = {
         Args: { p_end_time: string; p_start_time: string; p_user_id: string }
         Returns: boolean
       }
+      unread_chat_counts: {
+        Args: Record<PropertyKey, never>
+        Returns: { chat_id: string; unread: number }[]
+      }
       toggle_message_reaction: {
         Args: { p_message_id: string; p_emoji: string }
         Returns: Json

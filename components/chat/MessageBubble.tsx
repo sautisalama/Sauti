@@ -166,7 +166,7 @@ export function MessageBubble({ message, isOwn, showTail = true, currentUserId }
     <ContextMenu>
       <ContextMenuTrigger>
         <div
-          className={`flex mb-2 items-center gap-1 ${isOwn ? 'justify-end flex-row-reverse' : 'justify-start'} group relative`}
+          className={`flex w-full mb-2 items-center gap-1 ${isOwn ? 'justify-end' : 'justify-start'} group relative`}
           onDoubleClick={() => handleReaction('👍')}
         >
           
@@ -284,7 +284,7 @@ export function MessageBubble({ message, isOwn, showTail = true, currentUserId }
             type="button"
             aria-label="React to message"
             onClick={(e) => { e.stopPropagation(); toggleReactionPicker(); }}
-            className="hidden md:flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white text-serene-neutral-400 shadow-sm border border-serene-neutral-100 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 hover:text-serene-blue-600 transition-opacity"
+            className={`${isOwn ? 'order-first' : ''} hidden md:flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white text-serene-neutral-400 shadow-sm border border-serene-neutral-100 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 hover:text-serene-blue-600 transition-opacity`}
           >
             <Smile className="h-4 w-4" />
           </button>

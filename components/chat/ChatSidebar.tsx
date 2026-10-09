@@ -370,7 +370,7 @@ export function ChatSidebar({ chats, selectedChatId, onSelectChat, isLoading, cu
                          {lastMsg?.content || 'No messages yet'}
                       </span>
                       {(chat.unread_count || 0) > 0 && (
-                        <span className="ml-2 bg-[#25d366] text-white text-[11px] font-bold rounded-full h-5 min-w-[20px] flex items-center justify-center px-1">
+                        <span className="ml-2 bg-purple-600 text-white text-[11px] font-bold rounded-full h-5 min-w-[20px] flex items-center justify-center px-1">
                           {chat.unread_count}
                         </span>
                       )}

@@ -2,7 +2,8 @@ import { Chat, Message } from '@/types/chat';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { useState, useEffect, useRef, useOptimistic, startTransition } from 'react';
-import { getMessages, sendMessage, markMessagesAsRead } from '@/app/actions/chat';
+import { getMessages, sendMessage } from '@/app/actions/chat';
+import { markMessagesAsRead } from '@/lib/chat/client-read';
 import { fetchLinkMetadata } from '@/app/actions/chat-media';
 import { createClient } from '@/utils/supabase/client';
 import { MessageBubble } from './MessageBubble';
@@ -555,6 +556,7 @@ export function ChatWindow({ chat, onBack }: ChatWindowProps) {
                message={msg} 
                isOwn={isOwn} 
                showTail={showTail}
+               currentUserId={currentUserId || undefined}
              />
            );
          })}

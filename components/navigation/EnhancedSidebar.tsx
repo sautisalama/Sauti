@@ -521,7 +521,7 @@ export function EnhancedSidebar({
 										<Badge
 											className={cn(
 												"absolute -top-1.5 -right-1.5 h-4 w-4 flex items-center justify-center p-0 text-[10px] font-black shadow-sm",
-												"bg-red-600 text-white border border-white min-w-[18px] ring-2 ring-red-100 animate-in zoom-in duration-300" 
+												"bg-purple-600 text-white border border-white min-w-[18px] ring-2 ring-purple-100 animate-in zoom-in duration-300" 
 											)}
 										>
 											{item.badge > 99 ? "99" : item.badge}

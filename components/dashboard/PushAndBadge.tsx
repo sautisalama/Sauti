@@ -1,9 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
 import { BellRing, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/utils/supabase/client";
+import { useDashboardData } from "@/components/providers/DashboardDataProvider";
+import { getUnreadChatTotal } from "@/app/actions/chat";
+import { CHATS_CHANGED_EVENT } from "@/lib/chat/client-read";
 
 const VAPID = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
 const DISMISS_KEY = "ss_push_prompt_dismissed";
@@ -12,6 +16,13 @@ function keyToBytes(base64: string) {
 	const pad = "=".repeat((4 - (base64.length % 4)) % 4);
 	const raw = atob((base64 + pad).replace(/-/g, "+").replace(/_/g, "/"));
 	return Uint8Array.from(raw, (c) => c.charCodeAt(0));
+}
+
+/** Ask permission (needs a user gesture) and register this device for push. */
+export async function enablePush(): Promise<boolean> {
+	if (!("Notification" in window)) return false;
+	const result = Notification.permission === "granted" ? "granted" : await Notification.requestPermission();
+	return result === "granted" ? subscribe().catch(() => false) : false;
 }
 
 async function subscribe(): Promise<boolean> {
@@ -36,6 +47,32 @@ async function subscribe(): Promise<boolean> {
  */
 export function PushAndBadge() {
 	const [showPrompt, setShowPrompt] = useState(false);
+	const dash = useDashboardData();
+	const setUnreadChatCount = dash?.setUnreadChatCount;
+	const pathname = usePathname(); // recount after navigation (a server refresh resets the shared count)
+
+	// Unread chat messages -> nav badges (bottom bar, sidebar). Recounted when a message arrives
+	// (RLS limits realtime to chats I'm in), when a chat is read, and when the app is reopened.
+	useEffect(() => {
+		if (!setUnreadChatCount) return;
+		const supabase = createClient();
+		let active = true;
+		const recount = () => getUnreadChatTotal().then((n) => active && setUnreadChatCount(n)).catch(() => {});
+		recount();
+		const channel = supabase
+			.channel(`unread-chats-${Math.random().toString(36).slice(2)}`)
+			.on("postgres_changes", { event: "INSERT", schema: "public", table: "messages" }, recount)
+			.subscribe();
+		const onVisible = () => document.visibilityState === "visible" && recount();
+		document.addEventListener("visibilitychange", onVisible);
+		window.addEventListener(CHATS_CHANGED_EVENT, recount);
+		return () => {
+			active = false;
+			supabase.removeChannel(channel);
+			document.removeEventListener("visibilitychange", onVisible);
+			window.removeEventListener(CHATS_CHANGED_EVENT, recount);
+		};
+	}, [setUnreadChatCount, pathname]);
 
 	// Unread count -> app-icon badge.
 	useEffect(() => {
@@ -93,8 +130,7 @@ export function PushAndBadge() {
 
 	const enable = useCallback(async () => {
 		setShowPrompt(false);
-		const result = await Notification.requestPermission();
-		if (result === "granted") await subscribe().catch(() => {});
+		await enablePush();
 	}, []);
 
 	const dismiss = () => {

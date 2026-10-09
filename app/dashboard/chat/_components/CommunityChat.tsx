@@ -298,6 +298,7 @@ export default function CommunityChat({
                     <MessageBubble 
                       message={msg} 
                       isOwn={isOwn} 
+                      currentUserId={currentUserId || undefined}
                       showTail={showTail}
                     />
                   </div>
