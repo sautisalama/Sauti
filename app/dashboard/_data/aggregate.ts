@@ -194,6 +194,11 @@ export async function fetchDashboardData(): Promise<AggregatedDashboardData | nu
 		const { data: calendarConn } = await supabase.rpc("get_calendar_connection");
 		const calendarConnected = !!(Array.isArray(calendarConn) ? calendarConn[0] : calendarConn)?.connected;
 
+		// Unread chat messages, so the nav badges are right on first paint (and after every refresh),
+		// not only once the chat page has been opened.
+		const { data: unreadRows } = await supabase.rpc("unread_chat_counts");
+		const unreadChatCount = (unreadRows ?? []).reduce((n, r) => n + Number(r.unread), 0);
+
 		const result = {
 			userId,
 			profile,
@@ -203,7 +208,7 @@ export async function fetchDashboardData(): Promise<AggregatedDashboardData | nu
 			supportServices: supportServices || [],
 			appointments: (appointments as any) || [],
 			casesCount: casesCount || 0,
-			unreadChatCount: 0, // computed on client quickly
+			unreadChatCount,
 			calendarConnected,
 			preloaded: true,
 			verification,
