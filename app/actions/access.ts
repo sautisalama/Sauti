@@ -116,7 +116,7 @@ export async function addSuperAdmin(identifier: string) {
   if (profileId) await db.from('profiles').update({ is_admin: true }).eq('id', profileId);
 
   await logAudit({ actorId: actor.id, actorEmail: actor.email, action: 'super_admin.added', targetType: 'super_admin', targetId: profileId ?? email, targetLabel: email, details: { has_account: !!profileId } });
-  revalidatePath('/dashboard/admin/mjengo/people');
+  revalidatePath('/dashboard/mjengo/people');
   return { success: true };
 }
 
@@ -132,7 +132,7 @@ export async function removeSuperAdmin(id: string) {
   const { error } = await db.from('super_admins').delete().eq('id', id).eq('is_protected', false);
   if (error) throw new Error('Could not remove the super admin.');
   await logAudit({ actorId: actor.id, actorEmail: actor.email, action: 'super_admin.removed', targetType: 'super_admin', targetId: target.user_id ?? target.email, targetLabel: target.email });
-  revalidatePath('/dashboard/admin/mjengo/people');
+  revalidatePath('/dashboard/mjengo/people');
   return { success: true };
 }
 
@@ -176,7 +176,7 @@ export async function setAdminStatus(userId: string, makeAdmin: boolean) {
   const { error } = await db.from('profiles').update({ is_admin: makeAdmin }).eq('id', userId);
   if (error) throw new Error('Could not change the role.');
   await logAudit({ actorId: actor.id, actorEmail: actor.email, action: makeAdmin ? 'role.admin_granted' : 'role.admin_revoked', targetType: 'user', targetId: userId, targetLabel: p.email ?? fullName(p) ?? userId });
-  revalidatePath('/dashboard/admin/mjengo/people');
+  revalidatePath('/dashboard/mjengo/people');
   return { success: true };
 }
 
@@ -187,7 +187,7 @@ export async function setAccountType(userId: string, userType: 'survivor' | 'pro
   const { error } = await db.from('profiles').update({ user_type: userType }).eq('id', userId);
   if (error) throw new Error('Could not change the account type.');
   await logAudit({ actorId: actor.id, actorEmail: actor.email, action: 'role.account_type_changed', targetType: 'user', targetId: userId, targetLabel: p.email ?? userId, details: { from: p.user_type, to: userType } });
-  revalidatePath('/dashboard/admin/mjengo/people');
+  revalidatePath('/dashboard/mjengo/people');
   return { success: true };
 }
 

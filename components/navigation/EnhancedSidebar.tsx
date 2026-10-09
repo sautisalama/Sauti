@@ -200,7 +200,7 @@ export function EnhancedSidebar({
 
 	const getSidebarItems = useCallback((): SidebarItem[] => {
 		const isDashboard = pathname?.startsWith("/dashboard");
-		const isAdminRoute = pathname?.startsWith("/dashboard/admin");
+		const isAdminRoute = pathname?.startsWith("/dashboard/admin") || pathname?.startsWith("/dashboard/mjengo");
 
         // Onboarding State - Simplified Navigation
         if (needsOnboarding && isDashboard && !isAdminRoute) {
@@ -307,7 +307,7 @@ export function EnhancedSidebar({
 					id: "mjengo",
 					label: "Mjengo Suite",
 					icon: Briefcase,
-					href: "/dashboard/admin/mjengo",
+					href: "/dashboard/mjengo",
 					section: "main",
 				},
 				{
@@ -739,6 +739,17 @@ export function EnhancedSidebar({
 									{roleContext?.can_switch_to_admin && (
 										<>
 											<DropdownMenuSeparator className="bg-serene-neutral-100 my-1" />
+											<DropdownMenuItem asChild>
+												<Link href="/dashboard/mjengo" className="flex items-center gap-3 cursor-pointer rounded-xl focus:bg-purple-50 focus:text-purple-700 m-1 p-2">
+													<div className="h-8 w-8 rounded-lg bg-purple-50 flex items-center justify-center text-purple-600">
+														<Briefcase className="h-4 w-4" />
+													</div>
+													<div className="flex flex-col">
+														<span className="font-semibold text-xs text-neutral-800">Mjengo Suite</span>
+														<span className="text-[9px] text-gray-500">Mail, grants, projects</span>
+													</div>
+												</Link>
+											</DropdownMenuItem>
 											{!isAdminMode ? (
 												<DropdownMenuItem 
 													onClick={switchToAdmin} 

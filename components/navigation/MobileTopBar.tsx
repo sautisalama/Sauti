@@ -11,7 +11,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { User, LogOut, Shield, Building2, ChevronLeft } from "lucide-react";
+import { User, LogOut, Shield, Building2, ChevronLeft, Briefcase } from "lucide-react";
 import { signOut } from "@/app/(auth)/actions/auth";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -162,6 +162,14 @@ export function MobileTopBar() {
                         {roleContext?.can_switch_to_admin && (
                                 <>
                                     <DropdownMenuSeparator className="bg-serene-neutral-100 my-1" />
+                                    <DropdownMenuItem asChild>
+                                        <Link href="/dashboard/mjengo" className="flex items-center gap-3 cursor-pointer rounded-xl focus:bg-purple-50 focus:text-purple-700 p-3">
+                                            <div className="h-6 w-6 rounded-md bg-purple-100 flex items-center justify-center text-purple-600">
+                                                <Briefcase className="h-3.5 w-3.5" />
+                                            </div>
+                                            <span className="font-semibold text-sm">Mjengo Suite</span>
+                                        </Link>
+                                    </DropdownMenuItem>
                                     {!isAdminMode ? (
                                         <DropdownMenuItem 
                                             onClick={switchToAdmin} 

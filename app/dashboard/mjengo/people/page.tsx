@@ -6,6 +6,6 @@ export const metadata = { title: "People & access" };
 
 export default async function PeoplePage() {
 	const actor = await getActor();
-	if (!actor || !(await isSuperAdminEmail(actor.email))) redirect("/dashboard/admin/mjengo");
+	if (!actor || !(await isSuperAdminEmail(actor.email))) redirect("/dashboard/mjengo");
 	return <PeoplePanel />;
 }

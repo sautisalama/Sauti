@@ -102,7 +102,7 @@ async function audit(actor: Actor, action: string, kind: string, id: string, lab
   await logAudit({ actorId: actor.id, actorEmail: actor.email, action: `mjengo.${action}`, targetType: kind, targetId: id, targetLabel: label, details });
 }
 
-const revalidate = () => revalidatePath('/dashboard/admin/mjengo', 'layout');
+const revalidate = () => revalidatePath('/dashboard/mjengo', 'layout');
 
 /* ------------------------------------------------------------------ People */
 
@@ -514,11 +514,11 @@ export async function getOverview(): Promise<Overview> {
   const open = ['idea', 'researching', 'drafting', 'submitted', 'under_review'];
   const today = new Date().toISOString().slice(0, 10);
   const deadlines: Deadline[] = [
-    ...G.filter((g) => g.deadline && !['awarded', 'declined', 'closed'].includes(g.status)).map((g) => ({ kind: 'grant' as const, label: g.title, date: g.deadline!, href: '/dashboard/admin/mjengo/grants' })),
-    ...O.filter((o) => o.deadline && !['won', 'lost', 'passed'].includes(o.status)).map((o) => ({ kind: 'opportunity' as const, label: o.title, date: o.deadline!, href: '/dashboard/admin/mjengo/opportunities' })),
-    ...P.filter((p) => p.end_date && ['planning', 'active'].includes(p.status)).map((p) => ({ kind: 'project' as const, label: `${p.name} ends`, date: p.end_date!, href: '/dashboard/admin/mjengo/projects' })),
-    ...D.filter((d) => d.due_date && d.required && !d.file_path).map((d) => ({ kind: 'document' as const, label: d.name, date: d.due_date!, href: '/dashboard/admin/mjengo/documents', context: d.entity_type })),
-    ...T.filter((t) => t.due_date && t.status !== 'done').map((t) => ({ kind: 'todo' as const, label: t.title, date: t.due_date!, href: '/dashboard/admin/mjengo/todos' })),
+    ...G.filter((g) => g.deadline && !['awarded', 'declined', 'closed'].includes(g.status)).map((g) => ({ kind: 'grant' as const, label: g.title, date: g.deadline!, href: '/dashboard/mjengo/grants' })),
+    ...O.filter((o) => o.deadline && !['won', 'lost', 'passed'].includes(o.status)).map((o) => ({ kind: 'opportunity' as const, label: o.title, date: o.deadline!, href: '/dashboard/mjengo/opportunities' })),
+    ...P.filter((p) => p.end_date && ['planning', 'active'].includes(p.status)).map((p) => ({ kind: 'project' as const, label: `${p.name} ends`, date: p.end_date!, href: '/dashboard/mjengo/projects' })),
+    ...D.filter((d) => d.due_date && d.required && !d.file_path).map((d) => ({ kind: 'document' as const, label: d.name, date: d.due_date!, href: '/dashboard/mjengo/documents', context: d.entity_type })),
+    ...T.filter((t) => t.due_date && t.status !== 'done').map((t) => ({ kind: 'todo' as const, label: t.title, date: t.due_date!, href: '/dashboard/mjengo/todos' })),
   ].sort((a, b) => a.date.localeCompare(b.date));
 
   return {

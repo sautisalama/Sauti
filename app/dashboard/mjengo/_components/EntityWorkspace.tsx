@@ -282,7 +282,7 @@ export function EntityWorkspace({ kind }: { kind: Kind }) {
 								<>
 									{kind === "project" && <ProjectMoney v={editing.values} />}
 									<DocumentsPanel kind={kind} entityId={editing.id} onChange={load} />
-									<Link href="/dashboard/admin/mjengo/todos" className="flex items-center gap-2 rounded-xl border border-serene-neutral-100 p-3 text-sm text-serene-neutral-700 hover:bg-serene-neutral-50">
+									<Link href="/dashboard/mjengo/todos" className="flex items-center gap-2 rounded-xl border border-serene-neutral-100 p-3 text-sm text-serene-neutral-700 hover:bg-serene-neutral-50">
 										<CheckSquare className="h-4 w-4 text-purple-600" />
 										{(rows.find((r) => r.id === editing.id)?.openTodos ?? 0)} open to-dos linked to this {cfg.noun}
 										<ExternalLink className="ml-auto h-3.5 w-3.5 text-serene-neutral-400" />

@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { Briefcase, CalendarClock, CheckSquare, FileText, FolderKanban, LayoutDashboard, Lightbulb, Mail, ScrollText, ShieldCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-const BASE = "/dashboard/admin/mjengo";
+const BASE = "/dashboard/mjengo";
 
 const TABS = [
 	{ href: BASE, label: "Overview", icon: LayoutDashboard, exact: true },

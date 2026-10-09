@@ -26,11 +26,11 @@ export default function MjengoOverview() {
 	return (
 		<div className="space-y-6">
 			<div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
-				<Stat icon={TrendingUp} label="In the pipeline" value={money(o.pipelineValue, cur)} hint={o.currencies.length > 1 ? `${cur} grants only` : "open grants"} href="/dashboard/admin/mjengo/grants" />
-				<Stat icon={Briefcase} label="Awarded" value={money(o.awardedValue, cur)} hint="awarded or reporting" href="/dashboard/admin/mjengo/grants" />
-				<Stat icon={FileWarning} label="Documents needed" value={String(o.missingDocs)} hint="required, not uploaded" tone={o.missingDocs ? "warn" : undefined} href="/dashboard/admin/mjengo/documents" />
-				<Stat icon={CheckSquare} label="Open to-dos" value={String(o.openTodos)} hint={`${o.myTodos} yours`} href="/dashboard/admin/mjengo/todos" />
-				<Stat icon={Mail} label="Mail" value="Open" hint="connect an inbox" href="/dashboard/admin/mjengo/mail" />
+				<Stat icon={TrendingUp} label="In the pipeline" value={money(o.pipelineValue, cur)} hint={o.currencies.length > 1 ? `${cur} grants only` : "open grants"} href="/dashboard/mjengo/grants" />
+				<Stat icon={Briefcase} label="Awarded" value={money(o.awardedValue, cur)} hint="awarded or reporting" href="/dashboard/mjengo/grants" />
+				<Stat icon={FileWarning} label="Documents needed" value={String(o.missingDocs)} hint="required, not uploaded" tone={o.missingDocs ? "warn" : undefined} href="/dashboard/mjengo/documents" />
+				<Stat icon={CheckSquare} label="Open to-dos" value={String(o.openTodos)} hint={`${o.myTodos} yours`} href="/dashboard/mjengo/todos" />
+				<Stat icon={Mail} label="Mail" value="Open" hint="connect an inbox" href="/dashboard/mjengo/mail" />
 			</div>
 
 			<GrantCharts grants={grants} />
@@ -62,8 +62,8 @@ export default function MjengoOverview() {
 				</section>
 
 				<div className="space-y-4">
-					<Breakdown title="Opportunities" kind="opportunity" data={o.opportunitiesByStatus} href="/dashboard/admin/mjengo/opportunities" />
-					<Breakdown title="Projects" kind="project" data={o.projectsByStatus} href="/dashboard/admin/mjengo/projects" />
+					<Breakdown title="Opportunities" kind="opportunity" data={o.opportunitiesByStatus} href="/dashboard/mjengo/opportunities" />
+					<Breakdown title="Projects" kind="project" data={o.projectsByStatus} href="/dashboard/mjengo/projects" />
 				</div>
 			</div>
 		</div>

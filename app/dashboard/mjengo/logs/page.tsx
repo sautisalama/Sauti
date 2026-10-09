@@ -6,6 +6,6 @@ export const metadata = { title: "Logs" };
 
 export default async function LogsPage() {
 	const actor = await getActor();
-	if (!actor || !(await isSuperAdminEmail(actor.email))) redirect("/dashboard/admin/mjengo");
+	if (!actor || !(await isSuperAdminEmail(actor.email))) redirect("/dashboard/mjengo");
 	return <LogsPanel />;
 }

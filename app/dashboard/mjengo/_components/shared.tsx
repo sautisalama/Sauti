@@ -8,9 +8,9 @@ export type Kind = "grant" | "opportunity" | "project";
 
 export const KIND_LABEL: Record<Kind, string> = { grant: "Grant", opportunity: "Opportunity", project: "Project" };
 export const KIND_HREF: Record<Kind, string> = {
-	grant: "/dashboard/admin/mjengo/grants",
-	opportunity: "/dashboard/admin/mjengo/opportunities",
-	project: "/dashboard/admin/mjengo/projects",
+	grant: "/dashboard/mjengo/grants",
+	opportunity: "/dashboard/mjengo/opportunities",
+	project: "/dashboard/mjengo/projects",
 };
 
 export interface StatusDef {
