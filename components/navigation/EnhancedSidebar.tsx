@@ -28,7 +28,7 @@ import {
 	BookOpen, 
 	Building2,
     Network,
-	GraduationCap
+	GraduationCap, Briefcase
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -301,6 +301,13 @@ export function EnhancedSidebar({
 					label: "Matching Engine",
 					icon: Network,
 					href: "/dashboard/admin/matching",
+					section: "main",
+				},
+				{
+					id: "mjengo",
+					label: "Mjengo Suite",
+					icon: Briefcase,
+					href: "/dashboard/admin/mjengo",
 					section: "main",
 				},
 				{
