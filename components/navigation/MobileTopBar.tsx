@@ -23,6 +23,7 @@ import { Badge } from "@/components/ui/badge";
 import { NotificationDropdown } from "./NotificationDropdown";
 import { useDashboardData } from "@/components/providers/DashboardDataProvider";
 import { profileNeedsOnboarding } from "@/lib/onboarding";
+import { OutOfOfficeMenuItem } from "@/components/dashboard/OutOfOfficeMenuItem";
 
 export function MobileTopBar() {
   const user = useUser();
@@ -153,6 +154,10 @@ export function MobileTopBar() {
                             </DropdownMenuItem>
                         )}
     
+                        {(user?.profile?.user_type === "professional" || user?.profile?.user_type === "ngo") && user?.id && (
+                            <OutOfOfficeMenuItem userId={user.id} />
+                        )}
+
                         {/* Role Switcher Options */}
                         {roleContext?.can_switch_to_admin && (
                                 <>

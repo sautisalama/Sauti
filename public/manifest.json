@@ -2,13 +2,22 @@
 	"name": "Sauti Salama",
 	"short_name": "Sauti Salama",
 	"description": "Breaking the Silence, Building a Brighter Future",
+	"id": "/",
 	"theme_color": "#FC8E00",
 	"background_color": "#ffffff",
 	"display": "standalone",
-	"orientation": "portrait",
+	"display_override": [
+		"standalone",
+		"minimal-ui"
+	],
+	"orientation": "any",
 	"scope": "/",
-	"start_url": "/",
-	"categories": ["health", "nonprofit", "productivity"],
+	"start_url": "/dashboard?source=pwa",
+	"categories": [
+		"health",
+		"nonprofit",
+		"productivity"
+	],
 	"icons": [
 		{
 			"src": "/icons/icons-192.png",
@@ -56,8 +65,35 @@
 		}
 	],
 	"shortcuts": [
-		{ "name": "Open Cases", "url": "/dashboard/cases", "icons": [{"src":"/icons/icons-192.png","sizes":"192x192"}]},
-		{ "name": "New Report", "url": "/dashboard/reports", "icons": [{"src":"/icons/icons-192.png","sizes":"192x192"}]},
-		{ "name": "Messages", "url": "/dashboard/chat", "icons": [{"src":"/icons/icons-192.png","sizes":"192x192"}]}
+		{
+			"name": "Open Cases",
+			"url": "/dashboard/cases",
+			"icons": [
+				{
+					"src": "/icons/icons-192.png",
+					"sizes": "192x192"
+				}
+			]
+		},
+		{
+			"name": "New Report",
+			"url": "/dashboard/reports",
+			"icons": [
+				{
+					"src": "/icons/icons-192.png",
+					"sizes": "192x192"
+				}
+			]
+		},
+		{
+			"name": "Messages",
+			"url": "/dashboard/chat",
+			"icons": [
+				{
+					"src": "/icons/icons-192.png",
+					"sizes": "192x192"
+				}
+			]
+		}
 	]
 }

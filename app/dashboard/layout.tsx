@@ -8,6 +8,7 @@ import { MobileTopBar } from "@/components/navigation/MobileTopBar";
 import { DashboardDataProvider } from "@/components/providers/DashboardDataProvider";
 import { fetchDashboardData } from "./_data/aggregate";
 import { DeviceRegistration } from "./_components/DeviceRegistration";
+import { PushAndBadge } from "@/components/dashboard/PushAndBadge";
 
 
 export default async function DashboardLayout({
@@ -43,6 +44,7 @@ export default async function DashboardLayout({
 			<DashboardDataProvider initialData={initialData || fallbackData}>
 				{/* Device session tracking */}
 				<DeviceRegistration />
+				<PushAndBadge />
 				{/* Desktop Sidebar */}
 				<EnhancedSidebar />
 

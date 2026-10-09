@@ -11,6 +11,7 @@ import { format } from 'date-fns'
 import { sendEmail } from '@/lib/notifications/email'
 import { getAppointmentScheduledTemplate, getAppointmentConfirmedTemplate } from '@/lib/notifications/templates'
 import { syncAppointmentToGoogleCalendar } from '@/lib/notifications/calendar-sync'
+import { insertNotificationsWithPush } from '@/lib/notifications/push'
 
 /**
  * Professional accepts a match request
@@ -62,7 +63,7 @@ export async function acceptMatchRequest(matchId: string, proposedTimes?: TimeSl
 
   // Create notification for survivor
   // cross-user notification: written with the service role (RLS only lets people notify themselves)
-  await createAdminClient().from('notifications').insert({
+  await insertNotificationsWithPush({
     user_id: match.survivor_id!,
     title: 'Match Accepted',
     message: 'A professional has accepted your case and proposed meeting times.',
@@ -248,7 +249,7 @@ export async function confirmMatch(matchId: string, selectedTime?: TimeSlot) {
   const survivorId = match.survivor_id || (match.report as any)?.user_id;
   if (survivorId) {
     // cross-user notification: written with the service role (RLS only lets people notify themselves)
-  await createAdminClient().from('notifications').insert({
+  await insertNotificationsWithPush({
       user_id: survivorId,
       title: 'Match Accepted & Scheduled',
       message: `A professional has accepted your case and scheduled a session.`,
@@ -288,7 +289,7 @@ export async function confirmMatch(matchId: string, selectedTime?: TimeSlot) {
   // 6. Notify professional
   if (professionalId) {
     // cross-user notification: written with the service role (RLS only lets people notify themselves)
-  await createAdminClient().from('notifications').insert({
+  await insertNotificationsWithPush({
       user_id: professionalId!,
       title: 'Match Confirmed',
       message: 'A survivor has confirmed the match. You can now start chatting.',
@@ -445,7 +446,7 @@ export async function acceptAndScheduleCase(
 
     // Tell the survivor (in-app only: anonymous survivors have no real inbox).
     if (survivorId) {
-      await createAdminClient().from('notifications').insert({
+      await insertNotificationsWithPush({
         user_id: survivorId,
         type: 'match_accepted',
         title: 'A professional accepted your case',
@@ -540,7 +541,7 @@ export async function ensureChatForMatch(matchId: string) {
 
   // Notify both parties
   // cross-user notification: written with the service role (RLS only lets people notify themselves)
-  await createAdminClient().from('notifications').insert([
+  await insertNotificationsWithPush([
     {
       user_id: match.survivor_id,
       title: 'Chat Available',
@@ -600,7 +601,7 @@ export async function requestReschedule(matchId: string, preferredTimes: TimeSlo
   const professionalId = (match?.support_services as any)?.user_id
   if (professionalId) {
     // cross-user notification: written with the service role (RLS only lets people notify themselves)
-  await createAdminClient().from('notifications').insert({
+  await insertNotificationsWithPush({
       user_id: professionalId,
       title: 'Reschedule Requested',
       message: 'A survivor has requested to reschedule the meeting.',
@@ -648,7 +649,7 @@ export async function respondToReschedule(matchId: string, accept: boolean, newT
 
     if (match?.survivor_id) {
       // cross-user notification: written with the service role (RLS only lets people notify themselves)
-  await createAdminClient().from('notifications').insert({
+  await insertNotificationsWithPush({
         user_id: match.survivor_id,
         title: 'New Time Proposed',
         message: 'The professional has proposed a new meeting time.',

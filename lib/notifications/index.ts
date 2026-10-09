@@ -4,6 +4,7 @@ import { sendEmail } from './email';
 import { sendInAppNotification } from './in-app';
 import { NotificationPayload, NotificationType } from './types';
 import { baseTemplate } from './templates';
+import { sendPushToUser } from './push';
 
 const CRITICAL_TYPES: NotificationType[] = [
   'verification_verified',
@@ -44,6 +45,16 @@ export async function sendNotification(payload: NotificationPayload) {
 
   if (!inAppResult.success) {
     console.error('In-App notification failed:', inAppResult.error);
+  }
+
+  // 1b. Push to the user's devices (notification drawer + app-icon badge). Best-effort.
+  if (inAppResult.success) {
+    await sendPushToUser(payload.userId, {
+      title: payload.title,
+      body: payload.message,
+      url: payload.link,
+      tag: payload.type,
+    });
   }
 
   // 2. Check if Email is needed

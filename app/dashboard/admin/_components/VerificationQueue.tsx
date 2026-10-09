@@ -50,6 +50,9 @@ export function VerificationQueue({ onRefresh }: VerificationQueueProps) {
 		try {
 			setIsLoading(true);
 
+			// An admin never reviews their own profile or services.
+			const myId = (await supabase.auth.getUser()).data.user?.id ?? "00000000-0000-0000-0000-000000000000";
+
 			// Load pending users
 			const { data: users, error: usersError } = await supabase
 				.from("profiles")
@@ -60,6 +63,7 @@ export function VerificationQueue({ onRefresh }: VerificationQueueProps) {
         `
 				)
 				.in("user_type", ["professional", "ngo"])
+				.neq("id", myId)
 				.in("verification_status", ["pending", "under_review"])
 				.order("verification_updated_at", { ascending: false });
 
@@ -76,6 +80,7 @@ export function VerificationQueue({ onRefresh }: VerificationQueueProps) {
         `
 				)
 				.in("verification_status", ["pending", "under_review"])
+				.neq("user_id", myId)
 				.order("verification_updated_at", { ascending: false });
 
 			if (servicesError) throw servicesError;

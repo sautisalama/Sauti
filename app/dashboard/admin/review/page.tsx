@@ -128,8 +128,11 @@ export default function ReviewDashboardPage() {
 				setUserServiceCounts(counts);
 
 				// Everything pending is listed (the same set the admin counters use), including applicants who have not uploaded documents yet.
-				setPendingUsers((users || []) as unknown as PendingUser[]);
-				setPendingServices((services || []) as unknown as PendingService[]);
+				const myId = (await supabase.auth.getUser()).data.user?.id; // an admin never reviews their own profile/services
+					setPendingUsers(((users || []) as unknown as PendingUser[]).filter((u) => u.id !== myId));
+				const { data: mine } = myId ? await supabase.from("support_services").select("id").eq("user_id", myId) : { data: [] as { id: string }[] };
+					const mineIds = new Set((mine || []).map((s) => s.id));
+					setPendingServices(((services || []) as unknown as PendingService[]).filter((s) => !mineIds.has(s.id)));
                 setMatchedCount(casesCount || 0);
 			} catch (error) {
 				console.error("Error loading pending verifications:", error);

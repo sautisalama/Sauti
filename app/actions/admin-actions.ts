@@ -45,9 +45,17 @@ async function requireAdmin() {
     return user;
 }
 
+/** True when the profile, or the service, belongs to the acting user. */
+async function isOwnTarget(userId: string, targetType: DocTarget, targetId: string): Promise<boolean> {
+    if (targetType === 'profile') return targetId === userId;
+    const { data } = await createAdminClient().from('support_services').select('user_id').eq('id', targetId).maybeSingle();
+    return data?.user_id === userId;
+}
+
 /** Ask a professional/NGO (or the owner of a service) to upload verification documents. */
 export async function remindToUploadDocuments(targetType: DocTarget, targetId: string) {
     const admin = await requireAdmin();
+    if (await isOwnTarget(admin.id, targetType, targetId)) throw new Error("You cannot remind yourself.");
     const db = createAdminClient();
 
     let ownerId: string | null = null;
@@ -123,6 +131,11 @@ export async function performAdminAction({ targetId, targetType, action, notes }
     const { data: actor } = await supabase.from('profiles').select('is_admin').eq('id', user.id).maybeSingle();
     if (!actor?.is_admin) {
         throw new Error("Forbidden");
+    }
+
+    // Nobody reviews their own profile or services (no self-approval, and no notifying yourself).
+    if (await isOwnTarget(user.id, targetType, targetId)) {
+        throw new Error("You cannot review your own profile or services. Another admin must do it.");
     }
 
     // Verification is decided against documents, so there is nothing to approve or reject until some are uploaded.

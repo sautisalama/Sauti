@@ -37,6 +37,24 @@ export async function POST(request: Request) {
 		}
 
 		const table = targetType === "user" ? "profiles" : "support_services";
+
+		// No self-approval: an admin's own profile/services need another admin.
+		let ownerId: string | null = targetType === "user" ? targetId : null;
+		if (targetType !== "user") {
+			const { data: svc } = await createAdminClient()
+				.from("support_services")
+				.select("user_id")
+				.eq("id", targetId)
+				.maybeSingle();
+			ownerId = svc?.user_id ?? null;
+		}
+		if (ownerId === user.id) {
+			return NextResponse.json(
+				{ error: "You cannot review your own profile or services" },
+				{ status: 403 }
+			);
+		}
+
 		const verificationStatus = action === "verify" ? "verified" : "rejected";
 
 		// Update verification status
