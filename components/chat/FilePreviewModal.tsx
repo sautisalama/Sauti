@@ -15,9 +15,11 @@ interface FilePreviewModalProps {
   file: File | null;
   onSend: (file: File, caption: string) => void;
   isSending: boolean;
+  /** 0-100 while uploading. */
+  progress?: number | null;
 }
 
-export function FilePreviewModal({ isOpen, onClose, file, onSend, isSending }: FilePreviewModalProps) {
+export function FilePreviewModal({ isOpen, onClose, file, onSend, isSending, progress }: FilePreviewModalProps) {
   const [caption, setCaption] = useState("");
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
@@ -80,6 +82,18 @@ export function FilePreviewModal({ isOpen, onClose, file, onSend, isSending }: F
             )}
           </div>
         </div>
+
+        {isSending && (
+          <div className="bg-white px-4 pt-3" role="status" aria-live="polite">
+            <div className="mb-1 flex items-center justify-between text-xs font-medium text-serene-neutral-600">
+              <span>{progress != null && progress >= 100 ? 'Sending...' : 'Uploading...'}</span>
+              <span>{progress ?? 0}%</span>
+            </div>
+            <div className="h-2 w-full overflow-hidden rounded-full bg-serene-neutral-100">
+              <div className="h-full rounded-full bg-purple-600 transition-[width] duration-200 ease-out" style={{ width: `${progress ?? 0}%` }} />
+            </div>
+          </div>
+        )}
 
         <div className="p-3 bg-white border-t border-serene-neutral-100 flex items-center gap-2">
            <Input 

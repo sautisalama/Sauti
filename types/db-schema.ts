@@ -1269,6 +1269,7 @@ export type Database = {
           last_verification_check: string | null
           onboarded_by_admin: boolean | null
           out_of_office: boolean | null
+          sauti_id: string | null
           phone: string | null
           policies: Json | null
           professional_title: string | null
@@ -1317,6 +1318,7 @@ export type Database = {
           last_verification_check?: string | null
           onboarded_by_admin?: boolean | null
           out_of_office?: boolean | null
+          sauti_id?: string | null
           phone?: string | null
           policies?: Json | null
           professional_title?: string | null
@@ -1365,6 +1367,7 @@ export type Database = {
           last_verification_check?: string | null
           onboarded_by_admin?: boolean | null
           out_of_office?: boolean | null
+          sauti_id?: string | null
           phone?: string | null
           policies?: Json | null
           professional_title?: string | null
@@ -1536,6 +1539,20 @@ export type Database = {
           {
             foreignKeyName: "publications_published_by_fkey"
             columns: ["published_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      assistant_messages: {
+        Row: { content: string; created_at: string; id: string; role: string; user_id: string }
+        Insert: { content: string; created_at?: string; id?: string; role: string; user_id: string }
+        Update: { content?: string; created_at?: string; id?: string; role?: string; user_id?: string }
+        Relationships: [
+          {
+            foreignKeyName: "assistant_messages_user_id_fkey"
+            columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
@@ -2081,6 +2098,26 @@ export type Database = {
       unread_chat_counts: {
         Args: Record<PropertyKey, never>
         Returns: { chat_id: string; unread: number }[]
+      }
+      delete_message: {
+        Args: { p_message_id: string }
+        Returns: undefined
+      }
+      find_user_by_sauti_id: {
+        Args: { p_code: string }
+        Returns: { id: string; first_name: string | null; last_name: string | null; avatar_url: string | null; user_type: string | null; is_verified: boolean }[]
+      }
+      mark_messages_delivered: {
+        Args: { p_chat: string }
+        Returns: undefined
+      }
+      mark_messages_read: {
+        Args: { p_chat: string }
+        Returns: undefined
+      }
+      regenerate_sauti_id: {
+        Args: Record<PropertyKey, never>
+        Returns: string
       }
       toggle_message_reaction: {
         Args: { p_message_id: string; p_emoji: string }

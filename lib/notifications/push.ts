@@ -19,6 +19,8 @@ export interface PushPayload {
   url?: string;
   /** Same tag replaces an earlier notification instead of stacking. */
   tag?: string;
+  /** Chat the push is about, so the device can acknowledge delivery (double tick). */
+  chatId?: string;
 }
 
 /**

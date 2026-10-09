@@ -34,6 +34,14 @@ self.addEventListener("push", (event) => {
 	}
 	event.waitUntil(
 		Promise.all([
+			data.chatId
+				? fetch("/api/chat/delivered", {
+						method: "POST",
+						headers: { "Content-Type": "application/json" },
+						body: JSON.stringify({ chatId: data.chatId }),
+						credentials: "same-origin",
+					}).catch(() => {})
+				: Promise.resolve(),
 			self.registration.showNotification(data.title || "Sauti Salama", {
 				body: data.body || "",
 				icon: "/icons/icons-192.png",

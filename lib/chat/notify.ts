@@ -54,7 +54,7 @@ export async function notifyChatMessage(chatId: string, senderId: string): Promi
             read: false,
           });
         }
-        await sendPushToUser(user_id, { title: 'New message', body: message, url: link, tag: `chat-${chatId}` });
+        await sendPushToUser(user_id, { title: 'New message', body: message, url: link, tag: `chat-${chatId}`, chatId });
       } catch (err) {
         console.error('Chat notification failed:', err);
       }

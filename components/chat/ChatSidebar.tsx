@@ -1,5 +1,6 @@
 'use client';
 
+import { chatPreview } from '@/utils/chat/preview';
 import { openCommunityChat } from '@/app/actions/chat';
 import { useToast } from '@/hooks/use-toast';
 import { SALAMA_BOT_ID, salamaBotChat } from '@/utils/chat/bot';
@@ -367,7 +368,7 @@ export function ChatSidebar({ chats, selectedChatId, onSelectChat, isLoading, cu
                     </div>
                     <div className="flex justify-between items-center mt-0.5">
                       <span className="text-[14px] text-[#667781] truncate flex-1 block">
-                         {lastMsg?.content || 'No messages yet'}
+                         {chatPreview(chat, currentUserId)}
                       </span>
                       {(chat.unread_count || 0) > 0 && (
                         <span className="ml-2 bg-purple-600 text-white text-[11px] font-bold rounded-full h-5 min-w-[20px] flex items-center justify-center px-1">

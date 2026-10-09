@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
+import { createAdminClient } from "@/utils/supabase/admin-client";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -78,6 +79,10 @@ export async function POST(req: Request) {
 		return NextResponse.json({ error: "No message provided." }, { status: 400 });
 	}
 
+	// History: the conversation is kept per user so it is still there next time they open Salama.
+	const history = createAdminClient().from("assistant_messages");
+	await history.insert({ user_id: user.id, role: "user", content: messages[messages.length - 1].content });
+
 	let upstream: Response;
 	try {
 		upstream = await fetch("https://openrouter.ai/api/v1/chat/completions", {
@@ -112,11 +117,18 @@ export async function POST(req: Request) {
 	const encoder = new TextEncoder();
 	const reader = upstream.body.getReader();
 	let buffer = "";
+	let reply = "";
+	const saveReply = async () => {
+		if (reply.trim()) await history.insert({ user_id: user.id, role: "assistant", content: reply.slice(0, 8000) });
+	};
 	const stream = new ReadableStream<Uint8Array>({
 		async pull(controller) {
 			try {
 				const { done, value } = await reader.read();
-				if (done) return controller.close();
+				if (done) {
+					await saveReply();
+					return controller.close();
+				}
 				buffer += decoder.decode(value, { stream: true });
 				const lines = buffer.split("\n");
 				buffer = lines.pop() ?? "";
@@ -127,7 +139,10 @@ export async function POST(req: Request) {
 					if (!payload || payload === "[DONE]") continue;
 					try {
 						const delta = JSON.parse(payload)?.choices?.[0]?.delta?.content;
-						if (typeof delta === "string" && delta) controller.enqueue(encoder.encode(delta));
+						if (typeof delta === "string" && delta) {
+							reply += delta;
+							controller.enqueue(encoder.encode(delta));
+						}
 					} catch {
 						/* ignore keep-alive / partial frames */
 					}
@@ -137,6 +152,7 @@ export async function POST(req: Request) {
 			}
 		},
 		cancel() {
+			saveReply().catch(() => undefined); // user left mid-answer: keep what was said
 			reader.cancel().catch(() => undefined);
 		},
 	});

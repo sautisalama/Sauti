@@ -1,12 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { BellRing, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/utils/supabase/client";
 import { useDashboardData } from "@/components/providers/DashboardDataProvider";
 import { getUnreadChatTotal } from "@/app/actions/chat";
+import { markChatDelivered } from "@/app/actions/chat-social";
 import { CHATS_CHANGED_EVENT } from "@/lib/chat/client-read";
 
 const VAPID = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
@@ -49,6 +50,7 @@ export function PushAndBadge() {
 	const [showPrompt, setShowPrompt] = useState(false);
 	const dash = useDashboardData();
 	const setUnreadChatCount = dash?.setUnreadChatCount;
+	const myId = useRef<string | null>(null);
 	const pathname = usePathname(); // recount after navigation (a server refresh resets the shared count)
 
 	// Unread chat messages -> nav badges (bottom bar, sidebar). Recounted when a message arrives
@@ -57,11 +59,17 @@ export function PushAndBadge() {
 		if (!setUnreadChatCount) return;
 		const supabase = createClient();
 		let active = true;
+		supabase.auth.getUser().then(({ data }) => (myId.current = data.user?.id ?? null));
 		const recount = () => getUnreadChatTotal().then((n) => active && setUnreadChatCount(n)).catch(() => {});
 		recount();
 		const channel = supabase
 			.channel(`unread-chats-${Math.random().toString(36).slice(2)}`)
-			.on("postgres_changes", { event: "INSERT", schema: "public", table: "messages" }, recount)
+			.on("postgres_changes", { event: "INSERT", schema: "public", table: "messages" }, (payload) => {
+				recount();
+				// This device has the message: tell the sender (double tick).
+				const m = payload.new as { chat_id?: string; sender_id?: string };
+				if (m.chat_id && m.sender_id !== myId.current) markChatDelivered(m.chat_id).catch(() => {});
+			})
 			.subscribe();
 		const onVisible = () => document.visibilityState === "visible" && recount();
 		document.addEventListener("visibilitychange", onVisible);

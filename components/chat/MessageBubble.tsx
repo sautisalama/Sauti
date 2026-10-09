@@ -19,11 +19,24 @@ interface MessageBubbleProps {
   isOwn: boolean;
   showTail?: boolean;
   currentUserId?: string;
+  /** Group chats: show who sent it (name above the text, avatar beside the bubble). */
+  showSender?: boolean;
+  senderName?: string;
+  senderAvatar?: string | null;
+  onOpenProfile?: (userId: string) => void;
+  /** How many other people must read it before the ticks turn blue. */
+  recipientCount?: number;
+  /** Provide to allow deleting this message (own messages, or a group admin's moderation). */
+  onDelete?: (message: Message) => void;
 }
+
+// A stable accent per person so names in a busy group are easy to tell apart.
+const NAME_COLORS = ['text-rose-600', 'text-amber-700', 'text-emerald-700', 'text-sky-700', 'text-violet-700', 'text-pink-700', 'text-teal-700', 'text-orange-700'];
+const nameColor = (id: string) => NAME_COLORS[[...id].reduce((n, c) => n + c.charCodeAt(0), 0) % NAME_COLORS.length];
 
 type MessageStatus = 'sending' | 'sent' | 'delivered' | 'read';
 
-export function MessageBubble({ message, isOwn, showTail = true, currentUserId }: MessageBubbleProps) {
+export function MessageBubble({ message, isOwn, showTail = true, currentUserId, showSender, senderName, senderAvatar, onOpenProfile, recipientCount = 1, onDelete }: MessageBubbleProps) {
   const [showReactions, setShowReactions] = useState(false);
   const [isReacting, setIsReacting] = useState(false);
   // Local copy so a reaction shows instantly; the server's answer / realtime update replaces it.
@@ -41,21 +54,15 @@ export function MessageBubble({ message, isOwn, showTail = true, currentUserId }
     }
   }, [message.created_at]);
 
-  // Determine message status for tick display
+  // Ticks: one grey = saved, two grey = reached the recipient's device, two blue = read
+  // (in groups, blue once everyone else has read it).
   const messageStatus = useMemo((): MessageStatus => {
-    const readBy = (message as any).read_by as Array<{ user_id: string; read_at: string }> | undefined;
-    
-    // Check if message is read by anyone other than sender
-    if (readBy && readBy.length > 0) {
-      const readByOthers = readBy.some(r => r.user_id !== message.sender_id);
-      if (readByOthers) return 'read';
-    }
-    
-    // If message has an ID, it's at least delivered (saved to DB)
-    if (message.id) return 'delivered';
-    
-    return 'sending';
-  }, [message]);
+    if (!message.id || String(message.id).startsWith('temp')) return 'sending';
+    const readers = new Set(((message.read_by as Array<{ user_id: string }> | undefined) ?? []).map(r => r.user_id).filter(id => id !== message.sender_id));
+    if (readers.size >= Math.max(1, recipientCount)) return 'read';
+    if (message.delivered_at || readers.size > 0) return 'delivered';
+    return 'sent';
+  }, [message, recipientCount]);
 
   const handleReaction = async (emoji: string) => {
       if (isReacting || !message.id || String(message.id).startsWith('temp')) return;
@@ -101,7 +108,7 @@ export function MessageBubble({ message, isOwn, showTail = true, currentUserId }
       case 'delivered':
         return <CheckCheck className="h-3.5 w-3.5 opacity-70" />;
       case 'read':
-        return <CheckCheck className="h-3.5 w-3.5 text-blue-300" />;
+        return <CheckCheck className="h-3.5 w-3.5 text-sky-300 drop-shadow-sm" />;
       default:
         return <Check className="h-3.5 w-3.5 opacity-70" />;
     }
@@ -162,6 +169,20 @@ export function MessageBubble({ message, isOwn, showTail = true, currentUserId }
     );
   }
 
+  if (message.is_deleted) {
+    const byAdmin = (message.metadata as { deleted_by?: string } | undefined)?.deleted_by && (message.metadata as { deleted_by?: string }).deleted_by !== message.sender_id;
+    return (
+      <div className={`flex mb-2 w-full items-end gap-2 ${isOwn ? 'justify-end' : 'justify-start'}`}>
+        <div className="max-w-[75%] rounded-2xl border border-dashed border-serene-neutral-200 bg-white/70 px-4 py-2 text-[13px] italic text-serene-neutral-500">
+          🚫 {isOwn ? (byAdmin ? 'An admin removed your message' : 'You deleted this message') : byAdmin ? 'An admin removed this message' : 'This message was deleted'}
+        </div>
+      </div>
+    );
+  }
+
+  const showAvatar = Boolean(showSender && !isOwn);
+  const openProfile = () => onOpenProfile?.(message.sender_id);
+
   return (
     <ContextMenu>
       <ContextMenuTrigger>
@@ -190,6 +211,11 @@ export function MessageBubble({ message, isOwn, showTail = true, currentUserId }
               </div>
           )}
 
+          {showAvatar && (
+            <button type="button" onClick={openProfile} aria-label={`View ${senderName || 'member'}'s details`} className="mr-1 mt-auto h-8 w-8 shrink-0 self-end overflow-hidden rounded-full bg-serene-blue-100 text-xs font-bold text-serene-blue-700 ring-2 ring-white touch-manipulation">
+              {senderAvatar ? <img src={senderAvatar} alt="" className="h-full w-full object-cover" /> : <span className="flex h-full w-full items-center justify-center">{(senderName || '?').charAt(0).toUpperCase()}</span>}
+            </button>
+          )}
           <div className={`flex flex-col ${isOwn ? 'items-end' : 'items-start'} max-w-[75%]`}>
             <div 
                 className={`
@@ -201,6 +227,11 @@ export function MessageBubble({ message, isOwn, showTail = true, currentUserId }
                 `}
             >
                 <div className="pt-0.5">
+                    {showAvatar && senderName && (
+                        <button type="button" onClick={openProfile} className={`mb-0.5 block max-w-full truncate text-left text-[12px] font-bold ${nameColor(message.sender_id)}`}>
+                            {senderName}
+                        </button>
+                    )}
                     {/* Media Attachments - Enhanced */}
                     {((message.attachments as any[]) || []).concat(
                         ((message.metadata as any)?.attachment_urls || []).map((url: any) => ({ url, type: message.type as any }))
@@ -255,7 +286,7 @@ export function MessageBubble({ message, isOwn, showTail = true, currentUserId }
                 {/* Metadata & Status - WhatsApp Style */}
                 <div className={`flex justify-end items-center gap-1.5 mt-1 select-none text-[10px] ${isOwn ? 'text-blue-100/90' : 'text-serene-neutral-400'}`}>
                     <span className="font-medium">{time}</span>
-                    <span title={messageStatus === 'read' ? 'Read' : messageStatus === 'delivered' ? 'Delivered' : 'Sent'}>
+                    <span title={messageStatus === 'read' ? 'Read' : messageStatus === 'delivered' ? 'Delivered' : messageStatus === 'sending' ? 'Sending' : 'Sent'}>
                         <StatusTicks />
                     </span>
                 </div>
@@ -301,9 +332,11 @@ export function MessageBubble({ message, isOwn, showTail = true, currentUserId }
         <ContextMenuItem onClick={() => navigator.clipboard.writeText(message.content || '')}>
            <Copy className="mr-2 h-4 w-4" /> Copy Text
         </ContextMenuItem>
-        <ContextMenuItem className="text-red-600 focus:text-red-600 focus:bg-red-50">
-           <Trash2 className="mr-2 h-4 w-4" /> Delete Message
-        </ContextMenuItem>
+        {onDelete && (
+          <ContextMenuItem onClick={() => onDelete(message)} className="text-red-600 focus:text-red-600 focus:bg-red-50">
+             <Trash2 className="mr-2 h-4 w-4" /> Delete message
+          </ContextMenuItem>
+        )}
       </ContextMenuContent>
     </ContextMenu>
   );

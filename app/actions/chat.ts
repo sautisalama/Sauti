@@ -213,6 +213,8 @@ export async function markChatAsRead(chatId: string) {
   if (readError) throw readError;
   if (!row) return;
   clearChatNotifications(chatId, user.id).catch(() => undefined);
+  // Receipts: the senders' messages become 'read' (blue ticks).
+  await supabase.rpc('mark_messages_read', { p_chat: chatId });
 
   const { error } = await supabase
     .from('chat_participants')

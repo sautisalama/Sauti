@@ -3,6 +3,12 @@ import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { useState, useEffect, useRef, useOptimistic, startTransition } from 'react';
 import { getMessages, sendMessage } from '@/app/actions/chat';
+import { deleteMessage, getAssistantHistory, clearAssistantHistory } from '@/app/actions/chat-social';
+import { getCommunityDetails } from '@/app/actions/community-admin';
+import { MemberProfileSheet } from './MemberProfileSheet';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { markMessagesAsRead } from '@/lib/chat/client-read';
 import { fetchLinkMetadata } from '@/app/actions/chat-media';
 import { createClient } from '@/utils/supabase/client';
@@ -43,7 +49,7 @@ export function ChatWindow({ chat, onBack }: ChatWindowProps) {
         return [...state, newMessage];
     }
   );
-  
+
   const [inputText, setInputText] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [sending, setSending] = useState(false);
@@ -53,13 +59,17 @@ export function ChatWindow({ chat, onBack }: ChatWindowProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const emojiPickerRef = useRef<HTMLDivElement>(null);
   const [linkPreview, setLinkPreview] = useState<any>(null);
-  
+
   // File Handling State
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [selectedFileType, setSelectedFileType] = useState<'image' | 'video' | 'document' | null>(null);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
-  
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
+  const [profileUserId, setProfileUserId] = useState<string | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<Message | null>(null);
+  const [groupRole, setGroupRole] = useState<'admin' | 'moderator' | 'member' | null>(null);
+
   const supabase = createClient();
   const { toast } = useToast();
   const loadToken = useRef(0);
@@ -74,7 +84,7 @@ export function ChatWindow({ chat, onBack }: ChatWindowProps) {
   const [isOwner, setIsOwner] = useState(false);
   const [sharedMatches, setSharedMatches] = useState<any[]>([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
-  
+
   useEffect(() => {
     const getUserData = async () => {
        const { data: { user } } = await supabase.auth.getUser();
@@ -82,11 +92,11 @@ export function ChatWindow({ chat, onBack }: ChatWindowProps) {
            setCurrentUserId(user.id);
            const { data: profile } = await supabase.from('profiles').select('first_name, last_name').eq('id', user.id).single();
            if (profile?.first_name) setCurrentUserName(profile.first_name);
-           
+
            // Fetch chat ownership/role context
            const { data: creator } = await supabase.from('chats').select('created_by').eq('id', chat.id).single();
            setIsOwner(creator?.created_by === user.id);
-           
+
            // Fetch Shared Match History
            fetchMatchHistory(user.id);
        }
@@ -108,12 +118,12 @@ export function ChatWindow({ chat, onBack }: ChatWindowProps) {
             `)
             .or(`survivor_id.eq.${userId},survivor_id.eq.${otherId}`)
             .order('match_date', { ascending: false });
-          
+
           if (data) {
               // Filter for matches involving both parties
               const filtered = data.filter((m: any) => {
                   const profId = (m as any).support_services?.user_id || (m as any).hrd_profile_id;
-                  return (m.survivor_id === userId && profId === otherId) || 
+                  return (m.survivor_id === userId && profId === otherId) ||
                          (m.survivor_id === otherId && profId === userId);
               });
               setSharedMatches(filtered);
@@ -124,6 +134,13 @@ export function ChatWindow({ chat, onBack }: ChatWindowProps) {
           setIsLoadingHistory(false);
       }
   };
+
+  const isGroup = chat.type === 'community' || chat.type === 'group' || !!chat.metadata?.is_community;
+  useEffect(() => {
+    setGroupRole(null);
+    if (chat.type !== 'community' && !chat.metadata?.is_community) return;
+    getCommunityDetails(chat.id).then((d) => setGroupRole(d?.myRole ?? null)).catch(() => undefined);
+  }, [chat.id]);
 
   // Detect link in text
   useEffect(() => {
@@ -175,7 +192,7 @@ export function ChatWindow({ chat, onBack }: ChatWindowProps) {
             (payload) => {
               // Reactions and server-fetched link previews arrive as updates to an existing message.
               const next = payload.new as Message;
-              setMessages(prev => prev.map(m => (m.id === next.id ? { ...m, reactions: next.reactions, metadata: next.metadata } : m)));
+              setMessages(prev => prev.map(m => (m.id === next.id ? { ...m, reactions: next.reactions, metadata: next.metadata, read_by: next.read_by, delivered_at: next.delivered_at, is_deleted: next.is_deleted, content: next.content, attachments: next.attachments } : m)));
             }
           )
           .subscribe();
@@ -193,7 +210,18 @@ export function ChatWindow({ chat, onBack }: ChatWindowProps) {
     setIsLoading(true);
     try {
       if (isBot) {
-          setMessages([]);
+          // Salama remembers: restore the saved conversation (the greeting only shows on an empty one).
+          const [saved, { data: { user: me } }] = await Promise.all([getAssistantHistory(), supabase.auth.getUser()]);
+          if (token !== loadToken.current) return;
+          setMessages(saved.map((h) => ({
+            id: h.id,
+            chat_id: 'salama-ai-bot',
+            sender_id: h.role === 'assistant' ? 'system' : (me?.id || 'user'),
+            content: h.content,
+            type: 'text',
+            created_at: h.created_at,
+            metadata: {},
+          }) as Message));
       } else {
           // Use all_chat_ids if available to get full consolidated history
           const idsToFetch = chat.metadata?.all_chat_ids || chat.id;
@@ -349,25 +377,38 @@ export function ChatWindow({ chat, onBack }: ChatWindowProps) {
 
   const handleSendFile = async (file: File, caption: string) => {
       setIsUploading(true);
+      setUploadProgress(0);
       try {
           const fileExt = file.name.split('.').pop();
           const fileName = `${chat.id}/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
 
-          const { error: uploadError } = await supabase.storage
-            .from('chat-media')
-            .upload(fileName, file);
-
-          if (uploadError) throw uploadError;
+          // Direct upload with real progress (the storage client has no progress callback).
+          const { data: target, error: targetError } = await supabase.storage.from('chat-media').createSignedUploadUrl(fileName);
+          if (targetError || !target) throw targetError || new Error('Could not start the upload');
+          await new Promise<void>((resolve, reject) => {
+              const xhr = new XMLHttpRequest();
+              xhr.open('PUT', target.signedUrl);
+              xhr.upload.onprogress = (e) => {
+                  if (e.lengthComputable) setUploadProgress(Math.min(99, Math.round((e.loaded / e.total) * 100)));
+              };
+              xhr.onload = () => (xhr.status >= 200 && xhr.status < 300 ? resolve() : reject(new Error(`Upload failed (${xhr.status})`)));
+              xhr.onerror = () => reject(new Error('Network error during upload'));
+              xhr.onabort = () => reject(new Error('Upload cancelled'));
+              const body = new FormData();
+              body.append('cacheControl', '3600');
+              body.append('', file);
+              xhr.send(body);
+          });
+          setUploadProgress(100);
 
           const { data: signedData, error: signedError } = await supabase.storage
             .from('chat-media')
             .createSignedUrl(fileName, 60 * 60 * 24 * 365); // 1 year validity
-
           if (signedError) throw signedError;
-          
+
           const attachment = {
               url: signedData.signedUrl,
-              type: file.type.startsWith('image/') ? 'image' : file.type.startsWith('video/') ? 'video' : 'file',
+              type: file.type.startsWith('image/') ? 'image' : file.type.startsWith('video/') ? 'video' : file.type.startsWith('audio/') ? 'audio' : 'file',
               name: file.name,
               size: file.size,
               path: fileName
@@ -376,19 +417,48 @@ export function ChatWindow({ chat, onBack }: ChatWindowProps) {
           let msgType: any = 'file';
           if (attachment.type === 'image') msgType = 'image';
           if (attachment.type === 'video') msgType = 'video';
+          if (attachment.type === 'audio') msgType = 'audio';
 
-          await sendMessage(chat.id, caption, msgType, {}, [attachment as any]);
-          
+          const saved = await sendMessage(chat.id, caption, msgType, {}, [attachment as any]);
+          setMessages(prev => (prev.some(m => m.id === saved.id) ? prev : [...prev, saved]));
+          scrollToBottom();
+
           setIsPreviewOpen(false);
           setSelectedFile(null);
       } catch (err) {
           console.error('Upload failed', err);
-          toast({ title: 'Upload failed', description: 'Please try again.', variant: 'destructive' });
+          toast({ title: 'Upload failed', description: 'Check your connection and try again.', variant: 'destructive' });
       } finally {
           setIsUploading(false);
+          setUploadProgress(null);
       }
   };
 
+  const confirmDelete = async () => {
+      const target = pendingDelete;
+      setPendingDelete(null);
+      if (!target) return;
+      // Show it as deleted straight away; the server confirms (and restores it if that fails).
+      const before = messages;
+      setMessages(prev => prev.map(m => (m.id === target.id ? { ...m, is_deleted: true, content: '', attachments: null, reactions: {}, metadata: { deleted_by: currentUserId } as any } : m)));
+      try {
+          await deleteMessage(target.id);
+      } catch (e) {
+          setMessages(before);
+          toast({ title: 'Could not delete', description: e instanceof Error ? e.message : undefined, variant: 'destructive' });
+      }
+  };
+
+  const handleClearBot = async () => {
+      if (!window.confirm('Clear your conversation with Salama? This cannot be undone.')) return;
+      try {
+          await clearAssistantHistory();
+          botGreeted.current = false;
+          setMessages([]);
+      } catch {
+          toast({ title: 'Could not clear the conversation', variant: 'destructive' });
+      }
+  };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -399,27 +469,32 @@ export function ChatWindow({ chat, onBack }: ChatWindowProps) {
 
   // Chat Info Logic
   // Filter out the current user to find the other party
-  const otherParticipant = chat.participants?.find((p) => p.user_id !== currentUserId) || chat.participants?.[0]; 
+  const otherParticipant = chat.participants?.find((p) => p.user_id !== currentUserId) || chat.participants?.[0];
   const meta = chat.metadata || {};
   const name = meta.name || `${otherParticipant?.user?.first_name || 'User'} ${otherParticipant?.user?.last_name || ''}`;
   const avatar = meta.image_url || otherParticipant?.user?.avatar_url;
+  const senderOf = (id: string) => {
+    const u = chat.participants?.find((p) => p.user_id === id)?.user;
+    return u ? { name: `${u.first_name || ''} ${u.last_name || ''}`.trim() || 'Member', avatar: u.avatar_url || null } : undefined;
+  };
 
   return (
     <div className="flex flex-col h-full bg-gradient-to-b from-serene-neutral-50 to-white relative w-full font-sans">
        {/* Background Pattern - subtle and premium */}
        <div className="absolute inset-0 z-0 opacity-[0.02]" style={{ backgroundImage: 'radial-gradient(#374151 0.5px, transparent 0.5px)', backgroundSize: '24px 24px' }}></div>
-       
+
        {/* Header - Premium Glassmorphism */}
        <div className="flex items-center justify-between px-3 md:px-5 pb-3.5 pt-[max(0.875rem,env(safe-area-inset-top))] bg-white/70 backdrop-blur-xl border-b border-serene-neutral-100/80 z-10 shadow-sm">
          <div className="flex items-center gap-3">
-           <Button 
-             variant="ghost" 
-             size="icon" 
-             aria-label="Back to chats" className="md:hidden touch-manipulation text-serene-neutral-500 hover:text-serene-neutral-700 hover:bg-serene-neutral-100 rounded-full h-11 w-11 -ml-1" 
+           <Button
+             variant="ghost"
+             size="icon"
+             aria-label="Back to chats" className="md:hidden touch-manipulation text-serene-neutral-500 hover:text-serene-neutral-700 hover:bg-serene-neutral-100 rounded-full h-11 w-11 -ml-1"
              onClick={(e) => { e.stopPropagation(); onBack(); }}
            >
              <ArrowLeft className="h-5 w-5" />
            </Button>
+           <button type="button" onClick={() => !isBot && setIsDrawerOpen(true)} className="flex items-center gap-3 text-left touch-manipulation" aria-label="Open chat details">
            <Avatar className="h-11 w-11 cursor-pointer ring-2 ring-white shadow-md transition-transform hover:scale-105">
              <AvatarImage src={avatar} />
              <AvatarFallback className="bg-gradient-to-br from-serene-blue-100 to-serene-blue-50 text-serene-blue-600 font-bold">{name.charAt(0)}</AvatarFallback>
@@ -430,10 +505,13 @@ export function ChatWindow({ chat, onBack }: ChatWindowProps) {
                <span className="text-xs text-serene-blue-600 font-medium flex items-center gap-1.5">
                  <span className="w-2 h-2 rounded-full bg-serene-blue-500 animate-pulse"/> AI Assistant
                </span>
+             ) : isGroup ? (
+               <span className="text-xs text-serene-neutral-400">{chat.participants?.length ? `${chat.participants.length} members · tap for group info` : 'Tap for group info'}</span>
              ) : (
                <span className="text-xs text-serene-neutral-400">{(otherParticipant?.user as any)?.user_type ? String((otherParticipant?.user as any).user_type).replace(/_/g, ' ') : 'Secure chat'}</span>
              )}
            </div>
+           </button>
          </div>
          <div className="flex items-center gap-0.5">
            <Button variant="ghost" size="icon" className="rounded-full h-10 w-10 text-serene-neutral-400 hover:bg-serene-blue-50 hover:text-serene-blue-600 transition-all" disabled title="Coming Soon">
@@ -443,38 +521,45 @@ export function ChatWindow({ chat, onBack }: ChatWindowProps) {
              <Phone className="h-5 w-5" />
            </Button>
            <div className="w-px h-7 bg-serene-neutral-200 mx-1.5" />
-           
+
            <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button 
-                  variant="ghost" 
-                  size="icon" 
-                  className="rounded-full h-10 w-10 text-serene-neutral-400 hover:bg-serene-neutral-100 hover:text-serene-neutral-600 transition-all" 
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="rounded-full h-10 w-10 text-serene-neutral-400 hover:bg-serene-neutral-100 hover:text-serene-neutral-600 transition-all"
                 >
                    <MoreVertical className="h-5 w-5" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-64 rounded-2xl p-2 shadow-2xl border-serene-neutral-100 bg-white">
                 <DropdownMenuLabel className="px-3 py-2 text-xs font-bold text-serene-neutral-400 uppercase tracking-widest">Chat Options</DropdownMenuLabel>
+                {isBot ? (
+                  <DropdownMenuItem onClick={handleClearBot} className="rounded-xl px-3 py-2.5 cursor-pointer gap-3 text-red-600 focus:text-red-600">
+                    <X className="h-4 w-4" />
+                    <span className="font-medium">Clear conversation</span>
+                  </DropdownMenuItem>
+                ) : (
                 <DropdownMenuItem onClick={() => setIsDrawerOpen(true)} className="rounded-xl px-3 py-2.5 cursor-pointer hover:bg-serene-neutral-50 gap-3">
                   <Info className="h-4 w-4 text-serene-neutral-400" />
-                  <span className="font-medium text-serene-neutral-700">Chat Media & Info</span>
+                  <span className="font-medium text-serene-neutral-700">{isGroup ? 'Group info, media and members' : 'Chat Media & Info'}</span>
                 </DropdownMenuItem>
-                
+                )}
+
                 <DropdownMenuSeparator className="my-2 bg-serene-neutral-100" />
-                
+
                 <DropdownMenuLabel className="px-3 py-2 text-xs font-bold text-serene-neutral-400 uppercase tracking-widest flex items-center gap-2">
                   <History className="h-3 w-3" /> Shared {isOwner ? 'Reports' : 'Cases'}
                 </DropdownMenuLabel>
-                
+
                 {isLoadingHistory ? (
                    <DropdownMenuItem className="px-3 py-2 text-xs text-serene-neutral-400 animate-pulse">Loading history...</DropdownMenuItem>
                 ) : sharedMatches.length === 0 ? (
                    <DropdownMenuItem className="px-3 py-2 text-xs text-serene-neutral-400 italic">No shared history found</DropdownMenuItem>
                 ) : (
                   sharedMatches.map(match => (
-                    <DropdownMenuItem 
-                      key={match.id} 
+                    <DropdownMenuItem
+                      key={match.id}
                       asChild
                       className="rounded-xl px-3 py-2.5 cursor-pointer hover:bg-serene-blue-50 group"
                     >
@@ -551,12 +636,18 @@ export function ChatWindow({ chat, onBack }: ChatWindowProps) {
            const isOwn = msg.sender_id === currentUserId;
            const showTail = idx === 0 || optimisticMessages[idx - 1].sender_id !== msg.sender_id;
            return (
-             <MessageBubble 
-               key={msg.id} 
-               message={msg} 
-               isOwn={isOwn} 
+             <MessageBubble
+               key={msg.id}
+               message={msg}
+               isOwn={isOwn}
                showTail={showTail}
                currentUserId={currentUserId || undefined}
+               showSender={isGroup && msg.type !== 'system'}
+               senderName={senderOf(msg.sender_id)?.name}
+               senderAvatar={senderOf(msg.sender_id)?.avatar}
+               onOpenProfile={setProfileUserId}
+               recipientCount={Math.max(1, (chat.participants?.length ?? 2) - 1)}
+               onDelete={!isBot && !msg.id.startsWith('temp') && (isOwn || groupRole === 'admin' || groupRole === 'moderator') ? setPendingDelete : undefined}
              />
            );
          })}
@@ -589,11 +680,11 @@ export function ChatWindow({ chat, onBack }: ChatWindowProps) {
        <div className="bg-white/80 backdrop-blur-xl px-4 py-3 flex items-end gap-2 z-10 border-t border-serene-neutral-100/80 relative">
          {/* Emoji Picker Popover */}
          {showEmojiPicker && (
-           <div 
+           <div
              ref={emojiPickerRef}
              className="absolute bottom-full left-0 mb-2 z-50"
            >
-             <EmojiPicker 
+             <EmojiPicker
                onEmojiSelect={(emoji) => {
                  setInputText(prev => prev + emoji);
                  textareaRef.current?.focus();
@@ -602,9 +693,9 @@ export function ChatWindow({ chat, onBack }: ChatWindowProps) {
              />
            </div>
          )}
-         <Button 
-           variant="ghost" 
-           size="icon" 
+         <Button
+           variant="ghost"
+           size="icon"
            className={`text-serene-neutral-400 hover:text-serene-blue-500 hover:bg-serene-blue-50 rounded-full h-10 w-10 transition-all flex-shrink-0 ${showEmojiPicker ? 'bg-serene-blue-50 text-serene-blue-500' : ''}`}
            onClick={() => setShowEmojiPicker(!showEmojiPicker)}
          >
@@ -613,7 +704,7 @@ export function ChatWindow({ chat, onBack }: ChatWindowProps) {
 
          {/* Attachment Menu */}
          <AttachmentMenu onFileSelect={handleFileSelect} />
-         
+
          <div className="flex-1 bg-serene-neutral-50/80 hover:bg-serene-neutral-100/80 transition-all rounded-2xl flex items-end px-4 py-2.5 border border-serene-neutral-100 focus-within:border-serene-blue-300 focus-within:bg-white focus-within:ring-2 focus-within:ring-serene-blue-100 focus-within:shadow-sm">
            <textarea
              ref={(el) => {
@@ -625,7 +716,7 @@ export function ChatWindow({ chat, onBack }: ChatWindowProps) {
                 }
              }}
              className="flex-1 bg-transparent border-none outline-none text-serene-neutral-900 placeholder-serene-neutral-400 text-base md:text-[15px] resize-none max-h-[120px] py-0.5 leading-relaxed"
-             onFocus={() => setShowEmojiPicker(false)} 
+             onFocus={() => setShowEmojiPicker(false)}
              placeholder="Type a message..."
              rows={1}
              value={inputText}
@@ -644,8 +735,8 @@ export function ChatWindow({ chat, onBack }: ChatWindowProps) {
          </div>
 
          {inputText.trim() ? (
-           <Button 
-             onClick={handleSend} 
+           <Button
+             onClick={handleSend}
              disabled={sending}
              aria-label="Send message"
              className="bg-gradient-to-r from-serene-blue-600 to-serene-blue-500 hover:from-serene-blue-700 hover:to-serene-blue-600 text-white rounded-full h-11 w-11 flex items-center justify-center p-0 shadow-lg shadow-serene-blue-200/50 transition-all hover:scale-105 active:scale-95 flex-shrink-0"
@@ -655,14 +746,40 @@ export function ChatWindow({ chat, onBack }: ChatWindowProps) {
          ) : null}
        </div>
 
-       <ChatMediaDrawer 
-         chatId={chat.id} 
-         isOpen={isDrawerOpen} 
-         onClose={() => setIsDrawerOpen(false)} 
+       <ChatMediaDrawer
+         chatId={chat.id}
+         chat={chat}
+         currentUserId={currentUserId}
+         isOpen={isDrawerOpen}
+         onClose={() => setIsDrawerOpen(false)}
+         onOpenProfile={(id) => setProfileUserId(id)}
+         onLeft={onBack}
        />
 
+       <MemberProfileSheet
+         userId={profileUserId}
+         chatId={chat.id}
+         currentUserId={currentUserId}
+         onClose={() => setProfileUserId(null)}
+       />
+
+       <AlertDialog open={!!pendingDelete} onOpenChange={(open) => !open && setPendingDelete(null)}>
+         <AlertDialogContent>
+           <AlertDialogHeader>
+             <AlertDialogTitle>Delete this message?</AlertDialogTitle>
+             <AlertDialogDescription>
+               It will be removed for everyone in the chat. They will see that a message was deleted.
+             </AlertDialogDescription>
+           </AlertDialogHeader>
+           <AlertDialogFooter>
+             <AlertDialogCancel>Cancel</AlertDialogCancel>
+             <AlertDialogAction onClick={confirmDelete} className="bg-red-600 hover:bg-red-700">Delete</AlertDialogAction>
+           </AlertDialogFooter>
+         </AlertDialogContent>
+       </AlertDialog>
+
        {/* File Preview Modal */}
-       <FilePreviewModal 
+       <FilePreviewModal
          isOpen={isPreviewOpen}
          onClose={() => {
              setIsPreviewOpen(false);
@@ -671,6 +788,7 @@ export function ChatWindow({ chat, onBack }: ChatWindowProps) {
          file={selectedFile}
          onSend={handleSendFile}
          isSending={isUploading}
+         progress={uploadProgress}
        />
     </div>
   );
