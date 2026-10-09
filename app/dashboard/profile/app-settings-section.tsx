@@ -27,6 +27,7 @@ import {
 	type UserPolicies,
 } from "@/lib/user-settings";
 import { POLICIES } from "../_views/PolicyContent";
+import { NotificationPreferences } from "@/components/dashboard/NotificationPreferences";
 
 export function AppSettingsSection() {
 	const { toast } = useToast();
@@ -125,53 +126,8 @@ export function AppSettingsSection() {
 				</div>
 			</div>
 
-			{/* Notification Preferences */}
-			<Card className="border-neutral-200 shadow-sm">
-				<CardHeader className="border-b border-neutral-100 pb-4">
-					<div className="flex items-center gap-2">
-						<Bell className="h-5 w-5 text-neutral-500" />
-						<CardTitle className="text-base">Notifications</CardTitle>
-					</div>
-					<CardDescription className="mt-1">
-						Choose how you want to receive updates.
-					</CardDescription>
-				</CardHeader>
-				<CardContent className="p-0">
-					<div className="divide-y divide-neutral-100">
-						<div className="p-4 flex items-center justify-between opacity-60">
-							<div className="space-y-0.5">
-								<div className="font-medium text-sm flex items-center gap-2">
-									Email Notifications
-									<Badge className="bg-amber-50 text-amber-600 border-amber-100 text-[10px] uppercase font-bold px-1.5 py-0">Coming Soon</Badge>
-								</div>
-								<p className="text-xs text-neutral-500">
-									Receive updates about messages, appointments, and matches via email.
-								</p>
-							</div>
-							<Switch
-								checked={false}
-								disabled={true}
-							/>
-						</div>
-
-						<div className="p-4 flex items-center justify-between opacity-60">
-							<div className="space-y-0.5">
-								<div className="font-medium text-sm flex items-center gap-2">
-									Push Notifications
-									<Badge className="bg-amber-50 text-amber-600 border-amber-100 text-[10px] uppercase font-bold px-1.5 py-0">Coming Soon</Badge>
-								</div>
-								<p className="text-xs text-neutral-500">
-									Browser notifications for real-time alerts and messages.
-								</p>
-							</div>
-							<Switch
-								checked={false}
-								disabled={true}
-							/>
-						</div>
-					</div>
-				</CardContent>
-			</Card>
+				{/* Notification Preferences */}
+				<NotificationPreferences />
 
 			{/* Platform Policies */}
 			<Card className="border-neutral-200 shadow-sm">

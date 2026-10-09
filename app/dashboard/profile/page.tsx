@@ -540,7 +540,6 @@ export default function ProfilePage() {
 							{/* Section: App Settings */}
 							{activeSection === 'settings' && (
 								<div className="space-y-6">
-									<SautiIdCard />
 									<PushSettings />
 									<AppSettingsSection />
 								</div>

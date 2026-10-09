@@ -17,6 +17,7 @@ export async function POST() {
 		body: "This is a test from Sauti Salama.",
 		url: "/dashboard",
 		tag: "push-test",
+		force: true,
 	});
 	return NextResponse.json({ configured, devices: count ?? 0, sent });
 }

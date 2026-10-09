@@ -1,5 +1,7 @@
 import webpush from 'web-push';
 import { createAdminClient } from '@/utils/supabase/admin-client';
+import { categoryOfType, type NotificationCategoryId } from './catalog';
+import { allows, getPrefsByUserId } from './prefs';
 
 let configured = false;
 function configure(): boolean {
@@ -21,6 +23,10 @@ export interface PushPayload {
   tag?: string;
   /** Chat the push is about, so the device can acknowledge delivery (double tick). */
   chatId?: string;
+  /** Which Notifications-settings kind this is; the person's push switches are checked against it. */
+  category?: NotificationCategoryId;
+  /** Skip the preference check (the settings page's own test push). */
+  force?: boolean;
 }
 
 /**
@@ -31,6 +37,7 @@ export interface PushPayload {
 export async function sendPushToUser(userId: string, payload: PushPayload): Promise<{ sent: number }> {
   if (!configured && !configure()) return { sent: 0 };
   try {
+    if (!payload.force && !allows(await getPrefsByUserId(userId), payload.category ?? 'reminders', 'push')) return { sent: 0 };
     const db = createAdminClient();
     const { data: subs } = await db
       .from('push_subscriptions')
@@ -77,6 +84,7 @@ type NotificationRow = {
   message?: string | null;
   link?: string | null;
   type?: string;
+  metadata?: unknown;
   [k: string]: unknown;
 };
 
@@ -96,6 +104,7 @@ export async function insertNotificationsWithPush(rows: NotificationRow | Notifi
           body: r.message || '',
           url: r.link || undefined,
           tag: r.type,
+          category: categoryOfType(r.type || '', (r.metadata as Record<string, unknown> | undefined) ?? null),
         })
       )
     );

@@ -5,6 +5,7 @@ import { sendInAppNotification } from './in-app';
 import { NotificationPayload, NotificationType } from './types';
 import { baseTemplate } from './templates';
 import { sendPushToUser } from './push';
+import { categoryOfType } from './catalog';
 
 const CRITICAL_TYPES: NotificationType[] = [
   'verification_verified',
@@ -54,6 +55,7 @@ export async function sendNotification(payload: NotificationPayload) {
       body: payload.message,
       url: payload.link,
       tag: payload.type,
+      category: categoryOfType(payload.type, payload.metadata),
     });
   }
 
@@ -87,7 +89,7 @@ export async function sendNotification(payload: NotificationPayload) {
         payload.title
       );
 
-      const emailResult = await sendEmail(user.email, payload.title, htmlContent);
+      const emailResult = await sendEmail(user.email, payload.title, htmlContent, undefined, { prefCategory: categoryOfType(payload.type, payload.metadata) });
       return { inApp: inAppResult, email: emailResult };
 
     } catch (err) {

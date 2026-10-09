@@ -1,5 +1,8 @@
 import { MailtrapClient } from 'mailtrap';
 import { appendFileSync } from 'node:fs';
+import { createAdminClient } from '@/utils/supabase/admin-client';
+import { categoryOfSubject, type NotificationCategoryId } from './catalog';
+import { allows, getPrefsByEmails } from './prefs';
 
 /**
  * Test mode: EMAIL_MODE=capture records outbound mail to a local file instead of sending it, so
@@ -22,8 +25,32 @@ const DEFAULT_SENDER = {
   name: 'Sauti Salama Notifications',
 };
 
+/** Every outbound platform email is recorded here for the admin "Platform emails" view. Best effort. */
+async function logEmail(entry: { to: string[]; subject: string; category?: string; status: 'sent' | 'failed' | 'captured' | 'skipped'; error?: string; html?: string }) {
+  try {
+    await createAdminClient()
+      .from('email_log' as never)
+      .insert({
+        to_addresses: entry.to,
+        subject: entry.subject,
+        category: entry.category ?? null,
+        status: entry.status,
+        error: entry.error ?? null,
+        html: entry.html ? entry.html.slice(0, 200_000) : null,
+      } as never);
+  } catch (e) {
+    console.error('Could not log email:', e instanceof Error ? e.message : e);
+  }
+}
+
 /**
- * Sends an email using Mailtrap
+ * Sends an email using Mailtrap.
+ *
+ * - Recipients who turned this kind of email off (Profile > App Settings > Notifications) are skipped.
+ *   The kind comes from options.prefCategory, or is inferred from the subject for appointment mail.
+ * - EMAIL_AUDIT_BCC (comma-separated) receives a blind copy of everything sent.
+ * - Every send is recorded in email_log.
+ *
  * @param to Recipient email address or array of addresses
  * @param subject Subject line
  * @param html HTML content of the email
@@ -34,9 +61,28 @@ export async function sendEmail(
   subject: string,
   html: string,
   sender = DEFAULT_SENDER,
-  options: { urgent?: boolean; category?: string } = {}
+  options: { urgent?: boolean; category?: string; prefCategory?: NotificationCategoryId } = {}
 ) {
-  if (captured({ to, subject, category: options.category ?? 'Notification', urgent: !!options.urgent })) {
+  let recipientsList = Array.isArray(to) ? to : [to];
+
+  const prefCategory = options.prefCategory ?? categoryOfSubject(subject);
+  if (prefCategory) {
+    try {
+      const prefs = await getPrefsByEmails(recipientsList.map((e) => e.toLowerCase()));
+      recipientsList = recipientsList.filter((e) => {
+        const p = prefs.get(e.toLowerCase());
+        return !p || allows(p, prefCategory, 'email');
+      });
+    } catch (e) {
+      console.error('Could not check email preferences (sending anyway):', e instanceof Error ? e.message : e);
+    }
+    if (!recipientsList.length) {
+      await logEmail({ to: Array.isArray(to) ? to : [to], subject, category: options.category, status: 'skipped', html });
+      return { success: true, messageId: 'skipped-by-preference' };
+    }
+  }
+
+  if (captured({ to: recipientsList, subject, category: options.category ?? 'Notification', urgent: !!options.urgent })) {
     return { success: true, messageId: 'captured' };
   }
 
@@ -44,7 +90,7 @@ export async function sendEmail(
 
   if (!token) {
     console.warn('MAILTRAP_TOKEN not set. Email simulation:');
-    console.log(`To: ${to}`);
+    console.log(`To: ${recipientsList}`);
     console.log(`Subject: ${subject}`);
     return { success: false, error: 'MAILTRAP_TOKEN missing' };
   }
@@ -52,11 +98,18 @@ export async function sendEmail(
   const client = new MailtrapClient({ token });
 
   try {
-    const recipients = Array.isArray(to) ? to.map(email => ({ email })) : [{ email: to }];
+    const recipients = recipientsList.map((email) => ({ email }));
+    const lower = new Set(recipientsList.map((e) => e.toLowerCase()));
+    const bcc = (process.env.EMAIL_AUDIT_BCC ?? '')
+      .split(',')
+      .map((e) => e.trim())
+      .filter((e) => e && !lower.has(e.toLowerCase()))
+      .map((email) => ({ email }));
 
     const response = await client.send({
       from: sender,
       to: recipients,
+      ...(bcc.length && { bcc }),
       subject,
       html,
       category: options.category ?? 'Notification',
@@ -66,9 +119,11 @@ export async function sendEmail(
       }),
     });
 
+    await logEmail({ to: recipientsList, subject, category: options.category, status: 'sent', html });
     return { success: true, messageId: response.message_ids[0] };
   } catch (error) {
     console.error('Failed to send email:', error);
+    await logEmail({ to: recipientsList, subject, category: options.category, status: 'failed', error: error instanceof Error ? error.message : String(error), html });
     return { success: false, error };
   }
 }
