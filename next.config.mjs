@@ -40,6 +40,10 @@ const nextConfig = {
 		removeConsole: process.env.NODE_ENV !== "development", // Remove console.log in production
 	},
 	turbopack: {},
+	// Native/Node-only mail libraries are loaded at runtime, not bundled.
+	serverExternalPackages: ["imapflow", "nodemailer", "mailparser"],
+	// Mail attachments travel through server actions.
+	experimental: { serverActions: { bodySizeLimit: "20mb" } },
 	async headers() {
 		return [
 			// The worker must always be revalidated so updates reach users promptly.

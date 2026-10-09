@@ -25,7 +25,7 @@ export function MjengoShell({ isSuper, children }: { isSuper: boolean; children:
 	const fullBleed = pathname.startsWith(`${BASE}/mail`);
 
 	return (
-		<div className={cn("flex min-h-screen flex-col bg-serene-neutral-50/40", fullBleed && "h-[100dvh] min-h-0")}>
+		<div className={cn("flex min-h-screen flex-col bg-serene-neutral-50/40", fullBleed && "h-[calc(100dvh-9rem)] min-h-0 lg:h-[100dvh]")}>
 			<div className="z-20 border-b border-serene-neutral-200/60 bg-white/90 backdrop-blur-md">
 				<div className="mx-auto w-full max-w-7xl px-4 pt-3 md:px-8">
 					<div className="flex items-center gap-3 pb-2">
