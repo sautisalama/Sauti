@@ -4,7 +4,7 @@ import { Message } from '@/types/chat';
 import { MarkdownText } from "@/components/ui/MarkdownText";
 import { format } from 'date-fns';
 import { Check, CheckCheck, Reply, Trash2, Copy, Smile, Clock, Play, Lock } from 'lucide-react';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { addMessageReaction } from '@/app/actions/chat';
 import { DocumentPreview } from './DocumentPreview';
 import {
@@ -26,6 +26,12 @@ type MessageStatus = 'sending' | 'sent' | 'delivered' | 'read';
 export function MessageBubble({ message, isOwn, showTail = true, currentUserId }: MessageBubbleProps) {
   const [showReactions, setShowReactions] = useState(false);
   const [isReacting, setIsReacting] = useState(false);
+  // Local copy so a reaction shows instantly; the server's answer / realtime update replaces it.
+  const [reactions, setReactions] = useState<Record<string, string>>((message.reactions as Record<string, string>) || {});
+  useEffect(() => {
+    setReactions((message.reactions as Record<string, string>) || {});
+  }, [message.reactions]);
+  const myReaction = currentUserId ? reactions[currentUserId] : undefined;
   
   const time = useMemo(() => {
     try {
@@ -52,26 +58,34 @@ export function MessageBubble({ message, isOwn, showTail = true, currentUserId }
   }, [message]);
 
   const handleReaction = async (emoji: string) => {
-      if (isReacting) return;
+      if (isReacting || !message.id || String(message.id).startsWith('temp')) return;
       setIsReacting(true);
+      setShowReactions(false);
+      const before = reactions;
+      if (currentUserId) {
+          const next = { ...reactions };
+          if (next[currentUserId] === emoji) delete next[currentUserId];
+          else next[currentUserId] = emoji;
+          setReactions(next);
+      }
       try {
-          await addMessageReaction(message.id, emoji);
-          setShowReactions(false);
+          const res = await addMessageReaction(message.id, emoji);
+          setReactions(res.reactions as Record<string, string>);
       } catch (e) {
           console.error('Failed to react', e);
+          setReactions(before);
       } finally {
           setIsReacting(false);
       }
   };
 
   const reactionCounts = useMemo(() => {
-      if (!message.reactions || typeof message.reactions !== 'object') return {};
       const counts: Record<string, number> = {};
-      Object.values(message.reactions as Record<string, string>).forEach(emoji => {
+      Object.values(reactions).forEach(emoji => {
           counts[emoji] = (counts[emoji] || 0) + 1;
       });
       return counts;
-  }, [message.reactions]);
+  }, [reactions]);
 
   const toggleReactionPicker = () => setShowReactions(!showReactions);
 
@@ -151,9 +165,15 @@ export function MessageBubble({ message, isOwn, showTail = true, currentUserId }
   return (
     <ContextMenu>
       <ContextMenuTrigger>
-        <div className={`flex mb-2 ${isOwn ? 'justify-end' : 'justify-start'} group relative`}>
+        <div
+          className={`flex mb-2 items-center gap-1 ${isOwn ? 'justify-end flex-row-reverse' : 'justify-start'} group relative`}
+          onDoubleClick={() => handleReaction('👍')}
+        >
           
           {/* Reaction Picker Popover - WhatsApp Style */}
+          {showReactions && (
+              <div className="fixed inset-0 z-40" onClick={() => setShowReactions(false)} aria-hidden />
+          )}
           {showReactions && (
               <div className={`absolute bottom-full mb-2 z-50 bg-white shadow-xl rounded-full px-3 py-2 flex gap-0.5 border border-serene-neutral-100 animate-in fade-in zoom-in-95 duration-200 ${isOwn ? 'right-0' : 'left-0'}`}>
                   {['👍', '❤️', '😂', '😮', '😢', '🙏'].map((emoji, idx) => (
@@ -161,7 +181,7 @@ export function MessageBubble({ message, isOwn, showTail = true, currentUserId }
                           key={emoji}
                           onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleReaction(emoji); }}
                           disabled={isReacting}
-                          className="hover:bg-serene-neutral-100 p-2 rounded-full transition-all text-xl leading-none hover:scale-125 active:scale-95 disabled:opacity-50"
+                          className={`p-2 rounded-full transition-all text-xl leading-none hover:scale-125 active:scale-95 disabled:opacity-50 ${myReaction === emoji ? 'bg-serene-blue-100' : 'hover:bg-serene-neutral-100'}`}
                           style={{ animationDelay: `${idx * 30}ms` }}
                       >
                           {emoji}
@@ -247,8 +267,10 @@ export function MessageBubble({ message, isOwn, showTail = true, currentUserId }
                     {Object.entries(reactionCounts).map(([emoji, count]) => (
                         <div 
                             key={emoji} 
-                            className="bg-white border border-serene-neutral-100 shadow-sm rounded-full px-2 py-0.5 text-sm flex items-center gap-1 cursor-pointer hover:bg-serene-blue-50 hover:border-serene-blue-200 transition-all hover:scale-105 active:scale-95 animate-in zoom-in-95"
-                            onClick={toggleReactionPicker}
+                            role="button"
+                            aria-label={`${emoji} ${count}`}
+                            className={`border shadow-sm rounded-full px-2 py-0.5 text-sm flex items-center gap-1 cursor-pointer transition-all hover:scale-105 active:scale-95 animate-in zoom-in-95 ${myReaction === emoji ? 'bg-serene-blue-50 border-serene-blue-300' : 'bg-white border-serene-neutral-100 hover:bg-serene-blue-50 hover:border-serene-blue-200'}`}
+                            onClick={() => handleReaction(emoji)}
                         >
                             <span className="text-base">{emoji}</span>
                             {count > 1 && <span className="text-serene-neutral-600 font-semibold text-xs">{count}</span>}
@@ -257,6 +279,15 @@ export function MessageBubble({ message, isOwn, showTail = true, currentUserId }
                 </div>
             )}
           </div>
+          {/* Desktop hover affordance; on touch, long-press the message or double-tap for 👍 */}
+          <button
+            type="button"
+            aria-label="React to message"
+            onClick={(e) => { e.stopPropagation(); toggleReactionPicker(); }}
+            className="hidden md:flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white text-serene-neutral-400 shadow-sm border border-serene-neutral-100 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 hover:text-serene-blue-600 transition-opacity"
+          >
+            <Smile className="h-4 w-4" />
+          </button>
         </div>
       </ContextMenuTrigger>
       

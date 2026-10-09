@@ -1,6 +1,10 @@
 'use server';
 
 import { createClient } from '@/utils/supabase/server';
+import { after } from 'next/server';
+import { createAdminClient } from '@/utils/supabase/admin-client';
+import { firstUrl, loadLinkPreview } from '@/lib/chat/link-preview';
+import { notifyChatMessage, clearChatNotifications } from '@/lib/chat/notify';
 import { withParticipantProfiles } from '@/utils/chat/participants';
 import { Chat, Message, ChatType, MessageType, transformChat, transformMessage, MessageReactions, ChatMetadata } from '@/types/chat';
 
@@ -61,31 +65,11 @@ export async function addMessageReaction(messageId: string, emoji: string) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Unauthorized');
 
-  // Fetch current reactions
-  const { data: message, error: fetchError } = await supabase
-    .from('messages')
-    .select('reactions')
-    .eq('id', messageId)
-    .single();
-
-  if (fetchError) throw fetchError;
-
-  const currentReactions = (message.reactions as unknown as MessageReactions) || {};
-  
-  // Toggle reaction: if exists, remove it; if not, add/update it
-  if (currentReactions[user.id] === emoji) {
-      delete currentReactions[user.id];
-  } else {
-      currentReactions[user.id] = emoji;
-  }
-
-  const { error } = await supabase
-    .from('messages')
-    .update({ reactions: currentReactions })
-    .eq('id', messageId);
-
+  // Any participant may react (messages are otherwise update-able only by their sender), so this goes
+  // through a function that checks membership and toggles atomically.
+  const { data, error } = await supabase.rpc('toggle_message_reaction', { p_message_id: messageId, p_emoji: emoji });
   if (error) throw error;
-  return { success: true };
+  return { success: true, reactions: (data ?? {}) as MessageReactions };
 }
 
 export async function markMessagesAsRead(chatId: string) {
@@ -108,6 +92,9 @@ export async function markMessagesAsRead(chatId: string) {
 }
 
 export async function sendMessage(chatId: string, content: string, type: MessageType = 'text', metadata = {}, attachments: any[] = []) {
+  // Previews are fetched by the server below; a client-supplied one could show a fake title for a link.
+  const { link_preview: _clientPreview, ...cleanMetadata } = (metadata ?? {}) as Record<string, unknown>;
+  metadata = cleanMetadata;
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Unauthorized');
@@ -126,6 +113,27 @@ export async function sendMessage(chatId: string, content: string, type: Message
     .single();
 
   if (error) throw error;
+
+  // After the response is sent: notify the others (bell + push) and, for a text with a link, attach
+  // its preview. Doing it here means the preview never depends on the sender's browser.
+  after(async () => {
+    try {
+      await notifyChatMessage(chatId, user.id);
+      const url = type === 'text' ? firstUrl(content) : null;
+      if (url) {
+        const preview = await loadLinkPreview(url);
+        if (preview) {
+          await createAdminClient()
+            .from('messages')
+            .update({ metadata: { ...(((data.metadata as object | null) ?? {}) as object), link_preview: preview } as any })
+            .eq('id', data.id);
+        }
+      }
+    } catch (err) {
+      console.error('Post-send work failed:', err);
+    }
+  });
+
   return transformMessage(data);
 }
 
@@ -190,6 +198,7 @@ export async function markChatAsRead(chatId: string) {
     .maybeSingle();
   if (readError) throw readError;
   if (!row) return;
+  clearChatNotifications(chatId, user.id).catch(() => undefined);
 
   const { error } = await supabase
     .from('chat_participants')

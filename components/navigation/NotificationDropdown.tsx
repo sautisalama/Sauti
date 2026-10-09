@@ -1,6 +1,6 @@
 "use client";
 
-import { Bell, CheckCircle, XCircle, AlertTriangle, AlertCircle, Info, Clock, ArrowRight, Trash2 } from "lucide-react";
+import { Bell, MessageCircle, CheckCircle, XCircle, AlertTriangle, AlertCircle, Info, Clock, ArrowRight, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
 	DropdownMenu,
@@ -95,6 +95,7 @@ export function NotificationDropdown() {
     // --- Format Helpers ---
 
     const getIcon = (type: string) => {
+        if (type === 'new_message') return <MessageCircle className="h-5 w-5 text-sauti-teal" />;
         if (type.includes('verified') || type.includes('approved')) return <CheckCircle className="h-5 w-5 text-green-600" />;
         if (type.includes('rejected')) return <XCircle className="h-5 w-5 text-red-600" />;
         if (type.includes('banned') || type.includes('suspended')) return <AlertTriangle className="h-5 w-5 text-amber-600" />;

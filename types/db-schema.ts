@@ -2078,6 +2078,10 @@ export type Database = {
         Args: { p_end_time: string; p_start_time: string; p_user_id: string }
         Returns: boolean
       }
+      toggle_message_reaction: {
+        Args: { p_message_id: string; p_emoji: string }
+        Returns: Json
+      }
       revoke_device_session: {
         Args: { p_device_id: string; p_user_id: string }
         Returns: undefined

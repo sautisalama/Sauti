@@ -168,6 +168,15 @@ export function ChatWindow({ chat, onBack }: ChatWindowProps) {
               }
             }
           )
+          .on(
+            'postgres_changes',
+            { event: 'UPDATE', schema: 'public', table: 'messages', filter: `chat_id=eq.${id}` },
+            (payload) => {
+              // Reactions and server-fetched link previews arrive as updates to an existing message.
+              const next = payload.new as Message;
+              setMessages(prev => prev.map(m => (m.id === next.id ? { ...m, reactions: next.reactions, metadata: next.metadata } : m)));
+            }
+          )
           .subscribe();
     });
 
@@ -318,7 +327,9 @@ export function ChatWindow({ chat, onBack }: ChatWindowProps) {
     try {
       const saved = await sendMessage(chat.id, text, 'text', pendingMsg.metadata);
       // Commit the real row now; the realtime event for it is deduped by id.
-      setMessages(prev => (prev.some(m => m.id === saved.id) ? prev : [...prev, saved]));
+      // The server attaches the verified preview a moment later (arrives as an update); show the composer's meanwhile.
+      const shown = previousPreview ? { ...saved, metadata: { ...((saved.metadata as object) || {}), link_preview: previousPreview } } : saved;
+      setMessages(prev => (prev.some(m => m.id === saved.id) ? prev : [...prev, shown as Message]));
     } catch (error) {
       console.error('Failed to send', error);
       setInputText(previousInput);

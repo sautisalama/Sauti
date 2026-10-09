@@ -182,6 +182,15 @@ export function CaseChatPanel({
           scrollToBottom();
         }
       )
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'messages', filter: `chat_id=eq.${chat.id}` },
+        (payload) => {
+          // Reactions and server-fetched link previews arrive as updates to an existing message.
+          const next = payload.new as Message;
+          setMessages(prev => prev.map(m => (m.id === next.id ? { ...m, reactions: next.reactions, metadata: next.metadata } : m)));
+        }
+      )
       .subscribe();
 
     return () => {
