@@ -1,6 +1,7 @@
 "use client";
 
 import { PushSettings } from "@/components/dashboard/PushSettings";
+import { AvatarUploadOverlay } from "@/components/dashboard/AvatarUploadOverlay";
 import { SautiIdCard } from "@/components/chat/SautiIdCard";
 import { useState, useEffect, useCallback } from "react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
@@ -304,9 +305,7 @@ export default function ProfilePage() {
 															{profile?.first_name?.[0] || "U"}
 														</AvatarFallback>
 													</Avatar>
-													<div className="absolute inset-0 bg-black/10 rounded-full opacity-0 group-hover/avatar:opacity-100 transition-opacity flex items-center justify-center cursor-pointer">
-														<Camera className="h-6 w-6 sm:h-7 sm:w-7 text-white drop-shadow-md" />
-													</div>
+													<AvatarUploadOverlay />
 												</div>
 											</div>
 											{/* User info */}
@@ -342,7 +341,9 @@ export default function ProfilePage() {
 										</Alert>
 									)}
 
-									<Card className="rounded-2xl border-serene-neutral-200/60 shadow-sm bg-white overflow-hidden">
+									<SautiIdCard />
+
+										<Card className="rounded-2xl border-serene-neutral-200/60 shadow-sm bg-white overflow-hidden">
 										<CardHeader className="border-b border-serene-neutral-100 pb-4 pt-6 px-6 sm:px-8">
 											<CardTitle className="text-lg text-serene-neutral-900">Basic Information</CardTitle>
 										</CardHeader>

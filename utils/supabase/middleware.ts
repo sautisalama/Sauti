@@ -77,6 +77,7 @@ export async function updateSession(request: NextRequest) {
 		"/robots.txt",
 		"/manifest.webmanifest",
 		"/~offline",
+		"/join", // group invite pages show a preview before asking you to sign in
 	];
 	const path = request.nextUrl.pathname;
 	const isPublic = path === "/" || PUBLIC_PREFIXES.some((p) => path === p || path.startsWith(p.endsWith("/") ? p : `${p}/`) || (p === "/api" && path.startsWith("/api")));
@@ -86,7 +87,7 @@ export async function updateSession(request: NextRequest) {
 		url.pathname = "/signin";
 		// Bring the visitor back to where they were going after they sign in.
 		url.search = "";
-		if (path.startsWith("/dashboard")) url.searchParams.set("next", path + request.nextUrl.search);
+		if (path.startsWith("/dashboard") || path.startsWith("/connect")) url.searchParams.set("next", path + request.nextUrl.search);
 		return NextResponse.redirect(url);
 	}
 

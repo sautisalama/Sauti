@@ -21,7 +21,7 @@ import { EmojiPicker } from './EmojiPicker';
 import { AttachmentMenu } from './AttachmentMenu';
 import { FilePreviewModal } from './FilePreviewModal';
 import { format } from 'date-fns';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
 import {
@@ -79,6 +79,7 @@ export function ChatWindow({ chat, onBack }: ChatWindowProps) {
   const [currentUserName, setCurrentUserName] = useState<string>('there');
   const [isTyping, setIsTyping] = useState(false);
   const pathname = usePathname();
+  const router = useRouter();
   const isCaseDetailPage = pathname.includes('/dashboard/cases/');
   const isReportDetailPage = pathname.includes('/dashboard/reports/');
   const [isOwner, setIsOwner] = useState(false);
@@ -434,6 +435,12 @@ export function ChatWindow({ chat, onBack }: ChatWindowProps) {
       }
   };
 
+  // Tapping yourself opens your own profile page; anyone else opens their details card.
+  const openProfile = (id: string) => {
+      if (id === currentUserId) router.push('/dashboard/profile?section=account');
+      else setProfileUserId(id);
+  };
+
   const confirmDelete = async () => {
       const target = pendingDelete;
       setPendingDelete(null);
@@ -645,7 +652,7 @@ export function ChatWindow({ chat, onBack }: ChatWindowProps) {
                showSender={isGroup && msg.type !== 'system'}
                senderName={senderOf(msg.sender_id)?.name}
                senderAvatar={senderOf(msg.sender_id)?.avatar}
-               onOpenProfile={setProfileUserId}
+               onOpenProfile={openProfile}
                recipientCount={Math.max(1, (chat.participants?.length ?? 2) - 1)}
                onDelete={!isBot && !msg.id.startsWith('temp') && (isOwn || groupRole === 'admin' || groupRole === 'moderator') ? setPendingDelete : undefined}
              />
@@ -752,7 +759,7 @@ export function ChatWindow({ chat, onBack }: ChatWindowProps) {
          currentUserId={currentUserId}
          isOpen={isDrawerOpen}
          onClose={() => setIsDrawerOpen(false)}
-         onOpenProfile={(id) => setProfileUserId(id)}
+         onOpenProfile={openProfile}
          onLeft={onBack}
        />
 

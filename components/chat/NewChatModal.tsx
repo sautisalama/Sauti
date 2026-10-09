@@ -48,6 +48,14 @@ export function NewChatModal({ isOpen, onClose, onChatCreated }: NewChatModalPro
   };
 
   const lookupId = async () => {
+    // A group ID (SG-...) opens that group's invite page instead.
+    const compact = idCode.replace(/\s/g, '').toUpperCase();
+    if (/^SG-?[A-Z0-9]{4}-?[A-Z0-9]{4}$/.test(compact)) {
+      const body = compact.replace(/^SG-?/, '').replace(/-/g, '');
+      handleClose();
+      router.push(`/join/SG-${body.slice(0, 4)}-${body.slice(4)}`);
+      return;
+    }
     setLooking(true);
     setIdResult(null);
     try {
@@ -165,10 +173,10 @@ export function NewChatModal({ isOpen, onClose, onChatCreated }: NewChatModalPro
           </TabsContent>
 
           <TabsContent value="id" className="space-y-3">
-            <p className="text-sm text-serene-neutral-600">Enter the Sauti ID someone shared with you.</p>
+            <p className="text-sm text-serene-neutral-600">Enter a Sauti ID (SS-...) or a group ID (SG-...) someone shared with you.</p>
             <div className="flex gap-2">
               <Input
-                placeholder="SS-XXXX-XXXX"
+                placeholder="SS-XXXX-XXXX or SG-XXXX-XXXX"
                 value={idCode}
                 onChange={(e) => {
                   setIdCode(e.target.value.toUpperCase());

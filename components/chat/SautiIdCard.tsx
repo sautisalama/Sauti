@@ -1,16 +1,18 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Copy, Check, Share2, RefreshCw, IdCard } from "lucide-react";
+import { Copy, Check, Share2, RefreshCw, IdCard, QrCode } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { getMySautiId, regenerateMySautiId } from "@/app/actions/chat-social";
+import { QrShare } from "./QrShare";
 
 /** "Your Sauti ID": a short code you can give anyone so they can start a chat with you. */
 export function SautiIdCard({ compact = false }: { compact?: boolean }) {
 	const [id, setId] = useState<string | null | undefined>(undefined);
 	const [copied, setCopied] = useState(false);
 	const [busy, setBusy] = useState(false);
+	const [showQr, setShowQr] = useState(false);
 	const { toast } = useToast();
 
 	useEffect(() => {
@@ -31,7 +33,7 @@ export function SautiIdCard({ compact = false }: { compact?: boolean }) {
 	};
 
 	const share = async () => {
-		const text = `Connect with me on Sauti Salama. My Sauti ID is ${id}`;
+		const text = `Connect with me on Sauti Salama. My Sauti ID is ${id}. Open ${window.location.origin}/connect/${id}`;
 		if (navigator.share) {
 			try {
 				await navigator.share({ title: "My Sauti ID", text });
@@ -78,10 +80,18 @@ export function SautiIdCard({ compact = false }: { compact?: boolean }) {
 						<Button size="sm" variant="outline" onClick={share} className="gap-1.5">
 							<Share2 className="h-4 w-4" /> Share
 						</Button>
+						<Button size="sm" variant="outline" onClick={() => setShowQr((v) => !v)} className="gap-1.5">
+							<QrCode className="h-4 w-4" /> {showQr ? "Hide QR" : "QR code"}
+						</Button>
 						<Button size="sm" variant="ghost" onClick={regenerate} disabled={busy} className="gap-1.5 text-serene-neutral-500">
 							<RefreshCw className={`h-4 w-4 ${busy ? "animate-spin" : ""}`} /> New ID
 						</Button>
 					</div>
+					{showQr && (
+						<div className="mt-4 flex justify-center sm:justify-start">
+							<QrShare value={`${window.location.origin}/connect/${id}`} caption="Anyone who scans this signs in and can message you." filename={`sauti-id-${id}`} />
+						</div>
+					)}
 				</div>
 			</div>
 		</div>

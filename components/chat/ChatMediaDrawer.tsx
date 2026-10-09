@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { format } from 'date-fns';
 import {
-  Camera, Check, Download, FileText, Link as LinkIcon, Loader2, LogOut, MoreVertical, Pencil, Search, ShieldCheck, ShieldOff, UserMinus, UserPlus, Users, X,
+  Camera, Check, Copy, Download, QrCode, Share2, RefreshCw, FileText, Link as LinkIcon, Loader2, LogOut, MoreVertical, Pencil, Search, ShieldCheck, ShieldOff, UserMinus, UserPlus, Users, X,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -16,6 +16,8 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { getChatMedia } from '@/app/actions/chat-media';
 import { searchUsers } from '@/app/actions/chat';
 import { findUserBySautiId } from '@/app/actions/chat-social';
+import { resetInviteCode } from '@/app/actions/community-invite';
+import { QrShare } from './QrShare';
 import {
   addMembers, getCommunityDetails, leaveCommunity, removeMember, setMemberRole, updateCommunity,
   type CommunityDetails,
@@ -51,6 +53,8 @@ export function ChatMediaDrawer({ chatId, isOpen, onClose, chat, currentUserId, 
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [adding, setAdding] = useState(false);
+  const [showQr, setShowQr] = useState(false);
+  const [copied, setCopied] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
 
   const loadGroup = useCallback(async () => {
@@ -119,6 +123,41 @@ export function ChatMediaDrawer({ chatId, isOpen, onClose, chat, currentUserId, 
     } finally {
       setUploading(false);
     }
+  };
+
+  const inviteLink = group?.inviteCode && typeof window !== 'undefined' ? `${window.location.origin}/join/${group.inviteCode}` : null;
+  const copyInvite = async () => {
+    if (!inviteLink) return;
+    try {
+      await navigator.clipboard.writeText(inviteLink);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1800);
+    } catch {
+      toast({ title: 'Could not copy', description: inviteLink });
+    }
+  };
+  // The description travels with the ID and link, so a forwarded invite says what the group is for.
+  const shareInvite = async () => {
+    if (!group || !inviteLink) return;
+    const text = [`Join "${group.name}" on Sauti Salama`, group.description?.trim(), `Group ID: ${group.inviteCode}`, inviteLink].filter(Boolean).join('\n\n');
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: group.name, text });
+        return;
+      } catch {
+        /* cancelled */
+      }
+    }
+    try {
+      await navigator.clipboard.writeText(text);
+      toast({ title: 'Invite copied', description: 'Paste it into any chat or message.' });
+    } catch {
+      toast({ title: 'Could not share', variant: 'destructive' });
+    }
+  };
+  const resetInvite = async () => {
+    if (!group || !window.confirm('Reset the group link? The old link and QR code will stop working.')) return;
+    await run('Could not reset the link', () => resetInviteCode(group.communityId));
   };
 
   const leave = async () => {
@@ -211,6 +250,35 @@ export function ChatMediaDrawer({ chatId, isOpen, onClose, chat, currentUserId, 
             </>
           )}
         </div>
+
+        {/* Invite: group ID, link and QR travel together with the description */}
+        {isGroup && group?.inviteCode && (
+          <div className="mt-2 bg-white p-4 shadow-sm">
+            <h3 className="mb-2 flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-serene-neutral-400">Invite to this group</h3>
+            <div className="flex flex-wrap items-center gap-2">
+              <code className="select-all rounded-xl bg-purple-50 px-3 py-2 font-mono text-sm font-bold tracking-wider text-purple-800">{group.inviteCode}</code>
+              <Button size="sm" variant="outline" className="gap-1.5" onClick={copyInvite}>
+                {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />} {copied ? 'Copied' : 'Copy link'}
+              </Button>
+              <Button size="sm" variant="outline" className="gap-1.5" onClick={shareInvite}>
+                <Share2 className="h-4 w-4" /> Share
+              </Button>
+              <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setShowQr((v) => !v)}>
+                <QrCode className="h-4 w-4" /> {showQr ? 'Hide QR' : 'QR code'}
+              </Button>
+              {isAdmin && (
+                <Button size="sm" variant="ghost" className="gap-1.5 text-serene-neutral-500" onClick={resetInvite}>
+                  <RefreshCw className="h-4 w-4" /> Reset link
+                </Button>
+              )}
+            </div>
+            {showQr && inviteLink && (
+              <div className="mt-3 flex justify-center">
+                <QrShare value={inviteLink} caption={`Scan to join "${group.name}". People sign in first, then confirm.`} filename={`group-${group.inviteCode}`} />
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Members */}
         {isGroup && group && (

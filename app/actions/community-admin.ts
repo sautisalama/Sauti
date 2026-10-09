@@ -3,6 +3,7 @@
 import { createClient } from '@/utils/supabase/server';
 import { createAdminClient } from '@/utils/supabase/admin-client';
 import { insertNotificationsWithPush } from '@/lib/notifications/push';
+import { looseAdmin } from '@/lib/loose-db';
 
 type Role = 'admin' | 'moderator' | 'member';
 
@@ -60,6 +61,8 @@ export interface CommunityDetails {
   avatarUrl: string | null;
   isPublic: boolean;
   createdAt: string | null;
+  /** Shareable group ID (SG-XXXX-XXXX); the invite link is /join/<this>. */
+  inviteCode: string | null;
   myRole: Role;
   members: CommunityMember[];
 }
@@ -77,6 +80,7 @@ export async function getCommunityDetails(chatId: string): Promise<CommunityDeta
 
   const { role: myRole } = await standing(c.id, user.id);
   if (!myRole) return null;
+  const { data: inv } = await looseAdmin().from('communities').select('invite_code').eq('id', c.id).maybeSingle();
 
   const { data: members } = await db.from('community_members').select('user_id, role, joined_at').eq('community_id', c.id);
   const ids = Array.from(new Set([...(members ?? []).map((m) => m.user_id), c.creator_id].filter(Boolean))) as string[];
@@ -112,6 +116,7 @@ export async function getCommunityDetails(chatId: string): Promise<CommunityDeta
     avatarUrl: c.avatar_url,
     isPublic: !!c.is_public,
     createdAt: c.created_at,
+    inviteCode: inv?.invite_code ?? null,
     myRole,
     members: list,
   };
