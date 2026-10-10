@@ -17,7 +17,7 @@ import type { MailboxInfo } from "@/lib/mail/client";
 import {
 	actOnMessages, deleteView, getConversation, getMailboxes, getMessageDetail, listAccounts, listMessages, listSnippets, listViews, saveView, summariseMessage,
 	type AccountView, type MailAction, type MessageRow, type SnippetRow, type ViewConfig, type ViewRow,
-} from "@/app/actions/mjengo-mail";
+} from "./api";
 import { Composer, type ComposeSeed } from "./Composer";
 import { ConnectDialog, SettingsDialog, ViewDialog } from "./Dialogs";
 

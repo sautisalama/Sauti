@@ -4,6 +4,7 @@ import MailComposer from 'nodemailer/lib/mail-composer';
 import { looseAdmin } from '@/lib/loose-db';
 import { encryptField } from '@/lib/security/crypto';
 import { logAudit } from '@/lib/access/audit';
+import { guard } from '@/lib/action-result';
 import { requireAdminActor } from '@/lib/access/super-admin';
 import {
   PRESETS, classify, explain, loadAccount, normaliseSubject, parseSource, pathOf, testImap, transporter, verifySmtp, withImap,
@@ -18,7 +19,7 @@ export interface AccountView {
   email: string;
 }
 
-export async function listAccounts(): Promise<AccountView[]> {
+async function listAccounts_(): Promise<AccountView[]> {
   const actor = await requireAdminActor();
   const { data } = await looseAdmin().from('mail_accounts').select('id, label, email').eq('owner_id', actor.id).order('created_at');
   return (data ?? []) as AccountView[];
@@ -36,7 +37,7 @@ export interface AddAccountInput {
   smtpPort?: number;
 }
 
-export async function addAccount(input: AddAccountInput): Promise<AccountView> {
+async function addAccount_(input: AddAccountInput): Promise<AccountView> {
   const actor = await requireAdminActor();
   const email = (input.email ?? '').trim().toLowerCase();
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error('Enter a valid email address.');
@@ -82,7 +83,7 @@ export async function addAccount(input: AddAccountInput): Promise<AccountView> {
   return data as AccountView;
 }
 
-export async function removeAccount(id: string) {
+async function removeAccount_(id: string) {
   const actor = await requireAdminActor();
   const { data } = await looseAdmin().from('mail_accounts').delete().eq('id', id).eq('owner_id', actor.id).select('email').maybeSingle();
   if (data) await logAudit({ actorId: actor.id, actorEmail: actor.email, action: 'mail.account_removed', targetType: 'mailbox', targetId: id, targetLabel: data.email });
@@ -90,7 +91,7 @@ export async function removeAccount(id: string) {
 
 /* --------------------------------------------------------------- Mailboxes */
 
-export async function getMailboxes(accountId: string): Promise<{ boxes: MailboxInfo[]; unread: number }> {
+async function getMailboxes_(accountId: string): Promise<{ boxes: MailboxInfo[]; unread: number }> {
   const actor = await requireAdminActor();
   const acct = await loadAccount(accountId, actor.id);
   return withImap(acct, async (c) => {
@@ -130,7 +131,7 @@ function hasAttachment(node: { disposition?: string; childNodes?: unknown[] } | 
   return (node.childNodes ?? []).some((n) => hasAttachment(n as { disposition?: string; childNodes?: unknown[] }));
 }
 
-export async function listMessages(accountId: string, mailbox: string, query: ListQuery = {}, offset = 0, limit = 40): Promise<{ items: MessageRow[]; total: number }> {
+async function listMessages_(accountId: string, mailbox: string, query: ListQuery = {}, offset = 0, limit = 40): Promise<{ items: MessageRow[]; total: number }> {
   const actor = await requireAdminActor();
   const acct = await loadAccount(accountId, actor.id);
   return withImap(acct, async (c) => {
@@ -191,7 +192,7 @@ export async function listMessages(accountId: string, mailbox: string, query: Li
   });
 }
 
-export async function getMessageDetail(accountId: string, mailbox: string, uid: number, allowImages = false): Promise<ParsedMessage & { seen: boolean; flagged: boolean }> {
+async function getMessageDetail_(accountId: string, mailbox: string, uid: number, allowImages = false): Promise<ParsedMessage & { seen: boolean; flagged: boolean }> {
   const actor = await requireAdminActor();
   const acct = await loadAccount(accountId, actor.id);
   return withImap(acct, async (c) => {
@@ -210,7 +211,7 @@ export async function getMessageDetail(accountId: string, mailbox: string, uid: 
 }
 
 /** Other messages in this mailbox with the same subject, newest first. */
-export async function getConversation(accountId: string, mailbox: string, subject: string): Promise<MessageRow[]> {
+async function getConversation_(accountId: string, mailbox: string, subject: string): Promise<MessageRow[]> {
   const actor = await requireAdminActor();
   const acct = await loadAccount(accountId, actor.id);
   const key = normaliseSubject(subject);
@@ -234,7 +235,7 @@ export async function getConversation(accountId: string, mailbox: string, subjec
 
 export type MailAction = 'archive' | 'trash' | 'spam' | 'read' | 'unread' | 'star' | 'unstar' | 'delete';
 
-export async function actOnMessages(accountId: string, mailbox: string, uids: number[], action: MailAction) {
+async function actOnMessages_(accountId: string, mailbox: string, uids: number[], action: MailAction) {
   const actor = await requireAdminActor();
   const acct = await loadAccount(accountId, actor.id);
   if (!uids.length) return;
@@ -281,7 +282,7 @@ const emailOk = (e: string) => /^[^\s@,;]+@[^\s@,;]+\.[^\s@,;]+$/.test(e);
 const htmlToText = (html: string) =>
   html.replace(/<(br|\/p|\/div|\/h[1-6]|\/li)>/gi, '\n').replace(/<[^>]+>/g, '').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/\n{3,}/g, '\n\n').trim();
 
-export async function sendMail(input: SendInput) {
+async function sendMail_(input: SendInput) {
   const actor = await requireAdminActor();
   const acct = await loadAccount(input.accountId, actor.id);
   const to = input.to.map((e) => e.trim()).filter(Boolean);
@@ -342,13 +343,13 @@ export interface ViewRow {
   config: ViewConfig;
 }
 
-export async function listViews(): Promise<ViewRow[]> {
+async function listViews_(): Promise<ViewRow[]> {
   const actor = await requireAdminActor();
   const { data } = await looseAdmin().from('mail_views').select('id, name, icon, config').eq('owner_id', actor.id).order('position').order('created_at');
   return (data ?? []) as ViewRow[];
 }
 
-export async function saveView(id: string | null, v: { name: string; icon?: string; config: ViewConfig }): Promise<ViewRow> {
+async function saveView_(id: string | null, v: { name: string; icon?: string; config: ViewConfig }): Promise<ViewRow> {
   const actor = await requireAdminActor();
   const name = v.name.trim().slice(0, 40);
   if (!name) throw new Error('Name the view.');
@@ -360,7 +361,7 @@ export async function saveView(id: string | null, v: { name: string; icon?: stri
   return data as ViewRow;
 }
 
-export async function deleteView(id: string) {
+async function deleteView_(id: string) {
   const actor = await requireAdminActor();
   await looseAdmin().from('mail_views').delete().eq('id', id).eq('owner_id', actor.id);
 }
@@ -371,13 +372,13 @@ export interface SnippetRow {
   body_html: string;
 }
 
-export async function listSnippets(): Promise<SnippetRow[]> {
+async function listSnippets_(): Promise<SnippetRow[]> {
   const actor = await requireAdminActor();
   const { data } = await looseAdmin().from('mail_snippets').select('id, name, body_html').eq('owner_id', actor.id).order('name');
   return (data ?? []) as SnippetRow[];
 }
 
-export async function saveSnippet(id: string | null, name: string, bodyHtml: string): Promise<SnippetRow> {
+async function saveSnippet_(id: string | null, name: string, bodyHtml: string): Promise<SnippetRow> {
   const actor = await requireAdminActor();
   const n = name.trim().slice(0, 40);
   if (!n || !bodyHtml.trim()) throw new Error('A snippet needs a name and some content.');
@@ -389,7 +390,7 @@ export async function saveSnippet(id: string | null, name: string, bodyHtml: str
   return data as SnippetRow;
 }
 
-export async function deleteSnippet(id: string) {
+async function deleteSnippet_(id: string) {
   const actor = await requireAdminActor();
   await looseAdmin().from('mail_snippets').delete().eq('id', id).eq('owner_id', actor.id);
 }
@@ -426,13 +427,13 @@ async function bodyText(accountId: string, mailbox: string, uid: number, ownerId
 }
 
 /** Two or three sentences at the top of a long thread. Sent to the AI service only when asked. */
-export async function summariseMessage(accountId: string, mailbox: string, uid: number): Promise<string> {
+async function summariseMessage_(accountId: string, mailbox: string, uid: number): Promise<string> {
   const actor = await requireAdminActor();
   const { text, subject } = await bodyText(accountId, mailbox, uid, actor.id);
   return ai('Summarise the email in at most three short sentences. Plain text. Say what is being asked and any deadline. Do not invent details.', `Subject: ${subject}\n\n${text}`, 160);
 }
 
-export async function draftReply(accountId: string, mailbox: string, uid: number, instruction: string): Promise<string> {
+async function draftReply_(accountId: string, mailbox: string, uid: number, instruction: string): Promise<string> {
   const actor = await requireAdminActor();
   const { text, subject, from } = await bodyText(accountId, mailbox, uid, actor.id);
   const out = await ai(
@@ -445,3 +446,22 @@ export async function draftReply(accountId: string, mailbox: string, uid: number
     .map((p) => `<p>${p.replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[c]!).replace(/\n/g, '<br>')}</p>`)
     .join('');
 }
+
+/* Exported actions return { ok, data | error } so the message survives production builds. */
+export const listAccounts = guard(listAccounts_);
+export const addAccount = guard(addAccount_);
+export const removeAccount = guard(removeAccount_);
+export const getMailboxes = guard(getMailboxes_);
+export const listMessages = guard(listMessages_);
+export const getMessageDetail = guard(getMessageDetail_);
+export const getConversation = guard(getConversation_);
+export const actOnMessages = guard(actOnMessages_);
+export const sendMail = guard(sendMail_);
+export const listViews = guard(listViews_);
+export const saveView = guard(saveView_);
+export const deleteView = guard(deleteView_);
+export const listSnippets = guard(listSnippets_);
+export const saveSnippet = guard(saveSnippet_);
+export const deleteSnippet = guard(deleteSnippet_);
+export const summariseMessage = guard(summariseMessage_);
+export const draftReply = guard(draftReply_);

@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
-import { draftReply, sendMail, type AccountView, type SnippetRow } from "@/app/actions/mjengo-mail";
+import { draftReply, sendMail, type AccountView, type SnippetRow } from "./api";
 
 export interface ComposeSeed {
 	to?: string[];
