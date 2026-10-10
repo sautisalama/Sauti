@@ -28,8 +28,10 @@ import {
 	BookOpen, 
 	Building2,
     Network,
-	GraduationCap, Briefcase
+	GraduationCap, Briefcase,
+	Mail, CheckSquare, FolderKanban, Lightbulb, ScrollText, HardDrive, ShieldCheck, ArrowLeft
 } from "lucide-react";
+import { mjengoNav } from "@/app/actions/mjengo-nav";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -77,6 +79,8 @@ interface SidebarItem {
 	survivorOnly?: boolean;
 	professionalOnly?: boolean;
 	showDot?: boolean;
+	/** What this section is for; shown in the hover tooltip. */
+	hint?: string;
 }
 
 interface EnhancedSidebarProps {
@@ -106,6 +110,12 @@ export function EnhancedSidebar({
 	const [casesCount, setCasesCount] = useState<number>(0);
 	const { roleContext, switchToAdmin, switchToUser } = useRoleSwitcher();
 	const isAdminMode = dash?.isAdminMode || false;
+	const onMjengo = !!pathname?.startsWith("/dashboard/mjengo");
+	const [mjengoSuper, setMjengoSuper] = useState(false);
+	useEffect(() => {
+		if (!onMjengo) return;
+		mjengoNav().then((n) => setMjengoSuper(n.isSuper)).catch(() => setMjengoSuper(false));
+	}, [onMjengo]);
 	const supabase = useMemo(() => createClient(), []);
 	const userType = dash?.data?.profile?.user_type || user?.profile?.user_type || null;
 	const role = isAdminMode ? "admin" : userType;
@@ -242,6 +252,30 @@ export function EnhancedSidebar({
 					separator: true,
 				},
 			];
+		}
+
+		// Mjengo suite: its own sections take the place of the platform options.
+		if (pathname?.startsWith("/dashboard/mjengo")) {
+			const B = "/dashboard/mjengo";
+			const items: SidebarItem[] = [
+				{ id: "mj-overview", label: "Overview", icon: LayoutDashboard, href: B, section: "main", hint: "Summary of grants, opportunities and projects" },
+				{ id: "mj-mail", label: "Mail", icon: Mail, href: `${B}/mail`, section: "main", hint: "Read, write and organise email" },
+				{ id: "mj-grants", label: "Grants", icon: Briefcase, href: `${B}/grants`, section: "main", hint: "Track grant applications and deadlines" },
+				{ id: "mj-opps", label: "Opportunities", icon: Lightbulb, href: `${B}/opportunities`, section: "main", hint: "Funding and partnership leads" },
+				{ id: "mj-projects", label: "Projects", icon: FolderKanban, href: `${B}/projects`, section: "main", hint: "Projects, milestones and documents" },
+				{ id: "mj-forms", label: "Forms", icon: ClipboardList, href: `${B}/forms`, section: "main", hint: "Build forms and see responses" },
+				{ id: "mj-todos", label: "To-dos", icon: CheckSquare, href: `${B}/todos`, section: "main", hint: "Tasks and shared responsibilities" },
+				{ id: "mj-docs", label: "Documents", icon: FileText, href: `${B}/documents`, section: "main", hint: "Write and edit documents" },
+				{ id: "mj-vault", label: "Vault", icon: HardDrive, href: `${B}/vault`, section: "main", hint: "Shared files and folders with access control" },
+			];
+			if (mjengoSuper) {
+				items.push(
+					{ id: "mj-people", label: "People & access", icon: ShieldCheck, href: `${B}/people`, section: "main", hint: "Who can use the suite and what they can do" },
+					{ id: "mj-logs", label: "Logs", icon: ScrollText, href: `${B}/logs`, section: "main", hint: "Audit trail of actions in the suite" }
+				);
+			}
+			items.push({ id: "mj-back", label: "Back to dashboard", icon: ArrowLeft, href: "/dashboard", section: "secondary", separator: true, hint: "Leave the Mjengo suite" });
+			return items;
 		}
 
 		// Admin Dashboard Navigation
@@ -481,17 +515,18 @@ export function EnhancedSidebar({
 			...baseItems,
 
 		];
-	}, [pathname, role, casesCount, dash?.data?.unreadChatCount, dash?.data?.verification?.pendingCount]);
+	}, [pathname, role, casesCount, dash?.data?.unreadChatCount, dash?.data?.verification?.pendingCount, mjengoSuper]);
 
 	// Compute items once per relevant inputs to avoid recomputing on each render
 	const sidebarItems = useMemo(
 		() => getSidebarItems(),
-		[pathname, role, casesCount, dash?.data?.unreadChatCount, getSidebarItems]
+		[pathname, role, casesCount, dash?.data?.unreadChatCount, getSidebarItems, mjengoSuper]
 	);
 
 	const isActive = (item: SidebarItem) => {
 		if (!item.href) return false;
 		if (item.href === "/dashboard") return pathname === "/dashboard";
+		if (item.href === "/dashboard/mjengo") return pathname === "/dashboard/mjengo";
         
         // Fix for Admin Overview: Only active if exact match, otherwise 'Sub-pages' like 'review' take precedence
         if (item.href === "/dashboard/admin") return pathname === "/dashboard/admin";
@@ -566,7 +601,8 @@ export function EnhancedSidebar({
 							)}
 						</TooltipTrigger>
 						<TooltipContent side="right">
-							<p>{item.label}</p>
+							<p className="font-semibold">{item.label}</p>
+							{item.hint && <p className="max-w-[200px] text-xs opacity-80">{item.hint}</p>}
 						</TooltipContent>
 					</Tooltip>
 				</TooltipProvider>

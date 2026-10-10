@@ -114,8 +114,8 @@ function EditorScreen() {
 	};
 
 	return (
-		<div className="flex flex-col gap-3">
-			<div className="flex flex-wrap items-center gap-2">
+		<div className="flex h-full min-h-0 flex-col bg-white">
+			<div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-serene-neutral-200 px-3 py-1.5">
 				<Button asChild variant="ghost" size="sm" className="gap-1.5">
 					<Link href="/dashboard/mjengo/documents"><ArrowLeft className="h-4 w-4" /> Documents</Link>
 				</Button>
@@ -133,12 +133,12 @@ function EditorScreen() {
 			</div>
 
 			{loading ? (
-				<div className="flex h-96 items-center justify-center rounded-2xl border border-serene-neutral-100 bg-white"><Loader2 className="h-6 w-6 animate-spin text-serene-neutral-400" /></div>
+				<div className="flex min-h-0 flex-1 items-center justify-center"><Loader2 className="h-6 w-6 animate-spin text-serene-neutral-400" /></div>
 			) : (
-				<div className="overflow-hidden rounded-2xl border border-serene-neutral-200 bg-white">
+				<div className="min-h-0 flex-1 overflow-hidden">
 					<WordcraftEditor
 						ref={ref}
-						height="calc(100dvh - 15rem)"
+						height="100%"
 						document={doc}
 						guardUnload
 						author=""

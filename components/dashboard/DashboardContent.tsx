@@ -36,7 +36,9 @@ export function DashboardContent({ children }: DashboardContentProps) {
   const isOnboardingRoute = pathname === "/dashboard/onboarding" || pathname?.startsWith("/dashboard/onboarding");
   const needsOnboarding = isOnboardingRoute || profileNeedsOnboarding(profile);
 
-  const showTopPadding = !isChat && !needsOnboarding;
+  // The Mjengo suite uses the whole window: no header bar, no padding.
+  const isMjengo = !!pathname?.startsWith("/dashboard/mjengo");
+  const showTopPadding = !isChat && !needsOnboarding && !isMjengo;
 
   // Bottom Nav (pb-24) is hidden on chat DETAIL (but shown on list)
   // and Appointment detail
@@ -56,11 +58,11 @@ export function DashboardContent({ children }: DashboardContentProps) {
         >
       <div className={cn(
                 "flex-1 flex flex-col w-full min-w-0 transition-all duration-300", // Ensure full width/height usage
-                "lg:pt-16 lg:pb-0", // Desktop: Fixed header spacing
+                isMjengo ? "lg:pt-0 lg:pb-0" : "lg:pt-16 lg:pb-0", // Desktop: Fixed header spacing
                 showTopPadding ? "pt-14 lg:pt-16" : "", // 56px (h-14) mobile top bar
-                showBottomPadding ? "pb-24 lg:pb-0" : "" // Bottom nav spacing
+                showBottomPadding && !isMjengo ? "pb-24 lg:pb-0" : "" // Bottom nav spacing
             )}>
-                {!isChat && !needsOnboarding && (
+                {!isChat && !needsOnboarding && !isMjengo && (
                     <div className="hidden lg:block">
                         <DesktopHeader 
                             showSearch={true} 

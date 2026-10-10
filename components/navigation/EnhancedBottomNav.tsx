@@ -71,6 +71,8 @@ export function EnhancedBottomNav({ forceShow = false, className }: EnhancedBott
   // ... and always hide during onboarding
   const hide = forceShow ? false : (
     needsOnboarding ||
+    // The Mjengo suite has its own section strip and uses the whole window
+    !!pathname?.startsWith("/dashboard/mjengo") ||
     // Hide ONLY on chat detail page (either by UUID path OR by query param)
     isChatDetail || 
     (pathname?.includes("/dashboard/chat/") && pathname !== "/dashboard/chat") ||

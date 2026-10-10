@@ -49,7 +49,7 @@ export function MobileTopBar() {
   const isReportDetail = pathname?.startsWith('/dashboard/reports/') && pathname !== '/dashboard/reports';
   const shouldHideAvatar = isCaseDetail || isReportDetail;
   
-  if (isChat || isOnboarding) return null;
+  if (isChat || isOnboarding || pathname?.startsWith("/dashboard/mjengo")) return null;
 
   const getRoleLabel = (userType: string) => {
     switch (userType) {

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ClipboardList, Briefcase, CalendarClock, CheckSquare, FileText, HardDrive, FolderKanban, LayoutDashboard, Lightbulb, Mail, ScrollText, ShieldCheck } from "lucide-react";
+import { ArrowLeft, ClipboardList, Briefcase, CheckSquare, FileText, HardDrive, FolderKanban, LayoutDashboard, Lightbulb, Mail, ScrollText, ShieldCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const BASE = "/dashboard/mjengo";
@@ -23,44 +23,35 @@ const TABS = [
 
 export function MjengoShell({ isSuper, children }: { isSuper: boolean; children: React.ReactNode }) {
 	const pathname = usePathname() ?? "";
-	// The mail client uses the whole window, like a mail app.
-	const fullBleed = pathname.startsWith(`${BASE}/mail`);
+	// Mail and the document editor take the whole window, like native apps.
+	const fullBleed = pathname.startsWith(`${BASE}/mail`) || pathname.startsWith(`${BASE}/documents/editor`);
 
 	return (
-		<div className={cn("flex min-h-screen flex-col bg-serene-neutral-50", fullBleed && "h-[calc(100dvh-9rem)] min-h-0 lg:h-[100dvh]")}>
-			<div className="z-20 border-b border-serene-neutral-200 bg-white">
-				<div className="mx-auto w-full max-w-7xl px-4 pt-3 md:px-8">
-					<div className="flex items-center gap-3 pb-2">
-						<div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-sauti-teal text-white shadow-sm">
-							<CalendarClock className="h-5 w-5" />
-						</div>
-						<div className="min-w-0">
-							<h1 className="text-lg font-bold leading-tight text-sauti-dark">Mjengo Suite</h1>
-							<p className="text-xs text-serene-neutral-500">Mail, grants, opportunities and projects. Administrators only.</p>
-						</div>
-					</div>
-					<nav aria-label="Mjengo sections" className="-mx-1 flex gap-1 overflow-x-auto px-1 pb-2 scrollbar-hide">
-						{TABS.filter((t) => !t.superOnly || isSuper).map((t) => {
-							const active = t.exact ? pathname === t.href : pathname.startsWith(t.href);
-							return (
-								<Link
-									key={t.href}
-									href={t.href}
-									aria-current={active ? "page" : undefined}
-									className={cn(
-										"flex shrink-0 touch-manipulation items-center gap-2 rounded-full px-3.5 py-2 text-sm font-medium transition-colors",
-										active ? "bg-sauti-teal-light text-sauti-teal" : "text-serene-neutral-600 hover:bg-serene-neutral-100 hover:text-sauti-dark"
-									)}
-								>
-									<t.icon className="h-4 w-4" />
-									{t.label}
-								</Link>
-							);
-						})}
-					</nav>
-				</div>
-			</div>
-			<div className={cn("w-full flex-1", fullBleed ? "min-h-0" : "mx-auto max-w-7xl px-4 py-6 md:px-8")}>{children}</div>
+		<div className={cn("flex min-h-dvh flex-col bg-serene-neutral-50", fullBleed && "h-dvh min-h-0")}>
+			{/* Phones have no side panel: the same sections as a scrolling strip. */}
+			<nav aria-label="Mjengo sections" className="flex shrink-0 gap-1 overflow-x-auto border-b border-serene-neutral-200 bg-white px-2 pb-1.5 pt-[max(0.5rem,env(safe-area-inset-top))] scrollbar-hide lg:hidden">
+				<Link href="/dashboard" className="flex shrink-0 items-center gap-1.5 rounded-full px-3 py-2 text-sm font-medium text-serene-neutral-500">
+					<ArrowLeft className="h-4 w-4" /> Dashboard
+				</Link>
+				{TABS.filter((t) => !t.superOnly || isSuper).map((t) => {
+					const active = t.exact ? pathname === t.href : pathname.startsWith(t.href);
+					return (
+						<Link
+							key={t.href}
+							href={t.href}
+							aria-current={active ? "page" : undefined}
+							className={cn(
+								"flex shrink-0 touch-manipulation items-center gap-2 rounded-full px-3.5 py-2 text-sm font-medium transition-colors",
+								active ? "bg-sauti-teal-light text-sauti-teal" : "text-serene-neutral-600 hover:bg-serene-neutral-100"
+							)}
+						>
+							<t.icon className="h-4 w-4" />
+							{t.label}
+						</Link>
+					);
+				})}
+			</nav>
+			<div className={cn("w-full flex-1", fullBleed ? "min-h-0" : "px-4 py-5 md:px-8")}>{children}</div>
 		</div>
 	);
 }
