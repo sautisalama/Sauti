@@ -110,6 +110,21 @@ export function MailApp() {
 		setViews(v);
 		setSnippets(s);
 	}, []);
+	// Coming back from "Sign in with Google / Microsoft".
+	useEffect(() => {
+		const q = new URLSearchParams(window.location.search);
+		const ok = q.get("mail_connected");
+		const err = q.get("mail_error");
+		if (!ok && !err) return;
+		if (ok) toast({ title: "Mailbox connected", description: ok });
+		if (err) toast({ title: "Could not connect the mailbox", description: err, variant: "destructive" });
+		const clean = new URL(window.location.href);
+		clean.searchParams.delete("mail_connected");
+		clean.searchParams.delete("mail_error");
+		window.history.replaceState(null, "", clean.pathname + clean.search);
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, []);
+
 	useEffect(() => {
 		loadAccounts().catch(() => setAccounts([]));
 		loadMeta().catch(() => undefined);

@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Loader2, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
@@ -11,32 +12,40 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
-import { addAccount, deleteSnippet, removeAccount, saveSnippet, type AccountView, type SnippetRow, type ViewConfig, type ViewRow } from "./api";
+import { addAccount, oauthAvailability, deleteSnippet, removeAccount, saveSnippet, type AccountView, type SnippetRow, type ViewConfig, type ViewRow } from "./api";
 
 const PROVIDERS = [
-	{ id: "gmail", label: "Gmail / Google Workspace", hint: "Use an app password: Google Account > Security > 2-Step Verification > App passwords." },
-	{ id: "outlook", label: "Outlook / Microsoft 365", hint: "Your organisation must allow IMAP and SMTP sign-in. Use an app password if 2-step is on." },
+	{ id: "sautisalama", label: "Sauti Salama mail", hint: "Use your full address and your webmail password. Servers: mail.sautisalama.org." },
+	{ id: "gmail", label: "Gmail (app password)", hint: "Use an app password: Google Account > Security > 2-Step Verification > App passwords. Or use Sign in with Google above." },
+	{ id: "outlook", label: "Outlook (app password)", hint: "Most Microsoft accounts no longer accept passwords here. Use Sign in with Microsoft above." },
 	{ id: "zoho", label: "Zoho Mail", hint: "" },
 	{ id: "yahoo", label: "Yahoo Mail", hint: "Use an app password." },
-	{ id: "custom", label: "Other (IMAP / SMTP)", hint: "Ask your email host for the server names." },
+	{ id: "custom", label: "Other mail server", hint: "Ask your email host for the server names." },
 ] as const;
 
 export function ConnectDialog({ open, onClose, onConnected }: { open: boolean; onClose: () => void; onConnected: (a: AccountView) => void }) {
 	const { toast } = useToast();
-	const [preset, setPreset] = useState<(typeof PROVIDERS)[number]["id"]>("gmail");
+	const [preset, setPreset] = useState<(typeof PROVIDERS)[number]["id"]>("sautisalama");
+	const [protocol, setProtocol] = useState<"imap" | "pop3">("imap");
 	const [email, setEmail] = useState("");
 	const [password, setPassword] = useState("");
 	const [imapHost, setImapHost] = useState("");
 	const [smtpHost, setSmtpHost] = useState("");
 	const [busy, setBusy] = useState(false);
 	const [error, setError] = useState<string | null>(null);
+	const [oauth, setOauth] = useState<{ google: boolean; microsoft: boolean } | null>(null);
 	const hint = PROVIDERS.find((p) => p.id === preset)?.hint;
+	const canPop = preset === "sautisalama" || preset === "custom";
+
+	useEffect(() => {
+		if (open) oauthAvailability().then(setOauth).catch(() => setOauth({ google: false, microsoft: false }));
+	}, [open]);
 
 	const connect = async () => {
 		setBusy(true);
 		setError(null);
 		try {
-			const a = await addAccount({ preset, email, password, imapHost, smtpHost });
+			const a = await addAccount({ preset, protocol: canPop ? protocol : "imap", email, password, imapHost, smtpHost });
 			setPassword("");
 			onConnected(a);
 			toast({ title: "Mailbox connected", description: a.email });
@@ -48,24 +57,59 @@ export function ConnectDialog({ open, onClose, onConnected }: { open: boolean; o
 		}
 	};
 
+	const Oauth = ({ id, label, mark }: { id: "google" | "microsoft"; label: string; mark: React.ReactNode }) => {
+		const ready = oauth?.[id];
+		return (
+			<a
+				href={ready ? `/api/mjengo/mail/oauth/${id}/start` : undefined}
+				aria-disabled={!ready}
+				className={cn("flex min-h-12 items-center justify-center gap-3 rounded-xl border px-4 text-sm font-semibold transition", ready ? "border-serene-neutral-300 bg-white hover:bg-serene-neutral-50" : "cursor-not-allowed border-serene-neutral-200 bg-serene-neutral-50 text-serene-neutral-400")}
+			>
+				{mark} {label}
+			</a>
+		);
+	};
+
 	return (
 		<Dialog open={open} onOpenChange={(o) => !o && !busy && onClose()}>
-			<DialogContent className="max-w-md">
+			<DialogContent className="max-h-[92vh] max-w-md overflow-y-auto">
 				<DialogHeader>
 					<DialogTitle>Connect a mailbox</DialogTitle>
-					<DialogDescription>We check that you can both read and send before saving. The password is encrypted and only used to reach your mailbox.</DialogDescription>
+					<DialogDescription>We check that you can both read and send before saving. Passwords and sign-in tokens are encrypted.</DialogDescription>
 				</DialogHeader>
 				<div className="space-y-4">
+					<div className="space-y-2">
+						<Oauth id="google" label="Sign in with Google" mark={<span className="text-base font-bold text-[#4285F4]">G</span>} />
+						<Oauth id="microsoft" label="Sign in with Microsoft (Outlook, Microsoft 365)" mark={<span className="grid h-4 w-4 grid-cols-2 gap-px"><i className="bg-[#f25022]" /><i className="bg-[#7fba00]" /><i className="bg-[#00a4ef]" /><i className="bg-[#ffb900]" /></span>} />
+						{oauth && (!oauth.google || !oauth.microsoft) && (
+							<p className="text-xs text-serene-neutral-500">
+								{!oauth.google && "Google sign-in needs GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET on the server. "}
+								{!oauth.microsoft && "Microsoft sign-in needs MS_CLIENT_ID and MS_CLIENT_SECRET (an Azure app registration)."}
+							</p>
+						)}
+					</div>
+
+					<div className="flex items-center gap-3 text-xs text-serene-neutral-400"><span className="h-px flex-1 bg-serene-neutral-200" />or use a password<span className="h-px flex-1 bg-serene-neutral-200" /></div>
+
 					<div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
 						{PROVIDERS.map((p) => (
 							<button key={p.id} onClick={() => setPreset(p.id)} aria-pressed={preset === p.id} className={cn("touch-manipulation rounded-xl border px-3 py-2 text-left text-sm", preset === p.id ? "border-purple-600 bg-purple-50 font-semibold text-purple-900" : "border-serene-neutral-200 hover:bg-serene-neutral-50")}>{p.label}</button>
 						))}
 					</div>
+					{canPop && (
+						<div className="flex items-center gap-2 text-sm">
+							<span className="text-serene-neutral-600">Read mail with</span>
+							{(["imap", "pop3"] as const).map((pr) => (
+								<button key={pr} onClick={() => setProtocol(pr)} aria-pressed={protocol === pr} className={cn("rounded-full border px-3 py-1 text-xs font-semibold uppercase", protocol === pr ? "border-purple-600 bg-purple-600 text-white" : "border-serene-neutral-200")}>{pr}</button>
+							))}
+							{protocol === "pop3" && <span className="text-xs text-serene-neutral-500">Inbox only; no folders or stars.</span>}
+						</div>
+					)}
 					<div className="space-y-1.5"><Label htmlFor="mb-email">Email address</Label><Input id="mb-email" type="email" autoComplete="off" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@sautisalama.org" /></div>
-					<div className="space-y-1.5"><Label htmlFor="mb-pass">Password or app password</Label><Input id="mb-pass" type="password" autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} /></div>
+					<div className="space-y-1.5"><Label htmlFor="mb-pass">Password or app password</Label><PasswordInput id="mb-pass" autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} /></div>
 					{preset === "custom" && (
 						<div className="grid grid-cols-2 gap-3">
-							<div className="space-y-1.5"><Label htmlFor="mb-imap">IMAP server</Label><Input id="mb-imap" value={imapHost} onChange={(e) => setImapHost(e.target.value)} placeholder="imap.example.com" /></div>
+							<div className="space-y-1.5"><Label htmlFor="mb-imap">{protocol === "pop3" ? "POP3 server" : "IMAP server"}</Label><Input id="mb-imap" value={imapHost} onChange={(e) => setImapHost(e.target.value)} placeholder={protocol === "pop3" ? "pop.example.com" : "imap.example.com"} /></div>
 							<div className="space-y-1.5"><Label htmlFor="mb-smtp">SMTP server</Label><Input id="mb-smtp" value={smtpHost} onChange={(e) => setSmtpHost(e.target.value)} placeholder="smtp.example.com" /></div>
 						</div>
 					)}

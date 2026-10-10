@@ -7,9 +7,18 @@ import { logAudit } from '@/lib/access/audit';
 import { guard } from '@/lib/action-result';
 import { requireAdminActor } from '@/lib/access/super-admin';
 import {
-  PRESETS, classify, explain, loadAccount, normaliseSubject, parseSource, pathOf, testImap, transporter, verifySmtp, withImap,
+  PRESETS, classify, explain, fetchSource, loadAccount, normaliseSubject, parseSource, pathOf, testImap, testPop3, transporter, verifySmtp, withImap, withPop3,
   type Address, type MailboxInfo, type ParsedMessage,
 } from '@/lib/mail/client';
+import { oauthConfigured } from '@/lib/mail/oauth';
+import { uidOf } from '@/lib/mail/pop3';
+import { simpleParser } from 'mailparser';
+
+/** Which one-click sign-ins this deployment has credentials for. */
+async function oauthAvailability_() {
+  await requireAdminActor();
+  return { google: oauthConfigured('google'), microsoft: oauthConfigured('microsoft') };
+}
 
 /* ---------------------------------------------------------------- Accounts */
 
@@ -17,16 +26,20 @@ export interface AccountView {
   id: string;
   label: string;
   email: string;
+  protocol: 'imap' | 'pop3';
+  auth_type: 'password' | 'google' | 'microsoft';
 }
 
 async function listAccounts_(): Promise<AccountView[]> {
   const actor = await requireAdminActor();
-  const { data } = await looseAdmin().from('mail_accounts').select('id, label, email').eq('owner_id', actor.id).order('created_at');
+  const { data } = await looseAdmin().from('mail_accounts').select('id, label, email, protocol, auth_type').eq('owner_id', actor.id).order('created_at');
   return (data ?? []) as AccountView[];
 }
 
 export interface AddAccountInput {
   preset: keyof typeof PRESETS | 'custom';
+  /** How to read the mailbox. Sending always uses SMTP. */
+  protocol?: 'imap' | 'pop3';
   email: string;
   password: string;
   label?: string;
@@ -44,15 +57,17 @@ async function addAccount_(input: AddAccountInput): Promise<AccountView> {
   if (!input.password) throw new Error('Enter the password (or app password).');
 
   const p = input.preset !== 'custom' ? PRESETS[input.preset] : null;
-  const imapHost = p ? p.imap[0] : (input.imapHost ?? '').trim();
+  const protocol = input.protocol === 'pop3' ? 'pop3' : 'imap';
+  const readHost = protocol === 'pop3' && p?.pop ? p.pop : p?.imap;
+  const imapHost = readHost ? readHost[0] : (input.imapHost ?? '').trim();
   const smtpHost = p ? p.smtp[0] : (input.smtpHost ?? '').trim();
   if (!imapHost || !smtpHost) throw new Error('Enter the mail server names.');
-  const imapPort = p ? p.imap[1] : input.imapPort || 993;
+  const imapPort = readHost ? readHost[1] : input.imapPort || (protocol === 'pop3' ? 995 : 993);
   const smtpPort = p ? p.smtp[1] : input.smtpPort || 465;
   const row = {
     imap_host: imapHost,
     imap_port: imapPort,
-    imap_secure: p ? p.imap[2] : imapPort === 993,
+    imap_secure: readHost ? readHost[2] : imapPort === 993 || imapPort === 995,
     smtp_host: smtpHost,
     smtp_port: smtpPort,
     smtp_secure: p ? p.smtp[2] : smtpPort === 465,
@@ -61,12 +76,13 @@ async function addAccount_(input: AddAccountInput): Promise<AccountView> {
 
   // Prove both directions work before saving anything.
   try {
-    await testImap(row, input.password);
+    if (protocol === 'pop3') await testPop3(row, input.password);
+    else await testImap(row, { pass: input.password });
   } catch (e) {
     throw new Error(explain(e));
   }
   try {
-    await verifySmtp(row, input.password);
+    await verifySmtp(row, { pass: input.password });
   } catch (e) {
     throw new Error('Reading mail works, but sending does not: ' + explain(e));
   }
@@ -75,8 +91,8 @@ async function addAccount_(input: AddAccountInput): Promise<AccountView> {
   if (!enc) throw new Error('Could not secure the password.');
   const { data, error } = await looseAdmin()
     .from('mail_accounts')
-    .upsert({ owner_id: actor.id, label: (input.label || email).trim().slice(0, 60), email, password_enc: enc, ...row }, { onConflict: 'owner_id,email' })
-    .select('id, label, email')
+    .upsert({ owner_id: actor.id, label: (input.label || email).trim().slice(0, 60), email, password_enc: enc, protocol, auth_type: 'password', ...row }, { onConflict: 'owner_id,email' })
+    .select('id, label, email, protocol, auth_type')
     .single();
   if (error || !data) throw new Error('Could not save the mailbox.');
   await logAudit({ actorId: actor.id, actorEmail: actor.email, action: 'mail.account_connected', targetType: 'mailbox', targetId: data.id, targetLabel: email });
@@ -94,6 +110,7 @@ async function removeAccount_(id: string) {
 async function getMailboxes_(accountId: string): Promise<{ boxes: MailboxInfo[]; unread: number }> {
   const actor = await requireAdminActor();
   const acct = await loadAccount(accountId, actor.id);
+  if (acct.protocol === 'pop3') return { boxes: [{ path: 'INBOX', name: 'Inbox', special: 'inbox' as const }], unread: 0 };
   return withImap(acct, async (c) => {
     const boxes = classify(await c.list());
     const inbox = pathOf(boxes, 'inbox') ?? 'INBOX';
@@ -125,6 +142,34 @@ export interface ListQuery {
   text?: string;
 }
 
+async function listPop3(acct: Awaited<ReturnType<typeof loadAccount>>, query: ListQuery, offset: number, limit: number): Promise<{ items: MessageRow[]; total: number }> {
+  return withPop3(acct, async (p) => {
+    const all = (await p.uidl()).reverse(); // newest first
+    const term = (query.text ?? query.from ?? '').trim().toLowerCase();
+    // POP3 has no search: when filtering, look through the newest 200 headers.
+    const window = term ? all.slice(0, 200) : all.slice(offset, offset + limit);
+    const items: MessageRow[] = [];
+    for (const [n, id] of window) {
+      const h = await simpleParser(await p.top(n));
+      const from = h.from?.value?.[0];
+      const row: MessageRow = {
+        uid: uidOf(id),
+        mailbox: 'INBOX',
+        from: { name: from?.name || '', address: from?.address || '' },
+        subject: h.subject || '(no subject)',
+        date: h.date ? h.date.toISOString() : null,
+        seen: true,
+        flagged: false,
+        hasAttachments: false,
+        thread: 1,
+      };
+      if (term && ![row.subject, row.from.name, row.from.address].some((v) => v.toLowerCase().includes(term))) continue;
+      items.push(row);
+    }
+    return { items: term ? items.slice(offset, offset + limit) : items, total: term ? items.length : all.length };
+  });
+}
+
 function hasAttachment(node: { disposition?: string; childNodes?: unknown[] } | undefined): boolean {
   if (!node) return false;
   if (node.disposition === 'attachment') return true;
@@ -134,6 +179,7 @@ function hasAttachment(node: { disposition?: string; childNodes?: unknown[] } | 
 async function listMessages_(accountId: string, mailbox: string, query: ListQuery = {}, offset = 0, limit = 40): Promise<{ items: MessageRow[]; total: number }> {
   const actor = await requireAdminActor();
   const acct = await loadAccount(accountId, actor.id);
+  if (acct.protocol === 'pop3') return listPop3(acct, query, offset, limit);
   return withImap(acct, async (c) => {
     const lock = await c.getMailboxLock(mailbox);
     try {
@@ -195,6 +241,10 @@ async function listMessages_(accountId: string, mailbox: string, query: ListQuer
 async function getMessageDetail_(accountId: string, mailbox: string, uid: number, allowImages = false): Promise<ParsedMessage & { seen: boolean; flagged: boolean }> {
   const actor = await requireAdminActor();
   const acct = await loadAccount(accountId, actor.id);
+  if (acct.protocol === 'pop3') {
+    const parsed = await parseSource(uid, await fetchSource(acct, mailbox, uid), allowImages);
+    return { ...parsed, seen: true, flagged: false };
+  }
   return withImap(acct, async (c) => {
     const lock = await c.getMailboxLock(mailbox);
     try {
@@ -215,7 +265,7 @@ async function getConversation_(accountId: string, mailbox: string, subject: str
   const actor = await requireAdminActor();
   const acct = await loadAccount(accountId, actor.id);
   const key = normaliseSubject(subject);
-  if (!key) return [];
+  if (!key || acct.protocol === 'pop3') return [];
   return withImap(acct, async (c) => {
     const lock = await c.getMailboxLock(mailbox);
     try {
@@ -240,6 +290,18 @@ async function actOnMessages_(accountId: string, mailbox: string, uids: number[]
   const acct = await loadAccount(accountId, actor.id);
   if (!uids.length) return;
   const set = uids.slice(0, 200).join(',');
+  if (acct.protocol === 'pop3') {
+    // POP3 can only delete; reading state and stars have no meaning there.
+    if (!['archive', 'trash', 'spam', 'delete'].includes(action)) return;
+    await withPop3(acct, async (p) => {
+      const map = new Map((await p.uidl()).map(([n, id]) => [uidOf(id), n]));
+      for (const u of uids.slice(0, 200)) {
+        const n = map.get(u);
+        if (n) await p.dele(n);
+      }
+    });
+    return;
+  }
   await withImap(acct, async (c) => {
     const boxes = classify(await c.list());
     const lock = await c.getMailboxLock(mailbox);
@@ -308,13 +370,13 @@ async function sendMail_(input: SendInput) {
   };
   const raw = await new MailComposer(mail).compile().build();
   try {
-    await transporter(acct).sendMail({ envelope: { from: acct.email, to: [...to, ...cc, ...bcc] }, raw });
+    await (await transporter(acct)).sendMail({ envelope: { from: acct.email, to: [...to, ...cc, ...bcc] }, raw });
   } catch (e) {
     throw new Error('The message was not sent. ' + explain(e));
   }
 
   // Gmail and Microsoft keep a copy in Sent by themselves; others need us to file it.
-  if (!/gmail|googlemail|office365|outlook/i.test(acct.smtp_host)) {
+  if (acct.protocol === 'imap' && !/gmail|googlemail|office365|outlook/i.test(acct.smtp_host)) {
     await withImap(acct, async (c) => {
       const sent = pathOf(classify(await c.list()), 'sent');
       if (sent) await c.append(sent, raw, ['\\Seen']);
@@ -413,17 +475,8 @@ async function ai(system: string, user: string, maxTokens: number): Promise<stri
 
 async function bodyText(accountId: string, mailbox: string, uid: number, ownerId: string) {
   const acct = await loadAccount(accountId, ownerId);
-  return withImap(acct, async (c) => {
-    const lock = await c.getMailboxLock(mailbox);
-    try {
-      const m = await c.fetchOne(String(uid), { source: true }, { uid: true });
-      if (!m || !m.source) throw new Error('That message is no longer there.');
-      const p = await parseSource(uid, m.source, false);
-      return { text: (p.text || htmlToText(p.html ?? '')).slice(0, 8000), subject: p.subject, from: p.from[0] };
-    } finally {
-      lock.release();
-    }
-  });
+  const p = await parseSource(uid, await fetchSource(acct, mailbox, uid), false);
+  return { text: (p.text || htmlToText(p.html ?? '')).slice(0, 8000), subject: p.subject, from: p.from[0] };
 }
 
 /** Two or three sentences at the top of a long thread. Sent to the AI service only when asked. */
@@ -449,6 +502,7 @@ async function draftReply_(accountId: string, mailbox: string, uid: number, inst
 
 /* Exported actions return { ok, data | error } so the message survives production builds. */
 export const listAccounts = guard(listAccounts_);
+export const oauthAvailability = guard(oauthAvailability_);
 export const addAccount = guard(addAccount_);
 export const removeAccount = guard(removeAccount_);
 export const getMailboxes = guard(getMailboxes_);

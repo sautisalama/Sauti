@@ -20,3 +20,4 @@ export const saveSnippet = (...a: Parameters<typeof raw.saveSnippet>) => unwrap(
 export const deleteSnippet = (...a: Parameters<typeof raw.deleteSnippet>) => unwrap(raw.deleteSnippet(...a));
 export const summariseMessage = (...a: Parameters<typeof raw.summariseMessage>) => unwrap(raw.summariseMessage(...a));
 export const draftReply = (...a: Parameters<typeof raw.draftReply>) => unwrap(raw.draftReply(...a));
+export const oauthAvailability = (...a: Parameters<typeof raw.oauthAvailability>) => unwrap(raw.oauthAvailability(...a));

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { simpleParser } from "mailparser";
 import { getActor } from "@/lib/access/super-admin";
-import { loadAccount, withImap } from "@/lib/mail/client";
+import { fetchSource, loadAccount } from "@/lib/mail/client";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -20,15 +20,7 @@ export async function GET(request: Request) {
 
 	try {
 		const acct = await loadAccount(account, actor.id);
-		const parsed = await withImap(acct, async (c) => {
-			const lock = await c.getMailboxLock(mailbox);
-			try {
-				const m = await c.fetchOne(String(uid), { source: true }, { uid: true });
-				return m && m.source ? await simpleParser(m.source) : null;
-			} finally {
-				lock.release();
-			}
-		});
+		const parsed = await simpleParser(await fetchSource(acct, mailbox, uid));
 		const att = parsed?.attachments?.[index];
 		if (!att) return NextResponse.json({ error: "Not found" }, { status: 404 });
 		const name = encodeURIComponent(att.filename ?? `attachment-${index + 1}`);
