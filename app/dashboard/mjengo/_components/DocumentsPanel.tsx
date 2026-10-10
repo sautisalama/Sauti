@@ -121,7 +121,7 @@ export function DocumentsPanel({ kind, entityId, onChange }: { kind: Kind; entit
 									</p>
 									{p !== undefined && (
 										<div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-serene-neutral-100" role="progressbar" aria-valuenow={p}>
-											<div className="h-full rounded-full bg-purple-600 transition-[width]" style={{ width: `${p}%` }} />
+											<div className="h-full rounded-full bg-sauti-teal transition-[width]" style={{ width: `${p}%` }} />
 										</div>
 									)}
 								</div>

@@ -106,7 +106,7 @@ export default function VaultPage() {
 				{canWrite && (
 					<div className="flex gap-2">
 						<Button variant="outline" className="gap-2" onClick={() => setNewFolder(true)}><FolderPlus className="h-4 w-4" /> New folder</Button>
-						<Button className="gap-2 bg-purple-600 hover:bg-purple-700" onClick={() => fileInput.current?.click()}><Upload className="h-4 w-4" /> Upload</Button>
+						<Button className="gap-2 bg-sauti-teal hover:bg-sauti-dark" onClick={() => fileInput.current?.click()}><Upload className="h-4 w-4" /> Upload</Button>
 						<input ref={fileInput} type="file" multiple className="hidden" onChange={(e) => upload(e.target.files)} />
 					</div>
 				)}
@@ -115,7 +115,7 @@ export default function VaultPage() {
 			<div className="flex flex-wrap items-center gap-3">
 				<div className="inline-flex rounded-lg border border-serene-neutral-200 bg-white p-0.5">
 					{([["mine", "My vault", HardDrive], ["shared", "Shared with me", Users]] as const).map(([v, l, Icon]) => (
-						<button key={v} onClick={() => switchTab(v)} aria-pressed={tab === v} className={cn("flex touch-manipulation items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold", tab === v ? "bg-purple-600 text-white" : "text-serene-neutral-600 hover:bg-serene-neutral-50")}>
+						<button key={v} onClick={() => switchTab(v)} aria-pressed={tab === v} className={cn("flex touch-manipulation items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold", tab === v ? "bg-sauti-teal text-white" : "text-serene-neutral-600 hover:bg-serene-neutral-50")}>
 							<Icon className="h-3.5 w-3.5" /> {l}
 						</button>
 					))}
@@ -153,7 +153,7 @@ export default function VaultPage() {
 						{data.items.map((i) => (
 							<li key={`${i.type}:${i.id}`} className="flex items-center gap-3 p-3 hover:bg-serene-neutral-50/60">
 								<button onClick={() => open(i)} className="flex min-w-0 flex-1 touch-manipulation items-center gap-3 text-left">
-									{i.type === "folder" ? <Folder className="h-5 w-5 shrink-0 text-purple-600" /> : <FileIcon className="h-5 w-5 shrink-0 text-serene-neutral-500" />}
+									{i.type === "folder" ? <Folder className="h-5 w-5 shrink-0 text-sauti-teal" /> : <FileIcon className="h-5 w-5 shrink-0 text-serene-neutral-500" />}
 									<span className="min-w-0">
 										<span className="block truncate text-sm font-medium text-serene-neutral-900">{i.name}</span>
 										<span className="block truncate text-xs text-serene-neutral-500">
@@ -162,7 +162,7 @@ export default function VaultPage() {
 										</span>
 									</span>
 								</button>
-								{i.shared && <span title="Shared" className="hidden rounded-full bg-purple-50 px-2 py-0.5 text-[11px] font-semibold text-purple-700 sm:inline"><Users className="mr-1 inline h-3 w-3" />Shared</span>}
+								{i.shared && <span title="Shared" className="hidden rounded-full bg-sauti-teal-light/40 px-2 py-0.5 text-[11px] font-semibold text-sauti-teal sm:inline"><Users className="mr-1 inline h-3 w-3" />Shared</span>}
 								<span className="hidden w-14 text-right text-xs capitalize text-serene-neutral-400 sm:inline">{i.level}</span>
 								<DropdownMenu>
 									<DropdownMenuTrigger asChild><Button size="icon" variant="ghost" aria-label={`Actions for ${i.name}`}><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger>
@@ -237,7 +237,7 @@ function NameDialog({ open, title, action, initial, busy, onClose, onSubmit }: {
 				<Input autoFocus value={name} maxLength={120} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => e.key === "Enter" && name.trim() && onSubmit(name)} aria-label="Name" />
 				<DialogFooter>
 					<Button variant="outline" onClick={onClose}>Cancel</Button>
-					<Button disabled={busy || !name.trim()} onClick={() => onSubmit(name)} className="gap-2 bg-purple-600 hover:bg-purple-700">{busy && <Loader2 className="h-4 w-4 animate-spin" />}{action}</Button>
+					<Button disabled={busy || !name.trim()} onClick={() => onSubmit(name)} className="gap-2 bg-sauti-teal hover:bg-sauti-dark">{busy && <Loader2 className="h-4 w-4 animate-spin" />}{action}</Button>
 				</DialogFooter>
 			</DialogContent>
 		</Dialog>
@@ -331,7 +331,7 @@ function ShareDialog({ item, onClose }: { item: VaultItem | null; onClose: () =>
 						</div>
 					</div>
 				)}
-				<DialogFooter><Button onClick={onClose} className="bg-purple-600 hover:bg-purple-700">Done</Button></DialogFooter>
+				<DialogFooter><Button onClick={onClose} className="bg-sauti-teal hover:bg-sauti-dark">Done</Button></DialogFooter>
 			</DialogContent>
 		</Dialog>
 	);

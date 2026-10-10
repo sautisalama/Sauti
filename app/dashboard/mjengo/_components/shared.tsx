@@ -26,7 +26,7 @@ export const GRANT_STATUSES: StatusDef[] = [
 	{ value: "idea", label: "Idea", tone: "bg-slate-100 text-slate-700", color: "#94a3b8" },
 	{ value: "researching", label: "Researching", tone: "bg-sky-100 text-sky-800", color: "#38bdf8" },
 	{ value: "drafting", label: "Drafting", tone: "bg-indigo-100 text-indigo-800", color: "#818cf8" },
-	{ value: "submitted", label: "Submitted", tone: "bg-purple-100 text-purple-800", color: "#a855f7" },
+	{ value: "submitted", label: "Submitted", tone: "bg-sauti-teal-light text-sauti-dark", color: "#068297" },
 	{ value: "under_review", label: "Under review", tone: "bg-amber-100 text-amber-800", color: "#f59e0b" },
 	{ value: "awarded", label: "Awarded", tone: "bg-emerald-100 text-emerald-800", color: "#10b981" },
 	{ value: "declined", label: "Declined", tone: "bg-rose-100 text-rose-800", color: "#f43f5e" },
@@ -38,7 +38,7 @@ export const OPPORTUNITY_STATUSES: StatusDef[] = [
 	{ value: "new", label: "New", tone: "bg-slate-100 text-slate-700", color: "#94a3b8" },
 	{ value: "evaluating", label: "Evaluating", tone: "bg-sky-100 text-sky-800", color: "#38bdf8" },
 	{ value: "pursuing", label: "Pursuing", tone: "bg-indigo-100 text-indigo-800", color: "#818cf8" },
-	{ value: "applied", label: "Applied", tone: "bg-purple-100 text-purple-800", color: "#a855f7" },
+	{ value: "applied", label: "Applied", tone: "bg-sauti-teal-light text-sauti-dark", color: "#068297" },
 	{ value: "won", label: "Won", tone: "bg-emerald-100 text-emerald-800", color: "#10b981" },
 	{ value: "lost", label: "Lost", tone: "bg-rose-100 text-rose-800", color: "#f43f5e" },
 	{ value: "passed", label: "Passed", tone: "bg-neutral-100 text-neutral-600", color: "#a3a3a3" },
@@ -48,7 +48,7 @@ export const PROJECT_STATUSES: StatusDef[] = [
 	{ value: "planning", label: "Planning", tone: "bg-slate-100 text-slate-700", color: "#94a3b8" },
 	{ value: "active", label: "Active", tone: "bg-emerald-100 text-emerald-800", color: "#10b981" },
 	{ value: "on_hold", label: "On hold", tone: "bg-amber-100 text-amber-800", color: "#f59e0b" },
-	{ value: "completed", label: "Completed", tone: "bg-purple-100 text-purple-800", color: "#a855f7" },
+	{ value: "completed", label: "Completed", tone: "bg-sauti-teal-light text-sauti-dark", color: "#068297" },
 	{ value: "cancelled", label: "Cancelled", tone: "bg-rose-100 text-rose-800", color: "#f43f5e" },
 ];
 
@@ -96,7 +96,7 @@ export function Avatars({ ids, admins, max = 3 }: { ids: string[]; admins: { id:
 	return (
 		<div className="flex -space-x-2">
 			{people.slice(0, max).map((p) => (
-				<span key={p.id} title={p.name} className="flex h-6 w-6 items-center justify-center overflow-hidden rounded-full bg-purple-100 text-[10px] font-bold text-purple-700 ring-2 ring-white">
+				<span key={p.id} title={p.name} className="flex h-6 w-6 items-center justify-center overflow-hidden rounded-full bg-sauti-teal-light text-[10px] font-bold text-sauti-teal ring-2 ring-white">
 					{p.avatar ? <img src={p.avatar} alt={p.name} className="h-full w-full object-cover" /> : p.name.charAt(0).toUpperCase()}
 				</span>
 			))}

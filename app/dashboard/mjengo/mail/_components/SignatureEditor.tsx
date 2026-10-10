@@ -18,7 +18,7 @@ export function SignatureEditor({ initial, onChange }: { initial: string; onChan
 			StarterKit.configure({ heading: false, blockquote: false, codeBlock: false, code: false, horizontalRule: false, strike: false, link: { openOnClick: false, autolink: true } }),
 			Placeholder.configure({ placeholder: "Your name, role, organisation, phone" }),
 		],
-		editorProps: { attributes: { class: "prose prose-sm max-w-none min-h-[110px] rounded-xl border border-serene-neutral-200 bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-300" } },
+		editorProps: { attributes: { class: "prose prose-sm max-w-none min-h-[110px] rounded-xl border border-serene-neutral-200 bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-sauti-teal/50" } },
 		onUpdate: ({ editor: ed }) => onChange(ed.getHTML()),
 	});
 

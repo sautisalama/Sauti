@@ -195,7 +195,7 @@ export function EntityWorkspace({ kind }: { kind: Kind }) {
 						<Button size="sm" variant={view === "board" ? "secondary" : "ghost"} className="h-8 gap-1.5" onClick={() => changeView("board")}><Kanban className="h-4 w-4" /> Board</Button>
 						<Button size="sm" variant={view === "list" ? "secondary" : "ghost"} className="h-8 gap-1.5" onClick={() => changeView("list")}><List className="h-4 w-4" /> List</Button>
 					</div>
-					<Button onClick={openNew} className="gap-1.5 bg-purple-600 hover:bg-purple-700"><Plus className="h-4 w-4" /> New {cfg.noun}</Button>
+					<Button onClick={openNew} className="gap-1.5 bg-sauti-teal hover:bg-sauti-dark"><Plus className="h-4 w-4" /> New {cfg.noun}</Button>
 				</div>
 			</div>
 
@@ -283,13 +283,13 @@ export function EntityWorkspace({ kind }: { kind: Kind }) {
 									{kind === "project" && <ProjectMoney v={editing.values} />}
 									<DocumentsPanel kind={kind} entityId={editing.id} onChange={load} />
 									<Link href="/dashboard/mjengo/todos" className="flex items-center gap-2 rounded-xl border border-serene-neutral-100 p-3 text-sm text-serene-neutral-700 hover:bg-serene-neutral-50">
-										<CheckSquare className="h-4 w-4 text-purple-600" />
+										<CheckSquare className="h-4 w-4 text-sauti-teal" />
 										{(rows.find((r) => r.id === editing.id)?.openTodos ?? 0)} open to-dos linked to this {cfg.noun}
 										<ExternalLink className="ml-auto h-3.5 w-3.5 text-serene-neutral-400" />
 									</Link>
 								</>
 							) : (
-								<p className="flex items-start gap-2 rounded-xl bg-purple-50 p-3 text-sm text-purple-900"><AlertCircle className="mt-0.5 h-4 w-4 shrink-0" /> Save first, then add the documents this {cfg.noun} needs.</p>
+								<p className="flex items-start gap-2 rounded-xl bg-sauti-teal-light/40 p-3 text-sm text-sauti-dark"><AlertCircle className="mt-0.5 h-4 w-4 shrink-0" /> Save first, then add the documents this {cfg.noun} needs.</p>
 							)}
 						</div>
 					)}
@@ -297,7 +297,7 @@ export function EntityWorkspace({ kind }: { kind: Kind }) {
 						{editing?.id && <Button variant="ghost" className="gap-1.5 text-red-600 hover:bg-red-50 hover:text-red-700" onClick={remove}><Trash2 className="h-4 w-4" /> Delete</Button>}
 						<div className="flex-1" />
 						<Button variant="ghost" onClick={() => setEditing(null)}>Close</Button>
-						<Button onClick={save} disabled={saving} className="gap-1.5 bg-purple-600 hover:bg-purple-700">{saving && <Loader2 className="h-4 w-4 animate-spin" />} Save</Button>
+						<Button onClick={save} disabled={saving} className="gap-1.5 bg-sauti-teal hover:bg-sauti-dark">{saving && <Loader2 className="h-4 w-4 animate-spin" />} Save</Button>
 					</div>
 				</SheetContent>
 			</Sheet>
@@ -307,7 +307,7 @@ export function EntityWorkspace({ kind }: { kind: Kind }) {
 
 function FilterChip({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
 	return (
-		<button onClick={onClick} aria-pressed={active} className={cn("shrink-0 touch-manipulation rounded-full border px-3 py-1 text-xs font-medium transition-colors", active ? "border-purple-600 bg-purple-600 text-white" : "border-serene-neutral-200 bg-white text-serene-neutral-700 hover:bg-serene-neutral-50")}>
+		<button onClick={onClick} aria-pressed={active} className={cn("shrink-0 touch-manipulation rounded-full border px-3 py-1 text-xs font-medium transition-colors", active ? "border-sauti-teal bg-sauti-teal text-white" : "border-serene-neutral-200 bg-white text-serene-neutral-700 hover:bg-serene-neutral-50")}>
 			{children}
 		</button>
 	);
@@ -325,7 +325,7 @@ function Card({ kind, r, admins, onOpen, onDragStart, onDragEnd, dragging }: { k
 			onDragEnd={onDragEnd}
 			onClick={onOpen}
 			onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && onOpen()}
-			className={cn("cursor-pointer touch-manipulation rounded-xl border border-serene-neutral-100 bg-white p-3 shadow-sm transition hover:shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-purple-500", dragging && "opacity-40")}
+			className={cn("cursor-pointer touch-manipulation rounded-xl border border-serene-neutral-100 bg-white p-3 shadow-sm transition hover:shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-sauti-teal", dragging && "opacity-40")}
 		>
 			<p className="line-clamp-2 text-sm font-semibold text-serene-neutral-900">{r[cfg.titleKey]}</p>
 			{r[cfg.subKey] && kind !== "project" && <p className="mt-0.5 truncate text-xs text-serene-neutral-500">{r[cfg.subKey]}</p>}
@@ -334,7 +334,7 @@ function Card({ kind, r, admins, onOpen, onDragStart, onDragEnd, dragging }: { k
 			<div className="mt-2 flex flex-wrap items-center gap-1.5">
 				<DeadlineChip date={r[dueKey(kind)]} done={finished} />
 				{r.docs.missing > 0 && <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800"><FileWarning className="h-3 w-3" />{r.docs.missing} doc{r.docs.missing === 1 ? "" : "s"} needed</span>}
-				{r.openTodos > 0 && <span className="inline-flex items-center gap-1 rounded-full bg-purple-100 px-2 py-0.5 text-xs font-medium text-purple-800"><CheckSquare className="h-3 w-3" />{r.openTodos}</span>}
+				{r.openTodos > 0 && <span className="inline-flex items-center gap-1 rounded-full bg-sauti-teal-light px-2 py-0.5 text-xs font-medium text-sauti-dark"><CheckSquare className="h-3 w-3" />{r.openTodos}</span>}
 			</div>
 			<div className="mt-2"><Avatars ids={r[ownerKey(kind)] ? [r[ownerKey(kind)]] : []} admins={admins} /></div>
 		</div>

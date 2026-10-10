@@ -16,7 +16,7 @@ import { createTrack, deleteTodo, deleteTrack, getTodoBoard, renameTrack, saveTo
 import { Avatars, DeadlineChip, KIND_LABEL } from "../_components/shared";
 
 type Board = Awaited<ReturnType<typeof getTodoBoard>>;
-const DOTS: Record<string, string> = { purple: "bg-purple-500", blue: "bg-sky-500", green: "bg-emerald-500", amber: "bg-amber-500", rose: "bg-rose-500" };
+const DOTS: Record<string, string> = { purple: "bg-sauti-teal", blue: "bg-sky-500", green: "bg-emerald-500", amber: "bg-amber-500", rose: "bg-rose-500" };
 const COLORS = Object.keys(DOTS);
 
 export default function TodosPage() {
@@ -59,8 +59,8 @@ export default function TodosPage() {
 					<p className="text-sm text-serene-neutral-500">Everyone on the team can see every track. Give a task to one or more people to share the responsibility.</p>
 				</div>
 				<div className="inline-flex shrink-0 rounded-lg border border-serene-neutral-200 bg-white p-0.5">
-					<button onClick={() => setFilter("all")} aria-pressed={filter === "all"} className={cn("rounded-md px-3 py-1.5 text-xs font-semibold", filter === "all" ? "bg-purple-600 text-white" : "text-serene-neutral-600")}>Everyone</button>
-					<button onClick={() => setFilter("mine")} aria-pressed={filter === "mine"} className={cn("flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold", filter === "mine" ? "bg-purple-600 text-white" : "text-serene-neutral-600")}>
+					<button onClick={() => setFilter("all")} aria-pressed={filter === "all"} className={cn("rounded-md px-3 py-1.5 text-xs font-semibold", filter === "all" ? "bg-sauti-teal text-white" : "text-serene-neutral-600")}>Everyone</button>
+					<button onClick={() => setFilter("mine")} aria-pressed={filter === "mine"} className={cn("flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold", filter === "mine" ? "bg-sauti-teal text-white" : "text-serene-neutral-600")}>
 						<UserCheck className="h-3.5 w-3.5" /> Mine{myOpen > 0 && <span className="rounded-full bg-white/25 px-1.5">{myOpen}</span>}
 					</button>
 				</div>
@@ -78,7 +78,7 @@ export default function TodosPage() {
 				}}
 			>
 				<Input value={newTrack} onChange={(e) => setNewTrack(e.target.value)} placeholder="Start a new track, e.g. Q4 grant applications" className="max-w-md" />
-				<Button type="submit" disabled={adding || !newTrack.trim()} className="gap-1.5 bg-purple-600 hover:bg-purple-700"><ListPlus className="h-4 w-4" /> New track</Button>
+				<Button type="submit" disabled={adding || !newTrack.trim()} className="gap-1.5 bg-sauti-teal hover:bg-sauti-dark"><ListPlus className="h-4 w-4" /> New track</Button>
 			</form>
 
 			{tracks.length === 0 ? (
@@ -129,7 +129,7 @@ function TrackCard({ t, board, onEdit, run }: { t: TrackRow; board: Board; onEdi
 						<button
 							onClick={() => run(() => saveTodo(x.id, { status: x.status === "done" ? "todo" : "done" }), "Could not update")}
 							aria-label={x.status === "done" ? "Mark not done" : "Mark done"}
-							className={cn("mt-0.5 flex h-5 w-5 shrink-0 touch-manipulation items-center justify-center rounded-md border-2 transition-colors", x.status === "done" ? "border-emerald-500 bg-emerald-500 text-white" : "border-serene-neutral-300 hover:border-purple-500")}
+							className={cn("mt-0.5 flex h-5 w-5 shrink-0 touch-manipulation items-center justify-center rounded-md border-2 transition-colors", x.status === "done" ? "border-emerald-500 bg-emerald-500 text-white" : "border-serene-neutral-300 hover:border-sauti-teal")}
 						>
 							{x.status === "done" && <Check className="h-3.5 w-3.5" />}
 						</button>
@@ -207,7 +207,7 @@ function TodoSheet({ todo, board, onClose, onSaved, fail }: { todo: TodoRow | nu
 								{board.admins.map((a) => {
 									const on = v.assignee_ids.includes(a.id);
 									return (
-										<button key={a.id} type="button" onClick={() => toggle(a.id)} aria-pressed={on} className={cn("flex touch-manipulation items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors", on ? "border-purple-600 bg-purple-50 text-purple-800" : "border-serene-neutral-200 text-serene-neutral-700 hover:bg-serene-neutral-50")}>
+										<button key={a.id} type="button" onClick={() => toggle(a.id)} aria-pressed={on} className={cn("flex touch-manipulation items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors", on ? "border-sauti-teal bg-sauti-teal-light/40 text-sauti-dark" : "border-serene-neutral-200 text-serene-neutral-700 hover:bg-serene-neutral-50")}>
 											{on && <Check className="h-3.5 w-3.5" />} {a.name}{a.id === board.me ? " (you)" : ""}
 										</button>
 									);
@@ -231,7 +231,7 @@ function TodoSheet({ todo, board, onClose, onSaved, fail }: { todo: TodoRow | nu
 					{v && <Button variant="ghost" className="gap-1.5 text-red-600 hover:bg-red-50 hover:text-red-700" onClick={async () => { if (window.confirm("Delete this task?")) { try { await deleteTodo(v.id); await onSaved(); } catch (e) { fail("Could not delete", e); } } }}><Trash2 className="h-4 w-4" /> Delete</Button>}
 					<div className="flex-1" />
 					<Button variant="ghost" onClick={onClose}>Cancel</Button>
-					<Button onClick={save} disabled={busy || !v?.title.trim()} className="gap-1.5 bg-purple-600 hover:bg-purple-700">{busy && <Loader2 className="h-4 w-4 animate-spin" />} Save</Button>
+					<Button onClick={save} disabled={busy || !v?.title.trim()} className="gap-1.5 bg-sauti-teal hover:bg-sauti-dark">{busy && <Loader2 className="h-4 w-4 animate-spin" />} Save</Button>
 				</div>
 			</SheetContent>
 		</Sheet>

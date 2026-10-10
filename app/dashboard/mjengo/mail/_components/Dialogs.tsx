@@ -113,7 +113,7 @@ export function ConnectDialog({ open, onClose, onConnected }: { open: boolean; o
 					</div>
 
 					{!found && (
-						<Button type="submit" disabled={detecting || !email.includes("@")} className="w-full gap-2 bg-purple-600 hover:bg-purple-700">
+						<Button type="submit" disabled={detecting || !email.includes("@")} className="w-full gap-2 bg-sauti-teal hover:bg-sauti-dark">
 							{detecting && <Loader2 className="h-4 w-4 animate-spin" />} Continue
 						</Button>
 					)}
@@ -129,7 +129,7 @@ export function ConnectDialog({ open, onClose, onConnected }: { open: boolean; o
 								<>
 									<a
 										href={`/api/mjengo/mail/oauth/${found.kind}/start?email=${encodeURIComponent(email.trim())}`}
-										className="flex min-h-11 items-center justify-center gap-3 rounded-xl bg-purple-600 px-4 text-sm font-semibold text-white hover:bg-purple-700"
+										className="flex min-h-11 items-center justify-center gap-3 rounded-xl bg-sauti-teal px-4 text-sm font-semibold text-white hover:bg-sauti-dark"
 									>
 										Continue with {brand}
 									</a>
@@ -157,7 +157,7 @@ export function ConnectDialog({ open, onClose, onConnected }: { open: boolean; o
 											<div className="flex items-center gap-2 text-sm">
 												<span className="text-serene-neutral-600">Read mail with</span>
 												{(["imap", "pop3"] as const).map((pr) => (
-													<button type="button" key={pr} onClick={() => setProtocol(pr)} aria-pressed={protocol === pr} className={cn("rounded-full border px-3 py-1 text-xs font-semibold uppercase", protocol === pr ? "border-purple-600 bg-purple-600 text-white" : "border-serene-neutral-200")}>{pr}</button>
+													<button type="button" key={pr} onClick={() => setProtocol(pr)} aria-pressed={protocol === pr} className={cn("rounded-full border px-3 py-1 text-xs font-semibold uppercase", protocol === pr ? "border-sauti-teal bg-sauti-teal text-white" : "border-serene-neutral-200")}>{pr}</button>
 												))}
 											</div>
 											<div className="grid grid-cols-2 gap-3">
@@ -165,12 +165,12 @@ export function ConnectDialog({ open, onClose, onConnected }: { open: boolean; o
 												<div className="space-y-1.5"><Label htmlFor="mb-smtp">SMTP server</Label><Input id="mb-smtp" value={smtpHost} onChange={(e) => setSmtpHost(e.target.value)} placeholder={found.smtp?.[0] ?? "mail.example.com"} /></div>
 											</div>
 											{found.imap && <p className="text-xs text-serene-neutral-500">Leave these empty to use what we found.</p>}
-											<button type="button" onClick={() => { setImapHost("mail.sautisalama.org"); setSmtpHost("mail.sautisalama.org"); }} className="text-xs text-purple-700 underline">Use the Sauti Salama mail server (mail.sautisalama.org)</button>
+											<button type="button" onClick={() => { setImapHost("mail.sautisalama.org"); setSmtpHost("mail.sautisalama.org"); }} className="text-xs text-sauti-teal underline">Use the Sauti Salama mail server (mail.sautisalama.org)</button>
 										</div>
 									)}
 
 									{error && <p role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p>}
-									<Button type="submit" disabled={busy || !password} className="w-full gap-2 bg-purple-600 hover:bg-purple-700">
+									<Button type="submit" disabled={busy || !password} className="w-full gap-2 bg-sauti-teal hover:bg-sauti-dark">
 										{busy && <Loader2 className="h-4 w-4 animate-spin" />} {busy ? "Checking your mailbox..." : "Connect"}
 									</Button>
 								</>
@@ -205,7 +205,7 @@ export function ViewDialog({ view, labels = [], onClose, onSave, onDelete }: { v
 				<DialogHeader><DialogTitle>{view?.id ? "Edit view" : "New view"}</DialogTitle><DialogDescription>A view is a saved way of looking at your mail. It applies to existing and new messages.</DialogDescription></DialogHeader>
 				<div className="space-y-4">
 					<div className="space-y-1.5"><Label>Name</Label><Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Funder emails" autoFocus /></div>
-					<div className="flex flex-wrap gap-1.5">{ICONS.map((i) => <button key={i} onClick={() => setIcon(i)} aria-pressed={icon === i} className={cn("rounded-lg border px-2.5 py-1 text-xs capitalize", icon === i ? "border-purple-600 bg-purple-50" : "border-serene-neutral-200")}>{i}</button>)}</div>
+					<div className="flex flex-wrap gap-1.5">{ICONS.map((i) => <button key={i} onClick={() => setIcon(i)} aria-pressed={icon === i} className={cn("rounded-lg border px-2.5 py-1 text-xs capitalize", icon === i ? "border-sauti-teal bg-sauti-teal-light/40" : "border-serene-neutral-200")}>{i}</button>)}</div>
 					<div className="grid grid-cols-2 gap-3">
 						<div className="space-y-1.5"><Label>Folder</Label>
 							<Select value={cfg.mailbox} onValueChange={(v) => setCfg({ ...cfg, mailbox: v as ViewConfig["mailbox"] })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{MAILBOXES.map((m) => <SelectItem key={m.v} value={m.v}>{m.l}</SelectItem>)}</SelectContent></Select>
@@ -227,13 +227,13 @@ export function ViewDialog({ view, labels = [], onClose, onSave, onDelete }: { v
 					</div>
 					<div>
 						<Label>Hover actions</Label>
-						<div className="mt-1.5 flex flex-wrap gap-1.5">{(["archive", "trash", "unread", "star", "reply"] as const).map((a) => <button key={a} onClick={() => toggleAction(a)} aria-pressed={actions.includes(a)} className={cn("rounded-full border px-3 py-1 text-xs capitalize", actions.includes(a) ? "border-purple-600 bg-purple-600 text-white" : "border-serene-neutral-200")}>{a}</button>)}</div>
+						<div className="mt-1.5 flex flex-wrap gap-1.5">{(["archive", "trash", "unread", "star", "reply"] as const).map((a) => <button key={a} onClick={() => toggleAction(a)} aria-pressed={actions.includes(a)} className={cn("rounded-full border px-3 py-1 text-xs capitalize", actions.includes(a) ? "border-sauti-teal bg-sauti-teal text-white" : "border-serene-neutral-200")}>{a}</button>)}</div>
 					</div>
 					<div className="flex items-center gap-2">
 						{view?.id && onDelete && <Button variant="ghost" className="gap-1.5 text-red-600" onClick={async () => { if (window.confirm("Delete this view? Your mail is not affected.")) { await onDelete(view.id!); onClose(); } }}><Trash2 className="h-4 w-4" /> Delete</Button>}
 						<div className="flex-1" />
 						<Button variant="ghost" onClick={onClose}>Cancel</Button>
-						<Button disabled={busy || !name.trim()} className="gap-1.5 bg-purple-600 hover:bg-purple-700" onClick={async () => { setBusy(true); try { await onSave({ id: view?.id ?? null, name, icon, config: cfg }); onClose(); } finally { setBusy(false); } }}>{busy && <Loader2 className="h-4 w-4 animate-spin" />} Save view</Button>
+						<Button disabled={busy || !name.trim()} className="gap-1.5 bg-sauti-teal hover:bg-sauti-dark" onClick={async () => { setBusy(true); try { await onSave({ id: view?.id ?? null, name, icon, config: cfg }); onClose(); } finally { setBusy(false); } }}>{busy && <Loader2 className="h-4 w-4 animate-spin" />} Save view</Button>
 					</div>
 				</div>
 			</DialogContent>
@@ -259,7 +259,7 @@ export function SettingsDialog({ open, onClose, accounts, onAccountsChanged, onC
 					<h3 className="text-sm font-bold">Open messages as</h3>
 					<div className="grid grid-cols-3 gap-2">
 						{([["side", "Side peek"], ["center", "Center peek"], ["full", "Full page"]] as const).map(([v, l]) => (
-							<button key={v} onClick={() => onLayout(v)} aria-pressed={layout === v} className={cn("rounded-xl border px-3 py-2 text-sm", layout === v ? "border-purple-600 bg-purple-50 font-semibold text-purple-900" : "border-serene-neutral-200 hover:bg-serene-neutral-50")}>{l}</button>
+							<button key={v} onClick={() => onLayout(v)} aria-pressed={layout === v} className={cn("rounded-xl border px-3 py-2 text-sm", layout === v ? "border-sauti-teal bg-sauti-teal-light/40 font-semibold text-sauti-dark" : "border-serene-neutral-200 hover:bg-serene-neutral-50")}>{l}</button>
 						))}
 					</div>
 				</section>
@@ -304,7 +304,7 @@ export function SettingsDialog({ open, onClose, accounts, onAccountsChanged, onC
 }
 
 export const LABEL_COLORS: Record<string, { dot: string; chip: string }> = {
-	purple: { dot: "bg-purple-500", chip: "bg-purple-100 text-purple-800" },
+	purple: { dot: "bg-sauti-teal", chip: "bg-sauti-teal-light text-sauti-dark" },
 	blue: { dot: "bg-sky-500", chip: "bg-sky-100 text-sky-800" },
 	green: { dot: "bg-emerald-500", chip: "bg-emerald-100 text-emerald-800" },
 	amber: { dot: "bg-amber-500", chip: "bg-amber-100 text-amber-900" },
@@ -392,7 +392,7 @@ export function LabelDialog({ label, accountId, onClose, onSave, onDelete, onApp
 					</ul>
 					<div className="flex justify-end gap-2">
 						<Button variant="ghost" disabled={!!busy} onClick={() => { setReview(null); onClose(); }}>Skip</Button>
-						<Button disabled={!!busy} onClick={finishReview} className="gap-1.5 bg-purple-600 hover:bg-purple-700">{busy && <Loader2 className="h-4 w-4 animate-spin" />} Save</Button>
+						<Button disabled={!!busy} onClick={finishReview} className="gap-1.5 bg-sauti-teal hover:bg-sauti-dark">{busy && <Loader2 className="h-4 w-4 animate-spin" />} Save</Button>
 					</div>
 				</DialogContent>
 			</Dialog>
@@ -416,7 +416,7 @@ export function LabelDialog({ label, accountId, onClose, onSave, onDelete, onApp
 						<div className="flex-1" />
 						<Button variant="ghost" onClick={onClose} disabled={!!busy}>Cancel</Button>
 						{instruction.trim() && accountId && <Button variant="outline" disabled={!name.trim() || !!busy} onClick={() => save(true)} className="gap-1.5">{busy === "run" && <Loader2 className="h-4 w-4 animate-spin" />} Save and apply to recent mail</Button>}
-						<Button disabled={!name.trim() || !!busy} onClick={() => save(false)} className="gap-1.5 bg-purple-600 hover:bg-purple-700">{busy === "save" && <Loader2 className="h-4 w-4 animate-spin" />} Save</Button>
+						<Button disabled={!name.trim() || !!busy} onClick={() => save(false)} className="gap-1.5 bg-sauti-teal hover:bg-sauti-dark">{busy === "save" && <Loader2 className="h-4 w-4 animate-spin" />} Save</Button>
 					</div>
 				</div>
 			</DialogContent>

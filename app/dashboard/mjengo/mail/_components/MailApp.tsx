@@ -335,10 +335,10 @@ export function MailApp() {
 			<>
 				<div className="flex h-full items-center justify-center p-6">
 					<div className="max-w-md rounded-3xl border border-serene-neutral-100 bg-white p-8 text-center shadow-sm">
-						<div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-purple-100 text-purple-700"><Mail className="h-7 w-7" /></div>
+						<div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-sauti-teal-light text-sauti-teal"><Mail className="h-7 w-7" /></div>
 						<h2 className="text-xl font-bold text-serene-neutral-900">Bring your email here</h2>
 						<p className="mt-2 text-sm text-serene-neutral-600">Connect one or more inboxes to read, search and send mail alongside your grants and projects. Make views for the mail that matters.</p>
-						<Button onClick={() => setConnectOpen(true)} className="mt-6 gap-2 bg-purple-600 hover:bg-purple-700"><Plus className="h-4 w-4" /> Connect a mailbox</Button>
+						<Button onClick={() => setConnectOpen(true)} className="mt-6 gap-2 bg-sauti-teal hover:bg-sauti-dark"><Plus className="h-4 w-4" /> Connect a mailbox</Button>
 					</div>
 				</div>
 				<ConnectDialog open={connectOpen} onClose={() => setConnectOpen(false)} onConnected={(a) => { setAccounts([a]); setAccountId(a.id); }} />
@@ -387,10 +387,10 @@ export function MailApp() {
 							const mid = e.dataTransfer.getData("text/x-message-id");
 							if (mid && accountId) toggleLabel(mid, l.id, true);
 						}}
-						className={cn("group flex items-center rounded-md transition", viewKey === `label:${l.id}` ? "bg-black/[0.06]" : "hover:bg-black/5", dropOn === l.id && "ring-2 ring-blue-400")}
+						className={cn("group flex items-center rounded-md transition", viewKey === `label:${l.id}` ? "bg-black/[0.06]" : "hover:bg-black/5", dropOn === l.id && "ring-2 ring-sauti-teal")}
 					>
 						<button onClick={() => { setViewKey(`label:${l.id}`); setNavOpen(false); }} className="flex h-9 min-w-0 flex-1 touch-manipulation items-center gap-3 px-3 text-left text-[15px]">
-							<span className="flex h-[18px] w-[18px] shrink-0 items-center justify-center"><span className={cn("h-3 w-3 rounded-full", LABEL_COLORS[l.color]?.dot ?? "bg-purple-500")} /></span>
+							<span className="flex h-[18px] w-[18px] shrink-0 items-center justify-center"><span className={cn("h-3 w-3 rounded-full", LABEL_COLORS[l.color]?.dot ?? "bg-sauti-teal")} /></span>
 							<span className="truncate">{l.name}</span>
 						</button>
 						<button onClick={() => setLabelEdit(l)} aria-label={`Edit ${l.name}`} className="mr-1 hidden rounded p-1 text-[#787774] hover:text-[#37352f] group-hover:block"><Pencil className="h-3.5 w-3.5" /></button>
@@ -440,7 +440,7 @@ const Pane = (
 					>
 						<Sparkles className="h-4 w-4 text-[#787774]" /> Auto label
 					</button>
-					<button onClick={() => setOnlyUnread((v) => !v)} aria-pressed={onlyUnread} aria-label="Show unread only" title="Unread only" className={cn("flex h-8 w-8 items-center justify-center rounded-md hover:bg-black/5", onlyUnread ? "text-blue-600" : "text-[#787774]")}><ListFilter className="h-[18px] w-[18px]" /></button>
+					<button onClick={() => setOnlyUnread((v) => !v)} aria-pressed={onlyUnread} aria-label="Show unread only" title="Unread only" className={cn("flex h-8 w-8 items-center justify-center rounded-md hover:bg-black/5", onlyUnread ? "text-sauti-teal" : "text-[#787774]")}><ListFilter className="h-[18px] w-[18px]" /></button>
 					<button onClick={() => setViewEdit(active.view ?? {})} aria-label="View options" title="View options" className="flex h-8 w-8 items-center justify-center rounded-md text-[#787774] hover:bg-black/5"><SlidersHorizontal className="h-[18px] w-[18px]" /></button>
 					<button onClick={() => loadList(false)} aria-label="Refresh" title="Refresh" className="flex h-8 w-8 items-center justify-center rounded-md text-[#787774] hover:bg-black/5"><RotateCw className={cn("h-[18px] w-[18px]", loading && "animate-spin")} /></button>
 				</header>
@@ -459,7 +459,7 @@ const Pane = (
 								{g.items.map((m) => (
 									<li key={m.uid} className="group relative" draggable={!!m.messageId} onDragStart={(e) => { if (m.messageId) { e.dataTransfer.setData("text/x-message-id", m.messageId); e.dataTransfer.effectAllowed = "copy"; } }}>
 										<button onClick={() => open(m)} className={cn("-mx-2 flex w-[calc(100%+1rem)] touch-manipulation items-center gap-3 rounded-md px-2 py-[11px] text-left text-[15px] transition-colors hover:bg-black/[0.04]", selected?.uid === m.uid && "bg-black/[0.05]")}>
-											<span className={cn("h-[7px] w-[7px] shrink-0 rounded-full", m.seen ? "bg-transparent" : "bg-blue-500")} aria-label={m.seen ? undefined : "Unread"} />
+											<span className={cn("h-[7px] w-[7px] shrink-0 rounded-full", m.seen ? "bg-transparent" : "bg-sauti-teal")} aria-label={m.seen ? undefined : "Unread"} />
 											<span className={cn("w-[34%] max-w-[300px] shrink-0 truncate text-[#37352f] sm:w-[28%]", !m.seen && "font-semibold")}>{displayName(m.from)}</span>
 											<span className={cn("min-w-0 flex-1 truncate text-[#37352f]", !m.seen && "font-medium")}>
 												{m.subject}
@@ -572,7 +572,7 @@ function ReadingPane({ onPrev, onNext, hasPrev, hasNext, onAutoLabelSimilar, lab
 	const doc = useMemo(
 		() =>
 			detail
-				? `<!doctype html><html><head><meta charset="utf-8"><base target="_blank"><style>body{margin:0;font:15px/1.6 -apple-system,Segoe UI,Roboto,sans-serif;color:#1f2937;word-wrap:break-word}img{max-width:100%;height:auto}blockquote{margin:8px 0;padding-left:12px;border-left:3px solid #e5e7eb;color:#6b7280}a{color:#7c3aed}pre{white-space:pre-wrap}table{max-width:100%}</style></head><body>${detail.html ?? `<pre style="font:inherit">${detail.text.replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[c]!)}</pre>`}</body></html>`
+				? `<!doctype html><html><head><meta charset="utf-8"><base target="_blank"><style>body{margin:0;font:15px/1.6 -apple-system,Segoe UI,Roboto,sans-serif;color:#1f2937;word-wrap:break-word}img{max-width:100%;height:auto}blockquote{margin:8px 0;padding-left:12px;border-left:3px solid #e5e7eb;color:#6b7280}a{color:#068297}pre{white-space:pre-wrap}table{max-width:100%}</style></head><body>${detail.html ?? `<pre style="font:inherit">${detail.text.replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[c]!)}</pre>`}</body></html>`
 				: "",
 		[detail]
 	);
@@ -595,7 +595,7 @@ function ReadingPane({ onPrev, onNext, hasPrev, hasNext, onAutoLabelSimilar, lab
 						<PopoverContent align="end" className="w-60 p-1.5">
 							{labels.map((l) => { const on = selectedLabels.includes(l.id); return (
 								<button key={l.id} onClick={() => onToggleLabel(l.id, !on)} className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-black/5">
-									<span className={cn("h-2.5 w-2.5 rounded-full", LABEL_COLORS[l.color]?.dot ?? "bg-purple-500")} /><span className="flex-1 truncate">{l.name}</span>{on && <Check className="h-4 w-4 text-blue-600" />}
+									<span className={cn("h-2.5 w-2.5 rounded-full", LABEL_COLORS[l.color]?.dot ?? "bg-sauti-teal")} /><span className="flex-1 truncate">{l.name}</span>{on && <Check className="h-4 w-4 text-sauti-teal" />}
 								</button>
 							); })}
 							<button onClick={onNewLabel} className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm text-[#787774] hover:bg-black/5"><Plus className="h-4 w-4" /> New label</button>

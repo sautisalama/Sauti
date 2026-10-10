@@ -96,7 +96,7 @@ export function PeoplePanel() {
 			<Card className="rounded-2xl">
 				<CardHeader>
 					<CardTitle className="flex items-center gap-2 text-base">
-						<Crown className="h-5 w-5 text-purple-600" /> Super admins
+						<Crown className="h-5 w-5 text-sauti-teal" /> Super admins
 					</CardTitle>
 					<CardDescription>
 						Only super admins can open this page, change anyone&apos;s role and read the logs. Each super admin can add {data.me.limit} more. Protected accounts can never be removed.
@@ -106,7 +106,7 @@ export function PeoplePanel() {
 					<ul className="divide-y divide-serene-neutral-100 rounded-xl border border-serene-neutral-100">
 						{data.superAdmins.map((s) => (
 							<li key={s.id} className="flex items-center gap-3 p-3">
-								<div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-purple-100 text-sm font-bold text-purple-700">{initials(s.name || s.email)}</div>
+								<div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-sauti-teal-light text-sm font-bold text-sauti-teal">{initials(s.name || s.email)}</div>
 								<div className="min-w-0 flex-1">
 									<p className="truncate text-sm font-semibold text-serene-neutral-900">{s.name || s.email}</p>
 									<p className="truncate text-xs text-serene-neutral-500">
@@ -116,7 +116,7 @@ export function PeoplePanel() {
 									</p>
 								</div>
 								{s.is_protected && (
-									<Badge className="gap-1 bg-purple-100 text-purple-700 hover:bg-purple-100">
+									<Badge className="gap-1 bg-sauti-teal-light text-sauti-teal hover:bg-sauti-teal-light">
 										<Lock className="h-3 w-3" /> Protected
 									</Badge>
 								)}
@@ -162,7 +162,7 @@ export function PeoplePanel() {
 			<Card className="rounded-2xl">
 				<CardHeader>
 					<CardTitle className="flex items-center gap-2 text-base">
-						<ShieldCheck className="h-5 w-5 text-purple-600" /> Roles
+						<ShieldCheck className="h-5 w-5 text-sauti-teal" /> Roles
 					</CardTitle>
 					<CardDescription>Make someone an admin, or return them to a regular account (survivor, professional or NGO). Every change is logged.</CardDescription>
 				</CardHeader>
@@ -195,7 +195,7 @@ export function PeoplePanel() {
 									<p className="truncate text-sm font-semibold">{a.name}</p>
 									<p className="truncate text-xs text-serene-neutral-500">{a.email}</p>
 								</div>
-								{a.isSuperAdmin ? <Badge className="bg-purple-100 text-purple-700 hover:bg-purple-100">Super</Badge> : <Badge variant="secondary">Admin</Badge>}
+								{a.isSuperAdmin ? <Badge className="bg-sauti-teal-light text-sauti-teal hover:bg-sauti-teal-light">Super</Badge> : <Badge variant="secondary">Admin</Badge>}
 							</li>
 						))}
 					</ul>
@@ -218,7 +218,7 @@ function PersonRow({ p, busy, onAdmin, onType }: { p: PersonView; busy: boolean;
 					</p>
 				</div>
 				{p.isSuperAdmin ? (
-					<Badge className="bg-purple-100 text-purple-700 hover:bg-purple-100">Super admin</Badge>
+					<Badge className="bg-sauti-teal-light text-sauti-teal hover:bg-sauti-teal-light">Super admin</Badge>
 				) : p.isAdmin ? (
 					<Badge variant="secondary">Admin</Badge>
 				) : (

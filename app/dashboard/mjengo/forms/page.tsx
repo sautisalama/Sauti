@@ -43,7 +43,7 @@ export default function FormsPage() {
 					<h2 className="text-lg font-bold text-serene-neutral-900">Forms</h2>
 					<p className="text-sm text-serene-neutral-500">Build a form, share the link or QR code, and read the responses as a table or as charts.</p>
 				</div>
-				<Button onClick={create} disabled={busy} className="gap-1.5 bg-purple-600 hover:bg-purple-700">{busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />} New form</Button>
+				<Button onClick={create} disabled={busy} className="gap-1.5 bg-sauti-teal hover:bg-sauti-dark">{busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />} New form</Button>
 			</div>
 
 			{!forms ? (

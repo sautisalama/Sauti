@@ -96,7 +96,7 @@ export function GrantCharts({ grants }: { grants: GrantLite[] }) {
 							<XAxis dataKey="name" tick={{ fontSize: 11 }} />
 							<YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
 							<Tooltip formatter={(v: number) => [`${v} due`, "Grants"]} cursor={{ fill: "rgba(168,85,247,0.06)" }} />
-							<Bar dataKey="count" fill="#a855f7" radius={[6, 6, 0, 0]} />
+							<Bar dataKey="count" fill="#068297" radius={[6, 6, 0, 0]} />
 						</BarChart>
 					</ResponsiveContainer>
 				</div>

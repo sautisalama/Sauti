@@ -75,7 +75,7 @@ export default function DocumentsPage() {
 									{d.file_path ? `${d.file_name} · ${fmtBytes(d.file_size)}${d.uploaded_at ? ` · ${format(new Date(d.uploaded_at), "d MMM yyyy")}` : ""}${d.uploaded_by_name ? ` · ${d.uploaded_by_name}` : ""}` : "Not uploaded yet"}
 								</p>
 							</div>
-							<Link href={KIND_HREF[d.entity_type]} className="max-w-[40%] truncate text-xs text-purple-700 hover:underline sm:max-w-[220px]">
+							<Link href={KIND_HREF[d.entity_type]} className="max-w-[40%] truncate text-xs text-sauti-teal hover:underline sm:max-w-[220px]">
 								<Badge variant="secondary" className="mr-1.5">{KIND_LABEL[d.entity_type]}</Badge>
 								{d.entity_label ?? "Removed"}
 							</Link>
@@ -94,7 +94,7 @@ function Segmented<T extends string>({ value, onChange, options }: { value: T; o
 	return (
 		<div className="inline-flex shrink-0 rounded-lg border border-serene-neutral-200 bg-white p-0.5">
 			{options.map(([v, l]) => (
-				<button key={v} onClick={() => onChange(v)} aria-pressed={value === v} className={cn("touch-manipulation rounded-md px-3 py-1.5 text-xs font-semibold transition-colors", value === v ? "bg-purple-600 text-white" : "text-serene-neutral-600 hover:bg-serene-neutral-50")}>
+				<button key={v} onClick={() => onChange(v)} aria-pressed={value === v} className={cn("touch-manipulation rounded-md px-3 py-1.5 text-xs font-semibold transition-colors", value === v ? "bg-sauti-teal text-white" : "text-serene-neutral-600 hover:bg-serene-neutral-50")}>
 					{l}
 				</button>
 			))}

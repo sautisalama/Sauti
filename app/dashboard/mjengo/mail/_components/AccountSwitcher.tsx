@@ -10,7 +10,7 @@ const KIND: Record<string, string> = { google: "Google", microsoft: "Microsoft" 
 const providerOf = (a: AccountView) => KIND[a.auth_type] ?? (a.protocol === "pop3" ? "POP3" : "IMAP");
 
 /** Avatar chosen from the address so each mailbox is recognisable at a glance. */
-const TONES = ["bg-purple-100 text-purple-700", "bg-sky-100 text-sky-700", "bg-emerald-100 text-emerald-700", "bg-amber-100 text-amber-800", "bg-rose-100 text-rose-700", "bg-indigo-100 text-indigo-700"];
+const TONES = ["bg-sauti-teal-light text-sauti-teal", "bg-sky-100 text-sky-700", "bg-emerald-100 text-emerald-700", "bg-amber-100 text-amber-800", "bg-rose-100 text-rose-700", "bg-indigo-100 text-indigo-700"];
 const tone = (s: string) => TONES[[...s].reduce((n, c) => n + c.charCodeAt(0), 0) % TONES.length];
 
 function Avatar({ email, className }: { email: string; className?: string }) {
@@ -27,7 +27,7 @@ export function AccountSwitcher({ accounts, accountId, onSelect, onAdd, onSettin
 	return (
 		<DropdownMenu>
 			<DropdownMenuTrigger asChild>
-				<button className="flex h-9 w-full touch-manipulation items-center gap-2 rounded-md px-1.5 text-left text-[#37352f] transition hover:bg-black/5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500" aria-label="Switch or add mailbox">
+				<button className="flex h-9 w-full touch-manipulation items-center gap-2 rounded-md px-1.5 text-left text-[#37352f] transition hover:bg-black/5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-sauti-teal" aria-label="Switch or add mailbox">
 					{current && <Avatar email={current.email} className="h-6 w-6 rounded-full text-xs" />}
 					<span className="min-w-0 flex-1 truncate text-[15px] font-medium">{current?.label || current?.email || "No mailbox"}</span>
 					<ChevronsUpDown className="h-4 w-4 shrink-0 text-[#9b9a97]" />
@@ -42,7 +42,7 @@ export function AccountSwitcher({ accounts, accountId, onSelect, onAdd, onSettin
 							<span className="block truncate text-sm font-medium">{a.email}</span>
 							<span className="block text-[11px] text-serene-neutral-500">{providerOf(a)}</span>
 						</span>
-						{a.id === current?.id && <Check className="h-4 w-4 shrink-0 text-purple-600" />}
+						{a.id === current?.id && <Check className="h-4 w-4 shrink-0 text-sauti-teal" />}
 					</DropdownMenuItem>
 				))}
 				<DropdownMenuSeparator />

@@ -326,14 +326,14 @@ export function Composer({ accounts, accountId, seed, snippets, signature = "", 
 							{vault.length > 0 && (
 									<ul className="mt-3 flex flex-wrap gap-2" aria-label="Vault documents">
 										{vault.map((v) => (
-											<li key={v.id} className="flex items-center gap-2 rounded-lg border border-purple-200 bg-purple-50 px-2.5 py-1 text-xs text-purple-900">
+											<li key={v.id} className="flex items-center gap-2 rounded-lg border border-sauti-teal/30 bg-sauti-teal-light/40 px-2.5 py-1 text-xs text-sauti-dark">
 												<HardDrive className="h-3 w-3" /> {v.name}
 												<button
 													onClick={() => v.canShare && setVault(vault.map((x) => (x.id === v.id ? { ...x, mode: x.mode === "link" ? "attach" : "link" } : x)))}
 													title={v.canShare ? "Switch between a link and a copy" : "You can view this file but not share a copy; it goes as a link"}
 													className="rounded bg-white px-1.5 py-0.5 font-semibold"
 												>{v.mode === "link" ? "Link" : "Copy"}</button>
-												<button onClick={() => setVault(vault.filter((x) => x.id !== v.id))} aria-label={`Remove ${v.name}`}><X className="h-3 w-3 text-purple-400 hover:text-red-600" /></button>
+												<button onClick={() => setVault(vault.filter((x) => x.id !== v.id))} aria-label={`Remove ${v.name}`}><X className="h-3 w-3 text-sauti-teal hover:text-red-600" /></button>
 											</li>
 										))}
 									</ul>
@@ -379,7 +379,7 @@ export function Composer({ accounts, accountId, seed, snippets, signature = "", 
 							</Popover>
 							{seed.replyTo && (
 								<Popover>
-									<PopoverTrigger asChild><Button variant="ghost" size="sm" className="h-8 gap-1.5 text-purple-700"><Sparkles className="h-4 w-4" /> Write reply</Button></PopoverTrigger>
+									<PopoverTrigger asChild><Button variant="ghost" size="sm" className="h-8 gap-1.5 text-sauti-teal"><Sparkles className="h-4 w-4" /> Write reply</Button></PopoverTrigger>
 									<PopoverContent align="start" className="w-72 space-y-2 p-3">
 										<p className="text-xs text-serene-neutral-600">Tell the AI what to say. The email you are replying to is sent to the AI service to write the draft.</p>
 										<Input value={aiPrompt} onChange={(e) => setAiPrompt(e.target.value)} placeholder="e.g. Thank them and propose Tuesday" onKeyDown={(e) => e.key === "Enter" && writeWithAi()} />
@@ -389,7 +389,7 @@ export function Composer({ accounts, accountId, seed, snippets, signature = "", 
 							)}
 							<div className="flex-1" />
 							<span className="hidden text-xs text-serene-neutral-400 sm:inline">Ctrl+Enter</span>
-							<Button onClick={() => send()} disabled={sending} className="gap-1.5 bg-purple-600 hover:bg-purple-700">{sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />} Send</Button>
+							<Button onClick={() => send()} disabled={sending} className="gap-1.5 bg-sauti-teal hover:bg-sauti-dark">{sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />} Send</Button>
 						</footer>
 					</>
 				)}
@@ -418,7 +418,7 @@ export function Composer({ accounts, accountId, seed, snippets, signature = "", 
 					</ul>
 					<DialogFooter className="flex-col gap-2 sm:flex-col sm:space-x-0">
 						{issues?.some((c) => c.senderCanShare && c.recipients.some((r) => !r.level && !r.external)) && (
-							<Button className="bg-purple-600 hover:bg-purple-700" onClick={async () => {
+							<Button className="bg-sauti-teal hover:bg-sauti-dark" onClick={async () => {
 								const list = issues!;
 								try {
 									const ids = list.filter((c) => c.senderCanShare).map((c) => c.fileId);
@@ -448,7 +448,7 @@ export function Composer({ accounts, accountId, seed, snippets, signature = "", 
 				<div role="toolbar" aria-label="Improve selected text" style={{ left: Math.max(8, Math.min(sel.x, (typeof window !== "undefined" ? window.innerWidth : 800) - 330)), top: Math.max(8, sel.y - 46) }} className="fixed z-[60] flex items-center gap-0.5 rounded-xl border border-serene-neutral-200 bg-white p-1 shadow-xl">
 					{rewriting ? <span className="flex items-center gap-2 px-3 py-1.5 text-sm text-serene-neutral-600"><Loader2 className="h-4 w-4 animate-spin" /> Rewriting...</span> : (
 						<>
-							<Sparkles className="mx-1.5 h-4 w-4 text-purple-600" />
+							<Sparkles className="mx-1.5 h-4 w-4 text-sauti-teal" />
 							{([["improve", "Improve"], ["shorter", "Shorter"], ["friendlier", "Friendlier"], ["fix", "Fix spelling"]] as const).map(([m, l]) => (
 								<button key={m} onMouseDown={(e) => e.preventDefault()} onClick={() => rewrite(m)} className="rounded-lg px-2.5 py-1.5 text-sm font-medium text-serene-neutral-800 hover:bg-serene-neutral-100">{l}</button>
 							))}

@@ -94,7 +94,7 @@ export default function FormEditorPage() {
 	};
 
 	if (form === undefined) return <div className="flex justify-center py-24"><Loader2 className="h-6 w-6 animate-spin text-serene-neutral-400" /></div>;
-	if (form === null) return <p className="py-20 text-center text-serene-neutral-500">That form no longer exists. <Link href="/dashboard/mjengo/forms" className="text-purple-700 underline">Back to forms</Link></p>;
+	if (form === null) return <p className="py-20 text-center text-serene-neutral-500">That form no longer exists. <Link href="/dashboard/mjengo/forms" className="text-sauti-teal underline">Back to forms</Link></p>;
 
 	const previewForm = { slug: form.slug, title: title || "Untitled form", description: description || null, questions, collectEmail: !!settings.collectEmail, unavailable: null, confirmation: settings.confirmation || "Thank you." } as const;
 
@@ -102,14 +102,14 @@ export default function FormEditorPage() {
 		<div className="space-y-4">
 			<div className="flex flex-wrap items-center gap-2">
 				<Button asChild variant="ghost" size="icon" className="h-9 w-9"><Link href="/dashboard/mjengo/forms" aria-label="All forms"><ArrowLeft className="h-4 w-4" /></Link></Button>
-				<Input value={title} onChange={(e) => setTitle(e.target.value)} aria-label="Form title" className="h-10 min-w-0 flex-1 border-transparent bg-transparent text-lg font-bold shadow-none hover:border-serene-neutral-200 focus-visible:border-purple-500" />
+				<Input value={title} onChange={(e) => setTitle(e.target.value)} aria-label="Form title" className="h-10 min-w-0 flex-1 border-transparent bg-transparent text-lg font-bold shadow-none hover:border-serene-neutral-200 focus-visible:border-sauti-teal" />
 				<span className="text-xs text-serene-neutral-400" aria-live="polite">{save === "saving" ? "Saving..." : save === "error" ? "Not saved" : "Saved"}</span>
 				<Button variant="outline" size="sm" className="gap-1.5" onClick={() => setPreview(true)}><Eye className="h-4 w-4" /> Preview</Button>
 				<Button variant="outline" size="sm" className="gap-1.5" onClick={() => setShare(true)} disabled={form.status === "draft"}><Share2 className="h-4 w-4" /> Share</Button>
 				{form.status === "open" ? (
 					<Button size="sm" variant="outline" onClick={() => changeStatus("closed")}>Stop responses</Button>
 				) : (
-					<Button size="sm" className="bg-purple-600 hover:bg-purple-700" onClick={() => changeStatus("open")}>{form.status === "closed" ? "Reopen" : "Publish"}</Button>
+					<Button size="sm" className="bg-sauti-teal hover:bg-sauti-dark" onClick={() => changeStatus("open")}>{form.status === "closed" ? "Reopen" : "Publish"}</Button>
 				)}
 			</div>
 
@@ -136,7 +136,7 @@ export default function FormEditorPage() {
 			</Tabs>
 
 			<Dialog open={preview} onOpenChange={setPreview}>
-				<DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto bg-purple-50/60">
+				<DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto bg-sauti-teal-light/60">
 					<DialogHeader><DialogTitle>Preview (nothing is submitted)</DialogTitle></DialogHeader>
 					<FormRenderer form={previewForm} preview />
 				</DialogContent>
@@ -203,7 +203,7 @@ function QuestionsTab({ description, onDescription, questions, onChange }: { des
 										</div>
 									))}
 									<div className="flex flex-wrap items-center gap-3">
-										<Button variant="ghost" size="sm" className="gap-1.5 text-purple-700" onClick={() => update(i, { options: [...(q.options ?? []), `Option ${(q.options?.length ?? 0) + 1}`] })}><Plus className="h-4 w-4" /> Add option</Button>
+										<Button variant="ghost" size="sm" className="gap-1.5 text-sauti-teal" onClick={() => update(i, { options: [...(q.options ?? []), `Option ${(q.options?.length ?? 0) + 1}`] })}><Plus className="h-4 w-4" /> Add option</Button>
 										<label className="flex items-center gap-2 text-sm text-serene-neutral-600"><Switch checked={!!q.allowOther} onCheckedChange={(v) => update(i, { allowOther: v })} /> Add &quot;Other&quot; (people type their own)</label>
 									</div>
 								</div>
@@ -237,7 +237,7 @@ function QuestionsTab({ description, onDescription, questions, onChange }: { des
 					<SelectTrigger className="w-[190px]"><SelectValue /></SelectTrigger>
 					<SelectContent>{(Object.keys(TYPE_LABEL) as QuestionType[]).map((t) => <SelectItem key={t} value={t}>{TYPE_LABEL[t]}</SelectItem>)}</SelectContent>
 				</Select>
-				<Button onClick={() => onChange([...questions, newQuestion(type)])} className="gap-1.5 bg-purple-600 hover:bg-purple-700"><Plus className="h-4 w-4" /> Add question</Button>
+				<Button onClick={() => onChange([...questions, newQuestion(type)])} className="gap-1.5 bg-sauti-teal hover:bg-sauti-dark"><Plus className="h-4 w-4" /> Add question</Button>
 			</div>
 		</div>
 	);
@@ -336,7 +336,7 @@ function AnalyticsTab({ questions, responses }: { questions: Question[]; respons
 							<XAxis dataKey="date" tickFormatter={(d: string) => format(new Date(d), "d MMM")} tick={{ fontSize: 11 }} minTickGap={24} />
 							<YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
 							<Tooltip labelFormatter={(d) => format(new Date(String(d)), "EEE d MMM")} formatter={(v: number) => [v, "Responses"]} />
-							<Area type="monotone" dataKey="count" stroke="#9333ea" fill="#a855f7" fillOpacity={0.25} />
+							<Area type="monotone" dataKey="count" stroke="#056e80" fill="#068297" fillOpacity={0.25} />
 						</AreaChart>
 					</ResponsiveContainer>
 				</div>
@@ -355,7 +355,7 @@ function AnalyticsTab({ questions, responses }: { questions: Question[]; respons
 								{s.tallies.map((t) => (
 									<li key={t.value}>
 										<div className="mb-0.5 flex justify-between text-xs text-serene-neutral-700"><span className="truncate pr-2">{t.label}</span><span className="shrink-0 tabular-nums">{t.count} · {t.pct}%</span></div>
-										<div className="h-2.5 overflow-hidden rounded-full bg-serene-neutral-100"><div className="h-full rounded-full bg-purple-500" style={{ width: `${t.pct}%` }} /></div>
+										<div className="h-2.5 overflow-hidden rounded-full bg-serene-neutral-100"><div className="h-full rounded-full bg-sauti-teal" style={{ width: `${t.pct}%` }} /></div>
 									</li>
 								))}
 							</ul>
