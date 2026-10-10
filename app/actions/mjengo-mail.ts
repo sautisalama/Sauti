@@ -238,7 +238,7 @@ async function listMessages_(accountId: string, mailbox: string, query: ListQuer
   });
 }
 
-async function getMessageDetail_(accountId: string, mailbox: string, uid: number, allowImages = false): Promise<ParsedMessage & { seen: boolean; flagged: boolean }> {
+async function getMessageDetail_(accountId: string, mailbox: string, uid: number, allowImages = true): Promise<ParsedMessage & { seen: boolean; flagged: boolean }> {
   const actor = await requireAdminActor();
   const acct = await loadAccount(accountId, actor.id);
   if (acct.protocol === 'pop3') {

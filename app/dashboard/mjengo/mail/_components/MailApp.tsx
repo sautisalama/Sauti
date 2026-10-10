@@ -73,7 +73,8 @@ export function MailApp() {
 	const [selected, setSelected] = useState<MessageRow | null>(null);
 	const [detail, setDetail] = useState<Detail | null>(null);
 	const [detailBusy, setDetailBusy] = useState(false);
-	const [allowImages, setAllowImages] = useState(false);
+	// Remote images always load: this is the team's own mail and the images are part of the message.
+	const [allowImages, setAllowImages] = useState(true);
 	const [conversation, setConversation] = useState<MessageRow[]>([]);
 	const [summary, setSummary] = useState<string | null>(null);
 	const [summaryBusy, setSummaryBusy] = useState(false);
@@ -180,13 +181,12 @@ export function MailApp() {
 	}, [accountId, mailboxPath, viewKey, debouncedQ, views]);
 
 	/* ---- opening a message */
-	const open = useCallback(async (m: MessageRow, images = false) => {
+	const open = useCallback(async (m: MessageRow, images = true) => {
 		if (!accountId) return;
 		setSelected(m);
 		setDetailBusy(true);
 		setSummary(null);
 		setConversation([]);
-		if (!images) setAllowImages(false);
 		try {
 			const d = await getMessageDetail(accountId, m.mailbox, m.uid, images);
 			setDetail(d);
