@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import { autoLabel, type LabelRow } from "./api";
 import { addAccount, oauthAvailability, deleteSnippet, removeAccount, saveSnippet, type AccountView, type SnippetRow, type ViewConfig, type ViewRow } from "./api";
 
 const PROVIDERS = [
@@ -128,7 +129,7 @@ const MAILBOXES: { v: ViewConfig["mailbox"]; l: string }[] = [
 const ICONS = ["inbox", "star", "paperclip", "user", "tag", "flag"];
 
 /** Like Notion Mail's view editor: a name, what to show, how to group it and which hover actions appear. */
-export function ViewDialog({ view, onClose, onSave, onDelete }: { view: Partial<ViewRow> | null; onClose: () => void; onSave: (v: { id: string | null; name: string; icon: string; config: ViewConfig }) => Promise<void>; onDelete?: (id: string) => Promise<void> }) {
+export function ViewDialog({ view, labels = [], onClose, onSave, onDelete }: { view: Partial<ViewRow> | null; labels?: LabelRow[]; onClose: () => void; onSave: (v: { id: string | null; name: string; icon: string; config: ViewConfig }) => Promise<void>; onDelete?: (id: string) => Promise<void> }) {
 	const [name, setName] = useState(view?.name ?? "");
 	const [icon, setIcon] = useState(view?.icon ?? "inbox");
 	const [cfg, setCfg] = useState<ViewConfig>({ mailbox: "inbox", group: "date", hoverActions: ["archive", "trash", "unread", "star"], ...(view?.config ?? {}) });
@@ -151,6 +152,11 @@ export function ViewDialog({ view, onClose, onSave, onDelete }: { view: Partial<
 							<Select value={cfg.group ?? "date"} onValueChange={(v) => setCfg({ ...cfg, group: v as ViewConfig["group"] })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="date">Date</SelectItem><SelectItem value="sender">Sender</SelectItem><SelectItem value="none">No grouping</SelectItem></SelectContent></Select>
 						</div>
 					</div>
+					{labels.length > 0 && (
+						<div className="space-y-1.5"><Label>Label</Label>
+							<Select value={cfg.labelId ?? "any"} onValueChange={(v) => setCfg({ ...cfg, labelId: v === "any" ? undefined : v })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="any">Any</SelectItem>{labels.map((l) => <SelectItem key={l.id} value={l.id}>{l.name}</SelectItem>)}</SelectContent></Select>
+						</div>
+					)}
 					<div className="space-y-1.5"><Label>From contains</Label><Input value={cfg.from ?? ""} onChange={(e) => setCfg({ ...cfg, from: e.target.value })} placeholder="e.g. @fordfoundation.org" /></div>
 					<div className="space-y-2.5 rounded-xl border border-serene-neutral-100 p-3">
 						{([["unread", "Only unread"], ["starred", "Only starred"], ["hasAttachment", "Only with attachments"]] as const).map(([k, l]) => (
@@ -228,6 +234,68 @@ export function SettingsDialog({ open, onClose, accounts, onAccountsChanged, onC
 						}}>Save snippet</Button>
 					</div>
 				</section>
+			</DialogContent>
+		</Dialog>
+	);
+}
+
+export const LABEL_COLORS: Record<string, { dot: string; chip: string }> = {
+	purple: { dot: "bg-purple-500", chip: "bg-purple-100 text-purple-800" },
+	blue: { dot: "bg-sky-500", chip: "bg-sky-100 text-sky-800" },
+	green: { dot: "bg-emerald-500", chip: "bg-emerald-100 text-emerald-800" },
+	amber: { dot: "bg-amber-500", chip: "bg-amber-100 text-amber-900" },
+	rose: { dot: "bg-rose-500", chip: "bg-rose-100 text-rose-800" },
+};
+
+/** Create or edit a label. A plain-language rule lets AI sort recent mail into it (like Notion Mail's auto label). */
+export function LabelDialog({ label, accountId, onClose, onSave, onDelete, onApplied }: {
+	label: Partial<LabelRow> | null; accountId: string | null; onClose: () => void;
+	onSave: (v: { id: string | null; name: string; color: string; instruction: string }) => Promise<LabelRow>;
+	onDelete?: (id: string) => Promise<void>; onApplied?: () => void;
+}) {
+	const { toast } = useToast();
+	const [name, setName] = useState(label?.name ?? "");
+	const [color, setColor] = useState(label?.color ?? "purple");
+	const [instruction, setInstruction] = useState(label?.instruction ?? "");
+	const [busy, setBusy] = useState<"save" | "run" | null>(null);
+
+	const save = async (andRun = false) => {
+		setBusy(andRun ? "run" : "save");
+		try {
+			const saved = await onSave({ id: label?.id ?? null, name, color, instruction });
+			if (andRun && accountId) {
+				const r = await autoLabel(accountId, "INBOX", saved.id);
+				toast({ title: r.matched ? `Labelled ${r.matched} message${r.matched === 1 ? "" : "s"}` : "No recent messages matched", description: `Looked at the newest ${r.scanned}.` });
+				onApplied?.();
+			}
+			onClose();
+		} catch (e) {
+			toast({ title: "Could not save the label", description: e instanceof Error ? e.message : undefined, variant: "destructive" });
+		} finally {
+			setBusy(null);
+		}
+	};
+
+	return (
+		<Dialog open={!!label} onOpenChange={(o) => !o && !busy && onClose()}>
+			<DialogContent className="max-w-md">
+				<DialogHeader><DialogTitle>{label?.id ? "Edit label" : "New label"}</DialogTitle><DialogDescription>Labels are yours: they are the same across every mailbox you connect.</DialogDescription></DialogHeader>
+				<div className="space-y-4">
+					<div className="space-y-1.5"><Label>Name</Label><Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Funders" autoFocus /></div>
+					<div className="flex gap-2">{Object.keys(LABEL_COLORS).map((c) => <button key={c} onClick={() => setColor(c)} aria-label={c} aria-pressed={color === c} className={cn("h-7 w-7 rounded-full ring-offset-2", LABEL_COLORS[c].dot, color === c && "ring-2 ring-serene-neutral-800")} />)}</div>
+					<div className="space-y-1.5">
+						<Label>Which emails? (optional)</Label>
+						<Textarea rows={3} value={instruction} onChange={(e) => setInstruction(e.target.value)} placeholder="e.g. Emails from funders, donors or grant programme officers about applications or reporting" />
+						<p className="text-xs text-serene-neutral-500">With a description, AI can sort your recent mail into this label. Only senders and subjects are sent, when you ask.</p>
+					</div>
+					<div className="flex flex-wrap items-center gap-2">
+						{label?.id && onDelete && <Button variant="ghost" className="gap-1.5 text-red-600" onClick={async () => { if (window.confirm("Delete this label? Your mail is not affected.")) { await onDelete(label.id!); onClose(); } }}><Trash2 className="h-4 w-4" /> Delete</Button>}
+						<div className="flex-1" />
+						<Button variant="ghost" onClick={onClose} disabled={!!busy}>Cancel</Button>
+						{instruction.trim() && accountId && <Button variant="outline" disabled={!name.trim() || !!busy} onClick={() => save(true)} className="gap-1.5">{busy === "run" && <Loader2 className="h-4 w-4 animate-spin" />} Save and apply to recent mail</Button>}
+						<Button disabled={!name.trim() || !!busy} onClick={() => save(false)} className="gap-1.5 bg-purple-600 hover:bg-purple-700">{busy === "save" && <Loader2 className="h-4 w-4 animate-spin" />} Save</Button>
+					</div>
+				</div>
 			</DialogContent>
 		</Dialog>
 	);

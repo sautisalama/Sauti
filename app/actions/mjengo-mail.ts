@@ -130,6 +130,10 @@ export interface MessageRow {
   seen: boolean;
   flagged: boolean;
   hasAttachments: boolean;
+  /** Message-ID header: what labels are attached to. */
+  messageId: string | null;
+  /** Label ids on this message. */
+  labels: string[];
   /** Messages in this list that share the subject. */
   thread: number;
 }
@@ -140,6 +144,7 @@ export interface ListQuery {
   hasAttachment?: boolean;
   from?: string;
   text?: string;
+  labelId?: string;
 }
 
 async function listPop3(acct: Awaited<ReturnType<typeof loadAccount>>, query: ListQuery, offset: number, limit: number): Promise<{ items: MessageRow[]; total: number }> {
@@ -161,6 +166,8 @@ async function listPop3(acct: Awaited<ReturnType<typeof loadAccount>>, query: Li
         seen: true,
         flagged: false,
         hasAttachments: false,
+        messageId: h.messageId ?? null,
+        labels: [],
         thread: 1,
       };
       if (term && ![row.subject, row.from.name, row.from.address].some((v) => v.toLowerCase().includes(term))) continue;
@@ -176,7 +183,33 @@ function hasAttachment(node: { disposition?: string; childNodes?: unknown[] } | 
   return (node.childNodes ?? []).some((n) => hasAttachment(n as { disposition?: string; childNodes?: unknown[] }));
 }
 
+/** Messages of a folder with their labels; a label filter looks through the newest 300 messages. */
 async function listMessages_(accountId: string, mailbox: string, query: ListQuery = {}, offset = 0, limit = 40): Promise<{ items: MessageRow[]; total: number }> {
+  const actor = await requireAdminActor();
+  const db = looseAdmin();
+  let set: Set<string> | null = null;
+  if (query.labelId) {
+    const { data } = await db.from('mail_message_labels').select('message_id').eq('owner_id', actor.id).eq('account_id', accountId).eq('label_id', query.labelId);
+    set = new Set((data ?? []).map((r: { message_id: string }) => r.message_id));
+    offset = 0;
+    limit = 300;
+  }
+  const res = await listCore_(accountId, mailbox, query, offset, limit);
+  const ids = res.items.map((i) => i.messageId).filter(Boolean) as string[];
+  if (ids.length) {
+    const { data } = await db.from('mail_message_labels').select('message_id, label_id').eq('owner_id', actor.id).eq('account_id', accountId).in('message_id', ids);
+    const by = new Map<string, string[]>();
+    for (const r of (data ?? []) as { message_id: string; label_id: string }[]) by.set(r.message_id, [...(by.get(r.message_id) ?? []), r.label_id]);
+    res.items.forEach((i) => { i.labels = (i.messageId && by.get(i.messageId)) || []; });
+  }
+  if (set) {
+    const items = res.items.filter((i) => i.messageId && set!.has(i.messageId));
+    return { items, total: items.length };
+  }
+  return res;
+}
+
+async function listCore_(accountId: string, mailbox: string, query: ListQuery = {}, offset = 0, limit = 40): Promise<{ items: MessageRow[]; total: number }> {
   const actor = await requireAdminActor();
   const acct = await loadAccount(accountId, actor.id);
   if (acct.protocol === 'pop3') return listPop3(acct, query, offset, limit);
@@ -220,6 +253,8 @@ async function listMessages_(accountId: string, mailbox: string, query: ListQuer
           seen: m.flags?.has('\\Seen') ?? false,
           flagged: m.flags?.has('\\Flagged') ?? false,
           hasAttachments: hasAttachment(m.bodyStructure as never),
+          messageId: m.envelope?.messageId ?? null,
+          labels: [],
           thread: 1,
         });
       }
@@ -274,7 +309,7 @@ async function getConversation_(accountId: string, mailbox: string, subject: str
       const out: MessageRow[] = [];
       for await (const m of c.fetch(uids.join(','), { uid: true, envelope: true, flags: true, internalDate: true }, { uid: true })) {
         const f = m.envelope?.from?.[0];
-        out.push({ uid: m.uid, mailbox, from: { name: f?.name || '', address: f?.address || '' }, subject: m.envelope?.subject || '', date: m.envelope?.date ? new Date(m.envelope.date).toISOString() : null, seen: m.flags?.has('\\Seen') ?? false, flagged: m.flags?.has('\\Flagged') ?? false, hasAttachments: false, thread: 1 });
+        out.push({ uid: m.uid, mailbox, from: { name: f?.name || '', address: f?.address || '' }, subject: m.envelope?.subject || '', date: m.envelope?.date ? new Date(m.envelope.date).toISOString() : null, seen: m.flags?.has('\\Seen') ?? false, flagged: m.flags?.has('\\Flagged') ?? false, hasAttachments: false, messageId: m.envelope?.messageId ?? null, labels: [], thread: 1 });
       }
       return out.filter((m) => normaliseSubject(m.subject) === key).sort((a, b) => b.uid - a.uid);
     } finally {
@@ -394,6 +429,8 @@ export interface ViewConfig {
   starred?: boolean;
   hasAttachment?: boolean;
   from?: string;
+  /** Only messages carrying this label. */
+  labelId?: string;
   group?: 'date' | 'sender' | 'none';
   hoverActions?: ('archive' | 'trash' | 'unread' | 'star' | 'reply')[];
 }
@@ -455,6 +492,90 @@ async function saveSnippet_(id: string | null, name: string, bodyHtml: string): 
 async function deleteSnippet_(id: string) {
   const actor = await requireAdminActor();
   await looseAdmin().from('mail_snippets').delete().eq('id', id).eq('owner_id', actor.id);
+}
+
+/* ------------------------------------------------------------------ Labels */
+
+export interface LabelRow {
+  id: string;
+  name: string;
+  color: string;
+  instruction: string | null;
+}
+
+async function listLabels_(): Promise<LabelRow[]> {
+  const actor = await requireAdminActor();
+  const { data } = await looseAdmin().from('mail_labels').select('id, name, color, instruction').eq('owner_id', actor.id).order('created_at');
+  return (data ?? []) as LabelRow[];
+}
+
+async function saveLabel_(id: string | null, v: { name: string; color?: string; instruction?: string | null }): Promise<LabelRow> {
+  const actor = await requireAdminActor();
+  const name = v.name.trim().slice(0, 40);
+  if (!name) throw new Error('Name the label.');
+  const row = { name, color: v.color || 'purple', instruction: v.instruction?.trim().slice(0, 600) || null };
+  const db = looseAdmin();
+  const q = id ? db.from('mail_labels').update(row).eq('id', id).eq('owner_id', actor.id) : db.from('mail_labels').insert({ ...row, owner_id: actor.id });
+  const { data, error } = await q.select('id, name, color, instruction').single();
+  if (error || !data) throw new Error('Could not save the label.');
+  return data as LabelRow;
+}
+
+async function deleteLabel_(id: string) {
+  const actor = await requireAdminActor();
+  await looseAdmin().from('mail_labels').delete().eq('id', id).eq('owner_id', actor.id);
+}
+
+async function setMessageLabel_(accountId: string, messageId: string, labelId: string, on: boolean) {
+  const actor = await requireAdminActor();
+  await loadAccount(accountId, actor.id);
+  const db = looseAdmin();
+  const { data: label } = await db.from('mail_labels').select('id').eq('id', labelId).eq('owner_id', actor.id).maybeSingle();
+  if (!label) throw new Error('That label no longer exists.');
+  if (on) await db.from('mail_message_labels').upsert({ owner_id: actor.id, account_id: accountId, message_id: messageId, label_id: labelId });
+  else await db.from('mail_message_labels').delete().eq('account_id', accountId).eq('message_id', messageId).eq('label_id', labelId).eq('owner_id', actor.id);
+}
+
+/** Apply a label to the recent messages that match its plain-language rule. Sender and subject are sent to the AI service. */
+async function autoLabel_(accountId: string, mailbox: string, labelId: string): Promise<{ matched: number; scanned: number }> {
+  const actor = await requireAdminActor();
+  const db = looseAdmin();
+  const { data: label } = await db.from('mail_labels').select('id, name, instruction').eq('id', labelId).eq('owner_id', actor.id).maybeSingle();
+  if (!label) throw new Error('That label no longer exists.');
+  if (!label.instruction) throw new Error('Describe which emails this label is for first.');
+
+  const { items } = await listCore_(accountId, mailbox, {}, 0, 80);
+  if (!items.length) return { matched: 0, scanned: 0 };
+  const lines = items.map((m, i) => `${i}. From: ${m.from.name || ''} <${m.from.address}> | Subject: ${m.subject}`).join('\n');
+  const out = await ai(
+    'You sort emails. Given a rule and a numbered list of emails, reply with ONLY a JSON array of the numbers of the emails that clearly match the rule. If none match, reply [].',
+    `Rule: ${label.instruction}\n\nEmails:\n${lines}`,
+    300
+  );
+  let picked: number[] = [];
+  try {
+    picked = (JSON.parse(out.match(/\[[\s\S]*\]/)?.[0] ?? '[]') as unknown[]).filter((n): n is number => Number.isInteger(n) && (n as number) >= 0 && (n as number) < items.length);
+  } catch {
+    picked = [];
+  }
+  const rows = picked.map((i) => items[i]).filter((m) => m.messageId).map((m) => ({ owner_id: actor.id, account_id: accountId, message_id: m.messageId!, label_id: labelId }));
+  if (rows.length) await db.from('mail_message_labels').upsert(rows);
+  return { matched: rows.length, scanned: items.length };
+}
+
+/** Highlight-to-improve in the composer. Only the selected text is sent. */
+async function rewriteText_(text: string, mode: 'improve' | 'shorter' | 'friendlier' | 'fix'): Promise<string> {
+  await requireAdminActor();
+  const t = text.trim().slice(0, 4000);
+  if (!t) throw new Error('Select some text first.');
+  const how: Record<typeof mode, string> = {
+    improve: 'Improve the clarity and tone while keeping the meaning and the language.',
+    shorter: 'Make it shorter and clearer without losing the key points.',
+    friendlier: 'Make it warmer and friendlier while staying professional.',
+    fix: 'Fix spelling and grammar only. Change nothing else.',
+  };
+  const out = await ai(`You edit email text. ${how[mode]} Reply with only the rewritten text, no quotes or commentary.`, t, 600);
+  return out || t;
 }
 
 /* ---------------------------------------------------------------------- AI */
@@ -519,3 +640,9 @@ export const saveSnippet = guard(saveSnippet_);
 export const deleteSnippet = guard(deleteSnippet_);
 export const summariseMessage = guard(summariseMessage_);
 export const draftReply = guard(draftReply_);
+export const listLabels = guard(listLabels_);
+export const saveLabel = guard(saveLabel_);
+export const deleteLabel = guard(deleteLabel_);
+export const setMessageLabel = guard(setMessageLabel_);
+export const autoLabel = guard(autoLabel_);
+export const rewriteText = guard(rewriteText_);

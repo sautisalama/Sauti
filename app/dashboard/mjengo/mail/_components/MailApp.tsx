@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { format, isThisWeek, isToday, isYesterday, startOfDay } from "date-fns";
 import {
-	Archive, ArrowLeft, Command as CommandIcon, Edit3, FileText, Flag, Forward, Inbox, Loader2, Mail, MailOpen, Menu, Paperclip, Pencil, Plus, Reply, ReplyAll, Search, Send, Settings, ShieldAlert, Sparkles, Star, Tag, Trash2, User, X,
+	Archive, Check, ArrowLeft, Command as CommandIcon, Edit3, FileText, Flag, Forward, Inbox, Loader2, Mail, MailOpen, Menu, Paperclip, Pencil, Plus, Reply, ReplyAll, Search, Send, Settings, ShieldAlert, Sparkles, Star, Tag, Trash2, User, X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,7 +19,9 @@ import {
 	type AccountView, type MailAction, type MessageRow, type SnippetRow, type ViewConfig, type ViewRow,
 } from "./api";
 import { Composer, type ComposeSeed } from "./Composer";
-import { ConnectDialog, SettingsDialog, ViewDialog } from "./Dialogs";
+import { ConnectDialog, LabelDialog, LABEL_COLORS, SettingsDialog, ViewDialog } from "./Dialogs";
+import { listLabels, saveLabel, deleteLabel, setMessageLabel, type LabelRow } from "./api";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { AccountSwitcher } from "./AccountSwitcher";
 
 type Detail = Awaited<ReturnType<typeof getMessageDetail>>;
@@ -62,6 +64,9 @@ export function MailApp() {
 	const [unread, setUnread] = useState(0);
 	const [views, setViews] = useState<ViewRow[]>([]);
 	const [snippets, setSnippets] = useState<SnippetRow[]>([]);
+	const [labels, setLabels] = useState<LabelRow[]>([]);
+	const [labelEdit, setLabelEdit] = useState<Partial<LabelRow> | null>(null);
+	const [dropOn, setDropOn] = useState<string | null>(null);
 	const [viewKey, setViewKey] = useState("inbox");
 	const [q, setQ] = useState("");
 	const [debouncedQ, setDebouncedQ] = useState("");
@@ -108,9 +113,10 @@ export function MailApp() {
 		setAccountId((cur) => (cur && list.some((a) => a.id === cur) ? cur : list[0]?.id ?? null));
 	}, []);
 	const loadMeta = useCallback(async () => {
-		const [v, s] = await Promise.all([listViews(), listSnippets()]);
+		const [v, s, l] = await Promise.all([listViews(), listSnippets(), listLabels()]);
 		setViews(v);
 		setSnippets(s);
+		setLabels(l);
 	}, []);
 	// Coming back from "Sign in with Google / Microsoft".
 	useEffect(() => {
@@ -144,11 +150,13 @@ export function MailApp() {
 	}, [q]);
 
 	const active = useMemo(() => {
+		const lab = viewKey.startsWith("label:") ? labels.find((l) => `label:${l.id}` === viewKey) : null;
+		if (lab) return { label: lab.name, icon: Tag, config: { mailbox: "inbox", labelId: lab.id, group: "date" } as ViewConfig, view: null as ViewRow | null };
 		const custom = views.find((v) => `custom:${v.id}` === viewKey);
 		if (custom) return { label: custom.name, icon: ICON[custom.icon] ?? Inbox, config: custom.config, view: custom };
 		const b = BUILT_IN.find((x) => x.key === viewKey) ?? BUILT_IN[0];
 		return { label: b.label, icon: b.icon, config: b.config, view: null as ViewRow | null };
-	}, [views, viewKey]);
+	}, [views, viewKey, labels]);
 
 	const mailboxPath = useMemo(() => {
 		const hit = boxes.find((b) => b.special === active.config.mailbox);
@@ -162,7 +170,7 @@ export function MailApp() {
 		setLoadError(null);
 		try {
 			const c = active.config;
-			const res = await listMessages(accountId, mailboxPath, { unread: c.unread, starred: c.starred, hasAttachment: c.hasAttachment, from: c.from, text: debouncedQ }, append ? rows.length : 0, 40);
+			const res = await listMessages(accountId, mailboxPath, { unread: c.unread, starred: c.starred, hasAttachment: c.hasAttachment, from: c.from, labelId: c.labelId, text: debouncedQ }, append ? rows.length : 0, 40);
 			if (token !== listToken.current) return;
 			setRows((prev) => (append ? [...prev, ...res.items.filter((i) => !prev.some((p) => p.uid === i.uid))] : res.items));
 			setTotal(res.total);
@@ -224,6 +232,22 @@ export function MailApp() {
 			toast({ title: "That did not work", description: e instanceof Error ? e.message : undefined, variant: "destructive" });
 		}
 	}, [accountId, rows, selected, layout, open, toast]);
+
+	/** Add or remove a label on a message; reflected straight away in the list. */
+	const toggleLabel = async (messageId: string, labelId: string, on: boolean, uid?: number) => {
+		if (!accountId) return;
+		const apply = (r: MessageRow) => (r.messageId === messageId ? { ...r, labels: on ? Array.from(new Set([...r.labels, labelId])) : r.labels.filter((x) => x !== labelId) } : r);
+		setRows((prev) => prev.map(apply));
+		if (selected && selected.messageId === messageId) setSelected((s) => (s ? apply(s) : s));
+		try {
+			await setMessageLabel(accountId, messageId, labelId, on);
+			if (on) toast({ title: `Labelled ${labels.find((l) => l.id === labelId)?.name ?? ""}` });
+		} catch (e) {
+			toast({ title: "Could not change the label", description: e instanceof Error ? e.message : undefined, variant: "destructive" });
+			loadList(false);
+		}
+		void uid;
+	};
 
 	const startReply = (d: Detail, all: boolean, forward = false) => {
 		const me = accounts?.find((a) => a.id === accountId)?.email.toLowerCase();
@@ -319,6 +343,28 @@ export function MailApp() {
 				{views.length > 0 && <p className="px-2 pb-1 pt-4 text-[11px] font-semibold uppercase tracking-wider text-serene-neutral-400">Your views</p>}
 				{views.map((v) => <NavItem key={v.id} active={viewKey === `custom:${v.id}`} icon={ICON[v.icon] ?? Inbox} label={v.name} onClick={() => { setViewKey(`custom:${v.id}`); setNavOpen(false); }} onEdit={() => setViewEdit(v)} />)}
 				<button onClick={() => setViewEdit({})} className="mt-1 flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-serene-neutral-500 hover:bg-white/70"><Plus className="h-4 w-4" /> New view</button>
+				<p className="px-2 pb-1 pt-4 text-[11px] font-semibold uppercase tracking-wider text-serene-neutral-400">Labels</p>
+				{labels.map((l) => (
+					<div
+						key={l.id}
+						onDragOver={(e) => { e.preventDefault(); setDropOn(l.id); }}
+						onDragLeave={() => setDropOn((d) => (d === l.id ? null : d))}
+						onDrop={(e) => {
+							e.preventDefault();
+							setDropOn(null);
+							const mid = e.dataTransfer.getData("text/x-message-id");
+							if (mid && accountId) toggleLabel(mid, l.id, true);
+						}}
+						className={cn("group flex items-center rounded-lg transition", viewKey === `label:${l.id}` ? "bg-white shadow-sm" : "hover:bg-white/70", dropOn === l.id && "ring-2 ring-purple-400")}
+					>
+						<button onClick={() => { setViewKey(`label:${l.id}`); setNavOpen(false); }} className="flex min-w-0 flex-1 touch-manipulation items-center gap-2 px-2 py-1.5 text-left text-sm text-serene-neutral-700">
+							<span className={cn("h-2.5 w-2.5 shrink-0 rounded-full", LABEL_COLORS[l.color]?.dot ?? "bg-purple-500")} />
+							<span className="truncate">{l.name}</span>
+						</button>
+						<button onClick={() => setLabelEdit(l)} aria-label={`Edit ${l.name}`} className="mr-1 hidden rounded p-1 text-serene-neutral-400 hover:text-serene-neutral-800 group-hover:block"><Pencil className="h-3.5 w-3.5" /></button>
+					</div>
+				))}
+				<button onClick={() => setLabelEdit({})} className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-serene-neutral-500 hover:bg-white/70"><Plus className="h-4 w-4" /> New label</button>
 			</nav>
 			<div className="space-y-px border-t border-serene-neutral-200/70 p-2 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
 				<button onClick={() => setCmdOpen(true)} className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-serene-neutral-600 hover:bg-white/70"><CommandIcon className="h-4 w-4" /> Command menu <kbd className="ml-auto rounded border bg-white px-1.5 text-[10px]">Ctrl K</kbd></button>
@@ -329,7 +375,7 @@ export function MailApp() {
 
 	const Pane = (
 		<ReadingPane
-			selected={selected} detail={detail} busy={detailBusy} accountId={accountId!} conversation={conversation} summary={summary} summaryBusy={summaryBusy} allowImages={allowImages}
+			labels={labels} selectedLabels={rows.find((r) => r.uid === selected?.uid)?.labels ?? selected?.labels ?? []} onToggleLabel={(id, on) => selected?.messageId && toggleLabel(selected.messageId, id, on, selected.uid)} onNewLabel={() => setLabelEdit({})} selected={selected} detail={detail} busy={detailBusy} accountId={accountId!} conversation={conversation} summary={summary} summaryBusy={summaryBusy} allowImages={allowImages}
 			onClose={close} onSummarise={summarise} onOpen={(m) => open(m)} onAct={(a) => selected && act(selected, a)}
 			onReply={(all) => detail && startReply(detail, all)} onForward={() => detail && startReply(detail, false, true)}
 			onLoadImages={() => { setAllowImages(true); if (selected) open(selected, true); }} full={effectiveLayout === "full"}
@@ -364,13 +410,14 @@ export function MailApp() {
 							{g.label && <h3 className="sticky top-0 z-[1] bg-white/95 px-4 py-1.5 text-xs font-semibold text-serene-neutral-400 backdrop-blur">{g.label}</h3>}
 							<ul>
 								{g.items.map((m) => (
-									<li key={m.uid} className="group relative">
+									<li key={m.uid} className="group relative" draggable={!!m.messageId} onDragStart={(e) => { if (m.messageId) { e.dataTransfer.setData("text/x-message-id", m.messageId); e.dataTransfer.effectAllowed = "copy"; } }}>
 										<button onClick={() => open(m)} className={cn("flex w-full touch-manipulation items-center gap-3 px-4 py-2.5 text-left transition-colors hover:bg-serene-neutral-50", selected?.uid === m.uid && "bg-purple-50/70")}>
 											<span className={cn("h-2 w-2 shrink-0 rounded-full", m.seen ? "bg-transparent" : "bg-purple-600")} aria-label={m.seen ? "" : "Unread"} />
 											<span className={cn("w-36 shrink-0 truncate text-sm sm:w-44", m.seen ? "text-serene-neutral-700" : "font-semibold text-serene-neutral-900")}>{displayName(m.from)}</span>
 											<span className={cn("min-w-0 flex-1 truncate text-sm", m.seen ? "text-serene-neutral-600" : "font-semibold text-serene-neutral-900")}>
 												{m.subject}
 												{m.thread > 1 && <span className="ml-2 rounded bg-serene-neutral-100 px-1.5 py-0.5 text-[10px] font-medium text-serene-neutral-500">{m.thread}</span>}
+												{m.labels.slice(0, 2).map((id) => { const l = labels.find((x) => x.id === id); return l ? <span key={id} className={cn("ml-2 rounded px-1.5 py-0.5 text-[10px] font-semibold", LABEL_COLORS[l.color]?.chip ?? "bg-purple-100 text-purple-800")}>{l.name}</span> : null; })}
 											</span>
 											{m.hasAttachments && <Paperclip className="h-3.5 w-3.5 shrink-0 text-serene-neutral-400" />}
 											{m.flagged && <Star className="h-3.5 w-3.5 shrink-0 fill-amber-400 text-amber-400" />}
@@ -403,8 +450,19 @@ export function MailApp() {
 			{compose && accountId && <Composer accounts={accounts} accountId={accountId} seed={compose} snippets={snippets} onClose={() => setCompose(null)} onSent={() => { setCompose(null); if (active.config.mailbox === "sent") loadList(false); }} />}
 			<ConnectDialog open={connectOpen} onClose={() => setConnectOpen(false)} onConnected={(a) => { setAccounts((p) => [...(p ?? []), a]); setAccountId(a.id); }} />
 			<SettingsDialog open={settingsOpen} onClose={() => setSettingsOpen(false)} accounts={accounts} onAccountsChanged={() => loadAccounts().catch(() => undefined)} onConnect={() => setConnectOpen(true)} snippets={snippets} onSnippetsChanged={() => loadMeta().catch(() => undefined)} layout={layout} onLayout={changeLayout} />
+			{labelEdit && (
+				<LabelDialog
+					label={labelEdit}
+					accountId={accountId}
+					onClose={() => setLabelEdit(null)}
+					onSave={async (v) => { const saved = await saveLabel(v.id, { name: v.name, color: v.color, instruction: v.instruction }); await loadMeta(); return saved; }}
+					onDelete={async (id) => { await deleteLabel(id); await loadMeta(); if (viewKey === `label:${id}`) setViewKey("inbox"); }}
+					onApplied={() => loadList(false)}
+				/>
+			)}
 			{viewEdit && (
 				<ViewDialog
+					labels={labels}
 					view={viewEdit}
 					onClose={() => setViewEdit(null)}
 					onSave={async (v) => { const saved = await saveView(v.id, { name: v.name, icon: v.icon, config: v.config }); await loadMeta(); setViewKey(`custom:${saved.id}`); }}
@@ -456,7 +514,8 @@ function HoverBtn({ label, onClick, children }: { label: string; onClick: () => 
 	return <button onClick={(e) => { e.stopPropagation(); onClick(); }} title={label} aria-label={label} className="rounded-md p-1.5 text-serene-neutral-600 hover:bg-serene-neutral-100">{children}</button>;
 }
 
-function ReadingPane({ selected, detail, busy, accountId, conversation, summary, summaryBusy, allowImages, onClose, onSummarise, onOpen, onAct, onReply, onForward, onLoadImages, full }: {
+function ReadingPane({ labels, selectedLabels, onToggleLabel, onNewLabel, selected, detail, busy, accountId, conversation, summary, summaryBusy, allowImages, onClose, onSummarise, onOpen, onAct, onReply, onForward, onLoadImages, full }: {
+	labels: LabelRow[]; selectedLabels: string[]; onToggleLabel: (id: string, on: boolean) => void; onNewLabel: () => void;
 	selected: MessageRow | null; detail: Detail | null; busy: boolean; accountId: string; conversation: MessageRow[]; summary: string | null; summaryBusy: boolean; allowImages: boolean;
 	onClose: () => void; onSummarise: () => void; onOpen: (m: MessageRow) => void; onAct: (a: MailAction) => void; onReply: (all: boolean) => void; onForward: () => void; onLoadImages: () => void; full: boolean;
 }) {
@@ -483,6 +542,17 @@ function ReadingPane({ selected, detail, busy, accountId, conversation, summary,
 					<Button variant="ghost" size="icon" className="h-9 w-9" onClick={() => onReply(false)} aria-label="Reply" title="Reply (R)"><Reply className="h-4 w-4" /></Button>
 					<Button variant="ghost" size="icon" className="h-9 w-9" onClick={() => onReply(true)} aria-label="Reply all"><ReplyAll className="h-4 w-4" /></Button>
 					<Button variant="ghost" size="icon" className="h-9 w-9" onClick={onForward} aria-label="Forward"><Forward className="h-4 w-4" /></Button>
+					<Popover>
+						<PopoverTrigger asChild><Button variant="ghost" size="icon" className="h-9 w-9" aria-label="Labels" title="Label"><Tag className="h-4 w-4" /></Button></PopoverTrigger>
+						<PopoverContent align="end" className="w-60 p-1.5">
+							{labels.map((l) => { const on = selectedLabels.includes(l.id); return (
+								<button key={l.id} onClick={() => onToggleLabel(l.id, !on)} className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-serene-neutral-100">
+									<span className={cn("h-2.5 w-2.5 rounded-full", LABEL_COLORS[l.color]?.dot ?? "bg-purple-500")} /><span className="flex-1 truncate">{l.name}</span>{on && <Check className="h-4 w-4 text-purple-600" />}
+								</button>
+							); })}
+							<button onClick={onNewLabel} className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm text-serene-neutral-500 hover:bg-serene-neutral-100"><Plus className="h-4 w-4" /> New label</button>
+						</PopoverContent>
+					</Popover>
 					<Button variant="ghost" size="icon" className="h-9 w-9" onClick={() => onAct("archive")} aria-label="Archive" title="Archive (E)"><Archive className="h-4 w-4" /></Button>
 					<Button variant="ghost" size="icon" className="h-9 w-9" onClick={() => onAct(selected?.seen ? "unread" : "read")} aria-label="Mark unread" title="Mark unread (U)"><Mail className="h-4 w-4" /></Button>
 					<Button variant="ghost" size="icon" className="h-9 w-9" onClick={() => onAct(selected?.flagged ? "unstar" : "star")} aria-label="Star" title="Star (S)"><Star className={cn("h-4 w-4", selected?.flagged && "fill-amber-400 text-amber-400")} /></Button>

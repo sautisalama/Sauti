@@ -1,7 +1,7 @@
 import * as raw from '@/app/actions/mjengo-mail';
 import { unwrap } from '@/lib/action-result';
 
-export type { AccountView, AddAccountInput, MessageRow, ListQuery, MailAction, SendInput, ViewConfig, ViewRow, SnippetRow } from '@/app/actions/mjengo-mail';
+export type { LabelRow, AccountView, AddAccountInput, MessageRow, ListQuery, MailAction, SendInput, ViewConfig, ViewRow, SnippetRow } from '@/app/actions/mjengo-mail';
 
 export const listAccounts = (...a: Parameters<typeof raw.listAccounts>) => unwrap(raw.listAccounts(...a));
 export const addAccount = (...a: Parameters<typeof raw.addAccount>) => unwrap(raw.addAccount(...a));
@@ -21,3 +21,9 @@ export const deleteSnippet = (...a: Parameters<typeof raw.deleteSnippet>) => unw
 export const summariseMessage = (...a: Parameters<typeof raw.summariseMessage>) => unwrap(raw.summariseMessage(...a));
 export const draftReply = (...a: Parameters<typeof raw.draftReply>) => unwrap(raw.draftReply(...a));
 export const oauthAvailability = (...a: Parameters<typeof raw.oauthAvailability>) => unwrap(raw.oauthAvailability(...a));
+export const listLabels = (...a: Parameters<typeof raw.listLabels>) => unwrap(raw.listLabels(...a));
+export const saveLabel = (...a: Parameters<typeof raw.saveLabel>) => unwrap(raw.saveLabel(...a));
+export const deleteLabel = (...a: Parameters<typeof raw.deleteLabel>) => unwrap(raw.deleteLabel(...a));
+export const setMessageLabel = (...a: Parameters<typeof raw.setMessageLabel>) => unwrap(raw.setMessageLabel(...a));
+export const autoLabel = (...a: Parameters<typeof raw.autoLabel>) => unwrap(raw.autoLabel(...a));
+export const rewriteText = (...a: Parameters<typeof raw.rewriteText>) => unwrap(raw.rewriteText(...a));
