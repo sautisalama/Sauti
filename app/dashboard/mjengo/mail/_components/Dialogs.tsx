@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { autoLabel, type LabelRow } from "./api";
+import { clearMailCache } from "@/lib/mail/offline-cache";
 import { addAccount, oauthAvailability, deleteSnippet, removeAccount, saveSnippet, type AccountView, type SnippetRow, type ViewConfig, type ViewRow } from "./api";
 
 const PROVIDERS = [
@@ -205,7 +206,7 @@ export function SettingsDialog({ open, onClose, accounts, onAccountsChanged, onC
 					<ul className="divide-y divide-serene-neutral-100 rounded-xl border border-serene-neutral-100">
 						{accounts.map((a) => (
 							<li key={a.id} className="flex items-center gap-3 p-3"><div className="min-w-0 flex-1"><p className="truncate text-sm font-medium">{a.email}</p></div>
-								<Button size="sm" variant="ghost" className="text-red-600" onClick={async () => { if (window.confirm(`Disconnect ${a.email}? Your email stays in the mailbox.`)) { await removeAccount(a.id); onAccountsChanged(); } }}>Disconnect</Button>
+								<Button size="sm" variant="ghost" className="text-red-600" onClick={async () => { if (window.confirm(`Disconnect ${a.email}? Your email stays in the mailbox.`)) { await removeAccount(a.id); clearMailCache(); onAccountsChanged(); } }}>Disconnect</Button>
 							</li>
 						))}
 						{accounts.length === 0 && <li className="p-3 text-sm text-serene-neutral-500">None connected.</li>}

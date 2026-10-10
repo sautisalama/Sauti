@@ -23,6 +23,7 @@ import { ConnectDialog, LabelDialog, LABEL_COLORS, SettingsDialog, ViewDialog } 
 import { listLabels, saveLabel, deleteLabel, setMessageLabel, type LabelRow } from "./api";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { AccountSwitcher } from "./AccountSwitcher";
+import { cacheDetail, cacheList, readDetail, readList } from "@/lib/mail/offline-cache";
 
 type Detail = Awaited<ReturnType<typeof getMessageDetail>>;
 type Layout = "side" | "center" | "full";
@@ -75,6 +76,8 @@ export function MailApp() {
 	const [total, setTotal] = useState(0);
 	const [loading, setLoading] = useState(false);
 	const [loadError, setLoadError] = useState<string | null>(null);
+	// True while what is on screen came from this device's saved copy.
+	const [offline, setOffline] = useState(false);
 
 	const [selected, setSelected] = useState<MessageRow | null>(null);
 	const [detail, setDetail] = useState<Detail | null>(null);
@@ -174,8 +177,18 @@ export function MailApp() {
 			if (token !== listToken.current) return;
 			setRows((prev) => (append ? [...prev, ...res.items.filter((i) => !prev.some((p) => p.uid === i.uid))] : res.items));
 			setTotal(res.total);
+			setOffline(false);
+			if (!append && !debouncedQ) cacheList(`${accountId}:${viewKey}`, res);
 		} catch (e) {
-			if (token === listToken.current) setLoadError(e instanceof Error ? e.message : "Could not load this folder.");
+			if (token === listToken.current) {
+				// No connection (or the server is unreachable): fall back to the copy saved on this device.
+				const saved = !append && !debouncedQ ? readList<{ items: MessageRow[]; total: number }>(`${accountId}:${viewKey}`) : null;
+				if (saved) {
+					setRows(saved.items);
+					setTotal(saved.total);
+					setOffline(true);
+				} else setLoadError(e instanceof Error ? e.message : "Could not load this folder.");
+			}
 		} finally {
 			if (token === listToken.current) setLoading(false);
 		}
@@ -199,10 +212,17 @@ export function MailApp() {
 		try {
 			const d = await getMessageDetail(accountId, m.mailbox, m.uid, images);
 			setDetail(d);
+			cacheDetail(`${accountId}:${m.mailbox}:${m.uid}`, d);
 			setRows((prev) => prev.map((r) => (r.uid === m.uid ? { ...r, seen: true } : r)));
 			if (!m.seen) setUnread((u) => Math.max(0, u - 1));
 			getConversation(accountId, m.mailbox, d.subject).then((c) => setConversation(c.filter((x) => x.uid !== m.uid))).catch(() => undefined);
 		} catch (e) {
+			const saved = readDetail<Detail>(`${accountId}:${m.mailbox}:${m.uid}`);
+			if (saved) {
+				setDetail(saved);
+				setOffline(true);
+				return;
+			}
 			toast({ title: "Could not open it", description: e instanceof Error ? e.message : undefined, variant: "destructive" });
 			setSelected(null);
 		} finally {
@@ -399,6 +419,7 @@ export function MailApp() {
 					<Button variant="ghost" size="icon" className="h-9 w-9 lg:hidden" onClick={() => setCompose({})} aria-label="Compose"><Edit3 className="h-4 w-4" /></Button>
 				</header>
 
+				{offline && <div role="status" className="border-b border-amber-100 bg-amber-50 px-4 py-2 text-xs font-medium text-amber-900">You are offline, or the mail server cannot be reached. Showing mail saved on this device. <button className="ml-2 underline" onClick={() => loadList(false)}>Try again</button></div>}
 				<div className="min-h-0 flex-1 overflow-y-auto">
 					{loadError && <div className="m-4 rounded-xl bg-red-50 p-4 text-sm text-red-700">{loadError} <button className="ml-2 underline" onClick={() => loadList(false)}>Try again</button></div>}
 					{!loadError && loading && rows.length === 0 && <div className="space-y-px p-2">{Array.from({ length: 8 }).map((_, i) => <div key={i} className="h-11 animate-pulse rounded-lg bg-serene-neutral-50" />)}</div>}
