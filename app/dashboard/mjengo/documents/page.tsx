@@ -76,7 +76,7 @@ export default function DocumentsPage() {
 		<div className="space-y-4">
 			<div className="flex flex-wrap items-end justify-between gap-2">
 				<div>
-					<h2 className="text-lg font-bold text-serene-neutral-900">Documents</h2>
+					<h2 className="text-xl font-bold tracking-tight text-sauti-dark">Documents</h2>
 					<p className="text-sm text-serene-neutral-500">{docs.filter((d) => d.file_path).length} uploaded · {needed} still needed across all grants, opportunities and projects</p>
 				</div>
 				<DropdownMenu>
@@ -99,7 +99,7 @@ export default function DocumentsPage() {
 					<ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
 						{written.map((w) => (
 							<li key={w.id}>
-								<Link href={`/dashboard/mjengo/documents/editor?file=${w.id}`} className="flex items-center gap-3 rounded-2xl border border-serene-neutral-100 bg-white p-3 transition hover:border-sauti-teal/40 hover:shadow-sm">
+								<Link href={`/dashboard/mjengo/documents/editor?file=${w.id}`} className="flex items-center gap-3 rounded-2xl border border-serene-neutral-200/70 bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04)] p-3 transition hover:border-sauti-teal/40 hover:shadow-sm">
 									<span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-sauti-teal-light text-sauti-teal"><FileText className="h-5 w-5" /></span>
 									<span className="min-w-0"><span className="block truncate text-sm font-medium text-serene-neutral-900">{w.name}</span><span className="block truncate text-xs text-serene-neutral-500">{w.folder ?? "Vault"} · {fmtBytes(w.size)}</span></span>
 								</Link>
@@ -118,7 +118,7 @@ export default function DocumentsPage() {
 				<Segmented value={state} onChange={setState} options={[["all", "All"], ["needed", "Needed"], ["uploaded", "Uploaded"]]} />
 			</div>
 
-			<div className="overflow-hidden rounded-2xl border border-serene-neutral-100 bg-white">
+			<div className="overflow-hidden rounded-2xl border border-serene-neutral-200/70 bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04)]">
 				<ul className="divide-y divide-serene-neutral-50">
 					{shown.map((d) => (
 						<li key={d.id} className="flex flex-wrap items-center gap-3 p-3 sm:flex-nowrap">

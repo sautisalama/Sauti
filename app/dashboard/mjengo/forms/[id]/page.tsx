@@ -180,7 +180,7 @@ function QuestionsTab({ description, onDescription, questions, onChange }: { des
 			</div>
 
 			{questions.map((q, i) => (
-				<section key={q.id} className="rounded-2xl border border-serene-neutral-100 bg-white p-4 shadow-sm">
+				<section key={q.id} className="rounded-2xl border border-serene-neutral-200/70 bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04)] p-4 shadow-sm">
 					<div className="flex items-start gap-2">
 						<GripVertical className="mt-2.5 h-4 w-4 shrink-0 text-serene-neutral-300" aria-hidden />
 						<div className="min-w-0 flex-1 space-y-3">
@@ -279,7 +279,7 @@ function ResponsesTab({ formId, title, questions, collectEmail, responses, onCha
 				<span className="text-sm text-serene-neutral-500">{shown.length} of {responses.length}</span>
 				<Button variant="outline" size="sm" className="gap-1.5" onClick={download}><Download className="h-4 w-4" /> Export CSV</Button>
 			</div>
-			<div className="overflow-x-auto rounded-2xl border border-serene-neutral-100 bg-white">
+			<div className="overflow-x-auto rounded-2xl border border-serene-neutral-200/70 bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04)]">
 				<table className="w-full min-w-[640px] text-sm">
 					<thead className="bg-serene-neutral-50 text-left text-xs uppercase tracking-wide text-serene-neutral-500">
 						<tr>
@@ -327,8 +327,8 @@ function AnalyticsTab({ questions, responses }: { questions: Question[]; respons
 				<Stat label="Latest" value={format(new Date(responses[0].created_at), "d MMM")} />
 			</div>
 
-			<section className="rounded-2xl border border-serene-neutral-100 bg-white p-4">
-				<h3 className="mb-2 text-sm font-bold text-serene-neutral-900">Responses per day, last 30 days</h3>
+			<section className="rounded-2xl border border-serene-neutral-200/70 bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04)] p-4">
+				<h3 className="mb-2 text-sm font-bold text-sauti-dark">Responses per day, last 30 days</h3>
 				<div className="h-44" role="img" aria-label="Responses per day">
 					<ResponsiveContainer width="100%" height="100%">
 						<AreaChart data={days} margin={{ left: -20, right: 8, top: 6 }}>
@@ -344,9 +344,9 @@ function AnalyticsTab({ questions, responses }: { questions: Question[]; respons
 
 			<div className="grid gap-4 lg:grid-cols-2">
 				{summaries.map((s) => (
-					<section key={s.question.id} className="rounded-2xl border border-serene-neutral-100 bg-white p-4">
+					<section key={s.question.id} className="rounded-2xl border border-serene-neutral-200/70 bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04)] p-4">
 						<div className="mb-3 flex items-start justify-between gap-2">
-							<h3 className="text-sm font-bold text-serene-neutral-900">{s.question.label || "Untitled question"}</h3>
+							<h3 className="text-sm font-bold text-sauti-dark">{s.question.label || "Untitled question"}</h3>
 							<Badge variant="secondary" className="shrink-0">{s.answered} answered</Badge>
 						</div>
 
@@ -384,7 +384,7 @@ function AnalyticsTab({ questions, responses }: { questions: Question[]; respons
 
 function Stat({ label, value, hint }: { label: string; value: number | string; hint?: string }) {
 	return (
-		<div className="rounded-2xl border border-serene-neutral-100 bg-white p-4">
+		<div className="rounded-2xl border border-serene-neutral-200/70 bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04)] p-4">
 			<p className="text-2xl font-bold tabular-nums text-serene-neutral-900">{value}</p>
 			<p className="text-xs font-semibold text-serene-neutral-700">{label}</p>
 			{hint && <p className="text-xs text-serene-neutral-500">{hint}</p>}
@@ -397,7 +397,7 @@ function Stat({ label, value, hint }: { label: string; value: number | string; h
 function SettingsTab({ settings, onChange, onDelete }: { settings: FormSettings; onChange: (s: FormSettings) => void; onDelete: () => void }) {
 	return (
 		<div className="mx-auto max-w-2xl space-y-4">
-			<section className="space-y-4 rounded-2xl border border-serene-neutral-100 bg-white p-5">
+			<section className="space-y-4 rounded-2xl border border-serene-neutral-200/70 bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04)] p-5">
 				<div className="space-y-1.5">
 					<Label>Message after someone submits</Label>
 					<Textarea rows={2} value={settings.confirmation ?? ""} onChange={(e) => onChange({ ...settings, confirmation: e.target.value })} />

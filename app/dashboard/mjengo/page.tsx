@@ -24,20 +24,26 @@ export default function MjengoOverview() {
 	const cur = o.currencies[0] ?? "USD";
 
 	return (
-		<div className="space-y-6">
+		<div className="mx-auto max-w-6xl space-y-6">
+			<section className="relative overflow-hidden rounded-2xl border border-serene-blue-100 bg-gradient-to-br from-serene-blue-50 via-white to-sauti-teal-light/40 p-6 sm:p-8">
+				<h2 className="text-2xl font-bold tracking-tight text-sauti-dark sm:text-3xl">Mjengo <span className="text-sauti-teal">Suite</span></h2>
+				<p className="mt-1 text-sm text-serene-neutral-600">Grants, opportunities, projects, documents and mail in one calm place.</p>
+			</section>
+
+			<p className="px-1 text-[11px] font-semibold uppercase tracking-widest text-serene-neutral-400">Overview</p>
 			<div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
-				<Stat icon={TrendingUp} label="In the pipeline" value={money(o.pipelineValue, cur)} hint={o.currencies.length > 1 ? `${cur} grants only` : "open grants"} href="/dashboard/mjengo/grants" />
-				<Stat icon={Briefcase} label="Awarded" value={money(o.awardedValue, cur)} hint="awarded or reporting" href="/dashboard/mjengo/grants" />
-				<Stat icon={FileWarning} label="Documents needed" value={String(o.missingDocs)} hint="required, not uploaded" tone={o.missingDocs ? "warn" : undefined} href="/dashboard/mjengo/documents" />
-				<Stat icon={CheckSquare} label="Open to-dos" value={String(o.openTodos)} hint={`${o.myTodos} yours`} href="/dashboard/mjengo/todos" />
-				<Stat icon={Mail} label="Mail" value="Open" hint="connect an inbox" href="/dashboard/mjengo/mail" />
+				<Stat tint="bg-sauti-teal-light" icon={TrendingUp} label="In the pipeline" value={money(o.pipelineValue, cur)} hint={o.currencies.length > 1 ? `${cur} grants only` : "open grants"} href="/dashboard/mjengo/grants" />
+				<Stat tint="bg-serene-green-100" icon={Briefcase} label="Awarded" value={money(o.awardedValue, cur)} hint="awarded or reporting" href="/dashboard/mjengo/grants" />
+				<Stat tint="bg-sauti-yellow-light" icon={FileWarning} label="Documents needed" value={String(o.missingDocs)} hint="required, not uploaded" tone={o.missingDocs ? "warn" : undefined} href="/dashboard/mjengo/documents" />
+				<Stat tint="bg-serene-blue-50" icon={CheckSquare} label="Open to-dos" value={String(o.openTodos)} hint={`${o.myTodos} yours`} href="/dashboard/mjengo/todos" />
+				<Stat tint="bg-white" icon={Mail} label="Mail" value="Open" hint="connect an inbox" href="/dashboard/mjengo/mail" />
 			</div>
 
 			<GrantCharts grants={grants} />
 
 			<div className="grid gap-4 lg:grid-cols-3">
-				<section className="rounded-2xl border border-serene-neutral-100 bg-white p-4 lg:col-span-2">
-					<h3 className="mb-3 text-sm font-bold text-serene-neutral-900">Coming up</h3>
+				<section className="rounded-2xl border border-serene-neutral-200/70 bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04)] p-4 lg:col-span-2">
+					<h3 className="mb-3 text-sm font-bold text-sauti-dark">Coming up</h3>
 					{o.deadlines.length === 0 ? (
 						<p className="text-sm text-serene-neutral-500">No deadlines tracked yet. Add dates to grants, opportunities, documents and tasks and they appear here.</p>
 					) : (
@@ -70,10 +76,10 @@ export default function MjengoOverview() {
 	);
 }
 
-function Stat({ icon: Icon, label, value, hint, href, tone }: { icon: typeof Mail; label: string; value: string; hint: string; href: string; tone?: "warn" }) {
+function Stat({ icon: Icon, label, value, hint, href, tone, tint }: { tint: string; icon: typeof Mail; label: string; value: string; hint: string; href: string; tone?: "warn" }) {
 	return (
-		<Link href={href} className="rounded-2xl border border-serene-neutral-100 bg-white p-4 transition hover:shadow-md">
-			<div className={`mb-2 flex h-8 w-8 items-center justify-center rounded-lg ${tone === "warn" ? "bg-amber-100 text-amber-700" : "bg-sauti-teal-light/40 text-sauti-teal"}`}><Icon className="h-4 w-4" /></div>
+		<Link href={href} className={`rounded-2xl border border-black/5 ${tint} p-4 shadow-[0_1px_2px_rgba(16,24,40,0.04)] transition hover:-translate-y-0.5 hover:shadow-md`}>
+			<div className={`mb-3 flex h-9 w-9 items-center justify-center rounded-xl bg-white/80 ${tone === "warn" ? "text-amber-600" : "text-sauti-teal"}`}><Icon className="h-4 w-4" /></div>
 			<p className="text-xl font-bold tabular-nums text-serene-neutral-900">{value}</p>
 			<p className="text-xs font-semibold text-serene-neutral-700">{label}</p>
 			<p className="text-xs text-serene-neutral-500">{hint}</p>
@@ -84,8 +90,8 @@ function Stat({ icon: Icon, label, value, hint, href, tone }: { icon: typeof Mai
 function Breakdown({ title, kind, data, href }: { title: string; kind: Kind; data: { status: string; count: number }[]; href: string }) {
 	const total = data.reduce((n, d) => n + d.count, 0);
 	return (
-		<Link href={href} className="block rounded-2xl border border-serene-neutral-100 bg-white p-4 transition hover:shadow-md">
-			<div className="mb-2 flex items-baseline justify-between"><h3 className="text-sm font-bold text-serene-neutral-900">{title}</h3><span className="text-xs text-serene-neutral-500">{total} total</span></div>
+		<Link href={href} className="block rounded-2xl border border-serene-neutral-200/70 bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04)] p-4 transition hover:shadow-md">
+			<div className="mb-2 flex items-baseline justify-between"><h3 className="text-sm font-bold text-sauti-dark">{title}</h3><span className="text-xs text-serene-neutral-500">{total} total</span></div>
 			{total === 0 ? (
 				<p className="text-sm text-serene-neutral-500">None yet.</p>
 			) : (

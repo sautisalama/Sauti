@@ -98,7 +98,7 @@ export function DocumentsPanel({ kind, entityId, onChange }: { kind: Kind; entit
 	return (
 		<section aria-label="Documents">
 			<div className="mb-2 flex items-center justify-between">
-				<h3 className="text-sm font-bold text-serene-neutral-900">Documents</h3>
+				<h3 className="text-sm font-bold text-sauti-dark">Documents</h3>
 				{docs && docs.length > 0 && <span className={`text-xs font-medium ${missing ? "text-amber-700" : "text-emerald-700"}`}>{missing ? `${missing} still needed` : "All in"}</span>}
 			</div>
 

@@ -240,7 +240,7 @@ export function EntityWorkspace({ kind }: { kind: Kind }) {
 					})}
 				</div>
 			) : (
-				<div className="overflow-hidden rounded-2xl border border-serene-neutral-100 bg-white">
+				<div className="overflow-hidden rounded-2xl border border-serene-neutral-200/70 bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04)]">
 					<ul className="divide-y divide-serene-neutral-50">
 						{filtered.map((r) => (
 							<li key={r.id}>

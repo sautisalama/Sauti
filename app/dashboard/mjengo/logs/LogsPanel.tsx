@@ -81,7 +81,7 @@ function Activity() {
 				</Select>
 			</div>
 
-			<div className="overflow-hidden rounded-2xl border border-serene-neutral-100 bg-white">
+			<div className="overflow-hidden rounded-2xl border border-serene-neutral-200/70 bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04)]">
 				<ul className="divide-y divide-serene-neutral-50">
 					{rows.map((r) => (
 						<li key={r.id} className="flex flex-col gap-1 p-3 sm:flex-row sm:items-center sm:gap-4">
@@ -133,7 +133,7 @@ function Emails() {
 				<Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-serene-neutral-400" />
 				<Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search subject or kind" className="pl-9" />
 			</div>
-			<div className="overflow-hidden rounded-2xl border border-serene-neutral-100 bg-white">
+			<div className="overflow-hidden rounded-2xl border border-serene-neutral-200/70 bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04)]">
 				<ul className="divide-y divide-serene-neutral-50">
 					{rows.map((r) => (
 						<li key={r.id} className="flex items-center gap-3 p-3">

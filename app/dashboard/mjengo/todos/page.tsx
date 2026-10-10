@@ -55,7 +55,7 @@ export default function TodosPage() {
 		<div className="space-y-5">
 			<div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
 				<div>
-					<h2 className="text-lg font-bold text-serene-neutral-900">To-dos</h2>
+					<h2 className="text-xl font-bold tracking-tight text-sauti-dark">To-dos</h2>
 					<p className="text-sm text-serene-neutral-500">Everyone on the team can see every track. Give a task to one or more people to share the responsibility.</p>
 				</div>
 				<div className="inline-flex shrink-0 rounded-lg border border-serene-neutral-200 bg-white p-0.5">
@@ -105,11 +105,11 @@ function TrackCard({ t, board, onEdit, run }: { t: TrackRow; board: Board; onEdi
 	const done = t.todos.filter((x) => x.status === "done");
 
 	return (
-		<section className="flex flex-col rounded-2xl border border-serene-neutral-100 bg-white">
+		<section className="flex flex-col rounded-2xl border border-serene-neutral-200/70 bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04)]">
 			<header className="flex items-center gap-2 border-b border-serene-neutral-50 p-3">
 				<span className={cn("h-2.5 w-2.5 shrink-0 rounded-full", DOTS[t.color] ?? DOTS.purple)} />
 				<div className="min-w-0 flex-1">
-					<h3 className="truncate text-sm font-bold text-serene-neutral-900">{t.name}</h3>
+					<h3 className="truncate text-sm font-bold text-sauti-dark">{t.name}</h3>
 					<p className="truncate text-xs text-serene-neutral-500">{t.created_by === board.me ? "Started by you" : t.created_by_name ? `Started by ${t.created_by_name}` : ""} · {open.length} open</p>
 				</div>
 				{canManage && (

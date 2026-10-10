@@ -62,9 +62,9 @@ export function GrantCharts({ grants }: { grants: GrantLite[] }) {
 
 	return (
 		<div className="grid gap-4 lg:grid-cols-3">
-			<div className="rounded-2xl border border-serene-neutral-100 bg-white p-4 lg:col-span-1">
+			<div className="rounded-2xl border border-serene-neutral-200/70 bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04)] p-4 lg:col-span-1">
 				<div className="mb-2 flex items-center justify-between gap-2">
-					<h3 className="text-sm font-bold text-serene-neutral-900">Funding by stage</h3>
+					<h3 className="text-sm font-bold text-sauti-dark">Funding by stage</h3>
 					{currencies.length > 1 && (
 						<Select value={cur} onValueChange={setCurrency}>
 							<SelectTrigger className="h-8 w-[84px] text-xs"><SelectValue /></SelectTrigger>
@@ -87,8 +87,8 @@ export function GrantCharts({ grants }: { grants: GrantLite[] }) {
 				</div>
 			</div>
 
-			<div className="rounded-2xl border border-serene-neutral-100 bg-white p-4">
-				<h3 className="mb-2 text-sm font-bold text-serene-neutral-900">Deadlines, next 6 months</h3>
+			<div className="rounded-2xl border border-serene-neutral-200/70 bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04)] p-4">
+				<h3 className="mb-2 text-sm font-bold text-sauti-dark">Deadlines, next 6 months</h3>
 				<div className="h-52" role="img" aria-label="Number of grant deadlines in each of the next six months">
 					<ResponsiveContainer width="100%" height="100%">
 						<BarChart data={byMonth} margin={{ left: -16, right: 8, top: 4, bottom: 4 }}>
@@ -102,8 +102,8 @@ export function GrantCharts({ grants }: { grants: GrantLite[] }) {
 				</div>
 			</div>
 
-			<div className="rounded-2xl border border-serene-neutral-100 bg-white p-4">
-				<h3 className="mb-2 text-sm font-bold text-serene-neutral-900">Next due</h3>
+			<div className="rounded-2xl border border-serene-neutral-200/70 bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04)] p-4">
+				<h3 className="mb-2 text-sm font-bold text-sauti-dark">Next due</h3>
 				{upcoming.length === 0 ? (
 					<p className="text-sm text-serene-neutral-500">No open deadlines.</p>
 				) : (

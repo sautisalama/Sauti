@@ -100,7 +100,7 @@ export default function VaultPage() {
 		<div className="space-y-4">
 			<div className="flex flex-wrap items-center justify-between gap-2">
 				<div>
-					<h2 className="text-lg font-bold text-serene-neutral-900">Vault</h2>
+					<h2 className="text-xl font-bold tracking-tight text-sauti-dark">Vault</h2>
 					<p className="text-sm text-serene-neutral-500">Shared files for the team. Each file or folder has its own people and rights.</p>
 				</div>
 				{canWrite && (
@@ -143,7 +143,7 @@ export default function VaultPage() {
 				</ul>
 			)}
 
-			<div className="overflow-hidden rounded-2xl border border-serene-neutral-100 bg-white">
+			<div className="overflow-hidden rounded-2xl border border-serene-neutral-200/70 bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04)]">
 				{!data ? (
 					<div className="flex justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-serene-neutral-400" /></div>
 				) : data.items.length === 0 ? (

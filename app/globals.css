@@ -395,3 +395,26 @@ html {
 	@keyframes fade-only { from { opacity: 0; } to { opacity: 1; } }
 	:where(button:not(:disabled), [role="button"]):active { transform: none; }
 }
+
+/* Mjengo suite theme: the dashboards' calm teal palette for every shadcn control, including portalled
+   dialogs, menus and popovers (the class is put on <html> while the suite is open). Default buttons were
+   orange, ghost and secondary ones near-black; here they are teal with readable text. */
+html.mjengo-theme {
+	--primary: 189 93% 30%;
+	--primary-foreground: 0 0% 100%;
+	--ring: 189 93% 30%;
+	--accent: 176 28% 93%;
+	--accent-foreground: 190 70% 18%;
+	--secondary: 176 28% 93%;
+	--secondary-foreground: 190 70% 20%;
+	--muted: 180 14% 96%;
+	--muted-foreground: 200 10% 38%;
+	--border: 190 14% 90%;
+	--input: 190 14% 86%;
+}
+html.mjengo-theme .bg-sauti-orange { background-color: #068297; }
+html.mjengo-theme .hover\:bg-sauti-blue:hover { background-color: #0b2228; }
+html.mjengo-theme .border-sauti-blue { border-color: rgb(6 130 151 / 0.45); }
+html.mjengo-theme .text-sauti-blue { color: #068297; }
+html.mjengo-theme button:not([class*="text-"]):not(:disabled),
+html.mjengo-theme [role="menuitem"]:not([class*="text-"]) { color: #0b2228; }

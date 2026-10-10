@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect } from "react";
 import { usePathname } from "next/navigation";
 import { ArrowLeft, ClipboardList, Briefcase, CheckSquare, FileText, HardDrive, FolderKanban, LayoutDashboard, Lightbulb, Mail, ScrollText, ShieldCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -23,6 +24,11 @@ const TABS = [
 
 export function MjengoShell({ isSuper, children }: { isSuper: boolean; children: React.ReactNode }) {
 	const pathname = usePathname() ?? "";
+	// Retheme shadcn controls (also in portals) while the suite is open.
+	useEffect(() => {
+		document.documentElement.classList.add("mjengo-theme");
+		return () => document.documentElement.classList.remove("mjengo-theme");
+	}, []);
 	// Mail and the document editor take the whole window, like native apps.
 	const fullBleed = pathname.startsWith(`${BASE}/mail`) || pathname.startsWith(`${BASE}/documents/editor`);
 
