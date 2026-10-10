@@ -20,6 +20,7 @@ import {
 } from "./api";
 import { Composer, type ComposeSeed } from "./Composer";
 import { ConnectDialog, SettingsDialog, ViewDialog } from "./Dialogs";
+import { AccountSwitcher } from "./AccountSwitcher";
 
 type Detail = Awaited<ReturnType<typeof getMessageDetail>>;
 type Layout = "side" | "center" | "full";
@@ -305,10 +306,7 @@ export function MailApp() {
 	const sidebar = (
 		<div className="flex h-full flex-col bg-[#f7f7f5]">
 			<div className="space-y-3 p-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
-				<Select value={accountId ?? undefined} onValueChange={(v) => { setAccountId(v); setViewKey("inbox"); }}>
-					<SelectTrigger className="h-10 border-0 bg-white shadow-sm"><SelectValue /></SelectTrigger>
-					<SelectContent>{accounts.map((a) => <SelectItem key={a.id} value={a.id}>{a.email}</SelectItem>)}</SelectContent>
-				</Select>
+				<AccountSwitcher accounts={accounts} accountId={accountId} onSelect={(id) => { setAccountId(id); setViewKey("inbox"); setNavOpen(false); }} onAdd={() => { setNavOpen(false); setConnectOpen(true); }} onSettings={() => { setNavOpen(false); setSettingsOpen(true); }} />
 				<Button onClick={() => { setCompose({}); setNavOpen(false); }} className="w-full justify-start gap-2 bg-purple-600 hover:bg-purple-700"><Edit3 className="h-4 w-4" /> Compose <span className="ml-auto text-xs opacity-70">C</span></Button>
 				<div className="relative">
 					<Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-serene-neutral-400" />
