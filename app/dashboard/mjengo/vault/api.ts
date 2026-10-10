@@ -17,3 +17,5 @@ export const listPeople = (...a: Parameters<typeof raw.listPeople>) => unwrap(ra
 export const searchFiles = (...a: Parameters<typeof raw.searchFiles>) => unwrap(raw.searchFiles(...a));
 export const checkRecipients = (...a: Parameters<typeof raw.checkRecipients>) => unwrap(raw.checkRecipients(...a));
 export const grantViewTo = (...a: Parameters<typeof raw.grantViewTo>) => unwrap(raw.grantViewTo(...a));
+export const prepareReplace = (...a: Parameters<typeof raw.prepareReplace>) => unwrap(raw.prepareReplace(...a));
+export const finishReplace = (...a: Parameters<typeof raw.finishReplace>) => unwrap(raw.finishReplace(...a));

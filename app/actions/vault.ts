@@ -161,15 +161,34 @@ async function deleteItem_(type: ResType, id: string) {
   await logAudit({ actorId: c.actor.id, actorEmail: c.actor.email, action: 'vault.deleted', targetType: `vault_${type}`, targetId: id, targetLabel: label });
 }
 
-async function getFileUrl_(id: string): Promise<{ url: string; name: string }> {
+async function getFileUrl_(id: string): Promise<{ url: string; name: string; level: Level; folderId: string | null; mime: string | null }> {
   const c = await ctx();
-  need(c, 'file', id, 'view', 'open it');
+  const level = need(c, 'file', id, 'view', 'open it');
   const f = c.ix.files.get(id);
   if (!f) throw new Error('That file no longer exists.');
   const { data, error } = await looseAdmin().storage.from(BUCKET).createSignedUrl(f.storage_path, 300, { download: f.name });
   if (error || !data) throw new Error('Could not open the file.');
   if (f.owner_id !== c.actor.id) await logAudit({ actorId: c.actor.id, actorEmail: c.actor.email, action: 'vault.file_opened', targetType: 'vault_file', targetId: id, targetLabel: f.name });
-  return { url: data.signedUrl, name: f.name };
+  return { url: data.signedUrl, name: f.name, level, folderId: f.folder_id, mime: f.mime };
+}
+
+/** Overwrite a file's contents (the document editor saving): a one-time signed URL that may replace the object. */
+async function prepareReplace_(id: string): Promise<{ signedUrl: string }> {
+  const c = await ctx();
+  need(c, 'file', id, 'edit', 'save changes to it');
+  const f = c.ix.files.get(id);
+  if (!f) throw new Error('That file no longer exists.');
+  const { data, error } = await looseAdmin().storage.from(BUCKET).createSignedUploadUrl(f.storage_path, { upsert: true });
+  if (error || !data) throw new Error('Could not start the save.');
+  return { signedUrl: data.signedUrl };
+}
+
+async function finishReplace_(id: string, size: number) {
+  const c = await ctx();
+  need(c, 'file', id, 'edit', 'save changes to it');
+  const f = c.ix.files.get(id);
+  await looseAdmin().from('vault_files').update({ size }).eq('id', id);
+  await logAudit({ actorId: c.actor.id, actorEmail: c.actor.email, action: 'vault.file_saved', targetType: 'vault_file', targetId: id, targetLabel: f?.name });
 }
 
 export interface AccessEntry { userId: string; name: string; email: string; level: Level; inherited: boolean }
@@ -313,6 +332,8 @@ export const registerUpload = guard(registerUpload_);
 export const renameItem = guard(renameItem_);
 export const deleteItem = guard(deleteItem_);
 export const getFileUrl = guard(getFileUrl_);
+export const prepareReplace = guard(prepareReplace_);
+export const finishReplace = guard(finishReplace_);
 export const getAccess = guard(getAccess_);
 export const setPermission = guard(setPermission_);
 export const setGeneralAccess = guard(setGeneralAccess_);
