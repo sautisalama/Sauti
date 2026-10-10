@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Loader2, Plus, Trash2 } from "lucide-react";
+import { Check, Loader2, Plus, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/ui/password-input";
@@ -12,7 +12,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
-import { autoLabel, type LabelRow } from "./api";
+import { confirmAutoLabel, previewAutoLabel, type AutoLabelMatch, type LabelRow } from "./api";
 import { clearMailCache } from "@/lib/mail/offline-cache";
 import { SignatureSettings } from "./SignatureEditor";
 import { addAccount, oauthAvailability, deleteSnippet, removeAccount, saveSnippet, type AccountView, type SnippetRow, type ViewConfig, type ViewRow } from "./api";
@@ -262,15 +262,22 @@ export function LabelDialog({ label, accountId, onClose, onSave, onDelete, onApp
 	const [color, setColor] = useState(label?.color ?? "purple");
 	const [instruction, setInstruction] = useState(label?.instruction ?? "");
 	const [busy, setBusy] = useState<"save" | "run" | null>(null);
+	// Review step: the messages the AI would label, each of which you can accept or reject.
+	const [review, setReview] = useState<{ labelId: string; matches: AutoLabelMatch[]; scanned: number; ok: Set<string> } | null>(null);
 
 	const save = async (andRun = false) => {
 		setBusy(andRun ? "run" : "save");
 		try {
 			const saved = await onSave({ id: label?.id ?? null, name, color, instruction });
 			if (andRun && accountId) {
-				const r = await autoLabel(accountId, "INBOX", saved.id);
-				toast({ title: r.matched ? `Labelled ${r.matched} message${r.matched === 1 ? "" : "s"}` : "No recent messages matched", description: `Looked at the newest ${r.scanned}.` });
-				onApplied?.();
+				const r = await previewAutoLabel(accountId, "INBOX", saved.id);
+				if (r.matches.length === 0) {
+					toast({ title: "No recent messages matched", description: `Looked at the newest ${r.scanned}.` });
+					onClose();
+				} else {
+					setReview({ labelId: saved.id, matches: r.matches, scanned: r.scanned, ok: new Set(r.matches.map((m) => m.messageId)) });
+				}
+				return;
 			}
 			onClose();
 		} catch (e) {
@@ -279,6 +286,58 @@ export function LabelDialog({ label, accountId, onClose, onSave, onDelete, onApp
 			setBusy(null);
 		}
 	};
+
+	const finishReview = async () => {
+		if (!review || !accountId) return;
+		setBusy("save");
+		try {
+			const accept = review.matches.filter((m) => review.ok.has(m.messageId)).map((m) => m.messageId);
+			const reject = review.matches.filter((m) => !review.ok.has(m.messageId)).map((m) => ({ from: m.from, subject: m.subject }));
+			const r = await confirmAutoLabel(accountId, review.labelId, accept, reject);
+			toast({ title: `Labelled ${r.applied} message${r.applied === 1 ? "" : "s"}`, description: reject.length ? "Your corrections will guide future labelling." : undefined });
+			onApplied?.();
+			setReview(null);
+			onClose();
+		} catch (e) {
+			toast({ title: "Could not apply the label", description: e instanceof Error ? e.message : undefined, variant: "destructive" });
+		} finally {
+			setBusy(null);
+		}
+	};
+
+	if (review) {
+		return (
+			<Dialog open onOpenChange={(o) => !o && !busy && (setReview(null), onClose())}>
+				<DialogContent className="max-h-[88vh] max-w-lg overflow-y-auto">
+					<DialogHeader>
+						<DialogTitle>Teach me how to label future emails</DialogTitle>
+						<DialogDescription>Found {review.matches.length} of the newest {review.scanned}. Untick any that do not belong: they are used to improve the rule.</DialogDescription>
+					</DialogHeader>
+					<ul className="divide-y divide-serene-neutral-100 rounded-xl border border-serene-neutral-100">
+						{review.matches.map((m) => {
+							const on = review.ok.has(m.messageId);
+							return (
+								<li key={m.messageId}>
+									<button
+										onClick={() => { const ok = new Set(review.ok); if (on) ok.delete(m.messageId); else ok.add(m.messageId); setReview({ ...review, ok }); }}
+										aria-pressed={on}
+										className="flex w-full items-center gap-3 p-3 text-left hover:bg-serene-neutral-50"
+									>
+										<span className={cn("flex h-5 w-5 shrink-0 items-center justify-center rounded border", on ? "border-emerald-600 bg-emerald-600 text-white" : "border-red-300 bg-red-50 text-red-600")}>{on ? <Check className="h-3.5 w-3.5" /> : <X className="h-3.5 w-3.5" />}</span>
+										<span className="min-w-0 flex-1"><span className="block truncate text-sm font-medium">{m.subject}</span><span className="block truncate text-xs text-serene-neutral-500">{m.from}</span></span>
+									</button>
+								</li>
+							);
+						})}
+					</ul>
+					<div className="flex justify-end gap-2">
+						<Button variant="ghost" disabled={!!busy} onClick={() => { setReview(null); onClose(); }}>Skip</Button>
+						<Button disabled={!!busy} onClick={finishReview} className="gap-1.5 bg-purple-600 hover:bg-purple-700">{busy && <Loader2 className="h-4 w-4 animate-spin" />} Save</Button>
+					</div>
+				</DialogContent>
+			</Dialog>
+		);
+	}
 
 	return (
 		<Dialog open={!!label} onOpenChange={(o) => !o && !busy && onClose()}>

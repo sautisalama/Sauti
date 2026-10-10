@@ -424,12 +424,14 @@ async function sendMail_(input: SendInput) {
       if (error || !data) throw new Error(`Could not read "${f.name}" from the vault.`);
       attachments.push({ filename: f.name.slice(0, 200), content: Buffer.from(await data.arrayBuffer()), contentType: f.mime || 'application/octet-stream' });
     }
-    if (links.length) {
+    // A file already linked inline in the body (typed with @) does not need repeating below.
+    const extra = links.filter((l) => !html.includes(`open=${l.id}`));
+    if (extra.length) {
       const h = await headers();
       const host = h.get('x-forwarded-host') || h.get('host') || 'app.sautisalama.org';
       const origin = `${h.get('x-forwarded-proto') || (host.startsWith('localhost') ? 'http' : 'https')}://${host}`;
       const esc = (s: string) => s.replace(/[&<>"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[ch]!);
-      html += `<p style="margin-top:16px;color:#6b7280">Shared from the Sauti Salama vault. You need access to open these.</p><ul>${links
+      html += `<p style="margin-top:16px;color:#6b7280">Shared from the Sauti Salama vault. You need access to open these.</p><ul>${extra
         .map((l) => `<li><a href="${origin}/dashboard/mjengo/vault?open=${l.id}">${esc(l.name)}</a></li>`)
         .join('')}</ul>`;
     }
@@ -581,6 +583,52 @@ async function setMessageLabel_(accountId: string, messageId: string, labelId: s
   else await db.from('mail_message_labels').delete().eq('account_id', accountId).eq('message_id', messageId).eq('label_id', labelId).eq('owner_id', actor.id);
 }
 
+export interface AutoLabelMatch { messageId: string; from: string; subject: string }
+
+/** Which recent messages match a label's rule. Nothing is changed; sender and subject are sent to the AI service. */
+async function previewAutoLabel_(accountId: string, mailbox: string, labelId: string): Promise<{ matches: AutoLabelMatch[]; scanned: number }> {
+  const actor = await requireAdminActor();
+  const { data: label } = await looseAdmin().from('mail_labels').select('id, name, instruction').eq('id', labelId).eq('owner_id', actor.id).maybeSingle();
+  if (!label) throw new Error('That label no longer exists.');
+  if (!label.instruction) throw new Error('Describe which emails this label is for first.');
+  const { items } = await listCore_(accountId, mailbox, {}, 0, 80);
+  if (!items.length) return { matches: [], scanned: 0 };
+  const lines = items.map((m, i) => `${i}. From: ${m.from.name || ''} <${m.from.address}> | Subject: ${m.subject}`).join('\n');
+  const out = await ai(
+    'You sort emails. Given a rule and a numbered list of emails, reply with ONLY a JSON array of the numbers of the emails that clearly match the rule. If none match, reply [].',
+    `Rule: ${label.instruction}\n\nEmails:\n${lines}`,
+    300
+  );
+  let picked: number[] = [];
+  try {
+    picked = (JSON.parse(out.match(/\[[\s\S]*\]/)?.[0] ?? '[]') as unknown[]).filter((n): n is number => Number.isInteger(n) && (n as number) >= 0 && (n as number) < items.length);
+  } catch {
+    picked = [];
+  }
+  const matches = picked.map((i) => items[i]).filter((m) => m.messageId).map((m) => ({ messageId: m.messageId!, from: m.from.name || m.from.address, subject: m.subject }));
+  return { matches, scanned: items.length };
+}
+
+/**
+ * Save the person's review of a preview: accepted messages get the label; rejected ones are written into the
+ * label's rule as "not this" examples so future matching improves.
+ */
+async function confirmAutoLabel_(accountId: string, labelId: string, accept: string[], reject: { from: string; subject: string }[]): Promise<{ applied: number }> {
+  const actor = await requireAdminActor();
+  await loadAccount(accountId, actor.id);
+  const db = looseAdmin();
+  const { data: label } = await db.from('mail_labels').select('id, instruction').eq('id', labelId).eq('owner_id', actor.id).maybeSingle();
+  if (!label) throw new Error('That label no longer exists.');
+  const rows = accept.slice(0, 200).map((m) => ({ owner_id: actor.id, account_id: accountId, message_id: m, label_id: labelId }));
+  if (rows.length) await db.from('mail_message_labels').upsert(rows);
+  if (reject.length) {
+    const notes = reject.slice(0, 5).map((r) => `Not: "${r.subject.slice(0, 60)}" from ${r.from.slice(0, 40)}`).join('. ');
+    const next = `${label.instruction ?? ''}\n${notes}`.trim().slice(-600);
+    await db.from('mail_labels').update({ instruction: next }).eq('id', labelId).eq('owner_id', actor.id);
+  }
+  return { applied: rows.length };
+}
+
 /** Apply a label to the recent messages that match its plain-language rule. Sender and subject are sent to the AI service. */
 async function autoLabel_(accountId: string, mailbox: string, labelId: string): Promise<{ matched: number; scanned: number }> {
   const actor = await requireAdminActor();
@@ -725,6 +773,8 @@ export const saveLabel = guard(saveLabel_);
 export const deleteLabel = guard(deleteLabel_);
 export const setMessageLabel = guard(setMessageLabel_);
 export const autoLabel = guard(autoLabel_);
+export const previewAutoLabel = guard(previewAutoLabel_);
+export const confirmAutoLabel = guard(confirmAutoLabel_);
 export const rewriteText = guard(rewriteText_);
 export const getSignature = guard(getSignature_);
 export const saveSignature = guard(saveSignature_);

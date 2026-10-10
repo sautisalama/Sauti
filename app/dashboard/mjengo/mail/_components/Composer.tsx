@@ -5,7 +5,7 @@ import { EditorContent, useEditor, type Editor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Placeholder from "@tiptap/extension-placeholder";
 import { TaskItem, TaskList } from "@tiptap/extension-list";
-import { Bold, CalendarClock, Code2, HardDrive, Heading1, Heading2, Italic, List, ListChecks, ListOrdered, Loader2, Minus, Paperclip, Quote, Send, Sparkles, Text, X, Minimize2 } from "lucide-react";
+import { Bold, CalendarClock, Code2, HardDrive, Heading1, Heading2, Heading3, Italic, List, ListChecks, ListOrdered, Loader2, Minus, Paperclip, Quote, Send, Sparkles, Text, X, Minimize2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -40,6 +40,7 @@ const BLOCKS: SlashItem[] = [
 	{ id: "text", label: "Text", hint: "Plain paragraph", icon: Text, run: (e) => e.chain().focus().setParagraph().run() },
 	{ id: "h1", label: "Heading 1", hint: "Big heading", icon: Heading1, run: (e) => e.chain().focus().toggleHeading({ level: 1 }).run() },
 	{ id: "h2", label: "Heading 2", hint: "Medium heading", icon: Heading2, run: (e) => e.chain().focus().toggleHeading({ level: 2 }).run() },
+	{ id: "h3", label: "Heading 3", hint: "Small heading", icon: Heading3, run: (e) => e.chain().focus().toggleHeading({ level: 3 }).run() },
 	{ id: "bullets", label: "Bulleted list", hint: "A simple list", icon: List, run: (e) => e.chain().focus().toggleBulletList().run() },
 	{ id: "numbers", label: "Numbered list", hint: "Steps in order", icon: ListOrdered, run: (e) => e.chain().focus().toggleOrderedList().run() },
 	{ id: "todo", label: "To-do list", hint: "Checkboxes", icon: ListChecks, run: (e) => e.chain().focus().toggleTaskList().run() },
@@ -83,27 +84,40 @@ export function Composer({ accounts, accountId, seed, snippets, signature = "", 
 	const fileInput = useRef<HTMLInputElement>(null);
 
 	// ---- slash menu
-	const [slash, setSlash] = useState<{ query: string; from: number; x: number; y: number } | null>(null);
+	const [slash, setSlash] = useState<{ query: string; from: number; x: number; y: number; kind: "slash" | "mention" } | null>(null);
+	const [mentionHits, setMentionHits] = useState<{ id: string; name: string; level: string; folder: string | null }[]>([]);
 	// Highlighted text: offer to improve it with AI.
 	const [sel, setSel] = useState<{ from: number; to: number; x: number; y: number } | null>(null);
 	const [rewriting, setRewriting] = useState(false);
 	const [active, setActive] = useState(0);
 	const items = useMemo(() => {
 		if (!slash) return [];
-		const all: SlashItem[] = [
+		if (slash.kind === "mention") {
+				return mentionHits.slice(0, 8).map<SlashItem>((f) => ({
+					id: `vault-${f.id}`,
+					label: f.name,
+					hint: `${f.folder ? `${f.folder} · ` : ""}Vault file`,
+					icon: HardDrive,
+					run: (e) => {
+						e.chain().focus().insertContent(`<a href="${window.location.origin}/dashboard/mjengo/vault?open=${f.id}">${f.name.replace(/[&<>"]/g, "")}</a> `).run();
+						addVault(f);
+					},
+				}));
+			}
+			const all: SlashItem[] = [
 			...BLOCKS,
 			...snippets.map<SlashItem>((s) => ({ id: `snip-${s.id}`, label: s.name, hint: "Snippet", icon: Sparkles, snippet: s, run: () => undefined })),
 		];
 		const q = slash.query.toLowerCase();
 		return all.filter((i) => !q || i.label.toLowerCase().includes(q) || i.id.includes(q)).slice(0, 8);
-	}, [slash, snippets]);
+	}, [slash, snippets, mentionHits]);
 	const slashRef = useRef({ slash, items, active });
 	slashRef.current = { slash, items, active };
 
 	const editor = useEditor({
 		immediatelyRender: false,
 		content: signature ? `<p></p>${signature}${seed.html ?? ""}` : (seed.html ?? ""),
-		extensions: [StarterKit.configure({ heading: { levels: [1, 2] } }), Placeholder.configure({ placeholder: "Write something, or press / for blocks" }), TaskList, TaskItem.configure({ nested: true })],
+		extensions: [StarterKit.configure({ heading: { levels: [1, 2, 3] } }), Placeholder.configure({ placeholder: "Write something, or press / for blocks" }), TaskList, TaskItem.configure({ nested: true })],
 		editorProps: {
 			attributes: { class: "prose prose-sm max-w-none min-h-[200px] focus:outline-none px-1 py-2 [&_ul[data-type=taskList]]:list-none [&_ul[data-type=taskList]]:pl-0 [&_ul[data-type=taskList]_li]:flex [&_ul[data-type=taskList]_li]:gap-2" },
 			handleKeyDown: (_view, e) => {
@@ -134,9 +148,11 @@ export function Composer({ accounts, accountId, seed, snippets, signature = "", 
 		setSel(null);
 		const before = ed.state.doc.textBetween(Math.max(0, pos - 30), pos, "\n", "\0");
 		const m = /(?:^|\s)\/([\w-]*)$/.exec(before);
-		if (!m) return setSlash(null);
-		const rect = ed.view.coordsAtPos(pos);
-		setSlash({ query: m[1], from: pos - m[1].length - 1, x: rect.left, y: rect.bottom + 6 });
+			const at = /(?:^|\s)@([\w.-]*)$/.exec(before);
+			const hit = m ?? at;
+			if (!hit) return setSlash(null);
+			const rect = ed.view.coordsAtPos(pos);
+			setSlash({ query: hit[1], from: pos - hit[1].length - 1, x: rect.left, y: rect.bottom + 6, kind: m ? "slash" : "mention" });
 		setActive(0);
 	}, []);
 
@@ -170,6 +186,12 @@ export function Composer({ accounts, accountId, seed, snippets, signature = "", 
 		const t = setTimeout(() => searchFiles(vaultQ).then(setVaultHits).catch(() => setVaultHits([])), 200);
 		return () => clearTimeout(t);
 	}, [vaultQ]);
+
+	useEffect(() => {
+		if (slash?.kind !== "mention") return;
+		const t = setTimeout(() => searchFiles(slash.query).then(setMentionHits).catch(() => setMentionHits([])), 150);
+		return () => clearTimeout(t);
+	}, [slash?.kind, slash?.query]);
 
 	const addVault = (f: { id: string; name: string; level: string }) => {
 		if (vault.some((v) => v.id === f.id)) return;
@@ -288,15 +310,15 @@ export function Composer({ accounts, accountId, seed, snippets, signature = "", 
 								</select>
 							</Row>
 							<Row label="To" extra={!showCc && <button onClick={() => setShowCc(true)} className="px-2 text-xs text-serene-neutral-500 hover:text-serene-neutral-800">Cc / Bcc</button>}>
-								<Input value={to} onChange={(e) => setTo(e.target.value)} placeholder="name@example.com" className="h-9 border-0 px-0 shadow-none focus-visible:ring-0" autoComplete="off" inputMode="email" />
+								<Input value={to} onChange={(e) => setTo(e.target.value)} placeholder="Add recipient" className="h-9 border-0 px-0 shadow-none focus-visible:ring-0" autoComplete="off" inputMode="email" />
 							</Row>
 							{showCc && (
 								<>
-									<Row label="Cc"><Input value={cc} onChange={(e) => setCc(e.target.value)} className="h-9 border-0 px-0 shadow-none focus-visible:ring-0" autoComplete="off" /></Row>
-									<Row label="Bcc"><Input value={bcc} onChange={(e) => setBcc(e.target.value)} className="h-9 border-0 px-0 shadow-none focus-visible:ring-0" autoComplete="off" /></Row>
+									<Row label="Cc"><Input value={cc} onChange={(e) => setCc(e.target.value)} placeholder="Add Cc" className="h-9 border-0 px-0 shadow-none focus-visible:ring-0" autoComplete="off" /></Row>
+									<Row label="Bcc"><Input value={bcc} onChange={(e) => setBcc(e.target.value)} placeholder="Add Bcc" className="h-9 border-0 px-0 shadow-none focus-visible:ring-0" autoComplete="off" /></Row>
 								</>
 							)}
-							<Row label="Subject"><Input value={subject} onChange={(e) => setSubject(e.target.value)} className="h-9 border-0 px-0 shadow-none focus-visible:ring-0" /></Row>
+							<Row label="Subject"><Input value={subject} onChange={(e) => setSubject(e.target.value)} placeholder="Subject" className="h-9 border-0 px-0 shadow-none focus-visible:ring-0" /></Row>
 						</div>
 
 						<div className="flex-1 overflow-y-auto px-4 py-2">
@@ -436,7 +458,8 @@ export function Composer({ accounts, accountId, seed, snippets, signature = "", 
 			)}
 
 			{slash && items.length > 0 && (
-				<ul role="listbox" aria-label="Insert block" style={{ left: Math.min(slash.x, (typeof window !== "undefined" ? window.innerWidth : 800) - 270), top: slash.y }} className="fixed z-[60] w-64 overflow-hidden rounded-xl border border-serene-neutral-200 bg-white p-1 shadow-xl">
+				<ul role="listbox" aria-label="Insert block" style={{ left: Math.min(slash.x, (typeof window !== "undefined" ? window.innerWidth : 800) - 310), top: slash.y }} className="fixed z-[60] max-h-80 w-72 overflow-y-auto rounded-xl border border-serene-neutral-200 bg-white p-1 shadow-xl">
+					<li role="presentation" className="px-2.5 pb-1 pt-1.5 text-xs font-medium text-serene-neutral-500">{slash.kind === "mention" ? "Vault files" : "Basic blocks"}</li>
 					{items.map((it, i) => (
 						<li key={it.id} role="option" aria-selected={i === active}>
 							<button onMouseDown={(e) => { e.preventDefault(); pick(it); }} onMouseEnter={() => setActive(i)} className={cn("flex w-full items-center gap-3 rounded-lg px-2.5 py-2 text-left", i === active && "bg-serene-neutral-100")}>

@@ -1,7 +1,7 @@
 import * as raw from '@/app/actions/mjengo-mail';
 import { unwrap } from '@/lib/action-result';
 
-export type { SignatureState, LabelRow, AccountView, AddAccountInput, MessageRow, ListQuery, MailAction, SendInput, ViewConfig, ViewRow, SnippetRow } from '@/app/actions/mjengo-mail';
+export type { AutoLabelMatch, SignatureState, LabelRow, AccountView, AddAccountInput, MessageRow, ListQuery, MailAction, SendInput, ViewConfig, ViewRow, SnippetRow } from '@/app/actions/mjengo-mail';
 
 export const listAccounts = (...a: Parameters<typeof raw.listAccounts>) => unwrap(raw.listAccounts(...a));
 export const addAccount = (...a: Parameters<typeof raw.addAccount>) => unwrap(raw.addAccount(...a));
@@ -30,3 +30,5 @@ export const rewriteText = (...a: Parameters<typeof raw.rewriteText>) => unwrap(
 export const getSignature = (...a: Parameters<typeof raw.getSignature>) => unwrap(raw.getSignature(...a));
 export const saveSignature = (...a: Parameters<typeof raw.saveSignature>) => unwrap(raw.saveSignature(...a));
 export const dismissSignaturePrompt = (...a: Parameters<typeof raw.dismissSignaturePrompt>) => unwrap(raw.dismissSignaturePrompt(...a));
+export const previewAutoLabel = (...a: Parameters<typeof raw.previewAutoLabel>) => unwrap(raw.previewAutoLabel(...a));
+export const confirmAutoLabel = (...a: Parameters<typeof raw.confirmAutoLabel>) => unwrap(raw.confirmAutoLabel(...a));
