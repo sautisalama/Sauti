@@ -27,8 +27,14 @@ export async function GET(request: Request, { params }: { params: Promise<{ prov
 
 	if (sp.get("error")) return fail(sp.get("error_description") || "The sign-in was cancelled.");
 
-	const cookie = request.headers.get("cookie")?.split("; ").find((c) => c.startsWith("ss_mail_oauth="))?.split("=")[1];
-	if (!cookie || cookie !== `${p}:${sp.get("state")}`) return fail("That sign-in link has expired. Please try again.");
+	const raw = request.headers.get("cookie")?.split(/;\s*/).find((c) => c.startsWith("ss_mail_oauth="))?.slice("ss_mail_oauth=".length);
+	let cookie: string | undefined;
+	try {
+		cookie = raw ? decodeURIComponent(raw) : undefined;
+	} catch {
+		cookie = raw;
+	}
+	if (!cookie || !sp.get("state") || cookie !== `${p}:${sp.get("state")}`) return fail("That sign-in link has expired. Please try again.");
 
 	const actor = await getActor();
 	if (!actor?.isAdmin) return fail("Please sign in again.");

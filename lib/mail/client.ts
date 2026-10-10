@@ -49,8 +49,10 @@ export async function credentialFor(a: MailAccount): Promise<Credential> {
   if (a.auth_type === 'password') return { pass: secret };
   try {
     return { accessToken: await accessTokenFromRefresh(a.auth_type, secret) };
-  } catch {
-    throw new Error('Your sign-in with ' + (a.auth_type === 'google' ? 'Google' : 'Microsoft') + ' has expired. Disconnect this mailbox and connect it again.');
+  } catch (e) {
+    const why = e instanceof Error ? e.message : '';
+    console.error('[mail] token refresh failed for', a.auth_type, why);
+    throw new Error('Your sign-in with ' + (a.auth_type === 'google' ? 'Google' : 'Microsoft') + ' could not be renewed' + (why ? ` (${why})` : '') + '. Disconnect this mailbox and connect it again.');
   }
 }
 
