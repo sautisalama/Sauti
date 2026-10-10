@@ -20,7 +20,6 @@ import {
 } from "./api";
 import { Composer, type ComposeSeed } from "./Composer";
 import { ConnectDialog, LabelDialog, LABEL_COLORS, SettingsDialog, ViewDialog } from "./Dialogs";
-import { SignaturePrompt } from "./SignatureEditor";
 import { getSignature, type SignatureState } from "./api";
 import { listLabels, saveLabel, deleteLabel, setMessageLabel, type LabelRow } from "./api";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -71,8 +70,7 @@ export function MailApp() {
 	const [views, setViews] = useState<ViewRow[]>([]);
 	const [snippets, setSnippets] = useState<SnippetRow[]>([]);
 	const [signature, setSignature] = useState<SignatureState | null>(null);
-	const [sigPrompt, setSigPrompt] = useState(false);
-	const [labels, setLabels] = useState<LabelRow[]>([]);
+		const [labels, setLabels] = useState<LabelRow[]>([]);
 	const [labelEdit, setLabelEdit] = useState<Partial<LabelRow> | null>(null);
 	const [dropOn, setDropOn] = useState<string | null>(null);
 	const [onlyUnread, setOnlyUnread] = useState(false);
@@ -130,10 +128,7 @@ export function MailApp() {
 		setLabels(l);
 		if (sig) setSignature(sig);
 	}, []);
-	// First time with a mailbox and no signature: ask once.
-	useEffect(() => {
-		if (signature && !signature.configured && !signature.dismissed && accounts && accounts.length > 0) setSigPrompt(true);
-	}, [signature, accounts]);
+	
 	// Coming back from "Sign in with Google / Microsoft".
 	useEffect(() => {
 		const q = new URLSearchParams(window.location.search);
@@ -502,7 +497,6 @@ const Pane = (
 			{compose && accountId && <Composer accounts={accounts} accountId={accountId} seed={compose} snippets={snippets} signature={signature?.html ?? ""} onClose={() => setCompose(null)} onSent={() => { setCompose(null); if (active.config.mailbox === "sent") loadList(false); }} />}
 			<ConnectDialog open={connectOpen} onClose={() => setConnectOpen(false)} onConnected={(a) => { setAccounts((p) => [...(p ?? []), a]); setAccountId(a.id); }} />
 			<SettingsDialog open={settingsOpen} onClose={() => setSettingsOpen(false)} accounts={accounts} onAccountsChanged={() => loadAccounts().catch(() => undefined)} onConnect={() => setConnectOpen(true)} snippets={snippets} onSnippetsChanged={() => loadMeta().catch(() => undefined)} layout={layout} onLayout={changeLayout} signature={signature?.html ?? ""} onSignatureSaved={(html) => setSignature({ html, configured: !!html, dismissed: true })} />
-			<SignaturePrompt open={sigPrompt} onClose={() => { setSigPrompt(false); setSignature((s) => (s ? { ...s, dismissed: true } : s)); }} onSaved={(html) => setSignature({ html, configured: !!html, dismissed: true })} />
 			{labelEdit && (
 				<LabelDialog
 					label={labelEdit}

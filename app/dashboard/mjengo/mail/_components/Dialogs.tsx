@@ -15,111 +15,171 @@ import { cn } from "@/lib/utils";
 import { confirmAutoLabel, previewAutoLabel, type AutoLabelMatch, type LabelRow } from "./api";
 import { clearMailCache } from "@/lib/mail/offline-cache";
 import { SignatureSettings } from "./SignatureEditor";
-import { addAccount, oauthAvailability, deleteSnippet, removeAccount, saveSnippet, type AccountView, type SnippetRow, type ViewConfig, type ViewRow } from "./api";
+import { addAccount, detectMailbox, oauthAvailability, deleteSnippet, removeAccount, saveSnippet, type AccountView, type SnippetRow, type ViewConfig, type ViewRow } from "./api";
 
-const PROVIDERS = [
-	{ id: "sautisalama", label: "Sauti Salama mail server", hint: "For any address hosted on our mail server, including other domains such as you@tusonge.co.ke. Use your full address and your webmail password. Servers: mail.sautisalama.org." },
-	{ id: "gmail", label: "Gmail (app password)", hint: "Use an app password: Google Account > Security > 2-Step Verification > App passwords. Or use Sign in with Google above." },
-	{ id: "outlook", label: "Outlook (app password)", hint: "Most Microsoft accounts no longer accept passwords here. Use Sign in with Microsoft above." },
-	{ id: "zoho", label: "Zoho Mail", hint: "" },
-	{ id: "yahoo", label: "Yahoo Mail", hint: "Use an app password." },
-	{ id: "custom", label: "Other mail server", hint: "Ask your email host for the server names." },
-] as const;
+type Found = Awaited<ReturnType<typeof detectMailbox>>;
 
+/**
+ * Email first: type the address, we work out the provider and servers. Gmail and Outlook get one-click
+ * sign-in; every other mailbox just needs its password. Server names only appear if detection fails.
+ */
 export function ConnectDialog({ open, onClose, onConnected }: { open: boolean; onClose: () => void; onConnected: (a: AccountView) => void }) {
 	const { toast } = useToast();
-	const [preset, setPreset] = useState<(typeof PROVIDERS)[number]["id"]>("sautisalama");
-	const [protocol, setProtocol] = useState<"imap" | "pop3">("imap");
 	const [email, setEmail] = useState("");
 	const [password, setPassword] = useState("");
+	const [found, setFound] = useState<Found | null>(null);
+	const [detecting, setDetecting] = useState(false);
+	const [usePassword, setUsePassword] = useState(false);
+	const [advanced, setAdvanced] = useState(false);
+	const [protocol, setProtocol] = useState<"imap" | "pop3">("imap");
 	const [imapHost, setImapHost] = useState("");
 	const [smtpHost, setSmtpHost] = useState("");
 	const [busy, setBusy] = useState(false);
 	const [error, setError] = useState<string | null>(null);
-	const [oauth, setOauth] = useState<{ google: boolean; microsoft: boolean } | null>(null);
-	const hint = PROVIDERS.find((p) => p.id === preset)?.hint;
-	const canPop = preset === "sautisalama" || preset === "custom";
 
 	useEffect(() => {
-		if (open) oauthAvailability().then(setOauth).catch(() => setOauth({ google: false, microsoft: false }));
+		if (!open) return;
+		setFound(null);
+		setPassword("");
+		setError(null);
+		setUsePassword(false);
+		setAdvanced(false);
+		oauthAvailability().then((o) => setEmail((cur) => cur || o.myEmail)).catch(() => undefined);
 	}, [open]);
+
+	const detect = async () => {
+		setDetecting(true);
+		setError(null);
+		try {
+			const d = await detectMailbox(email.trim());
+			setFound(d);
+			setAdvanced(!d.imap || !d.smtp);
+			setUsePassword(d.kind === "password" || !d.oauthReady);
+		} catch (e) {
+			setError(e instanceof Error ? e.message : "Could not look that address up.");
+		} finally {
+			setDetecting(false);
+		}
+	};
 
 	const connect = async () => {
 		setBusy(true);
 		setError(null);
 		try {
-			const a = await addAccount({ preset, protocol: canPop ? protocol : "imap", email, password, imapHost, smtpHost });
+			const manual = advanced && (!found?.imap || imapHost.trim());
+			const a = await addAccount({
+				preset: manual ? "custom" : "auto",
+				protocol: found?.pop || manual ? protocol : "imap",
+				email,
+				password,
+				imapHost,
+				smtpHost,
+			});
 			setPassword("");
 			onConnected(a);
 			toast({ title: "Mailbox connected", description: a.email });
 			onClose();
 		} catch (e) {
 			setError(e instanceof Error ? e.message : "Could not connect.");
+			// Something went wrong with the guessed servers: let them type their own.
+			setAdvanced(true);
 		} finally {
 			setBusy(false);
 		}
 	};
 
-	const Oauth = ({ id, label, mark }: { id: "google" | "microsoft"; label: string; mark: React.ReactNode }) => {
-		const ready = oauth?.[id];
-		return (
-			<a
-				href={ready ? `/api/mjengo/mail/oauth/${id}/start` : undefined}
-				aria-disabled={!ready}
-				className={cn("flex min-h-12 items-center justify-center gap-3 rounded-xl border px-4 text-sm font-semibold transition", ready ? "border-serene-neutral-300 bg-white hover:bg-serene-neutral-50" : "cursor-not-allowed border-serene-neutral-200 bg-serene-neutral-50 text-serene-neutral-400")}
-			>
-				{mark} {label}
-			</a>
-		);
-	};
+	const oneClick = found && found.kind !== "password" && found.oauthReady && !usePassword;
+	const brand = found?.kind === "google" ? "Google" : "Microsoft";
 
 	return (
 		<Dialog open={open} onOpenChange={(o) => !o && !busy && onClose()}>
-			<DialogContent className="max-h-[92vh] max-w-md overflow-y-auto">
+			<DialogContent className="max-h-[92vh] max-w-sm overflow-y-auto">
 				<DialogHeader>
-					<DialogTitle>Connect a mailbox</DialogTitle>
-					<DialogDescription>We check that you can both read and send before saving. Passwords and sign-in tokens are encrypted.</DialogDescription>
+					<DialogTitle>Add an email account</DialogTitle>
+					<DialogDescription>Enter your email address. We take care of the rest.</DialogDescription>
 				</DialogHeader>
-				<div className="space-y-4">
-					<div className="space-y-2">
-						<Oauth id="google" label="Sign in with Google" mark={<span className="text-base font-bold text-[#4285F4]">G</span>} />
-						<Oauth id="microsoft" label="Sign in with Microsoft (Outlook, Microsoft 365)" mark={<span className="grid h-4 w-4 grid-cols-2 gap-px"><i className="bg-[#f25022]" /><i className="bg-[#7fba00]" /><i className="bg-[#00a4ef]" /><i className="bg-[#ffb900]" /></span>} />
-						{oauth && (!oauth.google || !oauth.microsoft) && (
-							<p className="text-xs text-serene-neutral-500">
-								{!oauth.google && "Google sign-in needs GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET on the server. "}
-								{!oauth.microsoft && "Microsoft sign-in needs MS_CLIENT_ID and MS_CLIENT_SECRET (an Azure app registration)."}
+
+				<form
+					className="space-y-4"
+					onSubmit={(e) => {
+						e.preventDefault();
+						if (!found) detect();
+						else if (!oneClick) connect();
+					}}
+				>
+					<div className="space-y-1.5">
+						<Label htmlFor="mb-email">Email address</Label>
+						<Input id="mb-email" type="email" autoComplete="email" autoFocus value={email} onChange={(e) => { setEmail(e.target.value); setFound(null); }} placeholder="you@example.com" />
+					</div>
+
+					{!found && (
+						<Button type="submit" disabled={detecting || !email.includes("@")} className="w-full gap-2 bg-purple-600 hover:bg-purple-700">
+							{detecting && <Loader2 className="h-4 w-4 animate-spin" />} Continue
+						</Button>
+					)}
+
+					{found && (
+						<>
+							<p className="flex items-center gap-2 rounded-lg bg-serene-neutral-50 px-3 py-2 text-sm text-serene-neutral-700">
+								<Check className="h-4 w-4 shrink-0 text-emerald-600" />
+								<span>{found.label}{found.imap ? <span className="text-serene-neutral-400"> · {found.imap[0]}</span> : null}</span>
 							</p>
-						)}
-					</div>
 
-					<div className="flex items-center gap-3 text-xs text-serene-neutral-400"><span className="h-px flex-1 bg-serene-neutral-200" />or use a password<span className="h-px flex-1 bg-serene-neutral-200" /></div>
+							{oneClick && (
+								<>
+									<a
+										href={`/api/mjengo/mail/oauth/${found.kind}/start?email=${encodeURIComponent(email.trim())}`}
+										className="flex min-h-11 items-center justify-center gap-3 rounded-xl bg-purple-600 px-4 text-sm font-semibold text-white hover:bg-purple-700"
+									>
+										Continue with {brand}
+									</a>
+									<button type="button" onClick={() => setUsePassword(true)} className="w-full text-center text-xs text-serene-neutral-500 underline">
+										Use an app password instead
+									</button>
+								</>
+							)}
 
-					<div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
-						{PROVIDERS.map((p) => (
-							<button key={p.id} onClick={() => setPreset(p.id)} aria-pressed={preset === p.id} className={cn("touch-manipulation rounded-xl border px-3 py-2 text-left text-sm", preset === p.id ? "border-purple-600 bg-purple-50 font-semibold text-purple-900" : "border-serene-neutral-200 hover:bg-serene-neutral-50")}>{p.label}</button>
-						))}
-					</div>
-					{canPop && (
-						<div className="flex items-center gap-2 text-sm">
-							<span className="text-serene-neutral-600">Read mail with</span>
-							{(["imap", "pop3"] as const).map((pr) => (
-								<button key={pr} onClick={() => setProtocol(pr)} aria-pressed={protocol === pr} className={cn("rounded-full border px-3 py-1 text-xs font-semibold uppercase", protocol === pr ? "border-purple-600 bg-purple-600 text-white" : "border-serene-neutral-200")}>{pr}</button>
-							))}
-							{protocol === "pop3" && <span className="text-xs text-serene-neutral-500">Inbox only; no folders or stars.</span>}
-						</div>
+							{!oneClick && (
+								<>
+									{found.kind !== "password" && !found.oauthReady && (
+										<p className="rounded-lg bg-amber-50 p-3 text-xs text-amber-900">One-click {brand} sign-in is not switched on for this site yet. Use an app password. {found.hint}</p>
+									)}
+									{found.kind !== "password" && found.oauthReady && found.hint && <p className="rounded-lg bg-serene-neutral-50 p-3 text-xs text-serene-neutral-600">{found.hint}</p>}
+									{found.kind === "password" && found.hint && <p className="rounded-lg bg-serene-neutral-50 p-3 text-xs text-serene-neutral-600">{found.hint}</p>}
+									<div className="space-y-1.5">
+										<Label htmlFor="mb-pass">{found.kind === "password" ? "Password" : "App password"}</Label>
+										<PasswordInput id="mb-pass" autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} />
+									</div>
+
+									<button type="button" onClick={() => setAdvanced((v) => !v)} className="text-xs text-serene-neutral-500 underline">{advanced ? "Hide" : "Show"} server settings</button>
+									{advanced && (
+										<div className="space-y-3 rounded-xl border border-serene-neutral-200 p-3">
+											<div className="flex items-center gap-2 text-sm">
+												<span className="text-serene-neutral-600">Read mail with</span>
+												{(["imap", "pop3"] as const).map((pr) => (
+													<button type="button" key={pr} onClick={() => setProtocol(pr)} aria-pressed={protocol === pr} className={cn("rounded-full border px-3 py-1 text-xs font-semibold uppercase", protocol === pr ? "border-purple-600 bg-purple-600 text-white" : "border-serene-neutral-200")}>{pr}</button>
+												))}
+											</div>
+											<div className="grid grid-cols-2 gap-3">
+												<div className="space-y-1.5"><Label htmlFor="mb-imap">{protocol === "pop3" ? "POP3 server" : "IMAP server"}</Label><Input id="mb-imap" value={imapHost} onChange={(e) => setImapHost(e.target.value)} placeholder={found.imap?.[0] ?? "mail.example.com"} /></div>
+												<div className="space-y-1.5"><Label htmlFor="mb-smtp">SMTP server</Label><Input id="mb-smtp" value={smtpHost} onChange={(e) => setSmtpHost(e.target.value)} placeholder={found.smtp?.[0] ?? "mail.example.com"} /></div>
+											</div>
+											{found.imap && <p className="text-xs text-serene-neutral-500">Leave these empty to use what we found.</p>}
+											<button type="button" onClick={() => { setImapHost("mail.sautisalama.org"); setSmtpHost("mail.sautisalama.org"); }} className="text-xs text-purple-700 underline">Use the Sauti Salama mail server (mail.sautisalama.org)</button>
+										</div>
+									)}
+
+									{error && <p role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p>}
+									<Button type="submit" disabled={busy || !password} className="w-full gap-2 bg-purple-600 hover:bg-purple-700">
+										{busy && <Loader2 className="h-4 w-4 animate-spin" />} {busy ? "Checking your mailbox..." : "Connect"}
+									</Button>
+								</>
+							)}
+						</>
 					)}
-					<div className="space-y-1.5"><Label htmlFor="mb-email">Email address</Label><Input id="mb-email" type="email" autoComplete="off" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@sautisalama.org or you@tusonge.co.ke" /></div>
-					<div className="space-y-1.5"><Label htmlFor="mb-pass">Password or app password</Label><PasswordInput id="mb-pass" autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} /></div>
-					{preset === "custom" && (
-						<div className="grid grid-cols-2 gap-3">
-							<div className="space-y-1.5"><Label htmlFor="mb-imap">{protocol === "pop3" ? "POP3 server" : "IMAP server"}</Label><Input id="mb-imap" value={imapHost} onChange={(e) => setImapHost(e.target.value)} placeholder={protocol === "pop3" ? "pop.example.com" : "imap.example.com"} /></div>
-							<div className="space-y-1.5"><Label htmlFor="mb-smtp">SMTP server</Label><Input id="mb-smtp" value={smtpHost} onChange={(e) => setSmtpHost(e.target.value)} placeholder="smtp.example.com" /></div>
-						</div>
-					)}
-					{hint && <p className="rounded-lg bg-serene-neutral-50 p-3 text-xs text-serene-neutral-600">{hint}</p>}
-					{error && <p role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p>}
-					<Button onClick={connect} disabled={busy || !email || !password} className="w-full gap-2 bg-purple-600 hover:bg-purple-700">{busy && <Loader2 className="h-4 w-4 animate-spin" />} {busy ? "Checking your mailbox..." : "Connect"}</Button>
-				</div>
+
+					{!found && error && <p role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p>}
+				</form>
 			</DialogContent>
 		</Dialog>
 	);

@@ -11,6 +11,7 @@ import {
   type Address, type MailboxInfo, type ParsedMessage,
 } from '@/lib/mail/client';
 import { oauthConfigured } from '@/lib/mail/oauth';
+import { detectMailbox as detect, type Detected } from '@/lib/mail/autoconfig';
 import { uidOf } from '@/lib/mail/pop3';
 import { simpleParser } from 'mailparser';
 import sanitizeHtml from 'sanitize-html';
@@ -20,7 +21,7 @@ import { atLeast, levelFor, loadIndex, oversightFor, recipientLevels } from '@/l
 /** Which one-click sign-ins this deployment has credentials for. */
 async function oauthAvailability_() {
   await requireAdminActor();
-  return { google: oauthConfigured('google'), microsoft: oauthConfigured('microsoft') };
+  return { google: oauthConfigured('google'), microsoft: oauthConfigured('microsoft'), myEmail: (await requireAdminActor()).email };
 }
 
 /* ---------------------------------------------------------------- Accounts */
@@ -40,7 +41,8 @@ async function listAccounts_(): Promise<AccountView[]> {
 }
 
 export interface AddAccountInput {
-  preset: keyof typeof PRESETS | 'custom';
+  /** 'auto' works the servers out from the email address. */
+  preset: keyof typeof PRESETS | 'custom' | 'auto';
   /** How to read the mailbox. Sending always uses SMTP. */
   protocol?: 'imap' | 'pop3';
   email: string;
@@ -59,7 +61,12 @@ async function addAccount_(input: AddAccountInput): Promise<AccountView> {
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error('Enter a valid email address.');
   if (!input.password) throw new Error('Enter the password (or app password).');
 
-  const p = input.preset !== 'custom' ? PRESETS[input.preset] : null;
+  let p: { imap: [string, number, boolean]; smtp: [string, number, boolean]; pop?: [string, number, boolean] } | null = null;
+  if (input.preset === 'auto') {
+    const d = await detect(email);
+    if (!d.imap || !d.smtp) throw new Error("We couldn't find this mailbox's servers from the address. Open Advanced and enter them.");
+    p = { imap: d.imap, smtp: d.smtp, pop: d.pop };
+  } else if (input.preset !== 'custom') p = PRESETS[input.preset];
   const protocol = input.protocol === 'pop3' ? 'pop3' : 'imap';
   const readHost = protocol === 'pop3' && p?.pop ? p.pop : p?.imap;
   const imapHost = readHost ? readHost[0] : (input.imapHost ?? '').trim();
@@ -106,6 +113,13 @@ async function removeAccount_(id: string) {
   const actor = await requireAdminActor();
   const { data } = await looseAdmin().from('mail_accounts').delete().eq('id', id).eq('owner_id', actor.id).select('email').maybeSingle();
   if (data) await logAudit({ actorId: actor.id, actorEmail: actor.email, action: 'mail.account_removed', targetType: 'mailbox', targetId: id, targetLabel: data.email });
+}
+
+/** From an email address alone: which provider, and which servers if it is a password mailbox. */
+async function detectMailbox_(email: string): Promise<Detected & { oauthReady: boolean }> {
+  await requireAdminActor();
+  const d = await detect(email);
+  return { ...d, oauthReady: d.kind === 'google' || d.kind === 'microsoft' ? oauthConfigured(d.kind) : false };
 }
 
 /* --------------------------------------------------------------- Mailboxes */
@@ -779,3 +793,4 @@ export const rewriteText = guard(rewriteText_);
 export const getSignature = guard(getSignature_);
 export const saveSignature = guard(saveSignature_);
 export const dismissSignaturePrompt = guard(dismissSignaturePrompt_);
+export const detectMailbox = guard(detectMailbox_);

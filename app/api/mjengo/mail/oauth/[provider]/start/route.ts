@@ -20,7 +20,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ prov
 	if (!oauthConfigured(p)) return back("mail_error=" + encodeURIComponent(`${p === "google" ? "Google" : "Microsoft"} sign-in is not set up on this site yet.`));
 
 	const state = randomBytes(24).toString("base64url");
-	const res = NextResponse.redirect(authorizeUrl(p, origin, state));
+	const res = NextResponse.redirect(authorizeUrl(p, origin, state, new URL(request.url).searchParams.get("email") || undefined));
 	res.cookies.set("ss_mail_oauth", `${p}:${state}`, { httpOnly: true, secure: origin.startsWith("https"), sameSite: "lax", path: "/api/mjengo/mail/oauth", maxAge: 600 });
 	return res;
 }

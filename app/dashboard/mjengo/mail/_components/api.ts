@@ -32,3 +32,4 @@ export const saveSignature = (...a: Parameters<typeof raw.saveSignature>) => unw
 export const dismissSignaturePrompt = (...a: Parameters<typeof raw.dismissSignaturePrompt>) => unwrap(raw.dismissSignaturePrompt(...a));
 export const previewAutoLabel = (...a: Parameters<typeof raw.previewAutoLabel>) => unwrap(raw.previewAutoLabel(...a));
 export const confirmAutoLabel = (...a: Parameters<typeof raw.confirmAutoLabel>) => unwrap(raw.confirmAutoLabel(...a));
+export const detectMailbox = (...a: Parameters<typeof raw.detectMailbox>) => unwrap(raw.detectMailbox(...a));

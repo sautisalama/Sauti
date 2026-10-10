@@ -1,14 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { EditorContent, useEditor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Placeholder from "@tiptap/extension-placeholder";
 import { Bold, Italic, Link2, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { dismissSignaturePrompt, saveSignature } from "./api";
+import { saveSignature } from "./api";
 
 /** A small Tiptap editor for the email signature: bold, italic and links. */
 export function SignatureEditor({ initial, onChange }: { initial: string; onChange: (html: string) => void }) {
@@ -73,46 +72,5 @@ export function SignatureSettings({ initial, onSaved }: { initial: string; onSav
 				{busy && <Loader2 className="h-4 w-4 animate-spin" />} Save signature
 			</Button>
 		</section>
-	);
-}
-
-/** Shown once, the first time someone opens mail without a signature. "Not now" is remembered. */
-export function SignaturePrompt({ open, onClose, onSaved }: { open: boolean; onClose: () => void; onSaved: (html: string) => void }) {
-	const { toast } = useToast();
-	const [html, setHtml] = useState("");
-	const [busy, setBusy] = useState(false);
-	useEffect(() => { if (open) setHtml(""); }, [open]);
-
-	return (
-		<Dialog open={open} onOpenChange={(o) => { if (!o) { dismissSignaturePrompt().catch(() => undefined); onClose(); } }}>
-			<DialogContent className="max-w-md">
-				<DialogHeader>
-					<DialogTitle>Set up your email signature</DialogTitle>
-					<DialogDescription>It is added to the bottom of the messages you write here. You can change it any time in mail settings.</DialogDescription>
-				</DialogHeader>
-				<SignatureEditor initial="" onChange={setHtml} />
-				<DialogFooter>
-					<Button variant="outline" onClick={() => { dismissSignaturePrompt().catch(() => undefined); onClose(); }}>Not now</Button>
-					<Button
-						disabled={busy || !html.replace(/<[^>]+>/g, "").trim()}
-						className="gap-1.5 bg-purple-600 hover:bg-purple-700"
-						onClick={async () => {
-							setBusy(true);
-							try {
-								const r = await saveSignature(html);
-								onSaved(r.html);
-								onClose();
-							} catch (e) {
-								toast({ title: "Could not save", description: e instanceof Error ? e.message : undefined, variant: "destructive" });
-							} finally {
-								setBusy(false);
-							}
-						}}
-					>
-						{busy && <Loader2 className="h-4 w-4 animate-spin" />} Save signature
-					</Button>
-				</DialogFooter>
-			</DialogContent>
-		</Dialog>
 	);
 }
