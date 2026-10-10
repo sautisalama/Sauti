@@ -21,3 +21,25 @@ const noOther = sanitiseQuestions([{ id: "choice1", type: "choice", label: "x", 
 const r2 = validateAnswers(noOther, { choice1: "Something else" });
 if (r2.ok) fail("other accepted when not allowed");
 console.log("forms schema: all pass");
+
+import { summarise, toCsv } from "../lib/forms/analytics";
+const aq = sanitiseQuestions([
+  { id: "area1", type: "choice", label: "Area", required: false, options: ["Nairobi", "Kisumu"], allowOther: true },
+  { id: "lang1", type: "checkbox", label: "Languages", required: false, options: ["English"], allowOther: true },
+  { id: "rate1", type: "scale", label: "Rate", required: false, scale: { min: 1, max: 5 } },
+]);
+const rs = [
+  { answers: { area1: "Nairobi", lang1: ["English", "kikuyu"], rate1: 4 }, created_at: "2026-10-09T10:00:00Z" },
+  { answers: { area1: "nakuru_town", lang1: ["kikuyu"], rate1: 2 }, created_at: "2026-10-09T11:00:00Z" },
+  { answers: { area1: "Nairobi" }, created_at: "2026-10-10T08:00:00Z" },
+];
+const sm = summarise(aq, rs);
+const area = sm[0].tallies!;
+if (area.find((t) => t.value === "Nairobi")!.count !== 2) fail("tally nairobi", area);
+if (!area.find((t) => t.label === "Nakuru town (other)")) fail("other label", area);
+if (sm[1].tallies!.find((t) => t.value === "kikuyu")!.count !== 2) fail("checkbox other", sm[1].tallies);
+if (Math.abs(sm[2].stats!.avg - 3) > 1e-9) fail("avg", sm[2].stats);
+const csv = toCsv(aq, [{ answers: { area1: "=cmd|x" , lang1: ["English", "kikuyu"] }, created_at: "2026-10-10T08:00:00Z" }], false);
+if (!csv.includes("'=cmd|x")) fail("csv formula guard", csv);
+if (!csv.includes("English; Kikuyu")) fail("csv other humanised", csv);
+console.log("forms analytics: all pass");
