@@ -5,13 +5,14 @@ import { EditorContent, useEditor, type Editor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Placeholder from "@tiptap/extension-placeholder";
 import { TaskItem, TaskList } from "@tiptap/extension-list";
-import { Bold, Code2, Heading1, Heading2, Italic, List, ListChecks, ListOrdered, Loader2, Minus, Paperclip, Quote, Send, Sparkles, Text, X, Minimize2 } from "lucide-react";
+import { Bold, CalendarClock, Code2, Heading1, Heading2, Italic, List, ListChecks, ListOrdered, Loader2, Minus, Paperclip, Quote, Send, Sparkles, Text, X, Minimize2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
-import { draftReply, sendMail, type AccountView, type SnippetRow } from "./api";
+import { draftReply, rewriteText, sendMail, type AccountView, type SnippetRow } from "./api";
+import { createClient } from "@/utils/supabase/client";
 
 export interface ComposeSeed {
 	to?: string[];
@@ -43,6 +44,7 @@ const BLOCKS: SlashItem[] = [
 	{ id: "quote", label: "Quote", hint: "Call out a passage", icon: Quote, run: (e) => e.chain().focus().toggleBlockquote().run() },
 	{ id: "code", label: "Code", hint: "Monospaced block", icon: Code2, run: (e) => e.chain().focus().toggleCodeBlock().run() },
 	{ id: "divider", label: "Divider", hint: "A horizontal line", icon: Minus, run: (e) => e.chain().focus().setHorizontalRule().run() },
+	{ id: "schedule", label: "Scheduling link", hint: "Let them book a time", icon: CalendarClock, run: () => document.dispatchEvent(new Event("ss-insert-scheduling")) },
 ];
 
 const splitAddresses = (s: string) => s.split(/[,;\s]+/).map((x) => x.trim()).filter(Boolean);
@@ -75,6 +77,9 @@ export function Composer({ accounts, accountId, seed, snippets, onClose, onSent 
 
 	// ---- slash menu
 	const [slash, setSlash] = useState<{ query: string; from: number; x: number; y: number } | null>(null);
+	// Highlighted text: offer to improve it with AI.
+	const [sel, setSel] = useState<{ from: number; to: number; x: number; y: number } | null>(null);
+	const [rewriting, setRewriting] = useState(false);
 	const [active, setActive] = useState(0);
 	const items = useMemo(() => {
 		if (!slash) return [];
@@ -109,8 +114,17 @@ export function Composer({ accounts, accountId, seed, snippets, onClose, onSent 
 	});
 
 	const detectSlash = useCallback((ed: Editor) => {
-		const { from: pos, empty } = ed.state.selection;
-		if (!empty) return setSlash(null);
+		const { from: pos, to, empty } = ed.state.selection;
+		if (!empty) {
+			setSlash(null);
+			const text = ed.state.doc.textBetween(pos, to, " ");
+			if (text.trim().length > 3) {
+				const r = ed.view.coordsAtPos(pos);
+				setSel({ from: pos, to, x: r.left, y: r.top });
+			} else setSel(null);
+			return;
+		}
+		setSel(null);
 		const before = ed.state.doc.textBetween(Math.max(0, pos - 30), pos, "\n", "\0");
 		const m = /(?:^|\s)\/([\w-]*)$/.exec(before);
 		if (!m) return setSlash(null);
@@ -127,6 +141,12 @@ export function Composer({ accounts, accountId, seed, snippets, onClose, onSent 
 		else item.run(editor);
 		setSlash(null);
 	};
+
+	useEffect(() => {
+		const h = () => insertScheduling();
+		document.addEventListener("ss-insert-scheduling", h);
+		return () => document.removeEventListener("ss-insert-scheduling", h);
+	});
 
 	useEffect(() => {
 		const onKey = (e: KeyboardEvent) => {
@@ -163,6 +183,29 @@ export function Composer({ accounts, accountId, seed, snippets, onClose, onSent 
 			toast({ title: "Not sent", description: e instanceof Error ? e.message : undefined, variant: "destructive" });
 		} finally {
 			setSending(false);
+		}
+	};
+
+	/** Put your public booking page in the message so people can pick a time. */
+	const insertScheduling = async () => {
+		const { data } = await createClient().auth.getUser();
+		if (!data.user || !editor) return;
+		const url = `${window.location.origin}/schedule/${data.user.id}`;
+		editor.chain().focus().insertContent(`<p>Pick a time that suits you: <a href="${url}">${url}</a></p>`).run();
+	};
+
+	const rewrite = async (mode: "improve" | "shorter" | "friendlier" | "fix") => {
+		if (!sel || !editor) return;
+		const text = editor.state.doc.textBetween(sel.from, sel.to, "\n");
+		setRewriting(true);
+		try {
+			const out = await rewriteText(text, mode);
+			editor.chain().focus().insertContentAt({ from: sel.from, to: sel.to }, out).run();
+			setSel(null);
+		} catch (e) {
+			toast({ title: "Could not rewrite that", description: e instanceof Error ? e.message : undefined, variant: "destructive" });
+		} finally {
+			setRewriting(false);
 		}
 	};
 
@@ -239,6 +282,7 @@ export function Composer({ accounts, accountId, seed, snippets, onClose, onSent 
 							<Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => editor?.chain().focus().toggleItalic().run()} aria-label="Italic"><Italic className="h-4 w-4" /></Button>
 							<Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => fileInput.current?.click()} aria-label="Attach files"><Paperclip className="h-4 w-4" /></Button>
 							<input ref={fileInput} type="file" multiple className="hidden" onChange={(e) => { setFiles([...files, ...Array.from(e.target.files ?? [])]); e.target.value = ""; }} />
+							<Button variant="ghost" size="icon" className="h-8 w-8" onClick={insertScheduling} aria-label="Insert scheduling link" title="Scheduling link"><CalendarClock className="h-4 w-4" /></Button>
 							<Popover>
 								<PopoverTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 font-mono text-xs" aria-label="Insert snippet" title="Snippets">{"{}"}</Button></PopoverTrigger>
 								<PopoverContent align="start" className="w-64 p-1">
@@ -264,6 +308,19 @@ export function Composer({ accounts, accountId, seed, snippets, onClose, onSent 
 					</>
 				)}
 			</div>
+
+			{sel && !slash && (
+				<div role="toolbar" aria-label="Improve selected text" style={{ left: Math.max(8, Math.min(sel.x, (typeof window !== "undefined" ? window.innerWidth : 800) - 330)), top: Math.max(8, sel.y - 46) }} className="fixed z-[60] flex items-center gap-0.5 rounded-xl border border-serene-neutral-200 bg-white p-1 shadow-xl">
+					{rewriting ? <span className="flex items-center gap-2 px-3 py-1.5 text-sm text-serene-neutral-600"><Loader2 className="h-4 w-4 animate-spin" /> Rewriting...</span> : (
+						<>
+							<Sparkles className="mx-1.5 h-4 w-4 text-purple-600" />
+							{([["improve", "Improve"], ["shorter", "Shorter"], ["friendlier", "Friendlier"], ["fix", "Fix spelling"]] as const).map(([m, l]) => (
+								<button key={m} onMouseDown={(e) => e.preventDefault()} onClick={() => rewrite(m)} className="rounded-lg px-2.5 py-1.5 text-sm font-medium text-serene-neutral-800 hover:bg-serene-neutral-100">{l}</button>
+							))}
+						</>
+					)}
+				</div>
+			)}
 
 			{slash && items.length > 0 && (
 				<ul role="listbox" aria-label="Insert block" style={{ left: Math.min(slash.x, (typeof window !== "undefined" ? window.innerWidth : 800) - 270), top: slash.y }} className="fixed z-[60] w-64 overflow-hidden rounded-xl border border-serene-neutral-200 bg-white p-1 shadow-xl">
