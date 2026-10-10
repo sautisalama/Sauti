@@ -90,3 +90,17 @@ export async function adminByEmail(email: string): Promise<{ id: string; email: 
 export async function oversightFor(email: string): Promise<boolean> {
   return isSuperAdminEmail(email);
 }
+
+export interface RecipientLevel { email: string; name: string | null; level: Level | null; /** Not an administrator on the platform, so cannot be given access. */ external: boolean }
+
+/** What each address can do with a file: view/share/edit, or nothing. */
+export async function recipientLevels(ix: VaultIndex, fileId: string, emails: string[]): Promise<RecipientLevel[]> {
+  const unique = [...new Set(emails.map((e) => e.trim().toLowerCase()).filter(Boolean))];
+  return Promise.all(
+    unique.map(async (email) => {
+      const p = await adminByEmail(email);
+      if (!p) return { email, name: null, external: true, level: null };
+      return { email, name: p.name, external: false, level: levelFor(ix, p.id, 'file', fileId, await oversightFor(p.email)) };
+    })
+  );
+}

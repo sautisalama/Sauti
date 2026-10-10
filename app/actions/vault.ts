@@ -6,7 +6,8 @@ import { logAudit } from '@/lib/access/audit';
 import { requireAdminActor } from '@/lib/access/super-admin';
 import {
   RANK, adminByEmail, atLeast, descendants, levelFor, loadIndex, oversightFor, pathTo,
-  type FileNode, type FolderNode, type General, type Level, type ResType, type VaultIndex,
+  recipientLevels,
+  type FileNode, type FolderNode, type General, type Level, type ResType, type RecipientLevel,
 } from '@/lib/vault/access';
 
 const BUCKET = 'mjengo-docs';
@@ -267,29 +268,19 @@ export interface RecipientCheck {
   fileName: string;
   /** Your own level: whether you may grant access to others. */
   senderCanShare: boolean;
-  recipients: { email: string; name: string | null; level: Level | null; /** Not on the platform, so cannot be given access. */ external: boolean }[];
+  recipients: RecipientLevel[];
 }
 
 /** For each linked file and each recipient: can they view it? Used before sending so the sender can be told. */
 async function checkRecipients_(fileIds: string[], emails: string[]): Promise<RecipientCheck[]> {
   const c = await ctx();
-  const ix: VaultIndex = c.ix;
-  const people = await Promise.all([...new Set(emails.map((e) => e.trim().toLowerCase()).filter(Boolean))].map(async (e) => ({ email: e, p: await adminByEmail(e) })));
   const out: RecipientCheck[] = [];
   for (const id of fileIds) {
-    const f = ix.files.get(id);
+    const f = c.ix.files.get(id);
     if (!f) continue;
     const mine = lvl(c, 'file', id);
     if (!mine) throw new Error(`You do not have access to "${f.name}".`);
-    const rec = await Promise.all(
-      people.map(async ({ email, p }) => ({
-        email,
-        name: p?.name ?? null,
-        external: !p,
-        level: p ? levelFor(ix, p.id, 'file', id, await oversightFor(p.email)) : null,
-      }))
-    );
-    out.push({ fileId: id, fileName: f.name, senderCanShare: atLeast(mine, 'share'), recipients: rec });
+    out.push({ fileId: id, fileName: f.name, senderCanShare: atLeast(mine, 'share'), recipients: await recipientLevels(c.ix, id, emails) });
   }
   return out;
 }

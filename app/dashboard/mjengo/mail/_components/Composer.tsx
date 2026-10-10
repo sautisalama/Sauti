@@ -5,7 +5,7 @@ import { EditorContent, useEditor, type Editor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Placeholder from "@tiptap/extension-placeholder";
 import { TaskItem, TaskList } from "@tiptap/extension-list";
-import { Bold, CalendarClock, Code2, Heading1, Heading2, Italic, List, ListChecks, ListOrdered, Loader2, Minus, Paperclip, Quote, Send, Sparkles, Text, X, Minimize2 } from "lucide-react";
+import { Bold, CalendarClock, Code2, HardDrive, Heading1, Heading2, Italic, List, ListChecks, ListOrdered, Loader2, Minus, Paperclip, Quote, Send, Sparkles, Text, X, Minimize2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -13,6 +13,8 @@ import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { draftReply, rewriteText, sendMail, type AccountView, type SnippetRow } from "./api";
 import { createClient } from "@/utils/supabase/client";
+import { checkRecipients, grantViewTo, searchFiles, type RecipientCheck } from "../../vault/api";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 export interface ComposeSeed {
 	to?: string[];
@@ -69,6 +71,11 @@ export function Composer({ accounts, accountId, seed, snippets, onClose, onSent 
 	const [showCc, setShowCc] = useState(!!seed.cc?.length);
 	const [subject, setSubject] = useState(seed.subject ?? "");
 	const [files, setFiles] = useState<File[]>([]);
+	// Documents from the Mjengo vault: sent as a link (recipients need access) or as a copy (needs share rights).
+	const [vault, setVault] = useState<{ id: string; name: string; mode: "link" | "attach"; canShare: boolean }[]>([]);
+	const [vaultQ, setVaultQ] = useState("");
+	const [vaultHits, setVaultHits] = useState<{ id: string; name: string; size: number; level: string; folder: string | null }[]>([]);
+	const [issues, setIssues] = useState<RecipientCheck[] | null>(null);
 	const [sending, setSending] = useState(false);
 	const [aiBusy, setAiBusy] = useState(false);
 	const [aiPrompt, setAiPrompt] = useState("");
@@ -159,8 +166,35 @@ export function Composer({ accounts, accountId, seed, snippets, onClose, onSent 
 		return () => window.removeEventListener("keydown", onKey);
 	});
 
-	const send = async () => {
+	useEffect(() => {
+		const t = setTimeout(() => searchFiles(vaultQ).then(setVaultHits).catch(() => setVaultHits([])), 200);
+		return () => clearTimeout(t);
+	}, [vaultQ]);
+
+	const addVault = (f: { id: string; name: string; level: string }) => {
+		if (vault.some((v) => v.id === f.id)) return;
+		setVault([...vault, { id: f.id, name: f.name, mode: "link", canShare: f.level !== "view" }]);
+	};
+
+	/** Before sending: who among the recipients cannot open the linked vault files? Tell the sender. */
+	const send = async (opts: { skipCheck?: boolean; acknowledge?: boolean; vault?: typeof vault } = {}) => {
 		if (!editor || sending) return;
+		const vlist = opts.vault ?? vault;
+		const everyone = [...splitAddresses(to), ...splitAddresses(cc), ...splitAddresses(bcc)];
+		const linked = vlist.filter((v) => v.mode === "link").map((v) => v.id);
+		if (!opts.skipCheck && linked.length && everyone.length) {
+			try {
+				const checks = await checkRecipients(linked, everyone);
+				if (checks.some((c) => c.recipients.some((r) => !r.level))) return setIssues(checks);
+			} catch (e) {
+				return toast({ title: "Could not check access", description: e instanceof Error ? e.message : undefined, variant: "destructive" });
+			}
+		}
+		await doSend(vlist, !!opts.acknowledge);
+	};
+
+	const doSend = async (vlist: typeof vault, acknowledgeNoAccess: boolean) => {
+		if (!editor) return;
 		const recipients = splitAddresses(to);
 		if (!recipients.length) return toast({ title: "Add a recipient", variant: "destructive" });
 		if (!subject.trim() && !window.confirm("Send without a subject?")) return;
@@ -176,6 +210,9 @@ export function Composer({ accounts, accountId, seed, snippets, onClose, onSent 
 				inReplyTo: seed.inReplyTo,
 				references: seed.references,
 				attachments: await Promise.all(files.map(async (f) => ({ filename: f.name, contentBase64: await toBase64(f), contentType: f.type || "application/octet-stream" }))),
+					vaultLinks: vlist.filter((v) => v.mode === "link").map((v) => v.id),
+					vaultAttach: vlist.filter((v) => v.mode === "attach").map((v) => v.id),
+					acknowledgeNoAccess,
 			});
 			toast({ title: "Sent" });
 			onSent();
@@ -264,7 +301,22 @@ export function Composer({ accounts, accountId, seed, snippets, onClose, onSent 
 
 						<div className="flex-1 overflow-y-auto px-4 py-2">
 							<EditorContent editor={editor} />
-							{files.length > 0 && (
+							{vault.length > 0 && (
+									<ul className="mt-3 flex flex-wrap gap-2" aria-label="Vault documents">
+										{vault.map((v) => (
+											<li key={v.id} className="flex items-center gap-2 rounded-lg border border-purple-200 bg-purple-50 px-2.5 py-1 text-xs text-purple-900">
+												<HardDrive className="h-3 w-3" /> {v.name}
+												<button
+													onClick={() => v.canShare && setVault(vault.map((x) => (x.id === v.id ? { ...x, mode: x.mode === "link" ? "attach" : "link" } : x)))}
+													title={v.canShare ? "Switch between a link and a copy" : "You can view this file but not share a copy; it goes as a link"}
+													className="rounded bg-white px-1.5 py-0.5 font-semibold"
+												>{v.mode === "link" ? "Link" : "Copy"}</button>
+												<button onClick={() => setVault(vault.filter((x) => x.id !== v.id))} aria-label={`Remove ${v.name}`}><X className="h-3 w-3 text-purple-400 hover:text-red-600" /></button>
+											</li>
+										))}
+									</ul>
+								)}
+								{files.length > 0 && (
 								<ul className="mt-3 flex flex-wrap gap-2">
 									{files.map((f, i) => (
 										<li key={i} className="flex items-center gap-2 rounded-lg border border-serene-neutral-200 px-2.5 py-1 text-xs">
@@ -282,6 +334,18 @@ export function Composer({ accounts, accountId, seed, snippets, onClose, onSent 
 							<Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => editor?.chain().focus().toggleItalic().run()} aria-label="Italic"><Italic className="h-4 w-4" /></Button>
 							<Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => fileInput.current?.click()} aria-label="Attach files"><Paperclip className="h-4 w-4" /></Button>
 							<input ref={fileInput} type="file" multiple className="hidden" onChange={(e) => { setFiles([...files, ...Array.from(e.target.files ?? [])]); e.target.value = ""; }} />
+							<Popover>
+								<PopoverTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" aria-label="Attach from the vault" title="Attach from the vault"><HardDrive className="h-4 w-4" /></Button></PopoverTrigger>
+								<PopoverContent align="start" className="w-80 space-y-2 p-2">
+									<Input value={vaultQ} onChange={(e) => setVaultQ(e.target.value)} placeholder="Search the vault" aria-label="Search the vault" />
+									<ul className="max-h-60 overflow-y-auto">
+										{vaultHits.map((f) => (
+											<li key={f.id}><button onClick={() => addVault(f)} className="flex w-full flex-col rounded-md px-2 py-1.5 text-left text-sm hover:bg-serene-neutral-100"><span className="truncate font-medium">{f.name}</span><span className="text-xs text-serene-neutral-500">{f.folder ? `${f.folder} · ` : ""}you can {f.level === "view" ? "view" : f.level === "share" ? "view and share" : "edit"}</span></button></li>
+										))}
+										{vaultHits.length === 0 && <li className="p-3 text-xs text-serene-neutral-500">No files you can use. Upload some in the Vault tab.</li>}
+									</ul>
+								</PopoverContent>
+							</Popover>
 							<Button variant="ghost" size="icon" className="h-8 w-8" onClick={insertScheduling} aria-label="Insert scheduling link" title="Scheduling link"><CalendarClock className="h-4 w-4" /></Button>
 							<Popover>
 								<PopoverTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 font-mono text-xs" aria-label="Insert snippet" title="Snippets">{"{}"}</Button></PopoverTrigger>
@@ -303,11 +367,60 @@ export function Composer({ accounts, accountId, seed, snippets, onClose, onSent 
 							)}
 							<div className="flex-1" />
 							<span className="hidden text-xs text-serene-neutral-400 sm:inline">Ctrl+Enter</span>
-							<Button onClick={send} disabled={sending} className="gap-1.5 bg-purple-600 hover:bg-purple-700">{sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />} Send</Button>
+							<Button onClick={() => send()} disabled={sending} className="gap-1.5 bg-purple-600 hover:bg-purple-700">{sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />} Send</Button>
 						</footer>
 					</>
 				)}
 			</div>
+
+			<Dialog open={!!issues} onOpenChange={(o) => !o && setIssues(null)}>
+				<DialogContent className="max-h-[90vh] max-w-lg overflow-y-auto">
+					<DialogHeader>
+						<DialogTitle>Some recipients cannot open these files</DialogTitle>
+						<DialogDescription>Access to vault documents follows who can view and share them. Choose what to do before sending.</DialogDescription>
+					</DialogHeader>
+					<ul className="space-y-3 text-sm">
+						{issues?.map((c) => {
+							const missing = c.recipients.filter((r) => !r.level);
+							if (!missing.length) return null;
+							return (
+								<li key={c.fileId} className="rounded-xl bg-amber-50 p-3 text-amber-950">
+									<p className="font-semibold">{c.fileName}</p>
+									<ul className="mt-1 list-disc pl-5 text-xs">
+										{missing.map((m) => <li key={m.email}>{m.email} {m.external ? "is outside the platform, so cannot be given access" : "has no view access"}</li>)}
+									</ul>
+									{!c.senderCanShare && <p className="mt-1 text-xs">You can view this file but not share it, so you cannot grant access or send a copy.</p>}
+								</li>
+							);
+						})}
+					</ul>
+					<DialogFooter className="flex-col gap-2 sm:flex-col sm:space-x-0">
+						{issues?.some((c) => c.senderCanShare && c.recipients.some((r) => !r.level && !r.external)) && (
+							<Button className="bg-purple-600 hover:bg-purple-700" onClick={async () => {
+								const list = issues!;
+								try {
+									const ids = list.filter((c) => c.senderCanShare).map((c) => c.fileId);
+									const emails = [...new Set(list.flatMap((c) => c.recipients.filter((r) => !r.level && !r.external).map((r) => r.email)))];
+									await grantViewTo(ids, emails);
+									setIssues(null);
+									await send({ skipCheck: true, acknowledge: true });
+								} catch (e) { toast({ title: "Could not share", description: e instanceof Error ? e.message : undefined, variant: "destructive" }); }
+							}}>Give them view access and send</Button>
+						)}
+						{issues?.some((c) => c.senderCanShare) && (
+							<Button variant="outline" onClick={() => {
+								const bad = new Set(issues!.filter((c) => c.senderCanShare && c.recipients.some((r) => !r.level)).map((c) => c.fileId));
+								const next = vault.map((v) => (bad.has(v.id) ? { ...v, mode: "attach" as const } : v));
+								setVault(next);
+								setIssues(null);
+								send({ skipCheck: true, vault: next });
+							}}>Send those files as attachments instead</Button>
+						)}
+						<Button variant="outline" onClick={() => { setIssues(null); send({ skipCheck: true, acknowledge: true }); }}>Send anyway (they will not be able to open the links)</Button>
+						<Button variant="ghost" onClick={() => setIssues(null)}>Go back and edit</Button>
+					</DialogFooter>
+				</DialogContent>
+			</Dialog>
 
 			{sel && !slash && (
 				<div role="toolbar" aria-label="Improve selected text" style={{ left: Math.max(8, Math.min(sel.x, (typeof window !== "undefined" ? window.innerWidth : 800) - 330)), top: Math.max(8, sel.y - 46) }} className="fixed z-[60] flex items-center gap-0.5 rounded-xl border border-serene-neutral-200 bg-white p-1 shadow-xl">

@@ -13,6 +13,8 @@ import {
 import { oauthConfigured } from '@/lib/mail/oauth';
 import { uidOf } from '@/lib/mail/pop3';
 import { simpleParser } from 'mailparser';
+import { headers } from 'next/headers';
+import { atLeast, levelFor, loadIndex, oversightFor, recipientLevels } from '@/lib/vault/access';
 
 /** Which one-click sign-ins this deployment has credentials for. */
 async function oauthAvailability_() {
@@ -372,6 +374,12 @@ export interface SendInput {
   inReplyTo?: string | null;
   references?: string[];
   attachments?: { filename: string; contentBase64: string; contentType: string }[];
+  /** Vault files sent as links; recipients open them under their own vault rights. */
+  vaultLinks?: string[];
+  /** Vault files attached as copies. Needs share rights on each file. */
+  vaultAttach?: string[];
+  /** The sender has been told some recipients cannot open the linked files and sends anyway. */
+  acknowledgeNoAccess?: boolean;
 }
 
 const emailOk = (e: string) => /^[^\s@,;]+@[^\s@,;]+\.[^\s@,;]+$/.test(e);
@@ -389,6 +397,42 @@ async function sendMail_(input: SendInput) {
   const bad = [...to, ...cc, ...bcc].find((e) => !emailOk(e));
   if (bad) throw new Error(`"${bad}" is not a valid email address.`);
   const attachments = (input.attachments ?? []).slice(0, 10).map((a) => ({ filename: a.filename.slice(0, 200), content: Buffer.from(a.contentBase64, 'base64'), contentType: a.contentType }));
+  let html = input.html;
+
+  // Vault documents: checked again here, whatever the browser said.
+  const linkIds = [...new Set(input.vaultLinks ?? [])].slice(0, 20);
+  const attachIds = [...new Set(input.vaultAttach ?? [])].slice(0, 10);
+  if (linkIds.length || attachIds.length) {
+    const ix = await loadIndex();
+    const oversight = await oversightFor(actor.email);
+    const allAddr = [...to, ...cc, ...bcc];
+    const links: { name: string; id: string }[] = [];
+    const blocked: string[] = [];
+    for (const id of linkIds) {
+      const f = ix.files.get(id);
+      if (!f || !levelFor(ix, actor.id, 'file', id, oversight)) throw new Error('You do not have access to one of the vault files you linked.');
+      const missing = (await recipientLevels(ix, id, allAddr)).filter((r) => !r.level);
+      if (missing.length) blocked.push(`"${f.name}" cannot be opened by ${missing.map((m) => m.email).join(', ')}`);
+      links.push({ name: f.name, id });
+    }
+    if (blocked.length && !input.acknowledgeNoAccess) throw new Error('Some recipients do not have access to vault files in this message. ' + blocked.join('; ') + '.');
+    for (const id of attachIds) {
+      const f = ix.files.get(id);
+      if (!f || !atLeast(levelFor(ix, actor.id, 'file', id, oversight), 'share')) throw new Error('You need share rights to send a vault file as an attachment.');
+      const { data, error } = await looseAdmin().storage.from('mjengo-docs').download(f.storage_path);
+      if (error || !data) throw new Error(`Could not read "${f.name}" from the vault.`);
+      attachments.push({ filename: f.name.slice(0, 200), content: Buffer.from(await data.arrayBuffer()), contentType: f.mime || 'application/octet-stream' });
+    }
+    if (links.length) {
+      const h = await headers();
+      const host = h.get('x-forwarded-host') || h.get('host') || 'app.sautisalama.org';
+      const origin = `${h.get('x-forwarded-proto') || (host.startsWith('localhost') ? 'http' : 'https')}://${host}`;
+      const esc = (s: string) => s.replace(/[&<>"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[ch]!);
+      html += `<p style="margin-top:16px;color:#6b7280">Shared from the Sauti Salama vault. You need access to open these.</p><ul>${links
+        .map((l) => `<li><a href="${origin}/dashboard/mjengo/vault?open=${l.id}">${esc(l.name)}</a></li>`)
+        .join('')}</ul>`;
+    }
+  }
   if (attachments.reduce((n, a) => n + a.content.length, 0) > 18 * 1024 * 1024) throw new Error('Attachments are too large (18 MB total).');
 
   const mail = {
@@ -397,8 +441,8 @@ async function sendMail_(input: SendInput) {
     cc: cc.length ? cc : undefined,
     bcc: bcc.length ? bcc : undefined,
     subject: input.subject.trim() || '(no subject)',
-    html: input.html,
-    text: htmlToText(input.html),
+    html,
+    text: htmlToText(html),
     inReplyTo: input.inReplyTo || undefined,
     references: input.references?.length ? input.references : undefined,
     attachments,
@@ -417,7 +461,7 @@ async function sendMail_(input: SendInput) {
       if (sent) await c.append(sent, raw, ['\\Seen']);
     }).catch(() => undefined);
   }
-  await logAudit({ actorId: actor.id, actorEmail: actor.email, action: 'mail.sent', targetType: 'mailbox', targetId: acct.id, targetLabel: acct.email, details: { to, subject: mail.subject.slice(0, 120), attachments: attachments.length } });
+  await logAudit({ actorId: actor.id, actorEmail: actor.email, action: 'mail.sent', targetType: 'mailbox', targetId: acct.id, targetLabel: acct.email, details: { to, subject: mail.subject.slice(0, 120), attachments: attachments.length, vault_links: linkIds, vault_attached: attachIds } });
   return { success: true };
 }
 

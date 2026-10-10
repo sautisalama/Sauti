@@ -46,6 +46,17 @@ export default function VaultPage() {
 		load();
 	}, [load]);
 
+	// A link from an email: /vault?open=<file id> opens that file if you have access.
+	useEffect(() => {
+		const id = new URLSearchParams(window.location.search).get("open");
+		if (!id) return;
+		getFileUrl(id)
+			.then((r) => window.open(r.url, "_blank", "noopener"))
+			.catch((e) => toast({ title: "You cannot open that file", description: e instanceof Error ? e.message : undefined, variant: "destructive" }));
+		window.history.replaceState(null, "", window.location.pathname);
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, []);
+
 	const canWrite = tab === "mine" || (!!folderId && data?.here === "edit");
 	const fail = (title: string, e: unknown) => toast({ title, description: e instanceof Error ? e.message : undefined, variant: "destructive" });
 
