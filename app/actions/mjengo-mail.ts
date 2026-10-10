@@ -16,6 +16,7 @@ import { uidOf } from '@/lib/mail/pop3';
 import { simpleParser } from 'mailparser';
 import sanitizeHtml from 'sanitize-html';
 import { headers } from 'next/headers';
+import { touchContacts } from '@/lib/mjengo-contacts';
 import { atLeast, levelFor, loadIndex, oversightFor, recipientLevels } from '@/lib/vault/access';
 
 /** Which one-click sign-ins this deployment has credentials for. */
@@ -479,6 +480,7 @@ async function sendMail_(input: SendInput) {
     }).catch(() => undefined);
   }
   await logAudit({ actorId: actor.id, actorEmail: actor.email, action: 'mail.sent', targetType: 'mailbox', targetId: acct.id, targetLabel: acct.email, details: { to, subject: mail.subject.slice(0, 120), attachments: attachments.length, vault_links: linkIds, vault_attached: attachIds } });
+  await touchContacts([...to, ...cc, ...bcc]);
   return { success: true };
 }
 
@@ -794,3 +796,11 @@ export const getSignature = guard(getSignature_);
 export const saveSignature = guard(saveSignature_);
 export const dismissSignaturePrompt = guard(dismissSignaturePrompt_);
 export const detectMailbox = guard(detectMailbox_);
+
+/** Everything the mail screen needs to start, in one round trip (server actions run one at a time). */
+async function mailBootstrap_() {
+  await requireAdminActor();
+  const [accounts, views, snippets, labels, signature] = await Promise.all([listAccounts_(), listViews_(), listSnippets_(), listLabels_(), getSignature_().catch(() => null)]);
+  return { accounts, views, snippets, labels, signature };
+}
+export const mailBootstrap = guard(mailBootstrap_);

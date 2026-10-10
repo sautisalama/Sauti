@@ -260,6 +260,7 @@ export function EnhancedSidebar({
 			const items: SidebarItem[] = [
 				{ id: "mj-overview", label: "Overview", icon: LayoutDashboard, href: B, section: "main", hint: "Summary of grants, opportunities and projects" },
 				{ id: "mj-mail", label: "Mail", icon: Mail, href: `${B}/mail`, section: "main", hint: "Read, write and organise email" },
+				{ id: "mj-contacts", label: "Contacts", icon: Users, href: `${B}/contacts`, section: "main", hint: "Your team's contact book" },
 				{ id: "mj-grants", label: "Grants", icon: Briefcase, href: `${B}/grants`, section: "main", hint: "Track grant applications and deadlines" },
 				{ id: "mj-opps", label: "Opportunities", icon: Lightbulb, href: `${B}/opportunities`, section: "main", hint: "Funding and partnership leads" },
 				{ id: "mj-projects", label: "Projects", icon: FolderKanban, href: `${B}/projects`, section: "main", hint: "Projects, milestones and documents" },

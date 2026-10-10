@@ -7,6 +7,7 @@ import { format } from "date-fns";
 import { CheckCircle2, Circle, Download, FilePlus2, FileText, Loader2, Plus, Search, Upload } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { putToSignedUrl } from "@/lib/client/upload";
+import { preloadWordcraft } from "@gamine/wordcraft-react/core";
 import { prepareUpload, registerUpload, searchFiles } from "../vault/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -81,7 +82,7 @@ export default function DocumentsPage() {
 				</div>
 				<DropdownMenu>
 					<DropdownMenuTrigger asChild>
-						<Button className="gap-2 bg-sauti-teal hover:bg-sauti-dark" disabled={uploading}>
+						<Button className="gap-2 bg-sauti-teal hover:bg-sauti-dark" disabled={uploading} onPointerEnter={() => preloadWordcraft()}>
 							{uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />} Add
 						</Button>
 					</DropdownMenuTrigger>

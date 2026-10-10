@@ -20,7 +20,10 @@ import {
 } from "./api";
 import { Composer, type ComposeSeed } from "./Composer";
 import { ConnectDialog, LabelDialog, LABEL_COLORS, SettingsDialog, ViewDialog } from "./Dialogs";
-import { getSignature, type SignatureState } from "./api";
+import { getSignature, mailBootstrap, type SignatureState } from "./api";
+import { PersonChip } from "./PersonChip";
+import { unwrap } from "@/lib/action-result";
+import { addContactFromMail } from "@/app/actions/mjengo-contacts";
 import { listLabels, saveLabel, deleteLabel, setMessageLabel, type LabelRow } from "./api";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { AccountSwitcher } from "./AccountSwitcher";
@@ -129,6 +132,13 @@ export function MailApp() {
 		if (sig) setSignature(sig);
 	}, []);
 	
+	// Opened from the contact book: /mail?to=someone@example.org
+	useEffect(() => {
+		const to = new URLSearchParams(window.location.search).get("to");
+		if (!to) return;
+		setCompose({ to: [to] });
+		window.history.replaceState(null, "", window.location.pathname);
+	}, []);
 	// Coming back from "Sign in with Google / Microsoft".
 	useEffect(() => {
 		const q = new URLSearchParams(window.location.search);
@@ -145,9 +155,17 @@ export function MailApp() {
 	}, []);
 
 	useEffect(() => {
-		loadAccounts().catch(() => setAccounts([]));
-		loadMeta().catch(() => undefined);
-	}, [loadAccounts, loadMeta]);
+		mailBootstrap()
+			.then((b) => {
+				setAccounts(b.accounts);
+				setAccountId((cur) => (cur && b.accounts.some((x) => x.id === cur) ? cur : b.accounts[0]?.id ?? null));
+				setViews(b.views);
+				setSnippets(b.snippets);
+				setLabels(b.labels);
+				if (b.signature) setSignature(b.signature);
+			})
+			.catch(() => setAccounts([]));
+	}, []);
 
 	useEffect(() => {
 		if (!accountId) return;
@@ -410,6 +428,15 @@ export function MailApp() {
 
 const Pane = (
 		<ReadingPane
+			onWrite={(address) => setCompose({ to: [address] })}
+			onAddContact={async (name, address) => {
+				try {
+					const c = await unwrap(addContactFromMail(name, address));
+					toast({ title: c.source === "mail" ? "Added to contacts" : "Already in your contacts", description: `${c.name} <${address}>` });
+				} catch (e) {
+					toast({ title: "Could not add the contact", description: e instanceof Error ? e.message : undefined, variant: "destructive" });
+				}
+			}}
 			onPrev={() => { const i = rows.findIndex((r) => r.uid === selected?.uid); if (i > 0) open(rows[i - 1]); }}
 			onNext={() => { const i = rows.findIndex((r) => r.uid === selected?.uid); if (rows[i + 1]) open(rows[i + 1]); }}
 			hasPrev={rows.findIndex((r) => r.uid === selected?.uid) > 0}
@@ -561,7 +588,8 @@ function HoverBtn({ label, onClick, children }: { label: string; onClick: () => 
 	return <button onClick={(e) => { e.stopPropagation(); onClick(); }} title={label} aria-label={label} className="rounded-md p-1.5 text-serene-neutral-600 hover:bg-serene-neutral-100">{children}</button>;
 }
 
-function ReadingPane({ onPrev, onNext, hasPrev, hasNext, onAutoLabelSimilar, labels, selectedLabels, onToggleLabel, onNewLabel, selected, detail, busy, accountId, conversation, summary, summaryBusy, allowImages, onClose, onSummarise, onOpen, onAct, onReply, onForward, onLoadImages, full }: {
+function ReadingPane({ onWrite, onAddContact, onPrev, onNext, hasPrev, hasNext, onAutoLabelSimilar, labels, selectedLabels, onToggleLabel, onNewLabel, selected, detail, busy, accountId, conversation, summary, summaryBusy, allowImages, onClose, onSummarise, onOpen, onAct, onReply, onForward, onLoadImages, full }: {
+	onWrite: (address: string) => void; onAddContact: (name: string, address: string) => void;
 	onPrev: () => void; onNext: () => void; hasPrev: boolean; hasNext: boolean; onAutoLabelSimilar: () => void;
 	labels: LabelRow[]; selectedLabels: string[]; onToggleLabel: (id: string, on: boolean) => void; onNewLabel: () => void;
 	selected: MessageRow | null; detail: Detail | null; busy: boolean; accountId: string; conversation: MessageRow[]; summary: string | null; summaryBusy: boolean; allowImages: boolean;
@@ -587,11 +615,20 @@ function ReadingPane({ onPrev, onNext, hasPrev, hasNext, onAutoLabelSimilar, lab
 				<button onClick={onClose} aria-label={full ? "Back to inbox" : "Close"} className="flex h-8 w-8 items-center justify-center rounded-md text-[#787774] hover:bg-black/5">{full ? <ArrowLeft className="h-[18px] w-[18px]" /> : <ChevronsRight className="h-[18px] w-[18px]" />}</button>
 				<button onClick={onPrev} disabled={!hasPrev} aria-label="Previous message (K)" className="flex h-8 w-8 items-center justify-center rounded-md text-[#787774] hover:bg-black/5 disabled:opacity-30"><ChevronUp className="h-[18px] w-[18px]" /></button>
 				<button onClick={onNext} disabled={!hasNext} aria-label="Next message (J)" className="flex h-8 w-8 items-center justify-center rounded-md text-[#787774] hover:bg-black/5 disabled:opacity-30"><ChevronDown className="h-[18px] w-[18px]" /></button>
-				<div className="flex-1" />
 				{detail && <>
-					<button onClick={onAutoLabelSimilar} className="mr-1 hidden h-8 items-center gap-2 rounded-lg border border-black/10 bg-white px-3 text-sm text-[#37352f] shadow-sm hover:bg-black/[0.03] sm:flex"><Sparkles className="h-4 w-4 text-[#787774]" /> Auto label similar</button>
+					<span className="mx-1 hidden h-5 w-px bg-black/10 sm:block" />
+					<button onClick={() => onAct("archive")} aria-label="Archive (E)" title="Archive (E)" className="flex h-8 w-8 items-center justify-center rounded-md text-[#787774] hover:bg-black/5 hover:text-[#37352f]"><Archive className="h-[18px] w-[18px]" /></button>
+					<button onClick={() => onAct("spam")} aria-label="Report spam" title="Report spam" className="flex h-8 w-8 items-center justify-center rounded-md text-[#787774] hover:bg-black/5 hover:text-[#37352f]"><ShieldAlert className="h-[18px] w-[18px]" /></button>
+					<button onClick={() => onAct("trash")} aria-label="Delete (#)" title="Delete (#)" className="flex h-8 w-8 items-center justify-center rounded-md text-[#787774] hover:bg-black/5 hover:text-[#37352f]"><Trash2 className="h-[18px] w-[18px]" /></button>
+					<span className="mx-1 h-5 w-px bg-black/10" />
+					<button onClick={() => onReply(false)} aria-label="Reply (R)" title="Reply (R)" className="flex h-8 w-8 items-center justify-center rounded-md text-[#787774] hover:bg-black/5 hover:text-[#37352f]"><Reply className="h-[18px] w-[18px]" /></button>
+					<button onClick={() => onReply(true)} aria-label="Reply all" title="Reply all" className="flex h-8 w-8 items-center justify-center rounded-md text-[#787774] hover:bg-black/5 hover:text-[#37352f]"><ReplyAll className="h-[18px] w-[18px]" /></button>
+					<button onClick={onForward} aria-label="Forward" title="Forward" className="flex h-8 w-8 items-center justify-center rounded-md text-[#787774] hover:bg-black/5 hover:text-[#37352f]"><Forward className="h-[18px] w-[18px]" /></button>
+					<span className="mx-1 h-5 w-px bg-black/10" />
+					<button onClick={() => onAct(selected?.seen ? "unread" : "read")} aria-label={selected?.seen ? "Mark unread (U)" : "Mark read"} title={selected?.seen ? "Mark unread (U)" : "Mark read"} className="flex h-8 w-8 items-center justify-center rounded-md text-[#787774] hover:bg-black/5 hover:text-[#37352f]">{selected?.seen ? <Mail className="h-[18px] w-[18px]" /> : <MailOpen className="h-[18px] w-[18px]" />}</button>
+					<button onClick={() => onAct(selected?.flagged ? "unstar" : "star")} aria-label={selected?.flagged ? "Remove star" : "Star (S)"} title={selected?.flagged ? "Remove star" : "Star (S)"} className="flex h-8 w-8 items-center justify-center rounded-md text-[#787774] hover:bg-black/5 hover:text-[#37352f]"><Star className={cn("h-[18px] w-[18px]", selected?.flagged && "fill-amber-400 text-amber-400")} /></button>
 					<Popover>
-						<PopoverTrigger asChild><button aria-label="Labels" title="Label" className="flex h-8 w-8 items-center justify-center rounded-md text-[#787774] hover:bg-black/5"><Tag className="h-[18px] w-[18px]" /></button></PopoverTrigger>
+						<PopoverTrigger asChild><button aria-label="Labels" title="Label" className="flex h-8 w-8 items-center justify-center rounded-md text-[#787774] hover:bg-black/5 hover:text-[#37352f]"><Tag className="h-[18px] w-[18px]" /></button></PopoverTrigger>
 						<PopoverContent align="end" className="w-60 p-1.5">
 							{labels.map((l) => { const on = selectedLabels.includes(l.id); return (
 								<button key={l.id} onClick={() => onToggleLabel(l.id, !on)} className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-black/5">
@@ -601,22 +638,9 @@ function ReadingPane({ onPrev, onNext, hasPrev, hasNext, onAutoLabelSimilar, lab
 							<button onClick={onNewLabel} className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm text-[#787774] hover:bg-black/5"><Plus className="h-4 w-4" /> New label</button>
 						</PopoverContent>
 					</Popover>
-					<button onClick={() => onAct("archive")} aria-label="Archive (E)" title="Archive (E)" className="flex h-8 w-8 items-center justify-center rounded-md text-[#787774] hover:bg-black/5"><Archive className="h-[18px] w-[18px]" /></button>
-					<button onClick={() => onAct("trash")} aria-label="Delete (#)" title="Delete (#)" className="flex h-8 w-8 items-center justify-center rounded-md text-[#787774] hover:bg-black/5"><Trash2 className="h-[18px] w-[18px]" /></button>
-					<Popover>
-						<PopoverTrigger asChild><button aria-label="More" className="flex h-8 w-8 items-center justify-center rounded-md text-[#787774] hover:bg-black/5"><MoreHorizontal className="h-[18px] w-[18px]" /></button></PopoverTrigger>
-						<PopoverContent align="end" className="w-52 p-1.5">
-							{[
-								{ l: "Reply", i: Reply, f: () => onReply(false) },
-								{ l: "Reply all", i: ReplyAll, f: () => onReply(true) },
-								{ l: "Forward", i: Forward, f: onForward },
-								{ l: selected?.seen ? "Mark unread" : "Mark read", i: Mail, f: () => onAct(selected?.seen ? "unread" : "read") },
-								{ l: selected?.flagged ? "Remove star" : "Star", i: Star, f: () => onAct(selected?.flagged ? "unstar" : "star") },
-								{ l: "Summarise", i: Sparkles, f: onSummarise },
-								{ l: "Mark as spam", i: ShieldAlert, f: () => onAct("spam") },
-							].map((x) => <button key={x.l} onClick={x.f} className="flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-left text-sm hover:bg-black/5"><x.i className="h-4 w-4 text-[#787774]" />{x.l}</button>)}
-						</PopoverContent>
-					</Popover>
+					<span className="flex-1" />
+					<button onClick={onAutoLabelSimilar} className="mr-1 hidden h-8 items-center gap-2 rounded-lg border border-black/10 bg-white px-3 text-sm text-[#37352f] shadow-sm hover:bg-black/[0.03] lg:flex"><Sparkles className="h-4 w-4 text-[#787774]" /> Auto label similar</button>
+					<button onClick={onSummarise} aria-label="Summarise" title="Summarise" className="flex h-8 w-8 items-center justify-center rounded-md text-[#787774] hover:bg-black/5 hover:text-[#37352f]"><Sparkles className="h-[18px] w-[18px]" /></button>
 				</>}
 			</header>
 
@@ -639,8 +663,16 @@ function ReadingPane({ onPrev, onNext, hasPrev, hasNext, onAutoLabelSimilar, lab
 
 						<div className="mt-4 flex items-start gap-3">
 							<div className="min-w-0 flex-1">
-								<p className="text-[15px] text-[#37352f]">{displayName(detail.from[0] ?? { name: "", address: "" })} <span className="text-[13px] text-[#9b9a97]">&lt;{detail.from[0]?.address}&gt;</span></p>
-								<p className="truncate text-[15px] text-[#9b9a97]">To {detail.to.map(displayName).join(", ") || "me"}{detail.cc.length ? `, Cc ${detail.cc.map(displayName).join(", ")}` : ""}</p>
+								<p className="text-[15px] text-[#37352f]">
+									{detail.from[0] ? <PersonChip name={detail.from[0].name} address={detail.from[0].address} onWrite={onWrite} onAddContact={onAddContact} className="font-medium" /> : null}{" "}
+									<span className="text-[13px] text-[#9b9a97]">&lt;{detail.from[0]?.address}&gt;</span>
+								</p>
+								<p className="flex flex-wrap items-center gap-x-1 text-[15px] text-[#9b9a97]">
+									<span>To</span>
+									{detail.to.length === 0 ? <span>me</span> : detail.to.map((t, k) => <span key={t.address + k} className="inline-flex items-center"><PersonChip name={t.name} address={t.address} onWrite={onWrite} onAddContact={onAddContact} className="text-[#787774]" />{k < detail.to.length - 1 ? "," : ""}</span>)}
+									{detail.cc.length > 0 && <span>, Cc</span>}
+									{detail.cc.map((t, k) => <span key={t.address + k} className="inline-flex items-center"><PersonChip name={t.name} address={t.address} onWrite={onWrite} onAddContact={onAddContact} className="text-[#787774]" />{k < detail.cc.length - 1 ? "," : ""}</span>)}
+								</p>
 							</div>
 							<span className="shrink-0 text-[15px] text-[#9b9a97]">{detail.date ? format(new Date(detail.date), "MMM d") : ""}</span>
 						</div>

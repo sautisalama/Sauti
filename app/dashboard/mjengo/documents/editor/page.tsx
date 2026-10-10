@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { Suspense, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { ArrowLeft, Download, Loader2, Save } from "lucide-react";
+import { ArrowLeft, Loader2 } from "lucide-react";
 import { WordcraftEditor, type SavedFile, type WordcraftEditorRef } from "@gamine/wordcraft-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -94,25 +94,6 @@ function EditorScreen() {
 		}
 	};
 
-	const saveNow = async () => {
-		const ed = ref.current;
-		if (!ed) return;
-		const base = name.replace(/\.[^.]+$/, "") || "Untitled document";
-		await onSave({ name: `${base}.docx`, mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", bytes: ed.export("docx") }).catch(() => undefined);
-		ed.markSaved();
-	};
-
-	const download = () => {
-		const ed = ref.current;
-		if (!ed) return;
-		const url = URL.createObjectURL(ed.exportBlob("docx"));
-		const a = document.createElement("a");
-		a.href = url;
-		a.download = name.replace(/\.[^.]+$/, "") + ".docx";
-		a.click();
-		URL.revokeObjectURL(url);
-	};
-
 	return (
 		<div className="flex h-full min-h-0 flex-col bg-white">
 			<div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-serene-neutral-200 px-3 py-1.5">
@@ -126,10 +107,6 @@ function EditorScreen() {
 						{saving ? "Saving..." : dirty ? "Unsaved changes" : savedAt ? `Saved ${savedAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}` : "Stored in the vault"}
 					</p>
 				</div>
-				<Button variant="outline" size="sm" className="gap-1.5" onClick={download}><Download className="h-4 w-4" /> Download</Button>
-				<Button size="sm" className="gap-1.5 bg-sauti-teal hover:bg-sauti-dark" disabled={saving} onClick={saveNow}>
-					{saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Save to vault
-				</Button>
 			</div>
 
 			{loading ? (

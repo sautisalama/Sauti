@@ -13,6 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { draftReply, rewriteText, sendMail, type AccountView, type SnippetRow } from "./api";
 import { createClient } from "@/utils/supabase/client";
+import { RecipientField } from "./RecipientField";
 import { checkRecipients, grantViewTo, searchFiles, type RecipientCheck } from "../../vault/api";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
@@ -310,12 +311,12 @@ export function Composer({ accounts, accountId, seed, snippets, signature = "", 
 								</select>
 							</Row>
 							<Row label="To" extra={!showCc && <button onClick={() => setShowCc(true)} className="px-2 text-xs text-serene-neutral-500 hover:text-serene-neutral-800">Cc / Bcc</button>}>
-								<Input value={to} onChange={(e) => setTo(e.target.value)} placeholder="Add recipient" className="h-9 border-0 px-0 shadow-none focus-visible:ring-0" autoComplete="off" inputMode="email" />
+								<RecipientField value={to} onChange={setTo} placeholder="Add recipient" autoFocus={!seed.to?.length} />
 							</Row>
 							{showCc && (
 								<>
-									<Row label="Cc"><Input value={cc} onChange={(e) => setCc(e.target.value)} placeholder="Add Cc" className="h-9 border-0 px-0 shadow-none focus-visible:ring-0" autoComplete="off" /></Row>
-									<Row label="Bcc"><Input value={bcc} onChange={(e) => setBcc(e.target.value)} placeholder="Add Bcc" className="h-9 border-0 px-0 shadow-none focus-visible:ring-0" autoComplete="off" /></Row>
+									<Row label="Cc"><RecipientField value={cc} onChange={setCc} placeholder="Add Cc" /></Row>
+									<Row label="Bcc"><RecipientField value={bcc} onChange={setBcc} placeholder="Add Bcc" /></Row>
 								</>
 							)}
 							<Row label="Subject"><Input value={subject} onChange={(e) => setSubject(e.target.value)} placeholder="Subject" className="h-9 border-0 px-0 shadow-none focus-visible:ring-0" /></Row>

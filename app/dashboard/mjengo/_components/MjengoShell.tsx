@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect } from "react";
 import { usePathname } from "next/navigation";
-import { ArrowLeft, ClipboardList, Briefcase, CheckSquare, FileText, HardDrive, FolderKanban, LayoutDashboard, Lightbulb, Mail, ScrollText, ShieldCheck } from "lucide-react";
+import { ArrowLeft, ClipboardList, Briefcase, CheckSquare, FileText, HardDrive, FolderKanban, LayoutDashboard, Lightbulb, Mail, ScrollText, ShieldCheck, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const BASE = "/dashboard/mjengo";
@@ -11,6 +11,7 @@ const BASE = "/dashboard/mjengo";
 const TABS = [
 	{ href: BASE, label: "Overview", icon: LayoutDashboard, exact: true },
 	{ href: `${BASE}/mail`, label: "Mail", icon: Mail },
+	{ href: `${BASE}/contacts`, label: "Contacts", icon: Users },
 	{ href: `${BASE}/grants`, label: "Grants", icon: Briefcase },
 	{ href: `${BASE}/opportunities`, label: "Opportunities", icon: Lightbulb },
 	{ href: `${BASE}/projects`, label: "Projects", icon: FolderKanban },
