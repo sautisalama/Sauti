@@ -27,13 +27,10 @@ export function AccountSwitcher({ accounts, accountId, onSelect, onAdd, onSettin
 	return (
 		<DropdownMenu>
 			<DropdownMenuTrigger asChild>
-				<button className="flex w-full touch-manipulation items-center gap-2.5 rounded-xl bg-white px-2 py-1.5 text-left shadow-sm transition hover:shadow focus-visible:outline focus-visible:outline-2 focus-visible:outline-purple-500" aria-label="Switch or add mailbox">
-					{current && <Avatar email={current.email} className="h-8 w-8 text-sm" />}
-					<span className="min-w-0 flex-1">
-						<span className="block truncate text-sm font-semibold text-serene-neutral-900">{current?.label || current?.email}</span>
-						<span className="block truncate text-[11px] text-serene-neutral-500">{current ? `${current.email}` : "No mailbox"}</span>
-					</span>
-					<ChevronsUpDown className="h-4 w-4 shrink-0 text-serene-neutral-400" />
+				<button className="flex h-9 w-full touch-manipulation items-center gap-2 rounded-md px-1.5 text-left text-[#37352f] transition hover:bg-black/5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500" aria-label="Switch or add mailbox">
+					{current && <Avatar email={current.email} className="h-6 w-6 rounded-full text-xs" />}
+					<span className="min-w-0 flex-1 truncate text-[15px] font-medium">{current?.label || current?.email || "No mailbox"}</span>
+					<ChevronsUpDown className="h-4 w-4 shrink-0 text-[#9b9a97]" />
 				</button>
 			</DropdownMenuTrigger>
 			<DropdownMenuContent align="start" className="w-[270px] rounded-xl p-1.5">

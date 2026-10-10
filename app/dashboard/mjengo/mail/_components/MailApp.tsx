@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { format, isThisWeek, isToday, isYesterday, startOfDay } from "date-fns";
 import {
-	Archive, Check, ArrowLeft, Command as CommandIcon, Edit3, FileText, Flag, Forward, Inbox, Loader2, Mail, MailOpen, Menu, Paperclip, Pencil, Plus, Reply, ReplyAll, Search, Send, Settings, ShieldAlert, Sparkles, Star, Tag, Trash2, User, X,
+	Archive, Check, ArrowLeft, ChevronDown, ChevronUp, ChevronsRight, Clock, ListFilter, MoreHorizontal, RotateCw, SlidersHorizontal, Command as CommandIcon, Edit3, FileText, Flag, Forward, Inbox, Loader2, Mail, MailOpen, Menu, Paperclip, Pencil, Plus, Reply, ReplyAll, Search, Send, Settings, ShieldAlert, Sparkles, Star, Tag, Trash2, User, X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -29,30 +29,33 @@ type Detail = Awaited<ReturnType<typeof getMessageDetail>>;
 type Layout = "side" | "center" | "full";
 type HoverAction = NonNullable<ViewConfig["hoverActions"]>[number];
 
-const BUILT_IN: { key: string; label: string; icon: typeof Inbox; config: ViewConfig }[] = [
-	{ key: "inbox", label: "Inbox", icon: Inbox, config: { mailbox: "inbox", group: "date" } },
-	{ key: "unread", label: "Unread", icon: Mail, config: { mailbox: "inbox", unread: true, group: "date" } },
-	{ key: "starred", label: "Starred", icon: Star, config: { mailbox: "inbox", starred: true, group: "date" } },
-	{ key: "sent", label: "Sent", icon: Send, config: { mailbox: "sent", group: "date" } },
-	{ key: "drafts", label: "Drafts", icon: FileText, config: { mailbox: "drafts", group: "date" } },
-	{ key: "archive", label: "Archive", icon: Archive, config: { mailbox: "archive", group: "date" } },
-	{ key: "spam", label: "Spam", icon: ShieldAlert, config: { mailbox: "spam", group: "date" } },
-	{ key: "trash", label: "Trash", icon: Trash2, config: { mailbox: "trash", group: "date" } },
+const BUILT_IN: { key: string; label: string; icon: typeof Inbox; config: ViewConfig; section: "views" | "mail" }[] = [
+	{ key: "inbox", label: "Inbox", icon: Inbox, config: { mailbox: "inbox", group: "date" }, section: "views" },
+	{ key: "unread", label: "Unread", icon: Mail, config: { mailbox: "inbox", unread: true, group: "date" }, section: "views" },
+	{ key: "starred", label: "Starred", icon: Star, config: { mailbox: "inbox", starred: true, group: "date" }, section: "views" },
+	{ key: "archive", label: "All Mail", icon: Archive, config: { mailbox: "archive", group: "date" }, section: "mail" },
+	{ key: "sent", label: "Sent", icon: Send, config: { mailbox: "sent", group: "date" }, section: "mail" },
+	{ key: "drafts", label: "Drafts", icon: FileText, config: { mailbox: "drafts", group: "date" }, section: "mail" },
+	{ key: "spam", label: "Spam", icon: ShieldAlert, config: { mailbox: "spam", group: "date" }, section: "mail" },
+	{ key: "trash", label: "Trash", icon: Trash2, config: { mailbox: "trash", group: "date" }, section: "mail" },
 ];
 const ICON: Record<string, typeof Inbox> = { inbox: Inbox, star: Star, paperclip: Paperclip, user: User, tag: Tag, flag: Flag };
 const DEFAULT_HOVER: HoverAction[] = ["archive", "trash", "unread", "star"];
 
 const displayName = (m: { name: string; address: string }) => m.name || m.address || "Unknown";
 
-function groupLabel(d: string | null, mode: ViewConfig["group"], from: string): string {
+function groupLabel(d: string | null, mode: ViewConfig["group"], from: string, seen = true): string {
 	if (mode === "none") return "";
 	if (mode === "sender") return from;
+	if (mode === "status") return seen ? "Read" : "Unread";
 	if (!d) return "Earlier";
 	const date = new Date(d);
+	const days = (Date.now() - date.getTime()) / 86400000;
 	if (isToday(date)) return "Today";
 	if (isYesterday(date)) return "Yesterday";
-	if (isThisWeek(date, { weekStartsOn: 1 })) return "This week";
-	return date >= startOfDay(new Date(Date.now() - 30 * 86400000)) ? "This month" : "Earlier";
+	if (days <= 7) return "Last 7 days";
+	if (days <= 30) return "Last 30 days";
+	return format(date, date.getFullYear() === new Date().getFullYear() ? "MMMM" : "MMMM yyyy");
 }
 
 const rowTime = (d: string | null) => (!d ? "" : isToday(new Date(d)) ? format(new Date(d), "HH:mm") : isThisWeek(new Date(d), { weekStartsOn: 1 }) ? format(new Date(d), "EEE") : format(new Date(d), "d MMM"));
@@ -68,6 +71,7 @@ export function MailApp() {
 	const [labels, setLabels] = useState<LabelRow[]>([]);
 	const [labelEdit, setLabelEdit] = useState<Partial<LabelRow> | null>(null);
 	const [dropOn, setDropOn] = useState<string | null>(null);
+	const [onlyUnread, setOnlyUnread] = useState(false);
 	const [viewKey, setViewKey] = useState("inbox");
 	const [q, setQ] = useState("");
 	const [debouncedQ, setDebouncedQ] = useState("");
@@ -173,7 +177,7 @@ export function MailApp() {
 		setLoadError(null);
 		try {
 			const c = active.config;
-			const res = await listMessages(accountId, mailboxPath, { unread: c.unread, starred: c.starred, hasAttachment: c.hasAttachment, from: c.from, labelId: c.labelId, text: debouncedQ }, append ? rows.length : 0, 40);
+			const res = await listMessages(accountId, mailboxPath, { unread: c.unread || onlyUnread, starred: c.starred, hasAttachment: c.hasAttachment, from: c.from, labelId: c.labelId, text: debouncedQ }, append ? rows.length : 0, 40);
 			if (token !== listToken.current) return;
 			setRows((prev) => (append ? [...prev, ...res.items.filter((i) => !prev.some((p) => p.uid === i.uid))] : res.items));
 			setTotal(res.total);
@@ -192,7 +196,7 @@ export function MailApp() {
 		} finally {
 			if (token === listToken.current) setLoading(false);
 		}
-	}, [accountId, mailboxPath, active, debouncedQ, rows.length]);
+	}, [accountId, mailboxPath, active, debouncedQ, rows.length, onlyUnread]);
 
 	// Reload when the account, view or search changes.
 	useEffect(() => {
@@ -200,7 +204,7 @@ export function MailApp() {
 		setDetail(null);
 		if (accountId && mailboxPath) loadList(false);
 		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [accountId, mailboxPath, viewKey, debouncedQ, views]);
+	}, [accountId, mailboxPath, viewKey, debouncedQ, views, onlyUnread]);
 
 	/* ---- opening a message */
 	const open = useCallback(async (m: MessageRow, images = true) => {
@@ -340,30 +344,35 @@ export function MailApp() {
 
 	const groups: { label: string; items: MessageRow[] }[] = [];
 	for (const r of rows) {
-		const label = groupLabel(r.date, active.config.group ?? "date", displayName(r.from));
+		const label = groupLabel(r.date, active.config.group ?? "date", displayName(r.from), r.seen);
 		const g = groups.find((x) => x.label === label);
 		if (g) g.items.push(r); else groups.push({ label, items: [r] });
 	}
 	const hover = active.config.hoverActions ?? DEFAULT_HOVER;
 	const effectiveLayout: Layout = layout;
 
+	const sigHtml = (_: string | null) => "";
+	const ink = "text-[#37352f]";
+	const Heading = ({ children }: { children: React.ReactNode }) => <p className="px-3 pb-1 pt-5 text-[13px] font-medium text-[#9b9a97]">{children}</p>;
 	const sidebar = (
-		<div className="flex h-full flex-col bg-[#f7f7f5]">
-			<div className="space-y-3 p-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
-				<AccountSwitcher accounts={accounts} accountId={accountId} onSelect={(id) => { setAccountId(id); setViewKey("inbox"); setNavOpen(false); }} onAdd={() => { setNavOpen(false); setConnectOpen(true); }} onSettings={() => { setNavOpen(false); setSettingsOpen(true); }} />
-				<Button onClick={() => { setCompose({}); setNavOpen(false); }} className="w-full justify-start gap-2 bg-purple-600 hover:bg-purple-700"><Edit3 className="h-4 w-4" /> Compose <span className="ml-auto text-xs opacity-70">C</span></Button>
-				<div className="relative">
-					<Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-serene-neutral-400" />
-					<Input ref={searchRef} value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search mail" className="h-9 border-0 bg-white pl-9 shadow-sm" />
-				</div>
+		<div className={cn("flex h-full flex-col bg-[#f7f7f5]", ink)}>
+			<div className="flex items-center gap-1 px-2 pb-1 pt-[max(0.625rem,env(safe-area-inset-top))]">
+				<div className="min-w-0 flex-1"><AccountSwitcher accounts={accounts} accountId={accountId} onSelect={(id) => { setAccountId(id); setViewKey("inbox"); setNavOpen(false); }} onAdd={() => { setNavOpen(false); setConnectOpen(true); }} onSettings={() => { setNavOpen(false); setSettingsOpen(true); }} /></div>
+				<button onClick={() => { setCompose({ html: sigHtml(null) }); setNavOpen(false); }} aria-label="Compose (C)" title="Compose (C)" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-[#37352f] hover:bg-black/5"><Edit3 className="h-[18px] w-[18px]" /></button>
+			</div>
+			<div className="px-2">
+				<label className="flex h-9 cursor-text items-center gap-3 rounded-md px-3 text-[15px] hover:bg-black/5 focus-within:bg-black/5">
+					<Search className="h-[18px] w-[18px] shrink-0 text-[#787774]" />
+					<input ref={searchRef} value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search" aria-label="Search mail" className="min-w-0 flex-1 bg-transparent outline-none placeholder:text-[#37352f]" />
+				</label>
 			</div>
 			<nav className="flex-1 overflow-y-auto px-2 pb-2" aria-label="Views">
-				<p className="px-2 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wider text-serene-neutral-400">Views</p>
-				{BUILT_IN.map((b) => <NavItem key={b.key} active={viewKey === b.key} icon={b.icon} label={b.label} badge={b.key === "inbox" ? unread : 0} onClick={() => { setViewKey(b.key); setNavOpen(false); }} />)}
-				{views.length > 0 && <p className="px-2 pb-1 pt-4 text-[11px] font-semibold uppercase tracking-wider text-serene-neutral-400">Your views</p>}
-				{views.map((v) => <NavItem key={v.id} active={viewKey === `custom:${v.id}`} icon={ICON[v.icon] ?? Inbox} label={v.name} onClick={() => { setViewKey(`custom:${v.id}`); setNavOpen(false); }} onEdit={() => setViewEdit(v)} />)}
-				<button onClick={() => setViewEdit({})} className="mt-1 flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-serene-neutral-500 hover:bg-white/70"><Plus className="h-4 w-4" /> New view</button>
-				<p className="px-2 pb-1 pt-4 text-[11px] font-semibold uppercase tracking-wider text-serene-neutral-400">Labels</p>
+				<Heading>Views</Heading>
+				{BUILT_IN.filter((b) => b.section === "views").map((b) => <NavItem key={b.key} active={viewKey === b.key} icon={b.icon} tone={b.key === "inbox" ? "text-red-500" : "text-[#787774]"} label={b.label} badge={b.key === "inbox" ? unread : 0} onClick={() => { setViewKey(b.key); setNavOpen(false); }} />)}
+				{views.map((v) => <NavItem key={v.id} active={viewKey === `custom:${v.id}`} icon={ICON[v.icon] ?? Inbox} tone="text-amber-600" label={v.name} onClick={() => { setViewKey(`custom:${v.id}`); setNavOpen(false); }} onEdit={() => setViewEdit(v)} />)}
+				<button onClick={() => setViewEdit({})} className="flex h-9 w-full items-center gap-3 rounded-md px-3 text-[15px] text-[#787774] hover:bg-black/5"><Plus className="h-[18px] w-[18px]" /> New view</button>
+
+				<Heading>Labels</Heading>
 				{labels.map((l) => (
 					<div
 						key={l.id}
@@ -375,26 +384,34 @@ export function MailApp() {
 							const mid = e.dataTransfer.getData("text/x-message-id");
 							if (mid && accountId) toggleLabel(mid, l.id, true);
 						}}
-						className={cn("group flex items-center rounded-lg transition", viewKey === `label:${l.id}` ? "bg-white shadow-sm" : "hover:bg-white/70", dropOn === l.id && "ring-2 ring-purple-400")}
+						className={cn("group flex items-center rounded-md transition", viewKey === `label:${l.id}` ? "bg-black/[0.06]" : "hover:bg-black/5", dropOn === l.id && "ring-2 ring-blue-400")}
 					>
-						<button onClick={() => { setViewKey(`label:${l.id}`); setNavOpen(false); }} className="flex min-w-0 flex-1 touch-manipulation items-center gap-2 px-2 py-1.5 text-left text-sm text-serene-neutral-700">
-							<span className={cn("h-2.5 w-2.5 shrink-0 rounded-full", LABEL_COLORS[l.color]?.dot ?? "bg-purple-500")} />
+						<button onClick={() => { setViewKey(`label:${l.id}`); setNavOpen(false); }} className="flex h-9 min-w-0 flex-1 touch-manipulation items-center gap-3 px-3 text-left text-[15px]">
+							<span className="flex h-[18px] w-[18px] shrink-0 items-center justify-center"><span className={cn("h-3 w-3 rounded-full", LABEL_COLORS[l.color]?.dot ?? "bg-purple-500")} /></span>
 							<span className="truncate">{l.name}</span>
 						</button>
-						<button onClick={() => setLabelEdit(l)} aria-label={`Edit ${l.name}`} className="mr-1 hidden rounded p-1 text-serene-neutral-400 hover:text-serene-neutral-800 group-hover:block"><Pencil className="h-3.5 w-3.5" /></button>
+						<button onClick={() => setLabelEdit(l)} aria-label={`Edit ${l.name}`} className="mr-1 hidden rounded p-1 text-[#787774] hover:text-[#37352f] group-hover:block"><Pencil className="h-3.5 w-3.5" /></button>
 					</div>
 				))}
-				<button onClick={() => setLabelEdit({})} className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-serene-neutral-500 hover:bg-white/70"><Plus className="h-4 w-4" /> New label</button>
+				<button onClick={() => setLabelEdit({})} className="flex h-9 w-full items-center gap-3 rounded-md px-3 text-[15px] text-[#787774] hover:bg-black/5"><Plus className="h-[18px] w-[18px]" /> New label</button>
+
+				<Heading>Mail</Heading>
+				{BUILT_IN.filter((b) => b.section === "mail").map((b) => <NavItem key={b.key} active={viewKey === b.key} icon={b.icon} tone="text-[#787774]" label={b.label} onClick={() => { setViewKey(b.key); setNavOpen(false); }} />)}
 			</nav>
-			<div className="space-y-px border-t border-serene-neutral-200/70 p-2 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
-				<button onClick={() => setCmdOpen(true)} className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-serene-neutral-600 hover:bg-white/70"><CommandIcon className="h-4 w-4" /> Command menu <kbd className="ml-auto rounded border bg-white px-1.5 text-[10px]">Ctrl K</kbd></button>
-				<button onClick={() => setSettingsOpen(true)} className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-serene-neutral-600 hover:bg-white/70"><Settings className="h-4 w-4" /> Settings</button>
+			<div className="space-y-px px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-1">
+				<button onClick={() => setSettingsOpen(true)} className="flex h-9 w-full items-center gap-3 rounded-md px-3 text-[15px] hover:bg-black/5"><Settings className="h-[18px] w-[18px] text-[#787774]" /> Settings</button>
+				<button onClick={() => setCmdOpen(true)} className="flex h-9 w-full items-center gap-3 rounded-md px-3 text-[15px] hover:bg-black/5"><CommandIcon className="h-[18px] w-[18px] text-[#787774]" /> Command menu <kbd className="ml-auto rounded border border-black/10 bg-white px-1.5 text-[10px] text-[#787774]">Ctrl K</kbd></button>
 			</div>
 		</div>
 	);
 
-	const Pane = (
+const Pane = (
 		<ReadingPane
+			onPrev={() => { const i = rows.findIndex((r) => r.uid === selected?.uid); if (i > 0) open(rows[i - 1]); }}
+			onNext={() => { const i = rows.findIndex((r) => r.uid === selected?.uid); if (rows[i + 1]) open(rows[i + 1]); }}
+			hasPrev={rows.findIndex((r) => r.uid === selected?.uid) > 0}
+			hasNext={rows.findIndex((r) => r.uid === selected?.uid) >= 0 && rows.findIndex((r) => r.uid === selected?.uid) < rows.length - 1}
+			onAutoLabelSimilar={() => { const f = detail?.from[0]; setLabelEdit({ name: f ? displayName(f) : "", instruction: f ? `Emails from ${displayName(f)} <${f.address}>` : "" }); }}
 			labels={labels} selectedLabels={rows.find((r) => r.uid === selected?.uid)?.labels ?? selected?.labels ?? []} onToggleLabel={(id, on) => selected?.messageId && toggleLabel(selected.messageId, id, on, selected.uid)} onNewLabel={() => setLabelEdit({})} selected={selected} detail={detail} busy={detailBusy} accountId={accountId!} conversation={conversation} summary={summary} summaryBusy={summaryBusy} allowImages={allowImages}
 			onClose={close} onSummarise={summarise} onOpen={(m) => open(m)} onAct={(a) => selected && act(selected, a)}
 			onReply={(all) => detail && startReply(detail, all)} onForward={() => detail && startReply(detail, false, true)}
@@ -404,19 +421,25 @@ export function MailApp() {
 
 	return (
 		<div className="flex h-full min-h-0 bg-white">
-			<aside className="hidden w-[248px] shrink-0 border-r border-serene-neutral-200/70 lg:block">{sidebar}</aside>
+			<aside className="hidden w-[268px] shrink-0 border-r border-black/[0.06] lg:block">{sidebar}</aside>
 			<Sheet open={navOpen} onOpenChange={setNavOpen}><SheetContent side="left" className="w-[280px] p-0"><SheetTitle className="sr-only">Mail navigation</SheetTitle>{sidebar}</SheetContent></Sheet>
 
 			<main className={cn("flex min-w-0 flex-1 flex-col", selected && effectiveLayout === "full" && "hidden")}>
-				<header className="flex items-center gap-2 border-b border-serene-neutral-100 px-3 py-2">
+				<header className="flex items-center gap-2 px-4 py-3 lg:px-6">
 					<Button variant="ghost" size="icon" className="h-9 w-9 lg:hidden" onClick={() => setNavOpen(true)} aria-label="Open menu"><Menu className="h-5 w-5" /></Button>
-					<active.icon className="h-4 w-4 text-serene-neutral-500" />
-					<h2 className="text-sm font-bold text-serene-neutral-900">{active.label}</h2>
-					<span className="text-xs text-serene-neutral-400">{total ? `${total}` : ""}</span>
+					<active.icon className="h-5 w-5 text-[#787774]" />
+					<h2 className="truncate text-[17px] font-medium text-[#37352f]">{active.label}</h2>
+					{debouncedQ && <span className="hidden truncate rounded-full bg-black/5 px-2.5 py-1 text-xs text-[#787774] sm:inline">Searching “{debouncedQ}”</span>}
 					<div className="flex-1" />
-					{debouncedQ && <span className="hidden rounded-full bg-serene-neutral-100 px-2.5 py-1 text-xs text-serene-neutral-600 sm:inline">Searching “{debouncedQ}”</span>}
-					{active.view && <Button variant="ghost" size="sm" className="gap-1.5 text-serene-neutral-600" onClick={() => setViewEdit(active.view)}><Pencil className="h-3.5 w-3.5" /> Edit view</Button>}
-					<Button variant="ghost" size="icon" className="h-9 w-9 lg:hidden" onClick={() => setCompose({})} aria-label="Compose"><Edit3 className="h-4 w-4" /></Button>
+					<button
+						onClick={() => setLabelEdit(viewKey.startsWith("label:") ? labels.find((l) => `label:${l.id}` === viewKey) ?? {} : {})}
+						className="hidden h-8 items-center gap-2 rounded-lg border border-black/10 bg-white px-3 text-sm text-[#37352f] shadow-sm hover:bg-black/[0.03] sm:flex"
+					>
+						<Sparkles className="h-4 w-4 text-[#787774]" /> Auto label
+					</button>
+					<button onClick={() => setOnlyUnread((v) => !v)} aria-pressed={onlyUnread} aria-label="Show unread only" title="Unread only" className={cn("flex h-8 w-8 items-center justify-center rounded-md hover:bg-black/5", onlyUnread ? "text-blue-600" : "text-[#787774]")}><ListFilter className="h-[18px] w-[18px]" /></button>
+					<button onClick={() => setViewEdit(active.view ?? {})} aria-label="View options" title="View options" className="flex h-8 w-8 items-center justify-center rounded-md text-[#787774] hover:bg-black/5"><SlidersHorizontal className="h-[18px] w-[18px]" /></button>
+					<button onClick={() => loadList(false)} aria-label="Refresh" title="Refresh" className="flex h-8 w-8 items-center justify-center rounded-md text-[#787774] hover:bg-black/5"><RotateCw className={cn("h-[18px] w-[18px]", loading && "animate-spin")} /></button>
 				</header>
 
 				{offline && <div role="status" className="border-b border-amber-100 bg-amber-50 px-4 py-2 text-xs font-medium text-amber-900">You are offline, or the mail server cannot be reached. Showing mail saved on this device. <button className="ml-2 underline" onClick={() => loadList(false)}>Try again</button></div>}
@@ -427,24 +450,24 @@ export function MailApp() {
 						<div className="flex h-full flex-col items-center justify-center gap-2 p-10 text-center text-serene-neutral-500"><MailOpen className="h-10 w-10 text-serene-neutral-300" /><p className="font-medium text-serene-neutral-700">{debouncedQ ? "Nothing matches your search" : "Nothing here"}</p><p className="text-sm">{debouncedQ ? "Try different words." : "New mail will appear as it arrives."}</p></div>
 					)}
 					{groups.map((g) => (
-						<section key={g.label}>
-							{g.label && <h3 className="sticky top-0 z-[1] bg-white/95 px-4 py-1.5 text-xs font-semibold text-serene-neutral-400 backdrop-blur">{g.label}</h3>}
+						<section key={g.label} className="px-4 lg:px-6">
+							{g.label && <h3 className="border-b border-black/[0.07] pb-2 pt-6 text-[15px] text-[#787774]">{g.label}</h3>}
 							<ul>
 								{g.items.map((m) => (
 									<li key={m.uid} className="group relative" draggable={!!m.messageId} onDragStart={(e) => { if (m.messageId) { e.dataTransfer.setData("text/x-message-id", m.messageId); e.dataTransfer.effectAllowed = "copy"; } }}>
-										<button onClick={() => open(m)} className={cn("flex w-full touch-manipulation items-center gap-3 px-4 py-2.5 text-left transition-colors hover:bg-serene-neutral-50", selected?.uid === m.uid && "bg-purple-50/70")}>
-											<span className={cn("h-2 w-2 shrink-0 rounded-full", m.seen ? "bg-transparent" : "bg-purple-600")} aria-label={m.seen ? "" : "Unread"} />
-											<span className={cn("w-36 shrink-0 truncate text-sm sm:w-44", m.seen ? "text-serene-neutral-700" : "font-semibold text-serene-neutral-900")}>{displayName(m.from)}</span>
-											<span className={cn("min-w-0 flex-1 truncate text-sm", m.seen ? "text-serene-neutral-600" : "font-semibold text-serene-neutral-900")}>
+										<button onClick={() => open(m)} className={cn("-mx-2 flex w-[calc(100%+1rem)] touch-manipulation items-center gap-3 rounded-md px-2 py-[11px] text-left text-[15px] transition-colors hover:bg-black/[0.04]", selected?.uid === m.uid && "bg-black/[0.05]")}>
+											<span className={cn("h-[7px] w-[7px] shrink-0 rounded-full", m.seen ? "bg-transparent" : "bg-blue-500")} aria-label={m.seen ? undefined : "Unread"} />
+											<span className={cn("w-[34%] max-w-[300px] shrink-0 truncate text-[#37352f] sm:w-[28%]", !m.seen && "font-semibold")}>{displayName(m.from)}</span>
+											<span className={cn("min-w-0 flex-1 truncate text-[#37352f]", !m.seen && "font-medium")}>
 												{m.subject}
-												{m.thread > 1 && <span className="ml-2 rounded bg-serene-neutral-100 px-1.5 py-0.5 text-[10px] font-medium text-serene-neutral-500">{m.thread}</span>}
-												{m.labels.slice(0, 2).map((id) => { const l = labels.find((x) => x.id === id); return l ? <span key={id} className={cn("ml-2 rounded px-1.5 py-0.5 text-[10px] font-semibold", LABEL_COLORS[l.color]?.chip ?? "bg-purple-100 text-purple-800")}>{l.name}</span> : null; })}
+												{m.thread > 1 && <span className="ml-2 rounded bg-black/[0.05] px-1.5 py-0.5 text-[11px] text-[#787774]">{m.thread}</span>}
 											</span>
-											{m.hasAttachments && <Paperclip className="h-3.5 w-3.5 shrink-0 text-serene-neutral-400" />}
+											{m.labels.slice(0, 2).map((id) => { const l = labels.find((x) => x.id === id); return l ? <span key={id} className="hidden shrink-0 rounded bg-black/[0.05] px-2 py-0.5 text-[13px] text-[#37352f] md:inline">{l.name}</span> : null; })}
+											{m.hasAttachments && <Paperclip className="h-3.5 w-3.5 shrink-0 text-[#9b9a97]" />}
 											{m.flagged && <Star className="h-3.5 w-3.5 shrink-0 fill-amber-400 text-amber-400" />}
-											<span className="w-14 shrink-0 text-right text-xs text-serene-neutral-400 group-hover:invisible">{rowTime(m.date)}</span>
+											<span className="w-[70px] shrink-0 text-right text-[#9b9a97] group-hover:invisible">{rowTime(m.date)}</span>
 										</button>
-										<div className="absolute right-3 top-1/2 hidden -translate-y-1/2 items-center gap-0.5 rounded-lg border border-serene-neutral-200 bg-white p-0.5 shadow-sm group-hover:flex">
+										<div className="absolute right-1 top-1/2 hidden -translate-y-1/2 items-center gap-0.5 rounded-lg border border-black/10 bg-white p-0.5 shadow-sm group-hover:flex">
 											{hover.includes("archive") && <HoverBtn label="Archive" onClick={() => act(m, "archive")}><Archive className="h-4 w-4" /></HoverBtn>}
 											{hover.includes("trash") && <HoverBtn label="Delete" onClick={() => act(m, "trash")}><Trash2 className="h-4 w-4" /></HoverBtn>}
 											{hover.includes("unread") && <HoverBtn label={m.seen ? "Mark unread" : "Mark read"} onClick={() => act(m, m.seen ? "unread" : "read")}>{m.seen ? <Mail className="h-4 w-4" /> : <MailOpen className="h-4 w-4" />}</HoverBtn>}
@@ -456,13 +479,13 @@ export function MailApp() {
 							</ul>
 						</section>
 					))}
-					{rows.length < total && !loading && <div className="flex justify-center p-4"><Button variant="ghost" size="sm" onClick={() => loadList(true)}>Load older ({total - rows.length} more)</Button></div>}
+{rows.length < total && !loading && <div className="px-4 pb-8 pt-3 lg:px-6"><button onClick={() => loadList(true)} className="flex items-center gap-3 text-[15px] text-[#9b9a97] hover:text-[#37352f]"><ArrowLeft className="h-4 w-4 -rotate-90" /> Load more</button></div>}
 					{loading && rows.length > 0 && <div className="flex justify-center p-4"><Loader2 className="h-4 w-4 animate-spin text-serene-neutral-400" /></div>}
 				</div>
 			</main>
 
 			{/* Reading: side peek / full page, or a centred dialog */}
-			{selected && effectiveLayout === "side" && <aside className="fixed inset-0 z-30 bg-white lg:static lg:z-auto lg:w-[46%] lg:max-w-[760px] lg:border-l lg:border-serene-neutral-200/70">{Pane}</aside>}
+			{selected && effectiveLayout === "side" && <aside className="fixed inset-0 z-30 bg-white lg:static lg:z-auto lg:w-[52%] lg:max-w-[820px] lg:border-l lg:border-black/[0.07]">{Pane}</aside>}
 			{selected && effectiveLayout === "full" && <section className="min-w-0 flex-1">{Pane}</section>}
 			{selected && effectiveLayout === "center" && (
 				<Dialog open onOpenChange={(o) => !o && close()}><DialogContent className="h-[88vh] max-w-3xl gap-0 overflow-hidden p-0 [&>button]:hidden"><DialogTitle className="sr-only">Message</DialogTitle>{Pane}</DialogContent></Dialog>
@@ -518,15 +541,15 @@ export function MailApp() {
 	);
 }
 
-function NavItem({ active, icon: Icon, label, badge, onClick, onEdit }: { active: boolean; icon: typeof Inbox; label: string; badge?: number; onClick: () => void; onEdit?: () => void }) {
+function NavItem({ active, icon: Icon, label, badge, tone, onClick, onEdit }: { active: boolean; icon: typeof Inbox; label: string; badge?: number; tone?: string; onClick: () => void; onEdit?: () => void }) {
 	return (
-		<div className={cn("group flex items-center rounded-lg", active ? "bg-white shadow-sm" : "hover:bg-white/70")}>
-			<button onClick={onClick} aria-current={active ? "page" : undefined} className={cn("flex min-w-0 flex-1 touch-manipulation items-center gap-2 px-2 py-1.5 text-left text-sm", active ? "font-semibold text-serene-neutral-900" : "text-serene-neutral-700")}>
-				<Icon className="h-4 w-4 shrink-0 text-serene-neutral-500" />
+		<div className={cn("group flex items-center rounded-md", active ? "bg-black/[0.06]" : "hover:bg-black/5")}>
+			<button onClick={onClick} aria-current={active ? "page" : undefined} className="flex h-9 min-w-0 flex-1 touch-manipulation items-center gap-3 px-3 text-left text-[15px] text-[#37352f]">
+				<Icon className={cn("h-[18px] w-[18px] shrink-0", tone ?? "text-[#787774]")} />
 				<span className="truncate">{label}</span>
-				{!!badge && <span className="ml-auto rounded-full bg-purple-600 px-1.5 text-[10px] font-bold text-white">{badge > 99 ? "99+" : badge}</span>}
+				{!!badge && <span className="ml-auto text-[13px] text-[#9b9a97]">{badge > 99 ? "99+" : badge}</span>}
 			</button>
-			{onEdit && <button onClick={onEdit} aria-label={`Edit ${label}`} className="mr-1 hidden rounded p-1 text-serene-neutral-400 hover:text-serene-neutral-800 group-hover:block"><Pencil className="h-3.5 w-3.5" /></button>}
+			{onEdit && <button onClick={onEdit} aria-label={`Edit ${label}`} className="mr-1 hidden rounded p-1 text-[#787774] hover:text-[#37352f] group-hover:block"><Pencil className="h-3.5 w-3.5" /></button>}
 		</div>
 	);
 }
@@ -535,7 +558,8 @@ function HoverBtn({ label, onClick, children }: { label: string; onClick: () => 
 	return <button onClick={(e) => { e.stopPropagation(); onClick(); }} title={label} aria-label={label} className="rounded-md p-1.5 text-serene-neutral-600 hover:bg-serene-neutral-100">{children}</button>;
 }
 
-function ReadingPane({ labels, selectedLabels, onToggleLabel, onNewLabel, selected, detail, busy, accountId, conversation, summary, summaryBusy, allowImages, onClose, onSummarise, onOpen, onAct, onReply, onForward, onLoadImages, full }: {
+function ReadingPane({ onPrev, onNext, hasPrev, hasNext, onAutoLabelSimilar, labels, selectedLabels, onToggleLabel, onNewLabel, selected, detail, busy, accountId, conversation, summary, summaryBusy, allowImages, onClose, onSummarise, onOpen, onAct, onReply, onForward, onLoadImages, full }: {
+	onPrev: () => void; onNext: () => void; hasPrev: boolean; hasNext: boolean; onAutoLabelSimilar: () => void;
 	labels: LabelRow[]; selectedLabels: string[]; onToggleLabel: (id: string, on: boolean) => void; onNewLabel: () => void;
 	selected: MessageRow | null; detail: Detail | null; busy: boolean; accountId: string; conversation: MessageRow[]; summary: string | null; summaryBusy: boolean; allowImages: boolean;
 	onClose: () => void; onSummarise: () => void; onOpen: (m: MessageRow) => void; onAct: (a: MailAction) => void; onReply: (all: boolean) => void; onForward: () => void; onLoadImages: () => void; full: boolean;
@@ -556,53 +580,69 @@ function ReadingPane({ labels, selectedLabels, onToggleLabel, onNewLabel, select
 
 	return (
 		<div className="flex h-full min-h-0 flex-col bg-white">
-			<header className="flex items-center gap-1 border-b border-serene-neutral-100 px-2 py-2 pt-[max(0.5rem,env(safe-area-inset-top))]">
-				<Button variant="ghost" size="icon" className="h-9 w-9" onClick={onClose} aria-label={full ? "Back to inbox" : "Close"}>{full ? <ArrowLeft className="h-4 w-4" /> : <X className="h-4 w-4" />}</Button>
+			<header className="flex items-center gap-1 px-3 py-2 pt-[max(0.5rem,env(safe-area-inset-top))]">
+				<button onClick={onClose} aria-label={full ? "Back to inbox" : "Close"} className="flex h-8 w-8 items-center justify-center rounded-md text-[#787774] hover:bg-black/5">{full ? <ArrowLeft className="h-[18px] w-[18px]" /> : <ChevronsRight className="h-[18px] w-[18px]" />}</button>
+				<button onClick={onPrev} disabled={!hasPrev} aria-label="Previous message (K)" className="flex h-8 w-8 items-center justify-center rounded-md text-[#787774] hover:bg-black/5 disabled:opacity-30"><ChevronUp className="h-[18px] w-[18px]" /></button>
+				<button onClick={onNext} disabled={!hasNext} aria-label="Next message (J)" className="flex h-8 w-8 items-center justify-center rounded-md text-[#787774] hover:bg-black/5 disabled:opacity-30"><ChevronDown className="h-[18px] w-[18px]" /></button>
 				<div className="flex-1" />
 				{detail && <>
-					<Button variant="ghost" size="icon" className="h-9 w-9" onClick={() => onReply(false)} aria-label="Reply" title="Reply (R)"><Reply className="h-4 w-4" /></Button>
-					<Button variant="ghost" size="icon" className="h-9 w-9" onClick={() => onReply(true)} aria-label="Reply all"><ReplyAll className="h-4 w-4" /></Button>
-					<Button variant="ghost" size="icon" className="h-9 w-9" onClick={onForward} aria-label="Forward"><Forward className="h-4 w-4" /></Button>
+					<button onClick={onAutoLabelSimilar} className="mr-1 hidden h-8 items-center gap-2 rounded-lg border border-black/10 bg-white px-3 text-sm text-[#37352f] shadow-sm hover:bg-black/[0.03] sm:flex"><Sparkles className="h-4 w-4 text-[#787774]" /> Auto label similar</button>
 					<Popover>
-						<PopoverTrigger asChild><Button variant="ghost" size="icon" className="h-9 w-9" aria-label="Labels" title="Label"><Tag className="h-4 w-4" /></Button></PopoverTrigger>
+						<PopoverTrigger asChild><button aria-label="Labels" title="Label" className="flex h-8 w-8 items-center justify-center rounded-md text-[#787774] hover:bg-black/5"><Tag className="h-[18px] w-[18px]" /></button></PopoverTrigger>
 						<PopoverContent align="end" className="w-60 p-1.5">
 							{labels.map((l) => { const on = selectedLabels.includes(l.id); return (
-								<button key={l.id} onClick={() => onToggleLabel(l.id, !on)} className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-serene-neutral-100">
-									<span className={cn("h-2.5 w-2.5 rounded-full", LABEL_COLORS[l.color]?.dot ?? "bg-purple-500")} /><span className="flex-1 truncate">{l.name}</span>{on && <Check className="h-4 w-4 text-purple-600" />}
+								<button key={l.id} onClick={() => onToggleLabel(l.id, !on)} className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-black/5">
+									<span className={cn("h-2.5 w-2.5 rounded-full", LABEL_COLORS[l.color]?.dot ?? "bg-purple-500")} /><span className="flex-1 truncate">{l.name}</span>{on && <Check className="h-4 w-4 text-blue-600" />}
 								</button>
 							); })}
-							<button onClick={onNewLabel} className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm text-serene-neutral-500 hover:bg-serene-neutral-100"><Plus className="h-4 w-4" /> New label</button>
+							<button onClick={onNewLabel} className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm text-[#787774] hover:bg-black/5"><Plus className="h-4 w-4" /> New label</button>
 						</PopoverContent>
 					</Popover>
-					<Button variant="ghost" size="icon" className="h-9 w-9" onClick={() => onAct("archive")} aria-label="Archive" title="Archive (E)"><Archive className="h-4 w-4" /></Button>
-					<Button variant="ghost" size="icon" className="h-9 w-9" onClick={() => onAct(selected?.seen ? "unread" : "read")} aria-label="Mark unread" title="Mark unread (U)"><Mail className="h-4 w-4" /></Button>
-					<Button variant="ghost" size="icon" className="h-9 w-9" onClick={() => onAct(selected?.flagged ? "unstar" : "star")} aria-label="Star" title="Star (S)"><Star className={cn("h-4 w-4", selected?.flagged && "fill-amber-400 text-amber-400")} /></Button>
-					<Button variant="ghost" size="icon" className="h-9 w-9 text-red-600" onClick={() => onAct("trash")} aria-label="Delete" title="Delete (#)"><Trash2 className="h-4 w-4" /></Button>
+					<button onClick={() => onAct("archive")} aria-label="Archive (E)" title="Archive (E)" className="flex h-8 w-8 items-center justify-center rounded-md text-[#787774] hover:bg-black/5"><Archive className="h-[18px] w-[18px]" /></button>
+					<button onClick={() => onAct("trash")} aria-label="Delete (#)" title="Delete (#)" className="flex h-8 w-8 items-center justify-center rounded-md text-[#787774] hover:bg-black/5"><Trash2 className="h-[18px] w-[18px]" /></button>
+					<Popover>
+						<PopoverTrigger asChild><button aria-label="More" className="flex h-8 w-8 items-center justify-center rounded-md text-[#787774] hover:bg-black/5"><MoreHorizontal className="h-[18px] w-[18px]" /></button></PopoverTrigger>
+						<PopoverContent align="end" className="w-52 p-1.5">
+							{[
+								{ l: "Reply", i: Reply, f: () => onReply(false) },
+								{ l: "Reply all", i: ReplyAll, f: () => onReply(true) },
+								{ l: "Forward", i: Forward, f: onForward },
+								{ l: selected?.seen ? "Mark unread" : "Mark read", i: Mail, f: () => onAct(selected?.seen ? "unread" : "read") },
+								{ l: selected?.flagged ? "Remove star" : "Star", i: Star, f: () => onAct(selected?.flagged ? "unstar" : "star") },
+								{ l: "Summarise", i: Sparkles, f: onSummarise },
+								{ l: "Mark as spam", i: ShieldAlert, f: () => onAct("spam") },
+							].map((x) => <button key={x.l} onClick={x.f} className="flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-left text-sm hover:bg-black/5"><x.i className="h-4 w-4 text-[#787774]" />{x.l}</button>)}
+						</PopoverContent>
+					</Popover>
 				</>}
 			</header>
 
 			<div className="min-h-0 flex-1 overflow-y-auto">
 				{busy && !detail && <div className="flex justify-center py-20"><Loader2 className="h-6 w-6 animate-spin text-serene-neutral-400" /></div>}
 				{detail && (
-					<article className="mx-auto max-w-3xl p-5">
-						<h2 className="text-xl font-bold leading-snug text-serene-neutral-900">{detail.subject}</h2>
+					<article className="mx-auto max-w-3xl px-6 pb-10 pt-3">
+						<h2 className="text-[28px] font-semibold leading-tight tracking-[-0.01em] text-[#37352f]">{detail.subject}</h2>
+						<div className="mt-3 flex flex-wrap items-center gap-2 text-[15px]">
+							{selectedLabels.length === 0 && <span className="text-[#9b9a97]">Add label</span>}
+							{selectedLabels.map((id) => { const l = labels.find((x) => x.id === id); return l ? <span key={id} className={cn("rounded px-2 py-0.5", LABEL_COLORS[l.color]?.chip ?? "bg-black/5")}>{l.name}</span> : null; })}
+						</div>
+						<hr className="-mx-6 mt-4 border-black/[0.07]" />
 
 						{summary ? (
-							<p className="mt-3 flex gap-2 rounded-xl bg-purple-50 p-3 text-sm text-purple-950"><Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-purple-600" />{summary}</p>
-						) : (
-							<Button variant="ghost" size="sm" className="mt-2 -ml-2 gap-1.5 text-purple-700" onClick={onSummarise} disabled={summaryBusy}>{summaryBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />} Summarise</Button>
-						)}
+							<p className="mt-4 flex gap-2 rounded-lg bg-black/[0.04] p-3 text-sm text-[#37352f]"><Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-[#787774]" />{summary}</p>
+						) : summaryBusy ? (
+							<p className="mt-4 flex items-center gap-2 text-sm text-[#787774]"><Loader2 className="h-4 w-4 animate-spin" /> Summarising...</p>
+						) : null}
 
 						<div className="mt-4 flex items-start gap-3">
-							<div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-purple-100 text-sm font-bold text-purple-700">{displayName(detail.from[0] ?? { name: "", address: "" }).charAt(0).toUpperCase()}</div>
-							<div className="min-w-0 flex-1 text-sm">
-								<p className="font-semibold text-serene-neutral-900">{displayName(detail.from[0] ?? { name: "", address: "" })} <span className="font-normal text-serene-neutral-500">&lt;{detail.from[0]?.address}&gt;</span></p>
-								<p className="truncate text-xs text-serene-neutral-500">to {detail.to.map(displayName).join(", ") || "me"}{detail.cc.length ? `, cc ${detail.cc.map(displayName).join(", ")}` : ""}</p>
+							<div className="min-w-0 flex-1">
+								<p className="text-[15px] text-[#37352f]">{displayName(detail.from[0] ?? { name: "", address: "" })} <span className="text-[13px] text-[#9b9a97]">&lt;{detail.from[0]?.address}&gt;</span></p>
+								<p className="truncate text-[15px] text-[#9b9a97]">To {detail.to.map(displayName).join(", ") || "me"}{detail.cc.length ? `, Cc ${detail.cc.map(displayName).join(", ")}` : ""}</p>
 							</div>
-							<span className="shrink-0 text-xs text-serene-neutral-400">{detail.date ? format(new Date(detail.date), "d MMM yyyy, HH:mm") : ""}</span>
+							<span className="shrink-0 text-[15px] text-[#9b9a97]">{detail.date ? format(new Date(detail.date), "MMM d") : ""}</span>
 						</div>
 
-						{detail.hasRemoteImages && !allowImages && (
+{detail.hasRemoteImages && !allowImages && (
 							<div className="mt-4 flex items-center gap-3 rounded-xl bg-amber-50 p-3 text-sm text-amber-900">Images are hidden to protect your privacy.<Button size="sm" variant="outline" className="ml-auto" onClick={onLoadImages}>Show images</Button></div>
 						)}
 

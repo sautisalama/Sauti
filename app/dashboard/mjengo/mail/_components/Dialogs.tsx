@@ -17,7 +17,7 @@ import { clearMailCache } from "@/lib/mail/offline-cache";
 import { addAccount, oauthAvailability, deleteSnippet, removeAccount, saveSnippet, type AccountView, type SnippetRow, type ViewConfig, type ViewRow } from "./api";
 
 const PROVIDERS = [
-	{ id: "sautisalama", label: "Sauti Salama mail", hint: "Use your full address and your webmail password. Servers: mail.sautisalama.org." },
+	{ id: "sautisalama", label: "Sauti Salama mail server", hint: "For any address hosted on our mail server, including other domains such as you@tusonge.co.ke. Use your full address and your webmail password. Servers: mail.sautisalama.org." },
 	{ id: "gmail", label: "Gmail (app password)", hint: "Use an app password: Google Account > Security > 2-Step Verification > App passwords. Or use Sign in with Google above." },
 	{ id: "outlook", label: "Outlook (app password)", hint: "Most Microsoft accounts no longer accept passwords here. Use Sign in with Microsoft above." },
 	{ id: "zoho", label: "Zoho Mail", hint: "" },
@@ -107,7 +107,7 @@ export function ConnectDialog({ open, onClose, onConnected }: { open: boolean; o
 							{protocol === "pop3" && <span className="text-xs text-serene-neutral-500">Inbox only; no folders or stars.</span>}
 						</div>
 					)}
-					<div className="space-y-1.5"><Label htmlFor="mb-email">Email address</Label><Input id="mb-email" type="email" autoComplete="off" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@sautisalama.org" /></div>
+					<div className="space-y-1.5"><Label htmlFor="mb-email">Email address</Label><Input id="mb-email" type="email" autoComplete="off" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@sautisalama.org or you@tusonge.co.ke" /></div>
 					<div className="space-y-1.5"><Label htmlFor="mb-pass">Password or app password</Label><PasswordInput id="mb-pass" autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} /></div>
 					{preset === "custom" && (
 						<div className="grid grid-cols-2 gap-3">
@@ -150,7 +150,7 @@ export function ViewDialog({ view, labels = [], onClose, onSave, onDelete }: { v
 							<Select value={cfg.mailbox} onValueChange={(v) => setCfg({ ...cfg, mailbox: v as ViewConfig["mailbox"] })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{MAILBOXES.map((m) => <SelectItem key={m.v} value={m.v}>{m.l}</SelectItem>)}</SelectContent></Select>
 						</div>
 						<div className="space-y-1.5"><Label>Group by</Label>
-							<Select value={cfg.group ?? "date"} onValueChange={(v) => setCfg({ ...cfg, group: v as ViewConfig["group"] })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="date">Date</SelectItem><SelectItem value="sender">Sender</SelectItem><SelectItem value="none">No grouping</SelectItem></SelectContent></Select>
+							<Select value={cfg.group ?? "date"} onValueChange={(v) => setCfg({ ...cfg, group: v as ViewConfig["group"] })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="date">Date</SelectItem><SelectItem value="sender">Sender</SelectItem><SelectItem value="status">Read / unread</SelectItem><SelectItem value="none">No grouping</SelectItem></SelectContent></Select>
 						</div>
 					</div>
 					{labels.length > 0 && (

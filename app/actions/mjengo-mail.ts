@@ -431,7 +431,7 @@ export interface ViewConfig {
   from?: string;
   /** Only messages carrying this label. */
   labelId?: string;
-  group?: 'date' | 'sender' | 'none';
+  group?: 'date' | 'sender' | 'status' | 'none';
   hoverActions?: ('archive' | 'trash' | 'unread' | 'star' | 'reply')[];
 }
 
