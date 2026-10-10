@@ -77,6 +77,7 @@ export async function updateSession(request: NextRequest) {
 		"/robots.txt",
 		"/manifest.webmanifest",
 		"/~offline",
+		"/f", // public forms from the Mjengo suite
 		"/join", // group invite pages show a preview before asking you to sign in
 	];
 	const path = request.nextUrl.pathname;
