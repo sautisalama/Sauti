@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ClipboardList, Briefcase, CalendarClock, CheckSquare, FileText, FolderKanban, LayoutDashboard, Lightbulb, Mail, ScrollText, ShieldCheck } from "lucide-react";
+import { ClipboardList, Briefcase, CalendarClock, CheckSquare, FileText, HardDrive, FolderKanban, LayoutDashboard, Lightbulb, Mail, ScrollText, ShieldCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const BASE = "/dashboard/mjengo";
@@ -16,6 +16,7 @@ const TABS = [
 	{ href: `${BASE}/forms`, label: "Forms", icon: ClipboardList },
 	{ href: `${BASE}/todos`, label: "To-dos", icon: CheckSquare },
 	{ href: `${BASE}/documents`, label: "Documents", icon: FileText },
+	{ href: `${BASE}/vault`, label: "Vault", icon: HardDrive },
 	{ href: `${BASE}/people`, label: "People & access", icon: ShieldCheck, superOnly: true },
 	{ href: `${BASE}/logs`, label: "Logs", icon: ScrollText, superOnly: true },
 ];

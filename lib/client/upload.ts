@@ -27,3 +27,26 @@ export async function uploadWithProgress(bucket: string, path: string, file: Fil
 }
 
 export const safeFileName = (name: string) => name.replace(/[^a-zA-Z0-9._-]+/g, '_').slice(-120);
+
+/** PUT a file to a signed upload URL that the server created (for paths the browser may not write to directly). */
+export function putToSignedUrl(signedUrl: string, file: File, onProgress?: (pct: number) => void): Promise<void> {
+	return new Promise<void>((resolve, reject) => {
+		const xhr = new XMLHttpRequest();
+		xhr.open('PUT', signedUrl);
+		xhr.upload.onprogress = (e) => {
+			if (e.lengthComputable) onProgress?.(Math.min(99, Math.round((e.loaded / e.total) * 100)));
+		};
+		xhr.onload = () => {
+			if (xhr.status >= 200 && xhr.status < 300) {
+				onProgress?.(100);
+				resolve();
+			} else reject(new Error(`Upload failed (${xhr.status})`));
+		};
+		xhr.onerror = () => reject(new Error('Network error during upload'));
+		xhr.onabort = () => reject(new Error('Upload cancelled'));
+		const body = new FormData();
+		body.append('cacheControl', '3600');
+		body.append('', file);
+		xhr.send(body);
+	});
+}
