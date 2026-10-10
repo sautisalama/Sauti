@@ -62,7 +62,7 @@ const toBase64 = (f: File) =>
  * Compose window with a block editor: type "/" for headings, lists, to-dos, quotes, dividers and your
  * saved snippets. Cmd/Ctrl+Enter sends.
  */
-export function Composer({ accounts, accountId, seed, snippets, onClose, onSent }: { accounts: AccountView[]; accountId: string; seed: ComposeSeed; snippets: SnippetRow[]; onClose: () => void; onSent: () => void }) {
+export function Composer({ accounts, accountId, seed, snippets, signature = "", onClose, onSent }: { accounts: AccountView[]; accountId: string; seed: ComposeSeed; snippets: SnippetRow[]; signature?: string; onClose: () => void; onSent: () => void }) {
 	const { toast } = useToast();
 	const [from, setFrom] = useState(accountId);
 	const [to, setTo] = useState((seed.to ?? []).join(", "));
@@ -102,7 +102,7 @@ export function Composer({ accounts, accountId, seed, snippets, onClose, onSent 
 
 	const editor = useEditor({
 		immediatelyRender: false,
-		content: seed.html ?? "",
+		content: signature ? `<p></p>${signature}${seed.html ?? ""}` : (seed.html ?? ""),
 		extensions: [StarterKit.configure({ heading: { levels: [1, 2] } }), Placeholder.configure({ placeholder: "Write something, or press / for blocks" }), TaskList, TaskItem.configure({ nested: true })],
 		editorProps: {
 			attributes: { class: "prose prose-sm max-w-none min-h-[200px] focus:outline-none px-1 py-2 [&_ul[data-type=taskList]]:list-none [&_ul[data-type=taskList]]:pl-0 [&_ul[data-type=taskList]_li]:flex [&_ul[data-type=taskList]_li]:gap-2" },

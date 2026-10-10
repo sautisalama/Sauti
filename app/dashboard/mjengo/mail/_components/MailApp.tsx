@@ -20,6 +20,8 @@ import {
 } from "./api";
 import { Composer, type ComposeSeed } from "./Composer";
 import { ConnectDialog, LabelDialog, LABEL_COLORS, SettingsDialog, ViewDialog } from "./Dialogs";
+import { SignaturePrompt } from "./SignatureEditor";
+import { getSignature, type SignatureState } from "./api";
 import { listLabels, saveLabel, deleteLabel, setMessageLabel, type LabelRow } from "./api";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { AccountSwitcher } from "./AccountSwitcher";
@@ -68,6 +70,8 @@ export function MailApp() {
 	const [unread, setUnread] = useState(0);
 	const [views, setViews] = useState<ViewRow[]>([]);
 	const [snippets, setSnippets] = useState<SnippetRow[]>([]);
+	const [signature, setSignature] = useState<SignatureState | null>(null);
+	const [sigPrompt, setSigPrompt] = useState(false);
 	const [labels, setLabels] = useState<LabelRow[]>([]);
 	const [labelEdit, setLabelEdit] = useState<Partial<LabelRow> | null>(null);
 	const [dropOn, setDropOn] = useState<string | null>(null);
@@ -120,11 +124,16 @@ export function MailApp() {
 		setAccountId((cur) => (cur && list.some((a) => a.id === cur) ? cur : list[0]?.id ?? null));
 	}, []);
 	const loadMeta = useCallback(async () => {
-		const [v, s, l] = await Promise.all([listViews(), listSnippets(), listLabels()]);
+		const [v, s, l, sig] = await Promise.all([listViews(), listSnippets(), listLabels(), getSignature().catch(() => null)]);
 		setViews(v);
 		setSnippets(s);
 		setLabels(l);
+		if (sig) setSignature(sig);
 	}, []);
+	// First time with a mailbox and no signature: ask once.
+	useEffect(() => {
+		if (signature && !signature.configured && !signature.dismissed && accounts && accounts.length > 0) setSigPrompt(true);
+	}, [signature, accounts]);
 	// Coming back from "Sign in with Google / Microsoft".
 	useEffect(() => {
 		const q = new URLSearchParams(window.location.search);
@@ -351,14 +360,13 @@ export function MailApp() {
 	const hover = active.config.hoverActions ?? DEFAULT_HOVER;
 	const effectiveLayout: Layout = layout;
 
-	const sigHtml = (_: string | null) => "";
-	const ink = "text-[#37352f]";
+		const ink = "text-[#37352f]";
 	const Heading = ({ children }: { children: React.ReactNode }) => <p className="px-3 pb-1 pt-5 text-[13px] font-medium text-[#9b9a97]">{children}</p>;
 	const sidebar = (
 		<div className={cn("flex h-full flex-col bg-[#f7f7f5]", ink)}>
 			<div className="flex items-center gap-1 px-2 pb-1 pt-[max(0.625rem,env(safe-area-inset-top))]">
 				<div className="min-w-0 flex-1"><AccountSwitcher accounts={accounts} accountId={accountId} onSelect={(id) => { setAccountId(id); setViewKey("inbox"); setNavOpen(false); }} onAdd={() => { setNavOpen(false); setConnectOpen(true); }} onSettings={() => { setNavOpen(false); setSettingsOpen(true); }} /></div>
-				<button onClick={() => { setCompose({ html: sigHtml(null) }); setNavOpen(false); }} aria-label="Compose (C)" title="Compose (C)" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-[#37352f] hover:bg-black/5"><Edit3 className="h-[18px] w-[18px]" /></button>
+				<button onClick={() => { setCompose({}); setNavOpen(false); }} aria-label="Compose (C)" title="Compose (C)" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-[#37352f] hover:bg-black/5"><Edit3 className="h-[18px] w-[18px]" /></button>
 			</div>
 			<div className="px-2">
 				<label className="flex h-9 cursor-text items-center gap-3 rounded-md px-3 text-[15px] hover:bg-black/5 focus-within:bg-black/5">
@@ -491,9 +499,10 @@ const Pane = (
 				<Dialog open onOpenChange={(o) => !o && close()}><DialogContent className="h-[88vh] max-w-3xl gap-0 overflow-hidden p-0 [&>button]:hidden"><DialogTitle className="sr-only">Message</DialogTitle>{Pane}</DialogContent></Dialog>
 			)}
 
-			{compose && accountId && <Composer accounts={accounts} accountId={accountId} seed={compose} snippets={snippets} onClose={() => setCompose(null)} onSent={() => { setCompose(null); if (active.config.mailbox === "sent") loadList(false); }} />}
+			{compose && accountId && <Composer accounts={accounts} accountId={accountId} seed={compose} snippets={snippets} signature={signature?.html ?? ""} onClose={() => setCompose(null)} onSent={() => { setCompose(null); if (active.config.mailbox === "sent") loadList(false); }} />}
 			<ConnectDialog open={connectOpen} onClose={() => setConnectOpen(false)} onConnected={(a) => { setAccounts((p) => [...(p ?? []), a]); setAccountId(a.id); }} />
-			<SettingsDialog open={settingsOpen} onClose={() => setSettingsOpen(false)} accounts={accounts} onAccountsChanged={() => loadAccounts().catch(() => undefined)} onConnect={() => setConnectOpen(true)} snippets={snippets} onSnippetsChanged={() => loadMeta().catch(() => undefined)} layout={layout} onLayout={changeLayout} />
+			<SettingsDialog open={settingsOpen} onClose={() => setSettingsOpen(false)} accounts={accounts} onAccountsChanged={() => loadAccounts().catch(() => undefined)} onConnect={() => setConnectOpen(true)} snippets={snippets} onSnippetsChanged={() => loadMeta().catch(() => undefined)} layout={layout} onLayout={changeLayout} signature={signature?.html ?? ""} onSignatureSaved={(html) => setSignature({ html, configured: !!html, dismissed: true })} />
+			<SignaturePrompt open={sigPrompt} onClose={() => { setSigPrompt(false); setSignature((s) => (s ? { ...s, dismissed: true } : s)); }} onSaved={(html) => setSignature({ html, configured: !!html, dismissed: true })} />
 			{labelEdit && (
 				<LabelDialog
 					label={labelEdit}

@@ -1,7 +1,7 @@
 import * as raw from '@/app/actions/mjengo-mail';
 import { unwrap } from '@/lib/action-result';
 
-export type { LabelRow, AccountView, AddAccountInput, MessageRow, ListQuery, MailAction, SendInput, ViewConfig, ViewRow, SnippetRow } from '@/app/actions/mjengo-mail';
+export type { SignatureState, LabelRow, AccountView, AddAccountInput, MessageRow, ListQuery, MailAction, SendInput, ViewConfig, ViewRow, SnippetRow } from '@/app/actions/mjengo-mail';
 
 export const listAccounts = (...a: Parameters<typeof raw.listAccounts>) => unwrap(raw.listAccounts(...a));
 export const addAccount = (...a: Parameters<typeof raw.addAccount>) => unwrap(raw.addAccount(...a));
@@ -27,3 +27,6 @@ export const deleteLabel = (...a: Parameters<typeof raw.deleteLabel>) => unwrap(
 export const setMessageLabel = (...a: Parameters<typeof raw.setMessageLabel>) => unwrap(raw.setMessageLabel(...a));
 export const autoLabel = (...a: Parameters<typeof raw.autoLabel>) => unwrap(raw.autoLabel(...a));
 export const rewriteText = (...a: Parameters<typeof raw.rewriteText>) => unwrap(raw.rewriteText(...a));
+export const getSignature = (...a: Parameters<typeof raw.getSignature>) => unwrap(raw.getSignature(...a));
+export const saveSignature = (...a: Parameters<typeof raw.saveSignature>) => unwrap(raw.saveSignature(...a));
+export const dismissSignaturePrompt = (...a: Parameters<typeof raw.dismissSignaturePrompt>) => unwrap(raw.dismissSignaturePrompt(...a));

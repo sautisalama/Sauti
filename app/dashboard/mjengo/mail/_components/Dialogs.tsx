@@ -14,6 +14,7 @@ import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { autoLabel, type LabelRow } from "./api";
 import { clearMailCache } from "@/lib/mail/offline-cache";
+import { SignatureSettings } from "./SignatureEditor";
 import { addAccount, oauthAvailability, deleteSnippet, removeAccount, saveSnippet, type AccountView, type SnippetRow, type ViewConfig, type ViewRow } from "./api";
 
 const PROVIDERS = [
@@ -181,7 +182,8 @@ export function ViewDialog({ view, labels = [], onClose, onSave, onDelete }: { v
 }
 
 /** Accounts, layout of the reading pane and snippets. */
-export function SettingsDialog({ open, onClose, accounts, onAccountsChanged, onConnect, snippets, onSnippetsChanged, layout, onLayout }: {
+export function SettingsDialog({ open, onClose, accounts, onAccountsChanged, onConnect, snippets, onSnippetsChanged, layout, onLayout, signature = "", onSignatureSaved }: {
+	signature?: string; onSignatureSaved?: (html: string) => void;
 	open: boolean; onClose: () => void; accounts: AccountView[]; onAccountsChanged: () => void; onConnect: () => void; snippets: SnippetRow[]; onSnippetsChanged: () => void; layout: "side" | "center" | "full"; onLayout: (l: "side" | "center" | "full") => void;
 }) {
 	const { toast } = useToast();
@@ -212,6 +214,7 @@ export function SettingsDialog({ open, onClose, accounts, onAccountsChanged, onC
 						{accounts.length === 0 && <li className="p-3 text-sm text-serene-neutral-500">None connected.</li>}
 					</ul>
 				</section>
+				{open && <SignatureSettings initial={signature} onSaved={(h) => onSignatureSaved?.(h)} />}
 				<section className="space-y-2">
 					<h3 className="text-sm font-bold">Snippets</h3>
 					<p className="text-xs text-serene-neutral-500">Reusable text. In a message, type / and pick the snippet.</p>

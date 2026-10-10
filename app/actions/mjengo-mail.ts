@@ -13,6 +13,7 @@ import {
 import { oauthConfigured } from '@/lib/mail/oauth';
 import { uidOf } from '@/lib/mail/pop3';
 import { simpleParser } from 'mailparser';
+import sanitizeHtml from 'sanitize-html';
 import { headers } from 'next/headers';
 import { atLeast, levelFor, loadIndex, oversightFor, recipientLevels } from '@/lib/vault/access';
 
@@ -622,6 +623,41 @@ async function rewriteText_(text: string, mode: 'improve' | 'shorter' | 'friendl
   return out || t;
 }
 
+/* ------------------------------------------------------------------ Signature */
+
+export interface SignatureState {
+  html: string;
+  /** They have saved one (possibly empty on purpose). */
+  configured: boolean;
+  /** They chose "Not now" on the first-time prompt. */
+  dismissed: boolean;
+}
+
+async function getSignature_(): Promise<SignatureState> {
+  const actor = await requireAdminActor();
+  const { data } = await looseAdmin().from('mail_signatures').select('html, prompt_dismissed').eq('owner_id', actor.id).maybeSingle();
+  return { html: data?.html ?? '', configured: !!data && (data.html ?? '').length > 0, dismissed: !!data?.prompt_dismissed };
+}
+
+async function saveSignature_(html: string): Promise<SignatureState> {
+  const actor = await requireAdminActor();
+  const clean = sanitizeHtml(html.slice(0, 8000), {
+    allowedTags: ['p', 'br', 'strong', 'b', 'em', 'i', 'u', 'a', 'ul', 'ol', 'li', 'span'],
+    allowedAttributes: { a: ['href'] },
+    allowedSchemes: ['http', 'https', 'mailto', 'tel'],
+    transformTags: { a: sanitizeHtml.simpleTransform('a', { target: '_blank', rel: 'noopener noreferrer' }) },
+  }).trim();
+  const isEmpty = !clean.replace(/<[^>]+>/g, '').trim();
+  const { error } = await looseAdmin().from('mail_signatures').upsert({ owner_id: actor.id, html: isEmpty ? '' : clean, prompt_dismissed: true, updated_at: new Date().toISOString() }, { onConflict: 'owner_id' });
+  if (error) throw new Error('Could not save your signature.');
+  return { html: isEmpty ? '' : clean, configured: !isEmpty, dismissed: true };
+}
+
+async function dismissSignaturePrompt_() {
+  const actor = await requireAdminActor();
+  await looseAdmin().from('mail_signatures').upsert({ owner_id: actor.id, prompt_dismissed: true }, { onConflict: 'owner_id' });
+}
+
 /* ---------------------------------------------------------------------- AI */
 
 async function ai(system: string, user: string, maxTokens: number): Promise<string> {
@@ -690,3 +726,6 @@ export const deleteLabel = guard(deleteLabel_);
 export const setMessageLabel = guard(setMessageLabel_);
 export const autoLabel = guard(autoLabel_);
 export const rewriteText = guard(rewriteText_);
+export const getSignature = guard(getSignature_);
+export const saveSignature = guard(saveSignature_);
+export const dismissSignaturePrompt = guard(dismissSignaturePrompt_);
