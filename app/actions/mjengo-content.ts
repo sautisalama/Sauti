@@ -137,7 +137,7 @@ async function caption_(about: string, channels: Channel[]): Promise<string> {
     signal: AbortSignal.timeout(30_000),
     headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json', 'X-Title': 'Sauti Salama Content' },
     body: JSON.stringify({
-      model: process.env.OPENROUTER_MODEL ?? 'google/gemini-2.5-flash-lite',
+      model: process.env.OPENROUTER_MODEL ?? 'qwen/qwen3.7-flash',
       temperature: 0.7,
       max_tokens: 400,
       messages: [

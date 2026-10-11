@@ -188,7 +188,7 @@ async function generate_(prompt: string): Promise<string> {
     signal: AbortSignal.timeout(40_000),
     headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json', 'X-Title': 'Sauti Salama Forms' },
     body: JSON.stringify({
-      model: process.env.OPENROUTER_MODEL ?? 'google/gemini-2.5-flash-lite',
+      model: process.env.OPENROUTER_MODEL ?? 'qwen/qwen3.7-flash',
       temperature: 0.4,
       max_tokens: 2500,
       response_format: { type: 'json_object' },

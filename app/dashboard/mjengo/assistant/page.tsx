@@ -395,7 +395,7 @@ function ConnectDialog({ mode, settings, onClose, onChanged }: { mode: null | "l
 					</div>
 					<div className="space-y-1.5">
 						<Label htmlFor="ai-model">Model <span className="font-normal text-serene-neutral-400">(optional)</span></Label>
-						<Input id="ai-model" value={model} onChange={(e) => setModel(e.target.value)} placeholder={provider === "openai" ? "gpt-4o-mini" : "google/gemini-2.5-flash-lite"} />
+						<Input id="ai-model" value={model} onChange={(e) => setModel(e.target.value)} placeholder={provider === "openai" ? "gpt-4o-mini" : "qwen/qwen3.7-flash"} />
 					</div>
 					{settings.chatgptAvailable ? (
 						<a href="/api/mjengo/assistant/chatgpt/start" className="flex items-center justify-center gap-2 rounded-lg border border-serene-neutral-200 py-2.5 text-sm font-semibold hover:bg-serene-neutral-50">

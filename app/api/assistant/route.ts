@@ -7,8 +7,8 @@ export const maxDuration = 60;
 
 type ChatMessage = { role: "user" | "assistant"; content: string };
 
-// Gemini 2.5 Flash Lite: cheap, fast and strong in Swahili/English. Override with OPENROUTER_MODEL.
-const DEFAULT_MODEL = "google/gemini-2.5-flash-lite";
+// Qwen 3.7 Flash: the cheapest capable model on OpenRouter (about a third of Gemini Flash Lite). Override with OPENROUTER_MODEL.
+const DEFAULT_MODEL = "qwen/qwen3.7-flash";
 const MAX_MESSAGES = 20;
 const MAX_CHARS = 4000;
 const RATE_LIMIT = { max: 30, windowMs: 10 * 60 * 1000 };

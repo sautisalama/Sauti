@@ -9,7 +9,7 @@ export async function askAi(system: string, user: string, maxTokens = 600, opts:
     signal: AbortSignal.timeout(45_000),
     headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json', 'X-Title': 'Sauti Salama Suite' },
     body: JSON.stringify({
-      model: process.env.OPENROUTER_MODEL ?? 'google/gemini-2.5-flash-lite',
+      model: process.env.OPENROUTER_MODEL ?? 'qwen/qwen3.7-flash',
       temperature: opts.temperature ?? 0.4,
       max_tokens: maxTokens,
       ...(opts.json ? { response_format: { type: 'json_object' } } : {}),

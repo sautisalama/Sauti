@@ -191,7 +191,7 @@ async function icons_(titles: string[]): Promise<Record<string, string>> {
     signal: AbortSignal.timeout(20_000),
     headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json', 'X-Title': 'Sauti Salama Calendar' },
     body: JSON.stringify({
-      model: process.env.OPENROUTER_MODEL ?? 'google/gemini-2.5-flash-lite',
+      model: process.env.OPENROUTER_MODEL ?? 'qwen/qwen3.7-flash',
       temperature: 0,
       max_tokens: 900,
       response_format: { type: 'json_object' },

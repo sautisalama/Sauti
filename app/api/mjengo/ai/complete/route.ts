@@ -5,7 +5,7 @@ import { NO_DASH_RULE } from "@/lib/plain-text";
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
-const MODEL = process.env.OPENROUTER_MODEL ?? "google/gemini-2.5-flash-lite";
+const MODEL = process.env.OPENROUTER_MODEL ?? "qwen/qwen3.7-flash";
 
 /** Writing help for the document editor: streams plain text, using the organisation's OpenRouter key. */
 export async function POST(request: Request) {
