@@ -10,6 +10,8 @@ import {
   type FileNode, type FolderNode, type General, type Level, type ResType, type RecipientLevel,
 } from '@/lib/vault/access';
 
+import { driveToken, updateFileContent } from '@/lib/google-drive';
+
 const BUCKET = 'mjengo-docs';
 const MAX_BYTES = 50 * 1024 * 1024;
 
@@ -28,6 +30,8 @@ export interface VaultItem {
   createdAt?: string;
   /** Where the copy in Google Drive lives, once it has been saved there. */
   driveLink?: string | null;
+  updatedAt?: string;
+  lastOpenedAt?: string | null;
   /** Owner first, then everyone it is shared with directly. */
   people: string[];
 }
@@ -38,6 +42,17 @@ export interface VaultListing {
   /** Your level on the open folder (null at the root, where you may always create). */
   here: Level | null;
   items: VaultItem[];
+}
+
+/** Push the latest bytes over the Drive copy, using the saver's Drive connection or else the owner's. */
+async function syncToDrive(actorId: string, ownerId: string, driveFileId: string, path: string, mime: string | null, name: string, id: string) {
+  const token = (await driveToken(actorId)) ?? (ownerId !== actorId ? await driveToken(ownerId) : null);
+  if (!token) return;
+  const { data } = await looseAdmin().storage.from(BUCKET).download(path);
+  if (!data) return;
+  await updateFileContent(token, driveFileId, new Uint8Array(await data.arrayBuffer()), mime || data.type || 'application/octet-stream');
+  await looseAdmin().from('vault_files').update({ drive_synced_at: new Date().toISOString() }).eq('id', id);
+  void name;
 }
 
 async function ctx() {
@@ -68,11 +83,11 @@ function toItems(c: Ctx, folders: FolderNode[], files: FileNode[]): VaultItem[] 
   const out: VaultItem[] = [];
   for (const f of folders) {
     const l = lvl(c, 'folder', f.id);
-    if (l) out.push({ type: 'folder', id: f.id, name: f.name, level: l, ownerId: f.owner_id, ownerName: c.names.get(f.owner_id) ?? 'Unknown', shared: f.general_access !== 'restricted' || sharedIds.has(`folder:${f.id}`), general: f.general_access, people: peopleOf(c, 'folder', f.id, f.owner_id) });
+    if (l) out.push({ type: 'folder', id: f.id, name: f.name, level: l, ownerId: f.owner_id, ownerName: c.names.get(f.owner_id) ?? 'Unknown', shared: f.general_access !== 'restricted' || sharedIds.has(`folder:${f.id}`), general: f.general_access, driveLink: f.drive_link, people: peopleOf(c, 'folder', f.id, f.owner_id) });
   }
   for (const f of files) {
     const l = lvl(c, 'file', f.id);
-    if (l) out.push({ type: 'file', id: f.id, name: f.name, level: l, ownerId: f.owner_id, ownerName: c.names.get(f.owner_id) ?? 'Unknown', shared: f.general_access !== 'restricted' || sharedIds.has(`file:${f.id}`), general: f.general_access, size: f.size, mime: f.mime, createdAt: f.created_at, driveLink: f.drive_link, people: peopleOf(c, 'file', f.id, f.owner_id) });
+    if (l) out.push({ type: 'file', id: f.id, name: f.name, level: l, ownerId: f.owner_id, ownerName: c.names.get(f.owner_id) ?? 'Unknown', shared: f.general_access !== 'restricted' || sharedIds.has(`file:${f.id}`), general: f.general_access, size: f.size, mime: f.mime, createdAt: f.created_at, updatedAt: f.updated_at, lastOpenedAt: f.last_opened_at, driveLink: f.drive_link, people: peopleOf(c, 'file', f.id, f.owner_id) });
   }
   return out.sort((a, b) => (a.type === b.type ? a.name.localeCompare(b.name) : a.type === 'folder' ? -1 : 1));
 }
@@ -175,6 +190,7 @@ async function getFileUrl_(id: string): Promise<{ url: string; name: string; lev
   if (!f) throw new Error('That file no longer exists.');
   const { data, error } = await looseAdmin().storage.from(BUCKET).createSignedUrl(f.storage_path, 300, { download: f.name });
   if (error || !data) throw new Error('Could not open the file.');
+  await looseAdmin().from('vault_files').update({ last_opened_at: new Date().toISOString() }).eq('id', id);
   if (f.owner_id !== c.actor.id) await logAudit({ actorId: c.actor.id, actorEmail: c.actor.email, action: 'vault.file_opened', targetType: 'vault_file', targetId: id, targetLabel: f.name });
   return { url: data.signedUrl, name: f.name, level, folderId: f.folder_id, mime: f.mime };
 }
@@ -194,7 +210,9 @@ async function finishReplace_(id: string, size: number) {
   const c = await ctx();
   need(c, 'file', id, 'edit', 'save changes to it');
   const f = c.ix.files.get(id);
-  await looseAdmin().from('vault_files').update({ size }).eq('id', id);
+  await looseAdmin().from('vault_files').update({ size, updated_at: new Date().toISOString() }).eq('id', id);
+  // The copy in Google Drive follows the latest save.
+  if (f?.drive_file_id) await syncToDrive(c.actor.id, f.owner_id, f.drive_file_id, f.storage_path, f.mime, f.name, id).catch(() => undefined);
   await logAudit({ actorId: c.actor.id, actorEmail: c.actor.email, action: 'vault.file_saved', targetType: 'vault_file', targetId: id, targetLabel: f?.name });
 }
 
