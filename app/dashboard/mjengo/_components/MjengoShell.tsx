@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect } from "react";
 import { usePathname } from "next/navigation";
-import { ArrowLeft, ClipboardList, Briefcase, CheckSquare, FileText, HardDrive, FolderKanban, LayoutDashboard, Lightbulb, Mail, ScrollText, ShieldCheck, Users } from "lucide-react";
+import { ArrowLeft, ClipboardList, Briefcase, CheckSquare, FileText, HardDrive, FolderKanban, LayoutDashboard, Lightbulb, Mail, ScrollText, ShieldCheck, Sparkles, CalendarClock, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const BASE = "/dashboard/mjengo";
@@ -17,6 +17,8 @@ const TABS = [
 	{ href: `${BASE}/projects`, label: "Projects", icon: FolderKanban },
 	{ href: `${BASE}/forms`, label: "Forms", icon: ClipboardList },
 	{ href: `${BASE}/todos`, label: "To-dos", icon: CheckSquare },
+	{ href: `${BASE}/assistant`, label: "Assistant", icon: Sparkles },
+	{ href: `${BASE}/content`, label: "Content", icon: CalendarClock },
 	{ href: `${BASE}/documents`, label: "Documents", icon: FileText },
 	{ href: `${BASE}/vault`, label: "Vault", icon: HardDrive },
 	{ href: `${BASE}/people`, label: "People & access", icon: ShieldCheck, superOnly: true },
@@ -36,7 +38,7 @@ export function MjengoShell({ isSuper, children }: { isSuper: boolean; children:
 		return () => clearTimeout(t);
 	}, []);
 	// Mail and the document editor take the whole window, like native apps.
-	const fullBleed = pathname.startsWith(`${BASE}/mail`) || pathname.startsWith(`${BASE}/documents/editor`);
+	const fullBleed = pathname.startsWith(`${BASE}/mail`) || pathname.startsWith(`${BASE}/assistant`) || pathname.startsWith(`${BASE}/documents/editor`);
 
 	return (
 		<div className={cn("flex min-h-dvh flex-col bg-serene-neutral-50", fullBleed && "h-dvh min-h-0")}>

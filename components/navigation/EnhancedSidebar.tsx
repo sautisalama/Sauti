@@ -29,7 +29,7 @@ import {
 	Building2,
     Network,
 	GraduationCap, Briefcase,
-	Mail, CheckSquare, FolderKanban, Lightbulb, ScrollText, HardDrive, ShieldCheck, ArrowLeft
+	Mail, Sparkles, CalendarClock, CheckSquare, FolderKanban, Lightbulb, ScrollText, HardDrive, ShieldCheck, ArrowLeft
 } from "lucide-react";
 import { mjengoNav } from "@/app/actions/mjengo-nav";
 import { Button } from "@/components/ui/button";
@@ -292,6 +292,8 @@ export function EnhancedSidebar({
 				{ id: "mj-projects", group: "Work", label: "Projects", icon: FolderKanban, href: `${B}/projects`, section: "main", hint: "Projects, milestones and documents" },
 				{ id: "mj-forms", group: "Work", label: "Forms", icon: ClipboardList, href: `${B}/forms`, section: "main", hint: "Build forms and see responses" },
 				{ id: "mj-todos", group: "Work", label: "To-dos", icon: CheckSquare, href: `${B}/todos`, section: "main", hint: "Tasks and shared responsibilities" },
+				{ id: "mj-assistant", group: "Create", label: "Assistant", icon: Sparkles, href: `${B}/assistant`, section: "main", hint: "Chat, write and create images" },
+				{ id: "mj-content", group: "Create", label: "Content", icon: CalendarClock, href: `${B}/content`, section: "main", hint: "Plan and schedule social posts" },
 				{ id: "mj-docs", group: "Files", label: "Documents", icon: FileText, href: `${B}/documents`, section: "main", hint: "Write and edit documents" },
 				{ id: "mj-vault", group: "Files", label: "Vault", icon: HardDrive, href: `${B}/vault`, section: "main", hint: "Shared files and folders with access control" },
 			];
