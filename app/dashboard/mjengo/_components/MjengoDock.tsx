@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { Bell, Calendar, GripVertical, Loader2, MessageCircle, Mic, Video } from "lucide-react";
+import { Bell, Calendar, GripVertical, Loader2, MessageCircle, Mic, Pin, PinOff, Video } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useToast } from "@/hooks/use-toast";
 import { unwrap } from "@/lib/action-result";
@@ -27,7 +27,9 @@ export function MjengoDock() {
 	const dash = useDashboardData();
 	const [mounted, setMounted] = useState(false);
 	const [place, setPlace] = useState<Place>({ edge: "right", at: 0.55 });
-	const [open, setOpen] = useState(false);
+	const [hover, setOpen] = useState(false);
+	const [pinned, setPinned] = useState(false);
+	const open = pinned || hover;
 	const [drag, setDrag] = useState<{ x: number; y: number } | null>(null);
 	const [starting, setStarting] = useState<"voice" | "video" | null>(null);
 	const [unread, setUnread] = useState(0);
@@ -43,8 +45,10 @@ export function MjengoDock() {
 				const p = JSON.parse(raw) as Place;
 				if (["left", "right", "bottom"].includes(p.edge) && typeof p.at === "number") setPlace({ edge: p.edge, at: Math.min(0.95, Math.max(0.05, p.at)) });
 			} else if (window.innerWidth < 1024) setPlace({ edge: "bottom", at: 0.85 });
+			setPinned(localStorage.getItem("ss_mj_dock_pin") === "1");
 		} catch { /* default */ }
 	}, []);
+	const togglePin = () => { const n = !pinned; setPinned(n); try { localStorage.setItem("ss_mj_dock_pin", n ? "1" : "0"); } catch { /* ignore */ } };
 	useEffect(() => {
 		let on = true;
 		const tick = () => suiteCounts().then((c) => on && setUnread(c.notifications)).catch(() => undefined);
@@ -71,13 +75,12 @@ export function MjengoDock() {
 		const w = window.innerWidth;
 		const h = window.innerHeight;
 		setDrag(null);
-		if (!moved.current) { setOpen((v) => !v); return; }
+		if (!moved.current) { if (!pinned) setOpen((v) => !v); return; }
 		const x = e.clientX;
 		const y = e.clientY;
 		const dl = x, dr = w - x, db = h - y;
 		const edge: Edge = Math.min(dl, dr, db) === db ? "bottom" : dl <= dr ? "left" : "right";
 		save({ edge, at: Math.min(0.95, Math.max(0.05, edge === "bottom" ? x / w : y / h)) });
-		setOpen(false);
 	};
 
 	const start = async (mode: "voice" | "video") => {
@@ -140,6 +143,7 @@ export function MjengoDock() {
 				</button>
 
 				<div role="toolbar" aria-label="Quick actions" className={cn("flex gap-0.5 overflow-hidden transition-all duration-200", horizontal ? "flex-row items-center" : "flex-col items-center", open ? (horizontal ? "max-w-[320px] px-1 opacity-100" : "max-h-[280px] pb-1 opacity-100") : (horizontal ? "max-w-0 opacity-0" : "max-h-0 opacity-0"))}>
+					<Item label={pinned ? "Unpin" : "Pin open"} hint={pinned ? "Let it collapse when you move away" : "Keep it open while you work"} onClick={togglePin} side={side}>{pinned ? <PinOff className="h-[18px] w-[18px] text-sauti-teal" /> : <Pin className="h-[18px] w-[18px]" />}</Item>
 					<Item label="Chats" hint="Conversations in the suite" href="/dashboard/mjengo/chat" side={side}><MessageCircle className="h-[18px] w-[18px]" /></Item>
 					<Item label="Notifications" hint="What needs your attention" href="/dashboard/mjengo/notifications" side={side}>
 						<Bell className="h-[18px] w-[18px]" />
