@@ -27,7 +27,7 @@ export function PeoplePanel() {
 	const [results, setResults] = useState<PersonView[]>([]);
 	const [searching, setSearching] = useState(false);
 	const [busyId, setBusyId] = useState<string | null>(null);
-	const [selected, setSelected] = useState<{ id: string; name: string; email: string; isSuperAdmin: boolean } | null>(null);
+	const [selected, setSelected] = useState<{ id: string; name: string; email: string | null; isSuperAdmin: boolean } | null>(null);
 
 	const load = useCallback(async () => {
 		try {
@@ -209,7 +209,7 @@ export function PeoplePanel() {
 			<Sheet open={!!selected} onOpenChange={(o) => !o && setSelected(null)}>
 				<SheetContent className="flex w-full flex-col gap-0 p-0 sm:max-w-md">
 					{selected && (() => {
-						const sa = data.superAdmins.find((x) => x.email.toLowerCase() === selected.email.toLowerCase());
+						const sa = data.superAdmins.find((x) => x.email.toLowerCase() === (selected.email ?? "").toLowerCase());
 						const live = data.admins.find((x) => x.id === selected.id) ?? selected;
 						return (
 							<>
@@ -241,7 +241,7 @@ export function PeoplePanel() {
 											<>
 												<p className="text-sm text-serene-neutral-600">Admins can use every part of the suite except people, access and logs.</p>
 												<div className="flex flex-wrap gap-2">
-													<Button variant="outline" className="gap-1.5" disabled={!data.me.canAdd || adding} onClick={() => window.confirm(`Make ${live.name} a super admin?`) && run(live.id, () => addSuperAdmin(live.email), "Made a super admin")}>
+													<Button variant="outline" className="gap-1.5" disabled={!data.me.canAdd || adding} onClick={() => window.confirm(`Make ${live.name} a super admin?`) && run(live.id, () => addSuperAdmin(live.email ?? ""), "Made a super admin")}>
 														<Crown className="h-4 w-4" /> Make super admin
 													</Button>
 													<Button variant="outline" className="gap-1.5" disabled={busyId === live.id} onClick={() => window.confirm(`Remove admin access for ${live.name}?`) && run(live.id, async () => { await setAdminStatus(live.id, false); setSelected(null); }, "Admin access removed")}>
@@ -266,7 +266,7 @@ export function PeoplePanel() {
 									<section className="space-y-2">
 										<h4 className="text-sm font-semibold">More</h4>
 										<div className="flex flex-wrap gap-2">
-											<Button asChild variant="outline" size="sm"><Link href={`/dashboard/mjengo/mail?to=${encodeURIComponent(live.email)}`}>Write an email</Link></Button>
+											<Button asChild variant="outline" size="sm"><Link href={`/dashboard/mjengo/mail?to=${encodeURIComponent(live.email ?? "")}`}>Write an email</Link></Button>
 											<Button asChild variant="outline" size="sm"><Link href="/dashboard/mjengo/logs">See activity in the logs</Link></Button>
 										</div>
 									</section>
