@@ -24,8 +24,11 @@ import { QrShare } from "@/components/chat/QrShare";
 import { FormRenderer } from "@/components/forms/FormRenderer";
 import { TYPE_LABEL, displayAnswer, hasOptions, newQuestion, type FormSettings, type Question, type QuestionType } from "@/lib/forms/schema";
 import { perDay, summarise, toCsv } from "@/lib/forms/analytics";
-import { deleteForm, deleteResponse, designSystemsForForms, exportedCsv, formImageUpload, getForm, getResponses, saveForm, setFormStatus, type FormRow, type ResponseRow } from "@/app/actions/mjengo-forms";
+import { deleteForm, deleteResponse, designSystemsForForms, exportedCsv, formImageUpload, linkPoster, getForm, getResponses, saveForm, setFormStatus, type FormRow, type ResponseRow } from "@/app/actions/mjengo-forms";
 import { putToSignedUrl } from "@/lib/client/upload";
+import { unwrap } from "@/lib/action-result";
+import { listAssets, type AssetRow } from "@/app/actions/mjengo-ai";
+import { PostThis } from "../../_components/PostThis";
 
 type Save = "saved" | "saving" | "error";
 
@@ -43,6 +46,7 @@ export default function FormEditorPage() {
 	const [responses, setResponses] = useState<ResponseRow[] | null>(null);
 	const [preview, setPreview] = useState(false);
 	const [share, setShare] = useState(false);
+	const [postTogether, setPostTogether] = useState(false);
 	const loaded = useRef(false);
 
 	useEffect(() => {
@@ -133,7 +137,7 @@ export default function FormEditorPage() {
 					<AnalyticsTab questions={questions} responses={responses} />
 				</TabsContent>
 				<TabsContent value="settings" className="mt-4">
-					<SettingsTab settings={settings} onChange={setSettings} onDelete={async () => { if (window.confirm("Delete this form and all of its responses? This cannot be undone.")) { await deleteForm(id); router.push("/dashboard/mjengo/forms"); } }} />
+					<SettingsTab formId={id} settings={settings} onChange={setSettings} onDelete={async () => { if (window.confirm("Delete this form and all of its responses? This cannot be undone.")) { await deleteForm(id); router.push("/dashboard/mjengo/forms"); } }} />
 				</TabsContent>
 			</Tabs>
 
@@ -144,6 +148,7 @@ export default function FormEditorPage() {
 				</DialogContent>
 			</Dialog>
 
+			<PostThis open={postTogether} assetId={(settings as FormSettings & { poster?: string | null }).poster ?? null} about={title} extraLink={publicUrl} onClose={() => setPostTogether(false)} />
 			<Dialog open={share} onOpenChange={setShare}>
 				<DialogContent className="max-w-md">
 					<DialogHeader><DialogTitle>Share this form</DialogTitle></DialogHeader>
@@ -154,6 +159,13 @@ export default function FormEditorPage() {
 						</div>
 						<div className="flex justify-center"><QrShare value={publicUrl} caption="Anyone can scan this to open the form." filename={`form-${form.slug}`} /></div>
 						{form.status !== "open" && <p className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900">The form is {form.status}, so the link will not accept responses.</p>}
+						{(settings as FormSettings & { poster?: string | null }).poster && (
+							<div className="flex items-center gap-3 rounded-xl border border-serene-neutral-200 p-3">
+								<img src={(settings.images ?? [])[0]} alt="" className="h-16 w-16 rounded-lg object-cover" />
+								<p className="min-w-0 flex-1 text-sm text-serene-neutral-700">This form has a poster. Share the poster and the link together.</p>
+								<Button size="sm" className="gap-1.5 bg-sauti-teal hover:bg-sauti-dark" onClick={() => { setShare(false); setPostTogether(true); }}>Post together</Button>
+							</div>
+						)}
 					</div>
 				</DialogContent>
 			</Dialog>
@@ -437,9 +449,12 @@ function Stat({ label, value, hint }: { label: string; value: number | string; h
 
 /* -------------------------------------------------------------- Settings */
 
-function SettingsTab({ settings, onChange, onDelete }: { settings: FormSettings; onChange: (s: FormSettings) => void; onDelete: () => void }) {
+function SettingsTab({ formId, settings, onChange, onDelete }: { formId: string; settings: FormSettings; onChange: (s: FormSettings) => void; onDelete: () => void }) {
+	const { toast } = useToast();
 	const [systems, setSystems] = useState<{ id: string; name: string; colors: string[] }[]>([]);
 	useEffect(() => { designSystemsForForms().then(setSystems).catch(() => setSystems([])); }, []);
+	const [assets, setAssets] = useState<AssetRow[]>([]);
+	useEffect(() => { unwrap(listAssets()).then(setAssets).catch(() => setAssets([])); }, []);
 	const accents = ["#068297", "#7c3aed", "#2563eb", "#16a34a", "#ea580c", "#db2777", "#111827"];
 	const palette = systems.find((d) => d.id === settings.style?.designSystem)?.colors ?? [];
 	return (
@@ -502,6 +517,30 @@ function SettingsTab({ settings, onChange, onDelete }: { settings: FormSettings;
 							<SelectContent><SelectItem value="none">None</SelectItem>{systems.map((d) => <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>)}</SelectContent>
 						</Select>
 						<p className="text-xs text-serene-neutral-500">Design systems are set up in the Assistant, with their colours, fonts and documents.</p>
+					</div>
+				)}
+			</section>
+
+			<section className="space-y-3 rounded-2xl border border-serene-neutral-200/70 bg-white p-5 shadow-[0_1px_2px_rgba(16,24,40,0.04)]">
+				<h3 className="text-sm font-bold text-sauti-dark">Poster</h3>
+				<p className="text-xs text-serene-neutral-500">Pick a poster made in Design or the Assistant. It shows at the top of the form, and can be posted together with the link.</p>
+				{assets.length === 0 ? <p className="text-xs text-serene-neutral-500">No images in Studio yet.</p> : (
+					<div className="flex gap-2 overflow-x-auto pb-1">
+						{assets.slice(0, 20).map((a) => {
+							const on = (settings as FormSettings & { poster?: string | null }).poster === a.id;
+							return (
+								<button key={a.id} type="button" aria-pressed={on} onClick={async () => {
+									try {
+										const r = await unwrap(linkPoster(formId, on ? null : a.id));
+										const imgs = (settings.images ?? []).filter((u) => !u.includes("/poster-"));
+										onChange({ ...settings, images: r.url ? [r.url, ...imgs] : imgs, ...({ poster: on ? null : a.id } as object) } as FormSettings);
+									} catch (e) { toast({ title: "Could not link the poster", description: e instanceof Error ? e.message : undefined, variant: "destructive" }); }
+								}} className={cn("relative h-20 w-20 shrink-0 overflow-hidden rounded-lg border-2", on ? "border-sauti-teal" : "border-transparent")}>
+									{a.url && <img src={a.url} alt="" className="h-full w-full object-cover" />}
+									{on && <span className="absolute right-1 top-1 flex h-4 w-4 items-center justify-center rounded-full bg-sauti-teal text-white"><Check className="h-3 w-3" /></span>}
+								</button>
+							);
+						})}
 					</div>
 				)}
 			</section>

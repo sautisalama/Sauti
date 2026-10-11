@@ -5,11 +5,14 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { formatDistanceToNow } from "date-fns";
-import { ClipboardList, LayoutGrid, List as ListIcon, Loader2, Plus } from "lucide-react";
+import { ClipboardList, LayoutGrid, List as ListIcon, Loader2, Plus, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
-import { createForm, listForms, type FormRow } from "@/app/actions/mjengo-forms";
+import { createForm, generateForm, listForms, type FormRow } from "@/app/actions/mjengo-forms";
+import { unwrap } from "@/lib/action-result";
+import { Textarea } from "@/components/ui/textarea";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 const STATUS: Record<FormRow["status"], { label: string; tone: string }> = {
 	draft: { label: "Draft", tone: "bg-slate-100 text-slate-700" },
@@ -25,6 +28,9 @@ export default function FormsPage() {
 	const [forms, setForms] = useState<FormRow[] | null>(null);
 	const [busy, setBusy] = useState(false);
 	const [view, setView] = useState<"cards" | "list">("cards");
+	const [aiOpen, setAiOpen] = useState(false);
+	const [aiText, setAiText] = useState("");
+	const [aiBusy, setAiBusy] = useState(false);
 
 	useEffect(() => {
 		listForms().then(setForms).catch(() => setForms([]));
@@ -54,6 +60,7 @@ export default function FormsPage() {
 						<button onClick={() => changeView("cards")} aria-pressed={view === "cards"} aria-label="Cards" className={cn("flex h-7 w-7 items-center justify-center rounded-md", view === "cards" ? "bg-sauti-teal text-white" : "text-serene-neutral-600")}><LayoutGrid className="h-4 w-4" /></button>
 						<button onClick={() => changeView("list")} aria-pressed={view === "list"} aria-label="List" className={cn("flex h-7 w-7 items-center justify-center rounded-md", view === "list" ? "bg-sauti-teal text-white" : "text-serene-neutral-600")}><ListIcon className="h-4 w-4" /></button>
 					</div>
+					<Button onClick={() => setAiOpen(true)} variant="outline" size="sm" className="h-8 gap-1.5 px-3 text-xs"><Sparkles className="h-4 w-4" /> Create with AI</Button>
 					<Button onClick={create} disabled={busy} size="sm" className="h-8 gap-1.5 bg-sauti-teal px-3 text-xs hover:bg-sauti-dark">{busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />} New form</Button>
 				</div>
 			</div>
@@ -118,6 +125,24 @@ export default function FormsPage() {
 					</ul>
 				</div>
 			)}
+			<Dialog open={aiOpen} onOpenChange={(o) => !aiBusy && setAiOpen(o)}>
+				<DialogContent className="max-w-lg">
+					<DialogHeader><DialogTitle>Create a form with AI</DialogTitle><DialogDescription>Say what the form is for and who will fill it in. You can change every question afterwards.</DialogDescription></DialogHeader>
+					<Textarea rows={5} autoFocus value={aiText} onChange={(e) => setAiText(e.target.value)} placeholder="A feedback form for people who attended our legal clinic last week, including how easy it was to reach us and what we should do better." />
+					<DialogFooter>
+						<Button variant="outline" onClick={() => setAiOpen(false)} disabled={aiBusy}>Cancel</Button>
+						<Button
+							className="gap-2 bg-sauti-teal hover:bg-sauti-dark"
+							disabled={aiBusy || aiText.trim().length < 8}
+							onClick={async () => {
+								setAiBusy(true);
+								try { router.push(`/dashboard/mjengo/forms/${await unwrap(generateForm(aiText))}`); }
+								catch (e) { toast({ title: "Could not create the form", description: e instanceof Error ? e.message : undefined, variant: "destructive" }); setAiBusy(false); }
+							}}
+						>{aiBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />} Create</Button>
+					</DialogFooter>
+				</DialogContent>
+			</Dialog>
 		</div>
 	);
 }

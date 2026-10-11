@@ -31,6 +31,8 @@ export interface FormSettings {
   allowAnonymous?: boolean;
   /** Pictures shown with the description (public image links). The first is the card preview. */
   images?: string[];
+  /** Studio image linked to the form as its poster. */
+  poster?: string | null;
   style?: { accent?: string; background?: string; designSystem?: string | null };
 }
 
