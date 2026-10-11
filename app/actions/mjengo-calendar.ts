@@ -176,6 +176,40 @@ async function remove_(id: string) {
   await logAudit({ actorId: a.id, actorEmail: a.email, action: 'calendar.event_deleted', targetType: 'event', targetId: raw, targetLabel: data.title });
 }
 
+const ICON_KEYS = ['meeting', 'call', 'travel', 'deadline', 'writing', 'review', 'workshop', 'lunch', 'training', 'interview', 'report', 'social', 'finance', 'focus', 'event', 'other'];
+
+/** An icon key per event title, chosen by the AI from what the activity is. Unknown or failed titles are left out. */
+async function icons_(titles: string[]): Promise<Record<string, string>> {
+  await requireAdminActor();
+  const list = [...new Set(titles.map((t) => t.trim().slice(0, 100)).filter(Boolean))].slice(0, 40);
+  const key = process.env.OPENROUTER_API_KEY;
+  if (!list.length || !key) return {};
+  const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+    method: 'POST',
+    signal: AbortSignal.timeout(20_000),
+    headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json', 'X-Title': 'Sauti Salama Calendar' },
+    body: JSON.stringify({
+      model: process.env.OPENROUTER_MODEL ?? 'google/gemini-2.5-flash-lite',
+      temperature: 0,
+      max_tokens: 900,
+      response_format: { type: 'json_object' },
+      messages: [
+        { role: 'system', content: `Classify each calendar event title by the kind of activity. Answer with a JSON object mapping every title exactly as given to one of: ${ICON_KEYS.join(', ')}.` },
+        { role: 'user', content: JSON.stringify(list) },
+      ],
+    }),
+  }).catch(() => null);
+  if (!res?.ok) return {};
+  try {
+    const j = (await res.json()) as { choices?: { message?: { content?: string } }[] };
+    const parsed = JSON.parse(j.choices?.[0]?.message?.content ?? '{}') as Record<string, string>;
+    return Object.fromEntries(Object.entries(parsed).filter(([t, k]) => list.includes(t) && ICON_KEYS.includes(k)));
+  } catch {
+    return {};
+  }
+}
+
+export const eventIcons = guard(icons_);
 export const calendarMonth = guard(month_);
 export const createCalendarEvent = guard(create_);
 export const removeCalendarEvent = guard(remove_);
