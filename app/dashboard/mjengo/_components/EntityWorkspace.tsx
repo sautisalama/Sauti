@@ -96,6 +96,14 @@ export function EntityWorkspace({ kind }: { kind: Kind }) {
 	const cfg = CONFIG[kind];
 	const statuses = STATUSES[kind];
 	const { toast } = useToast();
+	// Arriving from the phone share sheet.
+	useEffect(() => {
+		const p = new URLSearchParams(window.location.search);
+		if (p.get("shared")) toast({ title: "Added to Opportunities", description: "Shared from your phone. Open it to add the deadline and details." });
+		if (p.get("share_error")) toast({ title: "Could not save what you shared", variant: "destructive" });
+		if (p.get("shared") || p.get("share_error")) window.history.replaceState(null, "", window.location.pathname);
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, []);
 
 	const [rows, setRows] = useState<Row[] | null>(null);
 	const [admins, setAdmins] = useState<AdminLite[]>([]);

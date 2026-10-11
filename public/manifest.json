@@ -13,6 +13,15 @@
 	"orientation": "any",
 	"scope": "/",
 	"start_url": "/dashboard?source=pwa",
+	"share_target": {
+		"action": "/share",
+		"method": "GET",
+		"params": {
+			"title": "title",
+			"text": "text",
+			"url": "url"
+		}
+	},
 	"categories": [
 		"health",
 		"nonprofit",
