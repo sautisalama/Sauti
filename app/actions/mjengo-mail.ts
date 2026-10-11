@@ -813,13 +813,15 @@ async function getSignature_(): Promise<SignatureState> {
 
 async function saveSignature_(html: string): Promise<SignatureState> {
   const actor = await requireAdminActor();
-  const clean = sanitizeHtml(html.slice(0, 8000), {
-    allowedTags: ['p', 'br', 'strong', 'b', 'em', 'i', 'u', 'a', 'ul', 'ol', 'li', 'span'],
-    allowedAttributes: { a: ['href'] },
+  const clean = sanitizeHtml(html.slice(0, 30000), {
+    allowedTags: ['p', 'br', 'strong', 'b', 'em', 'i', 'u', 's', 'a', 'ul', 'ol', 'li', 'span', 'h1', 'h2', 'h3', 'div', 'img'],
+    allowedAttributes: { a: ['href'], img: ['src', 'alt', 'width', 'height'], span: ['style'], p: ['style'], h1: ['style'], h2: ['style'], h3: ['style'], div: ['style'] },
+    allowedStyles: { '*': { color: [/^#[0-9a-fA-F]{3,8}$/, /^rgb\(/], 'text-align': [/^(left|right|center|justify)$/] } },
     allowedSchemes: ['http', 'https', 'mailto', 'tel'],
+    allowedSchemesByTag: { img: ['https'] },
     transformTags: { a: sanitizeHtml.simpleTransform('a', { target: '_blank', rel: 'noopener noreferrer' }) },
   }).trim();
-  const isEmpty = !clean.replace(/<[^>]+>/g, '').trim();
+  const isEmpty = !clean.replace(/<(?!img)[^>]+>/g, '').trim();
   const { error } = await looseAdmin().from('mail_signatures').upsert({ owner_id: actor.id, html: isEmpty ? '' : clean, prompt_dismissed: true, updated_at: new Date().toISOString() }, { onConflict: 'owner_id' });
   if (error) throw new Error('Could not save your signature.');
   return { html: isEmpty ? '' : clean, configured: !isEmpty, dismissed: true };

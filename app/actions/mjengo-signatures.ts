@@ -29,3 +29,16 @@ async function remove_(id: string) {
 export const listSignatures = guard(list_);
 export const saveSignatureImage = guard(save_);
 export const deleteSignature = guard(remove_);
+
+/** A one-time upload link for a picture in an email signature. The picture is public so email apps can show it. */
+async function image_(fileName: string): Promise<{ signedUrl: string; publicUrl: string }> {
+  const a = await requireAdminActor();
+  const safe = fileName.replace(/[^\w.\-]+/g, '_').slice(-60) || 'image';
+  const path = `signatures/${a.id}/${Date.now()}-${safe}`;
+  const db = looseAdmin();
+  const { data, error } = await db.storage.from('mjengo-public').createSignedUploadUrl(path);
+  if (error || !data) throw new Error('Could not start the upload.');
+  return { signedUrl: data.signedUrl, publicUrl: db.storage.from('mjengo-public').getPublicUrl(path).data.publicUrl };
+}
+
+export const signatureImageUpload = guard(image_);
