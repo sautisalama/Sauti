@@ -7,11 +7,10 @@ import { ArrowLeft, Download, Loader2, Save } from "lucide-react";
 import * as XLSX from "xlsx";
 import "@univerjs/preset-sheets-core/lib/index.css";
 import { Button } from "@/components/ui/button";
-import { Sparkles } from "lucide-react";
+import { AiStar } from "@gamine/wordcraft-react";
+import { ArrowUp, X } from "lucide-react";
 import { unwrap } from "@/lib/action-result";
 import { aiTable } from "@/app/actions/mjengo-assist";
-import { Textarea } from "@/components/ui/textarea";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { putToSignedUrl } from "@/lib/client/upload";
@@ -216,13 +215,12 @@ function SheetScreen() {
 	};
 
 	return (
-		<div className="flex h-full min-h-0 flex-col bg-white">
+		<div className="relative flex h-full min-h-0 flex-col bg-white">
 			<div className="flex shrink-0 items-center gap-2 border-b border-black/[0.07] px-3 py-1.5">
 				<Button asChild variant="ghost" size="icon" aria-label="Back to Files"><Link href="/dashboard/mjengo/vault"><ArrowLeft className="h-[18px] w-[18px]" /></Link></Button>
 				<Input value={name} onChange={(e) => setName(e.target.value)} aria-label="File name" className="h-9 max-w-xs border-transparent bg-transparent px-2 text-[15px] font-medium shadow-none hover:border-black/10 focus-visible:ring-1" />
 				{level !== "edit" && <span className="text-xs text-[#787774]">View only: saving makes your own copy</span>}
 				<span className="flex-1" />
-				<Button variant="outline" size="sm" className="gap-1.5" onClick={() => setAsk(true)} disabled={loading}><Sparkles className="h-4 w-4" /> Ask AI</Button>
 				<Button variant="ghost" size="sm" className="gap-1.5" onClick={download} disabled={loading}><Download className="h-4 w-4" /> Download</Button>
 				<Button size="sm" className="gap-1.5 bg-sauti-teal hover:bg-sauti-dark" onClick={save} disabled={loading || saving}>{saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Save</Button>
 			</div>
@@ -230,16 +228,32 @@ function SheetScreen() {
 				{loading && <div className="absolute inset-0 z-10 bg-white"><MjengoLoader label="Opening the spreadsheet" className="h-full" /></div>}
 				<div ref={host} className="h-full w-full" />
 			</div>
-			<Dialog open={ask} onOpenChange={(o) => !asking && setAsk(o)}>
-				<DialogContent className="max-w-lg">
-					<DialogHeader><DialogTitle>Ask AI</DialogTitle><DialogDescription>Describe a table, a budget, a tracker or a clean-up. It is added under what is already on the sheet.</DialogDescription></DialogHeader>
-					<Textarea rows={4} autoFocus value={askText} onChange={(e) => setAskText(e.target.value)} placeholder="A 12 month budget for a legal aid clinic with columns for item, monthly cost and annual total, and a total row." />
-					<DialogFooter>
-						<Button variant="outline" onClick={() => setAsk(false)} disabled={asking}>Cancel</Button>
-						<Button className="gap-2 bg-sauti-teal hover:bg-sauti-dark" disabled={asking || askText.trim().length < 4} onClick={fillWithAi}>{asking && <Loader2 className="h-4 w-4 animate-spin" />} Add to the sheet</Button>
-					</DialogFooter>
-				</DialogContent>
-			</Dialog>
+			{/* The same sparkle at the bottom centre as the document editor, opening a prompt bar. */}
+			{!loading && (
+				<div className="pointer-events-none absolute inset-x-0 bottom-6 z-20 flex justify-center px-4">
+					{ask ? (
+						<form
+							onSubmit={(e) => { e.preventDefault(); if (askText.trim().length >= 4 && !asking) fillWithAi(); }}
+							className="pointer-events-auto flex w-full max-w-2xl items-center gap-2 rounded-full border border-black/10 bg-white py-1.5 pl-4 pr-1.5 shadow-[0_8px_30px_rgba(0,0,0,0.16)]"
+						>
+							<span className="text-[#7c3aed]"><AiStar size={20} /></span>
+							<input
+								autoFocus
+								value={askText}
+								onChange={(e) => setAskText(e.target.value)}
+								onKeyDown={(e) => { if (e.key === "Escape") setAsk(false); }}
+								placeholder="Describe a table, budget or tracker to add to this sheet"
+								aria-label="Ask AI"
+								className="h-9 min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-[#9b9a97]"
+							/>
+							<button type="submit" disabled={asking || askText.trim().length < 4} aria-label="Add to the sheet" className="flex h-9 w-9 items-center justify-center rounded-full bg-[#7c3aed] text-white disabled:opacity-40">{asking ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowUp className="h-4 w-4" />}</button>
+							<button type="button" onClick={() => setAsk(false)} aria-label="Close" className="flex h-9 w-9 items-center justify-center rounded-full text-[#787774] hover:bg-black/5"><X className="h-4 w-4" /></button>
+						</form>
+					) : (
+						<button onClick={() => setAsk(true)} aria-label="Ask AI" title="Ask AI" className="pointer-events-auto flex h-12 w-12 items-center justify-center rounded-full border border-black/10 bg-white text-[#7c3aed] shadow-[0_8px_30px_rgba(0,0,0,0.16)] transition hover:scale-105"><AiStar size={22} /></button>
+					)}
+				</div>
+			)}
 		</div>
 	);
 }
