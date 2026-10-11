@@ -4,8 +4,9 @@ import { MjengoLoader } from "@/app/dashboard/mjengo/_components/MjengoLoader";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { format, parseISO } from "date-fns";
-import { Briefcase, CheckSquare, FileWarning, FolderKanban, Lightbulb, Mail, TrendingUp } from "lucide-react";
+import { Briefcase, CheckSquare, ClipboardList, FileWarning, FolderKanban, Lightbulb, Mail, Megaphone, Settings2, TrendingUp } from "lucide-react";
 import { getOverview, listEntities, type Overview } from "@/app/actions/mjengo";
+import { suiteStatus, type SuiteStatus } from "@/app/actions/mjengo-nav";
 import { GrantCharts, type GrantLite } from "./_components/GrantCharts";
 import { DeadlineChip, KIND_LABEL, STATUSES, money, type Kind } from "./_components/shared";
 
@@ -14,9 +15,11 @@ const KIND_ICON = { grant: Briefcase, opportunity: Lightbulb, project: FolderKan
 export default function MjengoOverview() {
 	const [o, setO] = useState<Overview | null>(null);
 	const [grants, setGrants] = useState<GrantLite[]>([]);
+	const [st, setSt] = useState<SuiteStatus | null>(null);
 
 	useEffect(() => {
 		getOverview().then(setO).catch(() => undefined);
+		suiteStatus().then(setSt).catch(() => undefined);
 		listEntities("grant").then((g) => setGrants(g as unknown as GrantLite[])).catch(() => undefined);
 	}, []);
 
@@ -36,9 +39,33 @@ export default function MjengoOverview() {
 				<Stat tint="bg-sauti-teal-light" icon={TrendingUp} label="In the pipeline" value={money(o.pipelineValue, cur)} hint={o.currencies.length > 1 ? `${cur} grants only` : "open grants"} href="/dashboard/mjengo/grants" />
 				<Stat tint="bg-serene-green-100" icon={Briefcase} label="Awarded" value={money(o.awardedValue, cur)} hint="awarded or reporting" href="/dashboard/mjengo/grants" />
 				<Stat tint="bg-sauti-yellow-light" icon={FileWarning} label="Documents needed" value={String(o.missingDocs)} hint="required, not uploaded" tone={o.missingDocs ? "warn" : undefined} href="/dashboard/mjengo/documents" />
-				<Stat tint="bg-serene-blue-50" icon={CheckSquare} label="Open to-dos" value={String(o.openTodos)} hint={`${o.myTodos} yours`} href="/dashboard/mjengo/todos" />
-				<Stat tint="bg-white" icon={Mail} label="Mail" value="Open" hint="connect an inbox" href="/dashboard/mjengo/mail" />
+				<Stat tint="bg-serene-blue-50" icon={CheckSquare} label="Pending to-dos" value={String(st?.todos.pending ?? o.openTodos)} hint={st?.todos.overdue ? `${st.todos.overdue} overdue, ${st.todos.mine} yours` : `${st?.todos.mine ?? o.myTodos} yours`} tone={st?.todos.overdue ? "warn" : undefined} href="/dashboard/mjengo/todos" />
+				<Stat tint="bg-white" icon={ClipboardList} label="Open forms" value={String(st?.forms.open ?? 0)} hint={st?.forms.newResponses ? `${st.forms.newResponses} new responses` : "no new responses"} tone={st?.forms.newResponses ? "warn" : undefined} href="/dashboard/mjengo/forms" />
 			</div>
+
+			{st && (
+				<div className="grid gap-4 lg:grid-cols-2">
+					<section className="rounded-2xl border border-serene-neutral-200/70 bg-white p-4 shadow-[0_1px_2px_rgba(16,24,40,0.04)]">
+						<div className="mb-3 flex items-center justify-between"><h3 className="flex items-center gap-2 text-sm font-bold text-sauti-dark"><Megaphone className="h-4 w-4 text-sauti-teal" /> Shared online</h3><Link href="/dashboard/mjengo/design#schedule" className="text-xs font-medium text-sauti-teal hover:underline">Schedule content</Link></div>
+						<div className="grid grid-cols-3 gap-2 text-center">
+							<div className="rounded-xl bg-serene-neutral-50 p-3"><p className="text-xl font-bold tabular-nums">{st.content.posted}</p><p className="text-xs text-serene-neutral-500">Posted</p></div>
+							<div className="rounded-xl bg-serene-neutral-50 p-3"><p className="text-xl font-bold tabular-nums">{st.content.scheduled}</p><p className="text-xs text-serene-neutral-500">Scheduled</p></div>
+							<div className="rounded-xl bg-serene-neutral-50 p-3"><p className="text-xl font-bold tabular-nums">{st.content.drafts}</p><p className="text-xs text-serene-neutral-500">Drafts</p></div>
+						</div>
+						{st.content.lastPosted && <p className="mt-2 text-xs text-serene-neutral-500">Last posted {format(parseISO(st.content.lastPosted), "d MMM, HH:mm")}</p>}
+					</section>
+					<section className="rounded-2xl border border-serene-neutral-200/70 bg-white p-4 shadow-[0_1px_2px_rgba(16,24,40,0.04)]">
+						<h3 className="mb-3 flex items-center gap-2 text-sm font-bold text-sauti-dark"><Settings2 className="h-4 w-4 text-sauti-teal" /> Still to set up</h3>
+						{st.setup.length === 0 ? <p className="text-sm text-serene-neutral-500">Everything is connected.</p> : (
+							<ul className="space-y-1">
+								{st.setup.map((i) => (
+									<li key={i.id}><Link href={i.href} className="block rounded-lg px-2 py-1.5 hover:bg-serene-neutral-50"><span className="block text-sm font-medium text-serene-neutral-900">{i.label}</span><span className="block text-xs text-serene-neutral-500">{i.hint}</span></Link></li>
+								))}
+							</ul>
+						)}
+					</section>
+				</div>
+			)}
 
 			<GrantCharts grants={grants} />
 

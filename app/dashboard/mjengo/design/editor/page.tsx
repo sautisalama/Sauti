@@ -14,6 +14,7 @@ import { cn } from "@/lib/utils";
 import { putToSignedUrl } from "@/lib/client/upload";
 import { deleteTemplate, listTemplates, saveTemplate, studioRegister, studioUpload, type TemplateRow } from "@/app/actions/mjengo-templates";
 import { listAssets, type AssetRow } from "@/app/actions/mjengo-ai";
+import { pinterestImage } from "@/app/actions/mjengo-assist";
 import { PostThis } from "../../_components/PostThis";
 
 /* Canva's palette: the editor borrows its look so it feels familiar. */
@@ -85,7 +86,9 @@ function DesignEditor() {
 	const search = useSearchParams();
 	const initialId = search.get("id");
 	const initialTemplate = search.get("template");
-	const [designId, setDesignId] = useState<string | null>(initialId);
+	const isCopy = search.get("copy") === "1";
+	const inspire = search.get("inspire");
+	const [designId, setDesignId] = useState<string | null>(isCopy ? null : initialId);
 	const { toast } = useToast();
 	const host = useRef<HTMLDivElement>(null);
 	const el = useRef<HTMLCanvasElement>(null);
@@ -177,7 +180,7 @@ function DesignEditor() {
 			if (!row || !d?.json || !c) return;
 			const match = SIZES.find((x) => x.w === d.w && x.h === d.h);
 			if (match) setSize(match);
-			setName(row.name);
+			setName(isCopy ? `${row.name} copy` : row.name);
 			history.current.lock = true;
 			await c.loadFromJSON(d.json as never);
 			history.current.lock = false;
@@ -214,6 +217,26 @@ function DesignEditor() {
 		setSize(s);
 		snapshot();
 	};
+
+	// A picture picked from Pinterest arrives as an editable image on a fresh page.
+	useEffect(() => {
+		if (!inspire) return;
+		let on = true;
+		unwrap(pinterestImage(inspire)).then(async (data) => {
+			const c = canvas.current;
+			if (!c || !on) return;
+			const img = await FabricImage.fromURL(data);
+			const k = Math.max(size.w / (img.width ?? 1), size.h / (img.height ?? 1));
+			img.scale(k);
+			img.set({ left: (size.w - (img.width ?? 0) * k) / 2, top: (size.h - (img.height ?? 0) * k) / 2 });
+			c.add(img);
+			c.sendObjectToBack(img);
+			c.renderAll();
+			setName("Inspired design");
+		}).catch(() => toast({ title: "Could not use that picture", variant: "destructive" }));
+		return () => { on = false; };
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [inspire]);
 
 	const applyBuilt = (b: (typeof BUILT_IN)[number]) => {
 		const c = canvas.current;

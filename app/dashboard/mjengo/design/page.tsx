@@ -11,6 +11,8 @@ import { cn } from "@/lib/utils";
 import { deleteTemplate, listTemplates, type TemplateRow } from "@/app/actions/mjengo-templates";
 import { listAssets, type AssetRow } from "@/app/actions/mjengo-ai";
 import { MjengoLoader } from "../_components/MjengoLoader";
+import { pinterestSearch, type Pin } from "@/app/actions/mjengo-assist";
+import { Input } from "@/components/ui/input";
 import ContentPanel from "../content/page";
 
 const SIZES = [
@@ -62,6 +64,16 @@ export default function DesignHome() {
 		unwrap(listAssets()).then(setAssets).catch(() => setAssets([]));
 		try { const v = localStorage.getItem("ss_design_view"); if (v === "grid" || v === "list") setView(v); } catch { /* default */ }
 	}, []);
+
+	// Pinterest suggestions, when the site is connected to Pinterest.
+	const [pins, setPins] = useState<Pin[] | null>(null);
+	const [pinErr, setPinErr] = useState<string | null>(null);
+	const [pinQ, setPinQ] = useState("");
+	const searchPins = (q: string) => {
+		setPins(null); setPinErr(null);
+		unwrap(pinterestSearch(q)).then(setPins).catch((e) => { setPins([]); setPinErr(e instanceof Error ? e.message : "Could not load suggestions."); });
+	};
+	useEffect(() => { searchPins("social media poster design"); }, []);
 
 	const isOpen = (id: string) => !closed[id];
 	const toggle = (id: string, next: boolean) => {
@@ -118,7 +130,7 @@ export default function DesignHome() {
 					))}
 					{templates.map((t) => (
 						<div key={t.id} className="group relative overflow-hidden rounded-2xl border border-serene-neutral-200/70 bg-white transition hover:border-[#7D2AE8]/50 hover:shadow-sm">
-							<Link href={`/dashboard/mjengo/design/editor?id=${t.id}`} className="block">
+							<Link href={`/dashboard/mjengo/design/editor?id=${t.id}&copy=1`} className="block">
 								{(t.data as { thumb?: string }).thumb ? <img src={(t.data as { thumb: string }).thumb} alt="" className="h-24 w-full object-cover" /> : <span className="block h-24 bg-serene-neutral-100" />}
 								<span className="block truncate px-3 py-2 text-sm font-medium">{t.name}</span>
 							</Link>
@@ -126,6 +138,28 @@ export default function DesignHome() {
 						</div>
 					))}
 				</div>
+			</Fold>
+
+			<Fold id="inspire" title="Suggestions from Pinterest" open={isOpen("inspire")} onToggle={toggle} right={
+				<form className="flex gap-1.5" onSubmit={(e) => { e.preventDefault(); searchPins(pinQ); }}>
+					<Input value={pinQ} onChange={(e) => setPinQ(e.target.value)} placeholder="Search ideas" aria-label="Search Pinterest" className="h-8 w-44 text-sm" />
+					<Button type="submit" size="sm" variant="outline" className="h-8">Search</Button>
+				</form>
+			}>
+				{pinErr ? (
+					<p className="rounded-2xl border border-dashed border-serene-neutral-200 bg-white p-6 text-center text-sm text-serene-neutral-500">{pinErr}</p>
+				) : !pins ? <MjengoLoader compact label="Finding ideas" /> : pins.length === 0 ? (
+					<p className="rounded-2xl border border-dashed border-serene-neutral-200 bg-white p-6 text-center text-sm text-serene-neutral-500">No suggestions for that search.</p>
+				) : (
+					<div className="columns-2 gap-3 sm:columns-3 lg:columns-5">
+						{pins.map((p) => (
+							<Link key={p.id} href={`/dashboard/mjengo/design/editor?inspire=${encodeURIComponent(p.image)}&size=instagram`} className="group mb-3 block break-inside-avoid overflow-hidden rounded-xl border border-serene-neutral-200/70 bg-white transition hover:border-[#7D2AE8]/50 hover:shadow-sm">
+								<img src={p.image} alt={p.title} className="w-full" loading="lazy" />
+								<span className="block truncate px-2 py-1.5 text-xs text-serene-neutral-600">Start from this: {p.title}</span>
+							</Link>
+						))}
+					</div>
+				)}
 			</Fold>
 
 			<Fold

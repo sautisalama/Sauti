@@ -141,6 +141,7 @@ export default function VaultPage() {
 		const ext = i.name.includes(".") ? i.name.split(".").pop()!.toLowerCase() : "";
 		if (ext === "pdf") { window.location.href = `/dashboard/mjengo/files/pdf?file=${i.id}`; return; }
 		if (["xlsx", "xls", "csv"].includes(ext)) { window.location.href = `/dashboard/mjengo/files/sheet?file=${i.id}`; return; }
+		if (["pptx", "ppt"].includes(ext)) { window.location.href = `/dashboard/mjengo/files/slides?file=${i.id}`; return; }
 		if (["docx", "doc", "odt", "rtf", "md"].includes(ext)) { window.location.href = `/dashboard/mjengo/documents/editor?file=${i.id}`; return; }
 		try {
 			const { url } = await getFileUrl(i.id);
@@ -180,6 +181,7 @@ export default function VaultPage() {
 			<DropdownMenuTrigger asChild><Button size="icon" variant="ghost" aria-label={`Actions for ${i.name}`}><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger>
 			<DropdownMenuContent align="end">
 				{i.type === "file" && /\.pdf$/i.test(i.name) && <DropdownMenuItem onClick={() => { window.location.href = `/dashboard/mjengo/files/pdf?file=${i.id}`; }}><FileEdit className="mr-2 h-4 w-4" />Sign or mark up</DropdownMenuItem>}
+				{i.type === "file" && /\.pptx?$/i.test(i.name) && <DropdownMenuItem onClick={() => { window.location.href = `/dashboard/mjengo/files/slides?file=${i.id}`; }}><FileEdit className="mr-2 h-4 w-4" />View slides</DropdownMenuItem>}
 				{i.type === "file" && /\.(xlsx|xls|csv)$/i.test(i.name) && <DropdownMenuItem onClick={() => { window.location.href = `/dashboard/mjengo/files/sheet?file=${i.id}`; }}><FileEdit className="mr-2 h-4 w-4" />Open as a sheet</DropdownMenuItem>}
 				{i.type === "file" && /\.(docx|doc|odt|rtf|md|txt)$/i.test(i.name) && <DropdownMenuItem onClick={() => { window.location.href = `/dashboard/mjengo/documents/editor?file=${i.id}`; }}><FileEdit className="mr-2 h-4 w-4" />{i.level === "edit" ? "Edit" : "Open in editor"}</DropdownMenuItem>}
 				<DropdownMenuItem onClick={() => open(i)}>{i.type === "folder" ? <Folder className="mr-2 h-4 w-4" /> : <Download className="mr-2 h-4 w-4" />}{i.type === "folder" ? "Open" : "Download"}</DropdownMenuItem>

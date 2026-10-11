@@ -96,5 +96,42 @@ async function deck_(prompt: string, theme: DeckTheme, slides: number): Promise<
   return { name, base64, outline: body.map((s) => ({ title: s.title, bullets: s.bullets ?? [] })) };
 }
 
+/* --------------------------------------------------------------- Pinterest */
+
+export interface Pin { id: string; title: string; image: string; link: string | null }
+
+/** Design inspiration from Pinterest. Needs PINTEREST_ACCESS_TOKEN (a Pinterest app with the pins:read scope). */
+async function pins_(query: string): Promise<Pin[]> {
+  await requireAdminActor();
+  const token = process.env.PINTEREST_ACCESS_TOKEN;
+  if (!token) throw new Error('Pinterest is not connected on this site yet. Add a Pinterest access token to switch on suggestions.');
+  const term = query.trim().slice(0, 100) || 'social media poster design';
+  const headers = { Authorization: `Bearer ${token}` };
+  let res = await fetch(`https://api.pinterest.com/v5/search/partner/pins?${new URLSearchParams({ term, country_code: 'KE', locale: 'en-US', limit: '24' })}`, { headers, signal: AbortSignal.timeout(20_000) });
+  // Without partner search access, fall back to the pins of the connected account.
+  if (res.status === 401 || res.status === 403 || res.status === 404) res = await fetch('https://api.pinterest.com/v5/pins?page_size=24', { headers, signal: AbortSignal.timeout(20_000) });
+  if (!res.ok) throw new Error(res.status === 401 ? 'The Pinterest access token was refused.' : 'Pinterest did not answer. Try again in a moment.');
+  const j = (await res.json()) as { items?: { id?: string; title?: string; description?: string; link?: string | null; media?: { images?: Record<string, { url?: string }> } }[] };
+  return (j.items ?? []).flatMap((p) => {
+    const imgs = p.media?.images ?? {};
+    const url = imgs['600x']?.url ?? imgs['400x300']?.url ?? imgs['1200x']?.url ?? Object.values(imgs)[0]?.url;
+    return p.id && url ? [{ id: p.id, title: (p.title || p.description || 'Pin').slice(0, 80), image: url, link: p.link ?? null }] : [];
+  });
+}
+
+/** A pin picture as a data address, so it can be placed on the canvas and edited without cross-site limits. */
+async function pinImage_(url: string): Promise<string> {
+  await requireAdminActor();
+  const u = new URL(url);
+  if (!/(^|\.)pinimg\.com$/.test(u.hostname)) throw new Error('That is not a Pinterest picture.');
+  const res = await fetch(u, { signal: AbortSignal.timeout(20_000) });
+  if (!res.ok) throw new Error('Could not fetch the picture.');
+  const buf = Buffer.from(await res.arrayBuffer());
+  if (buf.length > 4_000_000) throw new Error('That picture is too large.');
+  return `data:${res.headers.get('content-type') ?? 'image/jpeg'};base64,${buf.toString('base64')}`;
+}
+
+export const pinterestSearch = guard(pins_);
+export const pinterestImage = guard(pinImage_);
 export const aiTable = guard(table_);
 export const makeDeck = guard(deck_);
