@@ -1,57 +1,95 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { formatDistanceToNow } from "date-fns";
-import { Bell, Calendar, Check, GripVertical, Loader2, MessageCircle, Mic, Video } from "lucide-react";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Bell, Calendar, GripVertical, Loader2, MessageCircle, Mic, MoveHorizontal, PanelBottom, Video, X } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useToast } from "@/hooks/use-toast";
 import { unwrap } from "@/lib/action-result";
-import { createClient } from "@/utils/supabase/client";
 import { useDashboardData } from "@/components/providers/DashboardDataProvider";
 import { cn } from "@/lib/utils";
 import { createMeeting } from "@/app/actions/mjengo-meet";
-import { callStore } from "@/lib/client/call-store";
+import { suiteCounts } from "@/app/actions/mjengo-nav";
 
-interface Note { id: string; title: string; message: string | null; link: string | null; read: boolean; created_at: string }
+type Edge = "left" | "right" | "bottom";
+interface Place { edge: Edge; at: number }
 
-const BTN = "relative flex h-10 w-10 items-center justify-center rounded-lg text-[#787774] transition-colors hover:bg-black/5 hover:text-[#37352f] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sauti-teal/40";
+const KEY = "ss_mj_dock";
+const BTN = "relative flex h-10 w-10 items-center justify-center rounded-xl text-[#37352f] transition-colors hover:bg-black/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sauti-teal/50";
 
 /**
- * A slim action bar on the left edge of the suite. It rests as a small handle and slides out on hover or
- * focus: chat, notifications, voice call, video call and calendar. Styled like the mail toolbar.
+ * Quick actions as a small floating handle you can drag to the left, right or bottom edge and tap to open:
+ * chats, notifications, voice call, video call and calendar. It sits above the side navigation, so it is
+ * always reachable, and the "Move" buttons do the same thing as dragging for keyboard users.
  */
 export function MjengoDock() {
 	const { toast } = useToast();
 	const dash = useDashboardData();
 	const [mounted, setMounted] = useState(false);
-	useEffect(() => setMounted(true), []);
-	const collapsed = mounted ? !!dash?.isSidebarCollapsed : false;
-
-	const [notesOpen, setNotesOpen] = useState(false);
-	const [notes, setNotes] = useState<Note[] | null>(null);
-	const [unread, setUnread] = useState(0);
+	const [place, setPlace] = useState<Place>({ edge: "right", at: 0.55 });
+	const [open, setOpen] = useState(false);
+	const [drag, setDrag] = useState<{ x: number; y: number } | null>(null);
 	const [starting, setStarting] = useState<"voice" | "video" | null>(null);
-	const supabase = useMemo(() => createClient(), []);
+	const [unread, setUnread] = useState(0);
+	const moved = useRef(false);
+	const origin = useRef({ x: 0, y: 0 });
+	const sidebarW = mounted && dash?.isSidebarCollapsed ? 72 : 256;
 
-	const loadNotes = useCallback(async () => {
-		const { data } = await supabase.from("notifications").select("id, title, message, link, read, created_at").order("created_at", { ascending: false }).limit(30);
-		const rows = (data ?? []) as Note[];
-		setNotes(rows);
-		setUnread(rows.filter((n) => !n.read).length);
-	}, [supabase]);
-	useEffect(() => { loadNotes().catch(() => undefined); }, [loadNotes]);
+	useEffect(() => {
+		setMounted(true);
+		try {
+			const raw = localStorage.getItem(KEY);
+			if (raw) {
+				const p = JSON.parse(raw) as Place;
+				if (["left", "right", "bottom"].includes(p.edge) && typeof p.at === "number") setPlace({ edge: p.edge, at: Math.min(0.95, Math.max(0.05, p.at)) });
+			} else if (window.innerWidth < 1024) setPlace({ edge: "bottom", at: 0.85 });
+		} catch { /* default */ }
+	}, []);
+	useEffect(() => {
+		let on = true;
+		const tick = () => suiteCounts().then((c) => on && setUnread(c.notifications)).catch(() => undefined);
+		tick();
+		const t = setInterval(tick, 60_000);
+		return () => { on = false; clearInterval(t); };
+	}, []);
+
+	const save = (p: Place) => { setPlace(p); try { localStorage.setItem(KEY, JSON.stringify(p)); } catch { /* ignore */ } };
+
+	const onDown = (e: React.PointerEvent) => {
+		(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+		origin.current = { x: e.clientX, y: e.clientY };
+		moved.current = false;
+		setDrag({ x: e.clientX, y: e.clientY });
+	};
+	const onMove = (e: React.PointerEvent) => {
+		if (!drag) return;
+		if (Math.abs(e.clientX - origin.current.x) + Math.abs(e.clientY - origin.current.y) > 6) moved.current = true;
+		setDrag({ x: e.clientX, y: e.clientY });
+	};
+	const onUp = (e: React.PointerEvent) => {
+		if (!drag) return;
+		const w = window.innerWidth;
+		const h = window.innerHeight;
+		setDrag(null);
+		if (!moved.current) { setOpen((v) => !v); return; }
+		const x = e.clientX;
+		const y = e.clientY;
+		const dl = x, dr = w - x, db = h - y;
+		const edge: Edge = Math.min(dl, dr, db) === db ? "bottom" : dl <= dr ? "left" : "right";
+		save({ edge, at: Math.min(0.95, Math.max(0.05, edge === "bottom" ? x / w : y / h)) });
+		setOpen(false);
+	};
 
 	const start = async (mode: "voice" | "video") => {
 		setStarting(mode);
 		try {
-			const { code } = await unwrap(createMeeting(mode === "voice" ? "voice" : "video", null));
+			const { code } = await unwrap(createMeeting(mode, null));
 			const url = `${window.location.origin}/meet/${code}`;
 			navigator.clipboard?.writeText(url).catch(() => undefined);
-			// The call opens in the floating window so work can carry on around it.
-			callStore.open(code, mode);
-			toast({ title: mode === "voice" ? "Voice call started" : "Video call started", description: "It is open in a floating window. The link is copied: send it to anyone you want in the call." });
+			// The call has its own page, so camera and microphone choices come first.
+			window.open(url, "_blank", "noopener");
+			toast({ title: mode === "voice" ? "Voice call ready" : "Video call ready", description: "It opened in its own page. The link is copied: send it to anyone you want in the call." });
+			setOpen(false);
 		} catch (e) {
 			toast({ title: "Could not start the call", description: e instanceof Error ? e.message : undefined, variant: "destructive" });
 		} finally {
@@ -59,110 +97,65 @@ export function MjengoDock() {
 		}
 	};
 
+	const style = useMemo<React.CSSProperties>(() => {
+		if (drag) return { left: drag.x - 22, top: drag.y - 22 };
+		const lg = typeof window !== "undefined" && window.innerWidth >= 1024;
+		if (place.edge === "bottom") return { left: `calc(${place.at * 100}% - 22px)`, bottom: 16 };
+		if (place.edge === "left") return { left: (lg ? sidebarW : 0) + 12, top: `calc(${place.at * 100}% - 22px)` };
+		return { right: 12, top: `calc(${place.at * 100}% - 22px)` };
+	}, [drag, place, sidebarW]);
+
+	const horizontal = place.edge === "bottom";
+	const toLeft = place.edge === "right";
+	const side: "left" | "right" | "top" = horizontal ? "top" : toLeft ? "left" : "right";
+
+	if (!mounted) return null;
 	return (
 		<TooltipProvider delayDuration={150}>
-			<nav
-				aria-label="Quick actions"
-				className={cn(
-					"group fixed top-1/2 z-30 hidden -translate-y-1/2 transition-[left] duration-300 lg:block",
-					collapsed ? "lg:left-[72px]" : "lg:left-64"
-				)}
-			>
-				<div className="flex items-center">
-					<div className="-translate-x-[calc(100%-14px)] rounded-r-2xl border border-l-0 border-black/10 bg-white py-1.5 pl-1.5 pr-1.5 shadow-[0_6px_24px_rgba(0,0,0,0.10)] transition-transform duration-200 ease-out hover:translate-x-0 focus-within:translate-x-0 group-hover:translate-x-0">
-						<div className="flex flex-col items-center gap-0.5">
-							<Item label="Chat" hint="Open your conversations" href="/dashboard/chat"><MessageCircle className="h-[18px] w-[18px]" /></Item>
-							<Item label="Notifications" hint="What needs your attention" onClick={() => { setNotesOpen(true); loadNotes().catch(() => undefined); }}>
-								<Bell className="h-[18px] w-[18px]" />
-								{unread > 0 && <span className="absolute right-1 top-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-sauti-teal px-1 text-[10px] font-bold text-white">{unread > 9 ? "9+" : unread}</span>}
-							</Item>
-							<Item label="Voice call" hint="Start an audio call and share the link" onClick={() => start("voice")} busy={starting === "voice"}><Mic className="h-[18px] w-[18px]" /></Item>
-							<Item label="Video call" hint="Start a video call with captions" onClick={() => start("video")} busy={starting === "video"}><Video className="h-[18px] w-[18px]" /></Item>
-							<Item label="Calendar" hint="Month view, events and meetings" href="/dashboard/mjengo/calendar"><Calendar className="h-[18px] w-[18px]" /></Item>
-						</div>
-					</div>
-					{/* The handle that stays visible while the bar is tucked away. */}
-					<span aria-hidden className="pointer-events-none -ml-[14px] flex h-14 w-[14px] items-center justify-center rounded-r-lg border border-l-0 border-black/10 bg-white text-[#9b9a97] shadow-sm transition-opacity group-hover:opacity-0">
-						<GripVertical className="h-4 w-4" />
-					</span>
-				</div>
-			</nav>
+			<div style={style} className={cn("fixed z-[55] flex items-center gap-1.5", horizontal ? "flex-col-reverse" : toLeft ? "flex-row-reverse" : "flex-row", drag && "select-none")}>
+				<button
+					type="button"
+					onPointerDown={onDown}
+					onPointerMove={onMove}
+					onPointerUp={onUp}
+					onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setOpen((v) => !v); } if (e.key === "Escape") setOpen(false); }}
+					aria-label={open ? "Close quick actions" : "Open quick actions. Drag to move."}
+					aria-expanded={open}
+					className="relative flex h-11 w-11 cursor-grab touch-none items-center justify-center rounded-2xl border border-black/10 bg-white text-[#787774] shadow-[0_6px_20px_rgba(0,0,0,0.14)] transition active:cursor-grabbing hover:text-[#37352f] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sauti-teal/50"
+				>
+					{open ? <X className="h-5 w-5" /> : <GripVertical className="h-5 w-5" />}
+					{!open && unread > 0 && <span className="absolute -right-1 -top-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-sauti-teal px-1 text-[10px] font-bold text-white">{unread > 9 ? "9+" : unread}</span>}
+				</button>
 
-			<Sheet open={notesOpen} onOpenChange={setNotesOpen}>
-				<SheetContent side="left" className="flex w-full flex-col gap-0 p-0 sm:max-w-sm">
-					<SheetHeader className="border-b p-4"><SheetTitle>Notifications</SheetTitle></SheetHeader>
-					<div className="min-h-0 flex-1 overflow-y-auto">
-						{!notes ? (
-							<div className="flex justify-center py-12"><Loader2 className="h-5 w-5 animate-spin text-serene-neutral-400" /></div>
-						) : notes.length === 0 ? (
-							<p className="p-8 text-center text-sm text-serene-neutral-500">Nothing new.</p>
-						) : (
-							<ul className="divide-y divide-serene-neutral-100">
-								{notes.map((n) => {
-									const inner = (
-										<>
-											<span className={cn("mt-1.5 h-2 w-2 shrink-0 rounded-full", n.read ? "bg-transparent" : "bg-sauti-teal")} />
-											<span className="min-w-0 flex-1">
-												<span className="block text-sm font-medium text-serene-neutral-900">{n.title}</span>
-												{n.message && <span className="block text-sm text-serene-neutral-600">{n.message}</span>}
-												<span className="mt-0.5 block text-xs text-serene-neutral-400">{formatDistanceToNow(new Date(n.created_at), { addSuffix: true })}</span>
-											</span>
-										</>
-									);
-									const mark = async () => {
-										if (n.read) return;
-										await supabase.from("notifications").update({ read: true }).eq("id", n.id);
-										setNotes((cur) => cur?.map((x) => (x.id === n.id ? { ...x, read: true } : x)) ?? cur);
-										setUnread((u) => Math.max(0, u - 1));
-									};
-									return (
-										<li key={n.id}>
-											{n.link ? (
-												<Link href={n.link} onClick={() => { mark(); setNotesOpen(false); }} className="flex gap-3 p-4 hover:bg-serene-neutral-50">{inner}</Link>
-											) : (
-												<button onClick={mark} className="flex w-full gap-3 p-4 text-left hover:bg-serene-neutral-50">{inner}</button>
-											)}
-										</li>
-									);
-								})}
-							</ul>
-						)}
+				{open && (
+					<div role="toolbar" aria-label="Quick actions" className={cn("flex gap-0.5 rounded-2xl border border-black/10 bg-white p-1 shadow-[0_6px_24px_rgba(0,0,0,0.14)]", horizontal ? "flex-row" : "flex-col")}>
+						<Item label="Chats" hint="Conversations in the suite" href="/dashboard/mjengo/chat" side={side}><MessageCircle className="h-[18px] w-[18px]" /></Item>
+						<Item label="Notifications" hint="What needs your attention" href="/dashboard/mjengo/notifications" side={side}>
+							<Bell className="h-[18px] w-[18px]" />
+							{unread > 0 && <span className="absolute right-1 top-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-sauti-teal px-1 text-[10px] font-bold text-white">{unread > 9 ? "9+" : unread}</span>}
+						</Item>
+						<Item label="Voice call" hint="Start an audio call in its own page" onClick={() => start("voice")} busy={starting === "voice"} side={side}><Mic className="h-[18px] w-[18px]" /></Item>
+						<Item label="Video call" hint="Start a video call with captions" onClick={() => start("video")} busy={starting === "video"} side={side}><Video className="h-[18px] w-[18px]" /></Item>
+						<Item label="Calendar" hint="Month view, events and meetings" href="/dashboard/mjengo/calendar" side={side}><Calendar className="h-[18px] w-[18px]" /></Item>
+						<span aria-hidden className={cn("bg-black/10", horizontal ? "mx-0.5 my-1 w-px" : "mx-1 my-0.5 h-px")} />
+						<Item label="Move to the left" hint="Dock on the left edge" onClick={() => { save({ edge: "left", at: place.at }); setOpen(false); }} side={side}><MoveHorizontal className="h-[18px] w-[18px] rotate-180" /></Item>
+						<Item label="Move to the right" hint="Dock on the right edge" onClick={() => { save({ edge: "right", at: place.at }); setOpen(false); }} side={side}><MoveHorizontal className="h-[18px] w-[18px]" /></Item>
+						<Item label="Move to the bottom" hint="Dock along the bottom" onClick={() => { save({ edge: "bottom", at: Math.min(0.9, place.at) }); setOpen(false); }} side={side}><PanelBottom className="h-[18px] w-[18px]" /></Item>
 					</div>
-					{notes && unread > 0 && (
-						<div className="border-t p-3">
-							<button
-								onClick={async () => {
-									await supabase.from("notifications").update({ read: true }).in("id", notes.filter((n) => !n.read).map((n) => n.id));
-									setNotes(notes.map((n) => ({ ...n, read: true })));
-									setUnread(0);
-								}}
-								className="flex w-full items-center justify-center gap-2 rounded-lg py-2 text-sm font-medium text-sauti-teal hover:bg-sauti-teal-light/40"
-							>
-								<Check className="h-4 w-4" /> Mark all as read
-							</button>
-						</div>
-					)}
-				</SheetContent>
-			</Sheet>
+				)}
+			</div>
 		</TooltipProvider>
 	);
 }
 
-function Item({ label, hint, href, onClick, busy, children }: { label: string; hint: string; href?: string; onClick?: () => void; busy?: boolean; children: React.ReactNode }) {
+function Item({ label, hint, href, onClick, busy, side, children }: { label: string; hint: string; href?: string; onClick?: () => void; busy?: boolean; side: "left" | "right" | "top"; children: React.ReactNode }) {
 	const body = busy ? <Loader2 className="h-[18px] w-[18px] animate-spin" /> : children;
 	return (
 		<Tooltip>
 			<TooltipTrigger asChild>
-				{href ? (
-					<Link href={href} aria-label={label} className={BTN}>{body}</Link>
-				) : (
-					<button type="button" onClick={onClick} aria-label={label} className={BTN}>{body}</button>
-				)}
+				{href ? <Link href={href} aria-label={label} className={BTN}>{body}</Link> : <button type="button" onClick={onClick} aria-label={label} className={BTN}>{body}</button>}
 			</TooltipTrigger>
-			<TooltipContent side="right" sideOffset={10}>
-				<p className="font-semibold">{label}</p>
-				<p className="text-xs opacity-80">{hint}</p>
-			</TooltipContent>
+			<TooltipContent side={side} sideOffset={10}><p className="font-semibold">{label}</p><p className="text-xs opacity-80">{hint}</p></TooltipContent>
 		</Tooltip>
 	);
 }
