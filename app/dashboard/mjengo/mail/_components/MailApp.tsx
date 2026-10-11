@@ -731,11 +731,11 @@ function ReadingPane({ teamIds, team, onWrite, onAddContact, onPrev, onNext, has
 						)}
 
 						{conversation.length > 0 && (
-							<section className="mt-6 border-t border-serene-neutral-100 pt-4">
-								<h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-serene-neutral-400">In this conversation</h3>
-								<ul className="divide-y divide-serene-neutral-50">
-									{conversation.map((c) => (
-										<li key={c.uid}><button onClick={() => onOpen(c)} className="flex w-full items-center gap-3 py-2 text-left text-sm hover:bg-serene-neutral-50"><span className="w-32 shrink-0 truncate font-medium">{displayName(c.from)}</span><span className="min-w-0 flex-1 truncate text-serene-neutral-500">{c.subject}</span><span className="shrink-0 text-xs text-serene-neutral-400">{rowTime(c.date)}</span></button></li>
+							<section className="mt-6 border-t border-black/[0.07] pt-4">
+								<h3 className="mb-1 text-xs font-semibold uppercase tracking-wider text-[#9b9a97]">Earlier in this conversation ({conversation.length})</h3>
+								<ul className="divide-y divide-black/[0.06]">
+									{[...conversation].sort((x, y) => (y.date ?? "").localeCompare(x.date ?? "")).map((c) => (
+										<ThreadItem key={c.uid} c={c} accountId={accountId} onOpen={() => onOpen(c)} />
 									))}
 								</ul>
 							</section>
@@ -745,5 +745,54 @@ function ReadingPane({ teamIds, team, onWrite, onAddContact, onPrev, onNext, has
 				)}
 			</div>
 		</div>
+	);
+}
+
+/** One earlier message of a conversation: a collapsed row that opens in place, as in Gmail. */
+function ThreadItem({ c, accountId, onOpen }: { c: MessageRow; accountId: string; onOpen: () => void }) {
+	const [open, setOpen] = useState(false);
+	const [d, setD] = useState<Detail | null>(null);
+	const [busy, setBusy] = useState(false);
+	const frame = useRef<HTMLIFrameElement>(null);
+	const [h, setH] = useState(160);
+	const toggle = async () => {
+		const next = !open;
+		setOpen(next);
+		if (next && !d) {
+			setBusy(true);
+			try { setD(await getMessageDetail(accountId, c.mailbox, c.uid, true)); } catch { setOpen(false); } finally { setBusy(false); }
+		}
+	};
+	const doc = d
+		? `<!doctype html><html><head><meta charset="utf-8"><base target="_blank"><style>body{margin:0;font:15px/1.6 -apple-system,Segoe UI,Roboto,sans-serif;color:#1f2937;word-wrap:break-word}img{max-width:100%;height:auto}blockquote{margin:8px 0;padding-left:12px;border-left:3px solid #e5e7eb;color:#6b7280}a{color:#068297}pre{white-space:pre-wrap}table{max-width:100%}</style></head><body>${d.html ?? `<pre style="font:inherit">${d.text.replace(/[&<>]/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[ch]!)}</pre>`}</body></html>`
+		: "";
+	return (
+		<li>
+			<button onClick={toggle} aria-expanded={open} className="flex w-full items-center gap-3 py-2.5 text-left text-sm hover:bg-black/[0.03]">
+				<ChevronDown className={cn("h-4 w-4 shrink-0 text-[#9b9a97] transition-transform", !open && "-rotate-90")} />
+				<span className="w-32 shrink-0 truncate font-medium text-[#37352f]">{displayName(c.from)}</span>
+				<span className="min-w-0 flex-1 truncate text-[#787774]">{c.subject}</span>
+				<span className="shrink-0 text-xs text-[#9b9a97]">{rowTime(c.date)}</span>
+			</button>
+			{open && (
+				<div className="pb-4 pl-7">
+					{busy && <p className="flex items-center gap-2 py-3 text-sm text-[#787774]"><Loader2 className="h-4 w-4 animate-spin" /> Opening...</p>}
+					{d && (
+						<>
+							<iframe
+								ref={frame}
+								title={`Message from ${displayName(c.from)}`}
+								sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox"
+								srcDoc={doc}
+								onLoad={() => { const dd = frame.current?.contentDocument; if (dd?.body) setH(Math.max(100, dd.documentElement.scrollHeight + 8)); }}
+								style={{ height: h }}
+								className="w-full border-0"
+							/>
+							<button onClick={onOpen} className="mt-1 text-xs font-medium text-sauti-teal hover:underline">Open this message on its own</button>
+						</>
+					)}
+				</div>
+			)}
+		</li>
 	);
 }
