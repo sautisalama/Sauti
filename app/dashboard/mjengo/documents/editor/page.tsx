@@ -1,12 +1,45 @@
 "use client";
 
-import { Suspense, useEffect, useRef, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { WordcraftEditor, type SavedFile, type WordcraftEditorRef } from "@gamine/wordcraft-react";
+import * as Y from "yjs";
+import type { AiOptions } from "@gamine/wordcraft-react";
+import { yjsCollaboration } from "@gamine/wordcraft-react/collab";
 import { MjengoLoader } from "../../_components/MjengoLoader";
+import { createClient } from "@/utils/supabase/client";
+import { useUser } from "@/hooks/useUser";
+import { SupabaseYProvider } from "@/lib/client/supabase-yjs";
 import { useToast } from "@/hooks/use-toast";
 import { putToSignedUrl } from "@/lib/client/upload";
 import { finishReplace, getFileUrl, prepareReplace, prepareUpload, registerUpload } from "../../vault/api";
+
+/** Writing help runs on our server so the organisation key never reaches the browser. */
+const ai: AiOptions = {
+	name: "Salama AI",
+	allowUserKey: true,
+	studio: true,
+	complete: (req) =>
+		(async function* () {
+			const res = await fetch("/api/mjengo/ai/complete", {
+				method: "POST",
+				signal: req.signal,
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ prompt: req.prompt, action: req.action, selection: req.selection, document: req.document, instructions: req.instructions }),
+			});
+			if (!res.ok || !res.body) throw new Error((await res.text().catch(() => "")) || "The AI service is unavailable.");
+			const reader = res.body.getReader();
+			const dec = new TextDecoder();
+			for (;;) {
+				const { done, value } = await reader.read();
+				if (done) break;
+				yield dec.decode(value, { stream: true });
+			}
+		})(),
+};
+
+const COLORS = ["#0f766e", "#c2410c", "#7c3aed", "#0369a1", "#be123c", "#4d7c0f", "#a16207", "#0e7490"];
+const colorFor = (s: string) => COLORS[[...s].reduce((a, c) => a + c.charCodeAt(0), 0) % COLORS.length];
 
 const extOf = (n: string) => n.split(".").pop()?.toLowerCase() ?? "";
 
@@ -49,6 +82,23 @@ function EditorScreen() {
 		return () => { cancelled = true; };
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [initialFile]);
+
+	const me = useUser();
+	const person = useMemo(() => {
+		const p = me?.profile as { first_name?: string | null; last_name?: string | null } | null | undefined;
+		const name = [p?.first_name, p?.last_name].filter(Boolean).join(" ") || me?.email || "Someone";
+		return { name, id: me?.id ?? undefined, color: colorFor(me?.id ?? name) };
+	}, [me?.id, me?.email, me?.profile]);
+
+	// Co-editing: everyone who opens this file with edit rights joins the same live document.
+	const collab = useMemo(() => {
+		if (!initialFile || loading || level !== "edit" || !me?.id) return null;
+		const ydoc = new Y.Doc();
+		const provider = new SupabaseYProvider(ydoc, createClient(), `mjengo-doc:${initialFile}`, `${me.id}:${Math.random().toString(36).slice(2, 8)}`);
+		return { provider, collaboration: yjsCollaboration({ doc: ydoc, provider, user: person }) };
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [initialFile, loading, level, me?.id]);
+	useEffect(() => () => collab?.provider.destroy(), [collab]);
 
 	// Where the open document lives, kept in a ref so a save that fires right after another (AutoSave)
 	// always sees the file the previous one created.
@@ -109,7 +159,9 @@ function EditorScreen() {
 						document={doc}
 						guardUnload
 						autoSave={level === "edit"}
-						author=""
+						user={person}
+						ai={ai}
+						collaboration={collab?.collaboration ?? null}
 						onSave={onSave}
 						onError={(e) => toast({ title: "The editor reported a problem", description: e.message, variant: "destructive" })}
 						loading={<MjengoLoader label="Starting the editor" hint="The first time takes a moment while it downloads." className="h-full min-h-0" />}
