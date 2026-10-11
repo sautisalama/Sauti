@@ -1,9 +1,9 @@
 "use client";
 
-import { Suspense, useEffect, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { ArrowLeft, Download, Highlighter, Loader2, MousePointer2, PenLine, Save, Signature, Trash2, Type, Undo2 } from "lucide-react";
+import { ArrowLeft, Download, Highlighter, Image as ImageIcon, Loader2, MousePointer2, PenLine, Save, Signature, Trash2, Type, Undo2 } from "lucide-react";
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,6 +11,8 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { putToSignedUrl } from "@/lib/client/upload";
+import { unwrap } from "@/lib/action-result";
+import { deleteSignature, listSignatures, saveSignatureImage, type SignatureRow } from "@/app/actions/mjengo-signatures";
 import { MjengoLoader } from "../../_components/MjengoLoader";
 import { finishReplace, getFileUrl, prepareReplace, prepareUpload, registerUpload } from "../../vault/api";
 
@@ -44,6 +46,9 @@ function PdfScreen() {
 	const [selected, setSelected] = useState<string | null>(null);
 	const [signature, setSignature] = useState<string | null>(null);
 	const [signing, setSigning] = useState(false);
+	const [library, setLibrary] = useState<SignatureRow[]>([]);
+	const loadLibrary = useCallback(() => { unwrap(listSignatures()).then(setLibrary).catch(() => undefined); }, []);
+	useEffect(() => { loadLibrary(); }, [loadLibrary]);
 	const [zoom, setZoom] = useState(1.25);
 	const canvases = useRef<(HTMLCanvasElement | null)[]>([]);
 
@@ -199,7 +204,7 @@ function PdfScreen() {
 				<span className="max-w-[200px] truncate px-1 text-[15px] font-medium text-[#37352f]">{name}</span>
 				<span className="mx-1 h-5 w-px bg-black/10" />
 				{tools.map(([t, label, icon]) => (
-					<button key={t} onClick={() => { setTool(t); if (t === "sign" && !signature) setSigning(true); }} aria-pressed={tool === t} title={label} aria-label={label} className={cn("flex h-9 items-center gap-1.5 rounded-lg px-2.5 text-sm", tool === t ? "bg-sauti-teal-light text-sauti-dark" : "text-[#787774] hover:bg-black/5")}>{icon}<span className="hidden md:inline">{label}</span></button>
+					<button key={t} onClick={() => { setTool(t); if (t === "sign") setSigning(true); }} aria-pressed={tool === t} title={label} aria-label={label} className={cn("flex h-9 items-center gap-1.5 rounded-lg px-2.5 text-sm", tool === t ? "bg-sauti-teal-light text-sauti-dark" : "text-[#787774] hover:bg-black/5")}>{icon}<span className="hidden md:inline">{label}</span></button>
 				))}
 				{(tool === "highlight" || tool === "pen" || tool === "text") && (
 					<div className="ml-1 flex items-center gap-1">
@@ -243,7 +248,7 @@ function PdfScreen() {
 				)}
 			</div>
 
-			<SignatureDialog open={signing} onClose={() => setSigning(false)} onDone={(url) => { setSignature(url); setSigning(false); setTool("sign"); }} />
+			<SignatureDialog open={signing} onClose={() => setSigning(false)} onDone={(url) => { setSignature(url); setSigning(false); setTool("sign"); }} library={library} onLibraryChanged={loadLibrary} />
 		</div>
 	);
 }
@@ -260,6 +265,14 @@ function PageView({ index, size, zoom, canvasRef, marks, tool, color, selected, 
 	const [stroke, setStroke] = useState<[number, number][] | null>(null);
 	const [typing, setTyping] = useState<{ x: number; y: number; text: string } | null>(null);
 	const start = useRef<{ x: number; y: number } | null>(null);
+	const typingInput = useRef<HTMLInputElement>(null);
+	// Focus after the click has finished, otherwise the browser takes the focus back and the box closes at once.
+	useEffect(() => {
+		if (!typing) return;
+		const t = setTimeout(() => typingInput.current?.focus(), 30);
+		return () => clearTimeout(t);
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [typing === null]);
 
 	const pos = (e: React.PointerEvent): [number, number] => {
 		const r = box.current!.getBoundingClientRect();
@@ -272,7 +285,7 @@ function PageView({ index, size, zoom, canvasRef, marks, tool, color, selected, 
 		onSelect(null);
 		if (tool === "highlight") { start.current = { x, y }; setDraft({ x, y, w: 0, h: 0 }); (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); }
 		else if (tool === "pen") { setStroke([[x, y]]); (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); }
-		else if (tool === "text") setTyping({ x, y, text: "" });
+		else if (tool === "text") { e.preventDefault(); setTyping({ x, y, text: "" }); }
 		else if (tool === "sign") {
 			if (!signature) return onNeedSignature();
 			const w = 0.28;
@@ -316,7 +329,8 @@ function PageView({ index, size, zoom, canvasRef, marks, tool, color, selected, 
 				{draft && <div className="absolute" style={{ left: `${draft.x * 100}%`, top: `${draft.y * 100}%`, width: `${draft.w * 100}%`, height: `${draft.h * 100}%`, background: color, opacity: 0.4 }} />}
 				{typing && (
 					<input
-						autoFocus
+						ref={typingInput}
+						onPointerDown={(e) => e.stopPropagation()}
 						value={typing.text}
 						onChange={(e) => setTyping({ ...typing, text: e.target.value })}
 						onBlur={commitText}
@@ -331,44 +345,124 @@ function PageView({ index, size, zoom, canvasRef, marks, tool, color, selected, 
 	);
 }
 
-/** Draw a signature with the finger, mouse or pen, or type one. Returns a transparent PNG. */
-function SignatureDialog({ open, onClose, onDone }: { open: boolean; onClose: () => void; onDone: (dataUrl: string) => void }) {
-	const [mode, setMode] = useState<"draw" | "type">("draw");
+/**
+ * Choose, draw, type or photograph a signature. Signatures you add are kept for you, so next time you pick
+ * one from the list. Returns a transparent PNG.
+ */
+function SignatureDialog({ open, onClose, onDone, library, onLibraryChanged }: { open: boolean; onClose: () => void; onDone: (dataUrl: string) => void; library: SignatureRow[]; onLibraryChanged: () => void }) {
+	const { toast } = useToast();
+	const [mode, setMode] = useState<"saved" | "draw" | "type" | "photo">("draw");
 	const [typed, setTyped] = useState("");
+	const [keep, setKeep] = useState(true);
+	const [label, setLabel] = useState("");
 	const pad = useRef<HTMLCanvasElement>(null);
 	const drawing = useRef(false);
 	const last = useRef<{ x: number; y: number } | null>(null);
 	const [empty, setEmpty] = useState(true);
+	const [photo, setPhoto] = useState<string | null>(null);
+	const [cutoff, setCutoff] = useState(200);
+	const photoCanvas = useRef<HTMLCanvasElement>(null);
+	const photoImg = useRef<HTMLImageElement | null>(null);
+	const [busy, setBusy] = useState(false);
+
 	useEffect(() => {
 		if (!open) return;
-		setEmpty(true);
-		setTyped("");
-		const c = pad.current;
-		if (c) c.getContext("2d")?.clearRect(0, 0, c.width, c.height);
-	}, [open, mode]);
+		setMode(library.length ? "saved" : "draw");
+		setEmpty(true); setTyped(""); setPhoto(null); setLabel(""); setKeep(true);
+	}, [open, library.length]);
+	useEffect(() => {
+		if (mode === "draw") { setEmpty(true); const c = pad.current; c?.getContext("2d")?.clearRect(0, 0, c.width, c.height); }
+	}, [mode]);
+
+	// A photo of a signature on white paper: the paper is made transparent and the picture is trimmed to the ink.
+	const renderPhoto = useCallback(() => {
+		const img = photoImg.current;
+		const c = photoCanvas.current;
+		if (!img || !c) return;
+		const k = Math.min(1, 700 / img.width);
+		c.width = Math.max(1, Math.round(img.width * k));
+		c.height = Math.max(1, Math.round(img.height * k));
+		const ctx = c.getContext("2d", { willReadFrequently: true })!;
+		ctx.drawImage(img, 0, 0, c.width, c.height);
+		const d = ctx.getImageData(0, 0, c.width, c.height);
+		let minX = c.width, minY = c.height, maxX = 0, maxY = 0;
+		for (let y = 0; y < c.height; y++) {
+			for (let x = 0; x < c.width; x++) {
+				const i = (y * c.width + x) * 4;
+				const lum = 0.299 * d.data[i] + 0.587 * d.data[i + 1] + 0.114 * d.data[i + 2];
+				if (lum > cutoff) d.data[i + 3] = 0;
+				else {
+					d.data[i + 3] = Math.min(255, (cutoff - lum) * 4);
+					if (x < minX) minX = x; if (x > maxX) maxX = x; if (y < minY) minY = y; if (y > maxY) maxY = y;
+				}
+			}
+		}
+		ctx.putImageData(d, 0, 0);
+		if (maxX > minX && maxY > minY) {
+			const w = maxX - minX + 1, h = maxY - minY + 1;
+			const crop = ctx.getImageData(minX, minY, w, h);
+			c.width = w; c.height = h;
+			ctx.putImageData(crop, 0, 0);
+		}
+	}, [cutoff]);
+	useEffect(() => { if (photo) renderPhoto(); }, [photo, cutoff, renderPhoto, mode]);
 
 	const point = (e: React.PointerEvent) => {
 		const c = pad.current!;
 		const r = c.getBoundingClientRect();
 		return { x: ((e.clientX - r.left) / r.width) * c.width, y: ((e.clientY - r.top) / r.height) * c.height };
 	};
-	const done = () => {
+
+	const result = (): string | null => {
 		const out = document.createElement("canvas");
 		out.width = 600; out.height = 240;
 		const ctx = out.getContext("2d")!;
 		if (mode === "draw") ctx.drawImage(pad.current!, 0, 0, 600, 240);
-		else { ctx.fillStyle = "#111827"; ctx.font = "italic 96px 'Segoe Script', 'Brush Script MT', cursive"; ctx.textBaseline = "middle"; ctx.fillText(typed, 20, 120, 560); }
-		onDone(out.toDataURL("image/png"));
+		else if (mode === "type") { ctx.fillStyle = "#111827"; ctx.font = "italic 96px 'Segoe Script', 'Brush Script MT', cursive"; ctx.textBaseline = "middle"; ctx.fillText(typed, 20, 120, 560); }
+		else if (mode === "photo" && photoCanvas.current) {
+			const src = photoCanvas.current;
+			const k = Math.min(560 / src.width, 200 / src.height);
+			const w = src.width * k, h = src.height * k;
+			ctx.drawImage(src, (600 - w) / 2, (240 - h) / 2, w, h);
+		} else return null;
+		return out.toDataURL("image/png");
 	};
+
+	const done = async () => {
+		const url = result();
+		if (!url) return;
+		if (keep) {
+			setBusy(true);
+			try { await unwrap(saveSignatureImage(label || (mode === "type" ? typed : "Signature"), url)); onLibraryChanged(); } catch (e) { toast({ title: "Used, but not saved for later", description: e instanceof Error ? e.message : undefined }); } finally { setBusy(false); }
+		}
+		onDone(url);
+	};
+
+	const ready = mode === "draw" ? !empty : mode === "type" ? !!typed.trim() : mode === "photo" ? !!photo : false;
+	const tabs: [typeof mode, string][] = [["saved", `Yours (${library.length})`], ["draw", "Draw"], ["type", "Type"], ["photo", "From a photo"]];
 
 	return (
 		<Dialog open={open} onOpenChange={(o) => !o && onClose()}>
 			<DialogContent className="max-w-lg">
-				<DialogHeader><DialogTitle>Your signature</DialogTitle><DialogDescription>It stays in this window only. Click on the page to place it.</DialogDescription></DialogHeader>
-				<div className="inline-flex w-fit rounded-lg border border-serene-neutral-200 p-0.5">
-					{(["draw", "type"] as const).map((m) => <button key={m} onClick={() => setMode(m)} aria-pressed={mode === m} className={cn("rounded-md px-3 py-1 text-sm font-medium capitalize", mode === m ? "bg-sauti-teal text-white" : "text-serene-neutral-600")}>{m}</button>)}
+				<DialogHeader><DialogTitle>Signature</DialogTitle><DialogDescription>Pick one you added before, or add a new one. Then click on the page to place it.</DialogDescription></DialogHeader>
+				<div className="inline-flex w-fit flex-wrap rounded-lg border border-serene-neutral-200 p-0.5">
+					{tabs.map(([m, l]) => <button key={m} onClick={() => setMode(m)} aria-pressed={mode === m} className={cn("rounded-md px-3 py-1 text-sm font-medium", mode === m ? "bg-sauti-teal text-white" : "text-serene-neutral-600")}>{l}</button>)}
 				</div>
-				{mode === "draw" ? (
+
+				{mode === "saved" && (
+					library.length === 0 ? <p className="py-6 text-center text-sm text-serene-neutral-500">No signatures yet. Draw one, type one or add a photo.</p> : (
+						<ul className="grid max-h-72 grid-cols-2 gap-2 overflow-y-auto">
+							{library.map((s) => (
+								<li key={s.id} className="group relative rounded-xl border border-serene-neutral-200 bg-white p-2">
+									<button onClick={() => onDone(s.data_url)} className="block w-full"><img src={s.data_url} alt={s.name} className="h-16 w-full object-contain" /><span className="mt-1 block truncate text-xs text-serene-neutral-600">{s.name}</span></button>
+									<button aria-label={`Delete ${s.name}`} onClick={async () => { await unwrap(deleteSignature(s.id)).catch(() => undefined); onLibraryChanged(); }} className="absolute right-1 top-1 hidden h-6 w-6 items-center justify-center rounded-md bg-white text-red-600 shadow group-hover:flex"><Trash2 className="h-3.5 w-3.5" /></button>
+								</li>
+							))}
+						</ul>
+					)
+				)}
+
+				{mode === "draw" && (
 					<canvas
 						ref={pad}
 						width={600}
@@ -386,15 +480,48 @@ function SignatureDialog({ open, onClose, onDone }: { open: boolean; onClose: ()
 						}}
 						onPointerUp={() => { drawing.current = false; last.current = null; }}
 					/>
-				) : (
+				)}
+
+				{mode === "type" && (
 					<div className="space-y-2">
 						<Input value={typed} onChange={(e) => setTyped(e.target.value)} placeholder="Type your name" autoFocus />
 						<p className="rounded-xl border border-dashed border-serene-neutral-300 p-4 text-3xl italic" style={{ fontFamily: "'Segoe Script','Brush Script MT',cursive" }}>{typed || "Your name"}</p>
 					</div>
 				)}
+
+				{mode === "photo" && (
+					<div className="space-y-3">
+						<label className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-serene-neutral-300 p-4 text-sm text-serene-neutral-600 hover:border-sauti-teal/60">
+							<ImageIcon className="h-4 w-4" /> {photo ? "Choose another photo" : "Choose a photo of your signature on white paper"}
+							<input type="file" accept="image/*" className="hidden" onChange={(e) => {
+								const f = e.target.files?.[0];
+								if (!f) return;
+								const r = new FileReader();
+								r.onload = () => { const img = new Image(); img.onload = () => { photoImg.current = img; setPhoto(String(r.result)); }; img.src = String(r.result); };
+								r.readAsDataURL(f);
+							}} />
+						</label>
+						{photo && (
+							<>
+								<div className="flex h-32 items-center justify-center rounded-xl border border-serene-neutral-200 p-2" style={{ backgroundImage: "linear-gradient(45deg,#f1f5f9 25%,transparent 25%),linear-gradient(-45deg,#f1f5f9 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#f1f5f9 75%),linear-gradient(-45deg,transparent 75%,#f1f5f9 75%)", backgroundSize: "16px 16px" }}>
+									<canvas ref={photoCanvas} className="max-h-full max-w-full object-contain" />
+								</div>
+								<label className="flex items-center gap-3 text-xs text-serene-neutral-600">Remove the paper<input type="range" min={120} max={245} value={cutoff} onChange={(e) => setCutoff(Number(e.target.value))} className="flex-1 accent-[#068297]" /></label>
+							</>
+						)}
+					</div>
+				)}
+
+				{mode !== "saved" && (
+					<div className="flex flex-wrap items-center gap-3">
+						<label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={keep} onChange={(e) => setKeep(e.target.checked)} className="h-4 w-4 accent-[#068297]" /> Keep it for next time</label>
+						{keep && <Input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Name (optional)" className="h-8 w-44" />}
+					</div>
+				)}
+
 				<DialogFooter>
-					<Button variant="ghost" onClick={() => { setEmpty(true); const c = pad.current; c?.getContext("2d")?.clearRect(0, 0, c.width, c.height); setTyped(""); }}>Clear</Button>
-					<Button className="bg-sauti-teal hover:bg-sauti-dark" disabled={mode === "draw" ? empty : !typed.trim()} onClick={done}>Use this signature</Button>
+					{mode === "draw" && <Button variant="ghost" onClick={() => { setEmpty(true); const c = pad.current; c?.getContext("2d")?.clearRect(0, 0, c.width, c.height); }}>Clear</Button>}
+					{mode !== "saved" && <Button className="gap-2 bg-sauti-teal hover:bg-sauti-dark" disabled={!ready || busy} onClick={done}>{busy && <Loader2 className="h-4 w-4 animate-spin" />} Use this signature</Button>}
 				</DialogFooter>
 			</DialogContent>
 		</Dialog>
