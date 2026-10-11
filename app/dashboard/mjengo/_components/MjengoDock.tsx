@@ -76,7 +76,7 @@ export function MjengoDock() {
 							</Item>
 							<Item label="Voice call" hint="Start an audio call and share the link" onClick={() => start("voice")} busy={starting === "voice"}><Mic className="h-[18px] w-[18px]" /></Item>
 							<Item label="Video call" hint="Start a video call with captions" onClick={() => start("video")} busy={starting === "video"}><Video className="h-[18px] w-[18px]" /></Item>
-							<Item label="Calendar" hint="Your calendar and connections" href="/dashboard/profile?section=calendar"><Calendar className="h-[18px] w-[18px]" /></Item>
+							<Item label="Calendar" hint="Month view, events and meetings" href="/dashboard/mjengo/calendar"><Calendar className="h-[18px] w-[18px]" /></Item>
 						</div>
 					</div>
 					{/* The handle that stays visible while the bar is tucked away. */}

@@ -13,6 +13,7 @@ const TABS = [
 	{ href: BASE, label: "Overview", icon: LayoutDashboard, exact: true },
 	{ href: `${BASE}/mail`, label: "Mail", icon: Mail },
 	{ href: `${BASE}/contacts`, label: "Contacts", icon: Users },
+	{ href: `${BASE}/calendar`, label: "Calendar", icon: CalendarClock },
 	{ href: `${BASE}/grants`, label: "Grants", icon: Briefcase },
 	{ href: `${BASE}/opportunities`, label: "Opportunities", icon: Lightbulb },
 	{ href: `${BASE}/projects`, label: "Projects", icon: FolderKanban },

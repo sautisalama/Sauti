@@ -292,8 +292,9 @@ export function EnhancedSidebar({
 				{ id: "mj-projects", group: "Work", label: "Projects", icon: FolderKanban, href: `${B}/projects`, section: "main", hint: "Projects, milestones and documents" },
 				{ id: "mj-forms", group: "Work", label: "Forms", icon: ClipboardList, href: `${B}/forms`, section: "main", hint: "Build forms and see responses" },
 				{ id: "mj-todos", group: "Work", label: "To-dos", icon: CheckSquare, href: `${B}/todos`, section: "main", hint: "Tasks and shared responsibilities" },
+				{ id: "mj-calendar", group: "Communicate", label: "Calendar", icon: CalendarClock, href: `${B}/calendar`, section: "main", hint: "Month view, events and meetings" },
 				{ id: "mj-assistant", group: "Create", label: "Assistant", icon: Sparkles, href: `${B}/assistant`, section: "main", hint: "Chat, write and create images" },
-				{ id: "mj-content", group: "Create", label: "Content", icon: CalendarClock, href: `${B}/content`, section: "main", hint: "Plan and schedule social posts" },
+				{ id: "mj-content", group: "Create", label: "Content", icon: Megaphone, href: `${B}/content`, section: "main", hint: "Plan and schedule social posts" },
 				{ id: "mj-docs", group: "Files", label: "Requirements", icon: FileText, href: `${B}/documents`, section: "main", hint: "Documents grants, opportunities and projects still need" },
 				{ id: "mj-vault", group: "Files", label: "Files", icon: HardDrive, href: `${B}/vault`, section: "main", hint: "Documents, PDFs and folders, shared and kept in step with Google Drive" },
 			];

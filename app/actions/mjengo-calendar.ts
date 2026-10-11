@@ -1,0 +1,181 @@
+'use server';
+
+import { randomBytes } from 'node:crypto';
+import { google } from 'googleapis';
+import { looseAdmin } from '@/lib/loose-db';
+import { guard } from '@/lib/action-result';
+import { logAudit } from '@/lib/access/audit';
+import { requireAdminActor } from '@/lib/access/super-admin';
+import { getCalendarTokens, saveCalendarTokens } from '@/lib/calendar/tokens';
+import { createOAuth2ClientFromTokens, isGoogleCalendarConfigured } from '@/lib/google-calendar-oauth';
+
+export type CalKind = 'event' | 'meeting' | 'google' | 'grant' | 'opportunity' | 'project' | 'todo' | 'post';
+
+export interface CalItem {
+  id: string;
+  title: string;
+  start: string;
+  end: string;
+  allDay: boolean;
+  kind: CalKind;
+  href?: string;
+  meetingCode?: string | null;
+  location?: string | null;
+  description?: string | null;
+  attendees?: string[];
+  removable?: boolean;
+}
+
+export interface CalMonth { items: CalItem[]; googleConnected: boolean; googleConfigured: boolean; googleError: string | null }
+
+export interface NewEvent {
+  title: string;
+  start: string;
+  end: string;
+  allDay?: boolean;
+  description?: string | null;
+  location?: string | null;
+  attendees?: string[];
+  videoCall?: boolean;
+}
+
+/** An authorised Google Calendar client for this person, refreshing the token when needed. */
+async function googleClient(userId: string) {
+  if (!isGoogleCalendarConfigured()) return null;
+  const stored = await getCalendarTokens(userId);
+  if (!stored?.access_token) return null;
+  const tokens = { access_token: stored.access_token, refresh_token: stored.refresh_token ?? undefined, expiry_date: stored.expiry_date ?? undefined };
+  const auth = createOAuth2ClientFromTokens(tokens);
+  if (tokens.expiry_date && tokens.expiry_date < Date.now() + 30_000 && tokens.refresh_token) {
+    const { credentials } = await auth.refreshAccessToken();
+    await saveCalendarTokens(userId, { access_token: credentials.access_token ?? tokens.access_token, refresh_token: credentials.refresh_token ?? tokens.refresh_token, expiry_date: credentials.expiry_date ?? null });
+    auth.setCredentials(credentials);
+  }
+  return google.calendar({ version: 'v3', auth });
+}
+
+const alphabet = 'abcdefghjkmnpqrstuvwxyz23456789';
+function meetCode() {
+  const b = randomBytes(10);
+  const pick = (n: number) => Array.from({ length: n }, (_, i) => alphabet[b[i] % alphabet.length]).join('');
+  return `${pick(3)}-${pick(4)}-${pick(3)}`;
+}
+
+/** Everything on the calendar between two instants: events, Google events, deadlines, due tasks and posts. */
+async function month_(fromIso: string, toIso: string): Promise<CalMonth> {
+  const a = await requireAdminActor();
+  const db = looseAdmin();
+  const from = fromIso.slice(0, 10);
+  const to = toIso.slice(0, 10);
+  const items: CalItem[] = [];
+
+  const [{ data: events }, { data: grants }, { data: opps }, { data: projects }, { data: todos }, { data: posts }] = await Promise.all([
+    db.from('mjengo_events').select('id, title, description, location, starts_at, ends_at, all_day, kind, meeting_code, attendees').gte('ends_at', fromIso).lte('starts_at', toIso),
+    db.from('mjengo_grants').select('id, title, deadline').gte('deadline', from).lte('deadline', to),
+    db.from('mjengo_opportunities').select('id, title, deadline').gte('deadline', from).lte('deadline', to),
+    db.from('mjengo_projects').select('id, name, end_date').gte('end_date', from).lte('end_date', to),
+    db.from('mjengo_todos').select('id, title, due_date, status').gte('due_date', from).lte('due_date', to).neq('status', 'done'),
+    db.from('mjengo_posts').select('id, title, body, scheduled_for, status').gte('scheduled_for', fromIso).lte('scheduled_for', toIso).neq('status', 'cancelled'),
+  ]);
+
+  for (const e of (events ?? []) as { id: string; title: string; description: string | null; location: string | null; starts_at: string; ends_at: string; all_day: boolean; kind: 'event' | 'meeting'; meeting_code: string | null; attendees: string[] }[]) {
+    items.push({ id: `ev:${e.id}`, title: e.title, start: e.starts_at, end: e.ends_at, allDay: e.all_day, kind: e.kind, meetingCode: e.meeting_code, location: e.location, description: e.description, attendees: e.attendees, removable: true });
+  }
+  const day = (d: string) => ({ start: `${d}T00:00:00.000Z`, end: `${d}T23:59:59.000Z`, allDay: true });
+  for (const g of (grants ?? []) as { id: string; title: string; deadline: string }[]) items.push({ id: `gr:${g.id}`, title: `Deadline: ${g.title}`, kind: 'grant', href: '/dashboard/mjengo/grants', ...day(g.deadline) });
+  for (const o of (opps ?? []) as { id: string; title: string; deadline: string }[]) items.push({ id: `op:${o.id}`, title: `Deadline: ${o.title}`, kind: 'opportunity', href: '/dashboard/mjengo/opportunities', ...day(o.deadline) });
+  for (const p of (projects ?? []) as { id: string; name: string; end_date: string }[]) items.push({ id: `pr:${p.id}`, title: `Ends: ${p.name}`, kind: 'project', href: '/dashboard/mjengo/projects', ...day(p.end_date) });
+  for (const t of (todos ?? []) as { id: string; title: string; due_date: string }[]) items.push({ id: `td:${t.id}`, title: t.title, kind: 'todo', href: `/dashboard/mjengo/todos?task=${t.id}`, ...day(t.due_date) });
+  for (const p of (posts ?? []) as { id: string; title: string | null; body: string; scheduled_for: string }[]) items.push({ id: `po:${p.id}`, title: `Post: ${p.title || p.body.slice(0, 40)}`, kind: 'post', href: '/dashboard/mjengo/content', start: p.scheduled_for, end: p.scheduled_for, allDay: false });
+
+  // The person's own Google Calendar, when connected.
+  let googleConnected = false;
+  let googleError: string | null = null;
+  try {
+    const cal = await googleClient(a.id);
+    if (cal) {
+      googleConnected = true;
+      const r = await cal.events.list({ calendarId: 'primary', timeMin: fromIso, timeMax: toIso, singleEvents: true, orderBy: 'startTime', maxResults: 250 });
+      const known = new Set(((events ?? []) as { id: string }[]).map((e) => e.id));
+      void known;
+      const mine = new Set((await db.from('mjengo_events').select('google_event_id').not('google_event_id', 'is', null)).data?.map((x: { google_event_id: string }) => x.google_event_id) ?? []);
+      for (const g of r.data.items ?? []) {
+        if (!g.id || mine.has(g.id) || g.status === 'cancelled') continue;
+        const allDay = !g.start?.dateTime;
+        const start = g.start?.dateTime ?? `${g.start?.date}T00:00:00.000Z`;
+        const end = g.end?.dateTime ?? `${g.end?.date}T00:00:00.000Z`;
+        items.push({ id: `g:${g.id}`, title: g.summary || '(No title)', start, end, allDay, kind: 'google', href: g.htmlLink ?? undefined, location: g.location, description: g.description, attendees: (g.attendees ?? []).map((x) => x.email ?? '').filter(Boolean) });
+      }
+    }
+  } catch (e) {
+    googleError = 'Could not read your Google Calendar. Open the calendar settings to reconnect.';
+    console.error('[calendar]', e instanceof Error ? e.message : e);
+  }
+
+  return { items, googleConnected, googleConfigured: isGoogleCalendarConfigured(), googleError };
+}
+
+/** Create an event the way Google does: title, time, guests, place and an optional video call link. */
+async function create_(v: NewEvent): Promise<CalItem> {
+  const a = await requireAdminActor();
+  const title = v.title.trim().slice(0, 200);
+  if (!title) throw new Error('Give the event a title.');
+  const start = new Date(v.start);
+  const end = new Date(v.end);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) throw new Error('That date or time is not valid.');
+  if (end < start) throw new Error('The event cannot end before it starts.');
+  const attendees = [...new Set((v.attendees ?? []).map((x) => x.trim().toLowerCase()).filter((x) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(x)))].slice(0, 50);
+  const db = looseAdmin();
+
+  let code: string | null = null;
+  if (v.videoCall) {
+    for (let i = 0; i < 5 && !code; i++) {
+      const c = meetCode();
+      const { error } = await db.from('mjengo_meetings').insert({ code: c, mode: 'video', title, created_by: a.id });
+      if (!error) code = c;
+    }
+  }
+  const origin = (process.env.NEXT_PUBLIC_APP_URL || 'https://app.sautisalama.org').replace(/\/$/, '');
+  const link = code ? `${origin.startsWith('http') ? origin : `https://${origin}`}/meet/${code}` : null;
+  const description = [v.description?.trim(), link ? `Join the call: ${link}` : ''].filter(Boolean).join('\n\n') || null;
+
+  let googleId: string | null = null;
+  try {
+    const cal = await googleClient(a.id);
+    if (cal) {
+      const body = v.allDay
+        ? { start: { date: start.toISOString().slice(0, 10) }, end: { date: new Date(end.getTime() + 86400_000).toISOString().slice(0, 10) } }
+        : { start: { dateTime: start.toISOString() }, end: { dateTime: end.toISOString() } };
+      const r = await cal.events.insert({ calendarId: 'primary', sendUpdates: 'all', requestBody: { summary: title, description: description ?? undefined, location: v.location || undefined, ...body, attendees: attendees.map((email) => ({ email })) } });
+      googleId = r.data.id ?? null;
+    }
+  } catch (e) {
+    console.error('[calendar] google insert failed', e instanceof Error ? e.message : e);
+  }
+
+  const { data, error } = await db.from('mjengo_events').insert({
+    title, description, location: v.location?.trim().slice(0, 200) || null, starts_at: start.toISOString(), ends_at: end.toISOString(), all_day: !!v.allDay,
+    kind: code ? 'meeting' : 'event', meeting_code: code, attendees, google_event_id: googleId, created_by: a.id,
+  }).select('id, title, description, location, starts_at, ends_at, all_day, kind, meeting_code, attendees').single();
+  if (error || !data) throw new Error('Could not save the event.');
+  await logAudit({ actorId: a.id, actorEmail: a.email, action: 'calendar.event_created', targetType: 'event', targetId: data.id, targetLabel: title });
+  return { id: `ev:${data.id}`, title: data.title, start: data.starts_at, end: data.ends_at, allDay: data.all_day, kind: data.kind, meetingCode: data.meeting_code, location: data.location, description: data.description, attendees: data.attendees, removable: true };
+}
+
+async function remove_(id: string) {
+  const a = await requireAdminActor();
+  const raw = id.replace(/^ev:/, '');
+  const db = looseAdmin();
+  const { data } = await db.from('mjengo_events').select('google_event_id, title, created_by').eq('id', raw).maybeSingle();
+  if (!data) return;
+  if (data.created_by !== a.id) throw new Error('Only the person who created an event can delete it.');
+  if (data.google_event_id) {
+    try { const cal = await googleClient(a.id); await cal?.events.delete({ calendarId: 'primary', eventId: data.google_event_id, sendUpdates: 'all' }); } catch { /* already gone */ }
+  }
+  await db.from('mjengo_events').delete().eq('id', raw);
+  await logAudit({ actorId: a.id, actorEmail: a.email, action: 'calendar.event_deleted', targetType: 'event', targetId: raw, targetLabel: data.title });
+}
+
+export const calendarMonth = guard(month_);
+export const createCalendarEvent = guard(create_);
+export const removeCalendarEvent = guard(remove_);
