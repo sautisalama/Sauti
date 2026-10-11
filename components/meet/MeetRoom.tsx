@@ -1,15 +1,16 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Captions, Check, Copy, Loader2, Mic, MicOff, MonitorUp, PhoneOff, Users, Video, VideoOff } from "lucide-react";
+import { Captions, Check, Copy, Loader2, Mail, Mic, MicOff, Minimize2, MonitorUp, PictureInPicture2, PhoneOff, Share2, SmartphoneNfc, Users, Video, VideoOff, Volume2, VolumeX, ExternalLink } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import { unwrap } from "@/lib/action-result";
 import { saveTranscript, type TranscriptLine } from "@/app/actions/mjengo-meet";
 import { cn } from "@/lib/utils";
 
 type SignalKind = "offer" | "answer" | "ice";
-interface Peer { id: string; name: string }
+interface Peer { id: string; name: string; companion?: boolean }
 interface Remote extends Peer { stream: MediaStream | null; muted: boolean }
+interface Device { id: string; label: string }
 
 const ICE: RTCIceServer[] = [
 	{ urls: "stun:stun.l.google.com:19302" },
@@ -20,11 +21,10 @@ const ICE: RTCIceServer[] = [
 
 const LANGS = [["en-KE", "English (Kenya)"], ["en-US", "English (US)"], ["en-GB", "English (UK)"], ["sw-KE", "Kiswahili"]] as const;
 
-/** A small peer-to-peer call room: video or voice, screen sharing, live captions kept as a transcript. */
-export function MeetRoom({ code, mode, title, defaultName, canSave }: { code: string; mode: "video" | "voice"; title: string | null; defaultName: string; canSave: boolean }) {
+/** A small peer-to-peer call room: preview and device choice, video or voice, companion mode, sharing, captions. */
+export function MeetRoom({ code, mode, title, defaultName, canSave, embedded }: { code: string; mode: "video" | "voice"; title: string | null; defaultName: string; canSave: boolean; embedded?: boolean }) {
 	const [name, setName] = useState(defaultName);
 	const [joined, setJoined] = useState(false);
-	const [error, setError] = useState<string | null>(null);
 	const [micOn, setMicOn] = useState(true);
 	const [camOn, setCamOn] = useState(mode === "video");
 	const [sharing, setSharing] = useState(false);
@@ -34,42 +34,98 @@ export function MeetRoom({ code, mode, title, defaultName, canSave }: { code: st
 	const [lines, setLines] = useState<TranscriptLine[]>([]);
 	const [lang, setLang] = useState<string>("en-KE");
 	const [copied, setCopied] = useState(false);
+	const [shareOpen, setShareOpen] = useState(false);
 	const [speechOk, setSpeechOk] = useState(true);
+
+	// Lobby
+	const [cams, setCams] = useState<Device[]>([]);
+	const [mics, setMics] = useState<Device[]>([]);
+	const [speakers, setSpeakers] = useState<Device[]>([]);
+	const [camId, setCamId] = useState("");
+	const [micId, setMicId] = useState("");
+	const [speakerId, setSpeakerId] = useState("");
+	const [level, setLevel] = useState(0);
+	const [permission, setPermission] = useState<"asking" | "granted" | "denied">("asking");
+	const [companion, setCompanion] = useState(false);
+	const [speakerOn, setSpeakerOn] = useState(true);
 
 	const myId = useRef(`${Math.random().toString(36).slice(2, 10)}${Date.now().toString(36)}`);
 	const local = useRef<MediaStream | null>(null);
+	const preview = useRef<MediaStream | null>(null);
+	const previewVideo = useRef<HTMLVideoElement>(null);
 	const localVideo = useRef<HTMLVideoElement>(null);
 	const pcs = useRef(new Map<string, RTCPeerConnection>());
 	const channel = useRef<ReturnType<ReturnType<typeof createClient>["channel"]> | null>(null);
-	const recog = useRef<{ stop: () => void } | null>(null);
 	const pendingIce = useRef(new Map<string, RTCIceCandidateInit[]>());
 	const savedUpTo = useRef(0);
 	const linesRef = useRef<TranscriptLine[]>([]);
 	linesRef.current = lines;
 
 	const link = typeof window === "undefined" ? "" : `${window.location.origin}/meet/${code}`;
+	const shownName = companion ? `${name} (phone)` : name;
 
-	const addLine = useCallback((l: TranscriptLine) => {
-		setLines((cur) => (cur.some((x) => x.id === l.id) ? cur : [...cur, l]));
-	}, []);
-
-	const send = useCallback((event: string, payload: Record<string, unknown>) => {
-		channel.current?.send({ type: "broadcast", event, payload }).catch(() => undefined);
-	}, []);
-
-	const setRemote = useCallback((id: string, patch: Partial<Remote> & { name?: string }) => {
+	const addLine = useCallback((l: TranscriptLine) => setLines((cur) => (cur.some((x) => x.id === l.id) ? cur : [...cur, l])), []);
+	const send = useCallback((event: string, payload: Record<string, unknown>) => { channel.current?.send({ type: "broadcast", event, payload }).catch(() => undefined); }, []);
+	const setRemote = useCallback((id: string, patch: Partial<Remote>) => {
 		setRemotes((cur) => {
-			const have = cur.find((r) => r.id === id);
-			if (have) return cur.map((r) => (r.id === id ? { ...r, ...patch } : r));
-			return [...cur, { id, name: patch.name ?? "Guest", stream: patch.stream ?? null, muted: false }];
+			if (cur.some((r) => r.id === id)) return cur.map((r) => (r.id === id ? { ...r, ...patch } : r));
+			return [...cur, { id, name: patch.name ?? "Guest", stream: patch.stream ?? null, muted: false, companion: patch.companion }];
 		});
 	}, []);
+
+	/* ------------------------------------------------------------ lobby preview */
+
+	const stopPreview = () => { preview.current?.getTracks().forEach((t) => t.stop()); preview.current = null; };
+	useEffect(() => {
+		if (joined) return;
+		let cancelled = false;
+		let ctx: AudioContext | null = null;
+		let raf = 0;
+		(async () => {
+			stopPreview();
+			try {
+				const stream = await navigator.mediaDevices.getUserMedia({
+					audio: micId ? { deviceId: { exact: micId } } : true,
+					video: mode === "video" && camOn ? (camId ? { deviceId: { exact: camId } } : true) : false,
+				});
+				if (cancelled) { stream.getTracks().forEach((t) => t.stop()); return; }
+				preview.current = stream;
+				setPermission("granted");
+				if (previewVideo.current) previewVideo.current.srcObject = stream;
+
+				const all = await navigator.mediaDevices.enumerateDevices();
+				const pick = (kind: MediaDeviceKind) => all.filter((d) => d.kind === kind && d.deviceId).map((d, i) => ({ id: d.deviceId, label: d.label || `${kind === "videoinput" ? "Camera" : kind === "audioinput" ? "Microphone" : "Speaker"} ${i + 1}` }));
+				setCams(pick("videoinput")); setMics(pick("audioinput")); setSpeakers(pick("audiooutput"));
+
+				// Microphone level meter, so people can tell the right mic is picked.
+				ctx = new AudioContext();
+				const src = ctx.createMediaStreamSource(stream);
+				const an = ctx.createAnalyser();
+				an.fftSize = 256;
+				src.connect(an);
+				const buf = new Uint8Array(an.frequencyBinCount);
+				const tick = () => {
+					an.getByteFrequencyData(buf);
+					setLevel(Math.min(1, buf.reduce((a, b) => a + b, 0) / buf.length / 90));
+					raf = requestAnimationFrame(tick);
+				};
+				tick();
+			} catch {
+				if (!cancelled) setPermission("denied");
+			}
+		})();
+		return () => { cancelled = true; cancelAnimationFrame(raf); ctx?.close().catch(() => undefined); };
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [joined, camId, micId, camOn, mode]);
+	useEffect(() => { if (previewVideo.current && preview.current) previewVideo.current.srcObject = preview.current; });
+
+	/* ------------------------------------------------------------ connections */
 
 	const connect = useCallback(async (peer: Peer, initiator: boolean) => {
 		if (pcs.current.has(peer.id)) return;
 		const pc = new RTCPeerConnection({ iceServers: ICE });
 		pcs.current.set(peer.id, pc);
-		setRemote(peer.id, { name: peer.name });
+		setRemote(peer.id, { name: peer.name, companion: peer.companion });
 		local.current?.getTracks().forEach((t) => pc.addTrack(t, local.current!));
 		if (!local.current?.getVideoTracks().length) pc.addTransceiver("video", { direction: "recvonly" });
 		pc.ontrack = (e) => setRemote(peer.id, { stream: e.streams[0] });
@@ -83,14 +139,14 @@ export function MeetRoom({ code, mode, title, defaultName, canSave }: { code: st
 		if (initiator) {
 			const offer = await pc.createOffer();
 			await pc.setLocalDescription(offer);
-			send("signal", { from: myId.current, to: peer.id, kind: "offer" as SignalKind, data: offer, name });
+			send("signal", { from: myId.current, to: peer.id, kind: "offer" as SignalKind, data: offer, name: shownName, companion });
 		}
-	}, [name, send, setRemote]);
+	}, [shownName, companion, send, setRemote]);
 
-	const onSignal = useCallback(async (m: { from: string; to: string; kind: SignalKind; data: unknown; name?: string }) => {
+	const onSignal = useCallback(async (m: { from: string; to: string; kind: SignalKind; data: unknown; name?: string; companion?: boolean }) => {
 		if (m.to !== myId.current) return;
 		if (m.kind === "offer") {
-			await connect({ id: m.from, name: m.name ?? "Guest" }, false);
+			await connect({ id: m.from, name: m.name ?? "Guest", companion: m.companion }, false);
 			const pc = pcs.current.get(m.from)!;
 			await pc.setRemoteDescription(m.data as RTCSessionDescriptionInit);
 			for (const c of pendingIce.current.get(m.from) ?? []) await pc.addIceCandidate(c).catch(() => undefined);
@@ -108,52 +164,49 @@ export function MeetRoom({ code, mode, title, defaultName, canSave }: { code: st
 	}, [connect, send]);
 
 	const join = async () => {
-		setError(null);
+		stopPreview();
 		try {
-			const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: mode === "video" ? { width: 1280, height: 720 } : false });
+			const stream = await navigator.mediaDevices.getUserMedia({
+				audio: micId ? { deviceId: { exact: micId } } : true,
+				video: mode === "video" ? (camId ? { deviceId: { exact: camId }, width: 1280, height: 720 } : { width: 1280, height: 720 }) : false,
+			});
 			local.current = stream;
 			stream.getAudioTracks().forEach((t) => (t.enabled = micOn));
 			stream.getVideoTracks().forEach((t) => (t.enabled = camOn));
 		} catch {
-			// No camera or microphone permission: still allow listening.
 			local.current = new MediaStream();
 			setMicOn(false);
 			setCamOn(false);
 		}
 
-		const supabase = createClient();
-		const ch = supabase.channel(`meet:${code}`, { config: { broadcast: { self: false }, presence: { key: myId.current } } });
+		const ch = createClient().channel(`meet:${code}`, { config: { broadcast: { self: false }, presence: { key: myId.current } } });
 		channel.current = ch;
 		ch.on("broadcast", { event: "signal" }, ({ payload }) => onSignal(payload))
 			.on("broadcast", { event: "caption" }, ({ payload }) => addLine(payload as TranscriptLine))
 			.on("broadcast", { event: "state" }, ({ payload }) => setRemote(payload.id, { muted: !!payload.muted }))
 			.on("presence", { event: "join" }, ({ key, newPresences }) => {
 				if (key === myId.current) return;
-				const p = newPresences[0] as unknown as { name?: string };
-				// The newer arrival is offered a connection by the one who was already here.
-				connect({ id: key, name: p?.name ?? "Guest" }, true);
+				const p = newPresences[0] as unknown as { name?: string; companion?: boolean };
+				connect({ id: key, name: p?.name ?? "Guest", companion: p?.companion }, true);
 			})
 			.on("presence", { event: "leave" }, ({ key }) => {
 				pcs.current.get(key)?.close();
 				pcs.current.delete(key);
 				setRemotes((cur) => cur.filter((r) => r.id !== key));
 			})
-			.subscribe(async (status) => {
-				if (status === "SUBSCRIBED") await ch.track({ name });
-			});
+			.subscribe(async (status) => { if (status === "SUBSCRIBED") await ch.track({ name: shownName, companion }); });
 		setJoined(true);
 	};
 
-	// Show my own camera.
-	useEffect(() => {
-		if (joined && localVideo.current && local.current) localVideo.current.srcObject = local.current;
-	}, [joined, camOn, sharing]);
+	useEffect(() => { if (joined && localVideo.current && local.current) localVideo.current.srcObject = local.current; }, [joined, camOn, sharing]);
 
-	// Live captions with the browser's speech recognition; every final phrase is shared and kept.
+	/* ------------------------------------------------------------ captions */
+
 	useEffect(() => {
-		if (!joined || !captionsOn || !micOn) { recog.current?.stop(); recog.current = null; return; }
+		if (!joined || !captionsOn || !micOn || companion) return;
 		type SR = { lang: string; continuous: boolean; interimResults: boolean; start: () => void; stop: () => void; onresult: ((e: { resultIndex: number; results: { isFinal: boolean; 0: { transcript: string } }[] & { length: number } }) => void) | null; onend: (() => void) | null; onerror: (() => void) | null };
-		const Ctor = (window as unknown as { SpeechRecognition?: new () => SR; webkitSpeechRecognition?: new () => SR }).SpeechRecognition ?? (window as unknown as { webkitSpeechRecognition?: new () => SR }).webkitSpeechRecognition;
+		const w = window as unknown as { SpeechRecognition?: new () => SR; webkitSpeechRecognition?: new () => SR };
+		const Ctor = w.SpeechRecognition ?? w.webkitSpeechRecognition;
 		if (!Ctor) { setSpeechOk(false); return; }
 		const r = new Ctor();
 		r.lang = lang;
@@ -173,9 +226,10 @@ export function MeetRoom({ code, mode, title, defaultName, canSave }: { code: st
 		r.onend = () => { if (!stopped) { try { r.start(); } catch { /* already running */ } } };
 		r.onerror = () => undefined;
 		try { r.start(); } catch { /* ignore */ }
-		recog.current = { stop: () => { stopped = true; try { r.stop(); } catch { /* ignore */ } } };
 		return () => { stopped = true; try { r.stop(); } catch { /* ignore */ } };
-	}, [joined, captionsOn, micOn, lang, name, addLine, send]);
+	}, [joined, captionsOn, micOn, companion, lang, name, addLine, send]);
+
+	/* ------------------------------------------------------------ controls */
 
 	const toggleMic = () => {
 		const next = !micOn;
@@ -189,40 +243,38 @@ export function MeetRoom({ code, mode, title, defaultName, canSave }: { code: st
 		local.current?.getVideoTracks().forEach((t) => (t.enabled = next));
 	};
 
-	const toggleShare = async () => {
-		const swap = async (track: MediaStreamTrack | null) => {
-			for (const pc of pcs.current.values()) {
-				const s = pc.getSenders().find((x) => x.track?.kind === "video") ?? pc.getTransceivers().find((t) => t.receiver.track.kind === "video")?.sender;
-				if (s) await s.replaceTrack(track).catch(() => undefined);
-			}
-		};
-		if (sharing) {
-			const cam = local.current?.getVideoTracks()[0] ?? null;
-			await swap(cam);
-			if (localVideo.current && local.current) localVideo.current.srcObject = local.current;
-			setSharing(false);
-			return;
-		}
-		try {
-			const screen = await navigator.mediaDevices.getDisplayMedia({ video: true });
-			const track = screen.getVideoTracks()[0];
-			await swap(track);
-			if (localVideo.current) localVideo.current.srcObject = screen;
-			track.onended = () => { void toggleShareOff(); };
-			setSharing(true);
-		} catch { /* cancelled */ }
-	};
-	const toggleShareOff = async () => {
-		const cam = local.current?.getVideoTracks()[0] ?? null;
+	const replaceVideo = async (track: MediaStreamTrack | null) => {
 		for (const pc of pcs.current.values()) {
-			const s = pc.getSenders().find((x) => x.track?.kind === "video");
-			if (s) await s.replaceTrack(cam).catch(() => undefined);
+			const s = pc.getSenders().find((x) => x.track?.kind === "video") ?? pc.getTransceivers().find((t) => t.receiver.track.kind === "video")?.sender;
+			if (s) await s.replaceTrack(track).catch(() => undefined);
 		}
+	};
+	const stopShare = async () => {
+		await replaceVideo(local.current?.getVideoTracks()[0] ?? null);
 		if (localVideo.current && local.current) localVideo.current.srcObject = local.current;
 		setSharing(false);
 	};
+	const toggleShare = async () => {
+		if (sharing) return stopShare();
+		try {
+			const screen = await navigator.mediaDevices.getDisplayMedia({ video: true });
+			const track = screen.getVideoTracks()[0];
+			await replaceVideo(track);
+			if (localVideo.current) localVideo.current.srcObject = screen;
+			track.onended = () => { void stopShare(); };
+			setSharing(true);
+		} catch { /* cancelled */ }
+	};
 
-	// Keep what was said (signed-in team members only, so guests cannot write to the record).
+	/** Picture in picture: the browser's own floating video of whoever is on screen. */
+	const pip = async () => {
+		const el = (document.querySelector("video[data-remote='1']") as HTMLVideoElement | null) ?? localVideo.current;
+		try {
+			if (document.pictureInPictureElement) await document.exitPictureInPicture();
+			else await el?.requestPictureInPicture();
+		} catch { /* not supported or no video yet */ }
+	};
+
 	const persist = useCallback(async (end: boolean) => {
 		if (!canSave) return;
 		const fresh = linesRef.current.slice(savedUpTo.current);
@@ -239,7 +291,6 @@ export function MeetRoom({ code, mode, title, defaultName, canSave }: { code: st
 	}, [joined, canSave, persist]);
 
 	const leave = useCallback(async () => {
-		recog.current?.stop();
 		await persist(true);
 		pcs.current.forEach((pc) => pc.close());
 		pcs.current.clear();
@@ -247,47 +298,97 @@ export function MeetRoom({ code, mode, title, defaultName, canSave }: { code: st
 		channel.current?.unsubscribe();
 		setJoined(false);
 		setRemotes([]);
-	}, [persist]);
+		if (embedded) window.parent.postMessage({ type: "meet:left" }, window.location.origin);
+	}, [persist, embedded]);
 
 	useEffect(() => () => {
+		stopPreview();
 		pcs.current.forEach((pc) => pc.close());
 		local.current?.getTracks().forEach((t) => t.stop());
 		channel.current?.unsubscribe();
 	}, []);
 
-	const tiles = useMemo(() => remotes.length + 1, [remotes.length]);
+	const tiles = remotes.length + 1;
 	const cols = tiles <= 1 ? "grid-cols-1" : tiles <= 4 ? "grid-cols-1 sm:grid-cols-2" : "grid-cols-2 lg:grid-cols-3";
+	const mailto = `mailto:?subject=${encodeURIComponent(title || "Join the call")}&body=${encodeURIComponent(`Join the call: ${link}`)}`;
+
+	/* ------------------------------------------------------------ lobby */
 
 	if (!joined) {
+		const sel = "h-10 w-full rounded-lg border border-black/10 bg-white px-3 text-sm outline-none focus:border-sauti-teal";
 		return (
-			<main className="mx-auto flex min-h-dvh max-w-md flex-col justify-center gap-5 px-6">
+			<main className={cn("mx-auto grid max-w-4xl gap-6 px-5", embedded ? "min-h-full content-start py-4 md:grid-cols-1" : "min-h-dvh content-center py-8 md:grid-cols-[1.2fr_1fr]")}>
 				<div>
-					<p className="text-sm font-medium text-[#787774]">Sauti Salama</p>
-					<h1 className="mt-1 text-2xl font-semibold text-[#37352f]">{title || (mode === "voice" ? "Voice call" : "Video call")}</h1>
-					<p className="mt-1 text-sm text-[#787774]">{mode === "voice" ? "Audio only. Your camera stays off." : "You can turn your camera and microphone off once you are in."}</p>
+					<div className="relative aspect-video overflow-hidden rounded-2xl bg-[#202020]">
+						<video ref={previewVideo} autoPlay playsInline muted className={cn("h-full w-full -scale-x-100 object-cover", (!camOn || mode === "voice" || permission !== "granted") && "hidden")} />
+						{(!camOn || mode === "voice" || permission !== "granted") && (
+							<div className="flex h-full items-center justify-center text-center text-sm text-white/70">
+								{permission === "denied" ? "Allow the camera and microphone in your browser to be seen and heard. You can still listen." : mode === "voice" ? "Voice call" : "Camera is off"}
+							</div>
+						)}
+						<div className="absolute inset-x-0 bottom-3 flex justify-center gap-2">
+							<button onClick={() => setMicOn((v) => !v)} aria-label={micOn ? "Turn microphone off" : "Turn microphone on"} className={cn("flex h-11 w-11 items-center justify-center rounded-full text-white", micOn ? "bg-white/20 hover:bg-white/30" : "bg-red-600")}>{micOn ? <Mic className="h-5 w-5" /> : <MicOff className="h-5 w-5" />}</button>
+							{mode === "video" && <button onClick={() => setCamOn((v) => !v)} aria-label={camOn ? "Turn camera off" : "Turn camera on"} className={cn("flex h-11 w-11 items-center justify-center rounded-full text-white", camOn ? "bg-white/20 hover:bg-white/30" : "bg-red-600")}>{camOn ? <Video className="h-5 w-5" /> : <VideoOff className="h-5 w-5" />}</button>}
+						</div>
+					</div>
+					{micOn && permission === "granted" && (
+						<div className="mt-3 flex items-center gap-2 text-xs text-[#787774]"><Mic className="h-3.5 w-3.5" /><div className="h-1.5 flex-1 overflow-hidden rounded-full bg-black/10"><div className="h-full rounded-full bg-sauti-teal transition-[width] duration-75" style={{ width: `${Math.round(level * 100)}%` }} /></div></div>
+					)}
 				</div>
-				<label className="block">
-					<span className="mb-1.5 block text-sm font-medium text-[#37352f]">Your name</span>
-					<input value={name} onChange={(e) => setName(e.target.value)} placeholder="How should people see you?" className="h-11 w-full rounded-lg border border-black/10 px-3 text-[15px] outline-none focus:border-sauti-teal" />
-				</label>
-				{error && <p className="text-sm text-red-600">{error}</p>}
-				<button onClick={join} disabled={!name.trim()} className="flex h-11 items-center justify-center gap-2 rounded-lg bg-sauti-teal text-[15px] font-semibold text-white hover:bg-sauti-dark disabled:opacity-40">
-					{mode === "voice" ? <Mic className="h-5 w-5" /> : <Video className="h-5 w-5" />} Join now
-				</button>
-				<p className="text-xs text-[#9b9a97]">Calls go directly between people in the call. Captions are made in your browser and added to the call transcript.</p>
+
+				<div className="space-y-4">
+					<div>
+						<p className="text-sm font-medium text-[#787774]">Sauti Salama</p>
+						<h1 className="mt-1 text-2xl font-semibold text-[#37352f]">{title || (mode === "voice" ? "Voice call" : "Video call")}</h1>
+					</div>
+					<label className="block"><span className="mb-1.5 block text-sm font-medium text-[#37352f]">Your name</span>
+						<input value={name} onChange={(e) => setName(e.target.value)} placeholder="How should people see you?" className="h-11 w-full rounded-lg border border-black/10 px-3 text-[15px] outline-none focus:border-sauti-teal" />
+					</label>
+
+					{permission === "granted" && (
+						<div className="space-y-2.5">
+							{mode === "video" && cams.length > 0 && <label className="block text-xs font-medium text-[#787774]">Camera<select value={camId} onChange={(e) => setCamId(e.target.value)} className={sel}><option value="">Default</option>{cams.map((d) => <option key={d.id} value={d.id}>{d.label}</option>)}</select></label>}
+							{mics.length > 0 && <label className="block text-xs font-medium text-[#787774]">Microphone<select value={micId} onChange={(e) => setMicId(e.target.value)} className={sel}><option value="">Default</option>{mics.map((d) => <option key={d.id} value={d.id}>{d.label}</option>)}</select></label>}
+							{speakers.length > 0 && <label className="block text-xs font-medium text-[#787774]">Speaker<select value={speakerId} onChange={(e) => setSpeakerId(e.target.value)} className={sel}><option value="">Default</option>{speakers.map((d) => <option key={d.id} value={d.id}>{d.label}</option>)}</select></label>}
+						</div>
+					)}
+
+					{canSave && (
+						<div className="rounded-xl border border-black/10 p-3">
+							<label className="flex cursor-pointer items-start gap-3">
+								<input type="checkbox" checked={companion} onChange={(e) => { setCompanion(e.target.checked); if (e.target.checked) setSpeakerOn(false); }} className="mt-1 h-4 w-4 accent-[#068297]" />
+								<span className="text-sm"><span className="flex items-center gap-1.5 font-medium text-[#37352f]"><SmartphoneNfc className="h-4 w-4" /> Companion mode</span><span className="block text-xs text-[#787774]">Join from this device as an extra camera and microphone for the call you are in on your computer. It is shown as your phone. Speaker stays off to avoid echo.</span></span>
+							</label>
+							{companion && (
+								<label className="mt-2 flex items-center gap-2 pl-7 text-xs text-[#37352f]"><input type="checkbox" checked={speakerOn} onChange={(e) => setSpeakerOn(e.target.checked)} className="accent-[#068297]" /> Also play the call audio on this device</label>
+							)}
+						</div>
+					)}
+
+					<button onClick={join} disabled={!name.trim()} className="flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-sauti-teal text-[15px] font-semibold text-white hover:bg-sauti-dark disabled:opacity-40">
+						{mode === "voice" ? <Mic className="h-5 w-5" /> : <Video className="h-5 w-5" />} {companion ? "Join as companion" : "Join now"}
+					</button>
+					<p className="text-xs text-[#9b9a97]">Calls go directly between people in the call. Captions are made in your browser and added to the call transcript.</p>
+				</div>
 			</main>
 		);
 	}
 
+	/* ------------------------------------------------------------ room */
+
 	return (
-		<div className="flex h-dvh flex-col bg-[#191919] text-white">
+		<div className="relative flex h-dvh flex-col bg-[#191919] text-white">
 			<div className="flex min-h-0 flex-1">
-				<div className={cn("grid min-h-0 flex-1 auto-rows-fr gap-2 p-3", cols)}>
-					<Tile name={`${name} (you)`} muted={!micOn} videoRef={localVideo} self showVideo={camOn || sharing} />
-					{remotes.map((r) => <RemoteTile key={r.id} r={r} />)}
+				<div className={cn("grid min-h-0 flex-1 auto-rows-fr gap-2 p-2 sm:p-3", cols)}>
+					<div className="relative flex min-h-[120px] items-center justify-center overflow-hidden rounded-2xl bg-[#2a2a2a]">
+						<video ref={localVideo} autoPlay playsInline muted className={cn("h-full w-full object-cover", !sharing && "-scale-x-100", !(camOn || sharing) && "hidden")} />
+						{!(camOn || sharing) && <span className="flex h-16 w-16 items-center justify-center rounded-full bg-sauti-teal text-xl font-semibold">{initials(shownName)}</span>}
+						<span className="absolute bottom-2 left-2 flex items-center gap-1.5 rounded-md bg-black/60 px-2 py-1 text-xs">{!micOn && <MicOff className="h-3 w-3" />}{shownName} (you)</span>
+					</div>
+					{remotes.map((r) => <RemoteTile key={r.id} r={r} sinkId={speakerId} audioOn={speakerOn} />)}
 				</div>
 
-				{panel !== "none" && (
+				{panel !== "none" && !embedded && (
 					<aside className="hidden w-80 shrink-0 flex-col border-l border-white/10 bg-[#202020] md:flex">
 						<div className="flex items-center justify-between border-b border-white/10 px-4 py-3 text-sm font-semibold">
 							{panel === "transcript" ? "Transcript" : "People"}
@@ -303,7 +404,7 @@ export function MeetRoom({ code, mode, title, defaultName, canSave }: { code: st
 							</div>
 						) : (
 							<ul className="space-y-2 p-4 text-sm">
-								<li>{name} (you)</li>
+								<li>{shownName} (you)</li>
 								{remotes.map((r) => <li key={r.id}>{r.name}</li>)}
 							</ul>
 						)}
@@ -312,27 +413,41 @@ export function MeetRoom({ code, mode, title, defaultName, canSave }: { code: st
 			</div>
 
 			{captionsOn && lines.length > 0 && panel !== "transcript" && (
-				<p className="pointer-events-none absolute inset-x-0 bottom-24 mx-auto w-fit max-w-[90%] rounded-lg bg-black/70 px-4 py-2 text-center text-[15px]">
+				<p className="pointer-events-none absolute inset-x-0 bottom-20 mx-auto w-fit max-w-[92%] rounded-lg bg-black/70 px-3 py-1.5 text-center text-sm sm:text-[15px]">
 					<span className="font-semibold">{lines[lines.length - 1].name}:</span> {lines[lines.length - 1].text}
 				</p>
 			)}
 
-			<div className="flex shrink-0 items-center justify-center gap-2 border-t border-white/10 bg-[#202020] p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
-				<Ctl on={micOn} onClick={toggleMic} label={micOn ? "Mute" : "Unmute"} icon={micOn ? <Mic className="h-5 w-5" /> : <MicOff className="h-5 w-5" />} danger={!micOn} />
-				{mode === "video" && <Ctl on={camOn} onClick={toggleCam} label={camOn ? "Camera off" : "Camera on"} icon={camOn ? <Video className="h-5 w-5" /> : <VideoOff className="h-5 w-5" />} danger={!camOn} />}
-				<Ctl on={sharing} onClick={toggleShare} label="Share screen" icon={<MonitorUp className="h-5 w-5" />} active={sharing} className="hidden sm:flex" />
-				<Ctl on={captionsOn} onClick={() => setCaptionsOn((v) => !v)} label="Captions" icon={<Captions className="h-5 w-5" />} active={captionsOn} />
-				<Ctl on onClick={() => setPanel((p) => (p === "transcript" ? "none" : "transcript"))} label="Transcript" icon={<span className="text-xs font-bold">TXT</span>} active={panel === "transcript"} className="hidden md:flex" />
-				<Ctl on onClick={() => setPanel((p) => (p === "people" ? "none" : "people"))} label="People" icon={<Users className="h-5 w-5" />} active={panel === "people"} className="hidden md:flex" />
-				<Ctl on onClick={() => { navigator.clipboard.writeText(link).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500); }); }} label="Copy link" icon={copied ? <Check className="h-5 w-5" /> : <Copy className="h-5 w-5" />} />
-				<button onClick={leave} aria-label="Leave" title="Leave" className="flex h-11 items-center gap-2 rounded-full bg-red-600 px-5 text-sm font-semibold hover:bg-red-700"><PhoneOff className="h-5 w-5" /> Leave</button>
+			<div className="flex shrink-0 flex-wrap items-center justify-center gap-1.5 border-t border-white/10 bg-[#202020] p-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] sm:gap-2 sm:p-3">
+				<Ctl onClick={toggleMic} label={micOn ? "Mute" : "Unmute"} icon={micOn ? <Mic className="h-5 w-5" /> : <MicOff className="h-5 w-5" />} danger={!micOn} />
+				{mode === "video" && <Ctl onClick={toggleCam} label={camOn ? "Camera off" : "Camera on"} icon={camOn ? <Video className="h-5 w-5" /> : <VideoOff className="h-5 w-5" />} danger={!camOn} />}
+				<Ctl onClick={() => setSpeakerOn((v) => !v)} label={speakerOn ? "Mute speaker" : "Unmute speaker"} icon={speakerOn ? <Volume2 className="h-5 w-5" /> : <VolumeX className="h-5 w-5" />} danger={!speakerOn} className="hidden sm:flex" />
+				<Ctl onClick={toggleShare} label="Share screen" icon={<MonitorUp className="h-5 w-5" />} active={sharing} className="hidden sm:flex" />
+				<Ctl onClick={() => setCaptionsOn((v) => !v)} label="Captions" icon={<Captions className="h-5 w-5" />} active={captionsOn} />
+				{!embedded && <Ctl onClick={() => setPanel((p) => (p === "transcript" ? "none" : "transcript"))} label="Transcript" icon={<span className="text-xs font-bold">TXT</span>} active={panel === "transcript"} className="hidden md:flex" />}
+				{!embedded && <Ctl onClick={() => setPanel((p) => (p === "people" ? "none" : "people"))} label="People" icon={<Users className="h-5 w-5" />} active={panel === "people"} className="hidden md:flex" />}
+				<Ctl onClick={pip} label="Picture in picture" icon={<PictureInPicture2 className="h-5 w-5" />} className="hidden sm:flex" />
+				<div className="relative">
+					<Ctl onClick={() => setShareOpen((v) => !v)} label="Share the link" icon={<Share2 className="h-5 w-5" />} active={shareOpen} />
+					{shareOpen && (
+						<div className="absolute bottom-14 right-0 z-10 w-64 rounded-xl border border-white/10 bg-[#2a2a2a] p-2 text-sm shadow-xl">
+							<p className="truncate px-2 pb-1 text-xs text-white/60">{link}</p>
+							<button onClick={() => { navigator.clipboard.writeText(link).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500); }); }} className="flex w-full items-center gap-2 rounded-lg px-2 py-2 hover:bg-white/10">{copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />} {copied ? "Copied" : "Copy link"}</button>
+							<a href={mailto} className="flex w-full items-center gap-2 rounded-lg px-2 py-2 hover:bg-white/10"><Mail className="h-4 w-4" /> Send by email</a>
+							<a href={`https://wa.me/?text=${encodeURIComponent(`Join the call: ${link}`)}`} target="_blank" rel="noopener noreferrer" className="flex w-full items-center gap-2 rounded-lg px-2 py-2 hover:bg-white/10"><ExternalLink className="h-4 w-4" /> WhatsApp</a>
+							{typeof navigator !== "undefined" && "share" in navigator && <button onClick={() => navigator.share({ title: title || "Call", url: link }).catch(() => undefined)} className="flex w-full items-center gap-2 rounded-lg px-2 py-2 hover:bg-white/10"><Share2 className="h-4 w-4" /> More options</button>}
+						</div>
+					)}
+				</div>
+				{embedded && <Ctl onClick={() => window.parent.postMessage({ type: "meet:minimize" }, window.location.origin)} label="Minimise" icon={<Minimize2 className="h-5 w-5" />} />}
+				{embedded && <Ctl onClick={() => window.parent.postMessage({ type: "meet:popout" }, window.location.origin)} label="Open in its own window" icon={<ExternalLink className="h-5 w-5" />} />}
+				<button onClick={leave} aria-label="Leave" title="Leave" className="flex h-11 items-center gap-2 rounded-full bg-red-600 px-4 text-sm font-semibold hover:bg-red-700"><PhoneOff className="h-5 w-5" /><span className="hidden sm:inline">Leave</span></button>
 			</div>
 		</div>
 	);
 }
 
-function Ctl({ icon, label, onClick, on, active, danger, className }: { icon: React.ReactNode; label: string; onClick: () => void; on?: boolean; active?: boolean; danger?: boolean; className?: string }) {
-	void on;
+function Ctl({ icon, label, onClick, active, danger, className }: { icon: React.ReactNode; label: string; onClick: () => void; active?: boolean; danger?: boolean; className?: string }) {
 	return (
 		<button onClick={onClick} aria-label={label} title={label} aria-pressed={active} className={cn("flex h-11 w-11 items-center justify-center rounded-full transition", danger ? "bg-red-600/90 hover:bg-red-600" : active ? "bg-sauti-teal" : "bg-white/10 hover:bg-white/20", className)}>
 			{icon}
@@ -342,24 +457,18 @@ function Ctl({ icon, label, onClick, on, active, danger, className }: { icon: Re
 
 function initials(n: string) { return n.trim().split(/\s+/).map((p) => p[0]).slice(0, 2).join("").toUpperCase() || "?"; }
 
-function Tile({ name, muted, videoRef, self, showVideo }: { name: string; muted: boolean; videoRef?: React.RefObject<HTMLVideoElement | null>; self?: boolean; showVideo: boolean }) {
-	return (
-		<div className="relative flex min-h-[160px] items-center justify-center overflow-hidden rounded-2xl bg-[#2a2a2a]">
-			<video ref={videoRef} autoPlay playsInline muted={self} className={cn("h-full w-full object-cover", self && "-scale-x-100", !showVideo && "hidden")} />
-			{!showVideo && <span className="flex h-20 w-20 items-center justify-center rounded-full bg-sauti-teal text-2xl font-semibold">{initials(name)}</span>}
-			<span className="absolute bottom-2 left-2 flex items-center gap-1.5 rounded-md bg-black/60 px-2 py-1 text-xs">{muted && <MicOff className="h-3 w-3" />}{name}</span>
-		</div>
-	);
-}
-
-function RemoteTile({ r }: { r: Remote }) {
+function RemoteTile({ r, sinkId, audioOn }: { r: Remote; sinkId: string; audioOn: boolean }) {
 	const ref = useRef<HTMLVideoElement>(null);
 	const hasVideo = !!r.stream?.getVideoTracks().some((t) => t.readyState === "live" && !t.muted);
 	useEffect(() => { if (ref.current && r.stream) ref.current.srcObject = r.stream; }, [r.stream]);
+	useEffect(() => {
+		const el = ref.current as (HTMLVideoElement & { setSinkId?: (id: string) => Promise<void> }) | null;
+		if (el?.setSinkId && sinkId) el.setSinkId(sinkId).catch(() => undefined);
+	}, [sinkId]);
 	return (
-		<div className="relative flex min-h-[160px] items-center justify-center overflow-hidden rounded-2xl bg-[#2a2a2a]">
-			<video ref={ref} autoPlay playsInline className={cn("h-full w-full object-cover", !hasVideo && "invisible absolute")} />
-			{!hasVideo && <span className="flex h-20 w-20 items-center justify-center rounded-full bg-[#4b5563] text-2xl font-semibold">{initials(r.name)}</span>}
+		<div className="relative flex min-h-[120px] items-center justify-center overflow-hidden rounded-2xl bg-[#2a2a2a]">
+			<video ref={ref} data-remote="1" autoPlay playsInline muted={!audioOn} className={cn("h-full w-full object-cover", !hasVideo && "invisible absolute")} />
+			{!hasVideo && <span className="flex h-16 w-16 items-center justify-center rounded-full bg-[#4b5563] text-xl font-semibold">{initials(r.name)}</span>}
 			{!r.stream && <Loader2 className="absolute right-3 top-3 h-4 w-4 animate-spin text-white/60" />}
 			<span className="absolute bottom-2 left-2 flex items-center gap-1.5 rounded-md bg-black/60 px-2 py-1 text-xs">{r.muted && <MicOff className="h-3 w-3" />}{r.name}</span>
 		</div>

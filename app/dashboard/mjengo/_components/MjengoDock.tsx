@@ -12,6 +12,7 @@ import { createClient } from "@/utils/supabase/client";
 import { useDashboardData } from "@/components/providers/DashboardDataProvider";
 import { cn } from "@/lib/utils";
 import { createMeeting } from "@/app/actions/mjengo-meet";
+import { callStore } from "@/lib/client/call-store";
 
 interface Note { id: string; title: string; message: string | null; link: string | null; read: boolean; created_at: string }
 
@@ -48,8 +49,9 @@ export function MjengoDock() {
 			const { code } = await unwrap(createMeeting(mode === "voice" ? "voice" : "video", null));
 			const url = `${window.location.origin}/meet/${code}`;
 			navigator.clipboard?.writeText(url).catch(() => undefined);
-			window.open(url, "_blank", "noopener");
-			toast({ title: mode === "voice" ? "Voice call started" : "Video call started", description: "The link is copied. Send it to anyone you want in the call." });
+			// The call opens in the floating window so work can carry on around it.
+			callStore.open(code, mode);
+			toast({ title: mode === "voice" ? "Voice call started" : "Video call started", description: "It is open in a floating window. The link is copied: send it to anyone you want in the call." });
 		} catch (e) {
 			toast({ title: "Could not start the call", description: e instanceof Error ? e.message : undefined, variant: "destructive" });
 		} finally {

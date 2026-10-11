@@ -6,6 +6,7 @@ import { usePathname, useSearchParams } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { DesktopHeader } from "@/components/navigation/DesktopHeader";
 import { profileNeedsOnboarding } from "@/lib/onboarding";
+import { CallDock } from "@/components/meet/CallDock";
 
 interface DashboardContentProps {
   children: React.ReactNode;
@@ -73,6 +74,7 @@ export function DashboardContent({ children }: DashboardContentProps) {
                 {children}
             </div>
         </main>
+        <CallDock />
     </>
   );
 }

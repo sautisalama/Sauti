@@ -15,6 +15,7 @@ import { unwrap } from "@/lib/action-result";
 import { cn } from "@/lib/utils";
 import { calendarMonth, createCalendarEvent, removeCalendarEvent, type CalItem, type CalKind, type CalMonth } from "@/app/actions/mjengo-calendar";
 import { MjengoLoader } from "../_components/MjengoLoader";
+import { callStore } from "@/lib/client/call-store";
 
 const KIND: Record<CalKind, { label: string; chip: string; dot: string }> = {
 	event: { label: "Event", chip: "bg-sauti-teal text-white", dot: "bg-sauti-teal" },
@@ -266,7 +267,7 @@ function ViewDialog({ item, onClose, onRemoved }: { item: CalItem | null; onClos
 					) : <span />}
 					<div className="flex gap-2">
 						{item.href && (item.href.startsWith("/") ? <Button asChild variant="outline"><Link href={item.href}>Open</Link></Button> : <Button asChild variant="outline"><a href={item.href} target="_blank" rel="noopener noreferrer" className="gap-2"><ExternalLink className="h-4 w-4" /> Open in Google</a></Button>)}
-						{item.meetingCode && <Button asChild className="gap-2 bg-sauti-teal hover:bg-sauti-dark"><a href={`/meet/${item.meetingCode}`} target="_blank" rel="noopener noreferrer"><Video className="h-4 w-4" /> Join</a></Button>}
+						{item.meetingCode && <Button className="gap-2 bg-sauti-teal hover:bg-sauti-dark" onClick={() => { callStore.open(item.meetingCode!, "video"); onClose(); }}><Video className="h-4 w-4" /> Join</Button>}
 						<Button variant="ghost" size="icon" aria-label="Close" onClick={onClose}><X className="h-4 w-4" /></Button>
 					</div>
 				</DialogFooter>
