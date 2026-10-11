@@ -50,38 +50,51 @@ function EditorScreen() {
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [initialFile]);
 
+	// Where the open document lives, kept in a ref so a save that fires right after another (AutoSave)
+	// always sees the file the previous one created.
+	const target = useRef({ fileId: initialFile as string | null, level: "edit" as "view" | "share" | "edit", name: "Untitled document.docx", folderId: folderParam as string | null });
+	target.current = { fileId, level, name, folderId };
+	const queue = useRef<Promise<unknown>>(Promise.resolve());
+
 	/** Write what the editor produced into the vault: over the open file, or as a new one. */
 	const persist = async (file: SavedFile) => {
+		const t = target.current;
 		const blob = new File([file.bytes as BlobPart], file.name, { type: file.mimeType });
-		const sameKind = fileId && level === "edit" && extOf(file.name) === extOf(name);
+		const sameKind = t.fileId && t.level === "edit" && extOf(file.name) === extOf(t.name);
 		if (sameKind) {
-			const { signedUrl } = await prepareReplace(fileId!);
+			const { signedUrl } = await prepareReplace(t.fileId!);
 			await putToSignedUrl(signedUrl, blob);
-			await finishReplace(fileId!, blob.size);
+			await finishReplace(t.fileId!, blob.size);
 			return;
 		}
 		// New file, or "Save As" to another format: a fresh vault file you own.
-		const target = level === "edit" || !fileId ? folderId : null;
-		const { path, signedUrl } = await prepareUpload(target, file.name, blob.size);
+		const folder = t.level === "edit" || !t.fileId ? t.folderId : null;
+		const { path, signedUrl } = await prepareUpload(folder, file.name, blob.size);
 		await putToSignedUrl(signedUrl, blob);
-		const created = await registerUpload(target, path, file.name, blob.size, file.mimeType || null);
-		if (extOf(file.name) === "docx" || !fileId) {
+		const created = await registerUpload(folder, path, file.name, blob.size, file.mimeType || null);
+		if (extOf(file.name) === "docx" || !t.fileId) {
+			target.current = { fileId: created.id, level: "edit", name: file.name, folderId: folder };
 			setFileId(created.id);
 			setName(file.name);
 			setLevel("edit");
-			setFolderId(target);
+			setFolderId(folder);
 			window.history.replaceState(null, "", `/dashboard/mjengo/documents/editor?file=${created.id}`);
 		}
 	};
 
-	const onSave = async (file: SavedFile) => {
-		try {
-			await persist(file);
-			toast({ title: "Saved to the vault", description: file.name });
-		} catch (e) {
-			toast({ title: "Could not save", description: e instanceof Error ? e.message : undefined, variant: "destructive" });
-			throw e;
-		}
+	// One save at a time, in order.
+	const onSave = (file: SavedFile) => {
+		const run = queue.current.catch(() => undefined).then(async () => {
+			try {
+				await persist(file);
+				if (file.reason !== "autosave") toast({ title: "Saved to the vault", description: file.name });
+			} catch (e) {
+				toast({ title: file.reason === "autosave" ? "AutoSave could not reach the vault" : "Could not save", description: e instanceof Error ? e.message : undefined, variant: "destructive" });
+				throw e;
+			}
+		});
+		queue.current = run;
+		return run;
 	};
 
 	return (
@@ -95,6 +108,7 @@ function EditorScreen() {
 						height="100%"
 						document={doc}
 						guardUnload
+						autoSave={level === "edit"}
 						author=""
 						onSave={onSave}
 						onError={(e) => toast({ title: "The editor reported a problem", description: e.message, variant: "destructive" })}
