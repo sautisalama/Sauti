@@ -85,7 +85,7 @@ export default function DesignPage() {
 	const fileInput = useRef<HTMLInputElement>(null);
 
 	const [size, setSize] = useState<(typeof SIZES)[number]>(SIZES[0]);
-	const [panel, setPanel] = useState<Panel>("templates");
+	const [panel, setPanel] = useState<Panel | null>("templates");
 	const [scale, setScale] = useState(0.5);
 	const [selected, setSelected] = useState<FabricObject | null>(null);
 	const [, bump] = useState(0);
@@ -355,10 +355,10 @@ export default function DesignPage() {
 				{/* Rail and panel */}
 				<nav aria-label="Design tools" className="flex w-16 shrink-0 flex-col items-center gap-1 border-r border-serene-neutral-100 bg-[#0E1318] py-2">
 					{rail.map(([k, label, icon]) => (
-						<button key={k} onClick={() => setPanel(k)} aria-pressed={panel === k} className={cn("flex w-14 flex-col items-center gap-1 rounded-xl py-2 text-[11px]", panel === k ? "bg-white/15 text-white" : "text-white/65 hover:bg-white/10")}>{icon}{label}</button>
+						<button key={k} onClick={() => setPanel((cur) => (cur === k ? null : k))} aria-pressed={panel === k} className={cn("flex w-14 flex-col items-center gap-1 rounded-xl py-2 text-[11px]", panel === k ? "bg-white/15 text-white" : "text-white/65 hover:bg-white/10")}>{icon}{label}</button>
 					))}
 				</nav>
-				<aside className="hidden w-64 shrink-0 overflow-y-auto border-r border-serene-neutral-100 bg-white p-3 sm:block">
+				<aside className={cn("shrink-0 overflow-y-auto border-serene-neutral-100 bg-white p-3 sm:w-64 sm:border-r", panel ? "max-sm:fixed max-sm:inset-x-0 max-sm:bottom-0 max-sm:z-30 max-sm:max-h-[45dvh] max-sm:border-t max-sm:shadow-2xl" : "hidden")}>
 					{panel === "templates" && (
 						<div className="space-y-4">
 							<div>
@@ -420,7 +420,7 @@ export default function DesignPage() {
 				</aside>
 
 				{/* Page */}
-				<div ref={host} className="flex min-w-0 flex-1 items-center justify-center overflow-auto bg-[#EBECF0] p-4">
+				<div ref={host} className="flex min-w-0 flex-1 items-center justify-center overflow-auto bg-[#EBECF0] p-2 sm:p-4">
 					<div className="shadow-xl"><canvas ref={el} /></div>
 				</div>
 			</div>
