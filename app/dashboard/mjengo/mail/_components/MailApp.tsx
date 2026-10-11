@@ -29,6 +29,7 @@ import { listLabels, saveLabel, deleteLabel, setMessageLabel, type LabelRow } fr
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { AccountSwitcher } from "./AccountSwitcher";
 import { listKey, mailStore, mergeFresh } from "./mail-store";
+import { AvatarStack, useTeam } from "../../_components/People";
 import { cacheDetail, cacheList, readDetail, readList } from "@/lib/mail/offline-cache";
 
 type Detail = Awaited<ReturnType<typeof getMessageDetail>>;
@@ -68,6 +69,8 @@ const rowTime = (d: string | null) => (!d ? "" : isToday(new Date(d)) ? format(n
 
 export function MailApp() {
 	const { toast } = useToast();
+	const team = useTeam();
+	const teamIds = (addresses: string[]) => addresses.map((a) => team.find((t) => t.email === a.toLowerCase())?.id);
 	const [accounts, setAccounts] = useState<AccountView[] | null>(null);
 	const [accountId, setAccountId] = useState<string | null>(null);
 	const [boxes, setBoxes] = useState<MailboxInfo[]>([]);
@@ -456,6 +459,7 @@ export function MailApp() {
 
 const Pane = (
 		<ReadingPane
+			teamIds={teamIds} team={team}
 			onWrite={(address) => setCompose({ to: [address] })}
 			onAddContact={async (name, address) => {
 				try {
@@ -521,6 +525,7 @@ const Pane = (
 												{m.thread > 1 && <span className="ml-2 rounded bg-black/[0.05] px-1.5 py-0.5 text-[11px] text-[#787774]">{m.thread}</span>}
 											</span>
 											{m.labels.slice(0, 2).map((id) => { const l = labels.find((x) => x.id === id); return l ? <span key={id} className="hidden shrink-0 rounded bg-black/[0.05] px-2 py-0.5 text-[13px] text-[#37352f] md:inline">{l.name}</span> : null; })}
+											<AvatarStack ids={teamIds([m.from.address])} team={team} className="hidden sm:flex" />
 											{m.hasAttachments && <Paperclip className="h-3.5 w-3.5 shrink-0 text-[#9b9a97]" />}
 											{m.flagged && <Star className="h-3.5 w-3.5 shrink-0 fill-amber-400 text-amber-400" />}
 											<span className="w-[70px] shrink-0 text-right text-[#9b9a97] group-hover:invisible">{rowTime(m.date)}</span>
@@ -616,7 +621,8 @@ function HoverBtn({ label, onClick, children }: { label: string; onClick: () => 
 	return <button onClick={(e) => { e.stopPropagation(); onClick(); }} title={label} aria-label={label} className="rounded-md p-1.5 text-serene-neutral-600 hover:bg-serene-neutral-100">{children}</button>;
 }
 
-function ReadingPane({ onWrite, onAddContact, onPrev, onNext, hasPrev, hasNext, onAutoLabelSimilar, labels, selectedLabels, onToggleLabel, onNewLabel, selected, detail, busy, accountId, conversation, summary, summaryBusy, allowImages, onClose, onSummarise, onOpen, onAct, onReply, onForward, onLoadImages, full }: {
+function ReadingPane({ teamIds, team, onWrite, onAddContact, onPrev, onNext, hasPrev, hasNext, onAutoLabelSimilar, labels, selectedLabels, onToggleLabel, onNewLabel, selected, detail, busy, accountId, conversation, summary, summaryBusy, allowImages, onClose, onSummarise, onOpen, onAct, onReply, onForward, onLoadImages, full }: {
+	teamIds: (a: string[]) => (string | undefined)[]; team: ReturnType<typeof useTeam>;
 	onWrite: (address: string) => void; onAddContact: (name: string, address: string) => void;
 	onPrev: () => void; onNext: () => void; hasPrev: boolean; hasNext: boolean; onAutoLabelSimilar: () => void;
 	labels: LabelRow[]; selectedLabels: string[]; onToggleLabel: (id: string, on: boolean) => void; onNewLabel: () => void;
@@ -690,6 +696,7 @@ function ReadingPane({ onWrite, onAddContact, onPrev, onNext, hasPrev, hasNext, 
 						) : null}
 
 						<div className="mt-4 flex items-start gap-3">
+							<AvatarStack size="md" ids={teamIds([...detail.from, ...detail.to, ...detail.cc].map((x) => x.address))} team={team} max={5} className="mt-0.5" />
 							<div className="min-w-0 flex-1">
 								<p className="text-[15px] text-[#37352f]">
 									{detail.from[0] ? <PersonChip name={detail.from[0].name} address={detail.from[0].address} onWrite={onWrite} onAddContact={onAddContact} className="font-medium" /> : null}{" "}

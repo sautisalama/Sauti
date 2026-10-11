@@ -110,6 +110,7 @@ export interface AdminLite {
   id: string;
   name: string;
   avatar: string | null;
+  email: string | null;
 }
 
 export async function listAdmins(): Promise<AdminLite[]> {
@@ -119,6 +120,7 @@ export async function listAdmins(): Promise<AdminLite[]> {
     id: p.id,
     name: [p.first_name, p.last_name].filter(Boolean).join(' ') || p.email || 'Admin',
     avatar: p.avatar_url,
+    email: p.email?.toLowerCase() ?? null,
   }));
 }
 
