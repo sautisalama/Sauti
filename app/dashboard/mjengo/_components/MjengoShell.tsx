@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect } from "react";
 import { usePathname } from "next/navigation";
-import { ArrowLeft, ClipboardList, Briefcase, CheckSquare, FileText, HardDrive, FolderKanban, LayoutDashboard, Lightbulb, Mail, ScrollText, ShieldCheck, Sparkles, CalendarClock, Users } from "lucide-react";
+import { ArrowLeft, ClipboardList, Briefcase, CheckSquare, FileText, HardDrive, FolderKanban, LayoutDashboard, Lightbulb, Mail, ScrollText, ShieldCheck, Sparkles, CalendarClock, Users, MessageCircle, Bell, Megaphone, Palette } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { MjengoDock } from "./MjengoDock";
 
@@ -12,17 +12,19 @@ const BASE = "/dashboard/mjengo";
 const TABS = [
 	{ href: BASE, label: "Overview", icon: LayoutDashboard, exact: true },
 	{ href: `${BASE}/mail`, label: "Mail", icon: Mail },
+	{ href: `${BASE}/chat`, label: "Chats", icon: MessageCircle },
 	{ href: `${BASE}/contacts`, label: "Contacts", icon: Users },
 	{ href: `${BASE}/calendar`, label: "Calendar", icon: CalendarClock },
+	{ href: `${BASE}/notifications`, label: "Notifications", icon: Bell },
+	{ href: `${BASE}/vault`, label: "Files", icon: HardDrive },
 	{ href: `${BASE}/grants`, label: "Grants", icon: Briefcase },
 	{ href: `${BASE}/opportunities`, label: "Opportunities", icon: Lightbulb },
 	{ href: `${BASE}/projects`, label: "Projects", icon: FolderKanban },
 	{ href: `${BASE}/forms`, label: "Forms", icon: ClipboardList },
 	{ href: `${BASE}/todos`, label: "To-dos", icon: CheckSquare },
 	{ href: `${BASE}/assistant`, label: "Assistant", icon: Sparkles },
-	{ href: `${BASE}/content`, label: "Content", icon: CalendarClock },
-	{ href: `${BASE}/documents`, label: "Requirements", icon: FileText },
-	{ href: `${BASE}/vault`, label: "Files", icon: HardDrive },
+	{ href: `${BASE}/content`, label: "Content", icon: Megaphone },
+	{ href: `${BASE}/design`, label: "Design", icon: Palette },
 	{ href: `${BASE}/people`, label: "People & access", icon: ShieldCheck, superOnly: true },
 	{ href: `${BASE}/logs`, label: "Logs", icon: ScrollText, superOnly: true },
 ];

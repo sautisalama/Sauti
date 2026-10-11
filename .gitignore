@@ -60,3 +60,5 @@ scripts/e2e/.email-build.mts
 
 #generated docs
 docs/notion-mail/**
+.vercel
+.env*
