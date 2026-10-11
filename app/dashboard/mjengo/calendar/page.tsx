@@ -19,6 +19,7 @@ import { MjengoLoader } from "../_components/MjengoLoader";
 const KIND: Record<CalKind, { label: string; chip: string; dot: string }> = {
 	event: { label: "Event", chip: "bg-sauti-teal text-white", dot: "bg-sauti-teal" },
 	meeting: { label: "Meeting", chip: "bg-sky-600 text-white", dot: "bg-sky-600" },
+	block: { label: "Blocked time", chip: "bg-serene-neutral-200 text-serene-neutral-700", dot: "bg-serene-neutral-400" },
 	google: { label: "Google Calendar", chip: "bg-[#e8f0fe] text-[#1a4fa3]", dot: "bg-[#4285F4]" },
 	grant: { label: "Grant deadline", chip: "bg-amber-100 text-amber-900", dot: "bg-amber-500" },
 	opportunity: { label: "Opportunity deadline", chip: "bg-orange-100 text-orange-900", dot: "bg-orange-500" },
@@ -203,6 +204,7 @@ function CreateDialog({ slot, onClose, onCreated }: { slot: { date: Date; from?:
 	const [to, setTo] = useState("10:00");
 	const [allDay, setAllDay] = useState(false);
 	const [video, setVideo] = useState(true);
+	const [block, setBlock] = useState(false);
 	const [guests, setGuests] = useState("");
 	const [place, setPlace] = useState("");
 	const [notes, setNotes] = useState("");
@@ -210,7 +212,7 @@ function CreateDialog({ slot, onClose, onCreated }: { slot: { date: Date; from?:
 
 	useEffect(() => {
 		if (!day) return;
-		setTitle(""); setDate(format(day, "yyyy-MM-dd")); setFrom(slot?.from ?? "09:00"); setTo(slot?.to ?? "10:00"); setAllDay(false); setVideo(true); setGuests(""); setPlace(""); setNotes("");
+		setTitle(""); setDate(format(day, "yyyy-MM-dd")); setFrom(slot?.from ?? "09:00"); setTo(slot?.to ?? "10:00"); setAllDay(false); setVideo(true); setBlock(false); setGuests(""); setPlace(""); setNotes("");
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [slot]);
 
@@ -227,7 +229,8 @@ function CreateDialog({ slot, onClose, onCreated }: { slot: { date: Date; from?:
 				description: notes || null,
 				location: place || null,
 				attendees: guests.split(/[,;\s]+/).filter(Boolean),
-				videoCall: video,
+				videoCall: video && !block,
+				block,
 			}));
 			toast({ title: "Event created" });
 			await onCreated();
@@ -260,16 +263,20 @@ function CreateDialog({ slot, onClose, onCreated }: { slot: { date: Date; from?:
 						<label className="ml-auto flex items-center gap-2 text-sm"><Switch checked={allDay} onCheckedChange={setAllDay} /> All day</label>
 					</div>
 					<div className="flex items-center gap-2">
+						<Clock className="h-4 w-4 text-serene-neutral-500" />
+						<label className="flex flex-1 items-center justify-between text-sm">Block this time (shows as busy, no guests) <Switch checked={block} onCheckedChange={setBlock} /></label>
+					</div>
+					{!block && <div className="flex items-center gap-2">
 						<Video className="h-4 w-4 text-serene-neutral-500" />
 						<label className="flex flex-1 items-center justify-between text-sm">Add a video call with a shareable link <Switch checked={video} onCheckedChange={setVideo} /></label>
-					</div>
-					<div className="flex items-start gap-2">
+					</div>}
+					{!block && <div className="flex items-start gap-2">
 						<Users className="mt-2 h-4 w-4 text-serene-neutral-500" />
 						<div className="flex-1 space-y-1">
 							<Input value={guests} onChange={(e) => setGuests(e.target.value)} placeholder="Add guests (emails, separated by commas)" aria-label="Guests" />
 							<p className="text-xs text-serene-neutral-500">Guests are invited by Google Calendar when it is connected.</p>
 						</div>
-					</div>
+					</div>}
 					<div className="flex items-center gap-2"><MapPin className="h-4 w-4 text-serene-neutral-500" /><Input value={place} onChange={(e) => setPlace(e.target.value)} placeholder="Add location" aria-label="Location" /></div>
 					<div className="space-y-1.5"><Label className="sr-only">Description</Label><Textarea rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Add description" /></div>
 				</div>

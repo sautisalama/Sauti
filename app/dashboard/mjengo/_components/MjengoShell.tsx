@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect } from "react";
 import { usePathname } from "next/navigation";
-import { ArrowLeft, ClipboardList, Briefcase, CheckSquare, FileText, HardDrive, FolderKanban, LayoutDashboard, Lightbulb, Mail, ScrollText, ShieldCheck, Sparkles, CalendarClock, Users, MessageCircle, Bell, Megaphone, Palette } from "lucide-react";
+import { ArrowLeft, ClipboardList, Briefcase, CheckSquare, FileText, HardDrive, FolderKanban, LayoutDashboard, Lightbulb, Mail, ScrollText, ShieldCheck, Sparkles, CalendarClock, Users, MessageCircle, Bell, Megaphone, Palette, Video } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { MjengoDock } from "./MjengoDock";
 
@@ -15,6 +15,7 @@ const TABS = [
 	{ href: `${BASE}/chat`, label: "Chats", icon: MessageCircle },
 	{ href: `${BASE}/contacts`, label: "Contacts", icon: Users },
 	{ href: `${BASE}/calendar`, label: "Calendar", icon: CalendarClock },
+	{ href: `${BASE}/meetings`, label: "Call notes", icon: Video },
 	{ href: `${BASE}/notifications`, label: "Notifications", icon: Bell },
 	{ href: `${BASE}/vault`, label: "Files", icon: HardDrive },
 	{ href: `${BASE}/grants`, label: "Grants", icon: Briefcase },

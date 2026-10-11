@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { timingSafeEqual } from "node:crypto";
 import { publishDue } from "@/lib/mjengo/publishers";
+import { remindEvents, shareMeetingNotes } from "@/lib/mjengo/meeting-jobs";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -17,7 +18,10 @@ function authorised(req: Request): boolean {
 export async function GET(req: Request) {
 	if (!authorised(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 	try {
-		return NextResponse.json({ ok: true, ...(await publishDue()) });
+		const posts = await publishDue();
+		const reminders = await remindEvents().catch(() => ({ sent: 0 }));
+		const notes = await shareMeetingNotes().catch(() => ({ done: 0 }));
+		return NextResponse.json({ ok: true, ...posts, reminders, notes });
 	} catch (e) {
 		return NextResponse.json({ ok: false, error: e instanceof Error ? e.message : "failed" }, { status: 500 });
 	}

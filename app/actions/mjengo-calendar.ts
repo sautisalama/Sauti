@@ -9,7 +9,7 @@ import { requireAdminActor } from '@/lib/access/super-admin';
 import { getCalendarTokens, saveCalendarTokens } from '@/lib/calendar/tokens';
 import { createOAuth2ClientFromTokens, isGoogleCalendarConfigured } from '@/lib/google-calendar-oauth';
 
-export type CalKind = 'event' | 'meeting' | 'google' | 'grant' | 'opportunity' | 'project' | 'todo' | 'post';
+export type CalKind = 'event' | 'meeting' | 'block' | 'google' | 'grant' | 'opportunity' | 'project' | 'todo' | 'post';
 
 export interface CalItem {
   id: string;
@@ -37,6 +37,8 @@ export interface NewEvent {
   location?: string | null;
   attendees?: string[];
   videoCall?: boolean;
+  /** Time kept free of meetings: shown as busy, and nobody is invited. */
+  block?: boolean;
 }
 
 /** An authorised Google Calendar client for this person, refreshing the token when needed. */
@@ -78,7 +80,7 @@ async function month_(fromIso: string, toIso: string): Promise<CalMonth> {
     db.from('mjengo_posts').select('id, title, body, scheduled_for, status').gte('scheduled_for', fromIso).lte('scheduled_for', toIso).neq('status', 'cancelled'),
   ]);
 
-  for (const e of (events ?? []) as { id: string; title: string; description: string | null; location: string | null; starts_at: string; ends_at: string; all_day: boolean; kind: 'event' | 'meeting'; meeting_code: string | null; attendees: string[] }[]) {
+  for (const e of (events ?? []) as { id: string; title: string; description: string | null; location: string | null; starts_at: string; ends_at: string; all_day: boolean; kind: 'event' | 'meeting' | 'block'; meeting_code: string | null; attendees: string[] }[]) {
     items.push({ id: `ev:${e.id}`, title: e.title, start: e.starts_at, end: e.ends_at, allDay: e.all_day, kind: e.kind, meetingCode: e.meeting_code, location: e.location, description: e.description, attendees: e.attendees, removable: true });
   }
   const day = (d: string) => ({ start: `${d}T00:00:00.000Z`, end: `${d}T23:59:59.000Z`, allDay: true });
@@ -128,7 +130,7 @@ async function create_(v: NewEvent): Promise<CalItem> {
   const db = looseAdmin();
 
   let code: string | null = null;
-  if (v.videoCall) {
+  if (v.videoCall && !v.block) {
     for (let i = 0; i < 5 && !code; i++) {
       const c = meetCode();
       const { error } = await db.from('mjengo_meetings').insert({ code: c, mode: 'video', title, created_by: a.id });
@@ -155,7 +157,7 @@ async function create_(v: NewEvent): Promise<CalItem> {
 
   const { data, error } = await db.from('mjengo_events').insert({
     title, description, location: v.location?.trim().slice(0, 200) || null, starts_at: start.toISOString(), ends_at: end.toISOString(), all_day: !!v.allDay,
-    kind: code ? 'meeting' : 'event', meeting_code: code, attendees, google_event_id: googleId, created_by: a.id,
+    kind: v.block ? 'block' : code ? 'meeting' : 'event', meeting_code: code, attendees: v.block ? [] : attendees, google_event_id: googleId, created_by: a.id,
   }).select('id, title, description, location, starts_at, ends_at, all_day, kind, meeting_code, attendees').single();
   if (error || !data) throw new Error('Could not save the event.');
   await logAudit({ actorId: a.id, actorEmail: a.email, action: 'calendar.event_created', targetType: 'event', targetId: data.id, targetLabel: title });
