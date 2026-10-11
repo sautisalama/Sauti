@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Canvas, Circle, FabricImage, Line, Rect, Textbox, Triangle, type FabricObject } from "fabric";
-import { AlignCenter, AlignLeft, AlignRight, ArrowLeft, Bold, Copy, Download, Image as ImageIcon, Italic, LayoutTemplate, Loader2, Redo2, Save, Shapes, Trash2, Type, Undo2, Upload } from "lucide-react";
+import { AlignCenter, AlignLeft, AlignRight, ArrowLeft, Bold, Copy, Download, Image as ImageIcon, Italic, Gift, LayoutTemplate, Loader2, Redo2, Save, Shapes, Trash2, Type, Undo2, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
@@ -26,7 +26,7 @@ const SIZES = [
 	{ id: "poster", label: "A4 poster", w: 1240, h: 1754 },
 ] as const;
 
-type Panel = "templates" | "text" | "shapes" | "uploads" | "studio";
+type Panel = "templates" | "text" | "shapes" | "uploads" | "studio" | "market";
 type Builder = (c: Canvas, w: number, h: number) => void;
 
 const text = (t: string, o: Partial<ConstructorParameters<typeof Textbox>[1]>) => new Textbox(t, { fontFamily: "Inter", fill: CANVA.ink, ...o });
@@ -306,6 +306,7 @@ export default function DesignPage() {
 		["shapes", "Shapes", <Shapes key="s" className="h-5 w-5" />],
 		["uploads", "Uploads", <Upload key="u" className="h-5 w-5" />],
 		["studio", "Studio", <ImageIcon key="i" className="h-5 w-5" />],
+		["market", "Free", <Gift key="m" className="h-5 w-5" />],
 	];
 	const canUndo = history.current.at > 0;
 	const canRedo = history.current.at < history.current.stack.length - 1;
@@ -409,6 +410,24 @@ export default function DesignPage() {
 							<Button className="w-full gap-2 bg-[#7D2AE8] hover:bg-[#6a22c9]" onClick={() => fileInput.current?.click()}><Upload className="h-4 w-4" /> Upload an image</Button>
 							<input ref={fileInput} type="file" accept="image/*" className="hidden" onChange={(e) => upload(e.target.files)} />
 							<p className="text-xs text-serene-neutral-500">Images stay in this design until you save it to Studio.</p>
+						</div>
+					)}
+					{panel === "market" && (
+						<div className="space-y-3 text-sm">
+							<p className="text-xs text-serene-neutral-500">Free places to find templates, photos and fonts. Download what you like, then use Uploads to bring it in.</p>
+							{[
+								["Canva free templates", "https://www.canva.com/templates/", "Layouts for posters and social posts"],
+								["Slidesgo", "https://slidesgo.com/", "Presentation themes"],
+								["Unsplash", "https://unsplash.com/", "Free photographs"],
+								["Pexels", "https://www.pexels.com/", "Free photos and video"],
+								["unDraw", "https://undraw.co/illustrations", "Free illustrations, recolourable"],
+								["Google Fonts", "https://fonts.google.com/", "Open fonts"],
+							].map(([n, u, d]) => (
+								<a key={u} href={u} target="_blank" rel="noopener noreferrer" className="block rounded-xl border border-serene-neutral-200 p-3 hover:border-[#7D2AE8]">
+									<span className="block font-semibold">{n}</span><span className="block text-xs text-serene-neutral-500">{d}</span>
+								</a>
+							))}
+							<p className="text-xs text-serene-neutral-500">Check each licence before using an image in public.</p>
 						</div>
 					)}
 					{panel === "studio" && (

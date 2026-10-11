@@ -7,6 +7,11 @@ import { ArrowLeft, Download, Loader2, Save } from "lucide-react";
 import * as XLSX from "xlsx";
 import "@univerjs/preset-sheets-core/lib/index.css";
 import { Button } from "@/components/ui/button";
+import { Sparkles } from "lucide-react";
+import { unwrap } from "@/lib/action-result";
+import { aiTable } from "@/app/actions/mjengo-assist";
+import { Textarea } from "@/components/ui/textarea";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { putToSignedUrl } from "@/lib/client/upload";
@@ -79,6 +84,9 @@ function SheetScreen() {
 	const [folderId, setFolderId] = useState<string | null>(folderParam);
 	const [loading, setLoading] = useState(true);
 	const [saving, setSaving] = useState(false);
+	const [ask, setAsk] = useState(false);
+	const [askText, setAskText] = useState("");
+	const [asking, setAsking] = useState(false);
 
 	// Open the file, then start the spreadsheet.
 	useEffect(() => {
@@ -166,6 +174,34 @@ function SheetScreen() {
 		}
 	};
 
+	/** Let the AI draft a block of cells, placed under whatever is on the sheet already. */
+	const fillWithAi = async () => {
+		setAsking(true);
+		try {
+			const snap = api.current?.getActiveWorkbook()?.save() as unknown as { sheets: Record<string, { cellData?: CellData }>; sheetOrder?: string[] } | undefined;
+			const first = snap?.sheets[snap.sheetOrder?.[0] ?? Object.keys(snap.sheets)[0]];
+			const rowsUsed = Object.keys(first?.cellData ?? {}).map(Number);
+			const lastRow = rowsUsed.length ? Math.max(...rowsUsed) : -1;
+			const context = Array.from({ length: Math.min(lastRow + 1, 30) }, (_, r) => {
+				const row = first?.cellData?.[r] ?? {};
+				const cols = Object.keys(row).map(Number);
+				return Array.from({ length: cols.length ? Math.max(...cols) + 1 : 0 }, (_, c) => String(row[c]?.v ?? "")).join("\t");
+			}).join("\n");
+			const out = await unwrap(aiTable(askText, context));
+			const sheet = (api.current as unknown as { getActiveWorkbook: () => { getActiveSheet: () => { getRange: (r: number, c: number, nr: number, nc: number) => { setValues: (v: (string | number)[][]) => void } } } }).getActiveWorkbook().getActiveSheet();
+			const width = Math.max(...out.rows.map((r) => r.length));
+			const padded = out.rows.map((r) => [...r, ...Array(width - r.length).fill("")]);
+			sheet.getRange(lastRow >= 0 ? lastRow + 2 : 0, 0, padded.length, width).setValues(padded);
+			toast({ title: "Added to the sheet", description: out.note });
+			setAsk(false);
+			setAskText("");
+		} catch (e) {
+			toast({ title: "Could not fill the sheet", description: e instanceof Error ? e.message : undefined, variant: "destructive" });
+		} finally {
+			setAsking(false);
+		}
+	};
+
 	const download = () => {
 		try {
 			const url = URL.createObjectURL(new Blob([bytes() as BlobPart], { type: mime }));
@@ -186,6 +222,7 @@ function SheetScreen() {
 				<Input value={name} onChange={(e) => setName(e.target.value)} aria-label="File name" className="h-9 max-w-xs border-transparent bg-transparent px-2 text-[15px] font-medium shadow-none hover:border-black/10 focus-visible:ring-1" />
 				{level !== "edit" && <span className="text-xs text-[#787774]">View only: saving makes your own copy</span>}
 				<span className="flex-1" />
+				<Button variant="outline" size="sm" className="gap-1.5" onClick={() => setAsk(true)} disabled={loading}><Sparkles className="h-4 w-4" /> Ask AI</Button>
 				<Button variant="ghost" size="sm" className="gap-1.5" onClick={download} disabled={loading}><Download className="h-4 w-4" /> Download</Button>
 				<Button size="sm" className="gap-1.5 bg-sauti-teal hover:bg-sauti-dark" onClick={save} disabled={loading || saving}>{saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Save</Button>
 			</div>
@@ -193,6 +230,16 @@ function SheetScreen() {
 				{loading && <div className="absolute inset-0 z-10 bg-white"><MjengoLoader label="Opening the spreadsheet" className="h-full" /></div>}
 				<div ref={host} className="h-full w-full" />
 			</div>
+			<Dialog open={ask} onOpenChange={(o) => !asking && setAsk(o)}>
+				<DialogContent className="max-w-lg">
+					<DialogHeader><DialogTitle>Ask AI</DialogTitle><DialogDescription>Describe a table, a budget, a tracker or a clean-up. It is added under what is already on the sheet.</DialogDescription></DialogHeader>
+					<Textarea rows={4} autoFocus value={askText} onChange={(e) => setAskText(e.target.value)} placeholder="A 12 month budget for a legal aid clinic with columns for item, monthly cost and annual total, and a total row." />
+					<DialogFooter>
+						<Button variant="outline" onClick={() => setAsk(false)} disabled={asking}>Cancel</Button>
+						<Button className="gap-2 bg-sauti-teal hover:bg-sauti-dark" disabled={asking || askText.trim().length < 4} onClick={fillWithAi}>{asking && <Loader2 className="h-4 w-4 animate-spin" />} Add to the sheet</Button>
+					</DialogFooter>
+				</DialogContent>
+			</Dialog>
 		</div>
 	);
 }
