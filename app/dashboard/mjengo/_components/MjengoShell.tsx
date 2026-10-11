@@ -20,8 +20,8 @@ const TABS = [
 	{ href: `${BASE}/todos`, label: "To-dos", icon: CheckSquare },
 	{ href: `${BASE}/assistant`, label: "Assistant", icon: Sparkles },
 	{ href: `${BASE}/content`, label: "Content", icon: CalendarClock },
-	{ href: `${BASE}/documents`, label: "Documents", icon: FileText },
-	{ href: `${BASE}/vault`, label: "Vault", icon: HardDrive },
+	{ href: `${BASE}/documents`, label: "Requirements", icon: FileText },
+	{ href: `${BASE}/vault`, label: "Files", icon: HardDrive },
 	{ href: `${BASE}/people`, label: "People & access", icon: ShieldCheck, superOnly: true },
 	{ href: `${BASE}/logs`, label: "Logs", icon: ScrollText, superOnly: true },
 ];

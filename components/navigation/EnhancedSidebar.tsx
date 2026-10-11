@@ -294,8 +294,8 @@ export function EnhancedSidebar({
 				{ id: "mj-todos", group: "Work", label: "To-dos", icon: CheckSquare, href: `${B}/todos`, section: "main", hint: "Tasks and shared responsibilities" },
 				{ id: "mj-assistant", group: "Create", label: "Assistant", icon: Sparkles, href: `${B}/assistant`, section: "main", hint: "Chat, write and create images" },
 				{ id: "mj-content", group: "Create", label: "Content", icon: CalendarClock, href: `${B}/content`, section: "main", hint: "Plan and schedule social posts" },
-				{ id: "mj-docs", group: "Files", label: "Documents", icon: FileText, href: `${B}/documents`, section: "main", hint: "Write and edit documents" },
-				{ id: "mj-vault", group: "Files", label: "Vault", icon: HardDrive, href: `${B}/vault`, section: "main", hint: "Shared files and folders with access control" },
+				{ id: "mj-docs", group: "Files", label: "Requirements", icon: FileText, href: `${B}/documents`, section: "main", hint: "Documents grants, opportunities and projects still need" },
+				{ id: "mj-vault", group: "Files", label: "Files", icon: HardDrive, href: `${B}/vault`, section: "main", hint: "Documents, PDFs and folders, shared and kept in step with Google Drive" },
 			];
 			if (mjengoSuper) {
 				items.push(
