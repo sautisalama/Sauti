@@ -1,7 +1,7 @@
 import * as raw from '@/app/actions/mjengo-mail';
 import { unwrap } from '@/lib/action-result';
 
-export type { AutoLabelMatch, SignatureState, LabelRow, AccountView, AddAccountInput, MessageRow, ListQuery, MailAction, SendInput, ViewConfig, ViewRow, SnippetRow } from '@/app/actions/mjengo-mail';
+export type { MailPrefs, AccountServers, UpdateServers, AutoLabelMatch, SignatureState, LabelRow, AccountView, AddAccountInput, MessageRow, ListQuery, MailAction, SendInput, ViewConfig, ViewRow, SnippetRow } from '@/app/actions/mjengo-mail';
 
 export const listAccounts = (...a: Parameters<typeof raw.listAccounts>) => unwrap(raw.listAccounts(...a));
 export const addAccount = (...a: Parameters<typeof raw.addAccount>) => unwrap(raw.addAccount(...a));
@@ -34,3 +34,7 @@ export const previewAutoLabel = (...a: Parameters<typeof raw.previewAutoLabel>) 
 export const confirmAutoLabel = (...a: Parameters<typeof raw.confirmAutoLabel>) => unwrap(raw.confirmAutoLabel(...a));
 export const detectMailbox = (...a: Parameters<typeof raw.detectMailbox>) => unwrap(raw.detectMailbox(...a));
 export const mailBootstrap = (...a: Parameters<typeof raw.mailBootstrap>) => unwrap(raw.mailBootstrap(...a));
+export const getMailPrefs = (...a: Parameters<typeof raw.getMailPrefs>) => unwrap(raw.getMailPrefs(...a));
+export const saveMailPrefs = (...a: Parameters<typeof raw.saveMailPrefs>) => unwrap(raw.saveMailPrefs(...a));
+export const getAccountServers = (...a: Parameters<typeof raw.getAccountServers>) => unwrap(raw.getAccountServers(...a));
+export const updateAccountServers = (...a: Parameters<typeof raw.updateAccountServers>) => unwrap(raw.updateAccountServers(...a));

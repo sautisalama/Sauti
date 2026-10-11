@@ -3,7 +3,7 @@
 import { NO_DASH_RULE, stripDashes } from '@/lib/plain-text';
 import MailComposer from 'nodemailer/lib/mail-composer';
 import { looseAdmin } from '@/lib/loose-db';
-import { encryptField } from '@/lib/security/crypto';
+import { decryptField, encryptField } from '@/lib/security/crypto';
 import { logAudit } from '@/lib/access/audit';
 import { guard } from '@/lib/action-result';
 import { requireAdminActor } from '@/lib/access/super-admin';
@@ -115,6 +115,113 @@ async function removeAccount_(id: string) {
   const actor = await requireAdminActor();
   const { data } = await looseAdmin().from('mail_accounts').delete().eq('id', id).eq('owner_id', actor.id).select('email').maybeSingle();
   if (data) await logAudit({ actorId: actor.id, actorEmail: actor.email, action: 'mail.account_removed', targetType: 'mailbox', targetId: id, targetLabel: data.email });
+}
+
+/* ------------------------------------------------------- Settings (Gmail-style) */
+
+export interface MailPrefs {
+  undoSeconds: 0 | 5 | 10 | 20 | 30;
+  replyDefault: 'reply' | 'reply_all';
+  conversationView: boolean;
+  density: 'comfortable' | 'compact';
+  blocked: string[];
+}
+
+const DEFAULT_PREFS: MailPrefs = { undoSeconds: 5, replyDefault: 'reply', conversationView: true, density: 'comfortable', blocked: [] };
+
+async function getPrefs_(): Promise<MailPrefs> {
+  const a = await requireAdminActor();
+  const { data } = await looseAdmin().from('mail_preferences').select('undo_seconds, reply_default, conversation_view, density, blocked').eq('owner_id', a.id).maybeSingle();
+  if (!data) return DEFAULT_PREFS;
+  return { undoSeconds: data.undo_seconds, replyDefault: data.reply_default, conversationView: data.conversation_view, density: data.density, blocked: data.blocked ?? [] };
+}
+
+async function savePrefs_(v: MailPrefs): Promise<MailPrefs> {
+  const a = await requireAdminActor();
+  const blocked = [...new Set(v.blocked.map((x) => x.trim().toLowerCase()).filter((x) => /^[^\s@]+@[^\s@]+\.[^\s@]+$|^@[^\s@]+\.[^\s@]+$/.test(x)))].slice(0, 200);
+  const row = {
+    owner_id: a.id,
+    undo_seconds: [0, 5, 10, 20, 30].includes(v.undoSeconds) ? v.undoSeconds : 5,
+    reply_default: v.replyDefault === 'reply_all' ? 'reply_all' : 'reply',
+    conversation_view: !!v.conversationView,
+    density: v.density === 'compact' ? 'compact' : 'comfortable',
+    blocked,
+    updated_at: new Date().toISOString(),
+  };
+  await looseAdmin().from('mail_preferences').upsert(row, { onConflict: 'owner_id' });
+  return { undoSeconds: row.undo_seconds as MailPrefs['undoSeconds'], replyDefault: row.reply_default as MailPrefs['replyDefault'], conversationView: row.conversation_view, density: row.density as MailPrefs['density'], blocked };
+}
+
+export interface AccountServers {
+  id: string;
+  email: string;
+  label: string;
+  protocol: 'imap' | 'pop3';
+  auth_type: 'password' | 'google' | 'microsoft';
+  imap_host: string;
+  imap_port: number;
+  imap_secure: boolean;
+  smtp_host: string;
+  smtp_port: number;
+  smtp_secure: boolean;
+  username: string;
+}
+
+/** The connection settings of a mailbox, to show and adjust like Gmail's Accounts and Import page. */
+async function getServers_(id: string): Promise<AccountServers> {
+  const a = await requireAdminActor();
+  const { data } = await looseAdmin().from('mail_accounts').select('id, email, label, protocol, auth_type, imap_host, imap_port, imap_secure, smtp_host, smtp_port, smtp_secure, username').eq('id', id).eq('owner_id', a.id).maybeSingle();
+  if (!data) throw new Error('That mailbox no longer exists.');
+  return data as AccountServers;
+}
+
+export interface UpdateServers {
+  label?: string;
+  username?: string;
+  password?: string;
+  imapHost?: string; imapPort?: number; imapSecure?: boolean;
+  smtpHost?: string; smtpPort?: number; smtpSecure?: boolean;
+}
+
+/** Change a password mailbox's servers, port, security or password; the new settings are tested before they are kept. */
+async function updateServers_(id: string, v: UpdateServers): Promise<AccountServers> {
+  const a = await requireAdminActor();
+  const db = looseAdmin();
+  const { data: cur } = await db.from('mail_accounts').select('*').eq('id', id).eq('owner_id', a.id).maybeSingle();
+  if (!cur) throw new Error('That mailbox no longer exists.');
+  const label = (v.label ?? cur.label).trim().slice(0, 60) || cur.email;
+  if (cur.auth_type !== 'password') {
+    await db.from('mail_accounts').update({ label }).eq('id', id);
+    return getServers_(id);
+  }
+  const row = {
+    imap_host: (v.imapHost ?? cur.imap_host).trim(),
+    imap_port: Number(v.imapPort ?? cur.imap_port),
+    imap_secure: v.imapSecure ?? cur.imap_secure,
+    smtp_host: (v.smtpHost ?? cur.smtp_host).trim(),
+    smtp_port: Number(v.smtpPort ?? cur.smtp_port),
+    smtp_secure: v.smtpSecure ?? cur.smtp_secure,
+    username: (v.username ?? cur.username).trim(),
+  };
+  if (!row.imap_host || !row.smtp_host || !row.username) throw new Error('Server names and the username cannot be empty.');
+  if (![row.imap_port, row.smtp_port].every((n) => Number.isInteger(n) && n > 0 && n < 65536)) throw new Error('Ports must be numbers between 1 and 65535.');
+  const pass = v.password || decryptField(cur.password_enc) || '';
+  try {
+    if (cur.protocol === 'pop3') await testPop3(row, pass);
+    else await testImap(row, { pass });
+  } catch (e) {
+    throw new Error('Reading mail with those settings failed: ' + explain(e));
+  }
+  try {
+    await verifySmtp(row, { pass });
+  } catch (e) {
+    throw new Error('Sending with those settings failed: ' + explain(e));
+  }
+  const patch: Record<string, unknown> = { ...row, label };
+  if (v.password) patch.password_enc = encryptField(v.password);
+  await db.from('mail_accounts').update(patch).eq('id', id);
+  await logAudit({ actorId: a.id, actorEmail: a.email, action: 'mail.account_settings_changed', targetType: 'mailbox', targetId: id, targetLabel: cur.email });
+  return getServers_(id);
 }
 
 /** From an email address alone: which provider, and which servers if it is a password mailbox. */
@@ -798,6 +905,10 @@ export const getSignature = guard(getSignature_);
 export const saveSignature = guard(saveSignature_);
 export const dismissSignaturePrompt = guard(dismissSignaturePrompt_);
 export const detectMailbox = guard(detectMailbox_);
+export const getMailPrefs = guard(getPrefs_);
+export const saveMailPrefs = guard(savePrefs_);
+export const getAccountServers = guard(getServers_);
+export const updateAccountServers = guard(updateServers_);
 
 /** Everything the mail screen needs to start, in one round trip (server actions run one at a time). */
 async function mailBootstrap_() {

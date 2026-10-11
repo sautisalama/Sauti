@@ -15,7 +15,7 @@ import { cn } from "@/lib/utils";
 import { confirmAutoLabel, previewAutoLabel, type AutoLabelMatch, type LabelRow } from "./api";
 import { clearMailCache } from "@/lib/mail/offline-cache";
 import { SignatureSettings } from "./SignatureEditor";
-import { addAccount, detectMailbox, oauthAvailability, deleteSnippet, removeAccount, saveSnippet, type AccountView, type SnippetRow, type ViewConfig, type ViewRow } from "./api";
+import { addAccount, detectMailbox, oauthAvailability, deleteSnippet, removeAccount, saveSnippet, getAccountServers, updateAccountServers, saveMailPrefs, type AccountView, type AccountServers, type MailPrefs, type SnippetRow, type ViewConfig, type ViewRow } from "./api";
 
 type Found = Awaited<ReturnType<typeof detectMailbox>>;
 
@@ -257,65 +257,204 @@ export function ViewDialog({ view, labels = [], onClose, onSave, onDelete }: { v
 	);
 }
 
-/** Accounts, layout of the reading pane and snippets. */
-export function SettingsDialog({ open, onClose, accounts, onAccountsChanged, onConnect, snippets, onSnippetsChanged, layout, onLayout, signature = "", onSignatureSaved }: {
+type SettingsTab = "general" | "signature" | "labels" | "accounts" | "filters" | "templates";
+
+/** Mail settings, laid out like Gmail's: General, Signature, Labels, Accounts and import, Filters and blocked, Templates. */
+export function SettingsDialog({ open, onClose, accounts, onAccountsChanged, onConnect, snippets, onSnippetsChanged, layout, onLayout, signature = "", onSignatureSaved, prefs, onPrefs, labels = [], onEditLabel }: {
 	signature?: string; onSignatureSaved?: (html: string) => void;
 	open: boolean; onClose: () => void; accounts: AccountView[]; onAccountsChanged: () => void; onConnect: () => void; snippets: SnippetRow[]; onSnippetsChanged: () => void; layout: "side" | "center" | "full"; onLayout: (l: "side" | "center" | "full") => void;
+	prefs: MailPrefs; onPrefs: (p: MailPrefs) => void; labels?: LabelRow[]; onEditLabel: (l: Partial<LabelRow>) => void;
 }) {
 	const { toast } = useToast();
+	const [tab, setTab] = useState<SettingsTab>("general");
 	const [name, setName] = useState("");
 	const [body, setBody] = useState("");
 	const [busy, setBusy] = useState(false);
+	const [block, setBlock] = useState("");
+	const [editing, setEditing] = useState<string | null>(null);
+
+	const TABS: [SettingsTab, string][] = [["general", "General"], ["signature", "Signature"], ["labels", "Labels"], ["accounts", "Accounts and import"], ["filters", "Filters and blocked"], ["templates", "Templates"]];
+	const row = "flex items-start justify-between gap-4 border-b border-black/[0.06] py-4";
+	const change = async (patch: Partial<MailPrefs>) => {
+		const next = { ...prefs, ...patch };
+		onPrefs(next);
+		try { await saveMailPrefs(next); } catch (e) { toast({ title: "Could not save the setting", description: e instanceof Error ? e.message : undefined, variant: "destructive" }); }
+	};
+	const sel = "h-9 rounded-lg border border-black/10 bg-white px-2 text-sm";
 
 	return (
 		<Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-			<DialogContent className="max-h-[88vh] max-w-lg overflow-y-auto">
-				<DialogHeader><DialogTitle>Mail settings</DialogTitle></DialogHeader>
-				<section className="space-y-2">
-					<h3 className="text-sm font-bold">Open messages as</h3>
-					<div className="grid grid-cols-3 gap-2">
-						{([["side", "Side peek"], ["center", "Center peek"], ["full", "Full page"]] as const).map(([v, l]) => (
-							<button key={v} onClick={() => onLayout(v)} aria-pressed={layout === v} className={cn("rounded-xl border px-3 py-2 text-sm", layout === v ? "border-sauti-teal bg-sauti-teal-light/40 font-semibold text-sauti-dark" : "border-serene-neutral-200 hover:bg-serene-neutral-50")}>{l}</button>
-						))}
-					</div>
-				</section>
-				<section className="space-y-2">
-					<div className="flex items-center justify-between"><h3 className="text-sm font-bold">Mailboxes</h3><Button size="sm" variant="outline" className="gap-1.5" onClick={onConnect}><Plus className="h-4 w-4" /> Connect</Button></div>
-					<ul className="divide-y divide-serene-neutral-100 rounded-xl border border-serene-neutral-100">
-						{accounts.map((a) => (
-							<li key={a.id} className="flex items-center gap-3 p-3"><div className="min-w-0 flex-1"><p className="truncate text-sm font-medium">{a.email}</p></div>
-								<Button size="sm" variant="ghost" className="text-red-600" onClick={async () => { if (window.confirm(`Disconnect ${a.email}? Your email stays in the mailbox.`)) { await removeAccount(a.id); clearMailCache(); onAccountsChanged(); } }}>Disconnect</Button>
-							</li>
-						))}
-						{accounts.length === 0 && <li className="p-3 text-sm text-serene-neutral-500">None connected.</li>}
-					</ul>
-				</section>
-				{open && <SignatureSettings initial={signature} onSaved={(h) => onSignatureSaved?.(h)} />}
-				<section className="space-y-2">
-					<h3 className="text-sm font-bold">Snippets</h3>
-					<p className="text-xs text-serene-neutral-500">Reusable text. In a message, type / and pick the snippet.</p>
-					<ul className="divide-y divide-serene-neutral-100 rounded-xl border border-serene-neutral-100">
-						{snippets.map((s) => (
-							<li key={s.id} className="flex items-center gap-3 p-3"><div className="min-w-0 flex-1"><p className="truncate text-sm font-medium">{s.name}</p><p className="truncate text-xs text-serene-neutral-500" dangerouslySetInnerHTML={{ __html: "" }} /></div>
-								<Button size="icon" variant="ghost" aria-label={`Delete ${s.name}`} onClick={async () => { await deleteSnippet(s.id); onSnippetsChanged(); }}><Trash2 className="h-4 w-4" /></Button>
-							</li>
-						))}
-					</ul>
-					<div className="space-y-2 rounded-xl border border-dashed border-serene-neutral-200 p-3">
-						<Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Snippet name, e.g. Intro" />
-						<Textarea value={body} onChange={(e) => setBody(e.target.value)} rows={3} placeholder="The text to insert" />
-						<Button size="sm" disabled={busy || !name.trim() || !body.trim()} onClick={async () => {
-							setBusy(true);
-							try {
-								const html = body.split(/\n{2,}/).map((p) => `<p>${p.replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[c]!).replace(/\n/g, "<br>")}</p>`).join("");
-								await saveSnippet(null, name, html);
-								setName(""); setBody(""); onSnippetsChanged();
-							} catch (e) { toast({ title: "Could not save", description: e instanceof Error ? e.message : undefined, variant: "destructive" }); } finally { setBusy(false); }
-						}}>Save snippet</Button>
-					</div>
-				</section>
+			<DialogContent className="flex h-[min(86vh,720px)] max-w-3xl flex-col gap-0 overflow-hidden p-0 sm:flex-row">
+				<DialogHeader className="sr-only"><DialogTitle>Mail settings</DialogTitle></DialogHeader>
+				<nav aria-label="Settings sections" className="flex shrink-0 gap-1 overflow-x-auto border-b border-black/[0.06] bg-[#f9f9f8] p-2 sm:w-52 sm:flex-col sm:border-b-0 sm:border-r">
+					<p className="hidden px-3 pb-2 pt-3 text-base font-semibold text-[#37352f] sm:block">Settings</p>
+					{TABS.map(([k, l]) => (
+						<button key={k} onClick={() => setTab(k)} aria-current={tab === k ? "page" : undefined} className={cn("shrink-0 rounded-lg px-3 py-2 text-left text-sm", tab === k ? "bg-sauti-teal-light/70 font-semibold text-sauti-dark" : "text-[#37352f] hover:bg-black/[0.05]")}>{l}</button>
+					))}
+				</nav>
+
+				<div className="min-h-0 flex-1 overflow-y-auto p-5">
+					{tab === "general" && (
+						<div>
+							<h3 className="text-lg font-semibold">General</h3>
+							<div className={row}><div><p className="text-sm font-medium">Open messages as</p><p className="text-xs text-[#787774]">Where a message opens when you click it.</p></div>
+								<select value={layout} onChange={(e) => onLayout(e.target.value as "side" | "center" | "full")} className={sel}><option value="side">Side peek</option><option value="center">Center peek</option><option value="full">Full page</option></select>
+							</div>
+							<div className={row}><div><p className="text-sm font-medium">Undo send</p><p className="text-xs text-[#787774]">How long you have to take a message back after pressing Send.</p></div>
+								<select value={prefs.undoSeconds} onChange={(e) => change({ undoSeconds: Number(e.target.value) as MailPrefs["undoSeconds"] })} className={sel}>{[0, 5, 10, 20, 30].map((n) => <option key={n} value={n}>{n === 0 ? "Off" : `${n} seconds`}</option>)}</select>
+							</div>
+							<div className={row}><div><p className="text-sm font-medium">Default reply behaviour</p><p className="text-xs text-[#787774]">What the R shortcut and the main reply action do.</p></div>
+								<select value={prefs.replyDefault} onChange={(e) => change({ replyDefault: e.target.value as MailPrefs["replyDefault"] })} className={sel}><option value="reply">Reply</option><option value="reply_all">Reply all</option></select>
+							</div>
+							<div className={row}><div><p className="text-sm font-medium">Conversation view</p><p className="text-xs text-[#787774]">Group messages with the same subject and show the thread count.</p></div>
+								<Switch checked={prefs.conversationView} onCheckedChange={(v) => change({ conversationView: v })} />
+							</div>
+							<div className={row}><div><p className="text-sm font-medium">Density</p><p className="text-xs text-[#787774]">How tightly the message list is spaced.</p></div>
+								<select value={prefs.density} onChange={(e) => change({ density: e.target.value as MailPrefs["density"] })} className={sel}><option value="comfortable">Comfortable</option><option value="compact">Compact</option></select>
+							</div>
+						</div>
+					)}
+
+					{tab === "signature" && (
+						<div><h3 className="mb-2 text-lg font-semibold">Signature</h3>{open && <SignatureSettings initial={signature} onSaved={(h) => onSignatureSaved?.(h)} />}</div>
+					)}
+
+					{tab === "labels" && (
+						<div className="space-y-3">
+							<div className="flex items-center justify-between"><h3 className="text-lg font-semibold">Labels</h3><Button size="sm" variant="outline" className="gap-1.5" onClick={() => onEditLabel({})}><Plus className="h-4 w-4" /> Create new label</Button></div>
+							<ul className="divide-y divide-black/[0.06] rounded-xl border border-black/[0.08]">
+								{labels.map((l) => (
+									<li key={l.id} className="flex items-center gap-3 p-3">
+										<span className={cn("h-3 w-3 rounded-full", LABEL_COLORS[l.color]?.dot ?? "bg-sauti-teal")} />
+										<span className="min-w-0 flex-1 truncate text-sm font-medium">{l.name}</span>
+										<Button size="sm" variant="ghost" onClick={() => onEditLabel(l)}>Edit</Button>
+									</li>
+								))}
+								{labels.length === 0 && <li className="p-4 text-sm text-[#787774]">No labels yet.</li>}
+							</ul>
+						</div>
+					)}
+
+					{tab === "accounts" && (
+						<div className="space-y-3">
+							<div className="flex items-center justify-between"><h3 className="text-lg font-semibold">Accounts and import</h3><Button size="sm" variant="outline" className="gap-1.5" onClick={onConnect}><Plus className="h-4 w-4" /> Add a mail account</Button></div>
+							<p className="text-xs text-[#787774]">Each mailbox can be read over IMAP or POP3 and sends over SMTP. Change the servers, ports and security here, like Gmail&apos;s Check mail from other accounts.</p>
+							<ul className="space-y-2">
+								{accounts.map((a) => (
+									<li key={a.id} className="rounded-xl border border-black/[0.08]">
+										<div className="flex items-center gap-3 p-3">
+											<div className="min-w-0 flex-1"><p className="truncate text-sm font-medium">{a.email}</p><p className="text-xs text-[#787774]">{a.auth_type === "password" ? a.protocol.toUpperCase() : `Signed in with ${a.auth_type === "google" ? "Google" : "Microsoft"}`}</p></div>
+											<Button size="sm" variant="ghost" onClick={() => setEditing(editing === a.id ? null : a.id)}>{editing === a.id ? "Close" : "Edit settings"}</Button>
+											<Button size="sm" variant="ghost" className="text-red-600" onClick={async () => { if (window.confirm(`Disconnect ${a.email}? Your email stays in the mailbox.`)) { await removeAccount(a.id); clearMailCache(); onAccountsChanged(); } }}>Disconnect</Button>
+										</div>
+										{editing === a.id && <ServersForm id={a.id} onSaved={() => { clearMailCache(); onAccountsChanged(); }} />}
+									</li>
+								))}
+								{accounts.length === 0 && <li className="rounded-xl border border-black/[0.08] p-4 text-sm text-[#787774]">None connected.</li>}
+							</ul>
+						</div>
+					)}
+
+					{tab === "filters" && (
+						<div className="space-y-3">
+							<h3 className="text-lg font-semibold">Filters and blocked addresses</h3>
+							<p className="text-sm text-[#787774]">Messages from blocked senders are hidden from your lists. Add an address, or a whole domain such as @example.org.</p>
+							<form className="flex gap-2" onSubmit={(e) => { e.preventDefault(); const v = block.trim().toLowerCase(); if (!v) return; setBlock(""); change({ blocked: [...new Set([...prefs.blocked, v])] }); }}>
+								<Input value={block} onChange={(e) => setBlock(e.target.value)} placeholder="name@example.org or @example.org" aria-label="Address to block" />
+								<Button type="submit" disabled={!block.trim()}>Block</Button>
+							</form>
+							<ul className="divide-y divide-black/[0.06] rounded-xl border border-black/[0.08]">
+								{prefs.blocked.map((b) => (
+									<li key={b} className="flex items-center gap-3 p-3 text-sm"><span className="min-w-0 flex-1 truncate">{b}</span><Button size="sm" variant="ghost" onClick={() => change({ blocked: prefs.blocked.filter((x) => x !== b) })}>Unblock</Button></li>
+								))}
+								{prefs.blocked.length === 0 && <li className="p-4 text-sm text-[#787774]">No blocked addresses.</li>}
+							</ul>
+							<p className="text-xs text-[#787774]">To sort mail automatically, create a label with a plain-language rule under Labels.</p>
+						</div>
+					)}
+
+					{tab === "templates" && (
+						<div className="space-y-2">
+							<h3 className="text-lg font-semibold">Templates</h3>
+							<p className="text-xs text-[#787774]">Reusable text. In a message, type / and pick the template.</p>
+							<ul className="divide-y divide-black/[0.06] rounded-xl border border-black/[0.08]">
+								{snippets.map((s) => (
+									<li key={s.id} className="flex items-center gap-3 p-3"><p className="min-w-0 flex-1 truncate text-sm font-medium">{s.name}</p>
+										<Button size="icon" variant="ghost" aria-label={`Delete ${s.name}`} onClick={async () => { await deleteSnippet(s.id); onSnippetsChanged(); }}><Trash2 className="h-4 w-4" /></Button>
+									</li>
+								))}
+								{snippets.length === 0 && <li className="p-4 text-sm text-[#787774]">No templates yet.</li>}
+							</ul>
+							<div className="space-y-2 rounded-xl border border-dashed border-black/15 p-3">
+								<Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Template name, e.g. Intro" />
+								<Textarea value={body} onChange={(e) => setBody(e.target.value)} rows={3} placeholder="The text to insert" />
+								<Button size="sm" disabled={busy || !name.trim() || !body.trim()} onClick={async () => {
+									setBusy(true);
+									try {
+										const html = body.split(/\n{2,}/).map((p) => `<p>${p.replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[c]!).replace(/\n/g, "<br>")}</p>`).join("");
+										await saveSnippet(null, name, html);
+										setName(""); setBody(""); onSnippetsChanged();
+									} catch (e) { toast({ title: "Could not save", description: e instanceof Error ? e.message : undefined, variant: "destructive" }); } finally { setBusy(false); }
+								}}>Save template</Button>
+							</div>
+						</div>
+					)}
+				</div>
 			</DialogContent>
 		</Dialog>
+	);
+}
+
+/** Editable server settings for one mailbox. Tested before they are kept. */
+function ServersForm({ id, onSaved }: { id: string; onSaved: () => void }) {
+	const { toast } = useToast();
+	const [s, setS] = useState<AccountServers | null>(null);
+	const [pw, setPw] = useState("");
+	const [busy, setBusy] = useState(false);
+	useEffect(() => { getAccountServers(id).then(setS).catch((e) => toast({ title: "Could not load the settings", description: e instanceof Error ? e.message : undefined, variant: "destructive" })); }, [id, toast]);
+	if (!s) return <p className="border-t border-black/[0.06] p-4 text-sm text-[#787774]">Loading...</p>;
+	const set = (patch: Partial<AccountServers>) => setS({ ...s, ...patch });
+	const locked = s.auth_type !== "password";
+	const f = "h-9";
+	return (
+		<div className="space-y-3 border-t border-black/[0.06] p-4">
+			<label className="block text-xs font-medium text-[#787774]">Name<Input className={f} value={s.label} onChange={(e) => set({ label: e.target.value })} /></label>
+			{locked ? (
+				<p className="text-xs text-[#787774]">This mailbox signs in with {s.auth_type === "google" ? "Google" : "Microsoft"}, so its servers are managed for you.</p>
+			) : (
+				<>
+					<div className="grid gap-3 sm:grid-cols-[1fr_90px_120px]">
+						<label className="block text-xs font-medium text-[#787774]">Incoming ({s.protocol.toUpperCase()}) server<Input className={f} value={s.imap_host} onChange={(e) => set({ imap_host: e.target.value })} /></label>
+						<label className="block text-xs font-medium text-[#787774]">Port<Input className={f} inputMode="numeric" value={s.imap_port} onChange={(e) => set({ imap_port: Number(e.target.value.replace(/\D/g, "")) })} /></label>
+						<label className="block text-xs font-medium text-[#787774]">Security<select className="h-9 w-full rounded-md border border-input bg-white px-2 text-sm" value={s.imap_secure ? "ssl" : "starttls"} onChange={(e) => set({ imap_secure: e.target.value === "ssl" })}><option value="ssl">SSL/TLS</option><option value="starttls">STARTTLS</option></select></label>
+					</div>
+					<div className="grid gap-3 sm:grid-cols-[1fr_90px_120px]">
+						<label className="block text-xs font-medium text-[#787774]">Outgoing (SMTP) server<Input className={f} value={s.smtp_host} onChange={(e) => set({ smtp_host: e.target.value })} /></label>
+						<label className="block text-xs font-medium text-[#787774]">Port<Input className={f} inputMode="numeric" value={s.smtp_port} onChange={(e) => set({ smtp_port: Number(e.target.value.replace(/\D/g, "")) })} /></label>
+						<label className="block text-xs font-medium text-[#787774]">Security<select className="h-9 w-full rounded-md border border-input bg-white px-2 text-sm" value={s.smtp_secure ? "ssl" : "starttls"} onChange={(e) => set({ smtp_secure: e.target.value === "ssl" })}><option value="ssl">SSL/TLS</option><option value="starttls">STARTTLS</option></select></label>
+					</div>
+					<div className="grid gap-3 sm:grid-cols-2">
+						<label className="block text-xs font-medium text-[#787774]">Username<Input className={f} value={s.username} onChange={(e) => set({ username: e.target.value })} /></label>
+						<label className="block text-xs font-medium text-[#787774]">New password <span className="font-normal">(leave empty to keep)</span><Input className={f} type="password" autoComplete="new-password" value={pw} onChange={(e) => setPw(e.target.value)} /></label>
+					</div>
+				</>
+			)}
+			<div className="flex justify-end">
+				<Button size="sm" className="gap-2 bg-sauti-teal hover:bg-sauti-dark" disabled={busy} onClick={async () => {
+					setBusy(true);
+					try {
+						await updateAccountServers(id, { label: s.label, ...(locked ? {} : { username: s.username, password: pw || undefined, imapHost: s.imap_host, imapPort: s.imap_port, imapSecure: s.imap_secure, smtpHost: s.smtp_host, smtpPort: s.smtp_port, smtpSecure: s.smtp_secure }) });
+						setPw("");
+						toast({ title: "Settings saved", description: locked ? undefined : "Both reading and sending were tested." });
+						onSaved();
+					} catch (e) {
+						toast({ title: "Could not save", description: e instanceof Error ? e.message : undefined, variant: "destructive" });
+					} finally {
+						setBusy(false);
+					}
+				}}>{busy && <Loader2 className="h-4 w-4 animate-spin" />} {locked ? "Save" : "Test and save"}</Button>
+			</div>
+		</div>
 	);
 }
 

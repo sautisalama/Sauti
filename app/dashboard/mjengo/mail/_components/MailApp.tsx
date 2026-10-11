@@ -21,7 +21,7 @@ import {
 } from "./api";
 import { Composer, type ComposeSeed } from "./Composer";
 import { ConnectDialog, LabelDialog, LABEL_COLORS, SettingsDialog, ViewDialog } from "./Dialogs";
-import { getSignature, mailBootstrap, type SignatureState } from "./api";
+import { getMailPrefs, getSignature, mailBootstrap, type MailPrefs, type SignatureState } from "./api";
 import { PersonChip } from "./PersonChip";
 import { unwrap } from "@/lib/action-result";
 import { addContactFromMail } from "@/app/actions/mjengo-contacts";
@@ -78,6 +78,7 @@ export function MailApp() {
 	const [views, setViews] = useState<ViewRow[]>([]);
 	const [snippets, setSnippets] = useState<SnippetRow[]>([]);
 	const [signature, setSignature] = useState<SignatureState | null>(null);
+	const [prefs, setPrefs] = useState<MailPrefs>({ undoSeconds: 5, replyDefault: "reply", conversationView: true, density: "comfortable", blocked: [] });
 		const [labels, setLabels] = useState<LabelRow[]>([]);
 	const [labelEdit, setLabelEdit] = useState<Partial<LabelRow> | null>(null);
 	const [dropOn, setDropOn] = useState<string | null>(null);
@@ -171,6 +172,8 @@ export function MailApp() {
 			})
 			.catch(() => setAccounts([]));
 	}, []);
+
+	useEffect(() => { getMailPrefs().then(setPrefs).catch(() => undefined); }, []);
 
 	useEffect(() => {
 		if (!accountId) return;
@@ -369,7 +372,7 @@ export function MailApp() {
 				case "u": if (selected) act(selected, selected.seen ? "unread" : "read"); break;
 				case "s": if (selected) act(selected, selected.flagged ? "unstar" : "star"); break;
 				case "#": case "Delete": case "Backspace": if (selected) act(selected, "trash"); break;
-				case "r": if (detail) startReply(detail, false); break;
+				case "r": if (detail) startReply(detail, prefs.replyDefault === "reply_all"); break;
 			}
 		};
 		window.addEventListener("keydown", onKey);
@@ -395,8 +398,12 @@ export function MailApp() {
 		);
 	}
 
+	const isBlocked = (address: string) => {
+		const a = address.toLowerCase();
+		return prefs.blocked.some((b) => (b.startsWith("@") ? a.endsWith(b) : a === b));
+	};
 	const groups: { label: string; items: MessageRow[] }[] = [];
-	for (const r of rows) {
+	for (const r of rows.filter((x) => !isBlocked(x.from.address))) {
 		const label = groupLabel(r.date, active.config.group ?? "date", displayName(r.from), r.seen);
 		const g = groups.find((x) => x.label === label);
 		if (g) g.items.push(r); else groups.push({ label, items: [r] });
@@ -517,12 +524,12 @@ const Pane = (
 							<ul>
 								{g.items.map((m) => (
 									<li key={m.uid} className="group relative" draggable={!!m.messageId} onDragStart={(e) => { if (m.messageId) { e.dataTransfer.setData("text/x-message-id", m.messageId); e.dataTransfer.effectAllowed = "copy"; } }}>
-										<button onClick={() => open(m)} className={cn("-mx-2 flex w-[calc(100%+1rem)] touch-manipulation items-center gap-3 rounded-md px-2 py-[11px] text-left text-[15px] transition-colors hover:bg-black/[0.04]", selected?.uid === m.uid && "bg-black/[0.05]")}>
+										<button onClick={() => open(m)} className={cn("-mx-2 flex w-[calc(100%+1rem)] touch-manipulation items-center gap-3 rounded-md px-2 text-left text-[15px]", prefs.density === "compact" ? "py-1.5" : "py-[11px]", " transition-colors hover:bg-black/[0.04]", selected?.uid === m.uid && "bg-black/[0.05]")}>
 											<span className={cn("h-[7px] w-[7px] shrink-0 rounded-full", m.seen ? "bg-transparent" : "bg-sauti-teal")} aria-label={m.seen ? undefined : "Unread"} />
 											<span className={cn("w-[34%] max-w-[300px] shrink-0 truncate text-[#37352f] sm:w-[28%]", !m.seen && "font-semibold")}>{displayName(m.from)}</span>
 											<span className={cn("min-w-0 flex-1 truncate text-[#37352f]", !m.seen && "font-medium")}>
 												{m.subject}
-												{m.thread > 1 && <span className="ml-2 rounded bg-black/[0.05] px-1.5 py-0.5 text-[11px] text-[#787774]">{m.thread}</span>}
+												{prefs.conversationView && m.thread > 1 && <span className="ml-2 rounded bg-black/[0.05] px-1.5 py-0.5 text-[11px] text-[#787774]">{m.thread}</span>}
 											</span>
 											{m.labels.slice(0, 2).map((id) => { const l = labels.find((x) => x.id === id); return l ? <span key={id} className="hidden shrink-0 rounded bg-black/[0.05] px-2 py-0.5 text-[13px] text-[#37352f] md:inline">{l.name}</span> : null; })}
 											<AvatarStack ids={teamIds([m.from.address])} team={team} className="hidden sm:flex" />
@@ -554,9 +561,9 @@ const Pane = (
 				<Dialog open onOpenChange={(o) => !o && close()}><DialogContent className="h-[88vh] max-w-3xl gap-0 overflow-hidden p-0 [&>button]:hidden"><DialogTitle className="sr-only">Message</DialogTitle>{Pane}</DialogContent></Dialog>
 			)}
 
-			{compose && accountId && <Composer accounts={accounts} accountId={accountId} seed={compose} snippets={snippets} signature={signature?.html ?? ""} onClose={() => setCompose(null)} onSent={() => { setCompose(null); if (active.config.mailbox === "sent") loadList(false); }} />}
+			{compose && accountId && <Composer accounts={accounts} accountId={accountId} seed={compose} snippets={snippets} signature={signature?.html ?? ""} undoSeconds={prefs.undoSeconds} onReopen={(seed) => setCompose(seed)} onClose={() => setCompose(null)} onSent={() => { setCompose(null); if (active.config.mailbox === "sent") loadList(false); }} />}
 			<ConnectDialog open={connectOpen} onClose={() => setConnectOpen(false)} onConnected={(a) => { setAccounts((p) => [...(p ?? []), a]); setAccountId(a.id); }} />
-			<SettingsDialog open={settingsOpen} onClose={() => setSettingsOpen(false)} accounts={accounts} onAccountsChanged={() => loadAccounts().catch(() => undefined)} onConnect={() => setConnectOpen(true)} snippets={snippets} onSnippetsChanged={() => loadMeta().catch(() => undefined)} layout={layout} onLayout={changeLayout} signature={signature?.html ?? ""} onSignatureSaved={(html) => setSignature({ html, configured: !!html, dismissed: true })} />
+			<SettingsDialog open={settingsOpen} onClose={() => setSettingsOpen(false)} accounts={accounts} onAccountsChanged={() => loadAccounts().catch(() => undefined)} onConnect={() => setConnectOpen(true)} snippets={snippets} onSnippetsChanged={() => loadMeta().catch(() => undefined)} layout={layout} onLayout={changeLayout} signature={signature?.html ?? ""} onSignatureSaved={(html) => setSignature({ html, configured: !!html, dismissed: true })} prefs={prefs} onPrefs={setPrefs} labels={labels} onEditLabel={(l) => { setSettingsOpen(false); setLabelEdit(l); }} />
 			{labelEdit && (
 				<LabelDialog
 					label={labelEdit}

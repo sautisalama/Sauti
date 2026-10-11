@@ -14,6 +14,7 @@ import { cn } from "@/lib/utils";
 import { draftReply, rewriteText, sendMail, type AccountView, type SnippetRow } from "./api";
 import { createClient } from "@/utils/supabase/client";
 import { RecipientField } from "./RecipientField";
+import { ToastAction } from "@/components/ui/toast";
 import { checkRecipients, grantViewTo, searchFiles, type RecipientCheck } from "../../vault/api";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
@@ -64,7 +65,7 @@ const toBase64 = (f: File) =>
  * Compose window with a block editor: type "/" for headings, lists, to-dos, quotes, dividers and your
  * saved snippets. Cmd/Ctrl+Enter sends.
  */
-export function Composer({ accounts, accountId, seed, snippets, signature = "", onClose, onSent }: { accounts: AccountView[]; accountId: string; seed: ComposeSeed; snippets: SnippetRow[]; signature?: string; onClose: () => void; onSent: () => void }) {
+export function Composer({ accounts, accountId, seed, snippets, signature = "", undoSeconds = 0, onReopen, onClose, onSent }: { accounts: AccountView[]; accountId: string; seed: ComposeSeed; snippets: SnippetRow[]; signature?: string; undoSeconds?: number; onReopen?: (seed: ComposeSeed) => void; onClose: () => void; onSent: () => void }) {
 	const { toast } = useToast();
 	const [from, setFrom] = useState(accountId);
 	const [to, setTo] = useState((seed.to ?? []).join(", "));
@@ -223,7 +224,7 @@ export function Composer({ accounts, accountId, seed, snippets, signature = "", 
 		if (!subject.trim() && !window.confirm("Send without a subject?")) return;
 		setSending(true);
 		try {
-			await sendMail({
+			const payload = {
 				accountId: from,
 				to: recipients,
 				cc: splitAddresses(cc),
@@ -236,7 +237,30 @@ export function Composer({ accounts, accountId, seed, snippets, signature = "", 
 					vaultLinks: vlist.filter((v) => v.mode === "link").map((v) => v.id),
 					vaultAttach: vlist.filter((v) => v.mode === "attach").map((v) => v.id),
 					acknowledgeNoAccess,
-			});
+			};
+			// Undo send: hold the message for a few seconds; Undo puts it back in the composer.
+			if (undoSeconds > 0 && onReopen) {
+				let cancelled = false;
+				const back: ComposeSeed = { to: recipients, cc: splitAddresses(cc), subject, html: editor.getHTML(), inReplyTo: seed.inReplyTo, references: seed.references, replyTo: seed.replyTo };
+				const timer = setTimeout(async () => {
+					if (cancelled) return;
+					try {
+						await sendMail(payload);
+						toast({ title: "Sent" });
+					} catch (e) {
+						toast({ title: "Not sent", description: e instanceof Error ? e.message : undefined, variant: "destructive" });
+						onReopen(back);
+					}
+				}, undoSeconds * 1000);
+				toast({
+					title: "Sending",
+					duration: undoSeconds * 1000,
+					action: <ToastAction altText="Undo send" onClick={() => { cancelled = true; clearTimeout(timer); onReopen(back); }}>Undo</ToastAction>,
+				});
+				onSent();
+				return;
+			}
+			await sendMail(payload);
 			toast({ title: "Sent" });
 			onSent();
 		} catch (e) {
