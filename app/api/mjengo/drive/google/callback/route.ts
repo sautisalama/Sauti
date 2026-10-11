@@ -6,7 +6,7 @@ import { logAudit } from "@/lib/access/audit";
 import { DRIVE_BUCKET, DRIVE_FOLDER_NAME, DRIVE_MAX_BYTES, resolveDriveSource, safeReturn } from "@/lib/mjengo-drive";
 
 export const runtime = "nodejs";
-export const maxDuration = 120;
+export const maxDuration = 60;
 
 const API = "https://www.googleapis.com/drive/v3";
 const UPLOAD = "https://www.googleapis.com/upload/drive/v3/files";
@@ -101,7 +101,7 @@ export async function GET(request: Request) {
 			method: "PUT",
 			headers: { "Content-Type": mime, "Content-Length": String(blob.size) },
 			body: Buffer.from(await blob.arrayBuffer()),
-			signal: AbortSignal.timeout(100_000),
+			signal: AbortSignal.timeout(45_000),
 		});
 		if (!up.ok) return fail(await driveError(up));
 		const file = (await up.json()) as { id: string; name: string; webViewLink?: string };

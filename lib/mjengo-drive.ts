@@ -3,7 +3,7 @@ import { atLeast, levelFor, loadIndex, oversightFor } from '@/lib/vault/access';
 import type { Actor } from '@/lib/access/super-admin';
 
 export const DRIVE_BUCKET = 'mjengo-docs';
-export const DRIVE_MAX_BYTES = 50 * 1024 * 1024;
+export const DRIVE_MAX_BYTES = 25 * 1024 * 1024;
 export const DRIVE_FOLDER_NAME = 'Sauti Salama';
 
 export interface DriveSource {
