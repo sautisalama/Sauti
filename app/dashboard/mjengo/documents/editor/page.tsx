@@ -10,6 +10,7 @@ import { MjengoLoader } from "../../_components/MjengoLoader";
 import { createClient } from "@/utils/supabase/client";
 import { useUser } from "@/hooks/useUser";
 import { SupabaseYProvider } from "@/lib/client/supabase-yjs";
+import { listTemplates } from "@/app/actions/mjengo-templates";
 import { useToast } from "@/hooks/use-toast";
 import { putToSignedUrl } from "@/lib/client/upload";
 import { finishReplace, getFileUrl, prepareReplace, prepareUpload, registerUpload } from "../../vault/api";
@@ -49,6 +50,7 @@ function EditorScreen() {
 	const params = useSearchParams();
 	const initialFile = params.get("file");
 	const folderParam = params.get("folder");
+	const templateId = params.get("template");
 
 	const ref = useRef<WordcraftEditorRef>(null);
 	const [fileId, setFileId] = useState<string | null>(initialFile);
@@ -56,7 +58,27 @@ function EditorScreen() {
 	const [folderId, setFolderId] = useState<string | null>(folderParam);
 	const [level, setLevel] = useState<"view" | "share" | "edit">("edit");
 	const [doc, setDoc] = useState<{ name: string; data: ArrayBuffer } | null>(null);
-	const [loading, setLoading] = useState(!!initialFile);
+	const [loading, setLoading] = useState(!!initialFile || !!templateId);
+
+	// A new document that starts from a template.
+	useEffect(() => {
+		if (!templateId || initialFile) return;
+		let cancelled = false;
+		(async () => {
+			try {
+				const r = await listTemplates("document");
+				const t = r.ok ? r.data.find((x) => x.id === templateId) : null;
+				if (t && !cancelled) {
+					const html = `<!doctype html><html><head><meta charset="utf-8"><title>${t.name}</title></head><body>${t.body}</body></html>`;
+					setDoc({ name: `${t.name}.html`, data: new TextEncoder().encode(html).buffer as ArrayBuffer });
+					setName(`${t.name}.docx`);
+				}
+			} finally {
+				if (!cancelled) setLoading(false);
+			}
+		})();
+		return () => { cancelled = true; };
+	}, [templateId, initialFile]);
 
 	// Open an existing file from the vault.
 	useEffect(() => {

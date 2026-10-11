@@ -18,6 +18,8 @@ import * as ai from "@/app/actions/mjengo-ai";
 import type { PostRow } from "@/app/actions/mjengo-content";
 import type { AssetRow } from "@/app/actions/mjengo-ai";
 import { MjengoLoader } from "../_components/MjengoLoader";
+import { TemplatePicker } from "../_components/TemplatePicker";
+import { saveTemplate } from "@/app/actions/mjengo-templates";
 
 const STATUS: Record<PostRow["status"], string> = { draft: "Draft", scheduled: "Scheduled", posted: "Posted", cancelled: "Cancelled" };
 const toLocalInput = (iso: string | null) => (iso ? format(new Date(iso), "yyyy-MM-dd'T'HH:mm") : "");
@@ -218,6 +220,7 @@ function PostDialog({ post, assets, state, onClose, onSaved }: { post: (Partial<
 	const [v, setV] = useState(post);
 	const [busy, setBusy] = useState(false);
 	const [tab, setTab] = useState<"shared" | Channel>("shared");
+	const [pickTpl, setPickTpl] = useState(false);
 	useEffect(() => { setV(post); setTab("shared"); }, [post]);
 	if (!v) return null;
 
@@ -297,6 +300,15 @@ function PostDialog({ post, assets, state, onClose, onSaved }: { post: (Partial<
 
 					{tab === "shared" ? (
 						<div className="space-y-1.5">
+							<div className="flex flex-wrap items-center gap-2">
+								<Button type="button" variant="outline" size="sm" className="h-7 gap-1.5 text-xs" onClick={() => setPickTpl(true)}>Use a template</Button>
+								<Button type="button" variant="ghost" size="sm" className="h-7 text-xs" disabled={!body.trim()} onClick={async () => {
+									const n = window.prompt("Name this template");
+									if (!n?.trim()) return;
+									try { await unwrap(saveTemplate(null, { kind: "post", name: n, body })); toast({ title: "Template saved" }); } catch (e) { toast({ title: "Could not save the template", description: e instanceof Error ? e.message : undefined, variant: "destructive" }); }
+								}}>Save this text as a template</Button>
+								<Button asChild type="button" variant="ghost" size="sm" className="ml-auto h-7 text-xs"><Link href="/dashboard/mjengo/design">Design an image</Link></Button>
+							</div>
 							<Textarea rows={6} value={body} onChange={(e) => setV({ ...v, body: e.target.value })} placeholder="What do you want to say?" aria-label="Post text" />
 							<Input value={v.link_url ?? ""} onChange={(e) => setV({ ...v, link_url: e.target.value })} placeholder="Link to share (tracking tags are added for each network)" aria-label="Link" />
 						</div>
@@ -370,6 +382,9 @@ function PostDialog({ post, assets, state, onClose, onSaved }: { post: (Partial<
 						<Button className="gap-2 bg-sauti-teal hover:bg-sauti-dark" disabled={busy || !v.whenLocal || over.length > 0} onClick={async () => { if (await save("scheduled")) await onSaved(); }}>{busy && <Loader2 className="h-4 w-4 animate-spin" />} Schedule</Button>
 					</div>
 				</DialogFooter>
+				<TemplatePicker kind="post" open={pickTpl} title="Post templates" onClose={() => setPickTpl(false)} onPick={(t) => { if (t) setV((cur) => (cur ? { ...cur, body: cur.body?.trim() ? `${cur.body}
+
+${t.body}` : t.body } : cur)); setPickTpl(false); }} />
 			</DialogContent>
 		</Dialog>
 	);

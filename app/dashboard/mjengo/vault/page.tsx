@@ -11,6 +11,7 @@ import { unwrap } from "@/lib/action-result";
 import { clearFilesInbox } from "@/app/actions/mjengo-nav";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import RequirementsPanel from "../documents/page";
+import { TemplatePicker } from "../_components/TemplatePicker";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -48,6 +49,7 @@ export default function VaultPage() {
 	const [typeFilter, setTypeFilter] = useState<string>("all");
 	const [driveRename, setDriveRename] = useState<{ id: string; name: string } | null>(null);
 	const [addLink, setAddLink] = useState(false);
+	const [pickDoc, setPickDoc] = useState(false);
 	const [view, setView] = useState<"list" | "grid">("list");
 	const [fold, setFold] = useState<Record<string, boolean>>({});
 	useEffect(() => {
@@ -232,7 +234,7 @@ export default function VaultPage() {
 			{!folderId && tab === "mine" && (
 				<Fold id="new" title="Start something new" openMap={fold} onToggle={toggleFold}>
 					<section aria-label="Start something new" className="grid grid-cols-2 gap-3 sm:grid-cols-5">
-						<NewCard badge="DOCX" tone="bg-[#3b8bc2]" label="Document" onClick={() => { window.location.href = "/dashboard/mjengo/documents/editor"; }} />
+						<NewCard badge="DOCX" tone="bg-[#3b8bc2]" label="Document" onClick={() => setPickDoc(true)} hint="Blank or from a template" />
 						<NewCard badge="XLSX" tone="bg-[#43a047]" label="Spreadsheet" onClick={() => { window.location.href = "/dashboard/mjengo/files/sheet"; }} />
 						<NewCard badge="PPTX" tone="bg-[#ef7d3c]" label="Presentation" soon />
 						<NewCard badge="PDF" tone="bg-[#e0483d]" label="PDF" onClick={() => pdfInput.current?.click()} hint="Add a PDF to sign or mark up" />
@@ -405,6 +407,14 @@ export default function VaultPage() {
 				</Fold>
 			)}
 
+			<TemplatePicker
+				kind="document"
+				open={pickDoc}
+				title="New document"
+				blankLabel="Blank document"
+				onClose={() => setPickDoc(false)}
+				onPick={(t) => { window.location.href = `/dashboard/mjengo/documents/editor${t ? `?template=${encodeURIComponent(t.id)}` : ""}${folderId ? `${t ? "&" : "?"}folder=${folderId}` : ""}`; }}
+			/>
 			<AddLinkDialog open={addLink} onClose={() => setAddLink(false)} folderId={folderId} onAdded={() => { setAddLink(false); load(); }} />
 
 			<NameDialog
