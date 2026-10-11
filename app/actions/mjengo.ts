@@ -216,7 +216,9 @@ export interface DocRow {
   file_size: number | null;
   mime_type: string | null;
   uploaded_at: string | null;
+  uploaded_by: string | null;
   uploaded_by_name: string | null;
+  drive_link: string | null;
   created_at: string;
 }
 
@@ -239,7 +241,7 @@ export async function listDocuments(opts: { kind?: Kind; entityId?: string } = {
   if (opts.kind) q = q.eq('entity_type', opts.kind);
   if (opts.entityId) q = q.eq('entity_id', opts.entityId);
   const { data } = await q;
-  const rows = (data ?? []) as (Omit<DocRow, 'entity_label' | 'uploaded_by_name'> & { uploaded_by: string | null })[];
+  const rows = (data ?? []) as Omit<DocRow, 'entity_label' | 'uploaded_by_name'>[];
   const labels = await labelsFor(rows);
   const uploaderIds = Array.from(new Set(rows.map((r) => r.uploaded_by).filter(Boolean))) as string[];
   const names = new Map<string, string>();

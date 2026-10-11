@@ -106,6 +106,8 @@ export async function GET(request: Request) {
 		if (!up.ok) return fail(await driveError(up));
 		const file = (await up.json()) as { id: string; name: string; webViewLink?: string };
 
+		const mark = { drive_file_id: file.id, drive_link: file.webViewLink ?? null, drive_saved_at: new Date().toISOString() };
+		await looseAdmin().from(src.kind === 'vault' ? 'vault_files' : 'mjengo_documents').update(mark).eq('id', src.id);
 		await logAudit({ actorId: actor.id, actorEmail: actor.email, action: 'vault.exported_to_drive', targetType: src.kind === 'vault' ? 'vault_file' : 'document', targetId: src.id, targetLabel: src.name });
 		const q = new URLSearchParams({ drive: "ok", name: file.name });
 		if (file.webViewLink) q.set("link", file.webViewLink);

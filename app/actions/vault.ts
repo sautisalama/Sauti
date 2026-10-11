@@ -26,6 +26,10 @@ export interface VaultItem {
   size?: number;
   mime?: string | null;
   createdAt?: string;
+  /** Where the copy in Google Drive lives, once it has been saved there. */
+  driveLink?: string | null;
+  /** Owner first, then everyone it is shared with directly. */
+  people: string[];
 }
 
 export interface VaultListing {
@@ -48,6 +52,9 @@ async function adminNames(): Promise<Map<string, string>> {
   return new Map((data ?? []).map((p: { id: string; first_name: string | null; last_name: string | null; email: string | null }) => [p.id, [p.first_name, p.last_name].filter(Boolean).join(' ') || p.email || 'Admin']));
 }
 
+/** The owner and the people it was shared with by name (not those who only inherit access). */
+const peopleOf = (c: Ctx, type: ResType, id: string, owner: string) => [owner, ...new Set(c.ix.perms.filter((p) => p.resource_type === type && p.resource_id === id && p.user_id !== owner).map((p) => p.user_id))];
+
 const lvl = (c: Ctx, type: ResType, id: string) => levelFor(c.ix, c.actor.id, type, id, c.oversight);
 
 function need(c: Ctx, type: ResType, id: string, min: Level, what: string): Level {
@@ -61,11 +68,11 @@ function toItems(c: Ctx, folders: FolderNode[], files: FileNode[]): VaultItem[] 
   const out: VaultItem[] = [];
   for (const f of folders) {
     const l = lvl(c, 'folder', f.id);
-    if (l) out.push({ type: 'folder', id: f.id, name: f.name, level: l, ownerId: f.owner_id, ownerName: c.names.get(f.owner_id) ?? 'Unknown', shared: f.general_access !== 'restricted' || sharedIds.has(`folder:${f.id}`), general: f.general_access });
+    if (l) out.push({ type: 'folder', id: f.id, name: f.name, level: l, ownerId: f.owner_id, ownerName: c.names.get(f.owner_id) ?? 'Unknown', shared: f.general_access !== 'restricted' || sharedIds.has(`folder:${f.id}`), general: f.general_access, people: peopleOf(c, 'folder', f.id, f.owner_id) });
   }
   for (const f of files) {
     const l = lvl(c, 'file', f.id);
-    if (l) out.push({ type: 'file', id: f.id, name: f.name, level: l, ownerId: f.owner_id, ownerName: c.names.get(f.owner_id) ?? 'Unknown', shared: f.general_access !== 'restricted' || sharedIds.has(`file:${f.id}`), general: f.general_access, size: f.size, mime: f.mime, createdAt: f.created_at });
+    if (l) out.push({ type: 'file', id: f.id, name: f.name, level: l, ownerId: f.owner_id, ownerName: c.names.get(f.owner_id) ?? 'Unknown', shared: f.general_access !== 'restricted' || sharedIds.has(`file:${f.id}`), general: f.general_access, size: f.size, mime: f.mime, createdAt: f.created_at, driveLink: f.drive_link, people: peopleOf(c, 'file', f.id, f.owner_id) });
   }
   return out.sort((a, b) => (a.type === b.type ? a.name.localeCompare(b.name) : a.type === 'folder' ? -1 : 1));
 }
@@ -101,7 +108,7 @@ async function createFolder_(parentId: string | null, name: string): Promise<Vau
   const { data, error } = await looseAdmin().from('vault_folders').insert({ parent_id: parentId, name: n, owner_id: c.actor.id }).select('id').single();
   if (error || !data) throw new Error('Could not create the folder.');
   await logAudit({ actorId: c.actor.id, actorEmail: c.actor.email, action: 'vault.folder_created', targetType: 'vault_folder', targetId: data.id, targetLabel: n });
-  return { type: 'folder', id: data.id, name: n, level: 'edit', ownerId: c.actor.id, ownerName: c.actor.name, shared: false, general: 'restricted' };
+  return { type: 'folder', id: data.id, name: n, level: 'edit', ownerId: c.actor.id, ownerName: c.actor.name, shared: false, general: 'restricted', people: [c.actor.id] };
 }
 
 /** Step 1 of an upload: a one-time signed URL under vault/<you>/, after checking you may write to the folder. */
@@ -125,7 +132,7 @@ async function registerUpload_(folderId: string | null, path: string, name: stri
   const { data, error } = await looseAdmin().from('vault_files').insert({ folder_id: folderId, name: n, storage_path: path, mime, size, owner_id: c.actor.id }).select('id, created_at').single();
   if (error || !data) throw new Error('Could not save the file.');
   await logAudit({ actorId: c.actor.id, actorEmail: c.actor.email, action: 'vault.file_uploaded', targetType: 'vault_file', targetId: data.id, targetLabel: n });
-  return { type: 'file', id: data.id, name: n, level: 'edit', ownerId: c.actor.id, ownerName: c.actor.name, shared: false, general: 'restricted', size, mime, createdAt: data.created_at };
+  return { type: 'file', id: data.id, name: n, level: 'edit', ownerId: c.actor.id, ownerName: c.actor.name, shared: false, general: 'restricted', size, mime, createdAt: data.created_at, people: [c.actor.id] };
 }
 
 async function renameItem_(type: ResType, id: string, name: string) {
@@ -270,7 +277,7 @@ async function listPeople_(): Promise<PersonRow[]> {
 }
 
 /** Files you may attach, for the mail composer's picker. */
-async function searchFiles_(q: string): Promise<{ id: string; name: string; size: number; level: Level; folder: string | null }[]> {
+async function searchFiles_(q: string): Promise<{ id: string; name: string; size: number; level: Level; folder: string | null; driveLink: string | null; people: string[] }[]> {
   const c = await ctx();
   const term = q.trim().toLowerCase();
   return [...c.ix.files.values()]
@@ -279,7 +286,7 @@ async function searchFiles_(q: string): Promise<{ id: string; name: string; size
     .filter((x): x is { f: FileNode; l: Level } => !!x.l)
     .sort((a, b) => b.f.created_at.localeCompare(a.f.created_at))
     .slice(0, 40)
-    .map(({ f, l }) => ({ id: f.id, name: f.name, size: f.size, level: l, folder: f.folder_id ? c.ix.folders.get(f.folder_id)?.name ?? null : null }));
+    .map(({ f, l }) => ({ id: f.id, name: f.name, size: f.size, level: l, folder: f.folder_id ? c.ix.folders.get(f.folder_id)?.name ?? null : null, driveLink: f.drive_link, people: peopleOf(c, 'file', f.id, f.owner_id) }));
 }
 
 export interface RecipientCheck {

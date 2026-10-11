@@ -2,6 +2,7 @@
 
 import { MjengoLoader } from "../_components/MjengoLoader";
 import { DriveResult, saveToDrive } from "../_components/drive";
+import { AvatarStack, DriveBadge, useTeam } from "../_components/People";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -22,10 +23,11 @@ import { cn } from "@/lib/utils";
 /** Every document across grants, opportunities and projects in one place. */
 export default function DocumentsPage() {
 	const { toast } = useToast();
+	const team = useTeam();
 	const router = useRouter();
 	const pick = useRef<HTMLInputElement>(null);
 	const [uploading, setUploading] = useState(false);
-	const [written, setWritten] = useState<{ id: string; name: string; size: number; folder: string | null }[]>([]);
+	const [written, setWritten] = useState<{ id: string; name: string; size: number; folder: string | null; driveLink: string | null; people: string[] }[]>([]);
 	const [docs, setDocs] = useState<DocRow[] | null>(null);
 	const [q, setQ] = useState("");
 	const [kind, setKind] = useState<Kind | "all">("all");
@@ -105,7 +107,9 @@ export default function DocumentsPage() {
 							<li key={w.id} className="group relative">
 								<Link href={`/dashboard/mjengo/documents/editor?file=${w.id}`} className="flex items-center gap-3 rounded-2xl border border-serene-neutral-200/70 bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04)] p-3 pr-11 transition hover:border-sauti-teal/40 hover:shadow-sm">
 									<span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-sauti-teal-light text-sauti-teal"><FileText className="h-5 w-5" /></span>
-									<span className="min-w-0"><span className="block truncate text-sm font-medium text-serene-neutral-900">{w.name}</span><span className="block truncate text-xs text-serene-neutral-500">{w.folder ?? "Vault"} · {fmtBytes(w.size)}</span></span>
+									<span className="min-w-0 flex-1"><span className="block truncate text-sm font-medium text-serene-neutral-900">{w.name}</span><span className="block truncate text-xs text-serene-neutral-500">{w.folder ?? "Vault"} · {fmtBytes(w.size)}</span></span>
+									{w.driveLink && <DriveBadge href={w.driveLink} />}
+									<AvatarStack ids={w.people} team={team} max={3} />
 								</Link>
 								<button type="button" onClick={() => saveToDrive("vault", w.id)} aria-label={`Save ${w.name} to Google Drive`} title="Save to Google Drive" className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-lg text-serene-neutral-400 opacity-0 transition hover:bg-serene-neutral-100 hover:text-sauti-teal focus:opacity-100 group-hover:opacity-100 max-sm:opacity-100"><CloudUpload className="h-4 w-4" /></button>
 							</li>
@@ -138,6 +142,8 @@ export default function DocumentsPage() {
 								<Badge variant="secondary" className="mr-1.5">{KIND_LABEL[d.entity_type]}</Badge>
 								{d.entity_label ?? "Removed"}
 							</Link>
+							{d.drive_link && <DriveBadge href={d.drive_link} />}
+							<AvatarStack ids={[d.uploaded_by]} team={team} />
 							{!d.file_path && <DeadlineChip date={d.due_date} />}
 							{d.file_path && <Button size="icon" variant="ghost" onClick={() => saveToDrive("entity", d.id)} aria-label={`Save ${d.name} to Google Drive`} title="Save to Google Drive"><CloudUpload className="h-4 w-4" /></Button>}
 							{d.file_path && <Button size="icon" variant="ghost" onClick={() => open(d)} aria-label={`Download ${d.name}`}><Download className="h-4 w-4" /></Button>}

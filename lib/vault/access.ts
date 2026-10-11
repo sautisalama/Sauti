@@ -12,7 +12,7 @@ const max = (a: Level | null, b: Level | null): Level | null => (!a ? b : !b ? a
 const fromGeneral = (g: General): Level | null => (g === 'admins_share' ? 'share' : g === 'admins_view' ? 'view' : null);
 
 export interface FolderNode { id: string; parent_id: string | null; name: string; owner_id: string; general_access: General }
-export interface FileNode { id: string; folder_id: string | null; name: string; storage_path: string; mime: string | null; size: number; owner_id: string; general_access: General; created_at: string }
+export interface FileNode { id: string; folder_id: string | null; name: string; storage_path: string; mime: string | null; size: number; owner_id: string; general_access: General; created_at: string; drive_link: string | null }
 interface Perm { resource_type: ResType; resource_id: string; user_id: string; level: Level }
 
 /** Everything needed to answer "what can this person do here" without further queries. */
@@ -26,7 +26,7 @@ export async function loadIndex(): Promise<VaultIndex> {
   const db = looseAdmin();
   const [f, fl, p] = await Promise.all([
     db.from('vault_folders').select('id, parent_id, name, owner_id, general_access'),
-    db.from('vault_files').select('id, folder_id, name, storage_path, mime, size, owner_id, general_access, created_at'),
+    db.from('vault_files').select('id, folder_id, name, storage_path, mime, size, owner_id, general_access, created_at, drive_link'),
     db.from('vault_permissions').select('resource_type, resource_id, user_id, level'),
   ]);
   return {

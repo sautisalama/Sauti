@@ -2,6 +2,7 @@
 
 import { MjengoLoader } from "../_components/MjengoLoader";
 import { DriveResult, saveToDrive } from "../_components/drive";
+import { AvatarStack, DriveBadge, useTeam } from "../_components/People";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ChevronRight, CloudUpload, Download, FileEdit, File as FileIcon, Folder, FolderPlus, HardDrive, Loader2, MoreVertical, Pencil, Share2, Trash2, Upload, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -22,6 +23,7 @@ type Tab = "mine" | "shared";
 
 /** Drive-style document vault: folders and files, shared with view / share / edit rights. */
 export default function VaultPage() {
+	const team = useTeam();
 	const { toast } = useToast();
 	const [tab, setTab] = useState<Tab>("mine");
 	const [folderId, setFolderId] = useState<string | null>(null);
@@ -165,7 +167,8 @@ export default function VaultPage() {
 										</span>
 									</span>
 								</button>
-								{i.shared && <span title="Shared" className="hidden rounded-full bg-sauti-teal-light/40 px-2 py-0.5 text-[11px] font-semibold text-sauti-teal sm:inline"><Users className="mr-1 inline h-3 w-3" />Shared</span>}
+								{i.driveLink && <DriveBadge href={i.driveLink} />}
+								{(i.shared || i.people.length > 1) && <AvatarStack ids={i.people} team={team} />}
 								<span className="hidden w-14 text-right text-xs capitalize text-serene-neutral-400 sm:inline">{i.level}</span>
 								<DropdownMenu>
 									<DropdownMenuTrigger asChild><Button size="icon" variant="ghost" aria-label={`Actions for ${i.name}`}><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger>
