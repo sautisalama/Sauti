@@ -28,6 +28,7 @@ import { addContactFromMail } from "@/app/actions/mjengo-contacts";
 import { listLabels, saveLabel, deleteLabel, setMessageLabel, type LabelRow } from "./api";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { AccountSwitcher } from "./AccountSwitcher";
+import { listKey, mailStore, mergeFresh } from "./mail-store";
 import { cacheDetail, cacheList, readDetail, readList } from "@/lib/mail/offline-cache";
 
 type Detail = Awaited<ReturnType<typeof getMessageDetail>>;
@@ -156,7 +157,7 @@ export function MailApp() {
 	}, []);
 
 	useEffect(() => {
-		mailBootstrap()
+		(mailStore.boot ??= mailBootstrap().catch((e) => { mailStore.boot = null; throw e; }))
 			.then((b) => {
 				setAccounts(b.accounts);
 				setAccountId((cur) => (cur && b.accounts.some((x) => x.id === cur) ? cur : b.accounts[0]?.id ?? null));
@@ -170,8 +171,14 @@ export function MailApp() {
 
 	useEffect(() => {
 		if (!accountId) return;
-		setBoxes([]);
-		getMailboxes(accountId).then((r) => { setBoxes(r.boxes); setUnread(r.unread); }).catch((e) => setLoadError(e instanceof Error ? e.message : "Could not reach the mailbox."));
+		const have = mailStore.boxes.get(accountId);
+		setBoxes(have?.boxes ?? []);
+		if (have) setUnread(have.unread);
+		// Already fetched (by the preload or an earlier visit): only ask again once it is a little old.
+		if (have && Date.now() - have.at < 60_000) return;
+		getMailboxes(accountId)
+			.then((r) => { mailStore.boxes.set(accountId, { ...r, at: Date.now() }); setBoxes(r.boxes); setUnread(r.unread); })
+			.catch((e) => { if (!have) setLoadError(e instanceof Error ? e.message : "Could not reach the mailbox."); });
 	}, [accountId]);
 
 	useEffect(() => {
@@ -193,16 +200,20 @@ export function MailApp() {
 		return hit?.path ?? (active.config.mailbox === "inbox" ? "INBOX" : null);
 	}, [boxes, active]);
 
-	const loadList = useCallback(async (append = false) => {
+	const loadList = useCallback(async (append = false, silent = false) => {
 		if (!accountId || !mailboxPath) return;
 		const token = ++listToken.current;
-		setLoading(true);
+		if (!silent) setLoading(true);
 		setLoadError(null);
 		try {
 			const c = active.config;
 			const res = await listMessages(accountId, mailboxPath, { unread: c.unread || onlyUnread, starred: c.starred, hasAttachment: c.hasAttachment, from: c.from, labelId: c.labelId, text: debouncedQ }, append ? rows.length : 0, 40);
 			if (token !== listToken.current) return;
-			setRows((prev) => (append ? [...prev, ...res.items.filter((i) => !prev.some((p) => p.uid === i.uid))] : res.items));
+			setRows((prev) => {
+				const next = append ? [...prev, ...res.items.filter((i) => !prev.some((p) => p.uid === i.uid))] : silent ? mergeFresh(prev, res.items) : res.items;
+				if (!debouncedQ) mailStore.lists.set(listKey(accountId, viewKey, onlyUnread), { items: next, total: res.total, at: Date.now() });
+				return next;
+			});
 			setTotal(res.total);
 			setOffline(false);
 			if (!append && !debouncedQ) cacheList(`${accountId}:${viewKey}`, res);
@@ -225,9 +236,25 @@ export function MailApp() {
 	useEffect(() => {
 		setSelected(null);
 		setDetail(null);
-		if (accountId && mailboxPath) loadList(false);
+		if (!accountId || !mailboxPath) return;
+		// Paint what we already have straight away; then fetch only if it is old, and fold in what is new.
+		const hit = !debouncedQ ? mailStore.lists.get(listKey(accountId, viewKey, onlyUnread)) : undefined;
+		if (hit) {
+			setRows(hit.items);
+			setTotal(hit.total);
+			if (Date.now() - hit.at > 30_000) loadList(false, true);
+		} else loadList(false);
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [accountId, mailboxPath, viewKey, debouncedQ, views, onlyUnread]);
+
+	// New mail shows up by itself: check quietly when the tab regains focus and once a minute.
+	useEffect(() => {
+		if (!accountId || !mailboxPath) return;
+		const tick = () => { if (!document.hidden && !debouncedQ) loadList(false, true); };
+		const t = setInterval(tick, 60_000);
+		window.addEventListener("focus", tick);
+		return () => { clearInterval(t); window.removeEventListener("focus", tick); };
+	}, [accountId, mailboxPath, debouncedQ, loadList]);
 
 	/* ---- opening a message */
 	const open = useCallback(async (m: MessageRow, images = true) => {
@@ -707,10 +734,6 @@ function ReadingPane({ onWrite, onAddContact, onPrev, onNext, hasPrev, hasNext, 
 							</section>
 						)}
 
-						<div className="mt-6 flex gap-2">
-							<Button variant="outline" className="gap-2" onClick={() => onReply(false)}><Reply className="h-4 w-4" /> Reply</Button>
-							<Button variant="outline" className="gap-2" onClick={onForward}><Forward className="h-4 w-4" /> Forward</Button>
-						</div>
 					</article>
 				)}
 			</div>

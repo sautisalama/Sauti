@@ -563,6 +563,9 @@ export function EnhancedSidebar({
         return false;
 	};
 
+	// Start loading the mail before it is clicked.
+	const warmMail = () => { import("@/app/dashboard/mjengo/mail/_components/mail-store").then((m) => m.prefetchMail()).catch(() => undefined); };
+
 	const renderItem = (item: SidebarItem) => {
 		const Icon = item.icon;
 		const active = isActive(item);
@@ -593,7 +596,7 @@ export function EnhancedSidebar({
 		);
 
 		const el = item.href ? (
-			<Link href={item.href} aria-current={active ? "page" : undefined} aria-label={isCollapsed ? item.label : undefined} className="block outline-none">{content}</Link>
+			<Link href={item.href} onPointerEnter={item.id === "mj-mail" ? warmMail : undefined} onFocus={item.id === "mj-mail" ? warmMail : undefined} aria-current={active ? "page" : undefined} aria-label={isCollapsed ? item.label : undefined} className="block outline-none">{content}</Link>
 		) : (
 			<button onClick={item.onClick} aria-label={isCollapsed ? item.label : undefined} className="block w-full text-left outline-none">{content}</button>
 		);

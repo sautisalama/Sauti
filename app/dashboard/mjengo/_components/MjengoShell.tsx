@@ -30,6 +30,11 @@ export function MjengoShell({ isSuper, children }: { isSuper: boolean; children:
 		document.documentElement.classList.add("mjengo-theme");
 		return () => document.documentElement.classList.remove("mjengo-theme");
 	}, []);
+	// Warm the mail screen shortly after the suite opens, so Mail is already there when it is clicked.
+	useEffect(() => {
+		const t = setTimeout(() => { import("../mail/_components/mail-store").then((m) => m.prefetchMail()).catch(() => undefined); }, 1200);
+		return () => clearTimeout(t);
+	}, []);
 	// Mail and the document editor take the whole window, like native apps.
 	const fullBleed = pathname.startsWith(`${BASE}/mail`) || pathname.startsWith(`${BASE}/documents/editor`);
 
