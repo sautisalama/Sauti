@@ -12,6 +12,7 @@ import { cn } from "@/lib/utils";
 import { putToSignedUrl } from "@/lib/client/upload";
 import { deleteTemplate, listTemplates, saveTemplate, studioRegister, studioUpload, type TemplateRow } from "@/app/actions/mjengo-templates";
 import { listAssets, type AssetRow } from "@/app/actions/mjengo-ai";
+import { PostThis } from "../_components/PostThis";
 
 /* Canva's palette: the editor borrows its look so it feels familiar. */
 const CANVA = { teal: "#00C4CC", purple: "#7D2AE8", ink: "#0E1318" };
@@ -93,6 +94,7 @@ export default function DesignPage() {
 	const [assets, setAssets] = useState<AssetRow[]>([]);
 	const [name, setName] = useState("Untitled design");
 	const [busy, setBusy] = useState<"save" | "template" | null>(null);
+	const [postFor, setPostFor] = useState<string | null>(null);
 
 	/* ------------------------------------------------------------ history */
 	const snapshot = useCallback(() => {
@@ -271,8 +273,9 @@ export default function DesignPage() {
 			const blob = await (await fetch(dataUrl())).blob();
 			const { path, signedUrl } = await unwrap(studioUpload());
 			await putToSignedUrl(signedUrl, new File([blob], "design.png", { type: "image/png" }));
-			await unwrap(studioRegister(path, name, null));
-			toast({ title: "Saved to Studio", description: "Find it in Content, under Studio, and attach it to a post." });
+			const reg = await unwrap(studioRegister(path, name, null));
+			toast({ title: "Saved to Studio" });
+			setPostFor(reg.id);
 		} catch (e) {
 			toast({ title: "Could not save", description: e instanceof Error ? e.message : undefined, variant: "destructive" });
 		} finally {
@@ -424,6 +427,7 @@ export default function DesignPage() {
 					<div className="shadow-xl"><canvas ref={el} /></div>
 				</div>
 			</div>
+			<PostThis open={!!postFor} assetId={postFor} about={name} onClose={() => setPostFor(null)} />
 		</div>
 	);
 }

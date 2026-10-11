@@ -100,7 +100,7 @@ async function deletePost_(id: string) {
 }
 
 export interface ConnectionRow { id: string; channel: Channel; account_name: string | null; connected_at: string }
-export interface ChannelsState { connections: ConnectionRow[]; available: { linkedin: boolean; x: boolean; meta: boolean } }
+export interface ChannelsState { connections: ConnectionRow[]; available: { linkedin: boolean; x: boolean; meta: boolean; tiktok: boolean } }
 
 async function channels_(): Promise<ChannelsState> {
   await requireAdminActor();
@@ -117,7 +117,7 @@ async function disconnect_(id: string) {
 /** Publish now to every channel that has a connected account; returns what happened per channel. */
 async function publishNow_(id: string): Promise<PostRow['results']> {
   const a = await requireAdminActor();
-  const { data } = await looseAdmin().from('mjengo_posts').select('id, title, body, channels, media, variants, link_url, results, status').eq('id', id).maybeSingle();
+  const { data } = await looseAdmin().from('mjengo_posts').select('id, title, body, channels, media, variants, link_url, results, status, created_by').eq('id', id).maybeSingle();
   if (!data) throw new Error('That post no longer exists.');
   if (!data.body?.trim()) throw new Error('Write the post first.');
   const results = await publishPost(data as unknown as PostForPublish);
@@ -125,6 +125,32 @@ async function publishNow_(id: string): Promise<PostRow['results']> {
   return results;
 }
 
+/** A caption for a post, written for the chosen networks. Plain text, no dashes, ready to edit. */
+async function caption_(about: string, channels: Channel[]): Promise<string> {
+  await requireAdminActor();
+  const key = process.env.OPENROUTER_API_KEY;
+  if (!key) throw new Error('AI is not set up on this site yet.');
+  const where = channels.length ? channels.join(', ') : 'social media';
+  const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+    method: 'POST',
+    signal: AbortSignal.timeout(30_000),
+    headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json', 'X-Title': 'Sauti Salama Content' },
+    body: JSON.stringify({
+      model: process.env.OPENROUTER_MODEL ?? 'google/gemini-2.5-flash-lite',
+      temperature: 0.7,
+      max_tokens: 400,
+      messages: [
+        { role: 'system', content: 'You write short, warm, plain posts for Sauti Salama, a survivor-led organisation in Kenya working on gender-based violence. Never include identifying details of survivors. Write like a person. Never use em dashes or en dashes. Reply with only the post text, with two or three relevant hashtags at the end.' },
+        { role: 'user', content: `Write a post for ${where} about: ${about.slice(0, 1500)}` },
+      ],
+    }),
+  });
+  if (!res.ok) throw new Error('The AI service is unavailable right now.');
+  const j = (await res.json()) as { choices?: { message?: { content?: string } }[] };
+  return (j.choices?.[0]?.message?.content ?? '').replace(/\s*[\u2013\u2014]\s*/g, ', ').trim();
+}
+
+export const suggestCaption = guard(caption_);
 export const channelsState = guard(channels_);
 export const disconnectChannel = guard(disconnect_);
 export const publishPostNow = guard(publishNow_);

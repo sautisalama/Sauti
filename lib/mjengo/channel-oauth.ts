@@ -2,7 +2,7 @@ import { looseAdmin } from '@/lib/loose-db';
 import { encryptField } from '@/lib/security/crypto';
 import type { Channel } from '@/lib/mjengo/channels';
 
-export type Provider = 'linkedin' | 'x' | 'meta';
+export type Provider = 'linkedin' | 'x' | 'meta' | 'tiktok';
 
 interface Config { id: string | undefined; secret: string | undefined; authorize: string; scope: string; pkce: boolean }
 
@@ -12,6 +12,8 @@ export function providerConfig(p: Provider): Config {
       return { id: process.env.LINKEDIN_CLIENT_ID, secret: process.env.LINKEDIN_CLIENT_SECRET, authorize: 'https://www.linkedin.com/oauth/v2/authorization', scope: 'openid profile email w_member_social', pkce: false };
     case 'x':
       return { id: process.env.X_CLIENT_ID, secret: process.env.X_CLIENT_SECRET, authorize: 'https://twitter.com/i/oauth2/authorize', scope: 'tweet.read tweet.write users.read offline.access', pkce: true };
+    case 'tiktok':
+      return { id: process.env.TIKTOK_CLIENT_KEY, secret: process.env.TIKTOK_CLIENT_SECRET, authorize: 'https://www.tiktok.com/v2/auth/authorize/', scope: 'user.info.basic,video.upload', pkce: false };
     case 'meta':
       return {
         id: process.env.META_APP_ID,
@@ -23,11 +25,11 @@ export function providerConfig(p: Provider): Config {
   }
 }
 
-export const isProvider = (v: string): v is Provider => v === 'linkedin' || v === 'x' || v === 'meta';
+export const isProvider = (v: string): v is Provider => v === 'linkedin' || v === 'x' || v === 'meta' || v === 'tiktok';
 
 /** Which providers have credentials on this server. */
 export function availableProviders(): Record<Provider, boolean> {
-  return { linkedin: !!providerConfig('linkedin').id, x: !!providerConfig('x').id, meta: !!providerConfig('meta').id };
+  return { linkedin: !!providerConfig('linkedin').id, x: !!providerConfig('x').id, meta: !!providerConfig('meta').id, tiktok: !!providerConfig('tiktok').id };
 }
 
 async function save(row: { channel: Channel; account_id: string; account_name: string | null; access: string; refresh?: string | null; expiresIn?: number | null; meta?: Record<string, unknown>; by: string }) {
@@ -82,6 +84,24 @@ export async function completeConnection(p: Provider, code: string, redirectUri:
     if (!mj.data?.id) throw new Error('Could not read the X account.');
     await save({ channel: 'x', account_id: mj.data.id, account_name: mj.data.username ? `@${mj.data.username}` : 'X', access: tj.access_token, refresh: tj.refresh_token, expiresIn: tj.expires_in, by: userId });
     return [mj.data.username ? `@${mj.data.username}` : 'X'];
+  }
+
+  if (p === 'tiktok') {
+    const t = await fetch('https://open.tiktokapis.com/v2/oauth/token/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ client_key: cfg.id, client_secret: cfg.secret ?? '', code, grant_type: 'authorization_code', redirect_uri: redirectUri }),
+      signal: AbortSignal.timeout(20_000),
+    });
+    const tj = (await t.json()) as { access_token?: string; refresh_token?: string; expires_in?: number; open_id?: string; error_description?: string };
+    if (!t.ok || !tj.access_token || !tj.open_id) throw new Error(tj.error_description || 'TikTok refused the sign-in.');
+    let display = 'TikTok';
+    try {
+      const me = await fetch('https://open.tiktokapis.com/v2/user/info/?fields=display_name', { headers: { Authorization: `Bearer ${tj.access_token}` }, signal: AbortSignal.timeout(15_000) });
+      display = ((await me.json()) as { data?: { user?: { display_name?: string } } }).data?.user?.display_name ?? display;
+    } catch { /* the name is only a label */ }
+    await save({ channel: 'tiktok', account_id: tj.open_id, account_name: display, access: tj.access_token, refresh: tj.refresh_token, expiresIn: tj.expires_in, by: userId });
+    return [display];
   }
 
   // Meta: Facebook Pages the person manages, and the Instagram accounts linked to them.

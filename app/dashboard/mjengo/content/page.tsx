@@ -177,7 +177,7 @@ function Studio({ assets, onChanged }: { assets: AssetRow[]; onChanged: () => Pr
 function ChannelsBar({ state, onChanged }: { state: content.ChannelsState | null; onChanged: () => Promise<void> }) {
 	const { toast } = useToast();
 	if (!state) return null;
-	const provider: Record<Channel, "linkedin" | "x" | "meta"> = { linkedin: "linkedin", x: "x", facebook: "meta", instagram: "meta" };
+	const provider: Record<Exclude<Channel, "website">, "linkedin" | "x" | "meta" | "tiktok"> = { linkedin: "linkedin", x: "x", facebook: "meta", instagram: "meta", tiktok: "tiktok" };
 	return (
 		<section aria-label="Connected accounts" className="flex flex-wrap items-center gap-2 rounded-2xl border border-serene-neutral-200/70 bg-white p-3">
 			<span className="mr-1 text-sm font-semibold text-sauti-dark">Accounts</span>
@@ -188,7 +188,7 @@ function ChannelsBar({ state, onChanged }: { state: content.ChannelsState | null
 					<button aria-label={`Disconnect ${c.account_name}`} onClick={async () => { try { await unwrap(content.disconnectChannel(c.id)); await onChanged(); } catch (e) { toast({ title: "Could not disconnect", description: e instanceof Error ? e.message : undefined, variant: "destructive" }); } }} className="rounded-full p-1 text-serene-neutral-400 hover:bg-serene-neutral-100 hover:text-red-600"><X className="h-3.5 w-3.5" /></button>
 				</span>
 			))}
-			{CHANNELS.filter((c) => !state.connections.some((x) => x.channel === c)).map((c) => {
+			{CHANNELS.filter((c): c is Exclude<Channel, "website"> => c !== "website" && !state.connections.some((x) => x.channel === c)).map((c) => {
 				const ok = state.available[provider[c]];
 				return ok ? (
 					<a key={c} href={`/api/mjengo/channels/${provider[c]}/start`} className="flex items-center gap-1.5 rounded-full border border-dashed border-serene-neutral-300 px-3 py-1 text-sm text-serene-neutral-700 hover:border-sauti-teal/50"><Plus className="h-3.5 w-3.5" /> Connect {CHANNEL_INFO[c].label}</a>
@@ -232,7 +232,7 @@ function PostDialog({ post, assets, state, onClose, onSaved }: { post: (Partial<
 	const finalText = (c: Channel) => textFor({ body, variants, link_url: v.link_url ?? null, title: v.title ?? null }, c);
 	const over = chosen.filter((c) => finalText(c).length > CHANNEL_INFO[c].limit);
 	const firstImage = assets.find((a) => (v.media ?? []).includes(a.id))?.url ?? null;
-	const connected = (c: Channel) => !!state?.connections.some((x) => x.channel === c);
+	const connected = (c: Channel) => c === "website" || !!state?.connections.some((x) => x.channel === c);
 
 	const save = async (status?: PostRow["status"]) => {
 		setBusy(true);

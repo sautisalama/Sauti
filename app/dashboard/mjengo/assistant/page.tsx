@@ -19,6 +19,7 @@ import * as raw from "@/app/actions/mjengo-ai";
 import type { AiSettings, ChatMessage, DesignSystem, ThreadRow } from "@/app/actions/mjengo-ai";
 import { Markdown } from "../_components/Markdown";
 import { MjengoLoader } from "../_components/MjengoLoader";
+import { PostThis } from "../_components/PostThis";
 
 const api = {
 	threads: () => unwrap(raw.listThreads()),
@@ -61,6 +62,7 @@ export default function AssistantPage() {
 	const [connect, setConnect] = useState<null | "limit" | "image" | "manual">(null);
 	const [manageDesigns, setManageDesigns] = useState(false);
 	const [rail, setRail] = useState(false);
+	const [postFor, setPostFor] = useState<{ id: string; about: string } | null>(null);
 	const [attached, setAttached] = useState<{ id: string; name: string }[]>([]);
 	const [uploading, setUploading] = useState(false);
 	const filePick = useRef<HTMLInputElement>(null);
@@ -172,10 +174,10 @@ export default function AssistantPage() {
 					const l = buf.slice(0, i).trim();
 					buf = buf.slice(i + 1);
 					if (!l) continue;
-					const ev = JSON.parse(l) as { t: string; id?: string; text?: string; url?: string; message?: string; reason?: string; hitLimit?: boolean };
+					const ev = JSON.parse(l) as { t: string; id?: string; text?: string; url?: string; assetId?: string; message?: string; reason?: string; hitLimit?: boolean };
 					if (ev.t === "thread" && ev.id) { threadId = ev.id; setActive(ev.id); }
 					else if (ev.t === "delta") setMessages((m) => m.map((x) => (x.id === aid ? { ...x, content: x.content + (ev.text ?? "") } : x)));
-					else if (ev.t === "image") setMessages((m) => m.map((x) => (x.id === aid ? { ...x, image: ev.url ?? null, pending: false } : x)));
+					else if (ev.t === "image") { setMessages((m) => m.map((x) => (x.id === aid ? { ...x, image: ev.url ?? null, pending: false } : x))); if (ev.assetId) setPostFor({ id: ev.assetId, about: text }); }
 					else if (ev.t === "limit") {
 						setMessages((m) => m.filter((x) => x.id !== aid && x.id !== uid));
 						setInput(text);
@@ -347,6 +349,7 @@ export default function AssistantPage() {
 				</div>
 			</section>
 
+			<PostThis open={!!postFor} assetId={postFor?.id ?? null} about={postFor?.about ?? ""} onClose={() => setPostFor(null)} />
 			<ConnectDialog mode={connect} settings={settings} onClose={() => setConnect(null)} onChanged={refresh} />
 			<DesignDialog open={manageDesigns} designs={designs} onClose={() => setManageDesigns(false)} onChanged={refresh} />
 		</div>

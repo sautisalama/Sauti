@@ -10,6 +10,7 @@ export interface PostForPublish {
   media: string[];
   variants: Partial<Record<Channel, Variant>>;
   link_url: string | null;
+  created_by?: string | null;
   results: Record<string, { ok: boolean; message: string; at: string; url?: string }>;
 }
 
@@ -149,6 +150,45 @@ async function postInstagram(c: Connection, text: string, images: string[]): Pro
   return undefined;
 }
 
+/** The website: the text becomes a draft in Blogs and Events, with the first image as its cover, for review. */
+async function postWebsite(post: PostForPublish, text: string, images: string[]): Promise<string | undefined> {
+  const db = looseAdmin();
+  let cover: string | null = null;
+  if (images[0]) {
+    try {
+      const bytes = Buffer.from(await (await fetch(images[0])).arrayBuffer());
+      const path = `blog/${Date.now()}.png`;
+      const up = await db.storage.from('mjengo-public').upload(path, bytes, { contentType: 'image/png' });
+      if (!up.error) cover = db.storage.from('mjengo-public').getPublicUrl(path).data.publicUrl;
+    } catch { /* the post still goes in without a cover */ }
+  }
+  const title = (post.title || text.split('\n')[0] || 'Untitled').slice(0, 120);
+  const slug = `${title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 60)}-${Date.now().toString(36)}`;
+  const { error } = await db.from('blogs').insert({ title, content: text.split('\n\n').map((p) => `<p>${p.replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[c]!).replace(/\n/g, '<br>')}</p>`).join(''), status: 'draft', slug, cover_image_url: cover, author_id: post.created_by ?? null, excerpt: text.slice(0, 160) });
+  if (error) throw new Error('Could not add the draft to the website.');
+  return '/dashboard/admin/blogs';
+}
+
+/** TikTok photo post, sent to the person's TikTok inbox to finish there. The image address must be on a verified domain. */
+async function postTikTok(c: Connection, text: string, images: string[], title: string | null): Promise<string | undefined> {
+  if (!images.length) fail('TikTok posts need an image.');
+  const t = await token(c);
+  const res = await fetch('https://open.tiktokapis.com/v2/post/publish/content/init/', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${t}`, 'Content-Type': 'application/json; charset=UTF-8' },
+    body: JSON.stringify({
+      post_info: { title: (title || text.split('\n')[0]).slice(0, 90), description: text.slice(0, 2200) },
+      source_info: { source: 'PULL_FROM_URL', photo_cover_index: 0, photo_images: images.slice(0, 35) },
+      post_mode: 'MEDIA_UPLOAD',
+      media_type: 'PHOTO',
+    }),
+    signal: AbortSignal.timeout(30_000),
+  });
+  const j = (await json(res)) as { error?: { code?: string; message?: string } };
+  if (!res.ok || (j.error?.code && j.error.code !== 'ok')) fail(j.error?.message || 'TikTok did not accept the post.');
+  return undefined;
+}
+
 /** Publish one post to every channel it names that has a connected account. Records what happened per channel. */
 export async function publishPost(post: PostForPublish): Promise<PostForPublish['results']> {
   const results = { ...(post.results ?? {}) };
@@ -157,13 +197,19 @@ export async function publishPost(post: PostForPublish): Promise<PostForPublish[
     if (results[channel]?.ok) continue;
     const at = new Date().toISOString();
     try {
-      const conns = await connectionsFor(channel);
-      if (!conns.length) throw new Error(`${CHANNEL_INFO[channel].label} is not connected yet.`);
       const text = textFor(post, channel);
       if (text.length > CHANNEL_INFO[channel].limit) throw new Error(`The text is over the ${CHANNEL_INFO[channel].limit} character limit.`);
+      if (channel === 'website') {
+        const url = await postWebsite(post, text, images);
+        results[channel] = { ok: true, message: 'Added to the website as a draft for review', at, url };
+        continue;
+      }
+      const conns = await connectionsFor(channel);
+      if (!conns.length) throw new Error(`${CHANNEL_INFO[channel].label} is not connected yet.`);
       const c = conns[0];
       const url =
-        channel === 'linkedin' ? await postLinkedIn(c, text, images)
+        channel === 'tiktok' ? await postTikTok(c, text, images, post.title)
+        : channel === 'linkedin' ? await postLinkedIn(c, text, images)
         : channel === 'x' ? await postX(c, text)
         : channel === 'facebook' ? await postFacebook(c, text, images, post.link_url ? withUtm(post.link_url, 'facebook', post.title) : null)
         : await postInstagram(c, text, images);
@@ -181,7 +227,7 @@ export async function publishPost(post: PostForPublish): Promise<PostForPublish[
 export async function publishDue(): Promise<{ due: number; posted: number }> {
   const { data } = await looseAdmin()
     .from('mjengo_posts')
-    .select('id, title, body, channels, media, variants, link_url, results')
+    .select('id, title, body, channels, media, variants, link_url, results, created_by')
     .eq('status', 'scheduled')
     .lte('scheduled_for', new Date().toISOString())
     .limit(20);

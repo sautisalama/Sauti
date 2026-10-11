@@ -1,12 +1,17 @@
-export type Channel = 'linkedin' | 'x' | 'facebook' | 'instagram';
+export type Channel = 'linkedin' | 'x' | 'facebook' | 'instagram' | 'tiktok' | 'website';
 
-export const CHANNELS: Channel[] = ['linkedin', 'x', 'facebook', 'instagram'];
+export const CHANNELS: Channel[] = ['website', 'linkedin', 'x', 'facebook', 'instagram', 'tiktok'];
+
+/** Channels that need a connected account (the website is ours). */
+export const NEEDS_ACCOUNT: Channel[] = ['linkedin', 'x', 'facebook', 'instagram', 'tiktok'];
 
 export const CHANNEL_INFO: Record<Channel, { label: string; limit: number; needsImage: boolean; color: string; composeUrl: (text: string) => string }> = {
   linkedin: { label: 'LinkedIn', limit: 3000, needsImage: false, color: '#0a66c2', composeUrl: () => 'https://www.linkedin.com/feed/' },
   x: { label: 'X', limit: 280, needsImage: false, color: '#111827', composeUrl: (t) => `https://x.com/intent/post?text=${encodeURIComponent(t)}` },
   facebook: { label: 'Facebook', limit: 63206, needsImage: false, color: '#1877f2', composeUrl: () => 'https://www.facebook.com/' },
   instagram: { label: 'Instagram', limit: 2200, needsImage: true, color: '#c13584', composeUrl: () => 'https://www.instagram.com/' },
+  tiktok: { label: 'TikTok', limit: 2200, needsImage: true, color: '#111827', composeUrl: () => 'https://www.tiktok.com/upload' },
+  website: { label: 'Website', limit: 10000, needsImage: false, color: '#068297', composeUrl: () => '/dashboard/admin/blogs' },
 };
 
 export interface Variant { body?: string; hashtags?: string[] }

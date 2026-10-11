@@ -21,7 +21,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ prov
 	const verifier = randomBytes(48).toString("base64url");
 	const q = new URLSearchParams({
 		response_type: "code",
-		client_id: cfg.id,
+		...(provider === "tiktok" ? { client_key: cfg.id } : { client_id: cfg.id }),
 		redirect_uri: `${origin}/api/mjengo/channels/${provider}/callback`,
 		scope: cfg.scope,
 		state,
