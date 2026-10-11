@@ -52,8 +52,8 @@ export function DashboardContent({ children }: DashboardContentProps) {
         <main
             className={cn(
                 "flex-1 transition-all duration-300 ease-in-out relative min-h-screen flex flex-col min-w-0 w-full",
-                "lg:ml-72", // Default expanded width
-                isCollapsed && "lg:ml-20" // Collapsed width
+                "lg:ml-64", // Default expanded width
+                isCollapsed && "lg:ml-[72px]" // Collapsed width
             )}
         >
       <div className={cn(

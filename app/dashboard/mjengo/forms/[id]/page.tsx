@@ -1,12 +1,13 @@
 "use client";
 
+import { MjengoLoader } from "../../_components/MjengoLoader";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { format } from "date-fns";
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import {
-	ArrowLeft, ArrowDown, ArrowUp, Check, Copy, Download, Eye, GripVertical, Loader2, Plus, QrCode, Search, Share2, Trash2, X,
+	ArrowLeft, ArrowDown, ArrowUp, Check, Copy, Download, Eye, GripVertical, Plus, QrCode, Search, Share2, Trash2, X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -93,7 +94,7 @@ export default function FormEditorPage() {
 		}
 	};
 
-	if (form === undefined) return <div className="flex justify-center py-24"><Loader2 className="h-6 w-6 animate-spin text-serene-neutral-400" /></div>;
+	if (form === undefined) return <MjengoLoader label="Loading the form" />;
 	if (form === null) return <p className="py-20 text-center text-serene-neutral-500">That form no longer exists. <Link href="/dashboard/mjengo/forms" className="text-sauti-teal underline">Back to forms</Link></p>;
 
 	const previewForm = { slug: form.slug, title: title || "Untitled form", description: description || null, questions, collectEmail: !!settings.collectEmail, unavailable: null, confirmation: settings.confirmation || "Thank you." } as const;
@@ -266,7 +267,7 @@ function ResponsesTab({ formId, title, questions, collectEmail, responses, onCha
 		exportedCsv(formId).catch(() => undefined);
 	};
 
-	if (!responses) return <div className="flex justify-center py-16"><Loader2 className="h-5 w-5 animate-spin text-serene-neutral-400" /></div>;
+	if (!responses) return <MjengoLoader label="Loading responses" compact />;
 	if (responses.length === 0) return <div className="rounded-2xl border border-dashed border-serene-neutral-200 bg-white p-12 text-center text-sm text-serene-neutral-500">No responses yet. Publish the form and share the link.</div>;
 
 	return (
@@ -312,7 +313,7 @@ function ResponsesTab({ formId, title, questions, collectEmail, responses, onCha
 function AnalyticsTab({ questions, responses }: { questions: Question[]; responses: ResponseRow[] | null }) {
 	const summaries = useMemo(() => (responses ? summarise(questions, responses) : []), [questions, responses]);
 	const days = useMemo(() => (responses ? perDay(responses, 30) : []), [responses]);
-	if (!responses) return <div className="flex justify-center py-16"><Loader2 className="h-5 w-5 animate-spin text-serene-neutral-400" /></div>;
+	if (!responses) return <MjengoLoader label="Loading responses" compact />;
 	if (responses.length === 0) return <div className="rounded-2xl border border-dashed border-serene-neutral-200 bg-white p-12 text-center text-sm text-serene-neutral-500">Charts appear once the first response arrives.</div>;
 
 	const week = responses.filter((r) => Date.now() - new Date(r.created_at).getTime() < 7 * 86400000).length;

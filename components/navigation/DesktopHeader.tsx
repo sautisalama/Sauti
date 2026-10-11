@@ -54,7 +54,7 @@ export function DesktopHeader({
 	return (
 		<header className={cn(
             "fixed top-0 z-40 transition-all duration-300 bg-white/80 backdrop-blur-xl border-b border-serene-neutral-200/60 h-16 flex items-center shrink-0 overflow-hidden",
-            isSidebarCollapsed ? "left-20 w-[calc(100%-5rem)]" : "left-72 w-[calc(100%-18rem)]"
+            isSidebarCollapsed ? "left-[72px] w-[calc(100%-72px)]" : "left-64 w-[calc(100%-16rem)]"
         )}>
 			<div className="flex items-center px-6 lg:px-8 gap-4 w-full h-full relative">
                 

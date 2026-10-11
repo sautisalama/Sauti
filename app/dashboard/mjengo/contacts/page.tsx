@@ -1,5 +1,6 @@
 "use client";
 
+import { MjengoLoader } from "../_components/MjengoLoader";
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Building2, Loader2, Mail, MoreVertical, Pencil, Phone, Plus, Search, Trash2, Upload, UserRound } from "lucide-react";
@@ -74,6 +75,7 @@ export default function ContactsPage() {
 	const [q, setQ] = useState("");
 	const [edit, setEdit] = useState<Partial<ContactRow> | null>(null);
 	const [busy, setBusy] = useState(false);
+	const [importing, setImporting] = useState(false);
 	const csv = useRef<HTMLInputElement>(null);
 
 	const load = useCallback(async (term: string) => {
@@ -119,15 +121,12 @@ export default function ContactsPage() {
 					<h2 className="text-xl font-bold tracking-tight text-sauti-dark">Contacts</h2>
 					<p className="text-sm text-serene-neutral-500">People you work with, shared by the team. They appear as suggestions when you write an email.</p>
 				</div>
-				<div className="flex flex-wrap gap-2">
-					<Button asChild variant="outline" className="gap-2">
-						<a href="/api/mjengo/contacts/google/start"><span className="text-sm font-bold text-[#4285F4]">G</span> Import from Google</a>
+				<div className="flex items-center gap-2">
+					<Button variant="outline" className="gap-2" disabled={busy} onClick={() => setImporting(true)}>
+						{busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />} Import
 					</Button>
-					<Button variant="outline" className="gap-2" disabled={busy} onClick={() => csv.current?.click()}>
-						{busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />} Import CSV
-					</Button>
-					<input ref={csv} type="file" accept=".csv,text/csv" className="hidden" onChange={(e) => onCsv(e.target.files?.[0])} />
 					<Button className="gap-2 bg-sauti-teal hover:bg-sauti-dark" onClick={() => setEdit({})}><Plus className="h-4 w-4" /> Add contact</Button>
+					<input ref={csv} type="file" accept=".csv,text/csv" className="hidden" onChange={(e) => onCsv(e.target.files?.[0])} />
 				</div>
 			</div>
 
@@ -138,7 +137,7 @@ export default function ContactsPage() {
 
 			<div className="overflow-hidden rounded-2xl border border-serene-neutral-200/70 bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04)]">
 				{!rows ? (
-					<div className="flex justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-serene-neutral-400" /></div>
+					<MjengoLoader label="Loading contacts" />
 				) : rows.length === 0 ? (
 					<div className="p-12 text-center">
 						<span className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-sauti-teal-light text-sauti-teal"><UserRound className="h-6 w-6" /></span>
@@ -179,6 +178,25 @@ export default function ContactsPage() {
 					</ul>
 				)}
 			</div>
+
+			<Dialog open={importing} onOpenChange={setImporting}>
+				<DialogContent className="max-w-md">
+					<DialogHeader>
+						<DialogTitle>Import contacts</DialogTitle>
+						<DialogDescription>Choose where your contacts are. People already in the book are skipped.</DialogDescription>
+					</DialogHeader>
+					<div className="space-y-2">
+						<a href="/api/mjengo/contacts/google/start" className="flex items-center gap-3 rounded-xl border border-serene-neutral-200 bg-white p-3 transition hover:border-sauti-teal/40 hover:bg-sauti-teal-light/30">
+							<span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white text-lg font-bold text-[#4285F4] ring-1 ring-serene-neutral-200">G</span>
+							<span className="min-w-0"><span className="block text-sm font-semibold text-sauti-dark">Continue with Google</span><span className="block text-xs text-serene-neutral-500">Read-only, once. Nothing is kept after the import.</span></span>
+						</a>
+						<button type="button" onClick={() => { setImporting(false); csv.current?.click(); }} className="flex w-full items-center gap-3 rounded-xl border border-serene-neutral-200 bg-white p-3 text-left transition hover:border-sauti-teal/40 hover:bg-sauti-teal-light/30">
+							<span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-sauti-teal-light text-sauti-teal"><Upload className="h-5 w-5" /></span>
+							<span className="min-w-0"><span className="block text-sm font-semibold text-sauti-dark">A CSV file</span><span className="block text-xs text-serene-neutral-500">From Google Contacts, Outlook or a spreadsheet.</span></span>
+						</button>
+					</div>
+				</DialogContent>
+			</Dialog>
 
 			<ContactDialog
 				contact={edit}

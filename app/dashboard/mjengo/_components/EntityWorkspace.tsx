@@ -1,5 +1,6 @@
 "use client";
 
+import { MjengoLoader } from "./MjengoLoader";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AlertCircle, CheckSquare, ExternalLink, FileWarning, Kanban, List, Loader2, Plus, Search, Trash2 } from "lucide-react";
@@ -178,7 +179,7 @@ export function EntityWorkspace({ kind }: { kind: Kind }) {
 	};
 
 	if (!rows) {
-		return <div className="flex justify-center py-24"><Loader2 className="h-6 w-6 animate-spin text-serene-neutral-400" /></div>;
+		return <MjengoLoader label="Loading" />;
 	}
 
 	return (

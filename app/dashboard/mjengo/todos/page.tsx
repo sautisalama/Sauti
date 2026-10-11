@@ -1,5 +1,6 @@
 "use client";
 
+import { MjengoLoader } from "../_components/MjengoLoader";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Check, ListPlus, Loader2, MoreVertical, Pencil, Plus, Trash2, UserCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -47,7 +48,7 @@ export default function TodosPage() {
 		return board.tracks.map((t) => (filter === "mine" ? { ...t, todos: t.todos.filter((x) => x.assignee_ids.includes(board.me)) } : t)).filter((t) => filter === "all" || t.todos.length > 0);
 	}, [board, filter]);
 
-	if (!board) return <div className="flex justify-center py-24"><Loader2 className="h-6 w-6 animate-spin text-serene-neutral-400" /></div>;
+	if (!board) return <MjengoLoader label="Loading to-dos" />;
 
 	const myOpen = board.tracks.flatMap((t) => t.todos).filter((x) => x.status !== "done" && x.assignee_ids.includes(board.me)).length;
 

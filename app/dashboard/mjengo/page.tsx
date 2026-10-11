@@ -1,9 +1,10 @@
 "use client";
 
+import { MjengoLoader } from "@/app/dashboard/mjengo/_components/MjengoLoader";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { format, parseISO } from "date-fns";
-import { Briefcase, CheckSquare, FileWarning, FolderKanban, Lightbulb, Loader2, Mail, TrendingUp } from "lucide-react";
+import { Briefcase, CheckSquare, FileWarning, FolderKanban, Lightbulb, Mail, TrendingUp } from "lucide-react";
 import { getOverview, listEntities, type Overview } from "@/app/actions/mjengo";
 import { GrantCharts, type GrantLite } from "./_components/GrantCharts";
 import { DeadlineChip, KIND_LABEL, STATUSES, money, type Kind } from "./_components/shared";
@@ -19,7 +20,7 @@ export default function MjengoOverview() {
 		listEntities("grant").then((g) => setGrants(g as unknown as GrantLite[])).catch(() => undefined);
 	}, []);
 
-	if (!o) return <div className="flex justify-center py-24"><Loader2 className="h-6 w-6 animate-spin text-serene-neutral-400" /></div>;
+	if (!o) return <MjengoLoader label="Loading your overview" />;
 
 	const cur = o.currencies[0] ?? "USD";
 

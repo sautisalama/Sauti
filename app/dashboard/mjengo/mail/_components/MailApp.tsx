@@ -1,5 +1,6 @@
 "use client";
 
+import { MjengoLoader } from "../../_components/MjengoLoader";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { format, isThisWeek, isToday, isYesterday, startOfDay } from "date-fns";
 import {
@@ -346,7 +347,7 @@ export function MailApp() {
 	});
 
 	/* ---- render */
-	if (!accounts) return <div className="flex h-full items-center justify-center"><Loader2 className="h-6 w-6 animate-spin text-serene-neutral-400" /></div>;
+	if (!accounts) return <MjengoLoader label="Opening your mail" className="h-full min-h-0" />;
 
 	if (accounts.length === 0) {
 		return (
@@ -645,7 +646,7 @@ function ReadingPane({ onWrite, onAddContact, onPrev, onNext, hasPrev, hasNext, 
 			</header>
 
 			<div className="min-h-0 flex-1 overflow-y-auto">
-				{busy && !detail && <div className="flex justify-center py-20"><Loader2 className="h-6 w-6 animate-spin text-serene-neutral-400" /></div>}
+				{busy && !detail && <MjengoLoader label="Opening message" compact />}
 				{detail && (
 					<article className="mx-auto max-w-3xl px-6 pb-10 pt-3">
 						<h2 className="text-[28px] font-semibold leading-tight tracking-[-0.01em] text-[#37352f]">{detail.subject}</h2>

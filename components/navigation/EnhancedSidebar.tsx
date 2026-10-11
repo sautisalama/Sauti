@@ -81,6 +81,8 @@ interface SidebarItem {
 	showDot?: boolean;
 	/** What this section is for; shown in the hover tooltip. */
 	hint?: string;
+	/** Heading the item is listed under (Mjengo suite). */
+	group?: string;
 }
 
 interface EnhancedSidebarProps {
@@ -145,20 +147,44 @@ export function EnhancedSidebar({
         setupProgress = ((stepCount + 1) / totalSteps) * 100;
     }
 	useEffect(() => {
-		const handleResize = () => {
-			if (window.innerWidth < 1024) {
-				setIsCollapsed(true);
-			} else {
-				// Don't force expand unless it was previously expanded? 
-				// Actually, auto-collapse on move to mobile is good, but let's keep it simple.
-				setIsCollapsed(false);
+		// Restore the choice made last time on wide screens; narrow windows start collapsed.
+		let wide = window.innerWidth >= 1024;
+		try {
+			const saved = window.localStorage.getItem("ss_sidebar_collapsed");
+			setIsCollapsed(!wide || saved === "1");
+		} catch {
+			setIsCollapsed(!wide);
+		}
+		// Only react when the window crosses the breakpoint, so resizing never undoes a manual choice.
+		const onResize = () => {
+			const nowWide = window.innerWidth >= 1024;
+			if (nowWide === wide) return;
+			wide = nowWide;
+			if (!nowWide) setIsCollapsed(true);
+		};
+		window.addEventListener("resize", onResize);
+		return () => window.removeEventListener("resize", onResize);
+	}, [setIsCollapsed]);
+
+	const toggleCollapsed = useCallback(() => {
+		const next = !rawIsCollapsed;
+		setIsCollapsed(next);
+		try { window.localStorage.setItem("ss_sidebar_collapsed", next ? "1" : "0"); } catch { /* private mode */ }
+	}, [rawIsCollapsed, setIsCollapsed]);
+
+	// Ctrl/Cmd + B, as in most editors and chat apps.
+	useEffect(() => {
+		const onKey = (e: KeyboardEvent) => {
+			if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === "b") {
+				const t = e.target as HTMLElement | null;
+				if (t?.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t?.tagName ?? "")) return;
+				e.preventDefault();
+				toggleCollapsed();
 			}
 		};
-
-		handleResize();
-		window.addEventListener("resize", handleResize);
-		return () => window.removeEventListener("resize", handleResize);
-	}, [setIsCollapsed]);
+		window.addEventListener("keydown", onKey);
+		return () => window.removeEventListener("keydown", onKey);
+	}, [toggleCollapsed]);
 
 	useEffect(() => {
 		const checkAdminMode = () => {
@@ -258,21 +284,21 @@ export function EnhancedSidebar({
 		if (pathname?.startsWith("/dashboard/mjengo")) {
 			const B = "/dashboard/mjengo";
 			const items: SidebarItem[] = [
-				{ id: "mj-overview", label: "Overview", icon: LayoutDashboard, href: B, section: "main", hint: "Summary of grants, opportunities and projects" },
-				{ id: "mj-mail", label: "Mail", icon: Mail, href: `${B}/mail`, section: "main", hint: "Read, write and organise email" },
-				{ id: "mj-contacts", label: "Contacts", icon: Users, href: `${B}/contacts`, section: "main", hint: "Your team's contact book" },
-				{ id: "mj-grants", label: "Grants", icon: Briefcase, href: `${B}/grants`, section: "main", hint: "Track grant applications and deadlines" },
-				{ id: "mj-opps", label: "Opportunities", icon: Lightbulb, href: `${B}/opportunities`, section: "main", hint: "Funding and partnership leads" },
-				{ id: "mj-projects", label: "Projects", icon: FolderKanban, href: `${B}/projects`, section: "main", hint: "Projects, milestones and documents" },
-				{ id: "mj-forms", label: "Forms", icon: ClipboardList, href: `${B}/forms`, section: "main", hint: "Build forms and see responses" },
-				{ id: "mj-todos", label: "To-dos", icon: CheckSquare, href: `${B}/todos`, section: "main", hint: "Tasks and shared responsibilities" },
-				{ id: "mj-docs", label: "Documents", icon: FileText, href: `${B}/documents`, section: "main", hint: "Write and edit documents" },
-				{ id: "mj-vault", label: "Vault", icon: HardDrive, href: `${B}/vault`, section: "main", hint: "Shared files and folders with access control" },
+				{ id: "mj-overview", label: "Overview", icon: LayoutDashboard, href: B, section: "main", group: "", hint: "Summary of grants, opportunities and projects" },
+				{ id: "mj-mail", group: "Communicate", label: "Mail", icon: Mail, href: `${B}/mail`, section: "main", hint: "Read, write and organise email" },
+				{ id: "mj-contacts", group: "Communicate", label: "Contacts", icon: Users, href: `${B}/contacts`, section: "main", hint: "Your team's contact book" },
+				{ id: "mj-grants", group: "Work", label: "Grants", icon: Briefcase, href: `${B}/grants`, section: "main", hint: "Track grant applications and deadlines" },
+				{ id: "mj-opps", group: "Work", label: "Opportunities", icon: Lightbulb, href: `${B}/opportunities`, section: "main", hint: "Funding and partnership leads" },
+				{ id: "mj-projects", group: "Work", label: "Projects", icon: FolderKanban, href: `${B}/projects`, section: "main", hint: "Projects, milestones and documents" },
+				{ id: "mj-forms", group: "Work", label: "Forms", icon: ClipboardList, href: `${B}/forms`, section: "main", hint: "Build forms and see responses" },
+				{ id: "mj-todos", group: "Work", label: "To-dos", icon: CheckSquare, href: `${B}/todos`, section: "main", hint: "Tasks and shared responsibilities" },
+				{ id: "mj-docs", group: "Files", label: "Documents", icon: FileText, href: `${B}/documents`, section: "main", hint: "Write and edit documents" },
+				{ id: "mj-vault", group: "Files", label: "Vault", icon: HardDrive, href: `${B}/vault`, section: "main", hint: "Shared files and folders with access control" },
 			];
 			if (mjengoSuper) {
 				items.push(
-					{ id: "mj-people", label: "People & access", icon: ShieldCheck, href: `${B}/people`, section: "main", hint: "Who can use the suite and what they can do" },
-					{ id: "mj-logs", label: "Logs", icon: ScrollText, href: `${B}/logs`, section: "main", hint: "Audit trail of actions in the suite" }
+					{ id: "mj-people", group: "Administration", label: "People & access", icon: ShieldCheck, href: `${B}/people`, section: "main", hint: "Who can use the suite and what they can do" },
+					{ id: "mj-logs", group: "Administration", label: "Logs", icon: ScrollText, href: `${B}/logs`, section: "main", hint: "Audit trail of actions in the suite" }
 				);
 			}
 			items.push({ id: "mj-back", label: "Back to dashboard", icon: ArrowLeft, href: "/dashboard", section: "secondary", separator: true, hint: "Leave the Mjengo suite" });
@@ -537,84 +563,68 @@ export function EnhancedSidebar({
         return false;
 	};
 
-	const SidebarItemComponent = ({ item }: { item: SidebarItem }) => {
+	const renderItem = (item: SidebarItem) => {
 		const Icon = item.icon;
 		const active = isActive(item);
 
 		const content = (
 			<div
 				className={cn(
-					"flex items-center rounded-2xl transition-all duration-300 my-1 overflow-hidden",
-					"group cursor-pointer select-none ring-offset-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-serene-blue-400 focus-visible:ring-offset-2",
+					"group relative flex cursor-pointer select-none items-center rounded-xl transition-colors duration-150",
+					"focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sauti-teal/40",
 					active
-						? "bg-serene-blue-50 text-serene-blue-700 font-bold shadow-none" 
-						: "text-serene-neutral-500 hover:bg-serene-neutral-50 hover:text-serene-blue-600 dark:text-neutral-400 dark:hover:bg-neutral-800",
-					isCollapsed ? "px-0 w-12 h-12 mx-auto justify-center" : "px-4 py-3.5 mx-3 justify-start"
+						? "bg-sauti-teal-light/70 font-semibold text-sauti-dark"
+						: "text-serene-neutral-600 hover:bg-serene-neutral-100/80 hover:text-serene-neutral-900",
+					isCollapsed ? "mx-auto my-0.5 h-11 w-11 justify-center" : "mx-2 my-0.5 h-10 gap-3 px-3"
 				)}
 			>
-				<div className="relative flex-shrink-0 flex items-center justify-center">
-					<Icon
-						className={cn(
-							"h-5 w-5 transition-all duration-300",
-							active
-								? "text-serene-blue-600 scale-100" // Simple scale
-								: "text-serene-neutral-400 group-hover:text-serene-blue-500 group-hover:scale-105"
-						)}
-					/>
+				{active && <span aria-hidden className="absolute -left-2 top-2 bottom-2 w-1 rounded-r-full bg-sauti-teal" />}
+				<span className="relative flex shrink-0 items-center justify-center">
+					<Icon className={cn("h-[18px] w-[18px] transition-colors", active ? "text-sauti-teal" : "text-serene-neutral-400 group-hover:text-serene-neutral-700")} />
 					{item.badge && item.badge > 0 && (
-										<Badge
-											className={cn(
-												"absolute -top-1.5 -right-1.5 h-4 w-4 flex items-center justify-center p-0 text-[10px] font-black shadow-sm",
-												"bg-purple-600 text-white border border-white min-w-[18px] ring-2 ring-purple-100 animate-in zoom-in duration-300" 
-											)}
-										>
-											{item.badge > 99 ? "99" : item.badge}
-										</Badge>
+						<Badge className="absolute -right-2 -top-2 flex h-4 min-w-[16px] items-center justify-center border border-white bg-purple-600 p-0 px-1 text-[10px] font-bold text-white">
+							{item.badge > 99 ? "99+" : item.badge}
+						</Badge>
 					)}
-					{item.showDot && (
-						<div className="absolute -top-0.5 -right-0.5 h-2.5 w-2.5 bg-serene-blue-500 rounded-full border-2 border-white dark:border-neutral-900 animate-pulse" />
-					)}
-				</div>
-
-				<span
-					className={cn(
-						"whitespace-nowrap transition-all duration-300 ease-in-out",
-						isCollapsed ? "w-0 opacity-0 ml-0 overflow-hidden" : "w-auto opacity-100 ml-3 flex-1",
-						active
-							? "text-serene-blue-900 font-bold"
-							: "font-medium group-hover:text-serene-blue-800"
-					)}
-				>
-					{item.label}
+					{item.showDot && <span className="absolute -right-0.5 -top-0.5 h-2 w-2 animate-pulse rounded-full border-2 border-white bg-serene-blue-500" />}
 				</span>
+				{!isCollapsed && <span className="min-w-0 flex-1 truncate text-sm">{item.label}</span>}
 			</div>
 		);
 
-		if (isCollapsed) {
+		const el = item.href ? (
+			<Link href={item.href} aria-current={active ? "page" : undefined} aria-label={isCollapsed ? item.label : undefined} className="block outline-none">{content}</Link>
+		) : (
+			<button onClick={item.onClick} aria-label={isCollapsed ? item.label : undefined} className="block w-full text-left outline-none">{content}</button>
+		);
+
+		if (!isCollapsed) return el;
+		return (
+			<Tooltip>
+				<TooltipTrigger asChild>{el}</TooltipTrigger>
+				<TooltipContent side="right" sideOffset={12} className="max-w-[220px]">
+					<p className="font-semibold">{item.label}</p>
+					{item.hint && <p className="text-xs opacity-80">{item.hint}</p>}
+				</TooltipContent>
+			</Tooltip>
+		);
+	};
+
+	/** Items, with a small heading (or a hairline when collapsed) wherever the group changes. */
+	const renderGroup = (list: SidebarItem[]) => {
+		let last: string | undefined;
+		return list.map((item) => {
+			const heading = item.group && item.group !== last ? item.group : null;
+			if (item.group !== undefined) last = item.group;
 			return (
-				<TooltipProvider>
-					<Tooltip>
-						<TooltipTrigger asChild>
-							{item.href ? (
-								<Link href={item.href}>{content}</Link>
-							) : (
-								<button onClick={item.onClick}>{content}</button>
-							)}
-						</TooltipTrigger>
-						<TooltipContent side="right">
-							<p className="font-semibold">{item.label}</p>
-							{item.hint && <p className="max-w-[200px] text-xs opacity-80">{item.hint}</p>}
-						</TooltipContent>
-					</Tooltip>
-				</TooltipProvider>
+				<div key={item.id}>
+					{heading && (isCollapsed
+						? <div className="mx-4 my-2 h-px bg-serene-neutral-200/70" />
+						: <p className="px-5 pb-1 pt-4 text-[11px] font-semibold uppercase tracking-wider text-serene-neutral-400">{heading}</p>)}
+					{renderItem(item)}
+				</div>
 			);
-		}
-
-		if (item.href) {
-			return <Link href={item.href}>{content}</Link>;
-		}
-
-		return <button onClick={item.onClick}>{content}</button>;
+		});
 	};
 
 	const mainItems = sidebarItems.filter((item) => item.section === "main");
@@ -631,12 +641,12 @@ export function EnhancedSidebar({
 	}, [dash?.data?.unreadChatCount]);
 
 	return (
-		<>
+		<TooltipProvider delayDuration={150}>
 			<div
 				className={cn(
-					"hidden lg:flex lg:fixed lg:inset-y-0 lg:left-0 lg:z-40 lg:overflow-y-auto flex-col h-screen transition-all duration-300 ease-in-out",
-					"bg-white/90 backdrop-blur-2xl border-r border-serene-neutral-200/40 shadow-[1px_0_20px_rgba(0,0,0,0.02)]",
-					isCollapsed ? "w-20" : "w-72",
+					"hidden lg:flex lg:fixed lg:inset-y-0 lg:left-0 lg:z-40 flex-col h-screen transition-[width] duration-300 ease-in-out",
+					"bg-white border-r border-serene-neutral-200/70",
+					isCollapsed ? "w-[72px]" : "w-64",
 					className
 				)}
 			>
@@ -661,33 +671,25 @@ export function EnhancedSidebar({
 						</div>
 					</Link>
 
-					{!needsOnboarding && (
-						<Button
-							variant="ghost"
-							size="icon"
-							onClick={() => setIsCollapsed(!isCollapsed)}
-							className={cn(
-								"h-8 w-8 text-neutral-500 hover:bg-neutral-50 hover:text-sauti-orange flex-shrink-0 transition-all duration-300",
-								isCollapsed ? "opacity-0 w-0 hidden" : "opacity-100"
-							)}
-						>
-							<ChevronLeft className="h-4 w-4" />
-						</Button>
-					)}
 				</div>
 
-				{/* Collapsed expand button overlay */}
-				{isCollapsed && !needsOnboarding && (
-					<div className="absolute right-0 top-5 translate-x-1/2 z-50">
-						<Button
-							variant="outline"
-							size="icon"
-							onClick={() => setIsCollapsed(false)}
-							className="h-6 w-6 rounded-full bg-white hover:bg-neutral-50 shadow-sm border-neutral-200 text-neutral-500"
-						>
-							<ChevronRight className="h-3 w-3" />
-						</Button>
-					</div>
+				{!needsOnboarding && (
+					<Tooltip>
+						<TooltipTrigger asChild>
+							<button
+								type="button"
+								onClick={toggleCollapsed}
+								aria-label={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+								aria-expanded={!isCollapsed}
+								className="absolute -right-3 top-[60px] z-50 flex h-6 w-6 items-center justify-center rounded-full border border-serene-neutral-200 bg-white text-serene-neutral-500 shadow-sm transition-colors hover:border-sauti-teal/40 hover:text-sauti-teal focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sauti-teal/40"
+							>
+								{isCollapsed ? <ChevronRight className="h-3.5 w-3.5" /> : <ChevronLeft className="h-3.5 w-3.5" />}
+							</button>
+						</TooltipTrigger>
+						<TooltipContent side="right" sideOffset={8}>
+							{isCollapsed ? "Expand sidebar" : "Collapse sidebar"} <span className="ml-1 rounded border border-white/20 px-1 text-[10px] opacity-70">Ctrl B</span>
+						</TooltipContent>
+					</Tooltip>
 				)}
 
 				{/* User Info - Wrapped with Dropdown */}
@@ -842,7 +844,7 @@ export function EnhancedSidebar({
 
 
 				{/* Navigation */}
-				<div className="flex-1 flex flex-col justify-between px-2 py-4">
+				<div className="flex min-h-0 flex-1 flex-col justify-between overflow-y-auto overflow-x-hidden py-2">
                     {needsOnboarding && !isCollapsed ? (
                          <div className="px-3 py-4 space-y-4">
                             <div className="bg-serene-blue-50/50 border border-serene-blue-100 rounded-2xl p-5 space-y-4 shadow-sm">
@@ -887,9 +889,7 @@ export function EnhancedSidebar({
 					<div className="space-y-1">
 						{/* Main Navigation */}
 						<div className="space-y-1">
-							{mainItems.map((item) => (
-								<SidebarItemComponent key={item.id} item={item} />
-							))}
+							{renderGroup(mainItems)}
 						</div>
 
 						{/* Secondary Navigation */}
@@ -900,9 +900,7 @@ export function EnhancedSidebar({
 										<div className="h-px bg-neutral-200 dark:bg-neutral-800" />
 									</div>
 								)}
-								{secondaryItems.map((item) => (
-									<SidebarItemComponent key={item.id} item={item} />
-								))}
+								{renderGroup(secondaryItems)}
 							</div>
 						)}
 					</div>
@@ -911,9 +909,7 @@ export function EnhancedSidebar({
 					{/* Footer Navigation */}
 					{!needsOnboarding && (
 						<div className="border-t border-neutral-200 dark:border-neutral-800 pt-4 space-y-1">
-							{footerItems.map((item) => (
-								<SidebarItemComponent key={item.id} item={item} />
-							))}
+							{renderGroup(footerItems)}
 						</div>
 					)}
 				</div>
@@ -939,6 +935,6 @@ export function EnhancedSidebar({
 					</div>
 				</DialogContent>
 			</Dialog>
-		</>
+		</TooltipProvider>
 	);
 }

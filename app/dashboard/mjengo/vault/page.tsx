@@ -1,7 +1,9 @@
 "use client";
 
+import { MjengoLoader } from "../_components/MjengoLoader";
+import { DriveResult, saveToDrive } from "../_components/drive";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ChevronRight, Download, FileEdit, File as FileIcon, Folder, FolderPlus, HardDrive, Loader2, MoreVertical, Pencil, Share2, Trash2, Upload, Users } from "lucide-react";
+import { ChevronRight, CloudUpload, Download, FileEdit, File as FileIcon, Folder, FolderPlus, HardDrive, Loader2, MoreVertical, Pencil, Share2, Trash2, Upload, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -98,6 +100,7 @@ export default function VaultPage() {
 
 	return (
 		<div className="space-y-4">
+			<DriveResult />
 			<div className="flex flex-wrap items-center justify-between gap-2">
 				<div>
 					<h2 className="text-xl font-bold tracking-tight text-sauti-dark">Vault</h2>
@@ -145,7 +148,7 @@ export default function VaultPage() {
 
 			<div className="overflow-hidden rounded-2xl border border-serene-neutral-200/70 bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04)]">
 				{!data ? (
-					<div className="flex justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-serene-neutral-400" /></div>
+					<MjengoLoader label="Opening the vault" />
 				) : data.items.length === 0 ? (
 					<p className="p-12 text-center text-sm text-serene-neutral-500">{tab === "shared" && !folderId ? "Nothing has been shared with you yet." : "This folder is empty."}</p>
 				) : (
@@ -169,6 +172,7 @@ export default function VaultPage() {
 									<DropdownMenuContent align="end">
 										{i.type === "file" && /\.(docx|doc|odt|rtf|md|txt)$/i.test(i.name) && <DropdownMenuItem onClick={() => { window.location.href = `/dashboard/mjengo/documents/editor?file=${i.id}`; }}><FileEdit className="mr-2 h-4 w-4" />{i.level === "edit" ? "Edit" : "Open in editor"}</DropdownMenuItem>}
 										<DropdownMenuItem onClick={() => open(i)}>{i.type === "folder" ? <Folder className="mr-2 h-4 w-4" /> : <Download className="mr-2 h-4 w-4" />}{i.type === "folder" ? "Open" : "Download"}</DropdownMenuItem>
+										{i.type === "file" && <DropdownMenuItem onClick={() => saveToDrive("vault", i.id)}><CloudUpload className="mr-2 h-4 w-4" />Save to Google Drive</DropdownMenuItem>}
 										{(i.level === "share" || i.level === "edit") && <DropdownMenuItem onClick={() => setShare(i)}><Share2 className="mr-2 h-4 w-4" />Share</DropdownMenuItem>}
 										{i.level === "edit" && <DropdownMenuItem onClick={() => setRename(i)}><Pencil className="mr-2 h-4 w-4" />Rename</DropdownMenuItem>}
 										{i.level === "edit" && <DropdownMenuItem className="text-red-600" onClick={() => setRemoving(i)}><Trash2 className="mr-2 h-4 w-4" />Delete</DropdownMenuItem>}
@@ -283,7 +287,7 @@ function ShareDialog({ item, onClose }: { item: VaultItem | null; onClose: () =>
 					<DialogDescription>Only Mjengo administrators can be added. People can also see anything inside a shared folder.</DialogDescription>
 				</DialogHeader>
 				{!view ? (
-					<div className="flex justify-center py-8"><Loader2 className="h-5 w-5 animate-spin text-serene-neutral-400" /></div>
+					<MjengoLoader label="Loading" compact />
 				) : (
 					<div className="space-y-4">
 						<div className="relative">

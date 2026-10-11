@@ -1,5 +1,6 @@
 "use client";
 
+import { MjengoLoader } from "../_components/MjengoLoader";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -47,7 +48,7 @@ export default function FormsPage() {
 			</div>
 
 			{!forms ? (
-				<div className="flex justify-center py-20"><Loader2 className="h-6 w-6 animate-spin text-serene-neutral-400" /></div>
+				<MjengoLoader label="Loading forms" />
 			) : forms.length === 0 ? (
 				<div className="rounded-2xl border border-dashed border-serene-neutral-200 bg-white p-12 text-center">
 					<ClipboardList className="mx-auto h-10 w-10 text-serene-neutral-300" />

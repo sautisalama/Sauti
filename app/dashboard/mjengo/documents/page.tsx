@@ -1,10 +1,12 @@
 "use client";
 
+import { MjengoLoader } from "../_components/MjengoLoader";
+import { DriveResult, saveToDrive } from "../_components/drive";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { format } from "date-fns";
-import { CheckCircle2, Circle, Download, FilePlus2, FileText, Loader2, Plus, Search, Upload } from "lucide-react";
+import { CheckCircle2, Circle, CloudUpload, Download, FilePlus2, FileText, Loader2, Plus, Search, Upload } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { putToSignedUrl } from "@/lib/client/upload";
 import { preloadWordcraft } from "@gamine/wordcraft-react/core";
@@ -69,12 +71,13 @@ export default function DocumentsPage() {
 		}
 	};
 
-	if (!docs) return <div className="flex justify-center py-24"><Loader2 className="h-6 w-6 animate-spin text-serene-neutral-400" /></div>;
+	if (!docs) return <MjengoLoader label="Loading documents" />;
 
 	const needed = docs.filter((d) => d.required && !d.file_path).length;
 
 	return (
 		<div className="space-y-4">
+			<DriveResult />
 			<div className="flex flex-wrap items-end justify-between gap-2">
 				<div>
 					<h2 className="text-xl font-bold tracking-tight text-sauti-dark">Documents</h2>
@@ -99,11 +102,12 @@ export default function DocumentsPage() {
 					<h3 className="mb-2 text-sm font-semibold text-sauti-dark">Your documents</h3>
 					<ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
 						{written.map((w) => (
-							<li key={w.id}>
-								<Link href={`/dashboard/mjengo/documents/editor?file=${w.id}`} className="flex items-center gap-3 rounded-2xl border border-serene-neutral-200/70 bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04)] p-3 transition hover:border-sauti-teal/40 hover:shadow-sm">
+							<li key={w.id} className="group relative">
+								<Link href={`/dashboard/mjengo/documents/editor?file=${w.id}`} className="flex items-center gap-3 rounded-2xl border border-serene-neutral-200/70 bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04)] p-3 pr-11 transition hover:border-sauti-teal/40 hover:shadow-sm">
 									<span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-sauti-teal-light text-sauti-teal"><FileText className="h-5 w-5" /></span>
 									<span className="min-w-0"><span className="block truncate text-sm font-medium text-serene-neutral-900">{w.name}</span><span className="block truncate text-xs text-serene-neutral-500">{w.folder ?? "Vault"} · {fmtBytes(w.size)}</span></span>
 								</Link>
+								<button type="button" onClick={() => saveToDrive("vault", w.id)} aria-label={`Save ${w.name} to Google Drive`} title="Save to Google Drive" className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-lg text-serene-neutral-400 opacity-0 transition hover:bg-serene-neutral-100 hover:text-sauti-teal focus:opacity-100 group-hover:opacity-100 max-sm:opacity-100"><CloudUpload className="h-4 w-4" /></button>
 							</li>
 						))}
 					</ul>
@@ -135,6 +139,7 @@ export default function DocumentsPage() {
 								{d.entity_label ?? "Removed"}
 							</Link>
 							{!d.file_path && <DeadlineChip date={d.due_date} />}
+							{d.file_path && <Button size="icon" variant="ghost" onClick={() => saveToDrive("entity", d.id)} aria-label={`Save ${d.name} to Google Drive`} title="Save to Google Drive"><CloudUpload className="h-4 w-4" /></Button>}
 							{d.file_path && <Button size="icon" variant="ghost" onClick={() => open(d)} aria-label={`Download ${d.name}`}><Download className="h-4 w-4" /></Button>}
 						</li>
 					))}

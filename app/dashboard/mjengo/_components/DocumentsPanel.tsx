@@ -1,5 +1,6 @@
 "use client";
 
+import { MjengoLoader } from "./MjengoLoader";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { format } from "date-fns";
 import { CheckCircle2, Circle, Download, FileText, Loader2, Plus, Trash2, Upload } from "lucide-react";
@@ -103,7 +104,7 @@ export function DocumentsPanel({ kind, entityId, onChange }: { kind: Kind; entit
 			</div>
 
 			{!docs ? (
-				<Loader2 className="h-5 w-5 animate-spin text-serene-neutral-400" />
+				<MjengoLoader label="Loading documents" compact />
 			) : (
 				<ul className="divide-y divide-serene-neutral-100 rounded-xl border border-serene-neutral-100 bg-white">
 					{docs.map((d) => {

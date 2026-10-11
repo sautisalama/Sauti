@@ -1,11 +1,9 @@
 "use client";
 
-import Link from "next/link";
 import { Suspense, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { ArrowLeft, Loader2 } from "lucide-react";
 import { WordcraftEditor, type SavedFile, type WordcraftEditorRef } from "@gamine/wordcraft-react";
-import { Button } from "@/components/ui/button";
+import { MjengoLoader } from "../../_components/MjengoLoader";
 import { useToast } from "@/hooks/use-toast";
 import { putToSignedUrl } from "@/lib/client/upload";
 import { finishReplace, getFileUrl, prepareReplace, prepareUpload, registerUpload } from "../../vault/api";
@@ -26,9 +24,6 @@ function EditorScreen() {
 	const [level, setLevel] = useState<"view" | "share" | "edit">("edit");
 	const [doc, setDoc] = useState<{ name: string; data: ArrayBuffer } | null>(null);
 	const [loading, setLoading] = useState(!!initialFile);
-	const [dirty, setDirty] = useState(false);
-	const [saving, setSaving] = useState(false);
-	const [savedAt, setSavedAt] = useState<Date | null>(null);
 
 	// Open an existing file from the vault.
 	useEffect(() => {
@@ -80,37 +75,19 @@ function EditorScreen() {
 	};
 
 	const onSave = async (file: SavedFile) => {
-		setSaving(true);
 		try {
 			await persist(file);
-			setSavedAt(new Date());
-			setDirty(false);
 			toast({ title: "Saved to the vault", description: file.name });
 		} catch (e) {
 			toast({ title: "Could not save", description: e instanceof Error ? e.message : undefined, variant: "destructive" });
 			throw e;
-		} finally {
-			setSaving(false);
 		}
 	};
 
 	return (
 		<div className="flex h-full min-h-0 flex-col bg-white">
-			<div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-serene-neutral-200 px-3 py-1.5">
-				<Button asChild variant="ghost" size="sm" className="gap-1.5">
-					<Link href="/dashboard/mjengo/documents"><ArrowLeft className="h-4 w-4" /> Documents</Link>
-				</Button>
-				<div className="min-w-0 flex-1">
-					<p className="truncate text-sm font-semibold text-sauti-dark">{name}</p>
-					<p className="text-xs text-serene-neutral-500">
-						{level !== "edit" ? "View only: Save makes your own copy. " : ""}
-						{saving ? "Saving..." : dirty ? "Unsaved changes" : savedAt ? `Saved ${savedAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}` : "Stored in the vault"}
-					</p>
-				</div>
-			</div>
-
 			{loading ? (
-				<div className="flex min-h-0 flex-1 items-center justify-center"><Loader2 className="h-6 w-6 animate-spin text-serene-neutral-400" /></div>
+				<MjengoLoader label="Opening your document" className="h-full min-h-0" />
 			) : (
 				<div className="min-h-0 flex-1 overflow-hidden">
 					<WordcraftEditor
@@ -119,10 +96,9 @@ function EditorScreen() {
 						document={doc}
 						guardUnload
 						author=""
-						onChange={(info) => setDirty(info.dirty)}
 						onSave={onSave}
 						onError={(e) => toast({ title: "The editor reported a problem", description: e.message, variant: "destructive" })}
-						loading={<div className="flex h-full items-center justify-center gap-2 text-sm text-serene-neutral-500"><Loader2 className="h-5 w-5 animate-spin" /> Starting the editor (first load downloads about 10 MB)...</div>}
+						loading={<MjengoLoader label="Starting the editor" hint="The first time takes a moment while it downloads." className="h-full min-h-0" />}
 						fallback={(e) => <div className="p-6 text-sm text-red-700">The editor could not start: {e.message}. It needs a current browser with WebGL2 or WebGPU.</div>}
 					/>
 				</div>
@@ -133,7 +109,7 @@ function EditorScreen() {
 
 export default function EditorPage() {
 	return (
-		<Suspense fallback={<div className="flex justify-center py-24"><Loader2 className="h-6 w-6 animate-spin text-serene-neutral-400" /></div>}>
+		<Suspense fallback={<MjengoLoader label="Starting the editor" className="h-full min-h-0" />}>
 			<EditorScreen />
 		</Suspense>
 	);

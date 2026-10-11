@@ -1,5 +1,6 @@
 "use client";
 
+import { MjengoLoader } from "../_components/MjengoLoader";
 import { useCallback, useEffect, useState } from "react";
 import { Crown, Loader2, Lock, Search, ShieldCheck, ShieldOff, UserPlus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -84,9 +85,7 @@ export function PeoplePanel() {
 
 	if (!data) {
 		return (
-			<div className="flex justify-center py-20">
-				<Loader2 className="h-6 w-6 animate-spin text-serene-neutral-400" />
-			</div>
+			<MjengoLoader label="Loading people and access" />
 		);
 	}
 
