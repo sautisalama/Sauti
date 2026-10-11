@@ -42,7 +42,7 @@ export function MjengoShell({ isSuper, children }: { isSuper: boolean; children:
 		return () => clearTimeout(t);
 	}, []);
 	// Mail and the document editor take the whole window, like native apps.
-	const fullBleed = pathname.startsWith(`${BASE}/mail`) || pathname.startsWith(`${BASE}/assistant`) || pathname.startsWith(`${BASE}/files/`) || pathname.startsWith(`${BASE}/documents/editor`);
+	const fullBleed = pathname.startsWith(`${BASE}/mail`) || pathname.startsWith(`${BASE}/assistant`) || pathname.startsWith(`${BASE}/files/`) || pathname.startsWith(`${BASE}/chat`) || pathname.startsWith(`${BASE}/documents/editor`);
 
 	return (
 		<div className={cn("flex min-h-dvh flex-col bg-serene-neutral-50", fullBleed && "h-dvh min-h-0")}>

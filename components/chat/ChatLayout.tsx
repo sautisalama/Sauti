@@ -12,7 +12,8 @@ import { CHATS_CHANGED_EVENT } from '@/lib/chat/client-read';
 
 const useIsoLayoutEffect = typeof window !== 'undefined' ? useLayoutEffect : useEffect;
 
-export function ChatLayout() {
+/** `basePath` and `embedded` let the Mjengo suite host the same chats without leaving the suite. */
+export function ChatLayout({ basePath = '/dashboard/chat', embedded = false }: { basePath?: string; embedded?: boolean } = {}) {
   const [selectedChat, setSelectedChat] = useState<Chat | null>(null);
   const [chats, setChats] = useState<Chat[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -76,7 +77,7 @@ export function ChatLayout() {
       pushedRef.current = false;
       router.back();
     } else {
-      router.replace('/dashboard/chat');
+      router.replace(basePath);
     }
     loadChats(); // refresh unread badges after reading
   };
@@ -151,7 +152,7 @@ export function ChatLayout() {
   const currentView = isMobile ? (selectedChat ? 'chat' : 'list') : 'split';
 
   return (
-    <div className="flex h-[100dvh] w-full bg-[#f0f2f5] overflow-hidden">
+    <div className={`flex ${embedded ? 'h-full' : 'h-[100dvh]'} w-full bg-[#f0f2f5] overflow-hidden`}>
       {/* Sidebar */}
       {(currentView === 'split' || currentView === 'list') && (
         <div className={`${currentView === 'split' ? 'w-[400px] border-r border-[#d1d7db]' : 'w-full'} h-full bg-white z-10`}>
