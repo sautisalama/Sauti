@@ -54,17 +54,23 @@ export default function VaultPage() {
 	const [pickDoc, setPickDoc] = useState(false);
 	const [deck, setDeck] = useState(false);
 	const [view, setView] = useState<"list" | "grid">("list");
-	const [fold, setFold] = useState<Record<string, boolean>>({});
+	// Which sections the person closed. Read before the first paint, written on every change.
+	const [fold, setFold] = useState<Record<string, boolean>>(() => {
+		if (typeof window === "undefined") return {};
+		try { return JSON.parse(localStorage.getItem("ss_files_fold") ?? "{}") as Record<string, boolean>; } catch { return {}; }
+	});
 	useEffect(() => {
 		try {
 			const v = localStorage.getItem("ss_files_view");
 			if (v === "grid" || v === "list") setView(v);
-			const f = localStorage.getItem("ss_files_fold");
-			if (f) setFold(JSON.parse(f));
 		} catch { /* defaults */ }
 	}, []);
 	const changeView = (v: "list" | "grid") => { setView(v); try { localStorage.setItem("ss_files_view", v); } catch { /* ignore */ } };
-	const toggleFold = (id: string, next: boolean) => setFold((m) => { const n = { ...m, [id]: next }; try { localStorage.setItem("ss_files_fold", JSON.stringify(n)); } catch { /* ignore */ } return n; });
+	const toggleFold = (id: string, next: boolean) => {
+		const n = { ...fold, [id]: next };
+		setFold(n);
+		try { localStorage.setItem("ss_files_fold", JSON.stringify(n)); } catch { /* ignore */ }
+	};
 
 	const load = useCallback(async () => {
 		try {

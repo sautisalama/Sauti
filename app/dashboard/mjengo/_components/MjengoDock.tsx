@@ -9,7 +9,7 @@ import { unwrap } from "@/lib/action-result";
 import { useDashboardData } from "@/components/providers/DashboardDataProvider";
 import { cn } from "@/lib/utils";
 import { createMeeting } from "@/app/actions/mjengo-meet";
-import { suiteCounts } from "@/app/actions/mjengo-nav";
+import { useSuiteNotifications } from "@/lib/client/suite-notifications";
 
 type Edge = "left" | "right" | "bottom";
 interface Place { edge: Edge; at: number }
@@ -32,7 +32,7 @@ export function MjengoDock() {
 	const open = pinned || hover;
 	const [drag, setDrag] = useState<{ x: number; y: number } | null>(null);
 	const [starting, setStarting] = useState<"voice" | "video" | null>(null);
-	const [unread, setUnread] = useState(0);
+	const { unread } = useSuiteNotifications();
 	const moved = useRef(false);
 	const origin = useRef({ x: 0, y: 0 });
 	const sidebarW = mounted && dash?.isSidebarCollapsed ? 72 : 256;
@@ -49,14 +49,6 @@ export function MjengoDock() {
 		} catch { /* default */ }
 	}, []);
 	const togglePin = () => { const n = !pinned; setPinned(n); try { localStorage.setItem("ss_mj_dock_pin", n ? "1" : "0"); } catch { /* ignore */ } };
-	useEffect(() => {
-		let on = true;
-		const tick = () => suiteCounts().then((c) => on && setUnread(c.notifications)).catch(() => undefined);
-		tick();
-		const t = setInterval(tick, 60_000);
-		return () => { on = false; clearInterval(t); };
-	}, []);
-
 	const save = (p: Place) => { setPlace(p); try { localStorage.setItem(KEY, JSON.stringify(p)); } catch { /* ignore */ } };
 
 	const onDown = (e: React.PointerEvent) => {

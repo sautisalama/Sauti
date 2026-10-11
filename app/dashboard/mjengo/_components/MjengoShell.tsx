@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { ArrowLeft, ClipboardList, Briefcase, CheckSquare, FileText, HardDrive, FolderKanban, LayoutDashboard, Lightbulb, Mail, ScrollText, ShieldCheck, Sparkles, CalendarClock, Users, MessageCircle, Bell, Megaphone, Palette, Video } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { MjengoDock } from "./MjengoDock";
+import { startSuiteNotifications } from "@/lib/client/suite-notifications";
 
 const BASE = "/dashboard/mjengo";
 
@@ -36,6 +37,8 @@ export function MjengoShell({ isSuper, children }: { isSuper: boolean; children:
 		document.documentElement.classList.add("mjengo-theme");
 		return () => document.documentElement.classList.remove("mjengo-theme");
 	}, []);
+	// Notifications load at once and stay live, so counters are right before anything is opened.
+	useEffect(() => { startSuiteNotifications(); }, []);
 	// Warm the mail screen shortly after the suite opens, so Mail is already there when it is clicked.
 	useEffect(() => {
 		const t = setTimeout(() => { import("../mail/_components/mail-store").then((m) => m.prefetchMail()).catch(() => undefined); }, 1200);

@@ -1,35 +1,23 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { formatDistanceToNow } from "date-fns";
 import { Bell, Check, CheckCheck, Lightbulb, ListChecks, Mail, Megaphone, Video } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { createClient } from "@/utils/supabase/client";
+import { markSuiteRead, startSuiteNotifications, useSuiteNotifications } from "@/lib/client/suite-notifications";
 import { cn } from "@/lib/utils";
 import { MjengoLoader } from "../_components/MjengoLoader";
 
-interface Note { id: string; type: string; title: string; message: string | null; link: string | null; read: boolean; created_at: string }
 
 const ICON: Record<string, typeof Bell> = { todo_due: ListChecks, todo_assigned: ListChecks, opportunity: Lightbulb, mail: Mail, meeting: Video, post: Megaphone };
 
 /** Only what belongs to the suite: anything that links into it. */
 export default function NotificationsPage() {
-	const supabase = useMemo(() => createClient(), []);
-	const [notes, setNotes] = useState<Note[] | null>(null);
+	const { notes } = useSuiteNotifications();
 	const [onlyUnread, setOnlyUnread] = useState(false);
-
-	const load = useCallback(async () => {
-		const { data } = await supabase.from("notifications").select("id, type, title, message, link, read, created_at").like("link", "/dashboard/mjengo%").order("created_at", { ascending: false }).limit(100);
-		setNotes((data ?? []) as Note[]);
-	}, [supabase]);
-	useEffect(() => { load().catch(() => setNotes([])); }, [load]);
-
-	const mark = async (ids: string[]) => {
-		if (!ids.length) return;
-		await supabase.from("notifications").update({ read: true }).in("id", ids);
-		setNotes((cur) => cur?.map((n) => (ids.includes(n.id) ? { ...n, read: true } : n)) ?? cur);
-	};
+	useEffect(() => { startSuiteNotifications(); }, []);
+	const mark = (ids: string[]) => markSuiteRead(ids);
 
 	if (!notes) return <MjengoLoader label="Loading notifications" />;
 	const shown = onlyUnread ? notes.filter((n) => !n.read) : notes;
