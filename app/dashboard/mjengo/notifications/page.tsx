@@ -18,6 +18,15 @@ export default function NotificationsPage() {
 	const [onlyUnread, setOnlyUnread] = useState(false);
 	useEffect(() => { startSuiteNotifications(); }, []);
 	const mark = (ids: string[]) => markSuiteRead(ids);
+	// Opening the page is reading it: everything unread is marked read a moment after it appears.
+	useEffect(() => {
+		if (!notes) return;
+		const ids = notes.filter((n) => !n.read).map((n) => n.id);
+		if (!ids.length) return;
+		const t = setTimeout(() => { markSuiteRead(ids); }, 1500);
+		return () => clearTimeout(t);
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [notes?.length]);
 
 	if (!notes) return <MjengoLoader label="Loading notifications" />;
 	const shown = onlyUnread ? notes.filter((n) => !n.read) : notes;

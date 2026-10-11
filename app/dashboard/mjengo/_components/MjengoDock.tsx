@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { Bell, Calendar, GripVertical, Loader2, MessageCircle, Mic, Pin, PinOff, Video } from "lucide-react";
+import { Bell, Calendar, GripVertical, Loader2, MessageCircle, Pin, PinOff, Video } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useToast } from "@/hooks/use-toast";
 import { unwrap } from "@/lib/action-result";
@@ -31,7 +31,7 @@ export function MjengoDock() {
 	const [pinned, setPinned] = useState(false);
 	const open = pinned || hover;
 	const [drag, setDrag] = useState<{ x: number; y: number } | null>(null);
-	const [starting, setStarting] = useState<"voice" | "video" | null>(null);
+	const [starting, setStarting] = useState<"video" | null>(null);
 	const { unread } = useSuiteNotifications();
 	const moved = useRef(false);
 	const origin = useRef({ x: 0, y: 0 });
@@ -75,14 +75,14 @@ export function MjengoDock() {
 		save({ edge, at: Math.min(0.95, Math.max(0.05, edge === "bottom" ? x / w : y / h)) });
 	};
 
-	const start = async (mode: "voice" | "video") => {
+	const start = async (mode: "video") => {
 		setStarting(mode);
 		try {
 			const { code } = await unwrap(createMeeting(mode, null));
 			const url = `${window.location.origin}/meet/${code}`;
 			navigator.clipboard?.writeText(url).catch(() => undefined);
 			// The call is its own page (/meet/...), opened right here so an installed app does not pop up a new window.
-			toast({ title: mode === "voice" ? "Voice call ready" : "Video call ready", description: "The link is copied: send it to anyone you want in the call." });
+			toast({ title: "Meeting ready", description: "The link is copied: send it to anyone you want in the call." });
 			setOpen(false);
 			window.location.assign(url);
 		} catch (e) {
@@ -141,8 +141,7 @@ export function MjengoDock() {
 						<Bell className="h-[18px] w-[18px]" />
 						{unread > 0 && <span className="absolute right-1 top-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-sauti-teal px-1 text-[10px] font-bold text-white">{unread > 9 ? "9+" : unread}</span>}
 					</Item>
-					<Item label="Voice call" hint="Start an audio call in its own page" onClick={() => start("voice")} busy={starting === "voice"} side={side}><Mic className="h-[18px] w-[18px]" /></Item>
-					<Item label="Video call" hint="Start a video call with captions" onClick={() => start("video")} busy={starting === "video"} side={side}><Video className="h-[18px] w-[18px]" /></Item>
+					<Item label="Meeting" hint="Start a meeting; turn the camera off for audio only" onClick={() => start("video")} busy={starting === "video"} side={side}><Video className="h-[18px] w-[18px]" /></Item>
 					<Item label="Calendar" hint="Month view, events and meetings" href="/dashboard/mjengo/calendar" side={side}><Calendar className="h-[18px] w-[18px]" /></Item>
 				</div>
 			</div>

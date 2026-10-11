@@ -17,7 +17,6 @@ const TABS = [
 	{ href: `${BASE}/contacts`, label: "Contacts", icon: Users },
 	{ href: `${BASE}/calendar`, label: "Calendar", icon: CalendarClock },
 	{ href: `${BASE}/meetings`, label: "Call notes", icon: Video },
-	{ href: `${BASE}/notifications`, label: "Notifications", icon: Bell },
 	{ href: `${BASE}/vault`, label: "Files", icon: HardDrive },
 	{ href: `${BASE}/grants`, label: "Grants", icon: Briefcase },
 	{ href: `${BASE}/opportunities`, label: "Opportunities", icon: Lightbulb },

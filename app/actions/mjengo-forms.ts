@@ -263,3 +263,10 @@ async function poster_(formId: string, assetId: string | null): Promise<{ url: s
 
 export const generateForm = guard(generate_);
 export const linkPoster = guard(poster_);
+
+async function seen_(formId: string) {
+  await requireAdminActor();
+  await looseAdmin().from('mjengo_forms').update({ responses_seen_at: new Date().toISOString() }).eq('id', formId);
+}
+
+export const markResponsesSeen = guard(seen_);

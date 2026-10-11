@@ -116,7 +116,7 @@ export function EnhancedSidebar({
 	const isAdminMode = dash?.isAdminMode || false;
 	const onMjengo = !!pathname?.startsWith("/dashboard/mjengo");
 	const [mjengoSuper, setMjengoSuper] = useState(false);
-	const [suite, setSuite] = useState({ opportunities: 0, files: 0, notifications: 0 });
+	const [suite, setSuite] = useState({ opportunities: 0, files: 0, notifications: 0, forms: 0, meetings: 0 });
 	const mailUnread = useMailUnread();
 	const liveNotes = useSuiteNotifications();
 	useEffect(() => { if (onMjengo) startSuiteNotifications(); }, [onMjengo]);
@@ -313,13 +313,12 @@ export function EnhancedSidebar({
 				{ id: "mj-chat", group: "Communicate", label: "Chats", icon: MessageCircle, href: `${B}/chat`, section: "main", hint: "Conversations with your team and contacts" },
 				{ id: "mj-contacts", group: "Communicate", label: "Contacts", icon: Users, href: `${B}/contacts`, section: "main", hint: "Your team's contact book" },
 				{ id: "mj-calendar", group: "Communicate", label: "Calendar", icon: CalendarClock, href: `${B}/calendar`, section: "main", hint: "Month view, events and meetings" },
-				{ id: "mj-meetings", group: "Communicate", label: "Call notes", icon: Video, href: `${B}/meetings`, section: "main", hint: "Transcripts and notes from your calls" },
-				{ id: "mj-notifications", group: "Communicate", label: "Notifications", icon: Bell, href: `${B}/notifications`, section: "main", hint: "What needs your attention in the suite", badge: liveNotes.unread || undefined },
+				...(suite.meetings > 0 ? ([{ id: "mj-meetings", group: "Communicate", label: "Call notes", icon: Video, href: `${B}/meetings`, section: "main", hint: "Transcripts and notes from your calls" }] as SidebarItem[]) : []),
 				{ id: "mj-files", group: "Files", label: "Files", icon: HardDrive, href: `${B}/vault`, section: "main", hint: "Documents, PDFs, sheets and folders, shared and kept in step with Google Drive", badge: suite.files || undefined },
 				{ id: "mj-grants", group: "Work", label: "Grants", icon: Briefcase, href: `${B}/grants`, section: "main", hint: "Track grant applications and deadlines" },
 				{ id: "mj-opps", group: "Work", label: "Opportunities", icon: Lightbulb, href: `${B}/opportunities`, section: "main", hint: "Funding and partnership leads", badge: counts.opportunities || undefined },
 				{ id: "mj-projects", group: "Work", label: "Projects", icon: FolderKanban, href: `${B}/projects`, section: "main", hint: "Projects, milestones and documents" },
-				{ id: "mj-forms", group: "Work", label: "Forms", icon: ClipboardList, href: `${B}/forms`, section: "main", hint: "Build forms and see responses" },
+				{ id: "mj-forms", group: "Work", label: "Forms", icon: ClipboardList, href: `${B}/forms`, section: "main", hint: "Build forms and see responses", badge: suite.forms || undefined },
 				{ id: "mj-todos", group: "Work", label: "To-dos", icon: CheckSquare, href: `${B}/todos`, section: "main", hint: "Tasks and shared responsibilities" },
 				{ id: "mj-design", group: "Create", label: "Design", icon: Palette, href: `${B}/design`, section: "main", hint: "Posters, banners and scheduled content" },
 			];

@@ -24,7 +24,7 @@ import { QrShare } from "@/components/chat/QrShare";
 import { FormRenderer } from "@/components/forms/FormRenderer";
 import { TYPE_LABEL, displayAnswer, hasOptions, newQuestion, type FormSettings, type Question, type QuestionType } from "@/lib/forms/schema";
 import { perDay, summarise, toCsv } from "@/lib/forms/analytics";
-import { deleteForm, deleteResponse, designSystemsForForms, exportedCsv, formImageUpload, linkPoster, getForm, getResponses, saveForm, setFormStatus, type FormRow, type ResponseRow } from "@/app/actions/mjengo-forms";
+import { markResponsesSeen, deleteForm, deleteResponse, designSystemsForForms, exportedCsv, formImageUpload, linkPoster, getForm, getResponses, saveForm, setFormStatus, type FormRow, type ResponseRow } from "@/app/actions/mjengo-forms";
 import { putToSignedUrl } from "@/lib/client/upload";
 import { unwrap } from "@/lib/action-result";
 import { listAssets, type AssetRow } from "@/app/actions/mjengo-ai";
@@ -60,6 +60,9 @@ export default function FormEditorPage() {
 			}
 		}).catch(() => setForm(null));
 	}, [id]);
+
+	// Opening the form is looking at its responses: the counter in the navigation stops counting them.
+	useEffect(() => { markResponsesSeen(id).catch(() => undefined); }, [id]);
 
 	const loadResponses = useCallback(() => getResponses(id).then(setResponses).catch(() => setResponses([])), [id]);
 	useEffect(() => {

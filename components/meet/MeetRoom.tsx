@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Captions, Check, Copy, Loader2, Mail, Mic, MicOff, Minimize2, MonitorUp, PictureInPicture2, PhoneOff, Share2, SmartphoneNfc, Users, Video, VideoOff, Volume2, VolumeX, ExternalLink } from "lucide-react";
+import { format } from "date-fns";
+import { Accessibility, Captions, Check, Copy, Hand, Info, Loader2, Mail, MessageSquareText, Mic, MicOff, Minimize2, MonitorUp, PictureInPicture2, PhoneOff, SmartphoneNfc, Users, Video, VideoOff, Volume2, X } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import { unwrap } from "@/lib/action-result";
 import { saveTranscript, type TranscriptLine } from "@/app/actions/mjengo-meet";
@@ -9,7 +10,7 @@ import { cn } from "@/lib/utils";
 
 type SignalKind = "offer" | "answer" | "ice";
 interface Peer { id: string; name: string; companion?: boolean }
-interface Remote extends Peer { stream: MediaStream | null; muted: boolean }
+interface Remote extends Peer { stream: MediaStream | null; muted: boolean; sharing?: boolean; hand?: boolean }
 interface Device { id: string; label: string }
 
 const ICE: RTCIceServer[] = [
@@ -29,8 +30,13 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded }: 
 	const [camOn, setCamOn] = useState(mode === "video");
 	const [sharing, setSharing] = useState(false);
 	const [remotes, setRemotes] = useState<Remote[]>([]);
-	const [captionsOn, setCaptionsOn] = useState(true);
-	const [panel, setPanel] = useState<"none" | "transcript" | "people">("none");
+	const [captionsOn, setCaptionsOn] = useState(false);
+	const [panel, setPanel] = useState<"none" | "transcript" | "people" | "info">("none");
+	const [handUp, setHandUp] = useState(false);
+	const [a11yOpen, setA11yOpen] = useState(false);
+	const [a11y, setA11yState] = useState<{ size: "md" | "lg" | "xl"; contrast: boolean; reduceMotion: boolean }>({ size: "md", contrast: false, reduceMotion: false });
+	const setA11y = (v: typeof a11y) => { setA11yState(v); try { localStorage.setItem("ss_meet_a11y", JSON.stringify(v)); } catch { /* ignore */ } };
+	const screenStream = useRef<MediaStream | null>(null);
 	const [lines, setLines] = useState<TranscriptLine[]>([]);
 	const [lang, setLang] = useState<string>("en-KE");
 	const [copied, setCopied] = useState(false);
@@ -49,8 +55,11 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded }: 
 	const [companion, setCompanion] = useState(false);
 	const [speakerOn, setSpeakerOn] = useState(true);
 
+	// Accessibility choices are remembered; captions themselves always start off.
+	useEffect(() => { try { const v = localStorage.getItem("ss_meet_a11y"); if (v) setA11yState(JSON.parse(v)); } catch { /* defaults */ } }, []);
 	const camOnRef = useRef(mode === "video");
 	const micOnRef = useRef(true);
+	const toggleShareRef = useRef<() => Promise<void>>(async () => undefined);
 	const myId = useRef(`${Math.random().toString(36).slice(2, 10)}${Date.now().toString(36)}`);
 	const local = useRef<MediaStream | null>(null);
 	const preview = useRef<MediaStream | null>(null);
@@ -180,7 +189,7 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded }: 
 		}
 	}, [connect, send]);
 
-	const join = async () => {
+	const join = async (present = false) => {
 		stopPreview();
 		try {
 			const stream = await navigator.mediaDevices.getUserMedia({
@@ -200,7 +209,7 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded }: 
 		channel.current = ch;
 		ch.on("broadcast", { event: "signal" }, ({ payload }) => onSignal(payload))
 			.on("broadcast", { event: "caption" }, ({ payload }) => addLine(payload as TranscriptLine))
-			.on("broadcast", { event: "state" }, ({ payload }) => setRemote(payload.id, { muted: !!payload.muted }))
+			.on("broadcast", { event: "state" }, ({ payload }) => setRemote(payload.id, { muted: !!payload.muted, sharing: !!payload.sharing, hand: !!payload.hand }))
 			.on("presence", { event: "join" }, ({ key, newPresences }) => {
 				if (key === myId.current) return;
 				const p = newPresences[0] as unknown as { name?: string; companion?: boolean };
@@ -213,6 +222,7 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded }: 
 			})
 			.subscribe(async (status) => { if (status === "SUBSCRIBED") await ch.track({ name: shownName, companion }); });
 		setJoined(true);
+		if (present) setTimeout(() => { void toggleShareRef.current(); }, 600);
 	};
 
 	useEffect(() => { if (joined && localVideo.current && local.current) localVideo.current.srcObject = local.current; }, [joined, camOn, sharing]);
@@ -252,7 +262,7 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded }: 
 		const next = !micOn;
 		setMicOn(next);
 		local.current?.getAudioTracks().forEach((t) => (t.enabled = next));
-		send("state", { id: myId.current, muted: !next });
+		send("state", { id: myId.current, muted: !next, sharing, hand: handUp });
 	};
 	const toggleCam = () => {
 		const next = !camOn;
@@ -268,18 +278,28 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded }: 
 	};
 	const stopShare = async () => {
 		await replaceVideo(local.current?.getVideoTracks()[0] ?? null);
+		screenStream.current?.getTracks().forEach((t) => t.stop());
+		screenStream.current = null;
 		if (localVideo.current && local.current) localVideo.current.srcObject = local.current;
 		setSharing(false);
+		send("state", { id: myId.current, muted: !micOnRef.current, sharing: false, hand: handUp });
+	};
+	const toggleHand = () => {
+		const next = !handUp;
+		setHandUp(next);
+		send("state", { id: myId.current, muted: !micOnRef.current, sharing, hand: next });
 	};
 	const toggleShare = async () => {
+		toggleShareRef.current = toggleShare;
 		if (sharing) return stopShare();
 		try {
 			const screen = await navigator.mediaDevices.getDisplayMedia({ video: true });
 			const track = screen.getVideoTracks()[0];
 			await replaceVideo(track);
-			if (localVideo.current) localVideo.current.srcObject = screen;
+			screenStream.current = screen;
 			track.onended = () => { void stopShare(); };
 			setSharing(true);
+			send("state", { id: myId.current, muted: !micOnRef.current, sharing: true, hand: handUp });
 		} catch { /* cancelled */ }
 	};
 
@@ -332,61 +352,61 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded }: 
 	/* ------------------------------------------------------------ lobby */
 
 	if (!joined) {
-		const sel = "h-10 w-full rounded-lg border border-black/10 bg-white px-3 text-sm outline-none focus:border-sauti-teal";
+		const chip = "flex h-9 max-w-[220px] items-center gap-2 rounded-full border border-[#dadce0] bg-white px-3 text-sm text-[#3c4043]";
 		return (
-			<main className={cn("mx-auto grid max-w-4xl gap-6 px-5", embedded ? "min-h-full content-start py-4 md:grid-cols-1" : "min-h-dvh content-center py-8 md:grid-cols-[1.2fr_1fr]")}>
+			<main className={cn("mx-auto grid w-full max-w-[1100px] gap-8 bg-white px-5 text-[#202124]", embedded ? "min-h-full content-start py-4" : "min-h-dvh content-center py-8 lg:grid-cols-[minmax(0,1.5fr)_minmax(320px,1fr)] lg:items-center")}>
 				<div>
-					<div className="relative aspect-video overflow-hidden rounded-2xl bg-[#202020]">
-						<video ref={previewVideo} autoPlay playsInline muted className={cn("h-full w-full -scale-x-100 object-cover", (!camOn || mode === "voice" || permission !== "granted") && "invisible absolute")} />
-						{(!camOn || mode === "voice" || permission !== "granted") && (
-							<div className="flex h-full items-center justify-center text-center text-sm text-white/70">
-								{permission === "denied" ? "Allow the camera and microphone in your browser to be seen and heard. You can still listen." : mode === "voice" ? "Voice call" : "Camera is off"}
+					<div className="relative aspect-video overflow-hidden rounded-xl bg-[#202124] shadow-[0_1px_2px_rgba(60,64,67,0.3),0_1px_3px_1px_rgba(60,64,67,0.15)]">
+						<video ref={previewVideo} autoPlay playsInline muted className={cn("h-full w-full -scale-x-100 object-cover", (!camOn || permission !== "granted") && "invisible absolute")} />
+						{(!camOn || permission !== "granted") && (
+							<div className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center text-white">
+								{permission === "denied" ? <p className="text-sm">Allow the camera and microphone in your browser to be seen and heard. You can still listen.</p> : (
+									<>
+										<span className="flex h-24 w-24 items-center justify-center rounded-full bg-sauti-teal text-3xl font-medium">{initials(name || "You")}</span>
+										<p className="text-lg">Camera is off</p>
+									</>
+								)}
 							</div>
 						)}
-						<div className="absolute inset-x-0 bottom-3 flex justify-center gap-2">
-							<button onClick={() => setMicOn((v) => !v)} aria-label={micOn ? "Turn microphone off" : "Turn microphone on"} className={cn("flex h-11 w-11 items-center justify-center rounded-full text-white", micOn ? "bg-white/20 hover:bg-white/30" : "bg-red-600")}>{micOn ? <Mic className="h-5 w-5" /> : <MicOff className="h-5 w-5" />}</button>
-							{mode === "video" && <button onClick={() => setCamOn((v) => !v)} aria-label={camOn ? "Turn camera off" : "Turn camera on"} className={cn("flex h-11 w-11 items-center justify-center rounded-full text-white", camOn ? "bg-white/20 hover:bg-white/30" : "bg-red-600")}>{camOn ? <Video className="h-5 w-5" /> : <VideoOff className="h-5 w-5" />}</button>}
+						<span className="absolute left-4 top-3 text-sm font-medium text-white drop-shadow">{name || "You"}</span>
+						<div className="absolute inset-x-0 bottom-4 flex justify-center gap-4">
+							<button onClick={() => setMicOn((v) => !v)} aria-label={micOn ? "Turn off microphone" : "Turn on microphone"} className={cn("flex h-12 w-12 items-center justify-center rounded-full border text-white transition", micOn ? "border-white/60 bg-transparent hover:bg-white/15" : "border-transparent bg-[#ea4335]")}>{micOn ? <Mic className="h-5 w-5" /> : <MicOff className="h-5 w-5" />}</button>
+							<button onClick={() => setCamOn((v) => !v)} aria-label={camOn ? "Turn off camera" : "Turn on camera"} className={cn("flex h-12 w-12 items-center justify-center rounded-full border text-white transition", camOn ? "border-white/60 bg-transparent hover:bg-white/15" : "border-transparent bg-[#ea4335]")}>{camOn ? <Video className="h-5 w-5" /> : <VideoOff className="h-5 w-5" />}</button>
 						</div>
 					</div>
 					{micOn && permission === "granted" && (
-						<div className="mt-3 flex items-center gap-2 text-xs text-[#787774]"><Mic className="h-3.5 w-3.5" /><div className="h-1.5 flex-1 overflow-hidden rounded-full bg-black/10"><div className="h-full rounded-full bg-sauti-teal transition-[width] duration-75" style={{ width: `${Math.round(level * 100)}%` }} /></div></div>
+						<div className="mt-3 flex items-center gap-2 text-xs text-[#5f6368]"><Mic className="h-3.5 w-3.5" /><div className="h-1.5 flex-1 overflow-hidden rounded-full bg-[#e8eaed]"><div className="h-full rounded-full bg-[#1a73e8] transition-[width] duration-100" style={{ width: `${Math.round(level * 100)}%` }} /></div></div>
+					)}
+					{permission === "granted" && (
+						<div className="mt-3 flex flex-wrap gap-2">
+							{mics.length > 0 && <label className={chip}><Mic className="h-4 w-4 shrink-0" /><select aria-label="Microphone" value={micId} onChange={(e) => setMicId(e.target.value)} className="min-w-0 bg-transparent outline-none"><option value="">Default microphone</option>{mics.map((d) => <option key={d.id} value={d.id}>{d.label}</option>)}</select></label>}
+							{speakers.length > 0 && <label className={chip}><Volume2 className="h-4 w-4 shrink-0" /><select aria-label="Speaker" value={speakerId} onChange={(e) => setSpeakerId(e.target.value)} className="min-w-0 bg-transparent outline-none"><option value="">Default speaker</option>{speakers.map((d) => <option key={d.id} value={d.id}>{d.label}</option>)}</select></label>}
+							{cams.length > 0 && <label className={chip}><Video className="h-4 w-4 shrink-0" /><select aria-label="Camera" value={camId} onChange={(e) => setCamId(e.target.value)} className="min-w-0 bg-transparent outline-none"><option value="">Default camera</option>{cams.map((d) => <option key={d.id} value={d.id}>{d.label}</option>)}</select></label>}
+						</div>
 					)}
 				</div>
 
-				<div className="space-y-4">
+				<div className="flex flex-col items-center gap-5 text-center lg:items-start lg:text-left">
+					{canSave && <a href="/dashboard/mjengo/calendar" className="text-xs font-medium text-[#5f6368] hover:text-[#202124]">&larr; Back to Sauti Salama</a>}
 					<div>
-						{canSave && <a href="/dashboard/mjengo/calendar" className="mb-2 inline-flex items-center gap-1 text-xs font-medium text-[#787774] hover:text-[#37352f]">&larr; Back to the suite</a>}
-					<p className="text-sm font-medium text-[#787774]">Sauti Salama</p>
-						<h1 className="mt-1 text-2xl font-semibold text-[#37352f]">{title || (mode === "voice" ? "Voice call" : "Video call")}</h1>
+						<h1 className="text-[28px] font-normal leading-tight">{title || "Ready to join?"}</h1>
+						<p className="mt-1 text-sm text-[#5f6368]">{remotes.length ? "Others are in the call" : "Check how you look and sound, then join"}</p>
 					</div>
-					<label className="block"><span className="mb-1.5 block text-sm font-medium text-[#37352f]">Your name</span>
-						<input value={name} onChange={(e) => setName(e.target.value)} placeholder="How should people see you?" className="h-11 w-full rounded-lg border border-black/10 px-3 text-[15px] outline-none focus:border-sauti-teal" />
+					<label className="w-full max-w-sm text-left">
+						<span className="mb-1 block text-xs font-medium text-[#5f6368]">Your name</span>
+						<input value={name} onChange={(e) => setName(e.target.value)} placeholder="How should people see you?" className="h-12 w-full rounded-lg border border-[#dadce0] px-3 text-base outline-none focus:border-[#1a73e8] focus:ring-1 focus:ring-[#1a73e8]" />
 					</label>
-
-					{permission === "granted" && (
-						<div className="space-y-2.5">
-							{mode === "video" && cams.length > 0 && <label className="block text-xs font-medium text-[#787774]">Camera<select value={camId} onChange={(e) => setCamId(e.target.value)} className={sel}><option value="">Default</option>{cams.map((d) => <option key={d.id} value={d.id}>{d.label}</option>)}</select></label>}
-							{mics.length > 0 && <label className="block text-xs font-medium text-[#787774]">Microphone<select value={micId} onChange={(e) => setMicId(e.target.value)} className={sel}><option value="">Default</option>{mics.map((d) => <option key={d.id} value={d.id}>{d.label}</option>)}</select></label>}
-							{speakers.length > 0 && <label className="block text-xs font-medium text-[#787774]">Speaker<select value={speakerId} onChange={(e) => setSpeakerId(e.target.value)} className={sel}><option value="">Default</option>{speakers.map((d) => <option key={d.id} value={d.id}>{d.label}</option>)}</select></label>}
-						</div>
-					)}
-
+					<div className="flex flex-wrap justify-center gap-3 lg:justify-start">
+						<button onClick={() => join(false)} disabled={!name.trim()} className="h-12 rounded-full bg-[#1a73e8] px-7 text-sm font-medium text-white shadow-sm hover:bg-[#1765cc] disabled:opacity-40">{companion ? "Join as companion" : "Join now"}</button>
+						<button onClick={() => join(true)} disabled={!name.trim() || companion} className="flex h-12 items-center gap-2 rounded-full border border-[#dadce0] px-6 text-sm font-medium text-[#1a73e8] hover:bg-[#f6fafe] disabled:opacity-40"><MonitorUp className="h-4 w-4" /> Present</button>
+					</div>
 					{canSave && (
-						<div className="rounded-xl border border-black/10 p-3">
-							<label className="flex cursor-pointer items-start gap-3">
-								<input type="checkbox" checked={companion} onChange={(e) => { setCompanion(e.target.checked); if (e.target.checked) setSpeakerOn(false); }} className="mt-1 h-4 w-4 accent-[#068297]" />
-								<span className="text-sm"><span className="flex items-center gap-1.5 font-medium text-[#37352f]"><SmartphoneNfc className="h-4 w-4" /> Companion mode</span><span className="block text-xs text-[#787774]">Join from this device as an extra camera and microphone for the call you are in on your computer. It is shown as your phone. Speaker stays off to avoid echo.</span></span>
-							</label>
-							{companion && (
-								<label className="mt-2 flex items-center gap-2 pl-7 text-xs text-[#37352f]"><input type="checkbox" checked={speakerOn} onChange={(e) => setSpeakerOn(e.target.checked)} className="accent-[#068297]" /> Also play the call audio on this device</label>
-							)}
-						</div>
+						<label className="flex max-w-sm cursor-pointer items-start gap-3 text-left">
+							<input type="checkbox" checked={companion} onChange={(e) => { setCompanion(e.target.checked); if (e.target.checked) setSpeakerOn(false); }} className="mt-1 h-4 w-4 accent-[#1a73e8]" />
+							<span className="text-sm"><span className="flex items-center gap-1.5 font-medium"><SmartphoneNfc className="h-4 w-4" /> Companion mode</span><span className="block text-xs text-[#5f6368]">Use this device as an extra camera and microphone for the call you are in on your computer. Its speaker stays off to avoid echo.</span></span>
+						</label>
 					)}
-
-					<button onClick={join} disabled={!name.trim()} className="flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-sauti-teal text-[15px] font-semibold text-white hover:bg-sauti-dark disabled:opacity-40">
-						{mode === "voice" ? <Mic className="h-5 w-5" /> : <Video className="h-5 w-5" />} {companion ? "Join as companion" : "Join now"}
-					</button>
-					<p className="text-xs text-[#9b9a97]">Calls go directly between people in the call. Captions are made in your browser and added to the call transcript.</p>
+					<p className="max-w-sm text-xs text-[#5f6368]">Captions and accessibility tools are off until you turn them on inside the call. Calls go directly between people in the call.</p>
 				</div>
 			</main>
 		);
@@ -394,83 +414,148 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded }: 
 
 	/* ------------------------------------------------------------ room */
 
+	// The presented screen, if anyone is presenting, takes the stage.
+	const presenter = sharing ? { id: "me", name: `${shownName} (you)`, stream: null as MediaStream | null } : remotes.find((r) => r.sharing) ?? null;
+	const capSize = a11y.size === "xl" ? "text-2xl" : a11y.size === "lg" ? "text-xl" : "text-base";
+	const clock = format(new Date(), "h:mm a");
+
+	const selfTile = (
+		<div className="relative flex min-h-[110px] items-center justify-center overflow-hidden rounded-xl bg-[#3c4043]">
+			<video ref={localVideo} autoPlay playsInline muted className={cn("h-full w-full object-cover", !sharing && "-scale-x-100", !(camOn || sharing) && "hidden")} />
+			{!(camOn || sharing) && <span className="flex h-16 w-16 items-center justify-center rounded-full bg-sauti-teal text-xl font-medium">{initials(shownName)}</span>}
+			<span className="absolute bottom-2 left-3 flex items-center gap-1.5 text-sm font-medium text-white drop-shadow">{!micOn && <MicOff className="h-3.5 w-3.5" />}{shownName} (you)</span>
+			{handUp && <span className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-[#1a73e8]"><Hand className="h-4 w-4" /></span>}
+		</div>
+	);
+
 	return (
-		<div className="relative flex h-dvh flex-col bg-[#191919] text-white">
+		<div className={cn("relative flex h-dvh flex-col bg-[#202124] text-white", a11y.reduceMotion && "[&_*]:!transition-none [&_*]:!animate-none")}>
 			<div className="flex min-h-0 flex-1">
-				<div className={cn("grid min-h-0 flex-1 auto-rows-fr gap-2 p-2 sm:p-3", cols)}>
-					<div className="relative flex min-h-[120px] items-center justify-center overflow-hidden rounded-2xl bg-[#2a2a2a]">
-						<video ref={localVideo} autoPlay playsInline muted className={cn("h-full w-full object-cover", !sharing && "-scale-x-100", !(camOn || sharing) && "hidden")} />
-						{!(camOn || sharing) && <span className="flex h-16 w-16 items-center justify-center rounded-full bg-sauti-teal text-xl font-semibold">{initials(shownName)}</span>}
-						<span className="absolute bottom-2 left-2 flex items-center gap-1.5 rounded-md bg-black/60 px-2 py-1 text-xs">{!micOn && <MicOff className="h-3 w-3" />}{shownName} (you)</span>
-					</div>
-					{remotes.map((r) => <RemoteTile key={r.id} r={r} sinkId={speakerId} audioOn={speakerOn} />)}
+				<div className="min-h-0 min-w-0 flex-1 p-3">
+					{presenter ? (
+						<div className="flex h-full min-h-0 flex-col gap-3 lg:flex-row">
+							<div className="relative min-h-0 flex-1 overflow-hidden rounded-xl bg-black">
+								{presenter.id === "me" ? (
+									<>
+										<ScreenPreview stream={screenStream.current} />
+										<span className="absolute left-3 top-3 rounded-md bg-black/60 px-2.5 py-1 text-sm">You are presenting to everyone</span>
+										<button onClick={stopShare} className="absolute bottom-4 left-1/2 -translate-x-1/2 rounded-full bg-[#ea4335] px-5 py-2 text-sm font-medium hover:bg-[#d93025]">Stop presenting</button>
+									</>
+								) : (
+									<>
+										<StreamVideo stream={(presenter as Remote).stream} className="h-full w-full object-contain" />
+										<span className="absolute left-3 top-3 rounded-md bg-black/60 px-2.5 py-1 text-sm">{presenter.name} is presenting</span>
+									</>
+								)}
+							</div>
+							<div className="flex shrink-0 gap-2 overflow-x-auto lg:w-56 lg:flex-col lg:overflow-y-auto">
+								<div className="h-28 w-44 shrink-0 lg:h-32 lg:w-full">{selfTile}</div>
+								{remotes.filter((r) => r.id !== presenter.id).map((r) => <div key={r.id} className="h-28 w-44 shrink-0 lg:h-32 lg:w-full"><RemoteTile r={r} sinkId={speakerId} audioOn={speakerOn} /></div>)}
+							</div>
+						</div>
+					) : (
+						<div className={cn("grid h-full min-h-0 auto-rows-fr gap-3", cols)}>
+							{selfTile}
+							{remotes.map((r) => <RemoteTile key={r.id} r={r} sinkId={speakerId} audioOn={speakerOn} />)}
+						</div>
+					)}
 				</div>
 
 				{panel !== "none" && !embedded && (
-					<aside className="hidden w-80 shrink-0 flex-col border-l border-white/10 bg-[#202020] md:flex">
-						<div className="flex items-center justify-between border-b border-white/10 px-4 py-3 text-sm font-semibold">
-							{panel === "transcript" ? "Transcript" : "People"}
-							<select value={lang} onChange={(e) => setLang(e.target.value)} className="rounded bg-white/10 px-2 py-1 text-xs" aria-label="Caption language">
-								{LANGS.map(([v, l]) => <option key={v} value={v} className="text-black">{l}</option>)}
-							</select>
+					<aside className="m-3 ml-0 hidden w-80 shrink-0 flex-col overflow-hidden rounded-xl bg-white text-[#202124] md:flex">
+						<div className="flex items-center justify-between border-b border-[#dadce0] px-4 py-3 text-base">
+							{panel === "transcript" ? "Transcript" : panel === "info" ? "Meeting details" : "People"}
+							<button onClick={() => setPanel("none")} aria-label="Close" className="flex h-8 w-8 items-center justify-center rounded-full hover:bg-black/5"><X className="h-4 w-4" /></button>
 						</div>
-						{panel === "transcript" ? (
+						{panel === "transcript" && (
 							<div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4 text-sm">
-								{!speechOk && <p className="text-amber-300">Live captions need Chrome, Edge or Safari. Others in the call may still see your words.</p>}
-								{lines.length === 0 && <p className="text-white/50">What people say appears here as they speak.</p>}
-								{lines.map((l) => (<p key={l.id}><span className="font-semibold text-sauti-teal-light">{l.name}</span> <span className="text-white/90">{l.text}</span></p>))}
+								{!speechOk && <p className="text-amber-700">Live captions need Chrome, Edge or Safari. Others in the call may still see your words.</p>}
+								{lines.length === 0 && <p className="text-[#5f6368]">{captionsOn ? "What people say appears here as they speak." : "Captions are off, so nothing is being transcribed on this device. Turn them on in the bar below."}</p>}
+								{lines.map((l) => (<p key={l.id}><span className="font-medium text-[#1a73e8]">{l.name}</span> <span>{l.text}</span></p>))}
 							</div>
-						) : (
-							<ul className="space-y-2 p-4 text-sm">
-								<li>{shownName} (you)</li>
-								{remotes.map((r) => <li key={r.id}>{r.name}</li>)}
+						)}
+						{panel === "people" && (
+							<ul className="space-y-1 p-3 text-sm">
+								<li className="flex items-center gap-3 rounded-lg p-2"><span className="flex h-8 w-8 items-center justify-center rounded-full bg-sauti-teal text-xs text-white">{initials(shownName)}</span>{shownName} (you)</li>
+								{remotes.map((r) => <li key={r.id} className="flex items-center gap-3 rounded-lg p-2"><span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#5f6368] text-xs text-white">{initials(r.name)}</span><span className="flex-1">{r.name}</span>{r.hand && <Hand className="h-4 w-4 text-[#1a73e8]" />}{r.muted && <MicOff className="h-4 w-4 text-[#5f6368]" />}</li>)}
 							</ul>
+						)}
+						{panel === "info" && (
+							<div className="space-y-3 p-4 text-sm">
+								<p className="font-medium">{title || "Meeting"}</p>
+								<p className="break-all rounded-lg bg-[#f1f3f4] p-3 text-xs">{link}</p>
+								<button onClick={() => { navigator.clipboard.writeText(link).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500); }); }} className="flex items-center gap-2 rounded-full border border-[#dadce0] px-4 py-2 text-[#1a73e8] hover:bg-[#f6fafe]">{copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />} {copied ? "Copied" : "Copy joining link"}</button>
+								<a href={mailto} className="flex items-center gap-2 text-[#1a73e8] hover:underline"><Mail className="h-4 w-4" /> Send by email</a>
+							</div>
 						)}
 					</aside>
 				)}
 			</div>
 
 			{captionsOn && lines.length > 0 && panel !== "transcript" && (
-				<p className="pointer-events-none absolute inset-x-0 bottom-20 mx-auto w-fit max-w-[92%] rounded-lg bg-black/70 px-3 py-1.5 text-center text-sm sm:text-[15px]">
+				<p className={cn("pointer-events-none absolute inset-x-0 bottom-24 mx-auto w-fit max-w-[90%] rounded-lg px-4 py-2 text-center", capSize, a11y.contrast ? "bg-black text-yellow-300 ring-2 ring-yellow-300" : "bg-black/75 text-white")}>
 					<span className="font-semibold">{lines[lines.length - 1].name}:</span> {lines[lines.length - 1].text}
 				</p>
 			)}
 
-			<div className="flex shrink-0 flex-wrap items-center justify-center gap-1.5 border-t border-white/10 bg-[#202020] p-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] sm:gap-2 sm:p-3">
-				<Ctl onClick={toggleMic} label={micOn ? "Mute" : "Unmute"} icon={micOn ? <Mic className="h-5 w-5" /> : <MicOff className="h-5 w-5" />} danger={!micOn} />
-				{mode === "video" && <Ctl onClick={toggleCam} label={camOn ? "Camera off" : "Camera on"} icon={camOn ? <Video className="h-5 w-5" /> : <VideoOff className="h-5 w-5" />} danger={!camOn} />}
-				<Ctl onClick={() => setSpeakerOn((v) => !v)} label={speakerOn ? "Mute speaker" : "Unmute speaker"} icon={speakerOn ? <Volume2 className="h-5 w-5" /> : <VolumeX className="h-5 w-5" />} danger={!speakerOn} className="hidden sm:flex" />
-				<Ctl onClick={toggleShare} label="Share screen" icon={<MonitorUp className="h-5 w-5" />} active={sharing} className="hidden sm:flex" />
-				<Ctl onClick={() => setCaptionsOn((v) => !v)} label="Captions" icon={<Captions className="h-5 w-5" />} active={captionsOn} />
-				{!embedded && <Ctl onClick={() => setPanel((p) => (p === "transcript" ? "none" : "transcript"))} label="Transcript" icon={<span className="text-xs font-bold">TXT</span>} active={panel === "transcript"} className="hidden md:flex" />}
-				{!embedded && <Ctl onClick={() => setPanel((p) => (p === "people" ? "none" : "people"))} label="People" icon={<Users className="h-5 w-5" />} active={panel === "people"} className="hidden md:flex" />}
-				<Ctl onClick={pip} label="Picture in picture" icon={<PictureInPicture2 className="h-5 w-5" />} className="hidden sm:flex" />
-				<div className="relative">
-					<Ctl onClick={() => setShareOpen((v) => !v)} label="Share the link" icon={<Share2 className="h-5 w-5" />} active={shareOpen} />
-					{shareOpen && (
-						<div className="absolute bottom-14 right-0 z-10 w-64 rounded-xl border border-white/10 bg-[#2a2a2a] p-2 text-sm shadow-xl">
-							<p className="truncate px-2 pb-1 text-xs text-white/60">{link}</p>
-							<button onClick={() => { navigator.clipboard.writeText(link).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500); }); }} className="flex w-full items-center gap-2 rounded-lg px-2 py-2 hover:bg-white/10">{copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />} {copied ? "Copied" : "Copy link"}</button>
-							<a href={mailto} className="flex w-full items-center gap-2 rounded-lg px-2 py-2 hover:bg-white/10"><Mail className="h-4 w-4" /> Send by email</a>
-							<a href={`https://wa.me/?text=${encodeURIComponent(`Join the call: ${link}`)}`} target="_blank" rel="noopener noreferrer" className="flex w-full items-center gap-2 rounded-lg px-2 py-2 hover:bg-white/10"><ExternalLink className="h-4 w-4" /> WhatsApp</a>
-							{typeof navigator !== "undefined" && "share" in navigator && <button onClick={() => navigator.share({ title: title || "Call", url: link }).catch(() => undefined)} className="flex w-full items-center gap-2 rounded-lg px-2 py-2 hover:bg-white/10"><Share2 className="h-4 w-4" /> More options</button>}
-						</div>
-					)}
+			{/* Bottom bar, as in Google Meet: details on the left, controls in the middle, panels on the right. */}
+			<div className="flex shrink-0 items-center justify-between gap-2 px-3 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-1 sm:px-5 sm:pb-3">
+				<div className="hidden min-w-0 items-center gap-2 text-sm md:flex"><span>{clock}</span><span className="text-white/40">|</span><span className="truncate">{title || code}</span></div>
+				<div className="mx-auto flex items-center gap-2 md:mx-0">
+					<Ctl onClick={toggleMic} label={micOn ? "Turn off microphone" : "Turn on microphone"} icon={micOn ? <Mic className="h-5 w-5" /> : <MicOff className="h-5 w-5" />} danger={!micOn} />
+					<Ctl onClick={toggleCam} label={camOn ? "Turn off camera" : "Turn on camera"} icon={camOn ? <Video className="h-5 w-5" /> : <VideoOff className="h-5 w-5" />} danger={!camOn} />
+					<Ctl onClick={() => setCaptionsOn((v) => !v)} label={captionsOn ? "Turn off captions" : "Turn on captions"} icon={<Captions className="h-5 w-5" />} active={captionsOn} />
+					<Ctl onClick={toggleHand} label={handUp ? "Lower hand" : "Raise hand"} icon={<Hand className="h-5 w-5" />} active={handUp} className="hidden sm:flex" />
+					<Ctl onClick={toggleShare} label={sharing ? "Stop presenting" : "Present now"} icon={<MonitorUp className="h-5 w-5" />} active={sharing} className="hidden sm:flex" />
+					<div className="relative">
+						<Ctl onClick={() => setA11yOpen((v) => !v)} label="Accessibility" icon={<Accessibility className="h-5 w-5" />} active={a11yOpen || a11y.contrast || a11y.size !== "md" || a11y.reduceMotion} />
+						{a11yOpen && (
+							<div className="absolute bottom-14 left-1/2 z-20 w-72 -translate-x-1/2 rounded-xl bg-white p-4 text-sm text-[#202124] shadow-xl">
+								<p className="mb-3 font-medium">Accessibility</p>
+								<label className="mb-3 flex items-center justify-between gap-3"><span>Captions</span><input type="checkbox" checked={captionsOn} onChange={(e) => setCaptionsOn(e.target.checked)} className="h-4 w-4 accent-[#1a73e8]" /></label>
+								<div className="mb-3">
+									<span className="mb-1 block text-xs text-[#5f6368]">Caption size</span>
+									<div className="inline-flex rounded-lg border border-[#dadce0] p-0.5">{([["md", "Normal"], ["lg", "Large"], ["xl", "Huge"]] as const).map(([k, l]) => <button key={k} onClick={() => setA11y({ ...a11y, size: k })} aria-pressed={a11y.size === k} className={cn("rounded-md px-3 py-1", a11y.size === k ? "bg-[#e8f0fe] text-[#1a73e8]" : "")}>{l}</button>)}</div>
+								</div>
+								<label className="mb-3 flex items-center justify-between gap-3"><span>High contrast captions</span><input type="checkbox" checked={a11y.contrast} onChange={(e) => setA11y({ ...a11y, contrast: e.target.checked })} className="h-4 w-4 accent-[#1a73e8]" /></label>
+								<label className="mb-3 flex items-center justify-between gap-3"><span>Reduce motion</span><input type="checkbox" checked={a11y.reduceMotion} onChange={(e) => setA11y({ ...a11y, reduceMotion: e.target.checked })} className="h-4 w-4 accent-[#1a73e8]" /></label>
+								<label className="flex items-center justify-between gap-3"><span>Caption language</span>
+									<select value={lang} onChange={(e) => setLang(e.target.value)} className="rounded-md border border-[#dadce0] bg-white px-2 py-1">{LANGS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select>
+								</label>
+								<p className="mt-3 text-xs text-[#5f6368]">All of these are off until you turn them on.</p>
+							</div>
+						)}
+					</div>
+					<Ctl onClick={pip} label="Picture in picture" icon={<PictureInPicture2 className="h-5 w-5" />} className="hidden md:flex" />
+					<button onClick={leave} aria-label="Leave call" title="Leave call" className="flex h-12 w-16 items-center justify-center rounded-full bg-[#ea4335] hover:bg-[#d93025]"><PhoneOff className="h-5 w-5" /></button>
 				</div>
-				{embedded && <Ctl onClick={() => window.parent.postMessage({ type: "meet:minimize" }, window.location.origin)} label="Minimise" icon={<Minimize2 className="h-5 w-5" />} />}
-				{embedded && <Ctl onClick={() => window.parent.postMessage({ type: "meet:popout" }, window.location.origin)} label="Open in its own window" icon={<ExternalLink className="h-5 w-5" />} />}
-				<button onClick={leave} aria-label="Leave" title="Leave" className="flex h-11 items-center gap-2 rounded-full bg-red-600 px-4 text-sm font-semibold hover:bg-red-700"><PhoneOff className="h-5 w-5" /><span className="hidden sm:inline">Leave</span></button>
+				<div className="hidden items-center gap-1 md:flex">
+					<Ctl onClick={() => setPanel((p) => (p === "info" ? "none" : "info"))} label="Meeting details" icon={<Info className="h-5 w-5" />} active={panel === "info"} flat />
+					<Ctl onClick={() => setPanel((p) => (p === "people" ? "none" : "people"))} label="People" icon={<Users className="h-5 w-5" />} active={panel === "people"} flat />
+					<Ctl onClick={() => setPanel((p) => (p === "transcript" ? "none" : "transcript"))} label="Transcript" icon={<MessageSquareText className="h-5 w-5" />} active={panel === "transcript"} flat />
+					{embedded && <Ctl onClick={() => window.parent.postMessage({ type: "meet:minimize" }, window.location.origin)} label="Minimise" icon={<Minimize2 className="h-5 w-5" />} flat />}
+				</div>
 			</div>
 		</div>
 	);
 }
 
-function Ctl({ icon, label, onClick, active, danger, className }: { icon: React.ReactNode; label: string; onClick: () => void; active?: boolean; danger?: boolean; className?: string }) {
+function Ctl({ icon, label, onClick, active, danger, className, flat }: { icon: React.ReactNode; label: string; onClick: () => void; active?: boolean; danger?: boolean; className?: string; flat?: boolean }) {
 	return (
-		<button onClick={onClick} aria-label={label} title={label} aria-pressed={active} className={cn("flex h-11 w-11 items-center justify-center rounded-full transition", danger ? "bg-red-600/90 hover:bg-red-600" : active ? "bg-sauti-teal" : "bg-white/10 hover:bg-white/20", className)}>
+		<button onClick={onClick} aria-label={label} title={label} aria-pressed={active} className={cn("flex shrink-0 items-center justify-center transition", flat ? "h-11 w-11 rounded-full" : "h-12 w-12 rounded-full", danger ? "bg-[#ea4335] hover:bg-[#d93025]" : active ? "bg-[#8ab4f8] text-[#202124]" : flat ? "text-white hover:bg-white/10" : "bg-[#3c4043] hover:bg-[#4a4d51]", className)}>
 			{icon}
 		</button>
 	);
+}
+
+/** Plays a stream; the presenter's own screen and a remote screen both use it. */
+function StreamVideo({ stream, className, muted }: { stream: MediaStream | null; className?: string; muted?: boolean }) {
+	const ref = useRef<HTMLVideoElement>(null);
+	useEffect(() => { if (ref.current && ref.current.srcObject !== stream) ref.current.srcObject = stream; }, [stream]);
+	return <video ref={ref} autoPlay playsInline muted={muted} className={className} />;
+}
+function ScreenPreview({ stream }: { stream: MediaStream | null }) {
+	return <StreamVideo stream={stream} muted className="h-full w-full object-contain" />;
 }
 
 function initials(n: string) { return n.trim().split(/\s+/).map((p) => p[0]).slice(0, 2).join("").toUpperCase() || "?"; }
