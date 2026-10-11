@@ -14,6 +14,8 @@ export type NotificationType =
   | 'new_service_submission'
   | 'system_alert'
   | 'new_content'
+  | 'todo_due'
+  | 'todo_assigned'
   | 'welcome';
 
 export interface RecipientProfile {

@@ -332,6 +332,9 @@ export interface TodoRow {
   entity_label: string | null;
   created_by: string | null;
   completed_at: string | null;
+  important: boolean;
+  remind_on: string | null;
+  steps: { id: string; title: string; done: boolean }[];
 }
 
 export interface TrackRow {
@@ -412,7 +415,15 @@ export async function deleteTrack(trackId: string) {
   revalidate();
 }
 
-export async function saveTodo(id: string | null, v: { trackId?: string; title?: string; notes?: string | null; dueDate?: string | null; assigneeIds?: string[]; status?: 'todo' | 'doing' | 'done'; entityType?: Kind | null; entityId?: string | null }) {
+/** Tell people they were given a task (never the person who gave it). */
+async function notifyAssigned(actor: Actor, userIds: string[], title: string, todoId: string) {
+  const others = userIds.filter((u) => u !== actor.id);
+  if (!others.length) return;
+  const { sendNotification } = await import('@/lib/notifications');
+  await Promise.all(others.map((userId) => sendNotification({ userId, type: 'todo_assigned', title: 'A task was given to you', message: `${actor.name || 'A teammate'}: ${title}`, link: `/dashboard/mjengo/todos?task=${todoId}`, sendEmail: false }).catch(() => undefined)));
+}
+
+export async function saveTodo(id: string | null, v: { trackId?: string; title?: string; notes?: string | null; dueDate?: string | null; assigneeIds?: string[]; status?: 'todo' | 'doing' | 'done'; entityType?: Kind | null; entityId?: string | null; important?: boolean; remindOn?: string | null; steps?: { id: string; title: string; done: boolean }[] }) {
   const actor = await requireAdminActor();
   const db = looseAdmin();
   const row: Record<string, unknown> = {};
@@ -436,14 +447,24 @@ export async function saveTodo(id: string | null, v: { trackId?: string; title?:
     row.status = v.status;
     row.completed_at = v.status === 'done' ? new Date().toISOString() : null;
   }
+  if (v.important !== undefined) row.important = !!v.important;
+  if (v.remindOn !== undefined) {
+    if (v.remindOn && !/^\d{4}-\d{2}-\d{2}$/.test(v.remindOn)) throw new Error('Invalid reminder date.');
+    row.remind_on = v.remindOn || null;
+    row.last_notified_on = null;
+  }
+  if (v.steps !== undefined) row.steps = v.steps.slice(0, 30).map((x) => ({ id: String(x.id).slice(0, 40), title: String(x.title).slice(0, 200), done: !!x.done }));
+  if (v.dueDate !== undefined) row.last_notified_on = null;
   if (v.entityType !== undefined) {
     row.entity_type = v.entityType;
     row.entity_id = v.entityType ? v.entityId ?? null : null;
   }
 
   if (id) {
+    const before = v.assigneeIds ? (await db.from('mjengo_todos').select('assignee_ids').eq('id', id).maybeSingle()).data?.assignee_ids as string[] | undefined : undefined;
     const { data, error } = await db.from('mjengo_todos').update(row).eq('id', id).select('title, status').single();
     if (error) throw new Error('Could not save the task.');
+    if (before && Array.isArray(row.assignee_ids)) await notifyAssigned(actor, (row.assignee_ids as string[]).filter((x) => !before.includes(x)), data.title, id);
     if (v.status) await audit(actor, 'todo.status_changed', 'todo', id, data.title, { to: v.status });
     else if (v.assigneeIds) await audit(actor, 'todo.assigned', 'todo', id, data.title, { assignees: row.assignee_ids });
   } else {
@@ -451,6 +472,7 @@ export async function saveTodo(id: string | null, v: { trackId?: string; title?:
     const { data, error } = await db.from('mjengo_todos').insert({ ...row, track_id: v.trackId, created_by: actor.id }).select('id, title').single();
     if (error) throw new Error('Could not add the task.');
     await audit(actor, 'todo.created', 'todo', data.id, data.title, { assignees: row.assignee_ids ?? [] });
+    await notifyAssigned(actor, (row.assignee_ids as string[] | undefined) ?? [], data.title, data.id);
   }
   revalidate();
 }
