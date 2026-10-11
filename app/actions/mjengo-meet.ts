@@ -33,8 +33,11 @@ async function createMeeting_(mode: 'video' | 'voice', title: string | null): Pr
 
 async function listMeetings_(): Promise<MeetingRow[]> {
   await requireAdminActor();
-  const { data } = await looseAdmin().from('mjengo_meetings').select('id, code, title, mode, created_at, ended_at, created_by, transcript').order('created_at', { ascending: false }).limit(30);
-  return ((data ?? []) as (Omit<MeetingRow, 'lines'> & { transcript: unknown[] })[]).map(({ transcript, ...m }) => ({ ...m, lines: Array.isArray(transcript) ? transcript.length : 0 }));
+  const { data } = await looseAdmin().from('mjengo_meetings').select('id, code, title, mode, created_at, ended_at, created_by, transcript, notes').order('created_at', { ascending: false }).limit(60);
+  return ((data ?? []) as (Omit<MeetingRow, 'lines'> & { transcript: unknown[]; notes?: string | null })[])
+    .map(({ transcript, ...m }) => ({ ...m, lines: Array.isArray(transcript) ? transcript.length : 0 }))
+    // Only calls that were actually held and written down.
+    .filter((m) => m.lines > 0 || !!m.notes);
 }
 
 /** Keep what was said. Several people may save: lines are merged by id. */

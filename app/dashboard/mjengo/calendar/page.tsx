@@ -15,6 +15,8 @@ import { unwrap } from "@/lib/action-result";
 import { cn } from "@/lib/utils";
 import { calendarMonth, createCalendarEvent, eventIcons, removeCalendarEvent, type CalItem, type CalKind, type CalMonth } from "@/app/actions/mjengo-calendar";
 import { MjengoLoader } from "../_components/MjengoLoader";
+import { Markdown } from "../_components/Markdown";
+import { meetingDetail, type MeetingDetail } from "@/app/actions/mjengo-meet";
 
 const KIND: Record<CalKind, { label: string; chip: string; dot: string }> = {
 	event: { label: "Event", chip: "bg-sauti-teal text-white", dot: "bg-sauti-teal" },
@@ -293,6 +295,15 @@ function CreateDialog({ slot, onClose, onCreated }: { slot: { date: Date; from?:
 function ViewDialog({ item, onClose, onRemoved }: { item: CalItem | null; onClose: () => void; onRemoved: () => Promise<void> }) {
 	const { toast } = useToast();
 	const [busy, setBusy] = useState(false);
+	const [call, setCall] = useState<MeetingDetail | null>(null);
+	// A meeting that has been held shows what was written down from it.
+	useEffect(() => {
+		setCall(null);
+		if (!item?.meetingCode) return;
+		let on = true;
+		unwrap(meetingDetail(item.meetingCode)).then((d) => on && setCall(d)).catch(() => undefined);
+		return () => { on = false; };
+	}, [item?.meetingCode]);
 	if (!item) return null;
 	const k = KIND[item.kind];
 	return (
@@ -309,6 +320,13 @@ function ViewDialog({ item, onClose, onRemoved }: { item: CalItem | null; onClos
 					{item.location && <p className="flex items-center gap-2"><MapPin className="h-4 w-4 text-serene-neutral-500" />{item.location}</p>}
 					{item.attendees && item.attendees.length > 0 && <p className="flex items-start gap-2"><Users className="mt-0.5 h-4 w-4 shrink-0 text-serene-neutral-500" /><span className="break-all">{item.attendees.join(", ")}</span></p>}
 					{item.description && <p className="whitespace-pre-wrap text-serene-neutral-700">{item.description}</p>}
+					{call && (call.notes || call.transcript.length > 0) && (
+						<div className="space-y-2 rounded-xl border border-serene-neutral-200 bg-serene-neutral-50 p-3">
+							<p className="text-xs font-semibold uppercase tracking-wide text-serene-neutral-500">From the call</p>
+							{call.notes ? <div className="text-sm leading-6"><Markdown text={call.notes} /></div> : <p className="text-sm text-serene-neutral-600">There is a transcript of {call.transcript.length} lines. Notes are written a few minutes after the call goes quiet.</p>}
+							<Link href={`/dashboard/mjengo/meetings?code=${call.code}`} className="text-xs font-medium text-sauti-teal hover:underline">Open the full transcript</Link>
+						</div>
+					)}
 				</div>
 				<DialogFooter className="gap-2 sm:justify-between">
 					{item.removable ? (

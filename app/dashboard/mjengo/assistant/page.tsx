@@ -300,6 +300,13 @@ export default function AssistantPage() {
 
 				<div className="shrink-0 px-4 pb-4">
 					<div className="mx-auto w-full max-w-3xl">
+						{!settings.hasKey && remaining <= 0 && (
+							<div className="mb-2 flex flex-wrap items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-900">
+								<KeyRound className="h-4 w-4 shrink-0" />
+								<span className="min-w-0 flex-1">The free allowance is used up. Connect your own key to keep chatting.</span>
+								<button onClick={() => setConnect("limit")} className="shrink-0 rounded-lg bg-amber-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-950">Connect</button>
+							</div>
+						)}
 						{activeStatus?.status === "failed" && !sending && (
 							<div className="mb-2 flex items-center gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-2.5 text-sm text-red-800">
 								<AlertCircle className="h-4 w-4 shrink-0" />
