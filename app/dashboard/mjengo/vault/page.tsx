@@ -4,12 +4,13 @@ import { MjengoLoader } from "../_components/MjengoLoader";
 import { DriveResult, saveToDrive } from "../_components/drive";
 import { AvatarStack, DriveBadge, useTeam } from "../_components/People";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ArrowDownAZ, ArrowUpAZ, ChevronRight, CloudUpload, Download, FileEdit, FileText as FileTextIcon, Folder, FolderPlus, HardDrive, Loader2, MoreVertical, Pencil, Share2, Trash2, Unplug, Upload, Users } from "lucide-react";
+import { ArrowDownAZ, ArrowUpAZ, ChevronDown, ChevronRight, LayoutGrid, List as ListIcon, CloudUpload, Download, FileEdit, FileText as FileTextIcon, Folder, FolderPlus, HardDrive, Loader2, MoreVertical, Pencil, Share2, Trash2, Unplug, Upload, Users } from "lucide-react";
 import { format, formatDistanceToNow } from "date-fns";
 import { filesHub, renameDriveFolder, disconnectDrive, shareFolderToDrive, type FilesHub } from "@/app/actions/mjengo-files";
 import { unwrap } from "@/lib/action-result";
 import { clearFilesInbox } from "@/app/actions/mjengo-nav";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import RequirementsPanel from "../documents/page";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -46,6 +47,19 @@ export default function VaultPage() {
 	const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
 	const [typeFilter, setTypeFilter] = useState<string>("all");
 	const [driveRename, setDriveRename] = useState<{ id: string; name: string } | null>(null);
+	const [addLink, setAddLink] = useState(false);
+	const [view, setView] = useState<"list" | "grid">("list");
+	const [fold, setFold] = useState<Record<string, boolean>>({});
+	useEffect(() => {
+		try {
+			const v = localStorage.getItem("ss_files_view");
+			if (v === "grid" || v === "list") setView(v);
+			const f = localStorage.getItem("ss_files_fold");
+			if (f) setFold(JSON.parse(f));
+		} catch { /* defaults */ }
+	}, []);
+	const changeView = (v: "list" | "grid") => { setView(v); try { localStorage.setItem("ss_files_view", v); } catch { /* ignore */ } };
+	const toggleFold = (id: string, next: boolean) => setFold((m) => { const n = { ...m, [id]: next }; try { localStorage.setItem("ss_files_fold", JSON.stringify(n)); } catch { /* ignore */ } return n; });
 
 	const load = useCallback(async () => {
 		try {
@@ -113,8 +127,18 @@ export default function VaultPage() {
 			setFolderId(i.id);
 			return;
 		}
+		const ext = i.name.includes(".") ? i.name.split(".").pop()!.toLowerCase() : "";
+		if (ext === "pdf") { window.location.href = `/dashboard/mjengo/files/pdf?file=${i.id}`; return; }
+		if (["xlsx", "xls", "csv"].includes(ext)) { window.location.href = `/dashboard/mjengo/files/sheet?file=${i.id}`; return; }
+		if (["docx", "doc", "odt", "rtf", "md"].includes(ext)) { window.location.href = `/dashboard/mjengo/documents/editor?file=${i.id}`; return; }
 		try {
 			const { url } = await getFileUrl(i.id);
+			if (ext === "url") {
+				// A saved link: read the address out of the shortcut and go there.
+				const text = await (await fetch(url)).text();
+				const target = /URL=(\S+)/i.exec(text)?.[1];
+				if (target && /^https?:\/\//i.test(target)) { window.open(target, "_blank", "noopener"); return; }
+			}
 			window.open(url, "_blank", "noopener");
 		} catch (e) {
 			fail("Could not open the file", e);
@@ -144,6 +168,8 @@ export default function VaultPage() {
 		<DropdownMenu>
 			<DropdownMenuTrigger asChild><Button size="icon" variant="ghost" aria-label={`Actions for ${i.name}`}><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger>
 			<DropdownMenuContent align="end">
+				{i.type === "file" && /\.pdf$/i.test(i.name) && <DropdownMenuItem onClick={() => { window.location.href = `/dashboard/mjengo/files/pdf?file=${i.id}`; }}><FileEdit className="mr-2 h-4 w-4" />Sign or mark up</DropdownMenuItem>}
+				{i.type === "file" && /\.(xlsx|xls|csv)$/i.test(i.name) && <DropdownMenuItem onClick={() => { window.location.href = `/dashboard/mjengo/files/sheet?file=${i.id}`; }}><FileEdit className="mr-2 h-4 w-4" />Open as a sheet</DropdownMenuItem>}
 				{i.type === "file" && /\.(docx|doc|odt|rtf|md|txt)$/i.test(i.name) && <DropdownMenuItem onClick={() => { window.location.href = `/dashboard/mjengo/documents/editor?file=${i.id}`; }}><FileEdit className="mr-2 h-4 w-4" />{i.level === "edit" ? "Edit" : "Open in editor"}</DropdownMenuItem>}
 				<DropdownMenuItem onClick={() => open(i)}>{i.type === "folder" ? <Folder className="mr-2 h-4 w-4" /> : <Download className="mr-2 h-4 w-4" />}{i.type === "folder" ? "Open" : "Download"}</DropdownMenuItem>
 				{i.type === "file" && <DropdownMenuItem onClick={() => saveToDrive("vault", i.id)}><CloudUpload className="mr-2 h-4 w-4" />{i.driveLink ? "Update in Google Drive" : "Save to Google Drive"}</DropdownMenuItem>}
@@ -204,99 +230,154 @@ export default function VaultPage() {
 			)}
 
 			{!folderId && tab === "mine" && (
-				<>
-					<section aria-label="Start something new" className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+				<Fold id="new" title="Start something new" openMap={fold} onToggle={toggleFold}>
+					<section aria-label="Start something new" className="grid grid-cols-2 gap-3 sm:grid-cols-5">
 						<NewCard badge="DOCX" tone="bg-[#3b8bc2]" label="Document" onClick={() => { window.location.href = "/dashboard/mjengo/documents/editor"; }} />
-						<NewCard badge="XLSX" tone="bg-[#43a047]" label="Spreadsheet" soon />
+						<NewCard badge="XLSX" tone="bg-[#43a047]" label="Spreadsheet" onClick={() => { window.location.href = "/dashboard/mjengo/files/sheet"; }} />
 						<NewCard badge="PPTX" tone="bg-[#ef7d3c]" label="Presentation" soon />
-						<NewCard badge="PDF" tone="bg-[#e0483d]" label="PDF" onClick={() => pdfInput.current?.click()} hint="Add a PDF" />
+						<NewCard badge="PDF" tone="bg-[#e0483d]" label="PDF" onClick={() => pdfInput.current?.click()} hint="Add a PDF to sign or mark up" />
+						<NewCard badge="URL" tone="bg-[#6b7280]" label="Link" onClick={() => setAddLink(true)} hint="Save a web address" />
 						<input ref={pdfInput} type="file" accept="application/pdf,.pdf" multiple className="hidden" onChange={(e) => upload(e.target.files)} />
 					</section>
+				</Fold>
+			)}
 
-					{hub && hub.recent.length > 0 && (
-						<section aria-label="Recent files">
-							<h3 className="mb-2 text-base font-semibold text-sauti-dark">Recent files</h3>
-							<div className="overflow-hidden rounded-2xl border border-serene-neutral-200/70 bg-white">
-								<div className="hidden grid-cols-[1fr_200px_160px] gap-3 border-b border-serene-neutral-100 px-4 py-2 text-xs font-semibold text-serene-neutral-500 sm:grid"><span>File name</span><span>Location</span><span className="text-right">Last opened</span></div>
-								<ul className="divide-y divide-serene-neutral-50">
-									{hub.recent.map((r) => (
-										<li key={r.id}>
-											<button onClick={() => open({ type: "file", id: r.id, name: r.name } as VaultItem)} className="grid w-full grid-cols-[1fr_auto] items-center gap-3 px-4 py-3 text-left hover:bg-serene-neutral-50/70 sm:grid-cols-[1fr_200px_160px]">
-												<span className="flex min-w-0 items-center gap-3"><TypeIcon name={r.name} /><span className="truncate text-sm font-medium text-serene-neutral-900">{r.name}</span>{r.driveLink && <DriveBadge href={r.driveLink} />}</span>
-												<span className="hidden truncate text-sm text-serene-neutral-500 sm:block">{r.location}</span>
-												<span className="text-right text-sm text-serene-neutral-500">{formatDistanceToNow(new Date(r.opened), { addSuffix: true })}</span>
-											</button>
-										</li>
-									))}
-								</ul>
-							</div>
-						</section>
+			{!folderId && tab === "mine" && hub && hub.recent.length > 0 && (
+				<Fold id="recent" title="Recent files" count={hub.recent.length} openMap={fold} onToggle={toggleFold} right={<ViewToggle view={view} onChange={changeView} />}>
+					{view === "list" ? (
+						<div className="overflow-hidden rounded-2xl border border-serene-neutral-200/70 bg-white">
+							<div className="hidden grid-cols-[1fr_200px_160px] gap-3 border-b border-serene-neutral-100 px-4 py-2 text-xs font-semibold text-serene-neutral-500 sm:grid"><span>File name</span><span>Location</span><span className="text-right">Last opened</span></div>
+							<ul className="divide-y divide-serene-neutral-50">
+								{hub.recent.map((r) => (
+									<li key={r.id}>
+										<button onClick={() => open({ type: "file", id: r.id, name: r.name } as VaultItem)} className="grid w-full grid-cols-[1fr_auto] items-center gap-3 px-4 py-3 text-left hover:bg-serene-neutral-50/70 sm:grid-cols-[1fr_200px_160px]">
+											<span className="flex min-w-0 items-center gap-3"><TypeIcon name={r.name} /><span className="truncate text-sm font-medium text-serene-neutral-900">{r.name}</span>{r.driveLink && <DriveBadge href={r.driveLink} />}</span>
+											<span className="hidden truncate text-sm text-serene-neutral-500 sm:block">{r.location}</span>
+											<span className="text-right text-sm text-serene-neutral-500">{formatDistanceToNow(new Date(r.opened), { addSuffix: true })}</span>
+										</button>
+									</li>
+								))}
+							</ul>
+						</div>
+					) : (
+						<div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+							{hub.recent.map((r) => (
+								<button key={r.id} onClick={() => open({ type: "file", id: r.id, name: r.name } as VaultItem)} className="flex flex-col items-center gap-2 rounded-2xl border border-serene-neutral-200/70 bg-white p-4 text-center transition hover:border-sauti-teal/40 hover:shadow-sm">
+									<TypeIcon name={r.name} big />
+									<span className="line-clamp-2 w-full break-words text-sm font-medium text-serene-neutral-900">{r.name}</span>
+									<span className="text-xs text-serene-neutral-500">{formatDistanceToNow(new Date(r.opened), { addSuffix: true })}</span>
+								</button>
+							))}
+						</div>
 					)}
-				</>
+				</Fold>
 			)}
 
 			{data && (folders.length > 0 || (!folderId && tab === "mine" && hub)) && (
-				<section aria-label="Folders" className="space-y-2">
-					<h3 className="text-base font-semibold text-sauti-dark">Folders</h3>
-					<div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-						{folders.map((f) => (
-							<div key={f.id} className="group flex items-center gap-3 rounded-2xl border border-serene-neutral-200/70 bg-white p-3 transition hover:border-sauti-teal/40">
-								<button onClick={() => open(f)} className="flex min-w-0 flex-1 items-center gap-3 text-left">
-									<span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-sauti-teal-light text-sauti-teal"><Folder className="h-5 w-5" /></span>
-									<span className="min-w-0"><span className="block truncate text-sm font-semibold text-serene-neutral-900">{f.name}</span><span className="block truncate text-xs text-serene-neutral-500">{f.ownerName}</span></span>
-								</button>
-								{f.driveLink && <DriveBadge href={f.driveLink} />}
-								<AvatarStack ids={f.people} team={team} max={3} />
-								{rowMenu(f)}
-							</div>
-						))}
-						{!folderId && tab === "mine" && hub?.drive.folders.map((d) => (
-							<div key={d.id} className="flex items-center gap-3 rounded-2xl border border-serene-neutral-200/70 bg-white p-3">
-								<a href={d.link ?? undefined} target="_blank" rel="noopener noreferrer" className="flex min-w-0 flex-1 items-center gap-3">
-									<span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#e8f0fe]"><DriveBadge className="h-5 w-5" /></span>
-									<span className="min-w-0"><span className="block truncate text-sm font-semibold text-serene-neutral-900">{d.name}</span><span className="block truncate text-xs text-serene-neutral-500">Google Drive{d.modified ? ` · ${format(new Date(d.modified), "d MMM")}` : ""}</span></span>
-								</a>
-								<DrivePeople folder={d} />
-								<Button size="icon" variant="ghost" aria-label={`Rename ${d.name}`} onClick={() => setDriveRename({ id: d.id, name: d.name })}><Pencil className="h-4 w-4" /></Button>
-							</div>
-						))}
-						{!folderId && tab === "mine" && hub && !hub.drive.connected && hub.drive.available && (
-							<a href="/api/mjengo/drive/google/start?kind=connect&return=/dashboard/mjengo/vault" className="flex items-center gap-3 rounded-2xl border border-dashed border-serene-neutral-300 bg-white p-3 hover:border-sauti-teal/50">
-								<span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#e8f0fe]"><DriveBadge className="h-5 w-5" /></span>
-								<span><span className="block text-sm font-semibold text-sauti-dark">Connect Google Drive</span><span className="block text-xs text-serene-neutral-500">See and rename your Drive folders here and keep copies up to date.</span></span>
-							</a>
+				<Fold id="folders" title="Folders" count={folders.length + (hub?.drive.folders.length ?? 0)} openMap={fold} onToggle={toggleFold} right={<ViewToggle view={view} onChange={changeView} />}>
+					<div className={view === "grid" ? "grid gap-3 sm:grid-cols-2 lg:grid-cols-3" : "overflow-hidden rounded-2xl border border-serene-neutral-200/70 bg-white"}>
+						{view === "grid" ? (
+							<>
+								{folders.map((f) => (
+									<div key={f.id} className="group flex items-center gap-3 rounded-2xl border border-serene-neutral-200/70 bg-white p-3 transition hover:border-sauti-teal/40">
+										<button onClick={() => open(f)} className="flex min-w-0 flex-1 items-center gap-3 text-left">
+											<span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-sauti-teal-light text-sauti-teal"><Folder className="h-5 w-5" /></span>
+											<span className="min-w-0"><span className="block truncate text-sm font-semibold text-serene-neutral-900">{f.name}</span><span className="block truncate text-xs text-serene-neutral-500">{f.ownerName}</span></span>
+										</button>
+										{f.driveLink && <DriveBadge href={f.driveLink} />}
+										<AvatarStack ids={f.people} team={team} max={3} />
+										{rowMenu(f)}
+									</div>
+								))}
+								{!folderId && tab === "mine" && hub?.drive.folders.map((d) => (
+									<div key={d.id} className="flex items-center gap-3 rounded-2xl border border-serene-neutral-200/70 bg-white p-3">
+										<a href={d.link ?? undefined} target="_blank" rel="noopener noreferrer" className="flex min-w-0 flex-1 items-center gap-3">
+											<span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#e8f0fe]"><DriveBadge className="h-5 w-5" /></span>
+											<span className="min-w-0"><span className="block truncate text-sm font-semibold text-serene-neutral-900">{d.name}</span><span className="block truncate text-xs text-serene-neutral-500">Google Drive{d.modified ? ` · ${format(new Date(d.modified), "d MMM")}` : ""}</span></span>
+										</a>
+										<DrivePeople folder={d} />
+										<Button size="icon" variant="ghost" aria-label={`Rename ${d.name}`} onClick={() => setDriveRename({ id: d.id, name: d.name })}><Pencil className="h-4 w-4" /></Button>
+									</div>
+								))}
+							</>
+						) : (
+							<ul className="divide-y divide-serene-neutral-50">
+								{folders.map((f) => (
+									<li key={f.id} className="flex items-center gap-3 p-3 hover:bg-serene-neutral-50/60">
+										<button onClick={() => open(f)} className="flex min-w-0 flex-1 items-center gap-3 text-left"><Folder className="h-5 w-5 shrink-0 text-sauti-teal" /><span className="truncate text-sm font-medium">{f.name}</span><span className="hidden truncate text-xs text-serene-neutral-500 sm:inline">{f.ownerName}</span></button>
+										{f.driveLink && <DriveBadge href={f.driveLink} />}
+										<AvatarStack ids={f.people} team={team} max={3} />
+										{rowMenu(f)}
+									</li>
+								))}
+								{!folderId && tab === "mine" && hub?.drive.folders.map((d) => (
+									<li key={d.id} className="flex items-center gap-3 p-3">
+										<a href={d.link ?? undefined} target="_blank" rel="noopener noreferrer" className="flex min-w-0 flex-1 items-center gap-3"><DriveBadge className="h-5 w-5" /><span className="truncate text-sm font-medium">{d.name}</span><span className="text-xs text-serene-neutral-500">Google Drive</span></a>
+										<DrivePeople folder={d} />
+										<Button size="icon" variant="ghost" aria-label={`Rename ${d.name}`} onClick={() => setDriveRename({ id: d.id, name: d.name })}><Pencil className="h-4 w-4" /></Button>
+									</li>
+								))}
+							</ul>
 						)}
 					</div>
-					{hub?.drive.error && <p className="text-xs text-amber-700">{hub.drive.error}</p>}
+					{!folderId && tab === "mine" && hub && !hub.drive.connected && hub.drive.available && (
+						<a href="/api/mjengo/drive/google/start?kind=connect&return=/dashboard/mjengo/vault" className="mt-3 flex items-center gap-3 rounded-2xl border border-dashed border-serene-neutral-300 bg-white p-3 hover:border-sauti-teal/50">
+							<span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#e8f0fe]"><DriveBadge className="h-5 w-5" /></span>
+							<span><span className="block text-sm font-semibold text-sauti-dark">Connect Google Drive</span><span className="block text-xs text-serene-neutral-500">See and rename your Drive folders here and keep copies up to date.</span></span>
+						</a>
+					)}
+					{hub?.drive.error && <p className="mt-2 text-xs text-amber-700">{hub.drive.error}</p>}
 					{hub?.drive.connected && (
-						<p className="flex flex-wrap items-center gap-2 text-xs text-serene-neutral-500">
+						<p className="mt-2 flex flex-wrap items-center gap-2 text-xs text-serene-neutral-500">
 							Connected to Google Drive{hub.drive.email ? ` as ${hub.drive.email}` : ""}.
 							<button className="inline-flex items-center gap-1 text-serene-neutral-600 underline" onClick={async () => { try { await unwrap(disconnectDrive()); await loadHub(); toast({ title: "Disconnected from Google Drive" }); } catch (e) { fail("Could not disconnect", e); } }}><Unplug className="h-3 w-3" /> Disconnect</button>
 						</p>
 					)}
-				</section>
+				</Fold>
 			)}
 
-			<section aria-label="Files" className="space-y-2">
-				<div className="flex flex-wrap items-center gap-2">
-					<h3 className="mr-auto text-base font-semibold text-sauti-dark">{tab === "shared" && !folderId ? "Shared with me" : folderId ? "In this folder" : "All files"}</h3>
-					<div className="flex flex-wrap gap-1">
-						{types.map((t) => (
-							<button key={t} onClick={() => setTypeFilter(t)} aria-pressed={typeFilter === t} className={cn("rounded-full border px-2.5 py-1 text-xs font-medium", typeFilter === t ? "border-sauti-teal bg-sauti-teal-light/50 text-sauti-dark" : "border-serene-neutral-200 text-serene-neutral-600 hover:bg-serene-neutral-50")}>{t === "all" ? "All types" : t.toUpperCase()}</button>
+			<Fold
+				id="files"
+				title={tab === "shared" && !folderId ? "Shared with me" : folderId ? "In this folder" : "All files"}
+				count={shownFiles.length}
+				openMap={fold}
+				onToggle={toggleFold}
+				right={
+					<div className="flex flex-wrap items-center gap-2">
+						<div className="hidden flex-wrap gap-1 md:flex">
+							{types.slice(0, 7).map((t) => (
+								<button key={t} onClick={() => setTypeFilter(t)} aria-pressed={typeFilter === t} className={cn("rounded-full border px-2.5 py-1 text-xs font-medium", typeFilter === t ? "border-sauti-teal bg-sauti-teal-light/50 text-sauti-dark" : "border-serene-neutral-200 text-serene-neutral-600 hover:bg-serene-neutral-50")}>{t === "all" ? "All types" : t.toUpperCase()}</button>
+							))}
+						</div>
+						<Select value={sortKey} onValueChange={(v) => setSortKey(v as typeof sortKey)}>
+							<SelectTrigger className="h-8 w-[120px] text-xs" aria-label="Sort by"><SelectValue /></SelectTrigger>
+							<SelectContent><SelectItem value="date">Last changed</SelectItem><SelectItem value="name">Name</SelectItem><SelectItem value="type">Type</SelectItem><SelectItem value="size">Size</SelectItem></SelectContent>
+						</Select>
+						<Button size="icon" variant="outline" className="h-8 w-8" aria-label={sortDir === "asc" ? "Ascending" : "Descending"} onClick={() => setSortDir((d) => (d === "asc" ? "desc" : "asc"))}>{sortDir === "asc" ? <ArrowUpAZ className="h-4 w-4" /> : <ArrowDownAZ className="h-4 w-4" />}</Button>
+						<ViewToggle view={view} onChange={changeView} />
+					</div>
+				}
+			>
+				{!data ? (
+					<div className="rounded-2xl border border-serene-neutral-200/70 bg-white"><MjengoLoader label="Opening your files" /></div>
+				) : shownFiles.length === 0 ? (
+					<p className="rounded-2xl border border-serene-neutral-200/70 bg-white p-12 text-center text-sm text-serene-neutral-500">{tab === "shared" && !folderId ? "Nothing has been shared with you yet." : typeFilter !== "all" ? "No files of this type." : "No files here yet."}</p>
+				) : view === "grid" ? (
+					<div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+						{shownFiles.map((i) => (
+							<div key={i.id} className="group relative flex flex-col items-center gap-2 rounded-2xl border border-serene-neutral-200/70 bg-white p-4 text-center transition hover:border-sauti-teal/40 hover:shadow-sm">
+								<button onClick={() => open(i)} className="flex w-full flex-col items-center gap-2">
+									<TypeIcon name={i.name} big />
+									<span className="line-clamp-2 w-full break-words text-sm font-medium text-serene-neutral-900">{i.name}</span>
+									<span className="text-xs text-serene-neutral-500">{i.size != null ? fmtBytes(i.size) : ""}{i.updatedAt ? ` · ${format(new Date(i.updatedAt), "d MMM")}` : ""}</span>
+								</button>
+								<div className="flex items-center gap-1">{i.driveLink && <DriveBadge href={i.driveLink} />}{(i.shared || i.people.length > 1) && <AvatarStack ids={i.people} team={team} max={3} />}</div>
+								<div className="absolute right-1.5 top-1.5">{rowMenu(i)}</div>
+							</div>
 						))}
 					</div>
-					<Select value={sortKey} onValueChange={(v) => setSortKey(v as typeof sortKey)}>
-						<SelectTrigger className="h-8 w-[130px] text-xs" aria-label="Sort by"><SelectValue /></SelectTrigger>
-						<SelectContent><SelectItem value="date">Last changed</SelectItem><SelectItem value="name">Name</SelectItem><SelectItem value="type">Type</SelectItem><SelectItem value="size">Size</SelectItem></SelectContent>
-					</Select>
-					<Button size="icon" variant="outline" className="h-8 w-8" aria-label={sortDir === "asc" ? "Ascending" : "Descending"} onClick={() => setSortDir((d) => (d === "asc" ? "desc" : "asc"))}>{sortDir === "asc" ? <ArrowUpAZ className="h-4 w-4" /> : <ArrowDownAZ className="h-4 w-4" />}</Button>
-				</div>
-				<div className="overflow-hidden rounded-2xl border border-serene-neutral-200/70 bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04)]">
-					{!data ? (
-						<MjengoLoader label="Opening your files" />
-					) : shownFiles.length === 0 ? (
-						<p className="p-12 text-center text-sm text-serene-neutral-500">{tab === "shared" && !folderId ? "Nothing has been shared with you yet." : typeFilter !== "all" ? "No files of this type." : "No files here yet."}</p>
-					) : (
+				) : (
+					<div className="overflow-hidden rounded-2xl border border-serene-neutral-200/70 bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04)]">
 						<ul className="divide-y divide-serene-neutral-50">
 							{shownFiles.map((i) => (
 								<li key={i.id} className="flex items-center gap-3 p-3 hover:bg-serene-neutral-50/60">
@@ -314,9 +395,17 @@ export default function VaultPage() {
 								</li>
 							))}
 						</ul>
-					)}
-				</div>
-			</section>
+					</div>
+				)}
+			</Fold>
+
+			{!folderId && tab === "mine" && (
+				<Fold id="requirements" title="Requirements for grants, opportunities and projects" openMap={fold} onToggle={toggleFold} defaultOpen={false}>
+					<RequirementsPanel />
+				</Fold>
+			)}
+
+			<AddLinkDialog open={addLink} onClose={() => setAddLink(false)} folderId={folderId} onAdded={() => { setAddLink(false); load(); }} />
 
 			<NameDialog
 				open={!!driveRename}
@@ -490,12 +579,12 @@ function ShareDialog({ item, onClose }: { item: VaultItem | null; onClose: () =>
 	);
 }
 
-const TYPE_STYLE: Record<string, string> = { pdf: "bg-[#e0483d]", doc: "bg-[#3b8bc2]", docx: "bg-[#3b8bc2]", xls: "bg-[#43a047]", xlsx: "bg-[#43a047]", csv: "bg-[#43a047]", ppt: "bg-[#ef7d3c]", pptx: "bg-[#ef7d3c]", png: "bg-[#8e5bd6]", jpg: "bg-[#8e5bd6]", jpeg: "bg-[#8e5bd6]", txt: "bg-[#6b7280]", md: "bg-[#6b7280]" };
+const TYPE_STYLE: Record<string, string> = { pdf: "bg-[#e0483d]", doc: "bg-[#3b8bc2]", docx: "bg-[#3b8bc2]", xls: "bg-[#43a047]", xlsx: "bg-[#43a047]", csv: "bg-[#43a047]", ppt: "bg-[#ef7d3c]", pptx: "bg-[#ef7d3c]", png: "bg-[#8e5bd6]", jpg: "bg-[#8e5bd6]", jpeg: "bg-[#8e5bd6]", txt: "bg-[#6b7280]", md: "bg-[#6b7280]", url: "bg-[#0f766e]" };
 
-function TypeIcon({ name }: { name: string }) {
+function TypeIcon({ name, big }: { name: string; big?: boolean }) {
 	const ext = name.includes(".") ? name.split(".").pop()!.toLowerCase() : "";
 	return (
-		<span className={cn("flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[9px] font-bold uppercase text-white", TYPE_STYLE[ext] ?? "bg-serene-neutral-400")}>{ext.slice(0, 4) || <FileTextIcon className="h-4 w-4" />}</span>
+		<span className={cn("flex shrink-0 items-center justify-center font-bold uppercase text-white", big ? "h-14 w-14 rounded-2xl text-xs" : "h-8 w-8 rounded-lg text-[9px]", TYPE_STYLE[ext] ?? "bg-serene-neutral-400")}>{ext.slice(0, 4) || <FileTextIcon className="h-4 w-4" />}</span>
 	);
 }
 
@@ -544,5 +633,78 @@ function DrivePeople({ folder }: { folder: { people: { email: string | null; nam
 				</ul>
 			</PopoverContent>
 		</Popover>
+	);
+}
+
+/** A collapsible section, like an accordion panel. Remembers whether it was left open. */
+function Fold({ id, title, count, right, openMap, onToggle, defaultOpen = true, children }: { id: string; title: string; count?: number; right?: React.ReactNode; openMap: Record<string, boolean>; onToggle: (id: string, next: boolean) => void; defaultOpen?: boolean; children: React.ReactNode }) {
+	const open = openMap[id] ?? defaultOpen;
+	return (
+		<section aria-label={title} className="space-y-2">
+			<div className="flex flex-wrap items-center gap-2">
+				<button type="button" onClick={() => onToggle(id, !open)} aria-expanded={open} className="mr-auto flex items-center gap-1.5 rounded-lg px-1 py-0.5 text-base font-semibold text-sauti-dark hover:bg-serene-neutral-100">
+					<ChevronDown className={cn("h-4 w-4 text-serene-neutral-500 transition-transform", !open && "-rotate-90")} />
+					{title}
+					{count !== undefined && <span className="rounded-full bg-serene-neutral-100 px-2 py-0.5 text-xs font-medium text-serene-neutral-600">{count}</span>}
+				</button>
+				{open && right}
+			</div>
+			{open && children}
+		</section>
+	);
+}
+
+function ViewToggle({ view, onChange }: { view: "list" | "grid"; onChange: (v: "list" | "grid") => void }) {
+	return (
+		<div className="inline-flex rounded-lg border border-serene-neutral-200 bg-white p-0.5" role="group" aria-label="View">
+			<button type="button" onClick={() => onChange("list")} aria-pressed={view === "list"} aria-label="List" className={cn("flex h-7 w-7 items-center justify-center rounded-md", view === "list" ? "bg-sauti-teal text-white" : "text-serene-neutral-600")}><ListIcon className="h-4 w-4" /></button>
+			<button type="button" onClick={() => onChange("grid")} aria-pressed={view === "grid"} aria-label="Grid" className={cn("flex h-7 w-7 items-center justify-center rounded-md", view === "grid" ? "bg-sauti-teal text-white" : "text-serene-neutral-600")}><LayoutGrid className="h-4 w-4" /></button>
+		</div>
+	);
+}
+
+/** Save a web address in Files as a shortcut that opens the page. */
+function AddLinkDialog({ open, onClose, folderId, onAdded }: { open: boolean; onClose: () => void; folderId: string | null; onAdded: () => void }) {
+	const { toast } = useToast();
+	const [url, setUrl] = useState("");
+	const [title, setTitle] = useState("");
+	const [busy, setBusy] = useState(false);
+	useEffect(() => { if (open) { setUrl(""); setTitle(""); } }, [open]);
+	return (
+		<Dialog open={open} onOpenChange={(o) => !o && !busy && onClose()}>
+			<DialogContent className="max-w-md">
+				<DialogHeader><DialogTitle>Add a link</DialogTitle><DialogDescription>Keep a web address with your files. Opening it goes to the page.</DialogDescription></DialogHeader>
+				<div className="space-y-3">
+					<Input autoFocus value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://example.org/funding-call" aria-label="Web address" />
+					<Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Name (optional)" aria-label="Name" />
+				</div>
+				<DialogFooter>
+					<Button variant="outline" onClick={onClose} disabled={busy}>Cancel</Button>
+					<Button
+						className="gap-2 bg-sauti-teal hover:bg-sauti-dark"
+						disabled={busy || !url.trim()}
+						onClick={async () => {
+							let u = url.trim();
+							if (!/^https?:\/\//i.test(u)) u = `https://${u}`;
+							try { new URL(u); } catch { toast({ title: "That is not a web address", variant: "destructive" }); return; }
+							setBusy(true);
+							try {
+								const host = new URL(u).hostname.replace(/^www\./, "");
+								const name = `${(title.trim() || host).replace(/[\\/:*?"<>|]+/g, " ").slice(0, 100)}.url`;
+								const file = new File([`[InternetShortcut]\nURL=${u}\n`], name, { type: "text/uri-list" });
+								const { path, signedUrl } = await prepareUpload(folderId, name, file.size);
+								await putToSignedUrl(signedUrl, file);
+								await registerUpload(folderId, path, name, file.size, "text/uri-list");
+								onAdded();
+							} catch (e) {
+								toast({ title: "Could not add the link", description: e instanceof Error ? e.message : undefined, variant: "destructive" });
+							} finally {
+								setBusy(false);
+							}
+						}}
+					>{busy && <Loader2 className="h-4 w-4 animate-spin" />} Add</Button>
+				</DialogFooter>
+			</DialogContent>
+		</Dialog>
 	);
 }
