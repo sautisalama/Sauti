@@ -3,7 +3,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import logo from "@/public/logo-small.png";
-import { ArrowUp, Check, ImageIcon, KeyRound, Loader2, MessageSquarePlus, MoreHorizontal, Palette, PanelLeft, Pencil, Plus, Sparkles, Trash2, X } from "lucide-react";
+import { AlertCircle, ArrowUp, Check, FileText, ImageIcon, KeyRound, Loader2, MessageSquarePlus, MoreHorizontal, Paperclip, Palette, PanelLeft, Pencil, Plus, RotateCw, Sparkles, Trash2, X } from "lucide-react";
+import { putToSignedUrl } from "@/lib/client/upload";
+import { prepareUpload, registerUpload, searchFiles } from "../vault/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -30,6 +32,10 @@ const api = {
 	designs: () => unwrap(raw.listDesignSystems()),
 	saveDesign: (...a: Parameters<typeof raw.saveDesignSystem>) => unwrap(raw.saveDesignSystem(...a)),
 	removeDesign: (id: string) => unwrap(raw.deleteDesignSystem(id)),
+	privateFolder: () => unwrap(raw.privateDocsFolder()),
+	designFiles: (id: string) => unwrap(raw.designFiles(id)),
+	attach: (id: string, f: string) => unwrap(raw.attachDesignFile(id, f)),
+	detach: (id: string, f: string) => unwrap(raw.detachDesignFile(id, f)),
 };
 
 interface Msg { id: string; role: "user" | "assistant"; content: string; image?: string | null; pending?: boolean }
@@ -55,6 +61,9 @@ export default function AssistantPage() {
 	const [connect, setConnect] = useState<null | "limit" | "image" | "manual">(null);
 	const [manageDesigns, setManageDesigns] = useState(false);
 	const [rail, setRail] = useState(false);
+	const [attached, setAttached] = useState<{ id: string; name: string }[]>([]);
+	const [uploading, setUploading] = useState(false);
+	const filePick = useRef<HTMLInputElement>(null);
 	const scroller = useRef<HTMLDivElement>(null);
 	const abort = useRef<AbortController | null>(null);
 
@@ -67,6 +76,22 @@ export default function AssistantPage() {
 	useEffect(() => {
 		refresh().catch(() => { setThreads([]); toast({ title: "Could not load the assistant", variant: "destructive" }); });
 	}, [refresh, toast]);
+
+	// Chats that are still being answered keep updating in the list, and a finished one refreshes the open chat.
+	const anyRunning = (threads ?? []).some((t) => t.status === "running");
+	useEffect(() => {
+		if (!anyRunning) return;
+		const t = setInterval(() => { refresh().catch(() => undefined); }, 3000);
+		return () => clearInterval(t);
+	}, [anyRunning, refresh]);
+	const activeStatus = threads?.find((t) => t.id === active);
+	const wasRunning = useRef(false);
+	useEffect(() => {
+		const running = activeStatus?.status === "running";
+		if (wasRunning.current && !running && active && !sending) open(active);
+		wasRunning.current = running;
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [activeStatus?.status]);
 
 	useEffect(() => {
 		scroller.current?.scrollTo({ top: scroller.current.scrollHeight, behavior: "smooth" });
@@ -86,10 +111,32 @@ export default function AssistantPage() {
 		}
 	};
 
+	/** Documents for the assistant are kept under Private docs in the vault. */
+	const attachFiles = async (files: FileList | null) => {
+		if (!files?.length) return;
+		setUploading(true);
+		try {
+			const folder = await api.privateFolder();
+			for (const f of Array.from(files).slice(0, 3)) {
+				const { path, signedUrl } = await prepareUpload(folder, f.name, f.size);
+				await putToSignedUrl(signedUrl, f);
+				const created = await registerUpload(folder, path, f.name, f.size, f.type || null);
+				setAttached((a) => [...a, { id: created.id, name: f.name }].slice(0, 3));
+			}
+		} catch (e) {
+			toast({ title: "Could not add the document", description: e instanceof Error ? e.message : undefined, variant: "destructive" });
+		} finally {
+			setUploading(false);
+			if (filePick.current) filePick.current.value = "";
+		}
+	};
+
 	const send = async (textIn?: string) => {
 		const text = (textIn ?? input).trim();
 		if (!text || sending) return;
 		setInput("");
+		const sentFiles = attached;
+		setAttached([]);
 		setSending(true);
 		const uid = `u${Date.now()}`;
 		const aid = `a${Date.now()}`;
@@ -102,7 +149,7 @@ export default function AssistantPage() {
 				method: "POST",
 				signal: ctl.signal,
 				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({ threadId: active, message: text, mode, designSystemId: designId }),
+				body: JSON.stringify({ threadId: active, message: text, mode, designSystemId: designId, fileIds: attached.map((a) => a.id) }),
 			});
 			if (!res.body) throw new Error("No answer came back.");
 			const reader = res.body.getReader();
@@ -124,6 +171,7 @@ export default function AssistantPage() {
 					else if (ev.t === "limit") {
 						setMessages((m) => m.filter((x) => x.id !== aid && x.id !== uid));
 						setInput(text);
+						setAttached(sentFiles);
 						setConnect(ev.reason === "image" ? "image" : "limit");
 					} else if (ev.t === "error") throw new Error(ev.message);
 					else if (ev.t === "done" && ev.hitLimit) setConnect("limit");
@@ -159,7 +207,11 @@ export default function AssistantPage() {
 					{threads.length === 0 && <p className="px-3 py-6 text-xs text-[#9b9a97]">Your chats appear here.</p>}
 					{threads.map((t) => (
 						<div key={t.id} className={cn("group flex items-center rounded-lg", active === t.id ? "bg-black/[0.06]" : "hover:bg-black/[0.04]")}>
-							<button onClick={() => open(t.id)} className="min-w-0 flex-1 truncate px-3 py-2 text-left text-sm text-[#37352f]">{t.title}</button>
+							<button onClick={() => open(t.id)} className="flex min-w-0 flex-1 items-center gap-2 px-3 py-2 text-left text-sm text-[#37352f]" title={t.status === "failed" ? t.error ?? "This reply did not finish" : undefined}>
+								{t.status === "running" && <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-sauti-teal" aria-label="Still answering" />}
+								{t.status === "failed" && <AlertCircle className="h-3.5 w-3.5 shrink-0 text-red-500" aria-label="Did not finish" />}
+								<span className="truncate">{t.title}</span>
+							</button>
 							<Popover>
 								<PopoverTrigger asChild><button aria-label="Chat options" className="mr-1 hidden h-7 w-7 items-center justify-center rounded-md text-[#787774] hover:bg-black/[0.06] group-hover:flex"><MoreHorizontal className="h-4 w-4" /></button></PopoverTrigger>
 								<PopoverContent align="end" className="w-40 p-1">
@@ -238,6 +290,16 @@ export default function AssistantPage() {
 
 				<div className="shrink-0 px-4 pb-4">
 					<div className="mx-auto w-full max-w-3xl">
+						{activeStatus?.status === "failed" && !sending && (
+							<div className="mb-2 flex items-center gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-2.5 text-sm text-red-800">
+								<AlertCircle className="h-4 w-4 shrink-0" />
+								<span className="min-w-0 flex-1 truncate">{activeStatus.error || "That reply did not finish."}</span>
+								<button onClick={() => { const last = [...messages].reverse().find((m) => m.role === "user"); if (last) send(last.content); }} className="flex shrink-0 items-center gap-1.5 font-semibold hover:underline"><RotateCw className="h-3.5 w-3.5" /> Try again</button>
+							</div>
+						)}
+						{activeStatus?.status === "running" && !sending && (
+							<p className="mb-2 flex items-center gap-2 text-xs text-[#787774]"><Loader2 className="h-3.5 w-3.5 animate-spin" /> This chat is still being answered. It will appear here when ready.</p>
+						)}
 						<form
 							onSubmit={(e) => { e.preventDefault(); send(); }}
 							className="rounded-3xl border border-black/10 bg-white p-2 shadow-[0_2px_12px_rgba(0,0,0,0.06)] focus-within:border-black/25"
@@ -251,7 +313,16 @@ export default function AssistantPage() {
 								aria-label="Message"
 								className="max-h-48 min-h-[44px] resize-none border-0 bg-transparent px-3 py-2.5 text-[15px] shadow-none focus-visible:ring-0"
 							/>
+							{attached.length > 0 && (
+								<div className="flex flex-wrap gap-1.5 px-2 pb-1">
+									{attached.map((a) => (
+										<span key={a.id} className="flex max-w-[220px] items-center gap-1.5 rounded-full bg-[#f4f4f2] py-1 pl-2.5 pr-1 text-xs text-[#37352f]"><FileText className="h-3.5 w-3.5 shrink-0" /><span className="truncate">{a.name}</span><button type="button" aria-label={`Remove ${a.name}`} onClick={() => setAttached((x) => x.filter((y) => y.id !== a.id))} className="rounded-full p-0.5 hover:bg-black/10"><X className="h-3 w-3" /></button></span>
+									))}
+								</div>
+							)}
 							<div className="flex items-center gap-1 px-1">
+								<button type="button" onClick={() => filePick.current?.click()} disabled={uploading} aria-label="Add a document" title="Add a document (kept in Private docs)" className="flex h-8 w-8 items-center justify-center rounded-full text-[#787774] hover:bg-black/5">{uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Paperclip className="h-4 w-4" />}</button>
+								<input ref={filePick} type="file" multiple accept=".pdf,.docx,.txt,.md,.csv,application/pdf" className="hidden" onChange={(e) => attachFiles(e.target.files)} />
 								<button type="button" onClick={() => setMode((m) => (m === "image" ? "chat" : "image"))} aria-pressed={mode === "image"} className={cn("flex h-8 items-center gap-1.5 rounded-full px-3 text-sm", mode === "image" ? "bg-sauti-teal-light text-sauti-teal" : "text-[#787774] hover:bg-black/5")}>
 									<ImageIcon className="h-4 w-4" /> Image
 								</button>
@@ -375,6 +446,7 @@ function DesignDialog({ open, designs, onClose, onChanged }: { open: boolean; de
 						<div className="space-y-1.5"><Label>Fonts</Label><Input value={edit.fonts ?? ""} onChange={set("fonts")} placeholder="Headings in Inter Bold, body in Inter" /></div>
 						<div className="space-y-1.5"><Label>Voice and tone</Label><Textarea rows={2} value={edit.voice ?? ""} onChange={set("voice")} placeholder="Warm, plain, survivor-centred" /></div>
 						<div className="space-y-1.5"><Label>Rules</Label><Textarea rows={3} value={edit.notes ?? ""} onChange={set("notes")} placeholder="Never show faces. Always include the helpline number." /></div>
+						{edit.id ? <DesignFiles designSystemId={edit.id as string} /> : <p className="text-xs text-serene-neutral-500">Save it first, then add PDFs or documents it should follow.</p>}
 						<DialogFooter>
 							<Button variant="outline" onClick={() => setEdit(null)} disabled={busy}>Back</Button>
 							<Button
@@ -400,5 +472,84 @@ function DesignDialog({ open, designs, onClose, onChanged }: { open: boolean; de
 				)}
 			</DialogContent>
 		</Dialog>
+	);
+}
+
+/** PDFs and documents a design system follows: uploaded to Private docs, or picked from the vault. */
+function DesignFiles({ designSystemId }: { designSystemId: string }) {
+	const { toast } = useToast();
+	const [files, setFiles] = useState<raw.DesignFile[] | null>(null);
+	const [picking, setPicking] = useState(false);
+	const [options, setOptions] = useState<{ id: string; name: string }[]>([]);
+	const [q, setQ] = useState("");
+	const [busy, setBusy] = useState(false);
+	const pick = useRef<HTMLInputElement>(null);
+
+	const load = useCallback(async () => { setFiles(await api.designFiles(designSystemId).catch(() => [])); }, [designSystemId]);
+	useEffect(() => { load(); }, [load]);
+	useEffect(() => {
+		if (!picking) return;
+		const t = setTimeout(() => { searchFiles(q).then((r) => setOptions(r.map((f) => ({ id: f.id, name: f.name })))).catch(() => setOptions([])); }, 200);
+		return () => clearTimeout(t);
+	}, [picking, q]);
+
+	const add = async (fileId: string) => {
+		setBusy(true);
+		try { await api.attach(designSystemId, fileId); await load(); setPicking(false); } catch (e) { toast({ title: "Could not add it", description: e instanceof Error ? e.message : undefined, variant: "destructive" }); } finally { setBusy(false); }
+	};
+	const upload = async (list: FileList | null) => {
+		if (!list?.length) return;
+		setBusy(true);
+		try {
+			const folder = await api.privateFolder();
+			for (const f of Array.from(list).slice(0, 5)) {
+				const { path, signedUrl } = await prepareUpload(folder, f.name, f.size);
+				await putToSignedUrl(signedUrl, f);
+				const created = await registerUpload(folder, path, f.name, f.size, f.type || null);
+				await api.attach(designSystemId, created.id);
+			}
+			await load();
+		} catch (e) {
+			toast({ title: "Could not add the file", description: e instanceof Error ? e.message : undefined, variant: "destructive" });
+		} finally {
+			setBusy(false);
+			if (pick.current) pick.current.value = "";
+		}
+	};
+
+	return (
+		<div className="space-y-2 rounded-xl border border-serene-neutral-200 p-3">
+			<div className="flex items-center justify-between">
+				<Label>Documents</Label>
+				{busy && <Loader2 className="h-4 w-4 animate-spin text-serene-neutral-400" />}
+			</div>
+			{files?.length === 0 && <p className="text-xs text-serene-neutral-500">Brand guides, tone documents, past examples. Uploads are kept in your Private docs folder in Files.</p>}
+			<ul className="space-y-1">
+				{(files ?? []).map((f) => (
+					<li key={f.file_id} className="flex items-center gap-2 text-sm">
+						<FileText className="h-4 w-4 shrink-0 text-serene-neutral-400" />
+						<span className="min-w-0 flex-1 truncate">{f.name}</span>
+						{!f.readable && <span className="text-xs text-amber-700">not readable</span>}
+						<button type="button" aria-label={`Remove ${f.name}`} className="text-serene-neutral-400 hover:text-red-600" onClick={async () => { await api.detach(designSystemId, f.file_id).catch(() => undefined); load(); }}><X className="h-4 w-4" /></button>
+					</li>
+				))}
+			</ul>
+			<div className="flex gap-2">
+				<Button type="button" size="sm" variant="outline" className="gap-1.5" disabled={busy} onClick={() => pick.current?.click()}><Paperclip className="h-4 w-4" /> Add PDF or document</Button>
+				<input ref={pick} type="file" multiple accept=".pdf,.docx,.txt,.md,application/pdf" className="hidden" onChange={(e) => upload(e.target.files)} />
+				<Button type="button" size="sm" variant="outline" disabled={busy} onClick={() => setPicking((v) => !v)}>Choose from Files</Button>
+			</div>
+			{picking && (
+				<div className="space-y-2 rounded-lg bg-serene-neutral-50 p-2">
+					<Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search your files" className="h-9 bg-white" />
+					<ul className="max-h-40 overflow-y-auto">
+						{options.length === 0 && <li className="px-2 py-2 text-xs text-serene-neutral-500">No files found.</li>}
+						{options.map((o) => (
+							<li key={o.id}><button type="button" onClick={() => add(o.id)} className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm hover:bg-white"><FileText className="h-4 w-4 text-serene-neutral-400" /><span className="truncate">{o.name}</span></button></li>
+						))}
+					</ul>
+				</div>
+			)}
+		</div>
 	);
 }

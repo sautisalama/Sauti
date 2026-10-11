@@ -3,6 +3,7 @@ import { getActor } from "@/lib/access/super-admin";
 import { looseAdmin } from "@/lib/loose-db";
 import { decryptField } from "@/lib/security/crypto";
 import { NO_DASH_RULE, stripDashes } from "@/lib/plain-text";
+import { readableFile } from "@/lib/mjengo/files-text";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -27,7 +28,7 @@ export async function POST(request: Request) {
 	const actor = await getActor();
 	if (!actor?.isAdmin) return new Response(line({ t: "error", message: "Please sign in again." }), { status: 401 });
 
-	let body: { threadId?: string | null; message?: string; mode?: "chat" | "image"; designSystemId?: string | null };
+	let body: { threadId?: string | null; message?: string; mode?: "chat" | "image"; designSystemId?: string | null; fileIds?: string[] };
 	try { body = await request.json(); } catch { return new Response(line({ t: "error", message: "Bad request." }), { status: 400 }); }
 	const text = (body.message ?? "").trim().slice(0, 6000);
 	if (!text) return new Response(line({ t: "error", message: "Write a message first." }), { status: 400 });
@@ -77,17 +78,31 @@ export async function POST(request: Request) {
 				d.notes ? `Rules: ${d.notes}` : "",
 			].filter(Boolean).join("\n");
 		}
+		const { data: refs } = await db.from("mjengo_design_system_files").select("excerpt").eq("design_system_id", designId).limit(4);
+		const texts = ((refs ?? []) as { excerpt: string | null }[]).map((r) => r.excerpt).filter(Boolean) as string[];
+		if (texts.length) design += `\n\nReference documents for this design system:\n${texts.map((t, i) => `[${i + 1}] ${t.slice(0, 3500)}`).join("\n\n")}`;
 	}
 
-	await db.from("mjengo_ai_messages").insert({ thread_id: threadId, role: "user", content: text });
+	// Documents attached to this message are read for context (and stay in the person's private docs).
+	const attached: { id: string; name: string; text: string }[] = [];
+	for (const fid of (body.fileIds ?? []).slice(0, 3)) {
+		try { attached.push(await readableFile(actor.id, actor.email, fid, 6000)); } catch { /* skip files they cannot open */ }
+	}
+	const withFiles = attached.length
+		? `${attached.map((f) => `Attached file "${f.name}":\n${f.text || "(the contents could not be read)"}`).join("\n\n")}\n\n${text}`
+		: text;
+
+	await db.from("mjengo_ai_messages").insert({ thread_id: threadId, role: "user", content: text, file_ids: attached.map((f) => f.id) });
+	await db.from("mjengo_ai_threads").update({ status: "running", error: null }).eq("id", threadId);
 
 	const enc = new TextEncoder();
 	const stream = new ReadableStream<Uint8Array>({
 		async start(controller) {
-			const send = (o: unknown) => controller.enqueue(enc.encode(line(o)));
+			let open = true;
+			const send = (o: unknown) => { if (!open) return; try { controller.enqueue(enc.encode(line(o))); } catch { open = false; } };
 			const finish = async (assistantText: string, tokens: number, assetId?: string | null) => {
 				await db.from("mjengo_ai_messages").insert({ thread_id: threadId, role: "assistant", content: assistantText, asset_id: assetId ?? null, tokens });
-				await db.from("mjengo_ai_threads").update({ updated_at: new Date().toISOString() }).eq("id", threadId);
+				await db.from("mjengo_ai_threads").update({ updated_at: new Date().toISOString(), status: "idle", error: null }).eq("id", threadId);
 				if (key!.shared) await db.from("mjengo_ai_settings").upsert({ owner_id: actor.id, free_tokens_used: used + tokens, updated_at: new Date().toISOString() }, { onConflict: "owner_id" });
 			};
 			try {
@@ -113,13 +128,12 @@ export async function POST(request: Request) {
 				].filter(Boolean).join("\n\n");
 				const remaining = Math.max(0, FREE_TOKENS - used);
 				const maxTokens = key!.shared ? Math.max(1, remaining) : 2000;
-				const messages = [{ role: "system", content: system }, ...history, { role: "user", content: text }];
+				const messages = [{ role: "system", content: system }, ...history, { role: "user", content: withFiles }];
 
 				const url = key!.provider === "openai" ? "https://api.openai.com/v1/chat/completions" : "https://openrouter.ai/api/v1/chat/completions";
 				const model = key!.model || (key!.provider === "openai" ? "gpt-4o-mini" : SHARED_MODEL);
 				const res = await fetch(url, {
 					method: "POST",
-					signal: request.signal,
 					headers: { Authorization: `Bearer ${key!.key}`, "Content-Type": "application/json", "X-Title": "Sauti Salama Assistant" },
 					body: JSON.stringify({ model, stream: true, stream_options: { include_usage: true }, max_tokens: maxTokens, temperature: 0.6, messages }),
 				});
@@ -161,9 +175,11 @@ export async function POST(request: Request) {
 				await finish(stripDashes(out), tokens);
 				send({ t: "done", tokens, usedFree: key!.shared ? used + tokens : undefined, hitLimit: key!.shared && used + tokens >= FREE_TOKENS });
 			} catch (e) {
-				send({ t: "error", message: e instanceof Error ? e.message : "Something went wrong." });
+				const message = e instanceof Error ? e.message : "Something went wrong.";
+				await db.from("mjengo_ai_threads").update({ status: "failed", error: message.slice(0, 300) }).eq("id", threadId);
+				send({ t: "error", message });
 			} finally {
-				controller.close();
+				try { controller.close(); } catch { /* the client has gone */ }
 			}
 		},
 	});
