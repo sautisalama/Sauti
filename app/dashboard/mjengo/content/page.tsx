@@ -66,7 +66,7 @@ export default function ContentPage() {
 		<div className="mx-auto max-w-6xl space-y-4">
 			<div className="flex flex-wrap items-end justify-between gap-3">
 				<div>
-					<h2 className="text-xl font-bold tracking-tight text-sauti-dark">Content</h2>
+					<h2 className="text-base font-semibold tracking-tight text-sauti-dark">Scheduled posts</h2>
 					<p className="text-sm text-serene-neutral-500">Plan posts for LinkedIn, X, Facebook and Instagram, and keep the images you create.</p>
 				</div>
 				<div className="flex items-center gap-2">
@@ -181,6 +181,7 @@ function ChannelsBar({ state, onChanged }: { state: content.ChannelsState | null
 	return (
 		<section aria-label="Connected accounts" className="flex flex-wrap items-center gap-2 rounded-2xl border border-serene-neutral-200/70 bg-white p-3">
 			<span className="mr-1 text-sm font-semibold text-sauti-dark">Accounts</span>
+			{state.connections.length === 0 && <span className="w-full text-xs text-serene-neutral-500 sm:w-auto">Sign in to the networks you post to, to set up scheduling.</span>}
 			{state.connections.map((c) => (
 				<span key={c.id} className="flex items-center gap-2 rounded-full border border-serene-neutral-200 py-1 pl-2.5 pr-1 text-sm">
 					<span className="h-2 w-2 rounded-full" style={{ background: CHANNEL_INFO[c.channel].color }} />

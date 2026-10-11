@@ -95,6 +95,7 @@ export default function CalendarPage() {
 				<h2 className="text-xl font-semibold text-sauti-dark">{format(month, "MMMM yyyy")}</h2>
 				{!data && <Loader2 className="h-4 w-4 animate-spin text-serene-neutral-400" />}
 				<span className="flex-1" />
+				<Button asChild variant="outline" size="sm" className="hidden h-9 gap-1.5 sm:inline-flex"><Link href="/dashboard/mjengo/design#schedule"><Megaphone className="h-4 w-4" /> Schedule content</Link></Button>
 				<Button asChild variant="ghost" size="icon" aria-label="Calendar settings" title="Calendar settings"><Link href="/dashboard/profile?section=calendar"><Settings className="h-5 w-5" /></Link></Button>
 				<Button className="gap-2 bg-sauti-teal hover:bg-sauti-dark" onClick={() => setCreate({ date: dayOpen ?? new Date() })}><CalendarPlus className="h-4 w-4" /> Create</Button>
 			</div>
