@@ -1,3 +1,4 @@
+import { useSyncExternalStore } from "react";
 import { getMailboxes, listMessages, mailBootstrap, type MessageRow } from "./api";
 
 type Boot = Awaited<ReturnType<typeof mailBootstrap>>;
@@ -47,6 +48,7 @@ export function prefetchMail(): Promise<void> {
 			if (!account) return;
 			const boxes = await getMailboxes(account.id);
 			mailStore.boxes.set(account.id, { ...boxes, at: Date.now() });
+			setMailUnread(boxes.unread);
 			const inbox = boxes.boxes.find((b) => b.special === "inbox")?.path ?? "INBOX";
 			const page = await listMessages(account.id, inbox, inboxQuery, 0, 40);
 			mailStore.lists.set(listKey(account.id, "inbox", false), { items: page.items, total: page.total, at: Date.now() });
@@ -57,4 +59,16 @@ export function prefetchMail(): Promise<void> {
 		}
 	})();
 	return warming;
+}
+
+/* ---- unread counter shared with the side navigation */
+let unreadTotal = 0;
+const unreadListeners = new Set<() => void>();
+export function setMailUnread(n: number) {
+	if (n === unreadTotal) return;
+	unreadTotal = n;
+	unreadListeners.forEach((l) => l());
+}
+export function useMailUnread(): number {
+	return useSyncExternalStore((l) => { unreadListeners.add(l); return () => unreadListeners.delete(l); }, () => unreadTotal, () => 0);
 }

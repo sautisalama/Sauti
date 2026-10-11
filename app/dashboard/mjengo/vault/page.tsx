@@ -8,6 +8,7 @@ import { ArrowDownAZ, ArrowUpAZ, ChevronRight, CloudUpload, Download, FileEdit, 
 import { format, formatDistanceToNow } from "date-fns";
 import { filesHub, renameDriveFolder, disconnectDrive, shareFolderToDrive, type FilesHub } from "@/app/actions/mjengo-files";
 import { unwrap } from "@/lib/action-result";
+import { clearFilesInbox } from "@/app/actions/mjengo-nav";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -59,6 +60,16 @@ export default function VaultPage() {
 		setData(null);
 		load();
 	}, [load]);
+
+	// Files shared from a phone: tell the person, then stop counting them.
+	useEffect(() => {
+		const n = new URLSearchParams(window.location.search).get("shared_files");
+		if (n) toast({ title: `${n} file${n === "1" ? "" : "s"} added from your phone`, description: "They are at the top level of Mine." });
+		const t = setTimeout(() => { clearFilesInbox().catch(() => undefined); }, 2500);
+		if (n) window.history.replaceState(null, "", window.location.pathname);
+		return () => clearTimeout(t);
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, []);
 
 	const loadHub = useCallback(async () => {
 		try { setHub(await unwrap(filesHub())); } catch { /* the page works without it */ }

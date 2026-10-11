@@ -28,7 +28,7 @@ import { addContactFromMail } from "@/app/actions/mjengo-contacts";
 import { listLabels, saveLabel, deleteLabel, setMessageLabel, type LabelRow } from "./api";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { AccountSwitcher } from "./AccountSwitcher";
-import { listKey, mailStore, mergeFresh } from "./mail-store";
+import { listKey, mailStore, mergeFresh, setMailUnread } from "./mail-store";
 import { AvatarStack, useTeam } from "../../_components/People";
 import { cacheDetail, cacheList, readDetail, readList } from "@/lib/mail/offline-cache";
 
@@ -183,7 +183,7 @@ export function MailApp() {
 		// Already fetched (by the preload or an earlier visit): only ask again once it is a little old.
 		if (have && Date.now() - have.at < 60_000) return;
 		getMailboxes(accountId)
-			.then((r) => { mailStore.boxes.set(accountId, { ...r, at: Date.now() }); setBoxes(r.boxes); setUnread(r.unread); })
+			.then((r) => { mailStore.boxes.set(accountId, { ...r, at: Date.now() }); setBoxes(r.boxes); setUnread(r.unread); setMailUnread(r.unread); })
 			.catch((e) => { if (!have) setLoadError(e instanceof Error ? e.message : "Could not reach the mailbox."); });
 	}, [accountId]);
 
@@ -253,10 +253,20 @@ export function MailApp() {
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [accountId, mailboxPath, viewKey, debouncedQ, views, onlyUnread]);
 
+	// The browser tab shows how many unread messages there are.
+	useEffect(() => {
+		document.title = unread > 0 ? `(${unread}) Mail` : "Mail";
+		return () => { document.title = "Mail"; };
+	}, [unread]);
+
 	// New mail shows up by itself: check quietly when the tab regains focus and once a minute.
 	useEffect(() => {
 		if (!accountId || !mailboxPath) return;
-		const tick = () => { if (!document.hidden && !debouncedQ) loadList(false, true); };
+		const tick = () => {
+			if (document.hidden || debouncedQ) return;
+			loadList(false, true);
+			getMailboxes(accountId).then((r) => { mailStore.boxes.set(accountId, { ...r, at: Date.now() }); setUnread(r.unread); setMailUnread(r.unread); }).catch(() => undefined);
+		};
 		const t = setInterval(tick, 60_000);
 		window.addEventListener("focus", tick);
 		return () => { clearInterval(t); window.removeEventListener("focus", tick); };

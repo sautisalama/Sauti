@@ -15,11 +15,15 @@
 	"start_url": "/dashboard?source=pwa",
 	"share_target": {
 		"action": "/share",
-		"method": "GET",
+		"method": "POST",
+		"enctype": "multipart/form-data",
 		"params": {
 			"title": "title",
 			"text": "text",
-			"url": "url"
+			"url": "url",
+			"files": [
+				{ "name": "files", "accept": ["application/pdf", ".pdf", ".doc", ".docx", ".xls", ".xlsx", ".csv", ".ppt", ".pptx", ".txt", ".md", "image/*"] }
+			]
 		}
 	},
 	"categories": [

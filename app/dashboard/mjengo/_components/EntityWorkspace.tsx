@@ -12,6 +12,7 @@ import { Progress } from "@/components/ui/progress";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import { clearOpportunityInbox } from "@/app/actions/mjengo-nav";
 import { deleteEntity, listAdmins, listEntities, saveEntity, type AdminLite, type EntityRow } from "@/app/actions/mjengo";
 import { cn } from "@/lib/utils";
 import { DocumentsPanel } from "./DocumentsPanel";
@@ -96,6 +97,12 @@ export function EntityWorkspace({ kind }: { kind: Kind }) {
 	const cfg = CONFIG[kind];
 	const statuses = STATUSES[kind];
 	const { toast } = useToast();
+	// Opportunities that arrived from a phone stop counting once the list has been looked at.
+	useEffect(() => {
+		if (kind !== "opportunity") return;
+		const t = setTimeout(() => { clearOpportunityInbox().catch(() => undefined); }, 2500);
+		return () => clearTimeout(t);
+	}, [kind]);
 	// Arriving from the phone share sheet.
 	useEffect(() => {
 		const p = new URLSearchParams(window.location.search);

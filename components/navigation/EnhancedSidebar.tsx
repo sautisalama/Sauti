@@ -31,7 +31,8 @@ import {
 	GraduationCap, Briefcase,
 	Mail, Sparkles, CalendarClock, Palette, CheckSquare, FolderKanban, Lightbulb, ScrollText, HardDrive, ShieldCheck, ArrowLeft
 } from "lucide-react";
-import { mjengoNav } from "@/app/actions/mjengo-nav";
+import { mjengoNav, suiteCounts } from "@/app/actions/mjengo-nav";
+import { useMailUnread } from "@/app/dashboard/mjengo/mail/_components/mail-store";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -114,7 +115,19 @@ export function EnhancedSidebar({
 	const isAdminMode = dash?.isAdminMode || false;
 	const onMjengo = !!pathname?.startsWith("/dashboard/mjengo");
 	const [mjengoSuper, setMjengoSuper] = useState(false);
-	const [counts, setCounts] = useState({ opportunities: 0, mail: 0 });
+	const [suite, setSuite] = useState({ opportunities: 0, files: 0, notifications: 0 });
+	const mailUnread = useMailUnread();
+	const counts = { opportunities: suite.opportunities, mail: mailUnread };
+	// Small counters on the suite items: phone arrivals and unread notifications, refreshed once a minute.
+	useEffect(() => {
+		if (!onMjengo) return;
+		let on = true;
+		const tick = () => suiteCounts().then((c) => on && setSuite(c)).catch(() => undefined);
+		tick();
+		const t = setInterval(tick, 60_000);
+		window.addEventListener("focus", tick);
+		return () => { on = false; clearInterval(t); window.removeEventListener("focus", tick); };
+	}, [onMjengo, pathname]);
 	useEffect(() => {
 		if (!onMjengo) return;
 		mjengoNav().then((n) => setMjengoSuper(n.isSuper)).catch(() => setMjengoSuper(false));
@@ -286,12 +299,12 @@ export function EnhancedSidebar({
 			const B = "/dashboard/mjengo";
 			const items: SidebarItem[] = [
 				{ id: "mj-overview", label: "Overview", icon: LayoutDashboard, href: B, section: "main", group: "", hint: "Summary of grants, opportunities and projects" },
-				{ id: "mj-mail", group: "Communicate", label: "Mail", icon: Mail, href: `${B}/mail`, section: "main", hint: "Read, write and organise email" },
+				{ id: "mj-mail", group: "Communicate", label: "Mail", icon: Mail, href: `${B}/mail`, section: "main", hint: "Read, write and organise email", badge: counts.mail || undefined },
 				{ id: "mj-chat", group: "Communicate", label: "Chats", icon: MessageCircle, href: `${B}/chat`, section: "main", hint: "Conversations with your team and contacts" },
 				{ id: "mj-contacts", group: "Communicate", label: "Contacts", icon: Users, href: `${B}/contacts`, section: "main", hint: "Your team's contact book" },
 				{ id: "mj-calendar", group: "Communicate", label: "Calendar", icon: CalendarClock, href: `${B}/calendar`, section: "main", hint: "Month view, events and meetings" },
-				{ id: "mj-notifications", group: "Communicate", label: "Notifications", icon: Bell, href: `${B}/notifications`, section: "main", hint: "What needs your attention in the suite" },
-				{ id: "mj-files", group: "Files", label: "Files", icon: HardDrive, href: `${B}/vault`, section: "main", hint: "Documents, PDFs, sheets and folders, shared and kept in step with Google Drive" },
+				{ id: "mj-notifications", group: "Communicate", label: "Notifications", icon: Bell, href: `${B}/notifications`, section: "main", hint: "What needs your attention in the suite", badge: suite.notifications || undefined },
+				{ id: "mj-files", group: "Files", label: "Files", icon: HardDrive, href: `${B}/vault`, section: "main", hint: "Documents, PDFs, sheets and folders, shared and kept in step with Google Drive", badge: suite.files || undefined },
 				{ id: "mj-grants", group: "Work", label: "Grants", icon: Briefcase, href: `${B}/grants`, section: "main", hint: "Track grant applications and deadlines" },
 				{ id: "mj-opps", group: "Work", label: "Opportunities", icon: Lightbulb, href: `${B}/opportunities`, section: "main", hint: "Funding and partnership leads", badge: counts.opportunities || undefined },
 				{ id: "mj-projects", group: "Work", label: "Projects", icon: FolderKanban, href: `${B}/projects`, section: "main", hint: "Projects, milestones and documents" },
