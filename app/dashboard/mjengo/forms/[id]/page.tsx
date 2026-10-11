@@ -106,16 +106,18 @@ export default function FormEditorPage() {
 
 	return (
 		<div className="space-y-4">
-			<div className="flex flex-wrap items-center gap-2">
-				<Button asChild variant="ghost" size="icon" className="h-8 w-8"><Link href="/dashboard/mjengo/forms" aria-label="All forms"><ArrowLeft className="h-4 w-4" /></Link></Button>
-				<Input value={title} onChange={(e) => setTitle(e.target.value)} aria-label="Form title" className="h-9 min-w-0 flex-1 border-transparent bg-transparent text-base font-semibold shadow-none hover:border-serene-neutral-200 focus-visible:border-sauti-teal" />
-				<span className="text-xs text-serene-neutral-400" aria-live="polite">{save === "saving" ? "Saving..." : save === "error" ? "Not saved" : "Saved"}</span>
-				<Button variant="outline" size="sm" className="h-8 gap-1.5 px-2.5 text-xs" onClick={() => setPreview(true)}><Eye className="h-4 w-4" /> Preview</Button>
-				<Button variant="outline" size="sm" className="h-8 gap-1.5 px-2.5 text-xs" onClick={() => setShare(true)} disabled={form.status === "draft"}><Share2 className="h-4 w-4" /> Share</Button>
+			{/* One quiet row, like the mail toolbar: icon buttons, one clear primary action. */}
+			<div className="flex items-center gap-1 border-b border-black/[0.07] pb-2">
+				<Link href="/dashboard/mjengo/forms" aria-label="All forms" title="All forms" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-[#787774] hover:bg-black/5"><ArrowLeft className="h-[18px] w-[18px]" /></Link>
+				<Input value={title} onChange={(e) => setTitle(e.target.value)} aria-label="Form title" className="h-8 min-w-0 flex-1 border-transparent bg-transparent px-2 text-[15px] font-semibold shadow-none hover:border-black/10 focus-visible:border-sauti-teal focus-visible:ring-0" />
+				<span className="hidden shrink-0 px-1 text-xs text-[#9b9a97] sm:inline" aria-live="polite">{save === "saving" ? "Saving..." : save === "error" ? "Not saved" : "Saved"}</span>
+				<button onClick={() => setPreview(true)} aria-label="Preview" title="Preview" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-[#787774] hover:bg-black/5"><Eye className="h-[18px] w-[18px]" /></button>
+				<button onClick={() => setShare(true)} disabled={form.status === "draft"} aria-label="Share" title={form.status === "draft" ? "Publish first to share" : "Share"} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-[#787774] hover:bg-black/5 disabled:opacity-40"><Share2 className="h-[18px] w-[18px]" /></button>
+				<span className="mx-1 h-5 w-px shrink-0 bg-black/10" />
 				{form.status === "open" ? (
-					<Button size="sm" variant="outline" className="h-8 px-3 text-xs" onClick={() => changeStatus("closed")}>Stop responses</Button>
+					<button onClick={() => changeStatus("closed")} className="h-8 shrink-0 whitespace-nowrap rounded-lg border border-black/10 px-3 text-[13px] font-medium text-[#37352f] hover:bg-black/[0.03]">Stop responses</button>
 				) : (
-					<Button size="sm" className="h-8 bg-sauti-teal px-3 text-xs hover:bg-sauti-dark" onClick={() => changeStatus("open")}>{form.status === "closed" ? "Reopen" : "Publish"}</Button>
+					<button onClick={() => changeStatus("open")} className="h-8 shrink-0 whitespace-nowrap rounded-lg bg-sauti-teal px-3.5 text-[13px] font-semibold text-white hover:bg-sauti-dark">{form.status === "closed" ? "Reopen" : "Publish"}</button>
 				)}
 			</div>
 
