@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { getActor } from "@/lib/access/super-admin";
 import { looseAdmin } from "@/lib/loose-db";
-import { decryptField } from "@/lib/security/crypto";
+import { decryptField, encryptField } from "@/lib/security/crypto";
 import { NO_DASH_RULE, stripDashes } from "@/lib/plain-text";
 import { readableFile } from "@/lib/mjengo/files-text";
 
@@ -13,7 +13,7 @@ const SHARED_MODEL = process.env.OPENROUTER_MODEL ?? "google/gemini-2.5-flash-li
 const IMAGE_MODEL = "google/gemini-2.5-flash-image-preview";
 const BUCKET = "mjengo-docs";
 
-type Provider = "openrouter" | "openai";
+type Provider = "openrouter" | "openai" | "chatgpt";
 interface Key { provider: Provider; key: string; model: string | null; shared: boolean }
 
 const line = (o: unknown) => JSON.stringify(o) + "\n";
@@ -35,12 +35,30 @@ export async function POST(request: Request) {
 	const mode = body.mode === "image" ? "image" : "chat";
 
 	const db = looseAdmin();
-	const { data: st } = await db.from("mjengo_ai_settings").select("provider, api_key_enc, model, free_tokens_used").eq("owner_id", actor.id).maybeSingle();
+	const { data: st } = await db.from("mjengo_ai_settings").select("provider, api_key_enc, refresh_token_enc, token_expires_at, chatgpt_client_id, model, free_tokens_used").eq("owner_id", actor.id).maybeSingle();
 	const used = st?.free_tokens_used ?? 0;
 
 	let key: Key | null = null;
 	if (st?.api_key_enc && st.provider) {
-		const k = decryptField(st.api_key_enc);
+		let k = decryptField(st.api_key_enc);
+		// A ChatGPT sign-in expires: renew it from the refresh token when it is close to ending.
+		if (st.provider === "chatgpt" && st.refresh_token_enc && st.chatgpt_client_id && (!st.token_expires_at || new Date(st.token_expires_at).getTime() < Date.now() + 60_000)) {
+			const r = await fetch("https://auth.openai.com/api/accounts/oauth/token", {
+				method: "POST",
+				headers: { "Content-Type": "application/x-www-form-urlencoded" },
+				body: new URLSearchParams({ grant_type: "refresh_token", client_id: st.chatgpt_client_id, refresh_token: decryptField(st.refresh_token_enc) ?? "", resource: "https://api.openai.com/v1" }),
+				signal: AbortSignal.timeout(15_000),
+			}).catch(() => null);
+			if (r?.ok) {
+				const t = (await r.json()) as { access_token?: string; refresh_token?: string; expires_in?: number };
+				if (t.access_token) {
+					k = t.access_token;
+					await db.from("mjengo_ai_settings").update({ api_key_enc: encryptField(t.access_token), refresh_token_enc: t.refresh_token ? encryptField(t.refresh_token) : st.refresh_token_enc, token_expires_at: new Date(Date.now() + (t.expires_in ?? 3600) * 1000).toISOString() }).eq("owner_id", actor.id);
+				}
+			} else {
+				return new Response(line({ t: "error", message: "Your ChatGPT sign-in ended. Connect it again in the assistant settings." }), { status: 401 });
+			}
+		}
 		if (k) key = { provider: st.provider as Provider, key: k, model: st.model, shared: false };
 	}
 	if (!key) {
@@ -109,7 +127,7 @@ export async function POST(request: Request) {
 				send({ t: "thread", id: threadId });
 				if (mode === "image") {
 					const prompt = design ? `${design}\n\nCreate: ${text}` : text;
-					const bytes = key!.provider === "openai" ? await openaiImage(key!, prompt) : await openrouterImage(key!, prompt);
+					const bytes = key!.provider === "openrouter" ? await openrouterImage(key!, prompt) : await openaiImage(key!, prompt);
 					const path = `studio/${randomUUID()}.png`;
 					const up = await db.storage.from(BUCKET).upload(path, bytes, { contentType: "image/png" });
 					if (up.error) throw new Error("Could not save the image.");
@@ -130,8 +148,8 @@ export async function POST(request: Request) {
 				const maxTokens = key!.shared ? Math.max(1, remaining) : 2000;
 				const messages = [{ role: "system", content: system }, ...history, { role: "user", content: withFiles }];
 
-				const url = key!.provider === "openai" ? "https://api.openai.com/v1/chat/completions" : "https://openrouter.ai/api/v1/chat/completions";
-				const model = key!.model || (key!.provider === "openai" ? "gpt-4o-mini" : SHARED_MODEL);
+				const url = key!.provider === "openrouter" ? "https://openrouter.ai/api/v1/chat/completions" : "https://api.openai.com/v1/chat/completions";
+				const model = key!.model || (key!.provider === "openrouter" ? SHARED_MODEL : "gpt-4o-mini");
 				const res = await fetch(url, {
 					method: "POST",
 					headers: { Authorization: `Bearer ${key!.key}`, "Content-Type": "application/json", "X-Title": "Sauti Salama Assistant" },

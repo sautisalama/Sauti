@@ -73,6 +73,14 @@ export default function AssistantPage() {
 		setSettings(s);
 		setDesigns(d);
 	}, []);
+	// Back from Sign in with ChatGPT.
+	useEffect(() => {
+		const p = new URLSearchParams(window.location.search);
+		if (p.get("chatgpt") === "connected") toast({ title: "Signed in with ChatGPT", description: "Chats now use your ChatGPT plan." });
+		if (p.get("chatgpt_error")) toast({ title: "Could not sign in with ChatGPT", description: p.get("chatgpt_error") ?? undefined, variant: "destructive" });
+		if (p.get("chatgpt") || p.get("chatgpt_error")) window.history.replaceState(null, "", window.location.pathname);
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, []);
 	useEffect(() => {
 		refresh().catch(() => { setThreads([]); toast({ title: "Could not load the assistant", variant: "destructive" }); });
 	}, [refresh, toast]);
@@ -224,7 +232,7 @@ export default function AssistantPage() {
 				</div>
 				<div className="border-t border-black/[0.06] p-3 text-xs text-[#787774]">
 					{settings.hasKey ? (
-						<button onClick={() => setConnect("manual")} className="flex w-full items-center gap-2 text-left"><KeyRound className="h-4 w-4" /> Using your {settings.provider === "openai" ? "OpenAI" : "OpenRouter"} key</button>
+						<button onClick={() => setConnect("manual")} className="flex w-full items-center gap-2 text-left"><KeyRound className="h-4 w-4" /> {settings.provider === "chatgpt" ? "Signed in with ChatGPT" : `Using your ${settings.provider === "openai" ? "OpenAI" : "OpenRouter"} key`}</button>
 					) : (
 						<button onClick={() => setConnect("manual")} className="flex w-full items-center gap-2 text-left hover:text-[#37352f]"><KeyRound className="h-4 w-4" /> {remaining > 0 ? `${remaining} free tokens left. Connect your own` : "Connect your own key"}</button>
 					)}
@@ -379,9 +387,15 @@ function ConnectDialog({ mode, settings, onClose, onChanged }: { mode: null | "l
 						<Label htmlFor="ai-model">Model <span className="font-normal text-serene-neutral-400">(optional)</span></Label>
 						<Input id="ai-model" value={model} onChange={(e) => setModel(e.target.value)} placeholder={provider === "openai" ? "gpt-4o-mini" : "google/gemini-2.5-flash-lite"} />
 					</div>
-					<p className="text-xs text-serene-neutral-500">
-						Sign in with ChatGPT is not offered to other apps by OpenAI. A ChatGPT account has no API key of its own; create one on platform.openai.com, or use OpenRouter.
-					</p>
+					{settings.chatgptAvailable ? (
+						<a href="/api/mjengo/assistant/chatgpt/start" className="flex items-center justify-center gap-2 rounded-lg border border-serene-neutral-200 py-2.5 text-sm font-semibold hover:bg-serene-neutral-50">
+							<Sparkles className="h-4 w-4" /> Sign in with ChatGPT instead
+						</a>
+					) : (
+						<p className="text-xs text-serene-neutral-500">
+							Sign in with ChatGPT is available to apps OpenAI has approved. It switches on here once this site has its OpenAI client id. Until then, an API key from platform.openai.com or OpenRouter works.
+						</p>
+					)}
 				</div>
 				<DialogFooter className="gap-2">
 					{settings.hasKey && <Button variant="ghost" className="text-red-600" disabled={busy} onClick={async () => { await api.removeKey().catch(() => undefined); await onChanged(); onClose(); }}>Remove key</Button>}

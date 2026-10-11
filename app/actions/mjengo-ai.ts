@@ -11,7 +11,7 @@ const FREE_TOKENS = Number(process.env.MJENGO_AI_FREE_TOKENS ?? 500);
 
 export interface ThreadRow { id: string; title: string; design_system_id: string | null; updated_at: string; status: 'idle' | 'running' | 'failed'; error: string | null }
 export interface ChatMessage { id: string; role: 'user' | 'assistant'; content: string; asset_id: string | null; created_at: string }
-export interface AiSettings { provider: 'openrouter' | 'openai' | null; hasKey: boolean; model: string | null; freeLimit: number; freeUsed: number; sharedAvailable: boolean }
+export interface AiSettings { provider: 'openrouter' | 'openai' | 'chatgpt' | null; chatgptAvailable: boolean; hasKey: boolean; model: string | null; freeLimit: number; freeUsed: number; sharedAvailable: boolean }
 export interface DesignSystem { id: string; name: string; description: string | null; colors: string[]; fonts: string | null; voice: string | null; notes: string | null }
 export interface AssetRow { id: string; name: string; prompt: string | null; mime: string | null; kind: string; created_at: string; url: string | null; design_system_id: string | null }
 
@@ -65,6 +65,7 @@ async function getSettings_(): Promise<AiSettings> {
   const { data } = await looseAdmin().from('mjengo_ai_settings').select('provider, api_key_enc, model, free_tokens_used').eq('owner_id', a.id).maybeSingle();
   return {
     provider: (data?.provider as AiSettings['provider']) ?? null,
+    chatgptAvailable: !!process.env.OPENAI_SIWC_CLIENT_ID,
     hasKey: !!data?.api_key_enc,
     model: data?.model ?? null,
     freeLimit: FREE_TOKENS,
@@ -92,7 +93,7 @@ async function saveKey_(provider: 'openrouter' | 'openai', apiKey: string, model
 
 async function removeKey_() {
   const a = await requireAdminActor();
-  await looseAdmin().from('mjengo_ai_settings').update({ provider: null, api_key_enc: null, model: null }).eq('owner_id', a.id);
+  await looseAdmin().from('mjengo_ai_settings').update({ provider: null, api_key_enc: null, refresh_token_enc: null, model: null }).eq('owner_id', a.id);
 }
 
 async function privateDocsFolder_(): Promise<string> {
