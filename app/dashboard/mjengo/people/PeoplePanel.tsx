@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import Link from "next/link";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -25,6 +27,7 @@ export function PeoplePanel() {
 	const [results, setResults] = useState<PersonView[]>([]);
 	const [searching, setSearching] = useState(false);
 	const [busyId, setBusyId] = useState<string | null>(null);
+	const [selected, setSelected] = useState<{ id: string; name: string; email: string; isSuperAdmin: boolean } | null>(null);
 
 	const load = useCallback(async () => {
 		try {
@@ -188,18 +191,92 @@ export function PeoplePanel() {
 				<CardContent>
 					<ul className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
 						{data.admins.map((a) => (
-							<li key={a.id} className="flex items-center gap-3 rounded-xl border border-serene-neutral-100 p-3">
-								<div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-serene-blue-100 text-sm font-bold text-serene-blue-700">{initials(a.name)}</div>
-								<div className="min-w-0 flex-1">
-									<p className="truncate text-sm font-semibold">{a.name}</p>
-									<p className="truncate text-xs text-serene-neutral-500">{a.email}</p>
-								</div>
-								{a.isSuperAdmin ? <Badge className="bg-sauti-teal-light text-sauti-teal hover:bg-sauti-teal-light">Super</Badge> : <Badge variant="secondary">Admin</Badge>}
+							<li key={a.id}>
+								<button type="button" onClick={() => setSelected(a)} className="flex w-full items-center gap-3 rounded-xl border border-serene-neutral-100 p-3 text-left transition hover:border-sauti-teal/40 hover:bg-serene-neutral-50/60">
+									<div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-sauti-teal-light text-sm font-bold text-sauti-teal">{initials(a.name)}</div>
+									<div className="min-w-0 flex-1">
+										<p className="truncate text-sm font-semibold">{a.name}</p>
+										<p className="truncate text-xs text-serene-neutral-500">{a.email}</p>
+									</div>
+									{a.isSuperAdmin ? <Badge className="bg-sauti-teal-light text-sauti-teal hover:bg-sauti-teal-light">Super</Badge> : <Badge variant="secondary">Admin</Badge>}
+								</button>
 							</li>
 						))}
 					</ul>
 				</CardContent>
 			</Card>
+
+			<Sheet open={!!selected} onOpenChange={(o) => !o && setSelected(null)}>
+				<SheetContent className="flex w-full flex-col gap-0 p-0 sm:max-w-md">
+					{selected && (() => {
+						const sa = data.superAdmins.find((x) => x.email.toLowerCase() === selected.email.toLowerCase());
+						const live = data.admins.find((x) => x.id === selected.id) ?? selected;
+						return (
+							<>
+								<SheetHeader className="border-b p-5">
+									<div className="flex items-center gap-3">
+										<span className="flex h-12 w-12 items-center justify-center rounded-full bg-sauti-teal-light text-lg font-bold text-sauti-teal">{initials(live.name)}</span>
+										<div className="min-w-0 text-left">
+											<SheetTitle className="truncate">{live.name}</SheetTitle>
+											<SheetDescription className="truncate">{live.email}</SheetDescription>
+										</div>
+									</div>
+									<div className="pt-2">{live.isSuperAdmin ? <Badge className="bg-sauti-teal-light text-sauti-teal hover:bg-sauti-teal-light">Super admin</Badge> : <Badge variant="secondary">Admin</Badge>}</div>
+								</SheetHeader>
+								<div className="flex-1 space-y-5 overflow-y-auto p-5">
+									<section className="space-y-2">
+										<h4 className="text-sm font-semibold">Role in the suite</h4>
+										{live.isSuperAdmin ? (
+											<>
+												<p className="text-sm text-serene-neutral-600">Super admins manage people and access and can read the logs.</p>
+												{sa?.is_protected ? (
+													<p className="flex items-center gap-1.5 text-sm text-serene-neutral-500"><Lock className="h-4 w-4" /> This account is protected and cannot be changed.</p>
+												) : sa?.canRemove ? (
+													<Button variant="outline" className="gap-1.5 text-red-600" disabled={busyId === sa.id} onClick={() => window.confirm(`Remove ${live.email} as a super admin?`) && run(sa.id, () => removeSuperAdmin(sa.id), "Super admin removed")}>
+														<ShieldOff className="h-4 w-4" /> Remove as super admin
+													</Button>
+												) : <p className="text-sm text-serene-neutral-500">Only the person who added them can remove them.</p>}
+											</>
+										) : (
+											<>
+												<p className="text-sm text-serene-neutral-600">Admins can use every part of the suite except people, access and logs.</p>
+												<div className="flex flex-wrap gap-2">
+													<Button variant="outline" className="gap-1.5" disabled={!data.me.canAdd || adding} onClick={() => window.confirm(`Make ${live.name} a super admin?`) && run(live.id, () => addSuperAdmin(live.email), "Made a super admin")}>
+														<Crown className="h-4 w-4" /> Make super admin
+													</Button>
+													<Button variant="outline" className="gap-1.5" disabled={busyId === live.id} onClick={() => window.confirm(`Remove admin access for ${live.name}?`) && run(live.id, async () => { await setAdminStatus(live.id, false); setSelected(null); }, "Admin access removed")}>
+														<ShieldOff className="h-4 w-4" /> Make regular member
+													</Button>
+												</div>
+												{!data.me.canAdd && <p className="text-xs text-amber-700">You have used all of your super admin additions.</p>}
+											</>
+										)}
+									</section>
+									<section className="space-y-2">
+										<h4 className="text-sm font-semibold">Account type</h4>
+										<Select onValueChange={(v) => window.confirm(`Change ${live.name}'s account type to ${v}?`) && run(live.id, () => setAccountType(live.id, v as "survivor" | "professional" | "ngo"), "Account type changed")} disabled={live.isSuperAdmin || busyId === live.id}>
+											<SelectTrigger><SelectValue placeholder="Keep as it is" /></SelectTrigger>
+											<SelectContent>
+												<SelectItem value="survivor">Survivor</SelectItem>
+												<SelectItem value="professional">Professional</SelectItem>
+												<SelectItem value="ngo">NGO</SelectItem>
+											</SelectContent>
+										</Select>
+									</section>
+									<section className="space-y-2">
+										<h4 className="text-sm font-semibold">More</h4>
+										<div className="flex flex-wrap gap-2">
+											<Button asChild variant="outline" size="sm"><Link href={`/dashboard/mjengo/mail?to=${encodeURIComponent(live.email)}`}>Write an email</Link></Button>
+											<Button asChild variant="outline" size="sm"><Link href="/dashboard/mjengo/logs">See activity in the logs</Link></Button>
+										</div>
+									</section>
+									{busyId === live.id && <p className="flex items-center gap-2 text-xs text-serene-neutral-500"><Loader2 className="h-4 w-4 animate-spin" /> Saving...</p>}
+								</div>
+							</>
+						);
+					})()}
+				</SheetContent>
+			</Sheet>
 		</div>
 	);
 }
