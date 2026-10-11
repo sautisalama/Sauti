@@ -62,7 +62,7 @@ export function StatusPill({ kind, value }: { kind: Kind; value: string }) {
 }
 
 export function money(amount: number | null | undefined, currency = "USD") {
-	if (amount == null) return "—";
+	if (amount == null) return "-";
 	try {
 		return new Intl.NumberFormat("en", { style: "currency", currency, maximumFractionDigits: 0 }).format(amount);
 	} catch {

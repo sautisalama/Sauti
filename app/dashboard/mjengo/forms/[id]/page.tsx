@@ -295,7 +295,7 @@ function ResponsesTab({ formId, title, questions, collectEmail, responses, onCha
 							<tr key={r.id} className="hover:bg-serene-neutral-50/60">
 								<td className="sticky left-0 whitespace-nowrap bg-white px-3 py-2 text-serene-neutral-500">{format(new Date(r.created_at), "d MMM yyyy, HH:mm")}</td>
 								{collectEmail && <td className="px-3 py-2">{r.respondent_email}</td>}
-								{questions.map((qq) => <td key={qq.id} className="max-w-[260px] truncate px-3 py-2" title={displayAnswer(qq, r.answers[qq.id])}>{displayAnswer(qq, r.answers[qq.id]) || <span className="text-serene-neutral-300">—</span>}</td>)}
+								{questions.map((qq) => <td key={qq.id} className="max-w-[260px] truncate px-3 py-2" title={displayAnswer(qq, r.answers[qq.id])}>{displayAnswer(qq, r.answers[qq.id]) || <span className="text-serene-neutral-300">-</span>}</td>)}
 								<td className="px-1">
 									<Button variant="ghost" size="icon" className="h-8 w-8 text-serene-neutral-400 hover:text-red-600" aria-label="Delete response" onClick={async () => { if (window.confirm("Delete this response?")) { try { await deleteResponse(formId, r.id); onChanged(); } catch { toast({ title: "Could not delete", variant: "destructive" }); } } }}><Trash2 className="h-4 w-4" /></Button>
 								</td>

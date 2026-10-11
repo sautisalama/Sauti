@@ -1,5 +1,6 @@
 'use server';
 
+import { NO_DASH_RULE, stripDashes } from '@/lib/plain-text';
 import MailComposer from 'nodemailer/lib/mail-composer';
 import { looseAdmin } from '@/lib/loose-db';
 import { encryptField } from '@/lib/security/crypto';
@@ -731,7 +732,8 @@ async function ai(system: string, user: string, maxTokens: number): Promise<stri
     method: 'POST',
     signal: AbortSignal.timeout(40_000),
     headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json', 'X-Title': 'Sauti Salama Mail' },
-    body: JSON.stringify({ model: process.env.OPENROUTER_MODEL ?? 'google/gemini-2.5-flash-lite', temperature: 0.4, max_tokens: maxTokens, messages: [{ role: 'system', content: system }, { role: 'user', content: user }] }),
+    body: JSON.stringify({ model: process.env.OPENROUTER_MODEL ?? 'google/gemini-2.5-flash-lite', temperature: 0.4, max_tokens: maxTokens, messages: [{ role: 'system', content: `${system}
+${NO_DASH_RULE}` }, { role: 'user', content: user }] }),
   });
   if (!res.ok) throw new Error('The AI service is unavailable right now.');
   const j = (await res.json()) as { choices?: { message?: { content?: string } }[] };
