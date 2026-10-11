@@ -89,6 +89,14 @@ export async function saveForm(id: string, patch: { title?: string; description?
       collectEmail: !!s.collectEmail,
       closeAt: s.closeAt || null,
       limit: s.limit && s.limit > 0 ? Math.min(Math.round(s.limit), 100000) : null,
+      layout: s.layout === 'single' ? 'single' : 'page',
+      allowAnonymous: s.allowAnonymous !== false,
+      images: (s.images ?? []).filter((u) => typeof u === 'string' && /^https:\/\//.test(u)).slice(0, 6),
+      style: {
+        accent: /^#[0-9a-fA-F]{6}$/.test(s.style?.accent ?? '') ? s.style!.accent : undefined,
+        background: /^#[0-9a-fA-F]{6}$/.test(s.style?.background ?? '') ? s.style!.background : undefined,
+        designSystem: s.style?.designSystem ?? null,
+      },
     };
   }
   const { data, error } = await looseAdmin().from('mjengo_forms').update(update).eq('id', id).select('title, questions').single();
@@ -143,4 +151,22 @@ export async function deleteResponse(formId: string, responseId: string) {
 export async function exportedCsv(formId: string): Promise<void> {
   const actor = await requireAdminActor();
   await logAudit({ actorId: actor.id, actorEmail: actor.email, action: 'mjengo.form.exported', targetType: 'form', targetId: formId });
+}
+
+/** A one-time upload link for an image shown with a form. The image is public, like the form itself. */
+export async function formImageUpload(formId: string, fileName: string): Promise<{ signedUrl: string; publicUrl: string }> {
+  await requireAdminActor();
+  const safe = fileName.replace(/[^\w.\-]+/g, '_').slice(-80) || 'image';
+  const path = `forms/${formId}/${Date.now()}-${safe}`;
+  const db = looseAdmin();
+  const { data, error } = await db.storage.from('mjengo-public').createSignedUploadUrl(path);
+  if (error || !data) throw new Error('Could not start the upload.');
+  return { signedUrl: data.signedUrl, publicUrl: db.storage.from('mjengo-public').getPublicUrl(path).data.publicUrl };
+}
+
+/** Colours and notes from the saved design systems, for styling a form. */
+export async function designSystemsForForms(): Promise<{ id: string; name: string; colors: string[] }[]> {
+  await requireAdminActor();
+  const { data } = await looseAdmin().from('mjengo_design_systems').select('id, name, colors').order('name');
+  return (data ?? []) as { id: string; name: string; colors: string[] }[];
 }

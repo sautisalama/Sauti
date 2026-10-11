@@ -25,6 +25,13 @@ export interface FormSettings {
   closeAt?: string | null;
   /** Stop after this many responses. */
   limit?: number | null;
+  /** Everything on one page, or one question at a time like Typeform. Respondents can switch. */
+  layout?: 'page' | 'single';
+  /** Signed-in people are identified by their account; set to false to hide the anonymous option. */
+  allowAnonymous?: boolean;
+  /** Pictures shown with the description (public image links). The first is the card preview. */
+  images?: string[];
+  style?: { accent?: string; background?: string; designSystem?: string | null };
 }
 
 export type Answer = string | string[] | number | null;

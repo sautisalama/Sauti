@@ -7,7 +7,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { format } from "date-fns";
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import {
-	ArrowLeft, ArrowDown, ArrowUp, Check, Copy, Download, Eye, GripVertical, Plus, QrCode, Search, Share2, Trash2, X,
+	ArrowLeft, ArrowDown, ArrowUp, Check, Copy, Download, Eye, GripVertical, ImagePlus, Loader2, Plus, QrCode, Search, Share2, Trash2, X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,7 +24,8 @@ import { QrShare } from "@/components/chat/QrShare";
 import { FormRenderer } from "@/components/forms/FormRenderer";
 import { TYPE_LABEL, displayAnswer, hasOptions, newQuestion, type FormSettings, type Question, type QuestionType } from "@/lib/forms/schema";
 import { perDay, summarise, toCsv } from "@/lib/forms/analytics";
-import { deleteForm, deleteResponse, exportedCsv, getForm, getResponses, saveForm, setFormStatus, type FormRow, type ResponseRow } from "@/app/actions/mjengo-forms";
+import { deleteForm, deleteResponse, designSystemsForForms, exportedCsv, formImageUpload, getForm, getResponses, saveForm, setFormStatus, type FormRow, type ResponseRow } from "@/app/actions/mjengo-forms";
+import { putToSignedUrl } from "@/lib/client/upload";
 
 type Save = "saved" | "saving" | "error";
 
@@ -97,33 +98,33 @@ export default function FormEditorPage() {
 	if (form === undefined) return <MjengoLoader label="Loading the form" />;
 	if (form === null) return <p className="py-20 text-center text-serene-neutral-500">That form no longer exists. <Link href="/dashboard/mjengo/forms" className="text-sauti-teal underline">Back to forms</Link></p>;
 
-	const previewForm = { slug: form.slug, title: title || "Untitled form", description: description || null, questions, collectEmail: !!settings.collectEmail, unavailable: null, confirmation: settings.confirmation || "Thank you." } as const;
+	const previewForm = { slug: form.slug, title: title || "Untitled form", description: description || null, questions, collectEmail: !!settings.collectEmail, unavailable: null, confirmation: settings.confirmation || "Thank you.", layout: settings.layout === "single" ? "single" : "page", allowAnonymous: settings.allowAnonymous !== false, images: settings.images ?? [], accent: settings.style?.accent || "#068297", background: settings.style?.background || "#f4f7f8", responder: null } as const;
 
 	return (
 		<div className="space-y-4">
 			<div className="flex flex-wrap items-center gap-2">
-				<Button asChild variant="ghost" size="icon" className="h-9 w-9"><Link href="/dashboard/mjengo/forms" aria-label="All forms"><ArrowLeft className="h-4 w-4" /></Link></Button>
-				<Input value={title} onChange={(e) => setTitle(e.target.value)} aria-label="Form title" className="h-10 min-w-0 flex-1 border-transparent bg-transparent text-lg font-bold shadow-none hover:border-serene-neutral-200 focus-visible:border-sauti-teal" />
+				<Button asChild variant="ghost" size="icon" className="h-8 w-8"><Link href="/dashboard/mjengo/forms" aria-label="All forms"><ArrowLeft className="h-4 w-4" /></Link></Button>
+				<Input value={title} onChange={(e) => setTitle(e.target.value)} aria-label="Form title" className="h-9 min-w-0 flex-1 border-transparent bg-transparent text-base font-semibold shadow-none hover:border-serene-neutral-200 focus-visible:border-sauti-teal" />
 				<span className="text-xs text-serene-neutral-400" aria-live="polite">{save === "saving" ? "Saving..." : save === "error" ? "Not saved" : "Saved"}</span>
-				<Button variant="outline" size="sm" className="gap-1.5" onClick={() => setPreview(true)}><Eye className="h-4 w-4" /> Preview</Button>
-				<Button variant="outline" size="sm" className="gap-1.5" onClick={() => setShare(true)} disabled={form.status === "draft"}><Share2 className="h-4 w-4" /> Share</Button>
+				<Button variant="outline" size="sm" className="h-8 gap-1.5 px-2.5 text-xs" onClick={() => setPreview(true)}><Eye className="h-4 w-4" /> Preview</Button>
+				<Button variant="outline" size="sm" className="h-8 gap-1.5 px-2.5 text-xs" onClick={() => setShare(true)} disabled={form.status === "draft"}><Share2 className="h-4 w-4" /> Share</Button>
 				{form.status === "open" ? (
-					<Button size="sm" variant="outline" onClick={() => changeStatus("closed")}>Stop responses</Button>
+					<Button size="sm" variant="outline" className="h-8 px-3 text-xs" onClick={() => changeStatus("closed")}>Stop responses</Button>
 				) : (
-					<Button size="sm" className="bg-sauti-teal hover:bg-sauti-dark" onClick={() => changeStatus("open")}>{form.status === "closed" ? "Reopen" : "Publish"}</Button>
+					<Button size="sm" className="h-8 bg-sauti-teal px-3 text-xs hover:bg-sauti-dark" onClick={() => changeStatus("open")}>{form.status === "closed" ? "Reopen" : "Publish"}</Button>
 				)}
 			</div>
 
 			<Tabs defaultValue="questions">
-				<TabsList>
-					<TabsTrigger value="questions">Questions</TabsTrigger>
-					<TabsTrigger value="responses">Responses{responses ? ` (${responses.length})` : ""}</TabsTrigger>
-					<TabsTrigger value="analytics">Analytics</TabsTrigger>
-					<TabsTrigger value="settings">Settings</TabsTrigger>
+				<TabsList className="h-9 w-full justify-start gap-1 overflow-x-auto rounded-none border-b border-black/[0.07] bg-transparent p-0 sm:w-auto">
+					<TabsTrigger value="questions" className="h-9 rounded-none border-b-2 border-transparent px-3 text-sm data-[state=active]:border-sauti-teal data-[state=active]:bg-transparent data-[state=active]:text-sauti-dark data-[state=active]:shadow-none">Questions</TabsTrigger>
+					<TabsTrigger value="responses" className="h-9 rounded-none border-b-2 border-transparent px-3 text-sm data-[state=active]:border-sauti-teal data-[state=active]:bg-transparent data-[state=active]:text-sauti-dark data-[state=active]:shadow-none">Responses{responses ? ` (${responses.length})` : ""}</TabsTrigger>
+					<TabsTrigger value="analytics" className="h-9 rounded-none border-b-2 border-transparent px-3 text-sm data-[state=active]:border-sauti-teal data-[state=active]:bg-transparent data-[state=active]:text-sauti-dark data-[state=active]:shadow-none">Analytics</TabsTrigger>
+					<TabsTrigger value="settings" className="h-9 rounded-none border-b-2 border-transparent px-3 text-sm data-[state=active]:border-sauti-teal data-[state=active]:bg-transparent data-[state=active]:text-sauti-dark data-[state=active]:shadow-none">Settings</TabsTrigger>
 				</TabsList>
 
 				<TabsContent value="questions" className="mt-4">
-					<QuestionsTab description={description} onDescription={setDescription} questions={questions} onChange={setQuestions} />
+					<QuestionsTab formId={id} description={description} onDescription={setDescription} questions={questions} onChange={setQuestions} settings={settings} onSettings={setSettings} />
 				</TabsContent>
 				<TabsContent value="responses" className="mt-4">
 					<ResponsesTab formId={id} title={title} questions={questions} collectEmail={!!settings.collectEmail} responses={responses} onChanged={loadResponses} />
@@ -162,7 +163,30 @@ export default function FormEditorPage() {
 
 /* ------------------------------------------------------------- Questions */
 
-function QuestionsTab({ description, onDescription, questions, onChange }: { description: string; onDescription: (v: string) => void; questions: Question[]; onChange: (q: Question[]) => void }) {
+function QuestionsTab({ formId, description, onDescription, questions, onChange, settings, onSettings }: { formId: string; description: string; onDescription: (v: string) => void; questions: Question[]; onChange: (q: Question[]) => void; settings: FormSettings; onSettings: (s: FormSettings) => void }) {
+	const { toast } = useToast();
+	const [uploading, setUploading] = useState(false);
+	const pick = useRef<HTMLInputElement>(null);
+	const images = settings.images ?? [];
+	const addImages = async (files: FileList | null) => {
+		if (!files?.length) return;
+		setUploading(true);
+		try {
+			const added: string[] = [];
+			for (const f of Array.from(files).slice(0, 4 - images.length)) {
+				if (!f.type.startsWith("image/") || f.size > 8 * 1024 * 1024) continue;
+				const { signedUrl, publicUrl } = await formImageUpload(formId, f.name);
+				await putToSignedUrl(signedUrl, f);
+				added.push(publicUrl);
+			}
+			if (added.length) onSettings({ ...settings, images: [...images, ...added] });
+		} catch (e) {
+			toast({ title: "Could not add the picture", description: e instanceof Error ? e.message : undefined, variant: "destructive" });
+		} finally {
+			setUploading(false);
+			if (pick.current) pick.current.value = "";
+		}
+	};
 	const [type, setType] = useState<QuestionType>("short");
 	const update = (i: number, patch: Partial<Question>) => onChange(questions.map((q, j) => (j === i ? { ...q, ...patch } : q)));
 	const move = (i: number, d: -1 | 1) => {
@@ -175,9 +199,27 @@ function QuestionsTab({ description, onDescription, questions, onChange }: { des
 
 	return (
 		<div className="mx-auto max-w-3xl space-y-3">
-			<div className="rounded-2xl border border-serene-neutral-100 border-t-8 border-t-purple-600 bg-white p-4">
-				<Label className="text-xs font-semibold text-serene-neutral-600">Description (optional)</Label>
-				<Textarea value={description} onChange={(e) => onDescription(e.target.value)} rows={2} placeholder="Tell people what this form is for" className="mt-1.5" />
+			<div className="overflow-hidden rounded-2xl border border-serene-neutral-200/70 bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04)]">
+				<div className="h-1.5" style={{ background: settings.style?.accent || "#068297" }} />
+				<div className="space-y-3 p-4">
+					<Label className="text-xs font-semibold text-serene-neutral-600">Description (optional)</Label>
+					<Textarea value={description} onChange={(e) => onDescription(e.target.value)} rows={2} placeholder="Tell people what this form is for" />
+					<div className="flex flex-wrap items-center gap-2">
+						{images.map((u) => (
+							<span key={u} className="group relative h-16 w-24 overflow-hidden rounded-lg border border-serene-neutral-200">
+								<img src={u} alt="" className="h-full w-full object-cover" />
+								<button type="button" aria-label="Remove picture" onClick={() => onSettings({ ...settings, images: images.filter((x) => x !== u) })} className="absolute right-1 top-1 hidden h-5 w-5 items-center justify-center rounded-full bg-black/60 text-white group-hover:flex"><X className="h-3 w-3" /></button>
+							</span>
+						))}
+						{images.length < 4 && (
+							<>
+								<Button type="button" variant="outline" size="sm" className="h-8 gap-1.5 text-xs" disabled={uploading} onClick={() => pick.current?.click()}>{uploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ImagePlus className="h-3.5 w-3.5" />} Add pictures</Button>
+								<input ref={pick} type="file" accept="image/*" multiple className="hidden" onChange={(e) => addImages(e.target.files)} />
+							</>
+						)}
+					</div>
+					{images.length > 0 && <p className="text-xs text-serene-neutral-500">The first picture is also the preview on the form card.</p>}
+				</div>
 			</div>
 
 			{questions.map((q, i) => (
@@ -396,6 +438,10 @@ function Stat({ label, value, hint }: { label: string; value: number | string; h
 /* -------------------------------------------------------------- Settings */
 
 function SettingsTab({ settings, onChange, onDelete }: { settings: FormSettings; onChange: (s: FormSettings) => void; onDelete: () => void }) {
+	const [systems, setSystems] = useState<{ id: string; name: string; colors: string[] }[]>([]);
+	useEffect(() => { designSystemsForForms().then(setSystems).catch(() => setSystems([])); }, []);
+	const accents = ["#068297", "#7c3aed", "#2563eb", "#16a34a", "#ea580c", "#db2777", "#111827"];
+	const palette = systems.find((d) => d.id === settings.style?.designSystem)?.colors ?? [];
 	return (
 		<div className="mx-auto max-w-2xl space-y-4">
 			<section className="space-y-4 rounded-2xl border border-serene-neutral-200/70 bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04)] p-5">
@@ -418,6 +464,48 @@ function SettingsTab({ settings, onChange, onDelete }: { settings: FormSettings;
 					</div>
 				</div>
 			</section>
+			<section className="space-y-4 rounded-2xl border border-serene-neutral-200/70 bg-white p-5 shadow-[0_1px_2px_rgba(16,24,40,0.04)]">
+				<h3 className="text-sm font-bold text-sauti-dark">How it is answered</h3>
+				<div className="space-y-1.5">
+					<Label>Layout</Label>
+					<div className="grid grid-cols-2 gap-2">
+						{([["page", "Whole page", "Every question on one page"], ["single", "One at a time", "Full page per question, like Typeform"]] as const).map(([v, l, d]) => (
+							<button key={v} type="button" onClick={() => onChange({ ...settings, layout: v })} aria-pressed={(settings.layout ?? "page") === v} className={cn("rounded-xl border p-3 text-left", (settings.layout ?? "page") === v ? "border-sauti-teal bg-sauti-teal-light/40" : "border-serene-neutral-200 hover:bg-serene-neutral-50")}>
+								<span className="block text-sm font-semibold">{l}</span><span className="block text-xs text-serene-neutral-500">{d}</span>
+							</button>
+						))}
+					</div>
+					<p className="text-xs text-serene-neutral-500">People answering can switch between the two.</p>
+				</div>
+				<label className="flex items-center justify-between gap-4 text-sm">
+					<span><span className="font-medium">Allow anonymous answers</span><span className="block text-xs text-serene-neutral-500">People signed in to Sauti Salama are recorded with their email unless they choose to be anonymous.</span></span>
+					<Switch checked={settings.allowAnonymous !== false} onCheckedChange={(v) => onChange({ ...settings, allowAnonymous: v })} />
+				</label>
+			</section>
+
+			<section className="space-y-4 rounded-2xl border border-serene-neutral-200/70 bg-white p-5 shadow-[0_1px_2px_rgba(16,24,40,0.04)]">
+				<h3 className="text-sm font-bold text-sauti-dark">Look</h3>
+				<div className="space-y-1.5">
+					<Label>Accent colour</Label>
+					<div className="flex flex-wrap items-center gap-2">
+						{[...accents, ...palette].map((c) => (
+							<button key={c} type="button" aria-label={`Accent ${c}`} aria-pressed={settings.style?.accent === c} onClick={() => onChange({ ...settings, style: { ...settings.style, accent: c } })} className={cn("h-7 w-7 rounded-full ring-offset-2", settings.style?.accent === c && "ring-2 ring-sauti-teal")} style={{ background: c }} />
+						))}
+						<input type="color" aria-label="Custom colour" value={settings.style?.accent || "#068297"} onChange={(e) => onChange({ ...settings, style: { ...settings.style, accent: e.target.value } })} className="h-7 w-9 cursor-pointer rounded border border-serene-neutral-200 bg-white p-0.5" />
+					</div>
+				</div>
+				{systems.length > 0 && (
+					<div className="space-y-1.5">
+						<Label>Use colours from a design system</Label>
+						<Select value={settings.style?.designSystem ?? "none"} onValueChange={(v) => { const d = systems.find((x) => x.id === v); onChange({ ...settings, style: { ...settings.style, designSystem: v === "none" ? null : v, ...(d?.colors[0] ? { accent: d.colors[0] } : {}) } }); }}>
+							<SelectTrigger><SelectValue /></SelectTrigger>
+							<SelectContent><SelectItem value="none">None</SelectItem>{systems.map((d) => <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>)}</SelectContent>
+						</Select>
+						<p className="text-xs text-serene-neutral-500">Design systems are set up in the Assistant, with their colours, fonts and documents.</p>
+					</div>
+				)}
+			</section>
+
 			<section className="rounded-2xl border border-red-100 bg-red-50/40 p-5">
 				<h3 className="text-sm font-bold text-red-800">Delete this form</h3>
 				<p className="mt-1 text-sm text-red-700">The form, its link and every response are removed for good.</p>

@@ -2,6 +2,7 @@
 
 import { headers } from 'next/headers';
 import { looseAdmin } from '@/lib/loose-db';
+import { getActor } from '@/lib/access/super-admin';
 import { validateAnswers, type FormSettings, type Question } from '@/lib/forms/schema';
 
 export interface PublicForm {
@@ -13,6 +14,13 @@ export interface PublicForm {
   /** Why it cannot be filled in right now, if so. */
   unavailable: 'closed' | 'full' | 'ended' | null;
   confirmation: string;
+  layout: 'page' | 'single';
+  allowAnonymous: boolean;
+  images: string[];
+  accent: string;
+  background: string;
+  /** The signed-in person, if any: their email is what a response is recorded under unless they choose anonymous. */
+  responder: { email: string; name: string } | null;
 }
 
 const SLUG = /^[a-z0-9]{6,12}$/;
@@ -26,6 +34,16 @@ function limited(key: string): boolean {
   hits.set(key, recent);
   if (hits.size > 5000) for (const [k, v] of hits) if (!v.some((t) => now - t < 10 * 60 * 1000)) hits.delete(k);
   return recent.length > 8;
+}
+
+/** The signed-in person filling the form in, if there is one. */
+async function currentResponder(): Promise<PublicForm['responder']> {
+  try {
+    const a = await getActor();
+    return a ? { email: a.email, name: a.name } : null;
+  } catch {
+    return null;
+  }
 }
 
 export async function getPublicForm(slug: string): Promise<PublicForm | null> {
@@ -49,12 +67,18 @@ export async function getPublicForm(slug: string): Promise<PublicForm | null> {
     collectEmail: !!s.collectEmail,
     unavailable,
     confirmation: s.confirmation || 'Thank you. Your response has been recorded.',
+    layout: s.layout === 'single' ? 'single' : 'page',
+    allowAnonymous: s.allowAnonymous !== false,
+    images: (s.images ?? []).filter((u) => typeof u === 'string' && /^https:\/\//.test(u)).slice(0, 6),
+    accent: /^#[0-9a-fA-F]{6}$/.test(s.style?.accent ?? '') ? (s.style!.accent as string) : '#068297',
+    background: /^#[0-9a-fA-F]{6}$/.test(s.style?.background ?? '') ? (s.style!.background as string) : '#f4f7f8',
+    responder: await currentResponder(),
   };
 }
 
 export type SubmitResult = { ok: true; message: string } | { ok: false; error: string; fieldErrors?: Record<string, string> };
 
-export async function submitFormResponse(slug: string, answers: Record<string, unknown>, extra: { email?: string; website?: string }): Promise<SubmitResult> {
+export async function submitFormResponse(slug: string, answers: Record<string, unknown>, extra: { email?: string; website?: string; anonymous?: boolean }): Promise<SubmitResult> {
   // Honeypot: real people never fill the hidden "website" field.
   if (extra.website) return { ok: true, message: 'Thank you.' };
   if (!SLUG.test(slug)) return { ok: false, error: 'This form is not available.' };
@@ -71,7 +95,9 @@ export async function submitFormResponse(slug: string, answers: Record<string, u
   if (!result.ok) return { ok: false, error: 'Please check the highlighted answers.', fieldErrors: result.errors };
 
   let email: string | null = null;
-  if (form.collectEmail) {
+  // Signed in to Sauti Salama and not anonymous: the account email is the responder.
+  if (form.responder && !(extra.anonymous && form.allowAnonymous)) email = form.responder.email;
+  else if (form.collectEmail) {
     const e = (extra.email ?? '').trim();
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e) || e.length > 200) return { ok: false, error: 'Enter a valid email address.', fieldErrors: { __email: 'Enter a valid email address.' } };
     email = e;
