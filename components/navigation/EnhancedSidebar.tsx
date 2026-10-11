@@ -117,6 +117,12 @@ export function EnhancedSidebar({
 	const [mjengoSuper, setMjengoSuper] = useState(false);
 	const [suite, setSuite] = useState({ opportunities: 0, files: 0, notifications: 0 });
 	const mailUnread = useMailUnread();
+	// The order of the suite's modules is the person's own: drag a module (or a heading) to move it.
+	const [navPref, setNavPref] = useState<{ order: string[]; group: Record<string, string> }>({ order: [], group: {} });
+	useEffect(() => {
+		try { const raw = localStorage.getItem("ss_mj_nav_v1"); if (raw) setNavPref(JSON.parse(raw)); } catch { /* default order */ }
+	}, []);
+	const saveNav = (n: { order: string[]; group: Record<string, string> }) => { setNavPref(n); try { localStorage.setItem("ss_mj_nav_v1", JSON.stringify(n)); } catch { /* ignore */ } };
 	const counts = { opportunities: suite.opportunities, mail: mailUnread };
 	// Small counters on the suite items: phone arrivals and unread notifications, refreshed once a minute.
 	useEffect(() => {
@@ -299,6 +305,7 @@ export function EnhancedSidebar({
 			const B = "/dashboard/mjengo";
 			const items: SidebarItem[] = [
 				{ id: "mj-overview", label: "Overview", icon: LayoutDashboard, href: B, section: "main", group: "", hint: "Summary of grants, opportunities and projects" },
+				{ id: "mj-assistant", group: "", label: "Assistant", icon: Sparkles, href: `${B}/assistant`, section: "main", hint: "Chat, write and create images" },
 				{ id: "mj-mail", group: "Communicate", label: "Mail", icon: Mail, href: `${B}/mail`, section: "main", hint: "Read, write and organise email", badge: counts.mail || undefined },
 				{ id: "mj-chat", group: "Communicate", label: "Chats", icon: MessageCircle, href: `${B}/chat`, section: "main", hint: "Conversations with your team and contacts" },
 				{ id: "mj-contacts", group: "Communicate", label: "Contacts", icon: Users, href: `${B}/contacts`, section: "main", hint: "Your team's contact book" },
@@ -311,9 +318,7 @@ export function EnhancedSidebar({
 				{ id: "mj-projects", group: "Work", label: "Projects", icon: FolderKanban, href: `${B}/projects`, section: "main", hint: "Projects, milestones and documents" },
 				{ id: "mj-forms", group: "Work", label: "Forms", icon: ClipboardList, href: `${B}/forms`, section: "main", hint: "Build forms and see responses" },
 				{ id: "mj-todos", group: "Work", label: "To-dos", icon: CheckSquare, href: `${B}/todos`, section: "main", hint: "Tasks and shared responsibilities" },
-				{ id: "mj-assistant", group: "Create", label: "Assistant", icon: Sparkles, href: `${B}/assistant`, section: "main", hint: "Chat, write and create images" },
-				{ id: "mj-content", group: "Create", label: "Content", icon: Megaphone, href: `${B}/content`, section: "main", hint: "Plan and schedule social posts" },
-				{ id: "mj-design", group: "Create", label: "Design", icon: Palette, href: `${B}/design`, section: "main", hint: "Posters and social graphics from templates" },
+				{ id: "mj-design", group: "Create", label: "Design", icon: Palette, href: `${B}/design`, section: "main", hint: "Posters, banners and scheduled content" },
 			];
 			if (mjengoSuper) {
 				items.push(
@@ -634,23 +639,67 @@ export function EnhancedSidebar({
 	};
 
 	/** Items, with a small heading (or a hairline when collapsed) wherever the group changes. */
-	const renderGroup = (list: SidebarItem[]) => {
+	const renderGroup = (list: SidebarItem[], reorderable = false) => {
 		let last: string | undefined;
+		const orderNow = list.map((i) => i.id);
+		const moveItem = (dragged: string, target: string) => {
+			if (dragged === target) return;
+			const order = orderNow.filter((x) => x !== dragged);
+			order.splice(order.indexOf(target), 0, dragged);
+			const t = list.find((x) => x.id === target);
+			saveNav({ order, group: { ...navPref.group, [dragged]: t?.group ?? "" } });
+		};
+		const moveGroup = (g: string, target: string) => {
+			if (g === target) return;
+			const members = list.filter((x) => (x.group ?? "") === g).map((x) => x.id);
+			const rest = orderNow.filter((x) => !members.includes(x));
+			const at = rest.findIndex((id) => (list.find((x) => x.id === id)?.group ?? "") === target);
+			rest.splice(at === -1 ? rest.length : at, 0, ...members);
+			saveNav({ order: rest, group: navPref.group });
+		};
 		return list.map((item) => {
 			const heading = item.group && item.group !== last ? item.group : null;
 			if (item.group !== undefined) last = item.group;
+			const drag = reorderable && onMjengo;
 			return (
-				<div key={item.id}>
+				<div
+					key={item.id}
+					draggable={drag}
+					onDragStart={(e) => { if (!drag) return; e.dataTransfer.setData("text/x-nav", `item:${item.id}`); e.dataTransfer.effectAllowed = "move"; }}
+					onDragOver={(e) => { if (drag && e.dataTransfer.types.includes("text/x-nav")) { e.preventDefault(); e.dataTransfer.dropEffect = "move"; } }}
+					onDrop={(e) => {
+						if (!drag) return;
+						const d = e.dataTransfer.getData("text/x-nav");
+						e.preventDefault();
+						if (d.startsWith("item:")) moveItem(d.slice(5), item.id);
+						else if (d.startsWith("group:")) moveGroup(d.slice(6), item.group ?? "");
+					}}
+					className={cn(drag && "cursor-grab active:cursor-grabbing")}
+				>
 					{heading && (isCollapsed
 						? <div className="mx-4 my-2 h-px bg-serene-neutral-200/70" />
-						: <p className="px-5 pb-1 pt-4 text-[11px] font-semibold uppercase tracking-wider text-serene-neutral-400">{heading}</p>)}
+						: (
+							<p
+								draggable={drag}
+								onDragStart={(e) => { if (!drag) return; e.stopPropagation(); e.dataTransfer.setData("text/x-nav", `group:${heading}`); e.dataTransfer.effectAllowed = "move"; }}
+								title={drag ? "Drag to move this whole section" : undefined}
+								className="px-5 pb-1 pt-4 text-[11px] font-semibold uppercase tracking-wider text-serene-neutral-400"
+							>{heading}</p>
+						))}
 					{renderItem(item)}
 				</div>
 			);
 		});
 	};
 
-	const mainItems = sidebarItems.filter((item) => item.section === "main");
+	const baseMain = sidebarItems.filter((item) => item.section === "main");
+	const mainItems = useMemo(() => {
+		if (!onMjengo) return baseMain;
+		const withGroups = baseMain.map((i) => (navPref.group[i.id] !== undefined ? { ...i, group: navPref.group[i.id] } : i));
+		const rank = (id: string, natural: number) => { const k = navPref.order.indexOf(id); return k === -1 ? 1000 + natural : k; };
+		return withGroups.map((i, n) => ({ i, r: rank(i.id, n) })).sort((a, b) => a.r - b.r).map((x) => x.i);
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [sidebarItems, navPref, onMjengo]);
 	const secondaryItems = sidebarItems.filter(
 		(item) => item.section === "secondary"
 	);
@@ -912,8 +961,12 @@ export function EnhancedSidebar({
 					<div className="space-y-1">
 						{/* Main Navigation */}
 						<div className="space-y-1">
-							{renderGroup(mainItems)}
+							{renderGroup(mainItems, true)}
 						</div>
+
+						{onMjengo && !isCollapsed && (navPref.order.length > 0) && (
+							<button onClick={() => saveNav({ order: [], group: {} })} className="mx-5 mt-2 text-[11px] font-medium text-serene-neutral-400 underline hover:text-serene-neutral-600">Reset the order</button>
+						)}
 
 						{/* Secondary Navigation */}
 						{secondaryItems.length > 0 && (

@@ -24,7 +24,6 @@ const TABS = [
 	{ href: `${BASE}/forms`, label: "Forms", icon: ClipboardList },
 	{ href: `${BASE}/todos`, label: "To-dos", icon: CheckSquare },
 	{ href: `${BASE}/assistant`, label: "Assistant", icon: Sparkles },
-	{ href: `${BASE}/content`, label: "Content", icon: Megaphone },
 	{ href: `${BASE}/design`, label: "Design", icon: Palette },
 	{ href: `${BASE}/people`, label: "People & access", icon: ShieldCheck, superOnly: true },
 	{ href: `${BASE}/logs`, label: "Logs", icon: ScrollText, superOnly: true },
