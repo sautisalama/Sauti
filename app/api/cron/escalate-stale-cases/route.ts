@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { timingSafeEqual } from "node:crypto";
 import { escalateStaleCases } from "@/lib/cases/escalation";
 import { remindTodos } from "@/lib/mjengo/todo-reminders";
+import { remindPosts } from "@/lib/mjengo/post-reminders";
 import { flushVerificationAlerts } from "@/lib/notifications/verification-alerts";
 
 export const dynamic = "force-dynamic";
@@ -25,7 +26,8 @@ export async function GET(req: Request) {
 		// Backstop: send any verification submissions the immediate path missed.
 		const verification = await flushVerificationAlerts(base).catch((e) => ({ sent: 0, error: e instanceof Error ? e.message : "failed" }));
 		const todos = await remindTodos().catch((e) => ({ tasks: 0, sent: 0, error: e instanceof Error ? e.message : "failed" }));
-		return NextResponse.json({ ok: true, ...result, verification, todos });
+		const posts = await remindPosts().catch((e) => ({ posts: 0, sent: 0, error: e instanceof Error ? e.message : "failed" }));
+		return NextResponse.json({ ok: true, ...result, verification, todos, posts });
 	} catch (e) {
 		console.error("[cron] escalate-stale-cases failed:", e);
 		return NextResponse.json({ ok: false, error: e instanceof Error ? e.message : "failed" }, { status: 500 });
