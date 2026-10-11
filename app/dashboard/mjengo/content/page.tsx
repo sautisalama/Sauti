@@ -12,7 +12,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { useToast } from "@/hooks/use-toast";
 import { unwrap } from "@/lib/action-result";
 import { cn } from "@/lib/utils";
-import { CHANNELS, CHANNEL_INFO, textFor, type Channel } from "@/lib/mjengo/channels";
+import { ASPECT, CHANNELS, CHANNEL_INFO, aspectProblem, textFor, type Channel } from "@/lib/mjengo/channels";
 import * as content from "@/app/actions/mjengo-content";
 import * as ai from "@/app/actions/mjengo-ai";
 import type { PostRow } from "@/app/actions/mjengo-content";
@@ -221,6 +221,19 @@ function PostDialog({ post, assets, state, onClose, onSaved }: { post: (Partial<
 	const [busy, setBusy] = useState(false);
 	const [tab, setTab] = useState<"shared" | Channel>("shared");
 	const [pickTpl, setPickTpl] = useState(false);
+	// The shape of the chosen pictures, measured in the browser, so each network can be checked.
+	const [dims, setDims] = useState<Record<string, [number, number]>>({});
+	const mediaIds = (v?.media ?? []) as string[];
+	useEffect(() => {
+		for (const id of mediaIds) {
+			const a = assets.find((x) => x.id === id);
+			if (!a?.url || dims[id]) continue;
+			const img = new window.Image();
+			img.onload = () => setDims((d) => ({ ...d, [id]: [img.naturalWidth, img.naturalHeight] }));
+			img.src = a.url;
+		}
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [mediaIds.join(","), assets]);
 	useEffect(() => { setV(post); setTab("shared"); }, [post]);
 	if (!v) return null;
 
@@ -345,6 +358,20 @@ function PostDialog({ post, assets, state, onClose, onSaved }: { post: (Partial<
 							</div>
 						)}
 					</div>
+
+					{chosen.length > 0 && (
+						<ul className="space-y-1 text-xs">
+							{chosen.map((c) => {
+								const first = mediaIds.map((id) => dims[id]).find(Boolean);
+								const noImage = !mediaIds.length;
+								const problem = first ? aspectProblem(c, first[0], first[1]) : null;
+								if (CHANNEL_INFO[c].needsImage && noImage) return <li key={c} className="flex items-start gap-2 text-amber-700"><span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500" />{CHANNEL_INFO[c].label} needs an image: {ASPECT[c].recommended}. <Link href={`/dashboard/mjengo/design?size=${ASPECT[c].designSize}`} className="underline">Design one</Link></li>;
+								if (problem) return <li key={c} className="flex items-start gap-2 text-amber-700"><span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500" />{problem} <Link href={`/dashboard/mjengo/design?size=${ASPECT[c].designSize}`} className="underline">Design one</Link></li>;
+								if (!noImage && first) return <li key={c} className="flex items-start gap-2 text-emerald-700"><span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500" />{CHANNEL_INFO[c].label}: the picture fits.</li>;
+								return null;
+							})}
+						</ul>
+					)}
 
 					<div className="space-y-1.5">
 						<Label htmlFor="post-when" className="text-xs font-semibold">Post at</Label>

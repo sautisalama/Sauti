@@ -59,6 +59,7 @@ function normalise(v: PostInput) {
   if (status !== 'draft' && !body) throw new Error('Write the post first.');
   if (channels.includes('x') && body.length > 280) throw new Error('X posts are limited to 280 characters.');
   if (channels.includes('instagram') && !(v.media ?? []).length) throw new Error('Instagram posts need an image.');
+  if (channels.includes('tiktok') && !(v.media ?? []).length) throw new Error('TikTok posts need an image.');
   const variants: Partial<Record<Channel, Variant>> = {};
   for (const c of channels) {
     const x = v.variants?.[c];

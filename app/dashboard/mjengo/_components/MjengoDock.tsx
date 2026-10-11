@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { Bell, Calendar, GripVertical, Loader2, MessageCircle, Mic, MoveHorizontal, PanelBottom, Video, X } from "lucide-react";
+import { Bell, Calendar, GripVertical, Loader2, MessageCircle, Mic, Video } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useToast } from "@/hooks/use-toast";
 import { unwrap } from "@/lib/action-result";
@@ -86,10 +86,10 @@ export function MjengoDock() {
 			const { code } = await unwrap(createMeeting(mode, null));
 			const url = `${window.location.origin}/meet/${code}`;
 			navigator.clipboard?.writeText(url).catch(() => undefined);
-			// The call has its own page, so camera and microphone choices come first.
-			window.open(url, "_blank", "noopener");
-			toast({ title: mode === "voice" ? "Voice call ready" : "Video call ready", description: "It opened in its own page. The link is copied: send it to anyone you want in the call." });
+			// The call is its own page (/meet/...), opened right here so an installed app does not pop up a new window.
+			toast({ title: mode === "voice" ? "Voice call ready" : "Video call ready", description: "The link is copied: send it to anyone you want in the call." });
 			setOpen(false);
+			window.location.assign(url);
 		} catch (e) {
 			toast({ title: "Could not start the call", description: e instanceof Error ? e.message : undefined, variant: "destructive" });
 		} finally {
@@ -109,40 +109,46 @@ export function MjengoDock() {
 	const toLeft = place.edge === "right";
 	const side: "left" | "right" | "top" = horizontal ? "top" : toLeft ? "left" : "right";
 
+	const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+	const expand = () => { if (hoverTimer.current) clearTimeout(hoverTimer.current); hoverTimer.current = null; setOpen(true); };
+	const collapse = () => { if (hoverTimer.current) clearTimeout(hoverTimer.current); hoverTimer.current = setTimeout(() => setOpen(false), 220); };
+
 	if (!mounted) return null;
 	return (
 		<TooltipProvider delayDuration={150}>
-			<div style={style} className={cn("fixed z-[55] flex items-center gap-1.5", horizontal ? "flex-col-reverse" : toLeft ? "flex-row-reverse" : "flex-row", drag && "select-none")}>
+			{/* Hover (or tap the handle) to expand; move away to collapse. Drag the handle to put it on another edge. */}
+			<div
+				style={style}
+				onPointerEnter={(e) => { if (e.pointerType === "mouse" && !drag) expand(); }}
+				onPointerLeave={(e) => { if (e.pointerType === "mouse") collapse(); }}
+				onFocus={expand}
+				onBlur={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) collapse(); }}
+				className={cn("fixed z-[55] flex items-stretch rounded-2xl border border-black/10 bg-white shadow-[0_6px_24px_rgba(0,0,0,0.14)]", horizontal ? "flex-row" : "flex-col", drag && "select-none")}
+			>
 				<button
 					type="button"
 					onPointerDown={onDown}
 					onPointerMove={onMove}
 					onPointerUp={onUp}
 					onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setOpen((v) => !v); } if (e.key === "Escape") setOpen(false); }}
-					aria-label={open ? "Close quick actions" : "Open quick actions. Drag to move."}
+					aria-label="Quick actions. Drag to move."
 					aria-expanded={open}
-					className="relative flex h-11 w-11 cursor-grab touch-none items-center justify-center rounded-2xl border border-black/10 bg-white text-[#787774] shadow-[0_6px_20px_rgba(0,0,0,0.14)] transition active:cursor-grabbing hover:text-[#37352f] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sauti-teal/50"
+					className="relative flex h-11 w-11 shrink-0 cursor-grab touch-none items-center justify-center rounded-2xl text-[#787774] transition active:cursor-grabbing hover:text-[#37352f] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sauti-teal/50"
 				>
-					{open ? <X className="h-5 w-5" /> : <GripVertical className="h-5 w-5" />}
+					<GripVertical className="h-5 w-5" />
 					{!open && unread > 0 && <span className="absolute -right-1 -top-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-sauti-teal px-1 text-[10px] font-bold text-white">{unread > 9 ? "9+" : unread}</span>}
 				</button>
 
-				{open && (
-					<div role="toolbar" aria-label="Quick actions" className={cn("flex gap-0.5 rounded-2xl border border-black/10 bg-white p-1 shadow-[0_6px_24px_rgba(0,0,0,0.14)]", horizontal ? "flex-row" : "flex-col")}>
-						<Item label="Chats" hint="Conversations in the suite" href="/dashboard/mjengo/chat" side={side}><MessageCircle className="h-[18px] w-[18px]" /></Item>
-						<Item label="Notifications" hint="What needs your attention" href="/dashboard/mjengo/notifications" side={side}>
-							<Bell className="h-[18px] w-[18px]" />
-							{unread > 0 && <span className="absolute right-1 top-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-sauti-teal px-1 text-[10px] font-bold text-white">{unread > 9 ? "9+" : unread}</span>}
-						</Item>
-						<Item label="Voice call" hint="Start an audio call in its own page" onClick={() => start("voice")} busy={starting === "voice"} side={side}><Mic className="h-[18px] w-[18px]" /></Item>
-						<Item label="Video call" hint="Start a video call with captions" onClick={() => start("video")} busy={starting === "video"} side={side}><Video className="h-[18px] w-[18px]" /></Item>
-						<Item label="Calendar" hint="Month view, events and meetings" href="/dashboard/mjengo/calendar" side={side}><Calendar className="h-[18px] w-[18px]" /></Item>
-						<span aria-hidden className={cn("bg-black/10", horizontal ? "mx-0.5 my-1 w-px" : "mx-1 my-0.5 h-px")} />
-						<Item label="Move to the left" hint="Dock on the left edge" onClick={() => { save({ edge: "left", at: place.at }); setOpen(false); }} side={side}><MoveHorizontal className="h-[18px] w-[18px] rotate-180" /></Item>
-						<Item label="Move to the right" hint="Dock on the right edge" onClick={() => { save({ edge: "right", at: place.at }); setOpen(false); }} side={side}><MoveHorizontal className="h-[18px] w-[18px]" /></Item>
-						<Item label="Move to the bottom" hint="Dock along the bottom" onClick={() => { save({ edge: "bottom", at: Math.min(0.9, place.at) }); setOpen(false); }} side={side}><PanelBottom className="h-[18px] w-[18px]" /></Item>
-					</div>
-				)}
+				<div role="toolbar" aria-label="Quick actions" className={cn("flex gap-0.5 overflow-hidden transition-all duration-200", horizontal ? "flex-row items-center" : "flex-col items-center", open ? (horizontal ? "max-w-[320px] px-1 opacity-100" : "max-h-[280px] pb-1 opacity-100") : (horizontal ? "max-w-0 opacity-0" : "max-h-0 opacity-0"))}>
+					<Item label="Chats" hint="Conversations in the suite" href="/dashboard/mjengo/chat" side={side}><MessageCircle className="h-[18px] w-[18px]" /></Item>
+					<Item label="Notifications" hint="What needs your attention" href="/dashboard/mjengo/notifications" side={side}>
+						<Bell className="h-[18px] w-[18px]" />
+						{unread > 0 && <span className="absolute right-1 top-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-sauti-teal px-1 text-[10px] font-bold text-white">{unread > 9 ? "9+" : unread}</span>}
+					</Item>
+					<Item label="Voice call" hint="Start an audio call in its own page" onClick={() => start("voice")} busy={starting === "voice"} side={side}><Mic className="h-[18px] w-[18px]" /></Item>
+					<Item label="Video call" hint="Start a video call with captions" onClick={() => start("video")} busy={starting === "video"} side={side}><Video className="h-[18px] w-[18px]" /></Item>
+					<Item label="Calendar" hint="Month view, events and meetings" href="/dashboard/mjengo/calendar" side={side}><Calendar className="h-[18px] w-[18px]" /></Item>
+				</div>
 			</div>
 		</TooltipProvider>
 	);

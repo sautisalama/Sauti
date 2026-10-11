@@ -38,3 +38,24 @@ export function withUtm(url: string, channel: Channel, campaign: string | null):
   }
 }
 
+
+/** What each network wants from a picture, so a post is checked before it goes out. Ratios are width / height. */
+export const ASPECT: Record<Channel, { recommended: string; size: [number, number]; min: number; max: number; designSize: string }> = {
+  linkedin: { recommended: '1.91:1 (1200 x 627) or square', size: [1200, 627], min: 0.4, max: 2.4, designSize: 'linkedin' },
+  x: { recommended: '16:9 (1600 x 900)', size: [1600, 900], min: 0.5, max: 2.0, designSize: 'x' },
+  facebook: { recommended: '1.91:1 (1200 x 630) or square', size: [1200, 630], min: 0.5, max: 2.0, designSize: 'facebook' },
+  instagram: { recommended: 'square (1080 x 1080) or 4:5 (1080 x 1350)', size: [1080, 1350], min: 0.8, max: 1.91, designSize: 'instagram' },
+  tiktok: { recommended: '9:16 (1080 x 1920)', size: [1080, 1920], min: 0.5, max: 0.8, designSize: 'story' },
+  website: { recommended: '16:9 (1600 x 900)', size: [1600, 900], min: 0.5, max: 2.5, designSize: 'x' },
+};
+
+/** A plain sentence when the picture's shape will not suit the network, or null when it will. */
+export function aspectProblem(channel: Channel, w: number, h: number): string | null {
+  if (!w || !h) return null;
+  const r = w / h;
+  const a = ASPECT[channel];
+  if (r < a.min) return `Too tall for ${CHANNEL_INFO[channel].label}. Use ${a.recommended}.`;
+  if (r > a.max) return `Too wide for ${CHANNEL_INFO[channel].label}. Use ${a.recommended}.`;
+  if (channel === 'tiktok' && r > 0.7) return `TikTok photos look best at ${a.recommended}; this one will have bars.`;
+  return null;
+}

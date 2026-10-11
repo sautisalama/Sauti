@@ -22,6 +22,8 @@ const SIZES = [
 	{ id: "instagram", label: "Instagram post", w: 1080, h: 1080 },
 	{ id: "story", label: "Story", w: 1080, h: 1920 },
 	{ id: "linkedin", label: "LinkedIn post", w: 1200, h: 627 },
+	{ id: "facebook", label: "Facebook post", w: 1200, h: 630 },
+	{ id: "tiktok", label: "TikTok photo", w: 1080, h: 1920 },
 	{ id: "x", label: "X post", w: 1600, h: 900 },
 	{ id: "poster", label: "A4 poster", w: 1240, h: 1754 },
 ] as const;
@@ -85,7 +87,11 @@ export default function DesignPage() {
 	const history = useRef<{ stack: string[]; at: number; lock: boolean }>({ stack: [], at: -1, lock: false });
 	const fileInput = useRef<HTMLInputElement>(null);
 
-	const [size, setSize] = useState<(typeof SIZES)[number]>(SIZES[0]);
+	const [size, setSize] = useState<(typeof SIZES)[number]>(() => {
+		if (typeof window === "undefined") return SIZES[0];
+		const want = new URLSearchParams(window.location.search).get("size");
+		return SIZES.find((x) => x.id === want) ?? SIZES[0];
+	});
 	const [panel, setPanel] = useState<Panel | null>("templates");
 	const [scale, setScale] = useState(0.5);
 	const [selected, setSelected] = useState<FabricObject | null>(null);

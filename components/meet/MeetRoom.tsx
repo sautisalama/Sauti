@@ -49,6 +49,8 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded }: 
 	const [companion, setCompanion] = useState(false);
 	const [speakerOn, setSpeakerOn] = useState(true);
 
+	const camOnRef = useRef(mode === "video");
+	const micOnRef = useRef(true);
 	const myId = useRef(`${Math.random().toString(36).slice(2, 10)}${Date.now().toString(36)}`);
 	const local = useRef<MediaStream | null>(null);
 	const preview = useRef<MediaStream | null>(null);
@@ -86,12 +88,14 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded }: 
 			try {
 				const stream = await navigator.mediaDevices.getUserMedia({
 					audio: micId ? { deviceId: { exact: micId } } : true,
-					video: mode === "video" && camOn ? (camId ? { deviceId: { exact: camId } } : true) : false,
+					video: mode === "video" ? (camId ? { deviceId: { exact: camId } } : true) : false,
 				});
 				if (cancelled) { stream.getTracks().forEach((t) => t.stop()); return; }
 				preview.current = stream;
 				setPermission("granted");
-				if (previewVideo.current) previewVideo.current.srcObject = stream;
+				if (previewVideo.current && previewVideo.current.srcObject !== stream) previewVideo.current.srcObject = stream;
+				stream.getVideoTracks().forEach((t) => (t.enabled = camOnRef.current));
+				stream.getAudioTracks().forEach((t) => (t.enabled = micOnRef.current));
 
 				const all = await navigator.mediaDevices.enumerateDevices();
 				const pick = (kind: MediaDeviceKind) => all.filter((d) => d.kind === kind && d.deviceId).map((d, i) => ({ id: d.deviceId, label: d.label || `${kind === "videoinput" ? "Camera" : kind === "audioinput" ? "Microphone" : "Speaker"} ${i + 1}` }));
@@ -104,20 +108,33 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded }: 
 				an.fftSize = 256;
 				src.connect(an);
 				const buf = new Uint8Array(an.frequencyBinCount);
-				const tick = () => {
-					an.getByteFrequencyData(buf);
-					setLevel(Math.min(1, buf.reduce((a, b) => a + b, 0) / buf.length / 90));
+				// The meter updates a few times a second, not every frame, so the preview is not redrawn constantly.
+				let last = 0;
+				const tick = (t: number) => {
+					if (t - last > 120) {
+						last = t;
+						an.getByteFrequencyData(buf);
+						const v = Math.round(Math.min(1, buf.reduce((a, b) => a + b, 0) / buf.length / 90) * 20) / 20;
+						setLevel((cur) => (cur === v ? cur : v));
+					}
 					raf = requestAnimationFrame(tick);
 				};
-				tick();
+				raf = requestAnimationFrame(tick);
 			} catch {
 				if (!cancelled) setPermission("denied");
 			}
 		})();
 		return () => { cancelled = true; cancelAnimationFrame(raf); ctx?.close().catch(() => undefined); };
 		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [joined, camId, micId, camOn, mode]);
-	useEffect(() => { if (previewVideo.current && preview.current) previewVideo.current.srcObject = preview.current; });
+	}, [joined, camId, micId, mode]);
+
+	// Turning the camera or microphone on and off only flips the track: the stream is not fetched again.
+	useEffect(() => {
+		camOnRef.current = camOn;
+		micOnRef.current = micOn;
+		preview.current?.getVideoTracks().forEach((t) => (t.enabled = camOn));
+		preview.current?.getAudioTracks().forEach((t) => (t.enabled = micOn));
+	}, [camOn, micOn]);
 
 	/* ------------------------------------------------------------ connections */
 
@@ -320,7 +337,7 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded }: 
 			<main className={cn("mx-auto grid max-w-4xl gap-6 px-5", embedded ? "min-h-full content-start py-4 md:grid-cols-1" : "min-h-dvh content-center py-8 md:grid-cols-[1.2fr_1fr]")}>
 				<div>
 					<div className="relative aspect-video overflow-hidden rounded-2xl bg-[#202020]">
-						<video ref={previewVideo} autoPlay playsInline muted className={cn("h-full w-full -scale-x-100 object-cover", (!camOn || mode === "voice" || permission !== "granted") && "hidden")} />
+						<video ref={previewVideo} autoPlay playsInline muted className={cn("h-full w-full -scale-x-100 object-cover", (!camOn || mode === "voice" || permission !== "granted") && "invisible absolute")} />
 						{(!camOn || mode === "voice" || permission !== "granted") && (
 							<div className="flex h-full items-center justify-center text-center text-sm text-white/70">
 								{permission === "denied" ? "Allow the camera and microphone in your browser to be seen and heard. You can still listen." : mode === "voice" ? "Voice call" : "Camera is off"}
@@ -338,7 +355,8 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded }: 
 
 				<div className="space-y-4">
 					<div>
-						<p className="text-sm font-medium text-[#787774]">Sauti Salama</p>
+						{canSave && <a href="/dashboard/mjengo/calendar" className="mb-2 inline-flex items-center gap-1 text-xs font-medium text-[#787774] hover:text-[#37352f]">&larr; Back to the suite</a>}
+					<p className="text-sm font-medium text-[#787774]">Sauti Salama</p>
 						<h1 className="mt-1 text-2xl font-semibold text-[#37352f]">{title || (mode === "voice" ? "Voice call" : "Video call")}</h1>
 					</div>
 					<label className="block"><span className="mb-1.5 block text-sm font-medium text-[#37352f]">Your name</span>
