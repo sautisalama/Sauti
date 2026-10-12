@@ -5,6 +5,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { QRCodeSVG } from "qrcode.react";
 import { Loader2, Search, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { FONT_OPTIONS, ensureFont } from "@/lib/mjengo/fonts";
@@ -246,5 +247,32 @@ export function UploadsPanel({ onPick, onUploadClick, assets }: { onPick: (url: 
 				)}
 			</div>
 		</div>
+	);
+}
+
+/** A font list where every name is drawn in its own typeface, so what you see is what you get. */
+export function FontPicker({ value, onChange }: { value: string; onChange: (family: string) => void }) {
+	const [open, setOpen] = useState(false);
+	useEffect(() => { if (open) FONT_OPTIONS.slice(0, 24).forEach((f) => void ensureFont(f.family)); }, [open]);
+	return (
+		<Popover open={open} onOpenChange={setOpen}>
+			<PopoverTrigger asChild>
+				<button aria-label="Font" className="flex h-8 min-w-[9rem] items-center justify-between gap-2 rounded-md border border-serene-neutral-200 bg-white px-2.5 text-sm hover:bg-serene-neutral-50" style={{ fontFamily: `"${value}", sans-serif` }}>
+					<span className="truncate">{value}</span>
+					<span className="text-xs text-serene-neutral-400">▾</span>
+				</button>
+			</PopoverTrigger>
+			<PopoverContent align="start" className="w-64 p-1">
+				<ul className="max-h-72 overflow-y-auto">
+					{FONT_OPTIONS.map((f) => (
+						<li key={f.family}>
+							<button onMouseEnter={() => void ensureFont(f.family)} onClick={() => { onChange(f.family); setOpen(false); }} className={cn("flex w-full items-center justify-between rounded-md px-2.5 py-1.5 text-left text-[17px] hover:bg-serene-neutral-100", value === f.family && "bg-sauti-teal-light")} style={{ fontFamily: `"${f.family}", sans-serif` }}>
+								<span>{f.family}</span><span className="text-[10px] text-serene-neutral-400" style={{ fontFamily: "Inter, sans-serif" }}>{f.group}</span>
+							</button>
+						</li>
+					))}
+				</ul>
+			</PopoverContent>
+		</Popover>
 	);
 }

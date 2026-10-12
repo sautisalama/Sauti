@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import Link from "next/link";
-import { addDays, addMonths, eachDayOfInterval, endOfMonth, endOfWeek, format, isSameDay, isSameMonth, isToday, startOfMonth, startOfWeek } from "date-fns";
+import { addDays, addMonths, addWeeks, eachDayOfInterval, endOfMonth, endOfWeek, format, isSameDay, isSameMonth, isToday, startOfMonth, startOfWeek } from "date-fns";
 import { BellRing, CalendarDays, CalendarPlus, Plus, ChevronLeft, ChevronRight, Clock, ExternalLink, Eye, FileText, Flag, GraduationCap, Loader2, MapPin, Megaphone, PenLine, Phone, Plane, Presentation, Settings, Sparkles, Target, Trash2, UserRound, Users, Utensils, Video, Wallet, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,6 +16,7 @@ import { unwrap } from "@/lib/action-result";
 import { cn } from "@/lib/utils";
 import { calendarMonth, createCalendarEvent, eventIcons, removeCalendarEvent, type CalItem, type CalKind, type CalMonth } from "@/app/actions/mjengo-calendar";
 import { MjengoLoader } from "../_components/MjengoLoader";
+import { holidayOn } from "@/lib/mjengo/holidays-ke";
 import { Markdown } from "../_components/Markdown";
 import { meetingDetail, type MeetingDetail } from "@/app/actions/mjengo-meet";
 
@@ -36,7 +37,15 @@ const pad = (d: Date, t: string) => `${format(d, "yyyy-MM-dd")}T${t}`;
 
 export default function CalendarPage() {
 	const { toast } = useToast();
-	const [month, setMonth] = useState(() => startOfMonth(new Date()));
+	const [cursor, setCursor] = useState(() => new Date());
+	const month = useMemo(() => startOfMonth(cursor), [cursor]);
+	const setMonth = (f: Date | ((m: Date) => Date)) => setCursor((c) => startOfMonth(typeof f === "function" ? f(startOfMonth(c)) : f));
+	const [mode, setModeState] = useState<"month" | "week" | "day">("month");
+	useEffect(() => { try { const m = localStorage.getItem("ss_cal_mode"); if (m === "month" || m === "week" || m === "day") setModeState(m); } catch { /* default */ } }, []);
+	const setMode = (m: "month" | "week" | "day") => { setModeState(m); try { localStorage.setItem("ss_cal_mode", m); } catch { /* ignore */ } };
+	/** Previous or next: a month, a week or a day, whichever is showing. */
+	const step = (dir: 1 | -1) => setCursor((c) => (mode === "month" ? addMonths(c, dir) : mode === "week" ? addWeeks(c, dir) : addDays(c, dir)));
+	const weekDays = useMemo(() => { const st = startOfWeek(cursor, { weekStartsOn: 1 }); return Array.from({ length: 7 }, (_, i) => addDays(st, i)); }, [cursor]);
 	const [data, setData] = useState<CalMonth | null>(null);
 	const [create, setCreate] = useState<{ date: Date; from?: string; to?: string } | null>(null);
 	const [dayOpen, setDayOpen] = useState<Date | null>(null);
@@ -99,12 +108,20 @@ export default function CalendarPage() {
 	return (
 		<div className="mx-auto max-w-[1400px] space-y-3">
 			<div className="flex min-h-9 flex-nowrap items-center gap-1">
-				<h2 className="min-w-0 truncate pr-1 text-base font-semibold text-sauti-dark sm:text-lg">{format(month, mobile ? "MMMM" : "MMMM yyyy")}{mobile && <span className="ml-1 font-normal text-serene-neutral-500">{format(month, "yyyy")}</span>}</h2>
-				<Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" aria-label="Previous month" onClick={() => setMonth((m) => addMonths(m, -1))}><ChevronLeft className="h-4 w-4" /></Button>
-				<Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" aria-label="Next month" onClick={() => setMonth((m) => addMonths(m, 1))}><ChevronRight className="h-4 w-4" /></Button>
+				<h2 className="min-w-0 truncate pr-1 text-base font-semibold text-sauti-dark sm:text-lg">
+					{mode === "month" ? format(month, mobile ? "MMMM" : "MMMM yyyy") : mode === "week" ? `${format(weekDays[0], "d MMM")} to ${format(weekDays[6], "d MMM yyyy")}` : format(cursor, mobile ? "EEE d MMM" : "EEEE d MMMM yyyy")}
+					{mobile && mode === "month" && <span className="ml-1 font-normal text-serene-neutral-500">{format(month, "yyyy")}</span>}
+				</h2>
+				<Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" aria-label="Previous" onClick={() => step(-1)}><ChevronLeft className="h-4 w-4" /></Button>
+				<Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" aria-label="Next" onClick={() => step(1)}><ChevronRight className="h-4 w-4" /></Button>
 				{!data && <Loader2 className="h-4 w-4 shrink-0 animate-spin text-serene-neutral-400" />}
 				<span className="flex-1" />
-				<Button variant="outline" size="sm" className="h-8 shrink-0 px-3 text-xs" onClick={() => { setMonth(startOfMonth(new Date())); if (mobile) setDayOpen(new Date()); }}>Today</Button>
+				<div className="mr-1 inline-flex shrink-0 rounded-lg border border-serene-neutral-200 bg-white p-0.5" role="tablist" aria-label="Calendar view">
+					{([["month", "Month"], ["week", "Week"], ["day", "Day"]] as const).map(([m, l]) => (
+						<button key={m} role="tab" aria-selected={mode === m} onClick={() => setMode(m)} className={cn("rounded-md px-2.5 py-1 text-xs font-semibold", mode === m ? "bg-sauti-teal text-white" : "text-serene-neutral-600 hover:bg-serene-neutral-50")}>{l}</button>
+					))}
+				</div>
+				<Button variant="outline" size="sm" className="h-8 shrink-0 px-3 text-xs" onClick={() => { setCursor(new Date()); if (mobile) setDayOpen(new Date()); }}>Today</Button>
 				<Button asChild variant="ghost" size="icon" className="hidden h-8 w-8 shrink-0 sm:inline-flex" aria-label="Schedule content" title="Schedule content"><Link href="/dashboard/mjengo/design#schedule"><Megaphone className="h-4 w-4" /></Link></Button>
 				<Button asChild variant="ghost" size="icon" className="h-8 w-8 shrink-0" aria-label="Calendar settings" title="Calendar settings"><Link href="/dashboard/profile?section=calendar"><Settings className="h-4 w-4" /></Link></Button>
 				<Button size="sm" className="hidden h-8 shrink-0 gap-1.5 bg-sauti-teal px-3 text-xs hover:bg-sauti-dark sm:inline-flex" onClick={() => setCreate({ date: dayOpen ?? new Date() })}><CalendarPlus className="h-3.5 w-3.5" /> Create</Button>
@@ -118,7 +135,50 @@ export default function CalendarPage() {
 			{data?.googleError && <p className="rounded-xl bg-amber-50 px-4 py-2.5 text-sm text-amber-900">{data.googleError}</p>}
 
 			<div className="grid gap-4 lg:grid-cols-[1fr_280px]">
-				<div className="overflow-hidden rounded-2xl border border-serene-neutral-200/70 bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04)]">
+				{mode === "week" && (
+					<div className="overflow-hidden rounded-2xl border border-serene-neutral-200/70 bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04)]">
+						<div className="grid grid-cols-1 divide-y divide-serene-neutral-100 sm:grid-cols-7 sm:divide-x sm:divide-y-0">
+							{weekDays.map((d) => {
+								const list = onDay(d);
+								const hol = holidayOn(d);
+								return (
+									<div key={d.toISOString()} className={cn("min-h-[120px] p-2 sm:min-h-[420px]", hol && "bg-amber-50/60")}>
+										<button onClick={() => { setCursor(d); setMode("day"); }} className="mb-2 flex w-full items-center gap-2 text-left sm:flex-col sm:items-center sm:gap-0.5">
+											<span className="text-[11px] font-semibold uppercase tracking-wider text-serene-neutral-500">{format(d, "EEE")}</span>
+											<span className={cn("flex h-8 w-8 items-center justify-center rounded-full text-sm font-semibold", isToday(d) ? "bg-sauti-teal text-white" : "text-serene-neutral-800")}>{format(d, "d")}</span>
+											{hol && <span className="truncate text-[10px] font-medium text-amber-700">{hol}</span>}
+										</button>
+										<div className="space-y-1">
+											{list.map((i) => (
+												<button key={i.id} onClick={() => setView(i)} className={cn("flex w-full items-start gap-1 rounded-lg px-1.5 py-1 text-left text-[11px] font-medium leading-tight", KIND[i.kind].chip)}>
+													{i.kind === "post" && <Megaphone className="mt-0.5 h-3 w-3 shrink-0" />}
+													<span className="min-w-0"><span className="block truncate">{i.title}</span>{!i.allDay && <span className="block opacity-80">{timeOf(i.start)}</span>}</span>
+												</button>
+											))}
+											{list.length === 0 && <p className="hidden text-center text-[11px] text-serene-neutral-300 sm:block">Free</p>}
+										</div>
+									</div>
+								);
+							})}
+						</div>
+					</div>
+				)}
+				{mode === "day" && (
+					<div>
+						{holidayOn(cursor) && <p className="mb-2 rounded-xl bg-amber-50 px-3 py-2 text-sm font-medium text-amber-800">{holidayOn(cursor)}: a public holiday in Kenya</p>}
+						<DayPanel
+							day={cursor}
+							items={onDay(cursor).filter((i) => i.kind !== "post")}
+							posts={onDay(cursor).filter((i) => i.kind === "post")}
+							icons={icons}
+							smart={smart}
+							onClose={() => setMode("month")}
+							onSlot={(from, to) => setCreate({ date: cursor, from, to })}
+							onOpen={setView}
+						/>
+					</div>
+				)}
+				<div className={cn("overflow-hidden rounded-2xl border border-serene-neutral-200/70 bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04)]", mode !== "month" && "hidden")}>
 					<div className="grid grid-cols-7 border-b border-serene-neutral-100 text-center text-[11px] font-semibold uppercase tracking-wider text-serene-neutral-500">
 						{["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((d) => <div key={d} className="py-1.5 sm:py-2">{mobile ? d[0] : d}</div>)}
 					</div>
@@ -129,13 +189,16 @@ export default function CalendarPage() {
 								<div
 									key={d.toISOString()}
 									onClick={() => setDayOpen(d)}
-									className={cn("cursor-pointer border-serene-neutral-100 p-1 transition hover:bg-serene-neutral-50/70", mobile ? "border-t" : "border-b border-r", !isSameMonth(d, month) && !mobile && "bg-serene-neutral-50/50")}
+									className={cn("cursor-pointer border-serene-neutral-100 p-1 transition hover:bg-serene-neutral-50/70", mobile ? "border-t" : "border-b border-r", !isSameMonth(d, month) && !mobile && "bg-serene-neutral-50/50", holidayOn(d) && isSameMonth(d, month) && "bg-amber-50/60")}
 								>
-									<div className="mb-0.5 flex justify-center">
+									<div className="mb-0.5 flex items-center justify-center gap-1">
+										{!mobile && list.some((i) => i.kind === "post") && <Megaphone className="h-3 w-3 text-rose-500" aria-label="Content scheduled" />}
 										<span className={cn("flex h-7 w-7 items-center justify-center rounded-full text-xs", isToday(d) ? "bg-sauti-teal font-bold text-white" : mobile && dayOpen && isSameDay(d, dayOpen) ? "bg-sauti-teal-light font-bold text-sauti-teal ring-1 ring-sauti-teal" : isSameMonth(d, month) ? "text-serene-neutral-800" : "text-serene-neutral-300")}>{format(d, "d")}</span>
 									</div>
+									{holidayOn(d) && !mobile && <p className="mb-0.5 truncate px-1 text-center text-[10px] font-medium text-amber-700" title={holidayOn(d) ?? ""}>{holidayOn(d)}</p>}
 									{mobile ? (
 										<div className="flex justify-center gap-0.5">
+											{holidayOn(d) && <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />}
 											{list.slice(0, 3).map((i) => <span key={i.id} className={cn("h-1.5 w-1.5 rounded-full", KIND[i.kind].dot)} />)}
 										</div>
 									) : (
@@ -157,7 +220,7 @@ export default function CalendarPage() {
 				</div>
 
 				<aside className="space-y-4">
-					{dayOpen && (
+					{dayOpen && mode === "month" && (
 						<DayPanel
 							day={dayOpen}
 							items={onDay(dayOpen).filter((i) => i.kind !== "post")}

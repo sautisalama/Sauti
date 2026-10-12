@@ -21,7 +21,7 @@ import { TemplatePreview } from "@/components/design/TemplatePreview";
 import { inspireImage } from "@/app/actions/mjengo-inspire";
 import { InspirePanel } from "./_InspirePanel";
 import { splitIntoLayers, type LayerSplit } from "@/lib/client/split-layers";
-import { ElementsPanel, TextPanel, UploadsPanel, type ShapeKind, type TextPreset } from "./_Panels";
+import { ElementsPanel, FontPicker, TextPanel, UploadsPanel, type ShapeKind, type TextPreset } from "./_Panels";
 import { CONCEPTS, conceptTemplate, generateTemplate, templateFromId } from "@/lib/mjengo/design-generator";
 import { FONT_OPTIONS } from "@/lib/mjengo/fonts";
 import { PostThis } from "../../_components/PostThis";
@@ -543,7 +543,7 @@ function DesignEditor() {
 					{isText && (
 						<>
 							<span className="mx-1 h-5 w-px bg-black/10" />
-							<select value={o.fontFamily} onChange={(e) => void changeFont(e.target.value)} aria-label="Font" className="h-8 rounded-md border border-serene-neutral-200 bg-white px-2 text-sm">{FONTS.map((f) => <option key={f}>{f}</option>)}</select>
+							<FontPicker value={o.fontFamily ?? "Inter"} onChange={(f) => void changeFont(f)} />
 							<Input type="number" value={Math.round(o.fontSize ?? 40)} onChange={(e) => set({ fontSize: Number(e.target.value) })} aria-label="Size" className="h-8 w-20 text-sm" />
 							<button onClick={() => set({ fontWeight: o.fontWeight === "bold" ? "normal" : "bold" })} aria-pressed={o.fontWeight === "bold"} aria-label="Bold" className={cn("flex h-8 w-8 items-center justify-center rounded-md", o.fontWeight === "bold" ? "bg-sauti-teal-light" : "hover:bg-serene-neutral-100")}><Bold className="h-4 w-4" /></button>
 							<button onClick={() => set({ fontStyle: o.fontStyle === "italic" ? "normal" : "italic" })} aria-pressed={o.fontStyle === "italic"} aria-label="Italic" className={cn("flex h-8 w-8 items-center justify-center rounded-md", o.fontStyle === "italic" ? "bg-sauti-teal-light" : "hover:bg-serene-neutral-100")}><Italic className="h-4 w-4" /></button>
