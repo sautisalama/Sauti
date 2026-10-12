@@ -162,7 +162,7 @@ export default function FormEditorPage() {
 						</PopoverContent>
 					</Popover>
 					<span className="hidden shrink-0 px-1 text-xs text-[#9b9a97] sm:inline" aria-live="polite">{save === "saving" ? "Saving..." : save === "error" ? "Not saved" : "Saved"}</span>
-				<button onClick={() => setPreview(true)} aria-label="Preview" title="Preview" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-[#787774] hover:bg-black/5"><Eye className="h-[18px] w-[18px]" /></button>
+				<button onClick={() => { void saveForm(id, { title, description, questions, settings }).catch(() => undefined).finally(() => window.open(`/dashboard/mjengo/forms/${id}/preview`, "_blank")); }} aria-label="Preview" title="Preview" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-[#787774] hover:bg-black/5"><Eye className="h-[18px] w-[18px]" /></button>
 				<button onClick={() => setShare(true)} disabled={form.status === "draft"} aria-label="Share" title={form.status === "draft" ? "Publish first to share" : "Share"} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-[#787774] hover:bg-black/5 disabled:opacity-40"><Share2 className="h-[18px] w-[18px]" /></button>
 				<span className="mx-1 h-5 w-px shrink-0 bg-black/10" />
 				{form.status === "open" ? (

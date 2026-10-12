@@ -135,6 +135,7 @@ function DesignEditor() {
 	const [zoomMul, setZoomMul] = useState(1);
 	const zoomRef = useRef(1);
 	zoomRef.current = zoomMul;
+	const lastSel = useRef<FabricObject | null>(null);
 	const sizeRef = useRef(size);
 	sizeRef.current = size;
 	const [panel, setPanel] = useState<Panel | null>("templates");
@@ -197,6 +198,12 @@ function DesignEditor() {
 		c.on("selection:updated", onSel);
 		c.on("selection:cleared", () => setSelected(null));
 		c.on("object:modified", () => { snapshot(); setSaved(false); bump((n) => n + 1); });
+		// One tap on text that is already selected starts typing (the keyboard opens on a phone).
+		c.on("mouse:down", (e) => { lastSel.current = (e as { target?: FabricObject }).target === c.getActiveObject() ? c.getActiveObject() ?? null : null; });
+		c.on("mouse:up", (e) => {
+			const t = (e as { target?: FabricObject }).target as (Textbox & { isEditing?: boolean }) | undefined;
+			if (t && t.type === "textbox" && lastSel.current === t && !t.isEditing) { t.enterEditing(); t.hiddenTextarea?.focus(); c.requestRenderAll(); }
+		});
 		c.on("object:added", () => snapshot());
 		c.on("object:removed", () => snapshot());
 		if (!initialId) {

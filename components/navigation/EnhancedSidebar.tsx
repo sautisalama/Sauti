@@ -114,7 +114,7 @@ export function EnhancedSidebar({
 	const [casesCount, setCasesCount] = useState<number>(0);
 	const { roleContext, switchToAdmin, switchToUser } = useRoleSwitcher();
 	const isAdminMode = dash?.isAdminMode || false;
-	const onMjengo = !!pathname?.startsWith("/dashboard/mjengo");
+	const onMjengo = !!(pathname?.startsWith("/dashboard/mjengo") || pathname?.startsWith("/meet"));
 	const [mjengoSuper, setMjengoSuper] = useState(false);
 	const [suite, setSuite] = useState({ opportunities: 0, files: 0, notifications: 0, forms: 0, meetings: 0 });
 	const mailUnread = useMailUnread();
@@ -260,7 +260,7 @@ export function EnhancedSidebar({
 
 	const getSidebarItems = useCallback((): SidebarItem[] => {
 		const isDashboard = pathname?.startsWith("/dashboard");
-		const isAdminRoute = pathname?.startsWith("/dashboard/admin") || pathname?.startsWith("/dashboard/mjengo");
+		const isAdminRoute = pathname?.startsWith("/dashboard/admin") || (pathname?.startsWith("/dashboard/mjengo") || pathname?.startsWith("/meet"));
 
         // Onboarding State - Simplified Navigation
         if (needsOnboarding && isDashboard && !isAdminRoute) {
@@ -304,7 +304,7 @@ export function EnhancedSidebar({
 		}
 
 		// Mjengo suite: its own sections take the place of the platform options.
-		if (pathname?.startsWith("/dashboard/mjengo")) {
+		if ((pathname?.startsWith("/dashboard/mjengo") || pathname?.startsWith("/meet"))) {
 			const B = "/dashboard/mjengo";
 			const items: SidebarItem[] = [
 				{ id: "mj-overview", label: "Overview", icon: LayoutDashboard, href: B, section: "main", group: "", hint: "Summary of grants, opportunities and projects" },

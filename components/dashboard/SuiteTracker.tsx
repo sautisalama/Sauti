@@ -36,7 +36,7 @@ export function SuiteTracker() {
 	useEffect(() => {
 		if (!userId) return;
 		let mode: "app" | "admin" | "mjengo" = "app";
-		if (isAdmin && pathname.startsWith("/dashboard/mjengo")) mode = "mjengo";
+		if (isAdmin && (pathname.startsWith("/dashboard/mjengo") || pathname.startsWith("/meet"))) mode = "mjengo";
 		else if (isAdmin && pathname.startsWith("/dashboard/admin")) mode = "admin";
 		else {
 			try {

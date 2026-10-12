@@ -155,7 +155,9 @@ export async function updateSession(request: NextRequest) {
 				request.nextUrl.pathname === "/")
 		) {
 			const url = request.nextUrl.clone();
-			url.pathname = profile?.is_admin ? "/dashboard/admin" : "/dashboard";
+			// Everyone lands on the dashboard, unless this person last left an admin or Mjengo suite.
+			const last = request.cookies.get(`ss_suite_${user.id}`)?.value;
+			url.pathname = profile?.is_admin && last === "mjengo" ? "/dashboard/mjengo" : profile?.is_admin && last === "admin" ? "/dashboard/admin" : "/dashboard";
 			const redirectResponse = NextResponse.redirect(url);
 			
 			// Sync cookies here too
