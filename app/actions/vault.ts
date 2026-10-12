@@ -11,6 +11,7 @@ import {
 } from '@/lib/vault/access';
 
 import { driveToken, updateFileContent } from '@/lib/google-drive';
+import { sendAccessEmail } from '@/lib/mjengo/invite-email';
 
 const BUCKET = 'mjengo-docs';
 const MAX_BYTES = 50 * 1024 * 1024;
@@ -257,7 +258,7 @@ async function getAccess_(type: ResType, id: string): Promise<AccessView> {
 }
 
 /** Give, change or (level = null) remove one person's access. Share holders can grant view/share; only editors can grant edit. */
-async function setPermission_(type: ResType, id: string, userId: string, level: Level | null) {
+async function setPermission_(type: ResType, id: string, userId: string, level: Level | null, notify = true, note?: string) {
   const c = await ctx();
   const mine = need(c, type, id, 'share', 'change who has access');
   const node = type === 'file' ? c.ix.files.get(id) : c.ix.folders.get(id);
@@ -267,6 +268,7 @@ async function setPermission_(type: ResType, id: string, userId: string, level: 
   const { data: target } = await looseAdmin().from('profiles').select('email, is_admin').eq('id', userId).maybeSingle();
   if (!target?.is_admin) throw new Error('Only Mjengo administrators can be given access.');
   const db = looseAdmin();
+  const before = c.ix.perms.find((p) => p.user_id === userId && p.resource_type === type && p.resource_id === id)?.level ?? null;
   if (level) await db.from('vault_permissions').upsert({ resource_type: type, resource_id: id, user_id: userId, level, granted_by: c.actor.id }, { onConflict: 'resource_type,resource_id,user_id' });
   else {
     const existing = c.ix.perms.find((p) => p.user_id === userId && p.resource_type === type && p.resource_id === id);
@@ -274,6 +276,18 @@ async function setPermission_(type: ResType, id: string, userId: string, level: 
     await db.from('vault_permissions').delete().eq('resource_type', type).eq('resource_id', id).eq('user_id', userId);
   }
   await logAudit({ actorId: c.actor.id, actorEmail: c.actor.email, action: level ? 'vault.shared' : 'vault.unshared', targetType: `vault_${type}`, targetId: id, targetLabel: node.name, details: { with: target.email, level } });
+  // Like Google: the person is told when they are added, when their access changes and when it is taken away.
+  if (notify && target.email && before !== level) {
+    const LABEL: Record<Level, string> = { view: 'can view', share: 'can view and share', edit: 'can edit' };
+    const isDoc = type === 'file' && /\.(docx?|odt|rtf)$/i.test(node.name);
+    const path = type === 'folder' ? `/dashboard/mjengo/vault?folder=${id}` : isDoc ? `/dashboard/mjengo/documents/editor?file=${id}` : `/dashboard/mjengo/vault`;
+    void sendAccessEmail({
+      kind: type === 'folder' ? 'folder' : isDoc ? 'document' : 'file',
+      to: [target.email], by: c.actor.name, title: node.name, url: path, note,
+      detail: level ? `You ${LABEL[level]}.` : undefined,
+      headline: !level ? `${c.actor.name} removed your access` : before ? `${c.actor.name} changed your access: you ${LABEL[level]}` : undefined,
+    });
+  }
 }
 
 async function setGeneralAccess_(type: ResType, id: string, general: General) {

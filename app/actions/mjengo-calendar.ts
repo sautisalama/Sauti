@@ -1,5 +1,6 @@
 'use server';
 
+import { sendAccessEmail } from '@/lib/mjengo/invite-email';
 import { randomBytes } from 'node:crypto';
 import { google } from 'googleapis';
 import { looseAdmin } from '@/lib/loose-db';
@@ -174,6 +175,12 @@ async function create_(v: NewEvent): Promise<CalItem> {
   }).select('id, title, description, location, starts_at, ends_at, all_day, kind, meeting_code, attendees').single();
   if (error || !data) throw new Error('Could not save the event.');
   await logAudit({ actorId: a.id, actorEmail: a.email, action: 'calendar.event_created', targetType: 'event', targetId: data.id, targetLabel: title });
+  // Guests are always emailed. When Google sent the invitation itself the app does not send a second one.
+  if (!googleId && attendees.length && !v.block) {
+    const when = start.toLocaleString('en-GB', { dateStyle: 'full', timeStyle: 'short', timeZone: 'Africa/Nairobi' });
+    void sendAccessEmail({ kind: code ? 'meeting' : 'event', to: attendees.filter((e) => e !== a.email), by: a.name, title, url: code ? `/meet/${code}` : '/dashboard/mjengo/calendar', detail: when, headline: undefined, note: v.description?.trim().slice(0, 600) || undefined });
+  }
+  if (code && attendees.length) await db.from('mjengo_meetings').update({ invitees: attendees }).eq('code', code);
   return { id: `ev:${data.id}`, title: data.title, start: data.starts_at, end: data.ends_at, allDay: data.all_day, kind: data.kind, meetingCode: data.meeting_code, location: data.location, description: data.description, attendees: data.attendees, removable: true };
 }
 

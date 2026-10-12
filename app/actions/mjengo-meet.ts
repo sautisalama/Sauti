@@ -5,6 +5,7 @@ import { looseAdmin } from '@/lib/loose-db';
 import { guard } from '@/lib/action-result';
 import { logAudit } from '@/lib/access/audit';
 import { requireAdminActor } from '@/lib/access/super-admin';
+import { sendAccessEmail } from '@/lib/mjengo/invite-email';
 
 export interface TranscriptLine { id: string; name: string; text: string; at: string }
 export interface MeetingRow { id: string; code: string; title: string | null; mode: 'video' | 'voice'; created_at: string; ended_at: string | null; created_by: string | null; lines: number; hasNotes?: boolean; recordingFileId?: string | null }
@@ -134,6 +135,8 @@ async function savePlan_(code: string, plan: { title?: string | null; descriptio
     .filter((r) => /^https?:\/\//i.test(r.url) || r.url.startsWith('/'))
     .map((r) => ({ ...r, label: r.label || r.url }))
     .slice(0, 20);
+  const { data: prev } = await looseAdmin().from('mjengo_meetings').select('invitees, title').eq('code', code).maybeSingle();
+  const had = new Set(((prev?.invitees ?? []) as string[]).map((x) => x.toLowerCase()));
   const { error } = await looseAdmin().from('mjengo_meetings').update({
     description: plan.description.trim().slice(0, 4000) || null,
     invitees,
@@ -142,6 +145,11 @@ async function savePlan_(code: string, plan: { title?: string | null; descriptio
   }).eq('code', code);
   if (error) throw new Error('Could not save the meeting details.');
   await logAudit({ actorId: a.id, actorEmail: a.email, action: 'meeting.planned', targetType: 'meeting', targetLabel: code });
+  // Everyone newly added is emailed the link, as Google does.
+  const fresh = invitees.filter((e) => !had.has(e) && e !== a.email);
+  if (fresh.length) {
+    void sendAccessEmail({ kind: 'meeting', to: fresh, by: a.name, title: plan.title?.trim() || prev?.title || 'Meeting', url: `/meet/${code}`, note: plan.description.trim().slice(0, 600) || undefined, detail: `Join with the code ${code}` });
+  }
   return getPlan_(code);
 }
 
