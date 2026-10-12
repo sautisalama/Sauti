@@ -5,7 +5,7 @@ import { guard } from '@/lib/action-result';
 import { logAudit } from '@/lib/access/audit';
 import { requireAdminActor } from '@/lib/access/super-admin';
 
-import { CHANNELS, type Channel, type Variant } from '@/lib/mjengo/channels';
+import { CHANNELS, CHANNEL_INFO, type Channel, type Variant } from '@/lib/mjengo/channels';
 import { availableProviders } from '@/lib/mjengo/channel-oauth';
 import { publishPost, type PostForPublish } from '@/lib/mjengo/publishers';
 
@@ -66,7 +66,8 @@ function normalise(v: PostInput) {
     if (!x) continue;
     const vb = (x.body ?? '').trim().slice(0, 10000);
     const tags = (x.hashtags ?? []).map((t) => t.trim().replace(/^#+/, '')).filter(Boolean).slice(0, 30);
-    if (vb || tags.length) variants[c] = { ...(vb ? { body: vb } : {}), ...(tags.length ? { hashtags: tags } : {}) };
+    const mentions = (x.mentions ?? []).map((m) => m.trim().replace(/^@+/, '')).filter((m) => /^[A-Za-z0-9._-]{1,60}$/.test(m)).slice(0, 20);
+    if (vb || tags.length || mentions.length) variants[c] = { ...(vb ? { body: vb } : {}), ...(tags.length ? { hashtags: tags } : {}), ...(mentions.length ? { mentions } : {}) };
   }
   let link: string | null = null;
   if (v.linkUrl?.trim()) {
@@ -152,7 +153,59 @@ async function caption_(about: string, channels: Channel[]): Promise<string> {
   return (j.choices?.[0]?.message?.content ?? '').replace(/\s*[\u2013\u2014]\s*/g, ', ').trim();
 }
 
+export interface SocialTag { id: string; channel: Channel; kind: 'mention' | 'hashtag'; value: string; label: string | null; auto: boolean }
+
+async function tags_(): Promise<SocialTag[]> {
+  await requireAdminActor();
+  const { data } = await looseAdmin().from('mjengo_social_tags').select('id, channel, kind, value, label, auto').order('kind').order('value');
+  return (data ?? []) as SocialTag[];
+}
+
+async function saveTag_(v: { channel: Channel; kind: 'mention' | 'hashtag'; value: string; label?: string | null; auto?: boolean }, id?: string | null): Promise<SocialTag> {
+  const a = await requireAdminActor();
+  if (!CHANNELS.includes(v.channel)) throw new Error('Unknown network.');
+  const value = v.value.trim().replace(/^[#@]+/, '').replace(/\s+/g, '');
+  if (!/^[A-Za-z0-9._-]{1,60}$/.test(value)) throw new Error('Use letters, numbers, dots, dashes or underscores.');
+  const row = { channel: v.channel, kind: v.kind === 'hashtag' ? 'hashtag' : 'mention', value, label: v.label?.trim().slice(0, 60) || null, auto: !!v.auto };
+  const db = looseAdmin();
+  const q = id ? db.from('mjengo_social_tags').update(row).eq('id', id) : db.from('mjengo_social_tags').upsert({ ...row, created_by: a.id }, { onConflict: 'channel,kind,value' });
+  const { data, error } = await q.select('id, channel, kind, value, label, auto').single();
+  if (error || !data) throw new Error('Could not save that.');
+  return data as SocialTag;
+}
+
+async function deleteTag_(id: string) {
+  await requireAdminActor();
+  await looseAdmin().from('mjengo_social_tags').delete().eq('id', id);
+}
+
+/** Rewrite the shared text in the voice and shape of one network, keeping the facts. */
+async function adapt_(text: string, channel: Channel): Promise<string> {
+  await requireAdminActor();
+  const info = CHANNEL_INFO[channel];
+  const { askAi } = await import('@/lib/mjengo/ai');
+  const rules: Record<Channel, string> = {
+    linkedin: 'Professional but human. A hook in the first line, short paragraphs, a closing line that invites a reply. No hashtags (they are added separately).',
+    x: `One tight post under 260 characters. Direct, no filler. No hashtags.`,
+    facebook: 'Warm and conversational, a question at the end. No hashtags.',
+    instagram: 'Caption for a picture post: friendly, a short first line that stands alone, line breaks, a call to action. Do not include a link. No hashtags.',
+    tiktok: 'A short caption of one or two lines, energetic and simple. No hashtags.',
+    website: 'A clear short article intro with a headline on the first line.',
+  };
+  const out = await askAi(
+    `You adapt posts for ${info.label}. ${rules[channel]} Keep every fact, name and date exactly. Never add details about survivors. Reply with only the text.`,
+    text.slice(0, 4000),
+    600,
+    { temperature: 0.6 }
+  );
+  return out.slice(0, info.limit);
+}
+
 export const suggestCaption = guard(caption_);
+export const listSocialTags = guard(tags_);
+export const saveSocialTag = guard(saveTag_);
+export const deleteSocialTag = guard(deleteTag_);
+export const adaptForChannel = guard(adapt_);
 export const channelsState = guard(channels_);
 export const disconnectChannel = guard(disconnect_);
 export const publishPostNow = guard(publishNow_);

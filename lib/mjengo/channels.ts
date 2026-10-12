@@ -14,13 +14,15 @@ export const CHANNEL_INFO: Record<Channel, { label: string; limit: number; needs
   website: { label: 'Website', limit: 10000, needsImage: false, color: '#068297', composeUrl: () => '/dashboard/admin/blogs' },
 };
 
-export interface Variant { body?: string; hashtags?: string[] }
+export interface Variant { body?: string; hashtags?: string[]; mentions?: string[] }
 
 /** What goes out on one channel: its own wording or the shared text, hashtags, and the link with tracking. */
 export function textFor(post: { body: string; variants: Partial<Record<Channel, Variant>>; link_url: string | null; title: string | null }, channel: Channel): string {
   const v = post.variants?.[channel];
   let text = (v?.body?.trim() || post.body).trim();
   const tags = (v?.hashtags ?? []).map((t) => t.trim().replace(/^#*/, '#').replace(/\s+/g, '')).filter((t) => t.length > 1);
+  const people = (v?.mentions ?? []).map((m) => m.trim().replace(/^@*/, '@').replace(/\s+/g, '')).filter((m) => m.length > 1);
+  if (people.length) text += `\n\n${people.join(' ')}`;
   if (tags.length) text += `\n\n${tags.join(' ')}`;
   if (post.link_url) text += `\n\n${withUtm(post.link_url, channel, post.title)}`;
   return text;
@@ -59,3 +61,14 @@ export function aspectProblem(channel: Channel, w: number, h: number): string | 
   if (channel === 'tiktok' && r > 0.7) return `TikTok photos look best at ${a.recommended}; this one will have bars.`;
   return null;
 }
+
+
+/** What works on each network, shown beside the wording for it. */
+export const PLATFORM_TIPS: Record<Channel, string[]> = {
+  linkedin: ['Open with one clear line: the first two lines are all people see before "see more".', 'Three to five hashtags at the end; tag partners and funders with their company page.', 'Short paragraphs, one idea each. A picture or document gets more attention than a bare link.'],
+  x: ['280 characters, including the link. One or two hashtags at most.', 'Lead with the point. Questions and short threads travel further.', 'Tag the account you are talking about, not a list.'],
+  facebook: ['Conversational and warm. Questions invite comments.', 'Add the link as the last line; a picture or short video lifts reach.', 'Tag the partner page so it shows on their page too.'],
+  instagram: ['The picture does the work; the caption supports it. The first line shows before "more".', 'Up to 30 hashtags, but five to ten that are specific do best. Tag in the picture and the caption.', 'Links in captions are not clickable: say "link in bio".'],
+  tiktok: ['A strong first second. Text on screen helps people watching without sound.', 'Short caption, three or four hashtags, one trending sound if it fits.', 'Vertical 9:16 only.'],
+  website: ['A clear headline and a short summary come first.', 'Use headings and short paragraphs; add a picture with a description.'],
+};
