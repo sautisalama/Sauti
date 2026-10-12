@@ -314,7 +314,6 @@ export function EnhancedSidebar({
 				{ id: "mj-contacts", group: "Communicate", label: "Contacts", icon: Users, href: `${B}/contacts`, section: "main", hint: "Your team's contact book" },
 				{ id: "mj-meet", group: "Communicate", label: "Meet", icon: Video, href: "/meet", section: "main", hint: "Start, schedule and join calls" },
 				{ id: "mj-calendar", group: "Communicate", label: "Calendar", icon: CalendarClock, href: `${B}/calendar`, section: "main", hint: "Month view, events and meetings" },
-				...(suite.meetings > 0 ? ([{ id: "mj-meetings", group: "Communicate", label: "Call notes", icon: Video, href: `${B}/meetings`, section: "main", hint: "Transcripts and notes from your calls" }] as SidebarItem[]) : []),
 				{ id: "mj-files", group: "Files", label: "Files", icon: HardDrive, href: `${B}/vault`, section: "main", hint: "Documents, PDFs, sheets and folders, shared and kept in step with Google Drive", badge: suite.files || undefined },
 				{ id: "mj-grants", group: "Work", label: "Grants", icon: Briefcase, href: `${B}/grants`, section: "main", hint: "Track grant applications and deadlines" },
 				{ id: "mj-opps", group: "Work", label: "Opportunities", icon: Lightbulb, href: `${B}/opportunities`, section: "main", hint: "Funding and partnership leads", badge: counts.opportunities || undefined },

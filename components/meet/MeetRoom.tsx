@@ -2,7 +2,11 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { format } from "date-fns";
-import { Accessibility, Captions, ExternalLink, MoreVertical, ShieldCheck, UserPlus, Check, Copy, Hand, Info, Loader2, Mail, MessageSquareText, Mic, MicOff, Minimize2, MonitorUp, PictureInPicture2, PhoneOff, SmartphoneNfc, Users, Video, VideoOff, Volume2, X } from "lucide-react";
+import { MeetRecorder } from "@/lib/client/meet-recorder";
+import { putToSignedUrl } from "@/lib/client/upload";
+import { prepareUpload, registerUpload } from "@/app/dashboard/mjengo/vault/api";
+import { attachRecording } from "@/app/actions/mjengo-meet";
+import { Accessibility, Captions, Circle, ExternalLink, MoreVertical, ShieldCheck, UserPlus, Check, Copy, Hand, Info, Loader2, Mail, MessageSquareText, Mic, MicOff, Minimize2, MonitorUp, PictureInPicture2, PhoneOff, SmartphoneNfc, Users, Video, VideoOff, Volume2, X } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import { unwrap } from "@/lib/action-result";
 import { saveTranscript, type TranscriptLine } from "@/app/actions/mjengo-meet";
@@ -36,6 +40,12 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 	const [a11yOpen, setA11yOpen] = useState(false);
 	const [moreOpen, setMoreOpen] = useState(false);
 	const [left, setLeft] = useState(false);
+	const [recording, setRecording] = useState(false);
+	const [recBy, setRecBy] = useState<string | null>(null);
+	const [recSecs, setRecSecs] = useState(0);
+	const [saving, setSaving] = useState(false);
+	const recorder = useRef<MeetRecorder | null>(null);
+	const remotesRef = useRef<Remote[]>([]);
 	const [readyOpen, setReadyOpen] = useState(false);
 	const [secs, setSecs] = useState(60);
 	const [a11y, setA11yState] = useState<{ size: "md" | "lg" | "xl"; contrast: boolean; reduceMotion: boolean }>({ size: "md", contrast: false, reduceMotion: false });
@@ -76,6 +86,8 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 	const linesRef = useRef<TranscriptLine[]>([]);
 	linesRef.current = lines;
 
+	remotesRef.current = remotes;
+
 	const link = typeof window === "undefined" ? "" : `${window.location.origin}/meet/${code}`;
 	const shownName = companion ? `${name} (phone)` : name;
 
@@ -92,7 +104,7 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 
 	const stopPreview = () => { preview.current?.getTracks().forEach((t) => t.stop()); preview.current = null; };
 	useEffect(() => {
-		if (joined) return;
+		if (joined || left) return;
 		let cancelled = false;
 		let ctx: AudioContext | null = null;
 		let raf = 0;
@@ -139,7 +151,7 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 		})();
 		return () => { cancelled = true; cancelAnimationFrame(raf); ctx?.close().catch(() => undefined); };
 		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [joined, camId, micId, mode]);
+	}, [joined, left, camId, micId, mode]);
 
 	// Turning the camera or microphone on and off only flips the track: the stream is not fetched again.
 	useEffect(() => {
@@ -213,6 +225,7 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 		channel.current = ch;
 		ch.on("broadcast", { event: "signal" }, ({ payload }) => onSignal(payload))
 			.on("broadcast", { event: "caption" }, ({ payload }) => addLine(payload as TranscriptLine))
+			.on("broadcast", { event: "rec" }, ({ payload }) => setRecBy(payload.on ? String(payload.by ?? "Someone") : null))
 			.on("broadcast", { event: "state" }, ({ payload }) => setRemote(payload.id, { muted: !!payload.muted, sharing: !!payload.sharing, hand: !!payload.hand }))
 			.on("presence", { event: "join" }, ({ key, newPresences }) => {
 				if (key === myId.current) return;
@@ -340,18 +353,76 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 		return () => clearTimeout(t);
 	}, [left, secs, home]);
 
+	/** Finish the recording: keep it in Files and attach it to this meeting. */
+	const stopRecording = useCallback(async () => {
+		const r = recorder.current;
+		if (!r) return;
+		recorder.current = null;
+		setRecording(false);
+		send("rec", { on: false, by: name });
+		setSaving(true);
+		try {
+			const blob = await r.stop();
+			if (blob.size < 2000) throw new Error("Nothing was recorded.");
+			const label = (title || code).replace(/[\\/:*?"<>|]+/g, " ").trim();
+			const file = `Recording ${label} ${format(new Date(), "yyyy-MM-dd HHmm")}.webm`;
+			try {
+				const { path, signedUrl } = await prepareUpload(null, file, blob.size);
+				await putToSignedUrl(signedUrl, new File([blob], file, { type: blob.type }));
+				const created = await registerUpload(null, path, file, blob.size, blob.type || "video/webm");
+				await unwrap(attachRecording(code, created.id));
+			} catch {
+				// Could not reach Files: hand the recording over so it is not lost.
+				const url = URL.createObjectURL(blob);
+				const a = document.createElement("a");
+				a.href = url; a.download = file; a.click();
+				setTimeout(() => URL.revokeObjectURL(url), 30_000);
+			}
+		} catch {
+			/* nothing to keep */
+		} finally {
+			setSaving(false);
+		}
+	}, [code, name, send, title]);
+
+	const startRecording = () => {
+		if (recorder.current || !canSave) return;
+		const r = new MeetRecorder({
+			title: title || code,
+			streams: () => [...(local.current ? [local.current] : []), ...remotesRef.current.flatMap((x) => (x.stream ? [x.stream] : []))],
+			videos: () => Array.from(document.querySelectorAll<HTMLVideoElement>("video[data-rec-video]")),
+		});
+		try { r.start(); } catch { return; }
+		recorder.current = r;
+		setRecording(true);
+		setRecSecs(0);
+		send("rec", { on: true, by: name || "Someone" });
+	};
+	useEffect(() => {
+		if (!recording) return;
+		const t = setInterval(() => setRecSecs((n) => n + 1), 1000);
+		return () => clearInterval(t);
+	}, [recording]);
+
 	const leave = useCallback(async () => {
+		// Everything that holds the camera, the microphone or the screen is let go first.
 		await persist(true);
+		if (recorder.current) await stopRecording();
+		stopPreview();
+		screenStream.current?.getTracks().forEach((t) => t.stop());
+		screenStream.current = null;
 		pcs.current.forEach((pc) => pc.close());
 		pcs.current.clear();
 		local.current?.getTracks().forEach((t) => t.stop());
+		local.current = null;
 		channel.current?.unsubscribe();
 		setJoined(false);
 		setRemotes([]);
 		setReadyOpen(false);
-		if (!embedded) { setSecs(60); setLeft(true); }
-		if (embedded) window.parent.postMessage({ type: "meet:left" }, window.location.origin);
-	}, [persist, embedded]);
+		if (embedded) { window.parent.postMessage({ type: "meet:left" }, window.location.origin); return; }
+		// Straight back to Meet: no second screen to dismiss, and no camera left on.
+		window.location.assign(home);
+	}, [persist, embedded, home, stopRecording]);
 
 	useEffect(() => () => {
 		stopPreview();
@@ -458,7 +529,7 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 
 	const selfTile = (
 		<div className="relative flex h-full min-h-[110px] w-full items-center justify-center overflow-hidden rounded-xl bg-[#1B232B] max-md:min-h-0">
-			<video ref={localVideo} autoPlay playsInline muted className={cn("h-full w-full object-cover", !sharing && "-scale-x-100", !(camOn || sharing) && "hidden")} />
+			<video ref={localVideo} data-rec-video="1" autoPlay playsInline muted className={cn("h-full w-full object-cover", !sharing && "-scale-x-100", !(camOn || sharing) && "hidden")} />
 			{!(camOn || sharing) && <span className="flex h-16 w-16 items-center justify-center rounded-full bg-sauti-teal text-xl font-medium">{initials(shownName)}</span>}
 			<span className="absolute bottom-2 left-3 flex items-center gap-1.5 text-sm font-medium text-white drop-shadow">{!micOn && <MicOff className="h-3.5 w-3.5" />}{shownName} (you)</span>
 			{handUp && <span className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-[#068297]"><Hand className="h-4 w-4" /></span>}
@@ -467,6 +538,12 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 
 	return (
 		<div className={cn("fixed inset-0 z-[100] flex h-dvh flex-col bg-[#0E1318] text-white", a11y.reduceMotion && "[&_*]:!transition-none [&_*]:!animate-none")}>
+			{(recording || recBy || saving) && (
+				<div role="status" className="absolute left-1/2 top-3 z-30 flex -translate-x-1/2 items-center gap-2 rounded-full bg-black/70 px-3.5 py-1.5 text-xs font-medium text-white backdrop-blur">
+					<span className={cn("h-2 w-2 rounded-full", saving ? "bg-amber-400" : "animate-pulse bg-[#ea4335]")} />
+					{saving ? "Saving the recording to Files" : recording ? `Recording ${String(Math.floor(recSecs / 60)).padStart(2, "0")}:${String(recSecs % 60).padStart(2, "0")}` : `${recBy} is recording this meeting`}
+				</div>
+			)}
 			<div className="hidden shrink-0 items-center gap-3 px-5 pt-3 text-base md:flex">
 				<span className="font-medium">{clock}</span>
 				<span className="text-white/40">|</span>
@@ -582,6 +659,7 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 							</div>
 						)}
 					</div>
+					{canSave && <Ctl onClick={() => (recording ? void stopRecording() : startRecording())} label={recording ? "Stop recording" : "Record the meeting"} icon={recording ? <span className="h-3.5 w-3.5 rounded-sm bg-white" /> : <Circle className="h-5 w-5 fill-[#ea4335] text-[#ea4335]" />} active={false} danger={recording} className="hidden md:flex" />}
 					<Ctl onClick={() => setMoreOpen(true)} label="More options" icon={<MoreVertical className="h-5 w-5" />} className="md:hidden" />
 					<Ctl onClick={pip} label="Picture in picture" icon={<PictureInPicture2 className="h-5 w-5" />} className="hidden md:flex" />
 					<button onClick={leave} aria-label="Leave call" title="Leave call" className="flex h-12 w-16 items-center justify-center rounded-full bg-[#ea4335] hover:bg-[#d93025]"><PhoneOff className="h-5 w-5" /></button>
@@ -614,6 +692,7 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 							[sharing ? "Stop presenting" : "Present screen", <MonitorUp key="p" className="h-5 w-5" />, () => { setMoreOpen(false); void toggleShare(); }, sharing],
 							[handUp ? "Lower hand" : "Raise hand", <Hand key="h" className="h-5 w-5" />, () => { toggleHand(); setMoreOpen(false); }, handUp],
 							[captionsOn ? "Turn off captions" : "Turn on captions", <Captions key="c" className="h-5 w-5" />, () => setCaptionsOn((v) => !v), captionsOn],
+							...(canSave ? [[recording ? "Stop recording" : "Record the meeting", <Circle key="rec" className="h-5 w-5 fill-[#ea4335] text-[#ea4335]" />, () => { setMoreOpen(false); if (recording) void stopRecording(); else startRecording(); }, recording]] : []),
 							["People", <Users key="u" className="h-5 w-5" />, () => { setPanel("people"); setMoreOpen(false); }, false],
 							["Meeting details", <Info key="i" className="h-5 w-5" />, () => { setPanel("info"); setMoreOpen(false); }, false],
 							["Transcript", <MessageSquareText key="t" className="h-5 w-5" />, () => { setPanel("transcript"); setMoreOpen(false); }, false],
@@ -645,7 +724,7 @@ function Ctl({ icon, label, onClick, active, danger, className, flat }: { icon: 
 function StreamVideo({ stream, className, muted }: { stream: MediaStream | null; className?: string; muted?: boolean }) {
 	const ref = useRef<HTMLVideoElement>(null);
 	useEffect(() => { if (ref.current && ref.current.srcObject !== stream) ref.current.srcObject = stream; }, [stream]);
-	return <video ref={ref} autoPlay playsInline muted={muted} className={className} />;
+	return <video ref={ref} data-rec-video="1" data-rec-stage="1" autoPlay playsInline muted={muted} className={className} />;
 }
 function ScreenPreview({ stream }: { stream: MediaStream | null }) {
 	return <StreamVideo stream={stream} muted className="h-full w-full object-contain" />;
@@ -663,7 +742,7 @@ function RemoteTile({ r, sinkId, audioOn }: { r: Remote; sinkId: string; audioOn
 	}, [sinkId]);
 	return (
 		<div className="relative flex min-h-[120px] items-center justify-center overflow-hidden rounded-2xl bg-[#2a2a2a]">
-			<video ref={ref} data-remote="1" autoPlay playsInline muted={!audioOn} className={cn("h-full w-full object-cover", !hasVideo && "invisible absolute")} />
+			<video ref={ref} data-remote="1" data-rec-video="1" autoPlay playsInline muted={!audioOn} className={cn("h-full w-full object-cover", !hasVideo && "invisible absolute")} />
 			{!hasVideo && <span className="flex h-16 w-16 items-center justify-center rounded-full bg-[#4b5563] text-xl font-semibold">{initials(r.name)}</span>}
 			{!r.stream && <Loader2 className="absolute right-3 top-3 h-4 w-4 animate-spin text-white/60" />}
 			<span className="absolute bottom-2 left-2 flex items-center gap-1.5 rounded-md bg-black/60 px-2 py-1 text-xs">{r.muted && <MicOff className="h-3 w-3" />}{r.name}</span>

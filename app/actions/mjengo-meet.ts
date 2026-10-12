@@ -7,7 +7,7 @@ import { logAudit } from '@/lib/access/audit';
 import { requireAdminActor } from '@/lib/access/super-admin';
 
 export interface TranscriptLine { id: string; name: string; text: string; at: string }
-export interface MeetingRow { id: string; code: string; title: string | null; mode: 'video' | 'voice'; created_at: string; ended_at: string | null; created_by: string | null; lines: number }
+export interface MeetingRow { id: string; code: string; title: string | null; mode: 'video' | 'voice'; created_at: string; ended_at: string | null; created_by: string | null; lines: number; hasNotes?: boolean; recordingFileId?: string | null }
 
 const alphabet = 'abcdefghjkmnpqrstuvwxyz23456789';
 function newCode(): string {
@@ -33,11 +33,19 @@ async function createMeeting_(mode: 'video' | 'voice', title: string | null): Pr
 
 async function listMeetings_(): Promise<MeetingRow[]> {
   await requireAdminActor();
-  const { data } = await looseAdmin().from('mjengo_meetings').select('id, code, title, mode, created_at, ended_at, created_by, transcript, notes').order('created_at', { ascending: false }).limit(60);
-  return ((data ?? []) as (Omit<MeetingRow, 'lines'> & { transcript: unknown[]; notes?: string | null })[])
-    .map(({ transcript, ...m }) => ({ ...m, lines: Array.isArray(transcript) ? transcript.length : 0 }))
-    // Only calls that were actually held and written down.
-    .filter((m) => m.lines > 0 || !!m.notes);
+  const { data } = await looseAdmin().from('mjengo_meetings').select('id, code, title, mode, created_at, ended_at, created_by, transcript, notes, recording_file_id').order('created_at', { ascending: false }).limit(80);
+  return ((data ?? []) as (Omit<MeetingRow, 'lines'> & { transcript: unknown[]; notes?: string | null; recording_file_id?: string | null })[])
+    .map(({ transcript, notes, recording_file_id, ...m }) => ({ ...m, lines: Array.isArray(transcript) ? transcript.length : 0, hasNotes: !!notes, recordingFileId: recording_file_id ?? null }))
+    // Only calls that were held: written down, noted or recorded.
+    .filter((m) => m.lines > 0 || m.hasNotes || !!m.recordingFileId);
+}
+
+/** A finished recording, kept in Files, belongs to its meeting. */
+async function attachRecording_(code: string, fileId: string): Promise<void> {
+  const a = await requireAdminActor();
+  const { error } = await looseAdmin().from('mjengo_meetings').update({ recording_file_id: fileId, recorded_at: new Date().toISOString(), recorded_by: a.id }).eq('code', code);
+  if (error) throw new Error('Could not attach the recording to the meeting.');
+  await logAudit({ actorId: a.id, actorEmail: a.email, action: 'meeting.recorded', targetType: 'meeting', targetLabel: code });
 }
 
 /** Keep what was said. Several people may save: lines are merged by id. */
@@ -64,10 +72,10 @@ export interface MeetingDetail extends MeetingRow { notes: string | null; transc
 
 async function meetingDetail_(code: string): Promise<MeetingDetail> {
   await requireAdminActor();
-  const { data } = await looseAdmin().from('mjengo_meetings').select('id, code, title, mode, created_at, ended_at, created_by, transcript, notes, notes_shared_at').eq('code', code).maybeSingle();
+  const { data } = await looseAdmin().from('mjengo_meetings').select('id, code, title, mode, created_at, ended_at, created_by, transcript, notes, notes_shared_at, recording_file_id').eq('code', code).maybeSingle();
   if (!data) throw new Error('That call does not exist.');
   const transcript = (data.transcript ?? []) as TranscriptLine[];
-  return { ...data, transcript, lines: transcript.length } as MeetingDetail;
+  return { ...data, transcript, lines: transcript.length, recordingFileId: (data as { recording_file_id?: string | null }).recording_file_id ?? null } as MeetingDetail;
 }
 
 /** Write (or rewrite) the notes now, and tell everyone who took part. */
@@ -137,6 +145,7 @@ async function savePlan_(code: string, plan: { title?: string | null; descriptio
   return getPlan_(code);
 }
 
+export const attachRecording = guard(attachRecording_);
 export const getMeetingPlan = guard(getPlan_);
 export const saveMeetingPlan = guard(savePlan_);
 export const meetHome = guard(meetHome_);

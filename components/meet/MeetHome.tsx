@@ -3,10 +3,10 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { addDays, endOfDay, format, isSameDay, startOfDay, startOfWeek } from "date-fns";
-import { CalendarClock, CalendarDays, ChevronLeft, ChevronRight, Keyboard, Link2, NotebookText, Video, Zap } from "lucide-react";
+import { CalendarClock, CalendarDays, ChevronLeft, ChevronRight, Clapperboard, History, Keyboard, Link2, NotebookText, Video, Zap } from "lucide-react";
 import { unwrap } from "@/lib/action-result";
 import { cn } from "@/lib/utils";
-import { meetHome, type MeetHomeItem } from "@/app/actions/mjengo-meet";
+import { listMeetings, meetHome, type MeetHomeItem, type MeetingRow } from "@/app/actions/mjengo-meet";
 import { MeetChooser } from "@/app/dashboard/mjengo/_components/MeetChooser";
 
 const CODE = /[a-z0-9]{3}-[a-z0-9]{4}-[a-z0-9]{3}/i;
@@ -16,10 +16,16 @@ export function MeetHome({ isAdmin }: { isAdmin: boolean }) {
 	const [day, setDay] = useState(() => startOfDay(new Date()));
 	const [items, setItems] = useState<MeetHomeItem[] | null>(null);
 	const [code, setCode] = useState("");
+	const [past, setPast] = useState<MeetingRow[] | null>(null);
 	const [chooser, setChooser] = useState<{ initial?: "now" | "later" | "calendar" } | null>(null);
 	const week = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(startOfWeek(day, { weekStartsOn: 1 }), i)), [day]);
 	const found = CODE.exec(code)?.[0]?.toLowerCase() ?? null;
 	const today = isSameDay(day, new Date());
+
+	useEffect(() => {
+		if (!isAdmin) return;
+		unwrap(listMeetings()).then(setPast).catch(() => setPast([]));
+	}, [isAdmin]);
 
 	useEffect(() => {
 		if (!isAdmin) return;
@@ -32,7 +38,7 @@ export function MeetHome({ isAdmin }: { isAdmin: boolean }) {
 	const join = () => { if (found) window.location.assign(`/meet/${found}`); };
 
 	return (
-		<div className="mx-auto max-w-6xl space-y-6 px-4 py-5 md:px-8">
+		<div className="mx-auto max-w-6xl space-y-6">
 			<section className="relative overflow-hidden rounded-2xl border border-serene-blue-100 bg-gradient-to-br from-serene-blue-50 via-white to-sauti-teal-light/40 p-6 sm:p-8">
 				<h1 className="text-2xl font-bold tracking-tight text-sauti-dark sm:text-3xl">Meet <span className="text-sauti-teal">Rooms</span></h1>
 				<p className="mt-1 max-w-xl text-sm text-serene-neutral-600">Calls that stay inside Sauti Salama. Start one, plan one, or join with a code. Call notes are kept for you afterwards.</p>
@@ -98,11 +104,30 @@ export function MeetHome({ isAdmin }: { isAdmin: boolean }) {
 			)}
 
 			{isAdmin && (
-				<Link href="/dashboard/mjengo/meetings" className="flex items-center gap-3 rounded-2xl border border-serene-neutral-200/70 bg-white p-4 text-sm shadow-[0_1px_2px_rgba(16,24,40,0.04)] transition hover:shadow-md">
-					<span className="flex h-10 w-10 items-center justify-center rounded-xl bg-serene-blue-50 text-sauti-teal"><NotebookText className="h-4 w-4" /></span>
-					<span className="flex-1"><span className="block font-semibold text-serene-neutral-900">Call notes</span><span className="block text-xs text-serene-neutral-500">Transcripts and summaries of calls that were held.</span></span>
-					<ChevronRight className="h-4 w-4 text-serene-neutral-400" />
-				</Link>
+				<section className="rounded-2xl border border-serene-neutral-200/70 bg-white p-4 shadow-[0_1px_2px_rgba(16,24,40,0.04)] sm:p-5">
+					<h2 className="mb-3 flex items-center gap-2 text-base font-bold text-sauti-dark"><History className="h-4 w-4 text-sauti-teal" /> Past meetings</h2>
+					{past === null ? (
+						<p className="py-6 text-center text-sm text-serene-neutral-500">Loading...</p>
+					) : past.length === 0 ? (
+						<p className="rounded-2xl border border-dashed border-serene-neutral-200 py-8 text-center text-sm text-serene-neutral-500">Meetings that were recorded or written down show up here, with their notes and recordings.</p>
+					) : (
+						<ul className="space-y-2">
+							{past.map((m) => (
+								<li key={m.id} className="flex flex-wrap items-center gap-3 rounded-xl border border-serene-neutral-200/70 p-3">
+									<span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-serene-blue-50 text-sauti-teal"><Video className="h-4 w-4" /></span>
+									<span className="min-w-0 flex-1">
+										<span className="block truncate text-sm font-semibold text-serene-neutral-900">{m.title || "Meeting"}</span>
+										<span className="block text-xs text-serene-neutral-500">{format(new Date(m.created_at), "EEE d MMM yyyy, h:mm a")}</span>
+									</span>
+									<span className="flex flex-wrap items-center gap-1.5">
+										{m.recordingFileId && <Link href={`/dashboard/mjengo/vault?open=${m.recordingFileId}`} className="flex items-center gap-1 rounded-full bg-rose-50 px-2.5 py-1 text-xs font-medium text-rose-700 hover:bg-rose-100"><Clapperboard className="h-3 w-3" /> Recording</Link>}
+										{(m.hasNotes || m.lines > 0) && <Link href={`/dashboard/mjengo/meetings?code=${m.code}`} className="flex items-center gap-1 rounded-full bg-sauti-teal-light px-2.5 py-1 text-xs font-medium text-sauti-dark hover:bg-sauti-teal-light/70"><NotebookText className="h-3 w-3" /> {m.hasNotes ? "Notes" : "Transcript"}</Link>}
+									</span>
+								</li>
+							))}
+						</ul>
+					)}
+				</section>
 			)}
 
 			{isAdmin && chooser && <MeetChooser open initial={chooser.initial} onClose={() => setChooser(null)} />}
