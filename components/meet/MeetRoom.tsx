@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { format } from "date-fns";
-import { Accessibility, Captions, Check, Copy, Hand, Info, Loader2, Mail, MessageSquareText, Mic, MicOff, Minimize2, MonitorUp, PictureInPicture2, PhoneOff, SmartphoneNfc, Users, Video, VideoOff, Volume2, X } from "lucide-react";
+import { Accessibility, Captions, MoreVertical, Check, Copy, Hand, Info, Loader2, Mail, MessageSquareText, Mic, MicOff, Minimize2, MonitorUp, PictureInPicture2, PhoneOff, SmartphoneNfc, Users, Video, VideoOff, Volume2, X } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import { unwrap } from "@/lib/action-result";
 import { saveTranscript, type TranscriptLine } from "@/app/actions/mjengo-meet";
@@ -34,6 +34,7 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded }: 
 	const [panel, setPanel] = useState<"none" | "transcript" | "people" | "info">("none");
 	const [handUp, setHandUp] = useState(false);
 	const [a11yOpen, setA11yOpen] = useState(false);
+	const [moreOpen, setMoreOpen] = useState(false);
 	const [a11y, setA11yState] = useState<{ size: "md" | "lg" | "xl"; contrast: boolean; reduceMotion: boolean }>({ size: "md", contrast: false, reduceMotion: false });
 	const setA11y = (v: typeof a11y) => { setA11yState(v); try { localStorage.setItem("ss_meet_a11y", JSON.stringify(v)); } catch { /* ignore */ } };
 	const screenStream = useRef<MediaStream | null>(null);
@@ -420,7 +421,7 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded }: 
 	const clock = format(new Date(), "h:mm a");
 
 	const selfTile = (
-		<div className="relative flex min-h-[110px] items-center justify-center overflow-hidden rounded-xl bg-[#3c4043]">
+		<div className="relative flex h-full min-h-[110px] w-full items-center justify-center overflow-hidden rounded-xl bg-[#3c4043] max-md:min-h-0">
 			<video ref={localVideo} autoPlay playsInline muted className={cn("h-full w-full object-cover", !sharing && "-scale-x-100", !(camOn || sharing) && "hidden")} />
 			{!(camOn || sharing) && <span className="flex h-16 w-16 items-center justify-center rounded-full bg-sauti-teal text-xl font-medium">{initials(shownName)}</span>}
 			<span className="absolute bottom-2 left-3 flex items-center gap-1.5 text-sm font-medium text-white drop-shadow">{!micOn && <MicOff className="h-3.5 w-3.5" />}{shownName} (you)</span>
@@ -430,8 +431,12 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded }: 
 
 	return (
 		<div className={cn("relative flex h-dvh flex-col bg-[#202124] text-white", a11y.reduceMotion && "[&_*]:!transition-none [&_*]:!animate-none")}>
+			<div className="pointer-events-none absolute inset-x-0 top-0 z-10 flex items-center gap-2 bg-gradient-to-b from-black/60 to-transparent px-4 pb-6 pt-[max(0.75rem,env(safe-area-inset-top))] text-sm md:hidden">
+				<span className="min-w-0 flex-1 truncate font-medium">{title || code}</span>
+				<span className="text-white/70">{clock}</span>
+			</div>
 			<div className="flex min-h-0 flex-1">
-				<div className="min-h-0 min-w-0 flex-1 p-3">
+				<div className="min-h-0 min-w-0 flex-1 p-3 max-md:p-1.5">
 					{presenter ? (
 						<div className="flex h-full min-h-0 flex-col gap-3 lg:flex-row">
 							<div className="relative min-h-0 flex-1 overflow-hidden rounded-xl bg-black">
@@ -454,15 +459,15 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded }: 
 							</div>
 						</div>
 					) : (
-						<div className={cn("grid h-full min-h-0 auto-rows-fr gap-3", cols)}>
-							{selfTile}
+						<div className={cn("grid h-full min-h-0 auto-rows-fr gap-3", cols, remotes.length > 0 && "max-md:grid-cols-1 max-md:gap-1.5")}>
+							<div className={cn("min-h-0", remotes.length > 0 && "max-md:fixed max-md:bottom-24 max-md:right-3 max-md:z-20 max-md:h-36 max-md:w-24 max-md:overflow-hidden max-md:rounded-xl max-md:shadow-xl max-md:ring-1 max-md:ring-white/20")}>{selfTile}</div>
 							{remotes.map((r) => <RemoteTile key={r.id} r={r} sinkId={speakerId} audioOn={speakerOn} />)}
 						</div>
 					)}
 				</div>
 
 				{panel !== "none" && !embedded && (
-					<aside className="m-3 ml-0 hidden w-80 shrink-0 flex-col overflow-hidden rounded-xl bg-white text-[#202124] md:flex">
+					<aside className="fixed inset-x-0 bottom-0 z-40 flex h-[70dvh] flex-col overflow-hidden rounded-t-2xl bg-white text-[#202124] shadow-2xl md:static md:m-3 md:ml-0 md:h-auto md:w-80 md:shrink-0 md:rounded-xl md:shadow-none">
 						<div className="flex items-center justify-between border-b border-[#dadce0] px-4 py-3 text-base">
 							{panel === "transcript" ? "Transcript" : panel === "info" ? "Meeting details" : "People"}
 							<button onClick={() => setPanel("none")} aria-label="Close" className="flex h-8 w-8 items-center justify-center rounded-full hover:bg-black/5"><X className="h-4 w-4" /></button>
@@ -504,10 +509,10 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded }: 
 				<div className="mx-auto flex items-center gap-2 md:mx-0">
 					<Ctl onClick={toggleMic} label={micOn ? "Turn off microphone" : "Turn on microphone"} icon={micOn ? <Mic className="h-5 w-5" /> : <MicOff className="h-5 w-5" />} danger={!micOn} />
 					<Ctl onClick={toggleCam} label={camOn ? "Turn off camera" : "Turn on camera"} icon={camOn ? <Video className="h-5 w-5" /> : <VideoOff className="h-5 w-5" />} danger={!camOn} />
-					<Ctl onClick={() => setCaptionsOn((v) => !v)} label={captionsOn ? "Turn off captions" : "Turn on captions"} icon={<Captions className="h-5 w-5" />} active={captionsOn} />
-					<Ctl onClick={toggleHand} label={handUp ? "Lower hand" : "Raise hand"} icon={<Hand className="h-5 w-5" />} active={handUp} className="hidden sm:flex" />
-					<Ctl onClick={toggleShare} label={sharing ? "Stop presenting" : "Present now"} icon={<MonitorUp className="h-5 w-5" />} active={sharing} className="hidden sm:flex" />
-					<div className="relative">
+					<Ctl onClick={() => setCaptionsOn((v) => !v)} label={captionsOn ? "Turn off captions" : "Turn on captions"} icon={<Captions className="h-5 w-5" />} active={captionsOn} className="hidden md:flex" />
+					<Ctl onClick={toggleHand} label={handUp ? "Lower hand" : "Raise hand"} icon={<Hand className="h-5 w-5" />} active={handUp} className="hidden md:flex" />
+					<Ctl onClick={toggleShare} label={sharing ? "Stop presenting" : "Present now"} icon={<MonitorUp className="h-5 w-5" />} active={sharing} className="hidden md:flex" />
+					<div className="relative hidden md:block">
 						<Ctl onClick={() => setA11yOpen((v) => !v)} label="Accessibility" icon={<Accessibility className="h-5 w-5" />} active={a11yOpen || a11y.contrast || a11y.size !== "md" || a11y.reduceMotion} />
 						{a11yOpen && (
 							<div className="absolute bottom-14 left-1/2 z-20 w-72 -translate-x-1/2 rounded-xl bg-white p-4 text-sm text-[#202124] shadow-xl">
@@ -526,6 +531,7 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded }: 
 							</div>
 						)}
 					</div>
+					<Ctl onClick={() => setMoreOpen(true)} label="More options" icon={<MoreVertical className="h-5 w-5" />} className="md:hidden" />
 					<Ctl onClick={pip} label="Picture in picture" icon={<PictureInPicture2 className="h-5 w-5" />} className="hidden md:flex" />
 					<button onClick={leave} aria-label="Leave call" title="Leave call" className="flex h-12 w-16 items-center justify-center rounded-full bg-[#ea4335] hover:bg-[#d93025]"><PhoneOff className="h-5 w-5" /></button>
 				</div>
@@ -536,6 +542,31 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded }: 
 					{embedded && <Ctl onClick={() => window.parent.postMessage({ type: "meet:minimize" }, window.location.origin)} label="Minimise" icon={<Minimize2 className="h-5 w-5" />} flat />}
 				</div>
 			</div>
+
+			{moreOpen && (
+				<div className="fixed inset-0 z-50 md:hidden" onClick={() => setMoreOpen(false)}>
+					<div className="absolute inset-0 bg-black/50" />
+					<div onClick={(e) => e.stopPropagation()} className="absolute inset-x-0 bottom-0 max-h-[85dvh] overflow-y-auto rounded-t-2xl bg-white px-2 pb-[max(1rem,env(safe-area-inset-bottom))] pt-2 text-[#202124]">
+						<span className="mx-auto mb-2 block h-1 w-10 rounded-full bg-[#dadce0]" />
+						{([
+							[sharing ? "Stop presenting" : "Present screen", <MonitorUp key="p" className="h-5 w-5" />, () => { setMoreOpen(false); void toggleShare(); }, sharing],
+							[handUp ? "Lower hand" : "Raise hand", <Hand key="h" className="h-5 w-5" />, () => { toggleHand(); setMoreOpen(false); }, handUp],
+							[captionsOn ? "Turn off captions" : "Turn on captions", <Captions key="c" className="h-5 w-5" />, () => setCaptionsOn((v) => !v), captionsOn],
+							["People", <Users key="u" className="h-5 w-5" />, () => { setPanel("people"); setMoreOpen(false); }, false],
+							["Meeting details", <Info key="i" className="h-5 w-5" />, () => { setPanel("info"); setMoreOpen(false); }, false],
+							["Transcript", <MessageSquareText key="t" className="h-5 w-5" />, () => { setPanel("transcript"); setMoreOpen(false); }, false],
+						] as [string, React.ReactNode, () => void, boolean][]).map(([label, icon, run, on]) => (
+							<button key={label} onClick={run} className={cn("flex w-full items-center gap-4 rounded-xl px-4 py-3 text-left text-[15px]", on ? "bg-[#e8f0fe] text-[#1a73e8]" : "active:bg-black/5")}>{icon}{label}</button>
+						))}
+						<div className="mx-2 mt-2 rounded-xl border border-[#dadce0] p-3 text-sm">
+							<p className="mb-2 flex items-center gap-2 font-medium"><Accessibility className="h-4 w-4" /> Accessibility</p>
+							<div className="mb-2 inline-flex rounded-lg border border-[#dadce0] p-0.5">{([["md", "Normal"], ["lg", "Large"], ["xl", "Huge"]] as const).map(([k, l]) => <button key={k} onClick={() => setA11y({ ...a11y, size: k })} aria-pressed={a11y.size === k} className={cn("rounded-md px-3 py-1", a11y.size === k ? "bg-[#e8f0fe] text-[#1a73e8]" : "")}>{l}</button>)}</div>
+							<label className="flex items-center justify-between gap-3 py-1"><span>High contrast captions</span><input type="checkbox" checked={a11y.contrast} onChange={(e) => setA11y({ ...a11y, contrast: e.target.checked })} className="h-4 w-4 accent-[#1a73e8]" /></label>
+							<label className="flex items-center justify-between gap-3 py-1"><span>Reduce motion</span><input type="checkbox" checked={a11y.reduceMotion} onChange={(e) => setA11y({ ...a11y, reduceMotion: e.target.checked })} className="h-4 w-4 accent-[#1a73e8]" /></label>
+						</div>
+					</div>
+				</div>
+			)}
 		</div>
 	);
 }
