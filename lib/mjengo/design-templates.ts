@@ -20,8 +20,11 @@ export type Layer =
   | { t: 'rect'; x: number; y: number; w: number; h: number; fill: string; r?: number }
   | { t: 'circle'; x: number; y: number; d: number; fill: string }
   /** A stand-in for a photo: a tinted block you replace with a picture. */
-  | { t: 'photo'; x: number; y: number; w: number; h: number; fill: string; r?: number }
-  | { t: 'text'; x: number; y: number; w: number; text: string; size: number; color: string; bold?: boolean; italic?: boolean; spacing?: number; align?: 'left' | 'center' | 'right'; lh?: number };
+  | { t: 'photo'; x: number; y: number; w: number; h: number; fill: string; r?: number; scene?: Scene }
+  | { t: 'line'; x: number; y: number; w: number; color: string; th: number }
+  | { t: 'text'; x: number; y: number; w: number; text: string; size: number; color: string; bold?: boolean; italic?: boolean; spacing?: number; align?: 'left' | 'center' | 'right'; lh?: number; font?: string };
+
+export type Scene = 'hills' | 'portrait' | 'city' | 'people';
 
 export interface DesignTemplate {
   id: string;
@@ -29,6 +32,8 @@ export interface DesignTemplate {
   category: 'Quotes' | 'Announcements' | 'Awareness' | 'Fundraising' | 'Events' | 'Stories' | 'Posters';
   size: SizeId;
   bg: string;
+  /** A second colour makes the background a soft top to bottom gradient. */
+  bg2?: string;
   layers: Layer[];
 }
 
@@ -92,7 +97,7 @@ export const TEMPLATES: DesignTemplate[] = [
   {
     id: 'donate', name: 'Donation appeal', category: 'Fundraising', size: 'facebook', bg: ROSE,
     layers: [
-      { t: 'photo', x: 0.58, y: 0, w: 0.42, h: 1, fill: '#FFB3C8' },
+      { t: 'photo', x: 0.58, y: 0, w: 0.42, h: 1, fill: '#FF8FB0', scene: 'people' },
       { t: 'text', x: 0.06, y: 0.12, w: 0.5, text: 'Your gift keeps a safe line open', size: 0.12, color: W, bold: true, lh: 1.1 },
       { t: 'text', x: 0.06, y: 0.58, w: 0.48, text: 'KES 1,000 pays for one counselling session.', size: 0.055, color: W },
       { t: 'rect', x: 0.06, y: 0.76, w: 0.26, h: 0.13, fill: INK, r: 0.01 },
@@ -103,8 +108,8 @@ export const TEMPLATES: DesignTemplate[] = [
     id: 'thanks', name: 'Thank you', category: 'Fundraising', size: 'instagram', bg: T,
     layers: [
       { t: 'circle', x: -0.12, y: 0.62, d: 0.6, fill: TEAL_D },
-      { t: 'text', x: 0.08, y: 0.16, w: 0.84, text: 'Thank you', size: 0.17, color: W, bold: true },
-      { t: 'text', x: 0.08, y: 0.42, w: 0.8, text: 'Because of you, 86 survivors found support this month.', size: 0.06, color: W, lh: 1.2 },
+      { t: 'text', x: 0.08, y: 0.16, w: 0.84, text: 'Thank you', size: 0.14, color: W, bold: true },
+      { t: 'text', x: 0.08, y: 0.4, w: 0.8, text: 'Because of you, 86 survivors found support this month.', size: 0.06, color: W, lh: 1.2 },
       { t: 'text', x: 0.08, y: 0.88, w: 0.6, text: 'With gratitude, the Sauti Salama team', size: 0.034, color: '#E6FBFC' },
     ],
   },
@@ -121,7 +126,7 @@ export const TEMPLATES: DesignTemplate[] = [
     id: 'workshop', name: 'Workshop flyer', category: 'Posters', size: 'poster', bg: W,
     layers: [
       { t: 'rect', x: 0, y: 0, w: 1, h: 0.46, fill: P },
-      { t: 'photo', x: 0.1, y: 0.1, w: 0.8, h: 0.5, fill: '#C9A6FF', r: 0.03 },
+      { t: 'photo', x: 0.1, y: 0.1, w: 0.8, h: 0.5, fill: '#9B5CF0', r: 0.03, scene: 'hills' },
       { t: 'text', x: 0.1, y: 0.66, w: 0.8, text: 'Community safety workshop', size: 0.058, color: INK, bold: true, lh: 1.1 },
       { t: 'text', x: 0.1, y: 0.8, w: 0.8, text: 'Saturday 12 December, 10:00 am\nKibera Community Hall', size: 0.026, color: '#4B5563', lh: 1.4 },
       { t: 'text', x: 0.1, y: 0.92, w: 0.8, text: 'Free entry. Everyone is welcome.', size: 0.024, color: P, bold: true },
@@ -142,9 +147,9 @@ export const TEMPLATES: DesignTemplate[] = [
     id: 'story-poll', name: 'Question story', category: 'Stories', size: 'story', bg: Y,
     layers: [
       { t: 'text', x: 0.1, y: 0.18, w: 0.8, text: 'Ask us anything', size: 0.07, color: INK, bold: true, lh: 1.1 },
-      { t: 'text', x: 0.1, y: 0.3, w: 0.8, text: 'Counsellors answer your questions about support and safety.', size: 0.03, color: INK, lh: 1.3 },
-      { t: 'rect', x: 0.1, y: 0.5, w: 0.8, h: 0.09, fill: W, r: 0.05 },
-      { t: 'text', x: 0.1, y: 0.525, w: 0.8, text: 'Type your question', size: 0.026, color: '#9CA3AF', align: 'center' },
+      { t: 'text', x: 0.1, y: 0.37, w: 0.8, text: 'Counsellors answer your questions about support and safety.', size: 0.03, color: INK, lh: 1.3 },
+      { t: 'rect', x: 0.1, y: 0.55, w: 0.8, h: 0.09, fill: W, r: 0.05 },
+      { t: 'text', x: 0.1, y: 0.575, w: 0.8, text: 'Type your question', size: 0.026, color: '#9CA3AF', align: 'center' },
       { t: 'circle', x: 0.7, y: 0.74, d: 0.5, fill: ROSE },
     ],
   },
@@ -152,7 +157,7 @@ export const TEMPLATES: DesignTemplate[] = [
     id: 'testimonial', name: 'Testimonial', category: 'Quotes', size: 'linkedin', bg: W,
     layers: [
       { t: 'rect', x: 0, y: 0, w: 0.035, h: 1, fill: T },
-      { t: 'photo', x: 0.08, y: 0.2, w: 0.2, h: 0.4, fill: '#CFF6F8', r: 0.5 },
+      { t: 'photo', x: 0.08, y: 0.2, w: 0.2, h: 0.4, fill: '#00C4CC', r: 0.5, scene: 'portrait' },
       { t: 'text', x: 0.34, y: 0.15, w: 0.58, text: 'I did not know where to turn until Sauti Salama answered.', size: 0.1, color: INK, bold: true, lh: 1.15 },
       { t: 'text', x: 0.34, y: 0.7, w: 0.58, text: 'A community member, shared with permission', size: 0.052, color: '#6B7280' },
     ],
@@ -164,3 +169,37 @@ export const TEMPLATES: DesignTemplate[] = [
 ];
 
 export const CATEGORIES = ['All', 'Quotes', 'Announcements', 'Awareness', 'Fundraising', 'Events', 'Stories', 'Posters'] as const;
+
+/* ---- placeholder scenes: a photo stand-in that looks like a picture, drawn from one colour */
+
+const clamp = (n: number) => Math.max(0, Math.min(255, Math.round(n)));
+function shade(hex: string, amt: number): string {
+  const m = /^#?([0-9a-f]{6})$/i.exec(hex);
+  if (!m) return hex;
+  const n = parseInt(m[1], 16);
+  const mix = (c: number) => clamp(amt >= 0 ? c + (255 - c) * amt : c * (1 + amt));
+  return `#${[(n >> 16) & 255, (n >> 8) & 255, n & 255].map(mix).map((v) => v.toString(16).padStart(2, '0')).join('')}`;
+}
+
+/** An SVG picture for a photo slot. Used by the preview cards and placed in the editor as a real image. */
+export function sceneSvg(scene: Scene, base: string, w = 400, h = 300): string {
+  const sky = shade(base, 0.55), far = shade(base, 0.15), near = shade(base, -0.25), dark = shade(base, -0.5), sun = shade(base, 0.85);
+  const body = (inner: string) => `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" preserveAspectRatio="xMidYMid slice"><rect width="${w}" height="${h}" fill="${sky}"/>${inner}</svg>`;
+  if (scene === 'portrait') {
+    return body(`<rect width="${w}" height="${h}" fill="${sky}"/><circle cx="${w * 0.5}" cy="${h * 0.38}" r="${h * 0.17}" fill="${dark}"/><path d="M${w * 0.18} ${h} C${w * 0.2} ${h * 0.66} ${w * 0.8} ${h * 0.66} ${w * 0.82} ${h} Z" fill="${near}"/><circle cx="${w * 0.5}" cy="${h * 0.36}" r="${h * 0.15}" fill="${shade(base, -0.15)}"/>`);
+  }
+  if (scene === 'city') {
+    const bars = Array.from({ length: 9 }, (_, i) => {
+      const bw = w / 9, bh = h * (0.35 + ((i * 37) % 40) / 100);
+      return `<rect x="${i * bw + 2}" y="${h - bh}" width="${bw - 4}" height="${bh}" fill="${i % 2 ? near : far}"/>` + Array.from({ length: 3 }, (_, j) => `<rect x="${i * bw + 8}" y="${h - bh + 12 + j * 22}" width="${bw - 20}" height="8" fill="${sun}" opacity=".7"/>`).join('');
+    }).join('');
+    return body(`<circle cx="${w * 0.8}" cy="${h * 0.2}" r="${h * 0.09}" fill="${sun}"/>${bars}`);
+  }
+  if (scene === 'people') {
+    const p = (cx: number, r: number, c: string) => `<circle cx="${cx}" cy="${h * 0.42}" r="${r}" fill="${c}"/><path d="M${cx - r * 1.6} ${h} C${cx - r * 1.5} ${h * 0.62} ${cx + r * 1.5} ${h * 0.62} ${cx + r * 1.6} ${h} Z" fill="${c}"/>`;
+    return body(`<rect y="${h * 0.7}" width="${w}" height="${h * 0.3}" fill="${far}"/>${p(w * 0.28, h * 0.1, near)}${p(w * 0.72, h * 0.1, dark)}${p(w * 0.5, h * 0.13, shade(base, -0.1))}`);
+  }
+  return body(`<circle cx="${w * 0.74}" cy="${h * 0.28}" r="${h * 0.12}" fill="${sun}"/><path d="M0 ${h * 0.75} C${w * 0.2} ${h * 0.45} ${w * 0.4} ${h * 0.5} ${w * 0.55} ${h * 0.68} C${w * 0.7} ${h * 0.5} ${w * 0.9} ${h * 0.5} ${w} ${h * 0.7} V${h} H0 Z" fill="${far}"/><path d="M0 ${h * 0.88} C${w * 0.25} ${h * 0.66} ${w * 0.55} ${h * 0.8} ${w} ${h * 0.74} V${h} H0 Z" fill="${near}"/>`);
+}
+
+export const sceneDataUrl = (scene: Scene, base: string, w = 400, h = 300) => `data:image/svg+xml;utf8,${encodeURIComponent(sceneSvg(scene, base, w, h))}`;

@@ -4,7 +4,7 @@ import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { MjengoLoader } from "../../_components/MjengoLoader";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { Canvas, Circle, FabricImage, Line, Rect, Textbox, Triangle, type FabricObject } from "fabric";
+import { Canvas, Circle, FabricImage, Gradient, Line, Path, Rect, Textbox, Triangle, type FabricObject } from "fabric";
 import { AlignCenter, AlignLeft, AlignRight, ArrowLeft, Bold, Copy, Download, Image as ImageIcon, Italic, Gift, LayoutTemplate, Loader2, Redo2, Save, Shapes, Sparkles, Trash2, Type, Undo2, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,16 +14,20 @@ import { cn } from "@/lib/utils";
 import { putToSignedUrl } from "@/lib/client/upload";
 import { deleteTemplate, listTemplates, saveTemplate, studioRegister, studioUpload, type TemplateRow } from "@/app/actions/mjengo-templates";
 import { listAssets, type AssetRow } from "@/app/actions/mjengo-ai";
-import { TEMPLATES, type DesignTemplate } from "@/lib/mjengo/design-templates";
+import { sceneDataUrl, TEMPLATES, type DesignTemplate } from "@/lib/mjengo/design-templates";
+import { ensureFont } from "@/lib/mjengo/fonts";
 import { TemplatePreview } from "@/components/design/TemplatePreview";
 import { inspireImage } from "@/app/actions/mjengo-inspire";
 import { InspirePanel } from "./_InspirePanel";
+import { ElementsPanel, TextPanel, UploadsPanel, type ShapeKind, type TextPreset } from "./_Panels";
+import { CONCEPTS, conceptTemplate, generateTemplate, templateFromId } from "@/lib/mjengo/design-generator";
+import { FONT_OPTIONS } from "@/lib/mjengo/fonts";
 import { PostThis } from "../../_components/PostThis";
 
 /* Canva's palette: the editor borrows its look so it feels familiar. */
 const CANVA = { teal: "#00C4CC", purple: "#7D2AE8", ink: "#0E1318" };
 const PALETTE = ["#0E1318", "#FFFFFF", "#7D2AE8", "#00C4CC", "#FF5757", "#FFDE59", "#5CE1E6", "#FF66C4", "#068297", "#38B6FF", "#8C52FF", "#7ED957"];
-const FONTS = ["Inter", "Arial", "Georgia", "Trebuchet MS", "Impact", "Courier New", "Times New Roman"];
+const FONTS = FONT_OPTIONS.map((f) => f.family);
 const SIZES = [
 	{ id: "instagram", label: "Instagram post", w: 1080, h: 1080 },
 	{ id: "story", label: "Story", w: 1080, h: 1920 },
@@ -34,25 +38,51 @@ const SIZES = [
 	{ id: "poster", label: "A4 poster", w: 1240, h: 1754 },
 ] as const;
 
-type Panel = "templates" | "text" | "shapes" | "uploads" | "inspire" | "studio" | "market";
+type Panel = "templates" | "text" | "shapes" | "uploads" | "inspire";
 type Builder = (c: Canvas, w: number, h: number) => void;
 
-const text = (t: string, o: Partial<ConstructorParameters<typeof Textbox>[1]>) => new Textbox(t, { fontFamily: "Inter", fill: CANVA.ink, ...o });
+// Fabric 7 positions objects by their centre unless told otherwise; everything here is placed by its top-left corner.
+const TL = { originX: "left", originY: "top" } as const;
+const text = (t: string, o: Partial<ConstructorParameters<typeof Textbox>[1]>) => new Textbox(t, { fontFamily: "Inter", fill: CANVA.ink, ...TL, ...o });
 
 /** Starting layouts, drawn with the same objects people can edit afterwards (the hub previews the same layers). */
 function buildFrom(t: DesignTemplate): Builder {
 	return (c, w, h) => {
-		c.backgroundColor = t.bg;
+		c.backgroundColor = t.bg2
+			? new Gradient({ type: "linear", gradientUnits: "pixels", coords: { x1: 0, y1: 0, x2: 0, y2: h }, colorStops: [{ offset: 0, color: t.bg }, { offset: 1, color: t.bg2 }] })
+			: t.bg;
+		const ink = (t.layers.find((x) => x.t === "text") as { color?: string } | undefined)?.color ?? "#000000";
 		for (const l of t.layers) {
 			if (l.t === "rect" || l.t === "photo") {
 				const r = l.r ? l.r * Math.min(l.w * w, l.h * h) : 0;
-				const o = new Rect({ left: l.x * w, top: l.y * h, width: l.w * w, height: l.h * h, fill: l.fill, rx: r, ry: r });
+				const ghost = l.t === "rect" && l.fill === "transparent";
+				const o = new Rect({ ...TL, left: l.x * w, top: l.y * h, width: l.w * w, height: l.h * h, fill: ghost ? "rgba(0,0,0,0)" : l.fill, stroke: ghost ? ink : undefined, strokeWidth: ghost ? 3 : 0, opacity: ghost ? 0.3 : 1, rx: r, ry: r });
 				c.add(o);
+				if (l.t === "photo" && l.scene) {
+					// A picture in the slot: drawn as a real image so it can be replaced or moved like any photo.
+					const at = c.getObjects().length;
+					FabricImage.fromURL(sceneDataUrl(l.scene, l.fill, 400, Math.max(120, Math.round((400 * (l.h * h)) / (l.w * w))))).then((img) => {
+						const k = Math.max((l.w * w) / (img.width ?? 1), (l.h * h) / (img.height ?? 1));
+						img.set({ ...TL, left: l.x * w, top: l.y * h, scaleX: k, scaleY: k, clipPath: new Rect({ ...TL, left: l.x * w, top: l.y * h, width: l.w * w, height: l.h * h, rx: r, ry: r, absolutePositioned: true }) });
+						c.insertAt(Math.min(at, c.getObjects().length), img);
+						c.requestRenderAll();
+					}).catch(() => undefined);
+				}
 			} else if (l.t === "circle") {
-				c.add(new Circle({ left: l.x * w, top: l.y * h, radius: (l.d * w) / 2, fill: l.fill }));
+				c.add(new Circle({ ...TL, left: l.x * w, top: l.y * h, radius: (l.d * w) / 2, fill: l.fill }));
+			} else if (l.t === "line") {
+				c.add(new Rect({ ...TL, left: l.x * w, top: l.y * h, width: l.w * w, height: Math.max(2, l.th * h), fill: l.color }));
 			} else {
+				if (l.font) {
+					const fam = l.font;
+					void ensureFont(fam).then(() => {
+						c.getObjects().forEach((o) => { if (o.type === "textbox" && (o as Textbox).fontFamily === fam) { o.set({ fontFamily: fam, dirty: true }); (o as Textbox).initDimensions(); o.setCoords(); } });
+						c.requestRenderAll();
+					});
+				}
 				c.add(text(l.text, {
 					left: l.x * w, top: l.y * h, width: l.w * w, fontSize: l.size * h, fill: l.color,
+					fontFamily: l.font ?? "Inter",
 					fontWeight: l.bold ? "bold" : "normal", fontStyle: l.italic ? "italic" : "normal",
 					charSpacing: l.spacing ?? 0, textAlign: l.align ?? "left", lineHeight: l.lh ?? 1.2,
 				}));
@@ -82,6 +112,9 @@ function DesignEditor() {
 		const want = new URLSearchParams(window.location.search).get("size");
 		return SIZES.find((x) => x.id === want) ?? SIZES[0];
 	});
+	const [ideaSeed, setIdeaSeed] = useState(1);
+	const sizeRef = useRef(size);
+	sizeRef.current = size;
 	const [panel, setPanel] = useState<Panel | null>("templates");
 	const [scale, setScale] = useState(0.5);
 	const [selected, setSelected] = useState<FabricObject | null>(null);
@@ -110,7 +143,7 @@ function DesignEditor() {
 		if (!c || i < 0 || i >= h.stack.length) return;
 		h.lock = true;
 		await c.loadFromJSON(h.stack[i]);
-		c.renderAll();
+		fit();
 		h.at = i;
 		h.lock = false;
 		setSelected(null);
@@ -122,12 +155,15 @@ function DesignEditor() {
 		const c = canvas.current;
 		const box = host.current;
 		if (!c || !box) return;
-		const s = Math.min((box.clientWidth - 48) / size.w, (box.clientHeight - 48) / size.h, 1);
-		c.setDimensions({ width: size.w * s, height: size.h * s });
-		c.setZoom(s);
-		c.renderAll();
+		const sz = sizeRef.current;
+		if (box.clientWidth < 80 || box.clientHeight < 80) return;
+		const s = Math.max(0.05, Math.min((box.clientWidth - 32) / sz.w, (box.clientHeight - 32) / sz.h, 1));
+		c.setDimensions({ width: Math.round(sz.w * s), height: Math.round(sz.h * s) });
+		// clear() and loadFromJSON() reset the view, so the zoom is always set again here.
+		c.setViewportTransform([s, 0, 0, s, 0, 0]);
+		c.requestRenderAll();
 		setScale(s);
-	}, [size]);
+	}, []);
 
 	useEffect(() => {
 		if (!el.current) return;
@@ -140,7 +176,13 @@ function DesignEditor() {
 		c.on("object:modified", () => { snapshot(); setSaved(false); bump((n) => n + 1); });
 		c.on("object:added", () => snapshot());
 		c.on("object:removed", () => snapshot());
-		if (!initialId) (BUILT_IN.find((b) => b.id === initialTemplate) ?? BUILT_IN[BUILT_IN.length - 1]).build(c, size.w, size.h);
+		if (!initialId) {
+			const sp = new URLSearchParams(window.location.search);
+			const conceptId = sp.get("concept");
+			const picked = initialTemplate ? templateFromId(initialTemplate) : conceptId ? conceptTemplate(conceptId, size.id as never, Number(sp.get("variant") ?? 0)) : null;
+			if (picked) buildFrom(picked)(c, size.w, size.h);
+			else (BUILT_IN.find((b) => b.id === initialTemplate) ?? BUILT_IN[BUILT_IN.length - 1]).build(c, size.w, size.h);
+		}
 		fit();
 		snapshot();
 		const ro = new ResizeObserver(() => fit());
@@ -148,7 +190,7 @@ function DesignEditor() {
 		return () => { ro.disconnect(); c.dispose(); canvas.current = null; };
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, []);
-	useEffect(() => { fit(); }, [fit]);
+	useEffect(() => { fit(); }, [fit, size]);
 
 	useEffect(() => {
 		unwrap(listTemplates("design")).then(async (rows) => {
@@ -165,7 +207,7 @@ function DesignEditor() {
 			history.current.lock = true;
 			await c.loadFromJSON(d.json as never);
 			history.current.lock = false;
-			c.renderAll();
+			fit();
 			snapshot();
 			setSaved(true);
 		}).catch(() => setMine([]));
@@ -209,7 +251,7 @@ function DesignEditor() {
 			const img = await FabricImage.fromURL(data);
 			const k = Math.max(size.w / (img.width ?? 1), size.h / (img.height ?? 1));
 			img.scale(k);
-			img.set({ left: (size.w - (img.width ?? 0) * k) / 2, top: (size.h - (img.height ?? 0) * k) / 2 });
+			img.set({ ...TL, left: (size.w - (img.width ?? 0) * k) / 2, top: (size.h - (img.height ?? 0) * k) / 2 });
 			c.add(img);
 			c.sendObjectToBack(img);
 			c.renderAll();
@@ -226,8 +268,22 @@ function DesignEditor() {
 		c.clear();
 		b.build(c, size.w, size.h);
 		history.current.lock = false;
-		c.renderAll();
+		fit();
 		snapshot();
+	};
+
+	/** A generated idea: built with the page's own size so it never has to be reshaped. */
+	const applyIdea = (t: DesignTemplate) => applyBuilt({ id: t.id, name: t.name, build: buildFrom(t), swatch: t.bg, template: t });
+
+	const setBackground = (a: string, b?: string) => {
+		const c = canvas.current;
+		if (!c) return;
+		c.backgroundColor = b
+			? new Gradient({ type: "linear", gradientUnits: "pixels", coords: { x1: 0, y1: 0, x2: 0, y2: size.h }, colorStops: [{ offset: 0, color: a }, { offset: 1, color: b }] })
+			: a;
+		c.requestRenderAll();
+		snapshot();
+		setSaved(false);
 	};
 
 	const applyMine = async (t: TemplateRow) => {
@@ -239,7 +295,7 @@ function DesignEditor() {
 		history.current.lock = true;
 		await c.loadFromJSON(d.json as never);
 		history.current.lock = false;
-		c.renderAll();
+		fit();
 		snapshot();
 	};
 
@@ -252,19 +308,48 @@ function DesignEditor() {
 		c.renderAll();
 	};
 	const addText = (t: string, fontSize: number, bold = false) => add(text(t, { width: size.w * 0.7, fontSize, fontWeight: bold ? "bold" : "normal", left: size.w * 0.15, top: size.h * 0.4 }));
-	const addShape = (k: "rect" | "circle" | "triangle" | "line") => {
-		const fill = CANVA.purple;
-		if (k === "rect") add(new Rect({ width: size.w * 0.3, height: size.w * 0.3, fill, rx: 12, ry: 12 }));
-		else if (k === "circle") add(new Circle({ radius: size.w * 0.15, fill: CANVA.teal }));
-		else if (k === "triangle") add(new Triangle({ width: size.w * 0.3, height: size.w * 0.26, fill: "#FFDE59" }));
-		else add(new Line([0, 0, size.w * 0.4, 0], { stroke: CANVA.ink, strokeWidth: 8 }));
+	const addShape = (k: ShapeKind) => {
+		const w = size.w * 0.3;
+		const paths: Partial<Record<ShapeKind, string>> = {
+			star: "M12 2l3 7 7.5.6-5.7 4.9 1.8 7.4L12 18l-6.6 3.9 1.8-7.4L1.5 9.6 9 9z",
+			heart: "M12 21s-8-5.4-8-11a4.5 4.5 0 0 1 8-2.7A4.5 4.5 0 0 1 20 10c0 5.6-8 11-8 11z",
+			arrow: "M3 11h13l-4-4 1.4-1.4L20 12l-6.6 6.4L12 17l4-4H3z",
+			bubble: "M4 4h16a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1h-9l-5 4v-4H4a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1z",
+		};
+		if (k === "rect") add(new Rect({ width: w, height: w, fill: CANVA.purple }));
+		else if (k === "rounded") add(new Rect({ width: w, height: w, fill: CANVA.purple, rx: w * 0.18, ry: w * 0.18 }));
+		else if (k === "circle") add(new Circle({ radius: w / 2, fill: CANVA.teal }));
+		else if (k === "triangle") add(new Triangle({ width: w, height: w * 0.87, fill: "#FFDE59" }));
+		else if (k === "line") add(new Line([0, 0, size.w * 0.4, 0], { stroke: CANVA.ink, strokeWidth: 8, strokeLineCap: "round" }));
+		else if (k === "dashed") add(new Line([0, 0, size.w * 0.4, 0], { stroke: CANVA.ink, strokeWidth: 8, strokeDashArray: [24, 18], strokeLineCap: "round" }));
+		else {
+			const o = new Path(paths[k] ?? paths.star!, { fill: k === "heart" ? "#FF5C8A" : k === "star" ? "#FFDE59" : CANVA.purple });
+			o.scaleToWidth(w);
+			add(o);
+		}
 	};
-	const addImage = async (url: string) => {
+	/** A text style from the Text panel: its font, weight and finish, placed in the middle of the page. */
+	const addPreset = async (p: TextPreset) => {
+		await ensureFont(p.font);
+		const t = p.caps ? p.sample.toUpperCase() : p.sample;
+		add(text(t, {
+			width: size.w * 0.7, fontSize: p.size * size.h, fontFamily: p.font, fontWeight: p.bold ? "bold" : "normal", fontStyle: p.italic ? "italic" : "normal",
+			fill: p.color ?? CANVA.ink, charSpacing: p.spacing ?? 0, textAlign: p.align ?? "left", lineHeight: p.lh ?? 1.15,
+			...(p.bg ? { backgroundColor: p.bg } : {}),
+		}));
+	};
+	const changeFont = async (family: string) => {
+		await ensureFont(family);
+		set({ fontFamily: family });
+		const t = canvas.current?.getActiveObject() as Textbox | undefined;
+		if (t && "initDimensions" in t) { t.initDimensions(); t.setCoords(); canvas.current?.requestRenderAll(); }
+	};
+	const addImage = async (url: string, frac = 0.7) => {
 		const c = canvas.current;
 		if (!c) return;
 		try {
 			const img = await FabricImage.fromURL(url, { crossOrigin: "anonymous" });
-			const k = Math.min((size.w * 0.7) / (img.width ?? 1), (size.h * 0.7) / (img.height ?? 1), 1);
+			const k = Math.min((size.w * frac) / (img.width ?? 1), (size.h * frac) / (img.height ?? 1), 4);
 			img.scale(k);
 			add(img);
 		} catch {
@@ -355,13 +440,11 @@ function DesignEditor() {
 	const o = selected as (FabricObject & { fontFamily?: string; fontSize?: number; fontWeight?: string; fontStyle?: string; textAlign?: string }) | null;
 	const isText = !!o && "fontFamily" in o;
 	const rail: [Panel, string, React.ReactNode][] = [
-		["templates", "Templates", <LayoutTemplate key="t" className="h-5 w-5" />],
+		["templates", "Design", <LayoutTemplate key="t" className="h-5 w-5" />],
+		["shapes", "Elements", <Shapes key="s" className="h-5 w-5" />],
 		["text", "Text", <Type key="x" className="h-5 w-5" />],
-		["shapes", "Shapes", <Shapes key="s" className="h-5 w-5" />],
+		["inspire", "Photos", <Sparkles key="n" className="h-5 w-5" />],
 		["uploads", "Uploads", <Upload key="u" className="h-5 w-5" />],
-		["inspire", "Inspire", <Sparkles key="n" className="h-5 w-5" />],
-		["studio", "Studio", <ImageIcon key="i" className="h-5 w-5" />],
-		["market", "Free", <Gift key="m" className="h-5 w-5" />],
 	];
 	const canUndo = history.current.at > 0;
 	const canRedo = history.current.at < history.current.stack.length - 1;
@@ -385,7 +468,7 @@ function DesignEditor() {
 					{isText && (
 						<>
 							<span className="mx-1 h-5 w-px bg-black/10" />
-							<select value={o.fontFamily} onChange={(e) => set({ fontFamily: e.target.value })} aria-label="Font" className="h-8 rounded-md border border-serene-neutral-200 bg-white px-2 text-sm">{FONTS.map((f) => <option key={f}>{f}</option>)}</select>
+							<select value={o.fontFamily} onChange={(e) => void changeFont(e.target.value)} aria-label="Font" className="h-8 rounded-md border border-serene-neutral-200 bg-white px-2 text-sm">{FONTS.map((f) => <option key={f}>{f}</option>)}</select>
 							<Input type="number" value={Math.round(o.fontSize ?? 40)} onChange={(e) => set({ fontSize: Number(e.target.value) })} aria-label="Size" className="h-8 w-20 text-sm" />
 							<button onClick={() => set({ fontWeight: o.fontWeight === "bold" ? "normal" : "bold" })} aria-pressed={o.fontWeight === "bold"} aria-label="Bold" className={cn("flex h-8 w-8 items-center justify-center rounded-md", o.fontWeight === "bold" ? "bg-sauti-teal-light" : "hover:bg-serene-neutral-100")}><Bold className="h-4 w-4" /></button>
 							<button onClick={() => set({ fontStyle: o.fontStyle === "italic" ? "normal" : "italic" })} aria-pressed={o.fontStyle === "italic"} aria-label="Italic" className={cn("flex h-8 w-8 items-center justify-center rounded-md", o.fontStyle === "italic" ? "bg-sauti-teal-light" : "hover:bg-serene-neutral-100")}><Italic className="h-4 w-4" /></button>
@@ -432,7 +515,7 @@ function DesignEditor() {
 						<button key={k} onClick={() => setPanel((cur) => (cur === k ? null : k))} aria-pressed={panel === k} className={cn("flex w-14 shrink-0 flex-col items-center gap-1 rounded-xl py-2 text-[11px] max-sm:w-[4.5rem] max-sm:py-1.5", panel === k ? "bg-white/15 text-white max-sm:bg-[#7D2AE8]/10 max-sm:text-[#7D2AE8]" : "text-white/65 hover:bg-white/10 max-sm:text-[#475569] max-sm:hover:bg-black/5")}>{icon}{label}</button>
 					))}
 				</nav>
-				<aside className={cn("shrink-0 overflow-y-auto border-serene-neutral-100 bg-white p-3 sm:w-64 sm:border-r", panel ? "max-sm:fixed max-sm:inset-x-0 max-sm:bottom-16 max-sm:z-30 max-sm:max-h-[45dvh] max-sm:rounded-t-2xl max-sm:border-t max-sm:shadow-2xl" : "hidden")}>
+				<aside className={cn("shrink-0 overflow-y-auto overflow-x-hidden border-serene-neutral-100 bg-white p-3 sm:w-72 sm:border-r", panel ? "max-sm:fixed max-sm:inset-x-0 max-sm:bottom-16 max-sm:z-30 max-sm:max-h-[45dvh] max-sm:rounded-t-2xl max-sm:border-t max-sm:shadow-2xl" : "hidden")}>
 					{panel === "templates" && (
 						<div className="space-y-4">
 							<div>
@@ -443,6 +526,46 @@ function DesignEditor() {
 											<TemplatePreview template={b.template} className="group-hover:ring-[#7D2AE8]" />
 											<span className="mt-1 block truncate text-xs font-medium">{b.name}</span>
 										</button>
+									))}
+								</div>
+							</div>
+							<div>
+								<div className="mb-2 flex items-center justify-between">
+									<h3 className="text-sm font-semibold">Ideas for this page</h3>
+									<button onClick={() => setIdeaSeed((n) => n + 1)} className="rounded-md px-2 py-0.5 text-xs font-medium text-[#7D2AE8] hover:bg-[#7D2AE8]/10">Shuffle</button>
+								</div>
+								<div className="grid grid-cols-2 gap-2">
+									{Array.from({ length: 6 }).map((_, i) => {
+										const t = generateTemplate(ideaSeed * 31 + i, { size: size.id });
+										return (
+											<button key={t.id} onClick={() => applyIdea(t)} className="group text-left transition hover:-translate-y-0.5">
+												<TemplatePreview template={t} className="group-hover:ring-[#7D2AE8]" />
+												<span className="mt-1 block truncate text-xs font-medium">{t.name}</span>
+											</button>
+										);
+									})}
+								</div>
+							</div>
+							<div>
+								<h3 className="mb-2 text-sm font-semibold">Moods</h3>
+								<div className="grid grid-cols-3 gap-1.5">
+									{CONCEPTS.map((c, i) => (
+										<button key={c.id} onClick={() => applyIdea(conceptTemplate(c.id, size.id, i))} title={`${c.name}: ${c.mood}`} className="overflow-hidden rounded-lg ring-1 ring-black/10 transition hover:ring-[#7D2AE8]">
+											<span className="flex h-9">{[c.bg, c.accent, c.accent2, c.ink].map((col, k) => <i key={k} className="flex-1" style={{ background: col }} />)}</span>
+											<span className="block truncate bg-white px-1 py-0.5 text-[10px] font-medium">{c.name}</span>
+										</button>
+									))}
+								</div>
+							</div>
+							<div>
+								<h3 className="mb-2 text-sm font-semibold">Background</h3>
+								<div className="flex flex-wrap gap-1.5">
+									{PALETTE.map((c) => <button key={c} aria-label={`Background ${c}`} onClick={() => setBackground(c)} className="h-7 w-7 rounded-full border border-black/10" style={{ background: c }} />)}
+									<input type="color" aria-label="Custom background" onChange={(e) => setBackground(e.target.value)} className="h-7 w-9 cursor-pointer rounded border border-serene-neutral-200 p-0.5" />
+								</div>
+								<div className="mt-2 grid grid-cols-4 gap-1.5">
+									{[["#7D2AE8", "#00C4CC"], ["#FF5C8A", "#FFDE59"], ["#0E1318", "#7D2AE8"], ["#068297", "#7FD3E0"], ["#FFF1DB", "#FFD9A8"], ["#1D4ED8", "#38BDF8"], ["#160B2E", "#2A1257"], ["#F1E8FD", "#FFFFFF"]].map(([a, b]) => (
+										<button key={a + b} aria-label={`Gradient ${a} to ${b}`} onClick={() => setBackground(a, b)} className="h-9 rounded-lg ring-1 ring-black/10 hover:ring-[#7D2AE8]" style={{ background: `linear-gradient(180deg, ${a}, ${b})` }} />
 									))}
 								</div>
 							</div>
@@ -461,26 +584,13 @@ function DesignEditor() {
 							</div>
 						</div>
 					)}
-					{panel === "text" && (
-						<div className="space-y-2">
-							<button onClick={() => addText("Add a heading", size.h * 0.09, true)} className="w-full rounded-xl border border-serene-neutral-200 p-3 text-left text-2xl font-bold hover:border-[#7D2AE8]">Add a heading</button>
-							<button onClick={() => addText("Add a subheading", size.h * 0.055, true)} className="w-full rounded-xl border border-serene-neutral-200 p-3 text-left text-lg font-semibold hover:border-[#7D2AE8]">Add a subheading</button>
-							<button onClick={() => addText("A little bit of body text", size.h * 0.035)} className="w-full rounded-xl border border-serene-neutral-200 p-3 text-left text-sm hover:border-[#7D2AE8]">A little bit of body text</button>
-						</div>
-					)}
-					{panel === "shapes" && (
-						<div className="grid grid-cols-2 gap-2">
-							{([["rect", "Square"], ["circle", "Circle"], ["triangle", "Triangle"], ["line", "Line"]] as const).map(([k, l]) => (
-								<button key={k} onClick={() => addShape(k)} className="rounded-xl border border-serene-neutral-200 py-6 text-sm hover:border-[#7D2AE8]">{l}</button>
-							))}
-						</div>
-					)}
+					{panel === "text" && <TextPanel onPreset={addPreset} onFont={changeFont} current={isText ? (o?.fontFamily ?? null) : null} />}
+					{panel === "shapes" && <ElementsPanel onShape={addShape} onQr={(u) => addImage(u, 0.28)} onSvg={(u) => addImage(u, 0.2)} />}
 					{panel === "uploads" && (
-						<div className="space-y-2">
-							<Button className="w-full gap-2 bg-[#7D2AE8] hover:bg-[#6a22c9]" onClick={() => fileInput.current?.click()}><Upload className="h-4 w-4" /> Upload an image</Button>
+						<>
+							<UploadsPanel onPick={(u) => addImage(u)} onUploadClick={() => fileInput.current?.click()} assets={assets} />
 							<input ref={fileInput} type="file" accept="image/*" className="hidden" onChange={(e) => upload(e.target.files)} />
-							<p className="text-xs text-serene-neutral-500">Images stay in this design until you save it to Studio.</p>
-						</div>
+						</>
 					)}
 					{panel === "inspire" && (
 						<InspirePanel
@@ -489,31 +599,20 @@ function DesignEditor() {
 							baseColour="#7D2AE8"
 						/>
 					)}
-					{panel === "market" && (
-						<div className="space-y-3 text-sm">
-							<p className="text-xs text-serene-neutral-500">Free places to find templates, photos and fonts. Download what you like, then use Uploads to bring it in.</p>
-							{[
-								["Canva free templates", "https://www.canva.com/templates/", "Layouts for posters and social posts"],
-								["Slidesgo", "https://slidesgo.com/", "Presentation themes"],
-								["Unsplash", "https://unsplash.com/", "Free photographs"],
-								["Pexels", "https://www.pexels.com/", "Free photos and video"],
-								["unDraw", "https://undraw.co/illustrations", "Free illustrations, recolourable"],
-								["Google Fonts", "https://fonts.google.com/", "Open fonts"],
-							].map(([n, u, d]) => (
-								<a key={u} href={u} target="_blank" rel="noopener noreferrer" className="block rounded-xl border border-serene-neutral-200 p-3 hover:border-[#7D2AE8]">
-									<span className="block font-semibold">{n}</span><span className="block text-xs text-serene-neutral-500">{d}</span>
-								</a>
-							))}
-							<p className="text-xs text-serene-neutral-500">Check each licence before using an image in public.</p>
-						</div>
-					)}
-					{panel === "studio" && (
-						<div>
-							{assets.length === 0 ? <p className="text-xs text-serene-neutral-500">Images made in the assistant or saved from here show up in Studio.</p> : (
-								<div className="grid grid-cols-2 gap-2">
-									{assets.filter((a) => a.url).map((a) => <button key={a.id} onClick={() => a.url && addImage(a.url)} className="overflow-hidden rounded-lg border border-serene-neutral-200 hover:border-[#7D2AE8]"><img src={a.url!} alt={a.name} className="aspect-square w-full object-cover" /></button>)}
-								</div>
-							)}
+					{panel === "inspire" && (
+						<div className="mt-5 border-t border-serene-neutral-100 pt-4">
+							<h3 className="mb-2 text-sm font-semibold">More free places</h3>
+							<div className="grid grid-cols-1 gap-2 text-sm">
+								{[
+									["Canva free templates", "https://www.canva.com/templates/", "Layouts for posters and social posts"],
+									["Slidesgo", "https://slidesgo.com/", "Presentation themes"],
+									["unDraw", "https://undraw.co/illustrations", "Recolourable illustrations"],
+									["Google Fonts", "https://fonts.google.com/", "Open fonts"],
+								].map(([n, u, d]) => (
+									<a key={u} href={u} target="_blank" rel="noopener noreferrer" className="block rounded-xl border border-serene-neutral-200 p-2.5 hover:border-[#7D2AE8]"><span className="block font-semibold">{n}</span><span className="block text-xs text-serene-neutral-500">{d}</span></a>
+								))}
+							</div>
+							<p className="mt-2 text-xs text-serene-neutral-500">Check each licence before using an image in public.</p>
 						</div>
 					)}
 				</aside>
@@ -521,8 +620,10 @@ function DesignEditor() {
 				{propBar("sm:hidden")}
 
 				{/* Page */}
-				<div ref={host} className="flex min-w-0 flex-1 items-center justify-center overflow-auto bg-[#EBECF0] p-2 sm:p-4">
-					<div className="shadow-xl"><canvas ref={el} /></div>
+				<div ref={host} className="relative min-h-0 min-w-0 flex-1 overflow-hidden bg-[#EBECF0]">
+					<div className="absolute inset-0 flex items-center justify-center overflow-auto p-4">
+						<div className="shrink-0 shadow-xl"><canvas ref={el} /></div>
+					</div>
 				</div>
 			</div>
 			<PostThis open={!!postFor} assetId={postFor} about={name} onClose={() => setPostFor(null)} />

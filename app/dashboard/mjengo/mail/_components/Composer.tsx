@@ -171,7 +171,7 @@ export function Composer({ accounts, accountId, seed, snippets, signature = "", 
 	const [minimised, setMinimised] = useState(false);
 	const [expanded, setExpanded] = useState(false);
 	const [rich, setRich] = useState(false);
-	const [threadOpen, setThreadOpen] = useState(false);
+	const [threadOpen, setThreadOpen] = useState(!!seed.thread?.length);
 	const [suggestions, setSuggestions] = useState<ReplySuggestion[] | null>(null);
 	const [tone, setTone] = useState<RewriteMode | null>(null);
 	const [dragging, setDragging] = useState(false);
@@ -482,7 +482,7 @@ export function Composer({ accounts, accountId, seed, snippets, signature = "", 
 				<header className="flex items-center gap-2 border-b border-black/[0.06] bg-white px-4 py-2 pt-[max(0.5rem,env(safe-area-inset-top))]">
 					<p className="min-w-0 flex-1 truncate text-sm font-semibold text-serene-neutral-800">{subject || "New message"}</p>
 					{thread.length > 0 && !expanded && (
-						<button onClick={() => setThreadOpen((v) => !v)} aria-expanded={threadOpen} className="flex items-center gap-1.5 rounded-full border border-black/10 px-2.5 py-1 text-xs font-medium text-serene-neutral-700 hover:bg-black/5 sm:hidden">
+						<button onClick={() => setThreadOpen((v) => !v)} aria-expanded={threadOpen} className="flex items-center gap-1.5 rounded-full border border-black/10 px-2.5 py-1 text-xs font-medium text-serene-neutral-700 hover:bg-black/5">
 							Conversation <span className="rounded-full bg-black/5 px-1.5">{thread.length}</span>
 						</button>
 					)}
@@ -529,7 +529,7 @@ export function Composer({ accounts, accountId, seed, snippets, signature = "", 
 								)}
 								{suggestions === null && seed.replyTo && empty && <div className="mb-3 flex gap-2"><div className="mj-skel h-[74px] w-56 rounded-xl" /><div className="mj-skel h-[74px] w-56 rounded-xl" /></div>}
 
-								{thread.length > 0 && threadOpen && !expanded && <div className="mb-3 max-h-64 overflow-y-auto rounded-xl border border-black/[0.06] bg-white/70 p-2">{threadList}</div>}
+								{thread.length > 0 && threadOpen && !expanded && <div className="mb-3 max-h-56 overflow-y-auto rounded-xl border border-black/[0.06] bg-white/80 p-2"><p className="mb-1.5 flex items-center gap-2 px-1 text-[11px] font-semibold uppercase tracking-wider text-serene-neutral-500">Conversation<span className="flex">{people.map((a, i) => <i key={a} className={cn("-ml-0.5 h-2.5 w-2.5 rounded-full ring-1 ring-white first:ml-0", (a === me ? MINE : SHADES[i % SHADES.length]).dot)} />)}</span></p>{threadList}</div>}
 
 								<div className="rounded-xl bg-white px-4 py-3 shadow-sm ring-1 ring-black/[0.06]">
 									{rich && (

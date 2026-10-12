@@ -18,6 +18,9 @@ import { Input } from "@/components/ui/input";
 import ContentPanel from "../content/page";
 import { ASPECT, CATEGORIES, TEMPLATES } from "@/lib/mjengo/design-templates";
 import { TemplatePreview } from "@/components/design/TemplatePreview";
+import { SizeMock } from "@/components/design/SizeMock";
+import { CONCEPTS, MOODS, conceptTemplate, generateTemplate } from "@/lib/mjengo/design-generator";
+import type { SizeId } from "@/lib/mjengo/design-templates";
 
 const SIZES = [
 	{ id: "instagram", label: "Instagram post", note: "1080 x 1080", w: 1080, h: 1080 },
@@ -67,6 +70,9 @@ export default function DesignHome() {
 	const [pinErr, setPinErr] = useState<string | null>(null);
 	const [pinQ, setPinQ] = useState("");
 	const [cat, setCat] = useState<(typeof CATEGORIES)[number]>("All");
+	const [ideas, setIdeas] = useState(12);
+	const [shuffle, setShuffle] = useState(0);
+	const [mood, setMood] = useState("All");
 	const [src, setSrc] = useState<"pinterest" | InspireSource>("pinterest");
 	const searchPins = (q: string, from: "pinterest" | InspireSource = src) => {
 		setPins(null); setPinErr(null);
@@ -107,18 +113,15 @@ export default function DesignHome() {
 
 			<Fold id="start" title="Start a design" open={isOpen("start")} onToggle={toggle}>
 				<div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-7">
-					{SIZES.map((s) => {
-						const r = s.w / s.h;
-						return (
-							<Link key={s.id} href={`/dashboard/mjengo/design/editor?size=${s.id}`} className="group flex flex-col items-center gap-2 rounded-2xl border border-serene-neutral-200/70 bg-serene-neutral-50 p-3 text-center transition hover:border-[#7D2AE8]/50 hover:bg-white hover:shadow-sm">
-								<span className="flex h-20 w-full items-center justify-center">
-									<span className="rounded-md bg-white shadow-sm ring-1 ring-black/5 transition group-hover:ring-[#7D2AE8]/40" style={{ width: r >= 1 ? 64 : 64 * r, height: r >= 1 ? 64 / r : 64, background: "linear-gradient(135deg,#00C4CC22,#7D2AE833)" }} />
-								</span>
-								<span className="text-xs font-semibold text-serene-neutral-800">{s.label}</span>
-								<span className="text-[11px] text-serene-neutral-500">{s.note}</span>
-							</Link>
-						);
-					})}
+					{SIZES.map((s) => (
+						<Link key={s.id} href={`/dashboard/mjengo/design/editor?size=${s.id}`} className="group flex flex-col items-center gap-2 rounded-2xl border border-serene-neutral-200/70 bg-[#F6F6F4] p-3 text-center transition hover:-translate-y-0.5 hover:border-[#7D2AE8]/50 hover:bg-white hover:shadow-md">
+							<span className="flex h-[112px] w-full items-center justify-center rounded-xl bg-white/70">
+								<SizeMock size={s.id as SizeId} className="transition-transform group-hover:scale-105" />
+							</span>
+							<span className="text-xs font-semibold text-serene-neutral-800">{s.label}</span>
+							<span className="text-[11px] text-serene-neutral-500">{s.note}</span>
+						</Link>
+					))}
 				</div>
 			</Fold>
 
@@ -136,6 +139,16 @@ export default function DesignHome() {
 							<span className="block text-xs text-serene-neutral-500">{t.category} · {ASPECT[t.size].w} x {ASPECT[t.size].h}</span>
 						</Link>
 					))}
+					{Array.from({ length: ideas }).map((_, i) => {
+						const t = generateTemplate(1000 + i + shuffle * 97, cat === "All" ? {} : { category: cat });
+						return (
+							<Link key={`${t.id}-${i}`} href={`/dashboard/mjengo/design/editor?template=${t.id}&size=${t.size}`} className="group mb-4 block break-inside-avoid">
+								<span className="block transition group-hover:-translate-y-0.5 group-hover:[&>div]:ring-[#7D2AE8] group-hover:[&>div]:shadow-md"><TemplatePreview template={t} /></span>
+								<span className="mt-1.5 block truncate text-sm font-medium text-serene-neutral-800">{t.name}</span>
+								<span className="block text-xs text-serene-neutral-500">{t.category} · fresh idea</span>
+							</Link>
+						);
+					})}
 					{cat === "All" && templates.map((t) => (
 						<div key={t.id} className="group relative mb-4 break-inside-avoid">
 							<Link href={`/dashboard/mjengo/design/editor?id=${t.id}&copy=1`} className="block">
@@ -146,6 +159,10 @@ export default function DesignHome() {
 							<button aria-label={`Delete ${t.name}`} onClick={() => remove(t)} className="absolute right-1.5 top-1.5 hidden h-7 w-7 items-center justify-center rounded-md bg-white text-red-600 shadow group-hover:flex"><Trash2 className="h-3.5 w-3.5" /></button>
 						</div>
 					))}
+				</div>
+				<div className="flex flex-wrap justify-center gap-2 pt-1">
+					<Button variant="outline" onClick={() => setIdeas((n) => n + 12)}>Show more ideas</Button>
+					<Button variant="ghost" onClick={() => { setShuffle((n) => n + 1); setIdeas(12); }}>Shuffle</Button>
 				</div>
 			</Fold>
 
@@ -158,8 +175,28 @@ export default function DesignHome() {
 					<Button type="submit" size="sm" variant="outline" className="h-8">Search</Button>
 				</form>
 			}>
+				<div className="mb-5">
+					<div className="mb-3 flex gap-1.5 overflow-x-auto pb-1 scrollbar-hide">
+						{MOODS.map((m) => (
+							<button key={m} onClick={() => setMood(m)} aria-pressed={mood === m} className={cn("shrink-0 rounded-full border px-3.5 py-1.5 text-sm font-medium transition", mood === m ? "border-[#7D2AE8] bg-[#7D2AE8] text-white" : "border-serene-neutral-200 bg-white text-serene-neutral-700 hover:border-[#7D2AE8]/50")}>{m}</button>
+						))}
+					</div>
+					<div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
+						{CONCEPTS.filter((c) => mood === "All" || c.mood === mood).map((c, i) => (
+							<Link key={c.id} href={`/dashboard/mjengo/design/editor?concept=${c.id}&variant=${i}&size=instagram`} className="group block">
+								<span className="block transition group-hover:-translate-y-0.5 group-hover:[&>div]:ring-[#7D2AE8] group-hover:[&>div]:shadow-md"><TemplatePreview template={conceptTemplate(c.id, "instagram", i)} /></span>
+								<span className="mt-1.5 flex items-center gap-1.5">
+									<span className="truncate text-sm font-medium text-serene-neutral-800">{c.name}</span>
+									<span className="ml-auto flex shrink-0">{[c.bg, c.accent, c.accent2, c.ink].map((col, k) => <i key={k} className="-ml-1 h-3 w-3 rounded-full ring-1 ring-white first:ml-0" style={{ background: col }} />)}</span>
+								</span>
+								<span className="block truncate text-xs text-serene-neutral-500">{c.mood} · {c.head}</span>
+							</Link>
+						))}
+					</div>
+				</div>
+				<p className="mb-2 text-xs font-semibold uppercase tracking-wider text-serene-neutral-500">Photos and pins</p>
 				{pinErr ? (
-					<p className="rounded-2xl border border-dashed border-serene-neutral-200 bg-white p-6 text-center text-sm text-serene-neutral-500">{pinErr}</p>
+					<p className="rounded-2xl border border-dashed border-serene-neutral-200 bg-white p-4 text-center text-sm text-serene-neutral-500">{pinErr}</p>
 				) : !pins ? <MjengoLoader compact label="Finding ideas" /> : pins.length === 0 ? (
 					<p className="rounded-2xl border border-dashed border-serene-neutral-200 bg-white p-6 text-center text-sm text-serene-neutral-500">No suggestions for that search.</p>
 				) : (
