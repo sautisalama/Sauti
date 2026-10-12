@@ -1,9 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useIsMobile } from "@/hooks/use-mobile";
 import Link from "next/link";
 import { addDays, addMonths, eachDayOfInterval, endOfMonth, endOfWeek, format, isSameDay, isSameMonth, isToday, startOfMonth, startOfWeek } from "date-fns";
-import { CalendarDays, CalendarPlus, ChevronLeft, ChevronRight, Clock, ExternalLink, Eye, FileText, Flag, GraduationCap, Loader2, MapPin, Megaphone, PenLine, Phone, Plane, Presentation, Settings, Sparkles, Target, Trash2, UserRound, Users, Utensils, Video, Wallet, X } from "lucide-react";
+import { CalendarDays, CalendarPlus, Plus, ChevronLeft, ChevronRight, Clock, ExternalLink, Eye, FileText, Flag, GraduationCap, Loader2, MapPin, Megaphone, PenLine, Phone, Plane, Presentation, Settings, Sparkles, Target, Trash2, UserRound, Users, Utensils, Video, Wallet, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -39,6 +40,7 @@ export default function CalendarPage() {
 	const [data, setData] = useState<CalMonth | null>(null);
 	const [create, setCreate] = useState<{ date: Date; from?: string; to?: string } | null>(null);
 	const [dayOpen, setDayOpen] = useState<Date | null>(null);
+	const mobile = useIsMobile();
 	const [smart, setSmart] = useState(true);
 	const [icons, setIcons] = useState<Record<string, string>>({});
 	useEffect(() => {
@@ -49,6 +51,12 @@ export default function CalendarPage() {
 	}, []);
 	const toggleSmart = (v: boolean) => { setSmart(v); try { localStorage.setItem("ss_cal_smart", v ? "1" : "0"); } catch { /* ignore */ } };
 	const [view, setView] = useState<CalItem | null>(null);
+	// On a phone the month is a compact grid with the chosen day listed underneath, like Google Calendar.
+	useEffect(() => {
+		if (!mobile) return;
+		setDayOpen((cur) => (cur && isSameMonth(cur, month) ? cur : isSameMonth(new Date(), month) ? new Date() : month));
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [mobile, month]);
 	const [hidden, setHidden] = useState<Set<CalKind>>(new Set());
 
 	const gridStart = useMemo(() => startOfWeek(startOfMonth(month), { weekStartsOn: 1 }), [month]);
@@ -90,16 +98,16 @@ export default function CalendarPage() {
 
 	return (
 		<div className="mx-auto max-w-[1400px] space-y-3">
-			<div className="flex flex-wrap items-center gap-2">
-				<Button variant="outline" size="sm" onClick={() => setMonth(startOfMonth(new Date()))}>Today</Button>
-				<Button variant="ghost" size="icon" aria-label="Previous month" onClick={() => setMonth((m) => addMonths(m, -1))}><ChevronLeft className="h-5 w-5" /></Button>
-				<Button variant="ghost" size="icon" aria-label="Next month" onClick={() => setMonth((m) => addMonths(m, 1))}><ChevronRight className="h-5 w-5" /></Button>
-				<h2 className="text-xl font-semibold text-sauti-dark">{format(month, "MMMM yyyy")}</h2>
-				{!data && <Loader2 className="h-4 w-4 animate-spin text-serene-neutral-400" />}
+			<div className="flex min-h-9 flex-nowrap items-center gap-1">
+				<h2 className="min-w-0 truncate pr-1 text-base font-semibold text-sauti-dark sm:text-lg">{format(month, mobile ? "MMMM" : "MMMM yyyy")}{mobile && <span className="ml-1 font-normal text-serene-neutral-500">{format(month, "yyyy")}</span>}</h2>
+				<Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" aria-label="Previous month" onClick={() => setMonth((m) => addMonths(m, -1))}><ChevronLeft className="h-4 w-4" /></Button>
+				<Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" aria-label="Next month" onClick={() => setMonth((m) => addMonths(m, 1))}><ChevronRight className="h-4 w-4" /></Button>
+				{!data && <Loader2 className="h-4 w-4 shrink-0 animate-spin text-serene-neutral-400" />}
 				<span className="flex-1" />
-				<Button asChild variant="outline" size="sm" className="hidden h-9 gap-1.5 sm:inline-flex"><Link href="/dashboard/mjengo/design#schedule"><Megaphone className="h-4 w-4" /> Schedule content</Link></Button>
-				<Button asChild variant="ghost" size="icon" aria-label="Calendar settings" title="Calendar settings"><Link href="/dashboard/profile?section=calendar"><Settings className="h-5 w-5" /></Link></Button>
-				<Button className="gap-2 bg-sauti-teal hover:bg-sauti-dark" onClick={() => setCreate({ date: dayOpen ?? new Date() })}><CalendarPlus className="h-4 w-4" /> Create</Button>
+				<Button variant="outline" size="sm" className="h-8 shrink-0 px-3 text-xs" onClick={() => { setMonth(startOfMonth(new Date())); if (mobile) setDayOpen(new Date()); }}>Today</Button>
+				<Button asChild variant="ghost" size="icon" className="hidden h-8 w-8 shrink-0 sm:inline-flex" aria-label="Schedule content" title="Schedule content"><Link href="/dashboard/mjengo/design#schedule"><Megaphone className="h-4 w-4" /></Link></Button>
+				<Button asChild variant="ghost" size="icon" className="h-8 w-8 shrink-0" aria-label="Calendar settings" title="Calendar settings"><Link href="/dashboard/profile?section=calendar"><Settings className="h-4 w-4" /></Link></Button>
+				<Button size="sm" className="hidden h-8 shrink-0 gap-1.5 bg-sauti-teal px-3 text-xs hover:bg-sauti-dark sm:inline-flex" onClick={() => setCreate({ date: dayOpen ?? new Date() })}><CalendarPlus className="h-3.5 w-3.5" /> Create</Button>
 			</div>
 
 			{data && !data.googleConnected && data.googleConfigured && (
@@ -112,20 +120,25 @@ export default function CalendarPage() {
 			<div className="grid gap-4 lg:grid-cols-[1fr_280px]">
 				<div className="overflow-hidden rounded-2xl border border-serene-neutral-200/70 bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04)]">
 					<div className="grid grid-cols-7 border-b border-serene-neutral-100 text-center text-[11px] font-semibold uppercase tracking-wider text-serene-neutral-500">
-						{["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((d) => <div key={d} className="py-2">{d}</div>)}
+						{["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((d) => <div key={d} className="py-1.5 sm:py-2">{mobile ? d[0] : d}</div>)}
 					</div>
-					<div className={cn("grid grid-cols-7", days.length > 35 ? "auto-rows-[minmax(112px,1fr)]" : "auto-rows-[minmax(124px,1fr)]")}>
+					<div className={cn("grid grid-cols-7", mobile ? "auto-rows-[52px]" : days.length > 35 ? "auto-rows-[minmax(112px,1fr)]" : "auto-rows-[minmax(124px,1fr)]")}>
 						{days.map((d) => {
 							const list = onDay(d);
 							return (
 								<div
 									key={d.toISOString()}
 									onClick={() => setDayOpen(d)}
-									className={cn("cursor-pointer border-b border-r border-serene-neutral-100 p-1 transition hover:bg-serene-neutral-50/70", !isSameMonth(d, month) && "bg-serene-neutral-50/50")}
+									className={cn("cursor-pointer border-serene-neutral-100 p-1 transition hover:bg-serene-neutral-50/70", mobile ? "border-t" : "border-b border-r", !isSameMonth(d, month) && !mobile && "bg-serene-neutral-50/50")}
 								>
 									<div className="mb-0.5 flex justify-center">
-										<span className={cn("flex h-7 w-7 items-center justify-center rounded-full text-xs", isToday(d) ? "bg-sauti-teal font-bold text-white" : isSameMonth(d, month) ? "text-serene-neutral-800" : "text-serene-neutral-300")}>{format(d, "d")}</span>
+										<span className={cn("flex h-7 w-7 items-center justify-center rounded-full text-xs", isToday(d) ? "bg-sauti-teal font-bold text-white" : mobile && dayOpen && isSameDay(d, dayOpen) ? "bg-sauti-teal-light font-bold text-sauti-teal ring-1 ring-sauti-teal" : isSameMonth(d, month) ? "text-serene-neutral-800" : "text-serene-neutral-300")}>{format(d, "d")}</span>
 									</div>
+									{mobile ? (
+										<div className="flex justify-center gap-0.5">
+											{list.slice(0, 3).map((i) => <span key={i.id} className={cn("h-1.5 w-1.5 rounded-full", KIND[i.kind].dot)} />)}
+										</div>
+									) : (
 									<div className="space-y-0.5">
 										{list.slice(0, 3).map((i) => (
 											<button key={i.id} onClick={(e) => { e.stopPropagation(); setView(i); }} className={cn("flex w-full items-center gap-1 truncate rounded px-1.5 py-0.5 text-left text-[11px] font-medium", i.allDay || i.kind === "event" || i.kind === "meeting" ? KIND[i.kind].chip : "text-serene-neutral-800 hover:bg-serene-neutral-100")}>
@@ -136,6 +149,7 @@ export default function CalendarPage() {
 										))}
 										{list.length > 3 && <button onClick={(e) => { e.stopPropagation(); setCreate(null); setView(list[3]); }} className="px-1.5 text-[11px] font-medium text-serene-neutral-500 hover:underline">+{list.length - 3} more</button>}
 									</div>
+									)}
 								</div>
 							);
 						})}
@@ -191,6 +205,12 @@ export default function CalendarPage() {
 			</div>
 
 			{!data && <MjengoLoader compact label="Loading the calendar" />}
+
+			{mobile && (
+				<button onClick={() => setCreate({ date: dayOpen ?? new Date() })} aria-label="Create event" className="fixed bottom-5 right-5 z-40 flex h-14 w-14 items-center justify-center rounded-2xl bg-sauti-teal text-white shadow-lg active:scale-95">
+					<Plus className="h-6 w-6" />
+				</button>
+			)}
 
 			<CreateDialog slot={create} onClose={() => setCreate(null)} onCreated={async () => { setCreate(null); await load(); }} />
 			<ViewDialog item={view} onClose={() => setView(null)} onRemoved={async () => { setView(null); await load(); }} />
