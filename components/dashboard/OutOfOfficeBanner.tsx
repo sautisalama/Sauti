@@ -132,14 +132,15 @@ export function OutOfOfficeBanner({ userId, variant = 'full', className = '' }: 
         />
       </div>
       
-      <div className="relative p-5 flex items-center gap-4">
+      <div className="relative flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:gap-4 sm:p-5">
         {/* Icon */}
-        <div className="h-14 w-14 rounded-2xl bg-amber-100 flex items-center justify-center flex-shrink-0 shadow-sm">
-          <AlertTriangle className="h-7 w-7 text-amber-600" />
+        <div className="flex items-start gap-3 sm:contents">
+        <div className="h-11 w-11 rounded-2xl bg-amber-100 flex items-center justify-center flex-shrink-0 shadow-sm sm:h-14 sm:w-14">
+          <AlertTriangle className="h-6 w-6 text-amber-600 sm:h-7 sm:w-7" />
         </div>
         
         {/* Content */}
-        <div className="flex-1 min-w-0">
+        <div className="flex-1 min-w-0 pr-8 sm:pr-0">
           <div className="flex items-center gap-2 mb-1">
             <h3 className="font-bold text-amber-900">Out of Office Mode</h3>
             <span className="px-2 py-0.5 bg-amber-200 text-amber-800 text-xs font-bold rounded-full">
@@ -153,12 +154,13 @@ export function OutOfOfficeBanner({ userId, variant = 'full', className = '' }: 
             )}
           </p>
         </div>
+        </div>
         
         {/* Actions */}
-        <div className="flex items-center gap-2 flex-shrink-0">
+        <div className="flex items-center gap-2 sm:flex-shrink-0">
           <Button
             variant="outline"
-            className="h-10 px-4 border-amber-300 bg-white/80 text-amber-700 hover:bg-amber-50 hover:text-amber-900 rounded-xl font-medium"
+            className="h-10 flex-1 px-4 border-amber-300 sm:flex-none bg-white/80 text-amber-700 hover:bg-amber-50 hover:text-amber-900 rounded-xl font-medium"
             onClick={handleToggle}
             disabled={loading}
           >
@@ -174,7 +176,8 @@ export function OutOfOfficeBanner({ userId, variant = 'full', className = '' }: 
           <Button
             variant="ghost"
             size="icon"
-            className="h-8 w-8 text-amber-600 hover:text-amber-800 hover:bg-amber-100 rounded-lg"
+            aria-label="Dismiss"
+            className="absolute right-2 top-2 h-8 w-8 text-amber-600 hover:text-amber-800 hover:bg-amber-100 rounded-lg sm:static"
             onClick={() => setDismissed(true)}
           >
             <X className="h-4 w-4" />

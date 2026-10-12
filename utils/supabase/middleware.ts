@@ -82,6 +82,13 @@ export async function updateSession(request: NextRequest) {
 		"/join", // group invite pages show a preview before asking you to sign in
 	];
 	const path = request.nextUrl.pathname;
+	// An OAuth redirect that fell back to the site root (for example on Android, when the app link was not on
+	// the allow list) carries the sign-in code with it: finish the sign-in instead of showing the landing page.
+	if (path === "/" && request.nextUrl.searchParams.has("code")) {
+		const url = request.nextUrl.clone();
+		url.pathname = "/api/auth/callback";
+		return NextResponse.redirect(url);
+	}
 	const isPublic = path === "/" || PUBLIC_PREFIXES.some((p) => path === p || path.startsWith(p.endsWith("/") ? p : `${p}/`) || (p === "/api" && path.startsWith("/api")));
 
 	if (!user && !isPublic) {

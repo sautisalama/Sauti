@@ -53,6 +53,10 @@ export function LandingPage({ publications = [] }: { publications?: FeedItem[] }
 				data: { session },
 			} = await supabase.auth.getSession();
 			setIsAuthenticated(!!session);
+			// Signed in on Android or in the installed app: the dashboard is home, not the marketing page.
+			if (session && (/Android/i.test(navigator.userAgent) || window.matchMedia("(display-mode: standalone)").matches)) {
+				window.location.replace("/dashboard");
+			}
 		};
 
 		checkAuth();
