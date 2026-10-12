@@ -2,8 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { addMonths, eachDayOfInterval, endOfMonth, endOfWeek, format, isSameDay, isSameMonth, startOfMonth, startOfWeek } from "date-fns";
-import { Check, ChevronLeft, ChevronRight, ClipboardCopy, ExternalLink, ImageIcon, Loader2, Palette, Plus, Send, Sparkles, Trash2, X } from "lucide-react";
+import { addDays, addMonths, eachDayOfInterval, endOfMonth, endOfWeek, format, isSameDay, isSameMonth, startOfMonth, startOfWeek } from "date-fns";
+import { CalendarDays, Check, ChevronLeft, ChevronRight, ClipboardCopy, ExternalLink, ImageIcon, Loader2, Palette, Plus, Send, Sparkles, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -20,6 +20,7 @@ import type { AssetRow } from "@/app/actions/mjengo-ai";
 import { MjengoLoader } from "../_components/MjengoLoader";
 import { TemplatePicker } from "../_components/TemplatePicker";
 import { saveTemplate } from "@/app/actions/mjengo-templates";
+import { holidayOn } from "@/lib/mjengo/holidays-ke";
 
 const STATUS: Record<PostRow["status"], string> = { draft: "Draft", scheduled: "Scheduled", posted: "Posted", cancelled: "Cancelled" };
 const toLocalInput = (iso: string | null) => (iso ? format(new Date(iso), "yyyy-MM-dd'T'HH:mm") : "");
@@ -27,6 +28,8 @@ const toLocalInput = (iso: string | null) => (iso ? format(new Date(iso), "yyyy-
 export default function ContentPage() {
 	const { toast } = useToast();
 	const [tab, setTab] = useState<"calendar" | "studio">("calendar");
+	const [day, setDay] = useState(() => new Date());
+	const [showMonth, setShowMonth] = useState(false);
 	const [posts, setPosts] = useState<PostRow[] | null>(null);
 	const [assets, setAssets] = useState<AssetRow[]>([]);
 	const [month, setMonth] = useState(() => startOfMonth(new Date()));
@@ -79,11 +82,72 @@ export default function ContentPage() {
 				</div>
 			</div>
 
+			{tab === "calendar" && (
+				<>
+					<section className="relative overflow-hidden rounded-2xl border border-serene-blue-100 bg-gradient-to-br from-serene-blue-50 via-white to-sauti-teal-light/40 p-6 sm:p-8">
+						<h3 className="text-2xl font-bold tracking-tight text-sauti-dark sm:text-3xl">Content <span className="text-sauti-teal">Calendar</span></h3>
+						<p className="mt-1 max-w-xl text-sm text-serene-neutral-600">Plan what goes out, to which accounts and when. Designs, pictures and wording stay together with the post.</p>
+					</section>
+
+					<div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+						<Tile tint="bg-sauti-teal-light" icon={Plus} title="Write a post" hint="Words, pictures and the accounts it goes to." onClick={() => start(day)} />
+						<Tile tint="bg-sauti-yellow-light" icon={Palette} title="Start from a design" hint="Make a graphic, then schedule it." href="/dashboard/mjengo/design" />
+						<Tile tint="bg-serene-blue-50" icon={CalendarDays} title="Month view" hint={showMonth ? "Hide the whole month." : "See the whole month at once."} onClick={() => setShowMonth((v) => !v)} />
+					</div>
+
+					<section className="rounded-2xl border border-serene-neutral-200/70 bg-white p-4 shadow-[0_1px_2px_rgba(16,24,40,0.04)] sm:p-5">
+						<div className="flex flex-wrap items-center gap-3">
+							<h3 className="text-base font-bold text-sauti-dark">{isSameDay(day, new Date()) ? "Today" : format(day, "EEEE")}<span className="ml-2 text-sm font-normal text-serene-neutral-500">{format(day, "d MMMM")}</span></h3>
+							{holidayOn(day) && <span className="rounded-full bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-800">{holidayOn(day)}</span>}
+							<span className="flex-1" />
+							<div className="flex items-center gap-1">
+								<button onClick={() => setDay((d) => addDays(d, -7))} aria-label="Previous week" className="flex h-9 w-9 items-center justify-center rounded-xl hover:bg-serene-neutral-100"><ChevronLeft className="h-4 w-4" /></button>
+								{Array.from({ length: 7 }, (_, i) => addDays(startOfWeek(day, { weekStartsOn: 1 }), i)).map((d) => {
+									const n = byDay(d).length;
+									return (
+										<button key={d.toISOString()} onClick={() => setDay(d)} aria-pressed={isSameDay(d, day)} className={cn("relative flex w-10 flex-col items-center rounded-xl py-1.5 text-xs transition sm:w-12", isSameDay(d, day) ? "bg-sauti-teal text-white" : isSameDay(d, new Date()) ? "bg-sauti-teal-light text-sauti-dark" : holidayOn(d) ? "bg-amber-50 hover:bg-amber-100" : "hover:bg-serene-neutral-100")}>
+											<span className="text-[10px] uppercase tracking-wide opacity-80">{format(d, "EEE")}</span>
+											<span className="text-base font-semibold">{format(d, "d")}</span>
+											{n > 0 && <span className={cn("absolute -right-0.5 -top-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full px-1 text-[10px] font-bold", isSameDay(d, day) ? "bg-white text-sauti-teal" : "bg-rose-500 text-white")}>{n}</span>}
+										</button>
+									);
+								})}
+								<button onClick={() => setDay((d) => addDays(d, 7))} aria-label="Next week" className="flex h-9 w-9 items-center justify-center rounded-xl hover:bg-serene-neutral-100"><ChevronRight className="h-4 w-4" /></button>
+							</div>
+						</div>
+						<div className="mt-4">
+							{byDay(day).length === 0 ? (
+								<div className="flex flex-col items-center rounded-2xl border border-dashed border-serene-neutral-200 py-10 text-center">
+									<span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-sauti-teal-light text-sauti-teal"><Send className="h-6 w-6" /></span>
+									<p className="mt-3 text-sm font-semibold text-serene-neutral-900">Nothing going out {isSameDay(day, new Date()) ? "today" : `on ${format(day, "EEEE")}`}</p>
+									<button onClick={() => start(day)} className="mt-2 text-sm font-medium text-sauti-teal hover:underline">Plan a post for this day</button>
+								</div>
+							) : (
+								<ul className="space-y-2">
+									{byDay(day).map((p) => (
+										<li key={p.id}>
+											<button onClick={() => setEdit({ ...p, whenLocal: toLocalInput(p.scheduled_for) })} className="flex w-full items-center gap-3 rounded-xl border border-serene-neutral-200/70 p-3 text-left transition hover:border-sauti-teal/40">
+												<span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-rose-50 text-rose-600"><Send className="h-4 w-4" /></span>
+												<span className="min-w-0 flex-1">
+													<span className="block truncate text-sm font-semibold text-serene-neutral-900">{p.title || p.body.slice(0, 60) || "Untitled post"}</span>
+													<span className="block text-xs text-serene-neutral-500">{p.scheduled_for ? format(new Date(p.scheduled_for), "h:mm a") : ""} · {STATUS[p.status]}</span>
+												</span>
+												<span className="flex shrink-0 -space-x-0.5">{p.channels.map((c) => <span key={c} className="h-2.5 w-2.5 rounded-full ring-1 ring-white" style={{ background: CHANNEL_INFO[c].color }} title={CHANNEL_INFO[c].label} />)}</span>
+											</button>
+										</li>
+									))}
+								</ul>
+							)}
+						</div>
+					</section>
+				</>
+			)}
+
 			<ChannelsBar state={chan} onChanged={load} />
 
 			{tab === "calendar" ? (
 				<>
-					<div className="overflow-hidden rounded-2xl border border-serene-neutral-200/70 bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04)]">
+					{showMonth && <div className="overflow-hidden rounded-2xl border border-serene-neutral-200/70 bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04)]">
 						<div className="flex items-center gap-2 border-b border-serene-neutral-100 p-3">
 							<h3 className="flex-1 text-base font-semibold text-sauti-dark">{format(month, "MMMM yyyy")}</h3>
 							<Button variant="ghost" size="sm" onClick={() => setMonth(startOfMonth(new Date()))}>Today</Button>
@@ -112,7 +176,7 @@ export default function ContentPage() {
 								);
 							})}
 						</div>
-					</div>
+					</div>}
 
 					{drafts.length > 0 && (
 						<section>
@@ -416,4 +480,17 @@ ${t.body}` : t.body } : cur)); setPickTpl(false); }} />
 			</DialogContent>
 		</Dialog>
 	);
+}
+
+
+function Tile({ icon: Icon, title, hint, tint, onClick, href }: { icon: typeof Plus; title: string; hint: string; tint: string; onClick?: () => void; href?: string }) {
+	const cls = cn("rounded-2xl border border-black/5 p-4 text-left shadow-[0_1px_2px_rgba(16,24,40,0.04)] transition hover:-translate-y-0.5 hover:shadow-md", tint);
+	const body = (
+		<>
+			<span className="mb-3 flex h-9 w-9 items-center justify-center rounded-xl bg-white/80 text-sauti-teal"><Icon className="h-4 w-4" /></span>
+			<span className="block text-sm font-bold text-serene-neutral-900">{title}</span>
+			<span className="block text-xs text-serene-neutral-600">{hint}</span>
+		</>
+	);
+	return href ? <Link href={href} className={cn(cls, "block")}>{body}</Link> : <button onClick={onClick} className={cls}>{body}</button>;
 }

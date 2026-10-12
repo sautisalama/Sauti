@@ -6,6 +6,7 @@ import { addDays, endOfDay, format, isSameDay, startOfDay, startOfWeek } from "d
 import { CalendarClock, CalendarDays, ChevronLeft, ChevronRight, Clapperboard, History, Keyboard, Link2, NotebookText, Video, Zap } from "lucide-react";
 import { unwrap } from "@/lib/action-result";
 import { cn } from "@/lib/utils";
+import { holidayOn } from "@/lib/mjengo/holidays-ke";
 import { listMeetings, meetHome, type MeetHomeItem, type MeetingRow } from "@/app/actions/mjengo-meet";
 import { MeetChooser } from "@/app/dashboard/mjengo/_components/MeetChooser";
 
@@ -65,9 +66,10 @@ export function MeetHome({ isAdmin }: { isAdmin: boolean }) {
 						<div className="flex items-center gap-1">
 							<button onClick={() => setDay((d) => addDays(d, -7))} aria-label="Previous week" className="flex h-9 w-9 items-center justify-center rounded-xl hover:bg-serene-neutral-100"><ChevronLeft className="h-4 w-4" /></button>
 							{week.map((d) => (
-								<button key={d.toISOString()} onClick={() => setDay(startOfDay(d))} aria-pressed={isSameDay(d, day)} className={cn("flex w-10 flex-col items-center rounded-xl py-1.5 text-xs transition sm:w-12", isSameDay(d, day) ? "bg-sauti-teal text-white" : isSameDay(d, new Date()) ? "bg-sauti-teal-light text-sauti-dark" : "hover:bg-serene-neutral-100")}>
+								<button key={d.toISOString()} onClick={() => setDay(startOfDay(d))} aria-pressed={isSameDay(d, day)} className={cn("relative flex w-10 flex-col items-center rounded-xl py-1.5 text-xs transition sm:w-12", isSameDay(d, day) ? "bg-sauti-teal text-white" : isSameDay(d, new Date()) ? "bg-sauti-teal-light text-sauti-dark" : "hover:bg-serene-neutral-100")}>
 									<span className="text-[10px] uppercase tracking-wide opacity-80">{format(d, "EEE")}</span>
 									<span className="text-base font-semibold">{format(d, "d")}</span>
+									{holidayOn(d) && <span title={holidayOn(d) ?? ""} className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-amber-400" />}
 								</button>
 							))}
 							<button onClick={() => setDay((d) => addDays(d, 7))} aria-label="Next week" className="flex h-9 w-9 items-center justify-center rounded-xl hover:bg-serene-neutral-100"><ChevronRight className="h-4 w-4" /></button>
