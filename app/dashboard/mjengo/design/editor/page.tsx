@@ -5,7 +5,7 @@ import { MjengoLoader } from "../../_components/MjengoLoader";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Canvas, Circle, FabricImage, Line, Rect, Textbox, Triangle, type FabricObject } from "fabric";
-import { AlignCenter, AlignLeft, AlignRight, ArrowLeft, Bold, Copy, Download, Image as ImageIcon, Italic, Gift, LayoutTemplate, Loader2, Redo2, Save, Shapes, Trash2, Type, Undo2, Upload } from "lucide-react";
+import { AlignCenter, AlignLeft, AlignRight, ArrowLeft, Bold, Copy, Download, Image as ImageIcon, Italic, Gift, LayoutTemplate, Loader2, Redo2, Save, Shapes, Sparkles, Trash2, Type, Undo2, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
@@ -14,7 +14,8 @@ import { cn } from "@/lib/utils";
 import { putToSignedUrl } from "@/lib/client/upload";
 import { deleteTemplate, listTemplates, saveTemplate, studioRegister, studioUpload, type TemplateRow } from "@/app/actions/mjengo-templates";
 import { listAssets, type AssetRow } from "@/app/actions/mjengo-ai";
-import { pinterestImage } from "@/app/actions/mjengo-assist";
+import { inspireImage } from "@/app/actions/mjengo-inspire";
+import { InspirePanel } from "./_InspirePanel";
 import { PostThis } from "../../_components/PostThis";
 
 /* Canva's palette: the editor borrows its look so it feels familiar. */
@@ -31,7 +32,7 @@ const SIZES = [
 	{ id: "poster", label: "A4 poster", w: 1240, h: 1754 },
 ] as const;
 
-type Panel = "templates" | "text" | "shapes" | "uploads" | "studio" | "market";
+type Panel = "templates" | "text" | "shapes" | "uploads" | "inspire" | "studio" | "market";
 type Builder = (c: Canvas, w: number, h: number) => void;
 
 const text = (t: string, o: Partial<ConstructorParameters<typeof Textbox>[1]>) => new Textbox(t, { fontFamily: "Inter", fill: CANVA.ink, ...o });
@@ -222,7 +223,7 @@ function DesignEditor() {
 	useEffect(() => {
 		if (!inspire) return;
 		let on = true;
-		unwrap(pinterestImage(inspire)).then(async (data) => {
+		unwrap(inspireImage(inspire)).then(async (data) => {
 			const c = canvas.current;
 			if (!c || !on) return;
 			const img = await FabricImage.fromURL(data);
@@ -378,6 +379,7 @@ function DesignEditor() {
 		["text", "Text", <Type key="x" className="h-5 w-5" />],
 		["shapes", "Shapes", <Shapes key="s" className="h-5 w-5" />],
 		["uploads", "Uploads", <Upload key="u" className="h-5 w-5" />],
+		["inspire", "Inspire", <Sparkles key="n" className="h-5 w-5" />],
 		["studio", "Studio", <ImageIcon key="i" className="h-5 w-5" />],
 		["market", "Free", <Gift key="m" className="h-5 w-5" />],
 	];
@@ -499,6 +501,13 @@ function DesignEditor() {
 							<input ref={fileInput} type="file" accept="image/*" className="hidden" onChange={(e) => upload(e.target.files)} />
 							<p className="text-xs text-serene-neutral-500">Images stay in this design until you save it to Studio.</p>
 						</div>
+					)}
+					{panel === "inspire" && (
+						<InspirePanel
+							onPlace={(data) => addImage(data)}
+							onColour={(hex) => { if (o) set(o.type === "line" ? { stroke: hex } : { fill: hex }); else navigator.clipboard?.writeText(hex).then(() => toast({ title: `${hex} copied`, description: "Select something on the page to fill it with a colour." })).catch(() => undefined); }}
+							baseColour="#7D2AE8"
+						/>
 					)}
 					{panel === "market" && (
 						<div className="space-y-3 text-sm">

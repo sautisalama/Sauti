@@ -11,7 +11,7 @@ export default async function MeetPage({ params, searchParams }: { params: Promi
 	const { code } = await params;
 	const { embed } = await searchParams;
 	if (!/^[a-z0-9]{3}-[a-z0-9]{4}-[a-z0-9]{3}$/.test(code)) notFound();
-	const { data } = await looseAdmin().from("mjengo_meetings").select("title, mode, ended_at").eq("code", code).maybeSingle();
+	const { data } = await looseAdmin().from("mjengo_meetings").select("title, mode, ended_at, description, resources").eq("code", code).maybeSingle();
 	if (!data) notFound();
 	const actor = await getActor();
 	return (
@@ -19,6 +19,8 @@ export default async function MeetPage({ params, searchParams }: { params: Promi
 			code={code}
 			mode={data.mode === "voice" ? "voice" : "video"}
 			title={data.title}
+			description={(data.description as string | null) ?? ""}
+			resources={(actor?.isAdmin ? (data.resources as { label: string; url: string }[] | null) : null) ?? []}
 			defaultName={actor?.name ?? ""}
 			canSave={!!actor?.isAdmin}
 			embedded={embed === "1"}

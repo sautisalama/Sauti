@@ -42,6 +42,8 @@ export interface NewEvent {
   /** How many alerts to send before it starts (0 to 10), and how many minutes apart. The last one lands one step before the start. */
   alerts?: number;
   alertEvery?: number;
+  /** Put an existing meeting on the calendar instead of making a new link. */
+  meetingCode?: string;
 }
 
 /** An authorised Google Calendar client for this person, refreshing the token when needed. */
@@ -135,7 +137,12 @@ async function create_(v: NewEvent): Promise<CalItem> {
   const alertEvery = Math.min(1440, Math.max(1, Math.round(v.alertEvery ?? 15)));
 
   let code: string | null = null;
-  if (v.videoCall && !v.block) {
+  if (v.meetingCode && !v.block) {
+    const { data: m } = await db.from('mjengo_meetings').select('code').eq('code', v.meetingCode).maybeSingle();
+    if (!m) throw new Error('That meeting link does not exist.');
+    code = m.code as string;
+  }
+  if (!code && v.videoCall && !v.block) {
     for (let i = 0; i < 5 && !code; i++) {
       const c = meetCode();
       const { error } = await db.from('mjengo_meetings').insert({ code: c, mode: 'video', title, created_by: a.id });

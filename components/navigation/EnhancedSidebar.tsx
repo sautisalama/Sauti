@@ -312,6 +312,7 @@ export function EnhancedSidebar({
 				{ id: "mj-mail", group: "Communicate", label: "Mail", icon: Mail, href: `${B}/mail`, section: "main", hint: "Read, write and organise email", badge: counts.mail || undefined },
 				{ id: "mj-chat", group: "Communicate", label: "Chats", icon: MessageCircle, href: `${B}/chat`, section: "main", hint: "Conversations with your team and contacts" },
 				{ id: "mj-contacts", group: "Communicate", label: "Contacts", icon: Users, href: `${B}/contacts`, section: "main", hint: "Your team's contact book" },
+				{ id: "mj-meet", group: "Communicate", label: "Meet", icon: Video, href: "/meet", section: "main", hint: "Start, schedule and join calls" },
 				{ id: "mj-calendar", group: "Communicate", label: "Calendar", icon: CalendarClock, href: `${B}/calendar`, section: "main", hint: "Month view, events and meetings" },
 				...(suite.meetings > 0 ? ([{ id: "mj-meetings", group: "Communicate", label: "Call notes", icon: Video, href: `${B}/meetings`, section: "main", hint: "Transcripts and notes from your calls" }] as SidebarItem[]) : []),
 				{ id: "mj-files", group: "Files", label: "Files", icon: HardDrive, href: `${B}/vault`, section: "main", hint: "Documents, PDFs, sheets and folders, shared and kept in step with Google Drive", badge: suite.files || undefined },

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { format } from "date-fns";
-import { Accessibility, Captions, MoreVertical, ShieldCheck, UserPlus, Check, Copy, Hand, Info, Loader2, Mail, MessageSquareText, Mic, MicOff, Minimize2, MonitorUp, PictureInPicture2, PhoneOff, SmartphoneNfc, Users, Video, VideoOff, Volume2, X } from "lucide-react";
+import { Accessibility, Captions, ExternalLink, MoreVertical, ShieldCheck, UserPlus, Check, Copy, Hand, Info, Loader2, Mail, MessageSquareText, Mic, MicOff, Minimize2, MonitorUp, PictureInPicture2, PhoneOff, SmartphoneNfc, Users, Video, VideoOff, Volume2, X } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import { unwrap } from "@/lib/action-result";
 import { saveTranscript, type TranscriptLine } from "@/app/actions/mjengo-meet";
@@ -23,7 +23,7 @@ const ICE: RTCIceServer[] = [
 const LANGS = [["en-KE", "English (Kenya)"], ["en-US", "English (US)"], ["en-GB", "English (UK)"], ["sw-KE", "Kiswahili"]] as const;
 
 /** A small peer-to-peer call room: preview and device choice, video or voice, companion mode, sharing, captions. */
-export function MeetRoom({ code, mode, title, defaultName, canSave, embedded }: { code: string; mode: "video" | "voice"; title: string | null; defaultName: string; canSave: boolean; embedded?: boolean }) {
+export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, description = "", resources = [] }: { code: string; mode: "video" | "voice"; title: string | null; defaultName: string; canSave: boolean; embedded?: boolean; description?: string; resources?: { label: string; url: string }[] }) {
 	const [name, setName] = useState(defaultName);
 	const [joined, setJoined] = useState(false);
 	const [micOn, setMicOn] = useState(true);
@@ -370,17 +370,17 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded }: 
 		return (
 			<main className="flex min-h-dvh flex-col bg-white text-[#202124]">
 				<header className="flex items-center gap-3 px-5 pt-5">
-					<span className="relative flex h-11 w-11 items-center justify-center rounded-full border-[3px] border-[#1a73e8] text-sm" aria-hidden>{secs}</span>
+					<span className="relative flex h-11 w-11 items-center justify-center rounded-full border-[3px] border-[#068297] text-sm" aria-hidden>{secs}</span>
 					<span className="text-sm text-[#5f6368]">Returning to home screen</span>
 				</header>
 				<div className="mx-auto mt-10 flex w-full max-w-xl flex-1 flex-col items-center px-5 text-center">
 					<h1 className="text-3xl font-normal sm:text-4xl">You left the meeting</h1>
 					<div className="mt-8 flex flex-wrap justify-center gap-3">
-						<button onClick={() => setLeft(false)} className="h-11 rounded-full border border-[#dadce0] px-6 text-sm font-medium text-[#1a73e8] hover:bg-[#f6fafe]">Rejoin</button>
-						<button onClick={() => window.location.assign(home)} className="h-11 rounded-full bg-[#1a73e8] px-6 text-sm font-medium text-white hover:bg-[#1765cc]">Return to home screen</button>
+						<button onClick={() => setLeft(false)} className="h-11 rounded-full border border-[#dadce0] px-6 text-sm font-medium text-[#068297] hover:bg-[#f1fafb]">Rejoin</button>
+						<button onClick={() => window.location.assign(home)} className="h-11 rounded-full bg-[#068297] px-6 text-sm font-medium text-white hover:bg-[#056d7e]">Return to home screen</button>
 					</div>
 					<div className="mt-12 flex w-full items-start gap-4 rounded-lg border border-[#dadce0] bg-[#f8f9fc] p-5 text-left">
-						<span className="mt-0.5 text-[#1a73e8]"><ShieldCheck className="h-8 w-8" /></span>
+						<span className="mt-0.5 text-[#068297]"><ShieldCheck className="h-8 w-8" /></span>
 						<span><span className="block text-lg">Your meeting is safe</span><span className="block text-sm text-[#5f6368]">No one can join a meeting unless invited or admitted by the host</span></span>
 					</div>
 				</div>
@@ -389,11 +389,11 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded }: 
 	}
 
 	if (!joined) {
-		const chip = "flex h-9 max-w-[220px] items-center gap-2 rounded-full border border-[#dadce0] bg-white px-3 text-sm text-[#3c4043]";
+		const chip = "flex h-9 max-w-[220px] items-center gap-2 rounded-full border border-[#dadce0] bg-white px-3 text-sm text-[#1B232B]";
 		return (
-			<main className={cn("mx-auto grid w-full max-w-[1100px] gap-8 bg-white px-5 text-[#202124]", embedded ? "min-h-full content-start py-4" : "min-h-dvh content-center py-8 lg:grid-cols-[minmax(0,1.5fr)_minmax(320px,1fr)] lg:items-center")}>
+			<main className={cn("text-[#0b2228]", embedded ? "fixed inset-0 z-[100] overflow-y-auto bg-white p-4" : "")}><div className="mx-auto grid w-full max-w-[1100px] gap-6 p-4 sm:p-6 lg:grid-cols-[minmax(0,1.5fr)_minmax(320px,1fr)] lg:items-start">
 				<div>
-					<div className="relative aspect-video overflow-hidden rounded-xl bg-[#202124] shadow-[0_1px_2px_rgba(60,64,67,0.3),0_1px_3px_1px_rgba(60,64,67,0.15)]">
+					<div className="relative aspect-video overflow-hidden rounded-2xl bg-[#0E1318] shadow-[0_1px_2px_rgba(16,24,40,0.08)]">
 						<video ref={previewVideo} autoPlay playsInline muted className={cn("h-full w-full -scale-x-100 object-cover", (!camOn || permission !== "granted") && "invisible absolute")} />
 						{(!camOn || permission !== "granted") && (
 							<div className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center text-white">
@@ -412,7 +412,7 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded }: 
 						</div>
 					</div>
 					{micOn && permission === "granted" && (
-						<div className="mt-3 flex items-center gap-2 text-xs text-[#5f6368]"><Mic className="h-3.5 w-3.5" /><div className="h-1.5 flex-1 overflow-hidden rounded-full bg-[#e8eaed]"><div className="h-full rounded-full bg-[#1a73e8] transition-[width] duration-100" style={{ width: `${Math.round(level * 100)}%` }} /></div></div>
+						<div className="mt-3 flex items-center gap-2 text-xs text-[#5f6368]"><Mic className="h-3.5 w-3.5" /><div className="h-1.5 flex-1 overflow-hidden rounded-full bg-[#e8eaed]"><div className="h-full rounded-full bg-[#068297] transition-[width] duration-100" style={{ width: `${Math.round(level * 100)}%` }} /></div></div>
 					)}
 					{permission === "granted" && (
 						<div className="mt-3 flex flex-wrap gap-2">
@@ -423,29 +423,29 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded }: 
 					)}
 				</div>
 
-				<div className="flex flex-col items-center gap-5 text-center lg:items-start lg:text-left">
+				<div className="flex flex-col items-center gap-5 rounded-2xl border border-serene-neutral-200/70 bg-white p-5 text-center shadow-[0_1px_2px_rgba(16,24,40,0.04)] lg:items-start lg:text-left">
 					{canSave && <a href="/dashboard/mjengo/calendar" className="text-xs font-medium text-[#5f6368] hover:text-[#202124]">&larr; Back to Sauti Salama</a>}
 					<div>
-						<h1 className="text-[28px] font-normal leading-tight">{title || "Ready to join?"}</h1>
+						<h1 className="text-2xl font-bold leading-tight tracking-tight text-sauti-dark">{title || "Ready to join?"}</h1>
 						<p className="mt-1 text-sm text-[#5f6368]">{remotes.length ? "Others are in the call" : "Check how you look and sound, then join"}</p>
 					</div>
 					<label className="w-full max-w-sm text-left">
 						<span className="mb-1 block text-xs font-medium text-[#5f6368]">Your name</span>
-						<input value={name} onChange={(e) => setName(e.target.value)} placeholder="How should people see you?" className="h-12 w-full rounded-lg border border-[#dadce0] px-3 text-base outline-none focus:border-[#1a73e8] focus:ring-1 focus:ring-[#1a73e8]" />
+						<input value={name} onChange={(e) => setName(e.target.value)} placeholder="How should people see you?" className="h-12 w-full rounded-lg border border-[#dadce0] px-3 text-base outline-none focus:border-[#068297] focus:ring-1 focus:ring-[#068297]" />
 					</label>
 					<div className="flex flex-wrap justify-center gap-3 lg:justify-start">
-						<button onClick={() => join(false)} disabled={!name.trim()} className="h-12 rounded-full bg-[#1a73e8] px-7 text-sm font-medium text-white shadow-sm hover:bg-[#1765cc] disabled:opacity-40">{companion ? "Join as companion" : "Join now"}</button>
-						<button onClick={() => join(true)} disabled={!name.trim() || companion} className="flex h-12 items-center gap-2 rounded-full border border-[#dadce0] px-6 text-sm font-medium text-[#1a73e8] hover:bg-[#f6fafe] disabled:opacity-40"><MonitorUp className="h-4 w-4" /> Present</button>
+						<button onClick={() => join(false)} disabled={!name.trim()} className="h-12 rounded-full bg-[#068297] px-7 text-sm font-medium text-white shadow-sm hover:bg-[#056d7e] disabled:opacity-40">{companion ? "Join as companion" : "Join now"}</button>
+						<button onClick={() => join(true)} disabled={!name.trim() || companion} className="flex h-12 items-center gap-2 rounded-full border border-[#dadce0] px-6 text-sm font-medium text-[#068297] hover:bg-[#f1fafb] disabled:opacity-40"><MonitorUp className="h-4 w-4" /> Present</button>
 					</div>
 					{canSave && (
 						<label className="flex max-w-sm cursor-pointer items-start gap-3 text-left">
-							<input type="checkbox" checked={companion} onChange={(e) => { setCompanion(e.target.checked); if (e.target.checked) setSpeakerOn(false); }} className="mt-1 h-4 w-4 accent-[#1a73e8]" />
+							<input type="checkbox" checked={companion} onChange={(e) => { setCompanion(e.target.checked); if (e.target.checked) setSpeakerOn(false); }} className="mt-1 h-4 w-4 accent-[#068297]" />
 							<span className="text-sm"><span className="flex items-center gap-1.5 font-medium"><SmartphoneNfc className="h-4 w-4" /> Companion mode</span><span className="block text-xs text-[#5f6368]">Use this device as an extra camera and microphone for the call you are in on your computer. Its speaker stays off to avoid echo.</span></span>
 						</label>
 					)}
 					<p className="max-w-sm text-xs text-[#5f6368]">Captions and accessibility tools are off until you turn them on inside the call. Calls go directly between people in the call.</p>
 				</div>
-			</main>
+			</div></main>
 		);
 	}
 
@@ -457,16 +457,16 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded }: 
 	const clock = format(new Date(), "h:mm a");
 
 	const selfTile = (
-		<div className="relative flex h-full min-h-[110px] w-full items-center justify-center overflow-hidden rounded-xl bg-[#3c4043] max-md:min-h-0">
+		<div className="relative flex h-full min-h-[110px] w-full items-center justify-center overflow-hidden rounded-xl bg-[#1B232B] max-md:min-h-0">
 			<video ref={localVideo} autoPlay playsInline muted className={cn("h-full w-full object-cover", !sharing && "-scale-x-100", !(camOn || sharing) && "hidden")} />
 			{!(camOn || sharing) && <span className="flex h-16 w-16 items-center justify-center rounded-full bg-sauti-teal text-xl font-medium">{initials(shownName)}</span>}
 			<span className="absolute bottom-2 left-3 flex items-center gap-1.5 text-sm font-medium text-white drop-shadow">{!micOn && <MicOff className="h-3.5 w-3.5" />}{shownName} (you)</span>
-			{handUp && <span className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-[#1a73e8]"><Hand className="h-4 w-4" /></span>}
+			{handUp && <span className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-[#068297]"><Hand className="h-4 w-4" /></span>}
 		</div>
 	);
 
 	return (
-		<div className={cn("relative flex h-dvh flex-col bg-[#202124] text-white", a11y.reduceMotion && "[&_*]:!transition-none [&_*]:!animate-none")}>
+		<div className={cn("fixed inset-0 z-[100] flex h-dvh flex-col bg-[#0E1318] text-white", a11y.reduceMotion && "[&_*]:!transition-none [&_*]:!animate-none")}>
 			<div className="hidden shrink-0 items-center gap-3 px-5 pt-3 text-base md:flex">
 				<span className="font-medium">{clock}</span>
 				<span className="text-white/40">|</span>
@@ -520,21 +520,28 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded }: 
 							<div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4 text-sm">
 								{!speechOk && <p className="text-amber-700">Live captions need Chrome, Edge or Safari. Others in the call may still see your words.</p>}
 								{lines.length === 0 && <p className="text-[#5f6368]">{captionsOn ? "What people say appears here as they speak." : "Captions are off, so nothing is being transcribed on this device. Turn them on in the bar below."}</p>}
-								{lines.map((l) => (<p key={l.id}><span className="font-medium text-[#1a73e8]">{l.name}</span> <span>{l.text}</span></p>))}
+								{lines.map((l) => (<p key={l.id}><span className="font-medium text-[#068297]">{l.name}</span> <span>{l.text}</span></p>))}
 							</div>
 						)}
 						{panel === "people" && (
 							<ul className="space-y-1 p-3 text-sm">
 								<li className="flex items-center gap-3 rounded-lg p-2"><span className="flex h-8 w-8 items-center justify-center rounded-full bg-sauti-teal text-xs text-white">{initials(shownName)}</span>{shownName} (you)</li>
-								{remotes.map((r) => <li key={r.id} className="flex items-center gap-3 rounded-lg p-2"><span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#5f6368] text-xs text-white">{initials(r.name)}</span><span className="flex-1">{r.name}</span>{r.hand && <Hand className="h-4 w-4 text-[#1a73e8]" />}{r.muted && <MicOff className="h-4 w-4 text-[#5f6368]" />}</li>)}
+								{remotes.map((r) => <li key={r.id} className="flex items-center gap-3 rounded-lg p-2"><span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#5f6368] text-xs text-white">{initials(r.name)}</span><span className="flex-1">{r.name}</span>{r.hand && <Hand className="h-4 w-4 text-[#068297]" />}{r.muted && <MicOff className="h-4 w-4 text-[#5f6368]" />}</li>)}
 							</ul>
 						)}
 						{panel === "info" && (
 							<div className="space-y-3 p-4 text-sm">
 								<p className="font-medium">{title || "Meeting"}</p>
+								{description && <p className="whitespace-pre-wrap text-[#444746]">{description}</p>}
+								{resources.length > 0 && (
+									<div>
+										<p className="mb-1 text-xs font-medium uppercase tracking-wide text-[#5f6368]">Resources</p>
+										<ul className="space-y-1">{resources.map((r) => <li key={r.url}><a href={r.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-[#068297] hover:underline"><ExternalLink className="h-3.5 w-3.5 shrink-0" /><span className="truncate">{r.label}</span></a></li>)}</ul>
+									</div>
+								)}
 								<p className="break-all rounded-lg bg-[#f1f3f4] p-3 text-xs">{link}</p>
-								<button onClick={() => { navigator.clipboard.writeText(link).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500); }); }} className="flex items-center gap-2 rounded-full border border-[#dadce0] px-4 py-2 text-[#1a73e8] hover:bg-[#f6fafe]">{copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />} {copied ? "Copied" : "Copy joining link"}</button>
-								<a href={mailto} className="flex items-center gap-2 text-[#1a73e8] hover:underline"><Mail className="h-4 w-4" /> Send by email</a>
+								<button onClick={() => { navigator.clipboard.writeText(link).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500); }); }} className="flex items-center gap-2 rounded-full border border-[#dadce0] px-4 py-2 text-[#068297] hover:bg-[#f1fafb]">{copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />} {copied ? "Copied" : "Copy joining link"}</button>
+								<a href={mailto} className="flex items-center gap-2 text-[#068297] hover:underline"><Mail className="h-4 w-4" /> Send by email</a>
 							</div>
 						)}
 					</aside>
@@ -561,13 +568,13 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded }: 
 						{a11yOpen && (
 							<div className="absolute bottom-14 left-1/2 z-20 w-72 -translate-x-1/2 rounded-xl bg-white p-4 text-sm text-[#202124] shadow-xl">
 								<p className="mb-3 font-medium">Accessibility</p>
-								<label className="mb-3 flex items-center justify-between gap-3"><span>Captions</span><input type="checkbox" checked={captionsOn} onChange={(e) => setCaptionsOn(e.target.checked)} className="h-4 w-4 accent-[#1a73e8]" /></label>
+								<label className="mb-3 flex items-center justify-between gap-3"><span>Captions</span><input type="checkbox" checked={captionsOn} onChange={(e) => setCaptionsOn(e.target.checked)} className="h-4 w-4 accent-[#068297]" /></label>
 								<div className="mb-3">
 									<span className="mb-1 block text-xs text-[#5f6368]">Caption size</span>
-									<div className="inline-flex rounded-lg border border-[#dadce0] p-0.5">{([["md", "Normal"], ["lg", "Large"], ["xl", "Huge"]] as const).map(([k, l]) => <button key={k} onClick={() => setA11y({ ...a11y, size: k })} aria-pressed={a11y.size === k} className={cn("rounded-md px-3 py-1", a11y.size === k ? "bg-[#e8f0fe] text-[#1a73e8]" : "")}>{l}</button>)}</div>
+									<div className="inline-flex rounded-lg border border-[#dadce0] p-0.5">{([["md", "Normal"], ["lg", "Large"], ["xl", "Huge"]] as const).map(([k, l]) => <button key={k} onClick={() => setA11y({ ...a11y, size: k })} aria-pressed={a11y.size === k} className={cn("rounded-md px-3 py-1", a11y.size === k ? "bg-[#e0f2f5] text-[#068297]" : "")}>{l}</button>)}</div>
 								</div>
-								<label className="mb-3 flex items-center justify-between gap-3"><span>High contrast captions</span><input type="checkbox" checked={a11y.contrast} onChange={(e) => setA11y({ ...a11y, contrast: e.target.checked })} className="h-4 w-4 accent-[#1a73e8]" /></label>
-								<label className="mb-3 flex items-center justify-between gap-3"><span>Reduce motion</span><input type="checkbox" checked={a11y.reduceMotion} onChange={(e) => setA11y({ ...a11y, reduceMotion: e.target.checked })} className="h-4 w-4 accent-[#1a73e8]" /></label>
+								<label className="mb-3 flex items-center justify-between gap-3"><span>High contrast captions</span><input type="checkbox" checked={a11y.contrast} onChange={(e) => setA11y({ ...a11y, contrast: e.target.checked })} className="h-4 w-4 accent-[#068297]" /></label>
+								<label className="mb-3 flex items-center justify-between gap-3"><span>Reduce motion</span><input type="checkbox" checked={a11y.reduceMotion} onChange={(e) => setA11y({ ...a11y, reduceMotion: e.target.checked })} className="h-4 w-4 accent-[#068297]" /></label>
 								<label className="flex items-center justify-between gap-3"><span>Caption language</span>
 									<select value={lang} onChange={(e) => setLang(e.target.value)} className="rounded-md border border-[#dadce0] bg-white px-2 py-1">{LANGS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select>
 								</label>
@@ -590,10 +597,10 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded }: 
 			{readyOpen && remotes.length === 0 && (
 				<div className="absolute bottom-24 left-3 right-3 z-30 rounded-lg bg-white p-5 text-[#202124] shadow-2xl md:right-auto md:w-[26rem]">
 					<div className="mb-4 flex items-center justify-between"><h2 className="text-lg">Your meeting&apos;s ready</h2><button onClick={() => setReadyOpen(false)} aria-label="Close" className="flex h-9 w-9 items-center justify-center rounded-full hover:bg-black/5"><X className="h-5 w-5" /></button></div>
-					<a href={mailto} className="mb-4 inline-flex h-11 items-center gap-2 rounded-full bg-[#0b57d0] px-5 text-sm font-medium text-white hover:bg-[#0a4cb8]"><UserPlus className="h-4 w-4" /> Add others</a>
+					<a href={mailto} className="mb-4 inline-flex h-11 items-center gap-2 rounded-full bg-[#068297] px-5 text-sm font-medium text-white hover:bg-[#056d7e]"><UserPlus className="h-4 w-4" /> Add others</a>
 					<p className="mb-3 text-sm text-[#444746]">Or share this meeting link with others you want in the meeting</p>
 					<div className="flex items-center rounded-lg bg-[#f1f3f4] py-2 pl-3 pr-1 text-sm"><span className="min-w-0 flex-1 truncate">{link.replace(/^https?:\/\//, "")}</span><button onClick={() => { navigator.clipboard.writeText(link).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500); }); }} aria-label="Copy joining info" className="flex h-9 w-9 items-center justify-center rounded-full hover:bg-black/5">{copied ? <Check className="h-5 w-5" /> : <Copy className="h-5 w-5" />}</button></div>
-					<p className="mt-4 flex items-start gap-2 text-xs text-[#5f6368]"><ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-[#1a73e8]" /> Anyone with this link can join the call, so only share it with people you want in.</p>
+					<p className="mt-4 flex items-start gap-2 text-xs text-[#5f6368]"><ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-[#068297]" /> Anyone with this link can join the call, so only share it with people you want in.</p>
 					{name && <p className="mt-3 text-xs text-[#5f6368]">Joined as {name}</p>}
 				</div>
 			)}
@@ -611,13 +618,13 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded }: 
 							["Meeting details", <Info key="i" className="h-5 w-5" />, () => { setPanel("info"); setMoreOpen(false); }, false],
 							["Transcript", <MessageSquareText key="t" className="h-5 w-5" />, () => { setPanel("transcript"); setMoreOpen(false); }, false],
 						] as [string, React.ReactNode, () => void, boolean][]).map(([label, icon, run, on]) => (
-							<button key={label} onClick={run} className={cn("flex w-full items-center gap-4 rounded-xl px-4 py-3 text-left text-[15px]", on ? "bg-[#e8f0fe] text-[#1a73e8]" : "active:bg-black/5")}>{icon}{label}</button>
+							<button key={label} onClick={run} className={cn("flex w-full items-center gap-4 rounded-xl px-4 py-3 text-left text-[15px]", on ? "bg-[#e0f2f5] text-[#068297]" : "active:bg-black/5")}>{icon}{label}</button>
 						))}
 						<div className="mx-2 mt-2 rounded-xl border border-[#dadce0] p-3 text-sm">
 							<p className="mb-2 flex items-center gap-2 font-medium"><Accessibility className="h-4 w-4" /> Accessibility</p>
-							<div className="mb-2 inline-flex rounded-lg border border-[#dadce0] p-0.5">{([["md", "Normal"], ["lg", "Large"], ["xl", "Huge"]] as const).map(([k, l]) => <button key={k} onClick={() => setA11y({ ...a11y, size: k })} aria-pressed={a11y.size === k} className={cn("rounded-md px-3 py-1", a11y.size === k ? "bg-[#e8f0fe] text-[#1a73e8]" : "")}>{l}</button>)}</div>
-							<label className="flex items-center justify-between gap-3 py-1"><span>High contrast captions</span><input type="checkbox" checked={a11y.contrast} onChange={(e) => setA11y({ ...a11y, contrast: e.target.checked })} className="h-4 w-4 accent-[#1a73e8]" /></label>
-							<label className="flex items-center justify-between gap-3 py-1"><span>Reduce motion</span><input type="checkbox" checked={a11y.reduceMotion} onChange={(e) => setA11y({ ...a11y, reduceMotion: e.target.checked })} className="h-4 w-4 accent-[#1a73e8]" /></label>
+							<div className="mb-2 inline-flex rounded-lg border border-[#dadce0] p-0.5">{([["md", "Normal"], ["lg", "Large"], ["xl", "Huge"]] as const).map(([k, l]) => <button key={k} onClick={() => setA11y({ ...a11y, size: k })} aria-pressed={a11y.size === k} className={cn("rounded-md px-3 py-1", a11y.size === k ? "bg-[#e0f2f5] text-[#068297]" : "")}>{l}</button>)}</div>
+							<label className="flex items-center justify-between gap-3 py-1"><span>High contrast captions</span><input type="checkbox" checked={a11y.contrast} onChange={(e) => setA11y({ ...a11y, contrast: e.target.checked })} className="h-4 w-4 accent-[#068297]" /></label>
+							<label className="flex items-center justify-between gap-3 py-1"><span>Reduce motion</span><input type="checkbox" checked={a11y.reduceMotion} onChange={(e) => setA11y({ ...a11y, reduceMotion: e.target.checked })} className="h-4 w-4 accent-[#068297]" /></label>
 						</div>
 					</div>
 				</div>
@@ -628,7 +635,7 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded }: 
 
 function Ctl({ icon, label, onClick, active, danger, className, flat }: { icon: React.ReactNode; label: string; onClick: () => void; active?: boolean; danger?: boolean; className?: string; flat?: boolean }) {
 	return (
-		<button onClick={onClick} aria-label={label} title={label} aria-pressed={active} className={cn("flex shrink-0 items-center justify-center transition", flat ? "h-11 w-11 rounded-full" : "h-12 w-12 rounded-full", danger ? "bg-[#ea4335] hover:bg-[#d93025]" : active ? "bg-[#8ab4f8] text-[#202124]" : flat ? "text-white hover:bg-white/10" : "bg-[#3c4043] hover:bg-[#4a4d51]", className)}>
+		<button onClick={onClick} aria-label={label} title={label} aria-pressed={active} className={cn("flex shrink-0 items-center justify-center transition", flat ? "h-11 w-11 rounded-full" : "h-12 w-12 rounded-full", danger ? "bg-[#ea4335] hover:bg-[#d93025]" : active ? "bg-[#7fd3e0] text-[#202124]" : flat ? "text-white hover:bg-white/10" : "bg-[#1B232B] hover:bg-[#27323b]", className)}>
 			{icon}
 		</button>
 	);

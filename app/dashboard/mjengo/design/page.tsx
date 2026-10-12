@@ -12,6 +12,8 @@ import { deleteTemplate, listTemplates, type TemplateRow } from "@/app/actions/m
 import { listAssets, type AssetRow } from "@/app/actions/mjengo-ai";
 import { MjengoLoader } from "../_components/MjengoLoader";
 import { pinterestSearch, type Pin } from "@/app/actions/mjengo-assist";
+import { inspireSearch } from "@/app/actions/mjengo-inspire";
+import type { InspireSource } from "@/lib/mjengo/inspire-sources";
 import { Input } from "@/components/ui/input";
 import ContentPanel from "../content/page";
 
@@ -69,9 +71,13 @@ export default function DesignHome() {
 	const [pins, setPins] = useState<Pin[] | null>(null);
 	const [pinErr, setPinErr] = useState<string | null>(null);
 	const [pinQ, setPinQ] = useState("");
-	const searchPins = (q: string) => {
+	const [src, setSrc] = useState<"pinterest" | InspireSource>("pinterest");
+	const searchPins = (q: string, from: "pinterest" | InspireSource = src) => {
 		setPins(null); setPinErr(null);
-		unwrap(pinterestSearch(q)).then(setPins).catch((e) => { setPins([]); setPinErr(e instanceof Error ? e.message : "Could not load suggestions."); });
+		const job = from === "pinterest"
+			? unwrap(pinterestSearch(q))
+			: unwrap(inspireSearch(from, q || "poster design")).then((r): Pin[] => r.map((x) => ({ id: x.id, title: x.title, image: x.full, link: x.link })));
+		job.then(setPins).catch((e) => { setPins([]); setPinErr(e instanceof Error ? e.message : "Could not load suggestions."); });
 	};
 	useEffect(() => { searchPins("social media poster design"); }, []);
 
@@ -140,8 +146,11 @@ export default function DesignHome() {
 				</div>
 			</Fold>
 
-			<Fold id="inspire" title="Suggestions from Pinterest" open={isOpen("inspire")} onToggle={toggle} right={
-				<form className="flex gap-1.5" onSubmit={(e) => { e.preventDefault(); searchPins(pinQ); }}>
+			<Fold id="inspire" title="Inspiration" open={isOpen("inspire")} onToggle={toggle} right={
+				<form className="flex flex-wrap items-center gap-1.5" onSubmit={(e) => { e.preventDefault(); searchPins(pinQ); }}>
+					<select value={src} onChange={(e) => { const v = e.target.value as "pinterest" | InspireSource; setSrc(v); searchPins(pinQ || "social media poster design", v); }} aria-label="Source" className="h-8 rounded-md border border-serene-neutral-200 bg-white px-2 text-sm">
+						<option value="pinterest">Pinterest</option><option value="unsplash">Unsplash</option><option value="pexels">Pexels</option><option value="pixabay">Pixabay</option><option value="openverse">Openverse</option>
+					</select>
 					<Input value={pinQ} onChange={(e) => setPinQ(e.target.value)} placeholder="Search ideas" aria-label="Search Pinterest" className="h-8 w-44 text-sm" />
 					<Button type="submit" size="sm" variant="outline" className="h-8">Search</Button>
 				</form>

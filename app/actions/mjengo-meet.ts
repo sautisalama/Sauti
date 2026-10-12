@@ -107,6 +107,38 @@ async function meetHome_(dayStart: string, dayEnd: string): Promise<MeetHomeItem
   ].sort((x, y) => x.start.localeCompare(y.start));
 }
 
+export interface MeetingResource { label: string; url: string }
+export interface MeetingPlan { code: string; title: string | null; description: string; invitees: string[]; resources: MeetingResource[] }
+
+async function getPlan_(code: string): Promise<MeetingPlan> {
+  await requireAdminActor();
+  const { data } = await looseAdmin().from('mjengo_meetings').select('code, title, description, invitees, resources').eq('code', code).maybeSingle();
+  if (!data) throw new Error('That call does not exist.');
+  return { code: data.code, title: data.title, description: data.description ?? '', invitees: (data.invitees ?? []) as string[], resources: (data.resources ?? []) as MeetingResource[] };
+}
+
+/** Description, invited people and resources for a meeting. People and links are cleaned before they are kept. */
+async function savePlan_(code: string, plan: { title?: string | null; description: string; invitees: string[]; resources: MeetingResource[] }): Promise<MeetingPlan> {
+  const a = await requireAdminActor();
+  const invitees = [...new Set(plan.invitees.map((x) => x.trim().toLowerCase()).filter((x) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(x)))].slice(0, 50);
+  const resources = plan.resources
+    .map((r) => ({ label: String(r.label ?? '').trim().slice(0, 120), url: String(r.url ?? '').trim().slice(0, 1000) }))
+    .filter((r) => /^https?:\/\//i.test(r.url) || r.url.startsWith('/'))
+    .map((r) => ({ ...r, label: r.label || r.url }))
+    .slice(0, 20);
+  const { error } = await looseAdmin().from('mjengo_meetings').update({
+    description: plan.description.trim().slice(0, 4000) || null,
+    invitees,
+    resources,
+    ...(plan.title !== undefined ? { title: plan.title?.trim().slice(0, 120) || null } : {}),
+  }).eq('code', code);
+  if (error) throw new Error('Could not save the meeting details.');
+  await logAudit({ actorId: a.id, actorEmail: a.email, action: 'meeting.planned', targetType: 'meeting', targetLabel: code });
+  return getPlan_(code);
+}
+
+export const getMeetingPlan = guard(getPlan_);
+export const saveMeetingPlan = guard(savePlan_);
 export const meetHome = guard(meetHome_);
 export const meetingDetail = guard(meetingDetail_);
 export const makeMeetingNotes = guard(makeNotes_);

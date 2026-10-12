@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { addDays, endOfDay, format, isSameDay, startOfDay, startOfWeek } from "date-fns";
-import { CalendarDays, ChevronLeft, ChevronRight, Keyboard, Link2, Phone, Plus, ShieldCheck, Video } from "lucide-react";
+import { CalendarClock, CalendarDays, ChevronLeft, ChevronRight, Keyboard, Link2, NotebookText, Video, Zap } from "lucide-react";
 import { unwrap } from "@/lib/action-result";
 import { cn } from "@/lib/utils";
 import { meetHome, type MeetHomeItem } from "@/app/actions/mjengo-meet";
@@ -11,14 +11,15 @@ import { MeetChooser } from "@/app/dashboard/mjengo/_components/MeetChooser";
 
 const CODE = /[a-z0-9]{3}-[a-z0-9]{4}-[a-z0-9]{3}/i;
 
-/** The Meet home screen: join with a code, start something new, and see the day's meetings. */
+/** The Meet home: join with a code, start a meeting now, later or on the calendar, and see the day's meetings. */
 export function MeetHome({ isAdmin }: { isAdmin: boolean }) {
 	const [day, setDay] = useState(() => startOfDay(new Date()));
 	const [items, setItems] = useState<MeetHomeItem[] | null>(null);
 	const [code, setCode] = useState("");
-	const [chooser, setChooser] = useState(false);
-	const week = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(startOfWeek(day, { weekStartsOn: 0 }), i)), [day]);
+	const [chooser, setChooser] = useState<{ initial?: "now" | "later" | "calendar" } | null>(null);
+	const week = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(startOfWeek(day, { weekStartsOn: 1 }), i)), [day]);
 	const found = CODE.exec(code)?.[0]?.toLowerCase() ?? null;
+	const today = isSameDay(day, new Date());
 
 	useEffect(() => {
 		if (!isAdmin) return;
@@ -29,92 +30,92 @@ export function MeetHome({ isAdmin }: { isAdmin: boolean }) {
 	}, [day, isAdmin]);
 
 	const join = () => { if (found) window.location.assign(`/meet/${found}`); };
-	const today = isSameDay(day, new Date());
 
 	return (
-		<div className="flex min-h-dvh flex-col bg-white text-[#202124]">
-			<header className="flex flex-wrap items-center gap-3 px-4 py-3 sm:px-6">
-				<Link href="/dashboard/mjengo" className="flex items-center gap-2 text-[22px] text-[#5f6368]">
-					<span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#fbbc04] text-white"><Video className="h-5 w-5" /></span>
-					<span><span className="font-medium text-[#202124]">Sauti</span> Meet</span>
-				</Link>
-				<form onSubmit={(e) => { e.preventDefault(); join(); }} className="order-3 flex w-full items-center gap-2 sm:order-none sm:mx-auto sm:w-auto sm:min-w-[24rem]">
-					<div className="flex min-w-0 flex-1 items-center gap-2 rounded-full bg-[#f1f3f9] py-1.5 pl-4 pr-1.5">
-						<Keyboard className="h-5 w-5 shrink-0 text-[#5f6368]" />
-						<input value={code} onChange={(e) => setCode(e.target.value)} placeholder="Enter a code or link" aria-label="Meeting code or link" className="h-9 min-w-0 flex-1 bg-transparent text-[15px] outline-none placeholder:text-[#5f6368]" />
-						<button type="submit" disabled={!found} className="h-9 rounded-full px-4 text-sm font-medium text-[#1a73e8] disabled:text-[#9aa0a6]">Join</button>
-					</div>
-					{isAdmin && (
-						<button type="button" onClick={() => setChooser(true)} className="flex h-11 shrink-0 items-center gap-2 rounded-full bg-[#c4eed0] px-5 text-sm font-medium text-[#0b3d1a] hover:bg-[#b2e5c2]"><Plus className="h-4 w-4" /> New</button>
-					)}
+		<div className="mx-auto max-w-6xl space-y-6 px-4 py-5 md:px-8">
+			<section className="relative overflow-hidden rounded-2xl border border-serene-blue-100 bg-gradient-to-br from-serene-blue-50 via-white to-sauti-teal-light/40 p-6 sm:p-8">
+				<h1 className="text-2xl font-bold tracking-tight text-sauti-dark sm:text-3xl">Meet <span className="text-sauti-teal">Rooms</span></h1>
+				<p className="mt-1 max-w-xl text-sm text-serene-neutral-600">Calls that stay inside Sauti Salama. Start one, plan one, or join with a code. Call notes are kept for you afterwards.</p>
+				<form onSubmit={(e) => { e.preventDefault(); join(); }} className="mt-5 flex max-w-xl items-center gap-2 rounded-2xl border border-serene-neutral-200 bg-white p-1.5 shadow-[0_1px_2px_rgba(16,24,40,0.04)]">
+					<Keyboard className="ml-2 h-5 w-5 shrink-0 text-serene-neutral-400" />
+					<input value={code} onChange={(e) => setCode(e.target.value)} placeholder="Enter a code or paste a link" aria-label="Meeting code or link" className="h-10 min-w-0 flex-1 bg-transparent text-[15px] outline-none placeholder:text-serene-neutral-400" />
+					<button type="submit" disabled={!found} className="h-10 rounded-xl bg-sauti-teal px-5 text-sm font-semibold text-white transition hover:bg-sauti-dark disabled:opacity-40">Join</button>
 				</form>
-			</header>
+			</section>
 
-			<div className="flex min-h-0 flex-1">
-				{isAdmin && (
-					<nav aria-label="Meet" className="hidden w-20 shrink-0 flex-col items-center gap-3 pt-4 sm:flex">
-						<span className="flex flex-col items-center gap-1 text-xs font-medium text-[#0b57d0]"><span className="flex h-8 w-14 items-center justify-center rounded-full bg-[#d3e3fd]"><CalendarDays className="h-5 w-5" /></span>Meetings</span>
-						<Link href="/dashboard/mjengo/meetings" className="flex flex-col items-center gap-1 text-xs text-[#444746]"><span className="flex h-8 w-14 items-center justify-center rounded-full hover:bg-black/5"><Phone className="h-5 w-5" /></span>Call notes</Link>
-					</nav>
-				)}
+			{isAdmin && (
+				<div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+					<Tile tint="bg-sauti-teal-light" icon={Zap} title="Start now" hint="Open a call right away and share the link." onClick={() => setChooser({ initial: "now" })} />
+					<Tile tint="bg-sauti-yellow-light" icon={Link2} title="Meeting for later" hint="Get a link, add people, notes and resources." onClick={() => setChooser({ initial: "later" })} />
+					<Tile tint="bg-serene-blue-50" icon={CalendarClock} title="Schedule on calendar" hint="Pick a time and choose how you are reminded." onClick={() => setChooser({ initial: "calendar" })} />
+				</div>
+			)}
 
-				<main className="mx-auto w-full max-w-5xl px-4 pb-10 sm:px-6">
-					{isAdmin ? (
-						<>
-							<div className="mt-2 flex flex-wrap items-center gap-3">
-								<h1 className="text-xl font-normal sm:text-2xl">{format(day, "EEE, MMM d")}</h1>
-								{!today && <button onClick={() => setDay(startOfDay(new Date()))} className="rounded-full border border-[#dadce0] px-3 py-1 text-sm text-[#1a73e8]">Today</button>}
-								<span className="flex-1" />
-								<div className="flex items-center gap-1">
-									<button onClick={() => setDay((d) => addDays(d, -7))} aria-label="Previous week" className="flex h-9 w-9 items-center justify-center rounded-full hover:bg-black/5"><ChevronLeft className="h-5 w-5" /></button>
-									{week.map((d) => (
-										<button key={d.toISOString()} onClick={() => setDay(startOfDay(d))} aria-pressed={isSameDay(d, day)} className={cn("flex w-10 flex-col items-center rounded-full py-1.5 text-xs sm:w-11", isSameDay(d, day) ? "bg-[#c2e7ff] text-[#001d35]" : "hover:bg-black/5")}>
-											<span className="text-[10px] uppercase tracking-wide">{format(d, "EEE")}</span>
-											<span className="text-base">{format(d, "d")}</span>
-										</button>
-									))}
-									<button onClick={() => setDay((d) => addDays(d, 7))} aria-label="Next week" className="flex h-9 w-9 items-center justify-center rounded-full hover:bg-black/5"><ChevronRight className="h-5 w-5" /></button>
-								</div>
-							</div>
-
-							<div className="mt-4 flex items-center gap-4 rounded-full bg-[#d3e3fd] px-5 py-3">
-								<ShieldCheck className="h-8 w-8 shrink-0 text-[#0b57d0]" />
-								<div className="min-w-0 flex-1"><p className="text-sm font-medium">Your meeting is safe</p><p className="text-sm text-[#444746]">Only people who have the link can join, and calls go directly between the people in them.</p></div>
-							</div>
-
-							{items === null ? (
-								<p className="mt-16 text-center text-sm text-[#5f6368]">Loading meetings...</p>
-							) : items.length === 0 ? (
-								<div className="mt-14 flex flex-col items-center text-center">
-									<span className="flex h-28 w-28 items-center justify-center rounded-full bg-[#f1f3f9] text-[#0b57d0]"><Video className="h-12 w-12" /></span>
-									<h2 className="mt-6 text-2xl font-normal sm:text-3xl">No meetings scheduled for {today ? "today" : format(day, "EEEE")}</h2>
-									<p className="mt-2 text-sm text-[#444746]">Schedule a meeting or enjoy the free time</p>
-									<button onClick={() => setChooser(true)} className="mt-6 flex h-12 items-center gap-2 rounded-full bg-[#c4eed0] px-6 text-sm font-medium text-[#0b3d1a] hover:bg-[#b2e5c2]"><Plus className="h-4 w-4" /> New</button>
-								</div>
-							) : (
-								<ul className="mt-6 space-y-2">
-									{items.map((m) => (
-										<li key={m.key} className="flex items-center gap-4 rounded-2xl border border-[#dadce0] p-4">
-											<span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#e8f0fe] text-[#1a73e8]">{m.kind === "link" ? <Link2 className="h-5 w-5" /> : <Video className="h-5 w-5" />}</span>
-											<span className="min-w-0 flex-1">
-												<span className="block truncate text-[15px] font-medium">{m.title}</span>
-												<span className="block text-sm text-[#5f6368]">{m.kind === "link" ? "Link for later" : `${format(new Date(m.start), "h:mm a")}${m.end ? ` to ${format(new Date(m.end), "h:mm a")}` : ""}`}{m.code ? `  ·  ${m.code}` : ""}</span>
-											</span>
-											{m.code && <a href={`/meet/${m.code}`} className="h-10 shrink-0 rounded-full bg-[#0b57d0] px-5 text-sm font-medium leading-10 text-white hover:bg-[#0a4cb8]">Join</a>}
-										</li>
-									))}
-								</ul>
-							)}
-						</>
-					) : (
-						<div className="mt-20 text-center">
-							<h1 className="text-3xl font-normal">Join a meeting</h1>
-							<p className="mt-2 text-sm text-[#444746]">Paste the code or link you were sent in the box above.</p>
+			{isAdmin ? (
+				<section className="rounded-2xl border border-serene-neutral-200/70 bg-white p-4 shadow-[0_1px_2px_rgba(16,24,40,0.04)] sm:p-5">
+					<div className="flex flex-wrap items-center gap-3">
+						<h2 className="text-base font-bold text-sauti-dark">{today ? "Today" : format(day, "EEEE")}<span className="ml-2 text-sm font-normal text-serene-neutral-500">{format(day, "d MMMM")}</span></h2>
+						<span className="flex-1" />
+						<div className="flex items-center gap-1">
+							<button onClick={() => setDay((d) => addDays(d, -7))} aria-label="Previous week" className="flex h-9 w-9 items-center justify-center rounded-xl hover:bg-serene-neutral-100"><ChevronLeft className="h-4 w-4" /></button>
+							{week.map((d) => (
+								<button key={d.toISOString()} onClick={() => setDay(startOfDay(d))} aria-pressed={isSameDay(d, day)} className={cn("flex w-10 flex-col items-center rounded-xl py-1.5 text-xs transition sm:w-12", isSameDay(d, day) ? "bg-sauti-teal text-white" : isSameDay(d, new Date()) ? "bg-sauti-teal-light text-sauti-dark" : "hover:bg-serene-neutral-100")}>
+									<span className="text-[10px] uppercase tracking-wide opacity-80">{format(d, "EEE")}</span>
+									<span className="text-base font-semibold">{format(d, "d")}</span>
+								</button>
+							))}
+							<button onClick={() => setDay((d) => addDays(d, 7))} aria-label="Next week" className="flex h-9 w-9 items-center justify-center rounded-xl hover:bg-serene-neutral-100"><ChevronRight className="h-4 w-4" /></button>
 						</div>
-					)}
-				</main>
-			</div>
-			{isAdmin && <MeetChooser open={chooser} onClose={() => setChooser(false)} />}
+					</div>
+
+					<div className="mt-4">
+						{items === null ? (
+							<p className="py-10 text-center text-sm text-serene-neutral-500">Loading meetings...</p>
+						) : items.length === 0 ? (
+							<div className="flex flex-col items-center rounded-2xl border border-dashed border-serene-neutral-200 py-10 text-center">
+								<span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-sauti-teal-light text-sauti-teal"><CalendarDays className="h-6 w-6" /></span>
+								<p className="mt-3 text-sm font-semibold text-serene-neutral-900">Nothing booked {today ? "today" : `on ${format(day, "EEEE")}`}</p>
+								<p className="text-sm text-serene-neutral-500">Schedule a meeting or enjoy the free time.</p>
+							</div>
+						) : (
+							<ul className="space-y-2">
+								{items.map((m) => (
+									<li key={m.key} className="flex items-center gap-3 rounded-xl border border-serene-neutral-200/70 p-3">
+										<span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-sauti-teal-light text-sauti-teal">{m.kind === "link" ? <Link2 className="h-4 w-4" /> : <Video className="h-4 w-4" />}</span>
+										<span className="min-w-0 flex-1">
+											<span className="block truncate text-sm font-semibold text-serene-neutral-900">{m.title}</span>
+											<span className="block text-xs text-serene-neutral-500">{m.kind === "link" ? "Link for later" : `${format(new Date(m.start), "h:mm a")}${m.end ? ` to ${format(new Date(m.end), "h:mm a")}` : ""}`}{m.code ? `  ·  ${m.code}` : ""}</span>
+										</span>
+										{m.code && <a href={`/meet/${m.code}`} className="shrink-0 rounded-xl bg-sauti-teal px-4 py-2 text-sm font-semibold text-white transition hover:bg-sauti-dark">Join</a>}
+									</li>
+								))}
+							</ul>
+						)}
+					</div>
+				</section>
+			) : (
+				<p className="rounded-2xl border border-dashed border-serene-neutral-200 bg-white p-6 text-center text-sm text-serene-neutral-500">Paste the code or link you were sent in the box above to join.</p>
+			)}
+
+			{isAdmin && (
+				<Link href="/dashboard/mjengo/meetings" className="flex items-center gap-3 rounded-2xl border border-serene-neutral-200/70 bg-white p-4 text-sm shadow-[0_1px_2px_rgba(16,24,40,0.04)] transition hover:shadow-md">
+					<span className="flex h-10 w-10 items-center justify-center rounded-xl bg-serene-blue-50 text-sauti-teal"><NotebookText className="h-4 w-4" /></span>
+					<span className="flex-1"><span className="block font-semibold text-serene-neutral-900">Call notes</span><span className="block text-xs text-serene-neutral-500">Transcripts and summaries of calls that were held.</span></span>
+					<ChevronRight className="h-4 w-4 text-serene-neutral-400" />
+				</Link>
+			)}
+
+			{isAdmin && chooser && <MeetChooser open initial={chooser.initial} onClose={() => setChooser(null)} />}
 		</div>
+	);
+}
+
+function Tile({ icon: Icon, title, hint, tint, onClick }: { icon: typeof Video; title: string; hint: string; tint: string; onClick: () => void }) {
+	return (
+		<button onClick={onClick} className={cn("rounded-2xl border border-black/5 p-4 text-left shadow-[0_1px_2px_rgba(16,24,40,0.04)] transition hover:-translate-y-0.5 hover:shadow-md", tint)}>
+			<span className="mb-3 flex h-9 w-9 items-center justify-center rounded-xl bg-white/80 text-sauti-teal"><Icon className="h-4 w-4" /></span>
+			<span className="block text-sm font-bold text-serene-neutral-900">{title}</span>
+			<span className="block text-xs text-serene-neutral-600">{hint}</span>
+		</button>
 	);
 }
