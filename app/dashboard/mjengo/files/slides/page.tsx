@@ -3,7 +3,8 @@
 import { Suspense, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { ArrowLeft, ChevronLeft, ChevronRight, Download, Maximize2 } from "lucide-react";
+import { ArrowLeft, ChevronLeft, ChevronRight, Download, Maximize2, Share2 } from "lucide-react";
+import { ShareDialog } from "../../_components/ShareDialog";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { MjengoLoader } from "../../_components/MjengoLoader";
@@ -13,6 +14,7 @@ import { getFileUrl } from "../../vault/api";
 function Viewer() {
 	const { toast } = useToast();
 	const fileId = useSearchParams().get("file");
+	const [shareOpen, setShareOpen] = useState(false);
 	const host = useRef<HTMLDivElement>(null);
 	const stage = useRef<HTMLDivElement>(null);
 	const previewer = useRef<{ renderNextSlide: () => void; renderPreSlide: () => void; destroy: () => void; slideCount?: number } | null>(null);
@@ -65,6 +67,7 @@ function Viewer() {
 
 	return (
 		<div className="flex h-full min-h-0 flex-col bg-[#f4f4f2]">
+			<ShareDialog item={shareOpen && fileId ? ({ type: "file", id: fileId, name } as never) : null} onClose={() => setShareOpen(false)} />
 			<div className="flex shrink-0 items-center gap-1 border-b border-black/[0.07] bg-white px-3 py-1.5">
 				<Button asChild variant="ghost" size="icon" aria-label="Back to Files"><Link href="/dashboard/mjengo/vault"><ArrowLeft className="h-[18px] w-[18px]" /></Link></Button>
 				<span className="min-w-0 flex-1 truncate px-1 text-[15px] font-medium text-[#37352f]">{name}</span>
@@ -79,6 +82,7 @@ function Viewer() {
 					</>
 				)}
 				<Button variant="ghost" size="icon" aria-label="Full screen" onClick={() => stage.current?.requestFullscreen?.().catch(() => undefined)}><Maximize2 className="h-[18px] w-[18px]" /></Button>
+				{fileId && <Button variant="outline" size="sm" className="h-9 shrink-0 gap-1.5" onClick={() => setShareOpen(true)} aria-label="Share"><Share2 className="h-4 w-4" /><span className="hidden sm:inline">Share</span></Button>}
 				{url && <Button asChild variant="outline" size="sm" className="gap-1.5"><a href={url} download={name}><Download className="h-4 w-4" /> Download</a></Button>}
 			</div>
 			<div ref={stage} onKeyDown={(e) => { if (e.key === "ArrowRight") previewer.current?.renderNextSlide(); if (e.key === "ArrowLeft") previewer.current?.renderPreSlide(); }} tabIndex={0} className="min-h-0 flex-1 overflow-auto bg-[#f4f4f2] p-4 outline-none">

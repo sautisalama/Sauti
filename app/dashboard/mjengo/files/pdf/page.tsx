@@ -3,7 +3,7 @@
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { ArrowLeft, Bold, Copy, Download, Highlighter, Image as ImageIcon, ImagePlus, Loader2, MapPin, Minus, MousePointer2, PenLine, Plus, Redo2, Save, Signature, Trash2, Type, Undo2 } from "lucide-react";
+import { ArrowLeft, Bold, Copy, Download, Highlighter, Image as ImageIcon, ImagePlus, Loader2, MapPin, Minus, MousePointer2, PenLine, Plus, Redo2, Save, Share2, Signature, Trash2, Type, Undo2 } from "lucide-react";
 import { PDFDocument, PDFHexString, StandardFonts, rgb } from "pdf-lib";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,6 +14,7 @@ import { putToSignedUrl } from "@/lib/client/upload";
 import { unwrap } from "@/lib/action-result";
 import { deleteSignature, listSignatures, saveSignatureImage, type SignatureRow } from "@/app/actions/mjengo-signatures";
 import { MjengoLoader } from "../../_components/MjengoLoader";
+import { ShareDialog } from "../../_components/ShareDialog";
 import { finishReplace, getFileUrl, prepareReplace, prepareUpload, registerUpload } from "../../vault/api";
 
 type Tool = "select" | "highlight" | "pen" | "text" | "pin" | "sign";
@@ -54,6 +55,7 @@ function PdfScreen() {
 	const [pages, setPages] = useState<{ w: number; h: number }[]>([]);
 	const [loading, setLoading] = useState(true);
 	const [saving, setSaving] = useState(false);
+	const [shareOpen, setShareOpen] = useState(false);
 	// Opens ready to read and scroll; a tool is picked on purpose, so a touch never starts a highlight by accident.
 	const [tool, setTool] = useState<Tool>("select");
 	const [color, setColor] = useState<string>(COLORS.yellow);
@@ -375,6 +377,7 @@ function PdfScreen() {
 					<select value={zoom} onChange={(e) => setZoom(Number(e.target.value))} aria-label="Zoom" className="hidden h-9 rounded-lg border border-black/10 bg-white px-2 text-sm sm:block">
 						{[0.5, 0.75, 1, 1.25, 1.5, 2].map((z) => <option key={z} value={z}>{Math.round(z * 100)}%</option>)}
 					</select>
+					{fileId && level !== "view" && <Button variant="outline" size="sm" className="h-9 shrink-0 gap-1.5" onClick={() => setShareOpen(true)} aria-label="Share"><Share2 className="h-4 w-4" /><span className="hidden sm:inline">Share</span></Button>}
 					<Button variant="ghost" size="sm" className="h-9 shrink-0 gap-1.5" aria-label="Download" onClick={download} disabled={loading}><Download className="h-4 w-4" /><span className="hidden sm:inline">Download</span></Button>
 					<Button size="sm" className="h-9 shrink-0 gap-1.5 bg-sauti-teal hover:bg-sauti-dark" onClick={save} disabled={loading || saving || (!marks.length && level === "edit")}>{saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Save</Button>
 				</div>
@@ -419,6 +422,7 @@ function PdfScreen() {
 				)}
 			</div>
 
+			<ShareDialog item={shareOpen && fileId ? ({ type: "file", id: fileId, name } as never) : null} onClose={() => setShareOpen(false)} />
 			<SignatureDialog open={signing} onClose={() => setSigning(false)} onDone={(url) => { setSignature(url); setSigning(false); setTool("sign"); }} library={library} onLibraryChanged={loadLibrary} />
 		</div>
 	);
