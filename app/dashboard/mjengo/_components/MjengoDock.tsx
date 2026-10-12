@@ -26,6 +26,7 @@ export function MjengoDock() {
 	const { toast } = useToast();
 	const dash = useDashboardData();
 	const [mounted, setMounted] = useState(false);
+	const [small, setSmall] = useState(false);
 	const [place, setPlace] = useState<Place>({ edge: "right", at: 0.55 });
 	const [hover, setOpen] = useState(false);
 	const [pinned, setPinned] = useState(false);
@@ -37,6 +38,13 @@ export function MjengoDock() {
 	const origin = useRef({ x: 0, y: 0 });
 	const sidebarW = mounted && dash?.isSidebarCollapsed ? 72 : 256;
 
+	useEffect(() => {
+		const mq = window.matchMedia("(max-width: 1023px)");
+		const on = () => setSmall(mq.matches);
+		on();
+		mq.addEventListener("change", on);
+		return () => mq.removeEventListener("change", on);
+	}, []);
 	useEffect(() => {
 		setMounted(true);
 		try {
@@ -109,6 +117,7 @@ export function MjengoDock() {
 	const collapse = () => { if (hoverTimer.current) clearTimeout(hoverTimer.current); hoverTimer.current = setTimeout(() => setOpen(false), 220); };
 
 	if (!mounted) return null;
+	if (small) return <EdgeSheet unread={unread} onMeeting={() => start("video")} starting={starting === "video"} />;
 	return (
 		<TooltipProvider delayDuration={150}>
 			{/* Hover (or tap the handle) to expand; move away to collapse. Drag the handle to put it on another edge. */}
@@ -158,5 +167,93 @@ function Item({ label, hint, href, onClick, busy, side, children }: { label: str
 			</TooltipTrigger>
 			<TooltipContent side={side} sideOffset={10}><p className="font-semibold">{label}</p><p className="text-xs opacity-80">{hint}</p></TooltipContent>
 		</Tooltip>
+	);
+}
+
+/**
+ * On phones the quick actions live off the right edge: swipe in from the right to pull them out, swipe
+ * back (or tap outside) to put them away. The thin tab on the edge shows where to swipe and works as a tap.
+ */
+function EdgeSheet({ unread, onMeeting, starting }: { unread: number; onMeeting: () => void; starting: boolean }) {
+	const [open, setOpen] = useState(false);
+	const [dx, setDx] = useState(0);
+	const from = useRef<{ x: number; y: number; open: boolean } | null>(null);
+	const W = 224;
+
+	const down = (e: React.TouchEvent) => {
+		const t = e.touches[0];
+		from.current = { x: t.clientX, y: t.clientY, open };
+	};
+	const move = (e: React.TouchEvent) => {
+		const f = from.current;
+		if (!f) return;
+		const t = e.touches[0];
+		const mx = t.clientX - f.x;
+		if (Math.abs(t.clientY - f.y) > Math.abs(mx) + 10) { from.current = null; setDx(0); return; }
+		setDx(f.open ? Math.max(0, Math.min(W, mx)) : Math.min(0, Math.max(-W, mx)));
+	};
+	const up = () => {
+		const f = from.current;
+		from.current = null;
+		if (f) {
+			if (!f.open && dx < -48) setOpen(true);
+			else if (f.open && dx > 48) setOpen(false);
+		}
+		setDx(0);
+	};
+
+	const dragging = from.current !== null && dx !== 0;
+	const offset = open ? dx : W + dx;
+	const items: { label: string; href?: string; run?: () => void; icon: React.ReactNode; badge?: number }[] = [
+		{ label: "Chats", href: "/dashboard/mjengo/chat", icon: <MessageCircle className="h-5 w-5" /> },
+		{ label: "Notifications", href: "/dashboard/mjengo/notifications", icon: <Bell className="h-5 w-5" />, badge: unread },
+		{ label: "Start a meeting", run: onMeeting, icon: starting ? <Loader2 className="h-5 w-5 animate-spin" /> : <Video className="h-5 w-5" /> },
+		{ label: "Calendar", href: "/dashboard/mjengo/calendar", icon: <Calendar className="h-5 w-5" /> },
+	];
+
+	return (
+		<>
+			{/* The swipe zone on the right edge, and the tab that shows it. */}
+			{!open && (
+				<div onTouchStart={down} onTouchMove={move} onTouchEnd={up} className="fixed bottom-24 right-0 top-24 z-[54] w-6 touch-pan-y">
+					<button onClick={() => setOpen(true)} aria-label="Open quick actions" className="absolute right-0 top-1/2 flex h-14 w-3 -translate-y-1/2 items-center justify-center rounded-l-full bg-black/25 active:bg-black/40">
+						{unread > 0 && <span className="absolute -left-1 -top-1 h-2.5 w-2.5 rounded-full bg-sauti-teal" />}
+					</button>
+				</div>
+			)}
+			{(open || dx !== 0) && <div onClick={() => setOpen(false)} className="fixed inset-0 z-[55] bg-black/30" style={{ opacity: open ? 1 - Math.min(1, dx / W) : Math.min(1, -dx / W) }} aria-hidden />}
+			<aside
+				aria-label="Quick actions"
+				onTouchStart={down}
+				onTouchMove={move}
+				onTouchEnd={up}
+				className="fixed bottom-0 right-0 top-0 z-[56] flex w-56 flex-col bg-white pt-[max(1rem,env(safe-area-inset-top))] shadow-2xl"
+				style={{ transform: `translateX(${open || dx !== 0 ? offset : W}px)`, transition: dragging ? "none" : "transform 220ms cubic-bezier(0.2, 0, 0, 1)", visibility: open || dx !== 0 ? "visible" : "hidden" }}
+			>
+				<p className="px-5 pb-2 text-xs font-semibold uppercase tracking-widest text-[#9b9a97]">Quick actions</p>
+				<ul className="space-y-0.5 px-2">
+					{items.map((it) => {
+						const inner = (
+							<>
+								<span className="relative flex h-10 w-10 items-center justify-center rounded-xl bg-[#f7f7f5] text-[#37352f]">
+									{it.icon}
+									{!!it.badge && <span className="absolute -right-1 -top-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-sauti-teal px-1 text-[10px] font-bold text-white">{it.badge > 9 ? "9+" : it.badge}</span>}
+								</span>
+								<span className="text-[15px] font-medium text-[#37352f]">{it.label}</span>
+							</>
+						);
+						return (
+							<li key={it.label}>
+								{it.href ? (
+									<Link href={it.href} onClick={() => setOpen(false)} className="flex items-center gap-3 rounded-xl px-2 py-1.5 active:bg-black/5">{inner}</Link>
+								) : (
+									<button onClick={() => { setOpen(false); it.run?.(); }} className="flex w-full items-center gap-3 rounded-xl px-2 py-1.5 text-left active:bg-black/5">{inner}</button>
+								)}
+							</li>
+						);
+					})}
+				</ul>
+			</aside>
+		</>
 	);
 }
