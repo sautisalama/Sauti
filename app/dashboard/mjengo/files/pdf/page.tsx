@@ -3,8 +3,8 @@
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { ArrowLeft, Download, Highlighter, Image as ImageIcon, Loader2, MousePointer2, PenLine, Save, Signature, Trash2, Type, Undo2 } from "lucide-react";
-import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
+import { ArrowLeft, Bold, Copy, Download, Highlighter, Image as ImageIcon, ImagePlus, Loader2, MapPin, Minus, MousePointer2, PenLine, Plus, Redo2, Save, Signature, Trash2, Type, Undo2 } from "lucide-react";
+import { PDFDocument, PDFHexString, StandardFonts, rgb } from "pdf-lib";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -16,17 +16,31 @@ import { deleteSignature, listSignatures, saveSignatureImage, type SignatureRow 
 import { MjengoLoader } from "../../_components/MjengoLoader";
 import { finishReplace, getFileUrl, prepareReplace, prepareUpload, registerUpload } from "../../vault/api";
 
-type Tool = "select" | "highlight" | "pen" | "text" | "sign";
+type Tool = "select" | "highlight" | "pen" | "text" | "pin" | "sign";
 /** All positions are fractions of the page, so they hold at any zoom. */
 type Mark =
 	| { id: string; page: number; kind: "highlight"; x: number; y: number; w: number; h: number; color: string }
-	| { id: string; page: number; kind: "pen"; points: [number, number][]; color: string }
-	| { id: string; page: number; kind: "text"; x: number; y: number; text: string; size: number; color: string }
-	| { id: string; page: number; kind: "sign"; x: number; y: number; w: number; h: number; dataUrl: string };
+	| { id: string; page: number; kind: "pen"; points: [number, number][]; color: string; width: number }
+	| { id: string; page: number; kind: "text"; x: number; y: number; text: string; size: number; color: string; bold?: boolean }
+	| { id: string; page: number; kind: "sign"; x: number; y: number; w: number; h: number; dataUrl: string }
+	| { id: string; page: number; kind: "pin"; x: number; y: number; text: string };
 
 const COLORS = { yellow: "#facc15", green: "#4ade80", pink: "#f472b6", blue: "#38bdf8" } as const;
+const INK = ["#111827", "#dc2626", "#2563eb", "#16a34a"];
 const uid = () => Math.random().toString(36).slice(2, 10);
+const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
 const hex = (c: string) => { const n = parseInt(c.slice(1), 16); return rgb(((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255); };
+
+/** Where a mark sits, as fractions of the page. */
+function bounds(m: Mark): { x: number; y: number; w: number; h: number } {
+	if (m.kind === "pen") {
+		const xs = m.points.map((p) => p[0]); const ys = m.points.map((p) => p[1]);
+		const x = Math.min(...xs), y = Math.min(...ys);
+		return { x, y, w: Math.max(...xs) - x, h: Math.max(...ys) - y };
+	}
+	if (m.kind === "highlight" || m.kind === "sign") return { x: m.x, y: m.y, w: m.w, h: m.h };
+	return { x: m.x, y: m.y, w: 0.02, h: 0.02 };
+}
 
 function PdfScreen() {
 	const { toast } = useToast();
@@ -40,9 +54,15 @@ function PdfScreen() {
 	const [pages, setPages] = useState<{ w: number; h: number }[]>([]);
 	const [loading, setLoading] = useState(true);
 	const [saving, setSaving] = useState(false);
-	const [tool, setTool] = useState<Tool>("highlight");
+	// Opens ready to read and scroll; a tool is picked on purpose, so a touch never starts a highlight by accident.
+	const [tool, setTool] = useState<Tool>("select");
 	const [color, setColor] = useState<string>(COLORS.yellow);
-	const [marks, setMarks] = useState<Mark[]>([]);
+	const [thickness, setThickness] = useState(2);
+	const [marks, setMarksState] = useState<Mark[]>([]);
+	const marksRef = useRef<Mark[]>([]);
+	const past = useRef<Mark[][]>([]);
+	const future = useRef<Mark[][]>([]);
+	const [, bump] = useState(0);
 	const [selected, setSelected] = useState<string | null>(null);
 	const [signature, setSignature] = useState<string | null>(null);
 	const [signing, setSigning] = useState(false);
@@ -53,6 +73,36 @@ function PdfScreen() {
 	// A phone starts with the whole page in view.
 	useEffect(() => { if (window.innerWidth < 640) setZoom(0.5); }, []);
 	const canvases = useRef<(HTMLCanvasElement | null)[]>([]);
+	const scroller = useRef<HTMLDivElement>(null);
+	const picture = useRef<HTMLInputElement>(null);
+
+	/* ------------------------------------------------------------ History */
+	const setMarks = (next: Mark[]) => { marksRef.current = next; setMarksState(next); };
+	/** Remember where things were, so Undo can come back to it. */
+	const record = () => {
+		past.current.push(marksRef.current);
+		if (past.current.length > 100) past.current.shift();
+		future.current = [];
+		bump((n) => n + 1);
+	};
+	const commit = (fn: (m: Mark[]) => Mark[]) => { record(); setMarks(fn(marksRef.current)); };
+	const live = (fn: (m: Mark[]) => Mark[]) => setMarks(fn(marksRef.current));
+	const undo = () => {
+		const prev = past.current.pop();
+		if (!prev) return;
+		future.current.push(marksRef.current);
+		setMarks(prev);
+		setSelected((s) => (prev.some((m) => m.id === s) ? s : null));
+		bump((n) => n + 1);
+	};
+	const redo = () => {
+		const next = future.current.pop();
+		if (!next) return;
+		past.current.push(marksRef.current);
+		setMarks(next);
+		bump((n) => n + 1);
+	};
+	const resetHistory = () => { past.current = []; future.current = []; setMarks([]); setSelected(null); bump((n) => n + 1); };
 
 	// Load the file and measure the pages.
 	useEffect(() => {
@@ -111,24 +161,78 @@ function PdfScreen() {
 		return () => { cancelled = true; };
 	}, [bytes, pages, zoom]);
 
+	const sel = marks.find((m) => m.id === selected) ?? null;
+
+	const remove = () => { if (!selected) return; commit((m) => m.filter((x) => x.id !== selected)); setSelected(null); };
+	const duplicate = () => {
+		if (!sel) return;
+		const copy = { ...sel, id: uid() } as Mark;
+		if (copy.kind === "pen") copy.points = copy.points.map(([x, y]) => [Math.min(1, x + 0.02), Math.min(1, y + 0.02)] as [number, number]);
+		else copy.x = Math.min(0.95, copy.x + 0.02), copy.y = Math.min(0.95, copy.y + 0.02);
+		commit((m) => [...m, copy]);
+		setSelected(copy.id);
+	};
+
 	useEffect(() => {
 		const onKey = (e: KeyboardEvent) => {
-			if ((e.key === "Delete" || e.key === "Backspace") && selected && !(e.target as HTMLElement)?.closest("input, textarea")) {
-				setMarks((m) => m.filter((x) => x.id !== selected));
-				setSelected(null);
+			if ((e.target as HTMLElement)?.closest("input, textarea, select")) return;
+			const mod = e.ctrlKey || e.metaKey;
+			if (mod && e.key.toLowerCase() === "z") { e.preventDefault(); if (e.shiftKey) redo(); else undo(); return; }
+			if (mod && e.key.toLowerCase() === "y") { e.preventDefault(); redo(); return; }
+			if (mod && e.key.toLowerCase() === "d" && sel) { e.preventDefault(); duplicate(); return; }
+			if ((e.key === "Delete" || e.key === "Backspace") && selected) { e.preventDefault(); remove(); return; }
+			if (e.key === "Escape") { setSelected(null); return; }
+			if (selected && e.key.startsWith("Arrow")) {
+				e.preventDefault();
+				const d = e.shiftKey ? 0.01 : 0.002;
+				const dx = e.key === "ArrowLeft" ? -d : e.key === "ArrowRight" ? d : 0;
+				const dy = e.key === "ArrowUp" ? -d : e.key === "ArrowDown" ? d : 0;
+				commit((ms) => ms.map((m) => (m.id !== selected ? m : m.kind === "pen" ? { ...m, points: m.points.map(([x, y]) => [clamp(x + dx, 0, 1), clamp(y + dy, 0, 1)] as [number, number]) } : { ...m, x: clamp(m.x + dx, 0, 1), y: clamp(m.y + dy, 0, 1) })));
 			}
 		};
 		window.addEventListener("keydown", onKey);
 		return () => window.removeEventListener("keydown", onKey);
-	}, [selected]);
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	});
 
-	const add = (m: Mark) => setMarks((x) => [...x, m]);
+	const add = (m: Mark) => { commit((x) => [...x, m]); };
+
+	/** A picture from the device, placed on the page in view, then ready to move and resize. */
+	const placePicture = (file: File | undefined) => {
+		if (!file) return;
+		if (!file.type.startsWith("image/")) { toast({ title: "Choose a picture", variant: "destructive" }); return; }
+		const reader = new FileReader();
+		reader.onload = () => {
+			const img = new Image();
+			img.onload = () => {
+				const k = Math.min(1, 1400 / Math.max(img.width, img.height));
+				const c = document.createElement("canvas");
+				c.width = Math.max(1, Math.round(img.width * k)); c.height = Math.max(1, Math.round(img.height * k));
+				c.getContext("2d")!.drawImage(img, 0, 0, c.width, c.height);
+				const box = scroller.current?.getBoundingClientRect();
+				const el = box ? document.elementsFromPoint(box.left + box.width / 2, box.top + box.height / 2).find((n) => (n as HTMLElement).dataset?.page != null) as HTMLElement | undefined : undefined;
+				const pg = el ? Number(el.dataset.page) : 0;
+				const size = pages[pg] ?? pages[0];
+				if (!size) return;
+				const w = 0.35;
+				const h = w * (c.height / c.width) * (size.w / size.h);
+				const m: Mark = { id: uid(), page: pg, kind: "sign", x: (1 - w) / 2, y: clamp(0.3, 0, 1 - h), w, h: Math.min(h, 0.9), dataUrl: c.toDataURL("image/png") };
+				add(m);
+				setSelected(m.id);
+				setTool("select");
+			};
+			img.src = String(reader.result);
+		};
+		reader.readAsDataURL(file);
+		if (picture.current) picture.current.value = "";
+	};
 
 	/** Write every mark into a new copy of the PDF. */
 	const build = async (): Promise<Uint8Array> => {
 		if (!bytes) throw new Error("The PDF is not ready yet.");
 		const doc = await PDFDocument.load(bytes);
 		const font = await doc.embedFont(StandardFonts.Helvetica);
+		const fontBold = await doc.embedFont(StandardFonts.HelveticaBold);
 		const all = doc.getPages();
 		for (const m of marks) {
 			const page = all[m.page];
@@ -140,14 +244,25 @@ function PdfScreen() {
 				for (let i = 1; i < m.points.length; i++) {
 					const [x1, y1] = m.points[i - 1];
 					const [x2, y2] = m.points[i];
-					page.drawLine({ start: { x: x1 * W, y: H - y1 * H }, end: { x: x2 * W, y: H - y2 * H }, thickness: 1.8, color: hex(m.color) });
+					page.drawLine({ start: { x: x1 * W, y: H - y1 * H }, end: { x: x2 * W, y: H - y2 * H }, thickness: m.width * 0.9, color: hex(m.color), lineCap: 1 });
 				}
 			} else if (m.kind === "text") {
 				const size = m.size * (H / pages[m.page].h);
-				page.drawText(m.text, { x: m.x * W, y: H - m.y * H - size, size, font, color: hex(m.color) });
+				m.text.split("\n").forEach((line, i) => {
+					if (line) page.drawText(line, { x: m.x * W, y: H - m.y * H - size - i * size * 1.2, size, font: m.bold ? fontBold : font, color: hex(m.color) });
+				});
 			} else if (m.kind === "sign") {
 				const img = await doc.embedPng(m.dataUrl);
 				page.drawImage(img, { x: m.x * W, y: H - (m.y + m.h) * H, width: m.w * W, height: m.h * H });
+			} else if (m.kind === "pin") {
+				const x = m.x * W, y = H - m.y * H - 16;
+				// A real note annotation, so other PDF viewers show the comment too, plus a visible marker.
+				const ref = doc.context.register(doc.context.obj({
+					Type: "Annot", Subtype: "Text", Rect: [x, y, x + 16, y + 16], Contents: PDFHexString.fromText(m.text), Name: "Comment", C: [1, 0.8, 0], F: 4, T: PDFHexString.fromText("Sauti Salama"),
+				}));
+				page.node.addAnnot(ref);
+				page.drawRectangle({ x, y, width: 16, height: 16, color: rgb(1, 0.8, 0), borderColor: rgb(0.6, 0.45, 0), borderWidth: 0.8, opacity: 0.95 });
+				page.drawText("i", { x: x + 6, y: y + 4, size: 9, font: fontBold, color: rgb(0.3, 0.2, 0) });
 			}
 		}
 		return await doc.save();
@@ -163,7 +278,7 @@ function PdfScreen() {
 				await putToSignedUrl(signedUrl, blob);
 				await finishReplace(fileId, blob.size);
 				setBytes(out);
-				setMarks([]);
+				resetHistory();
 			} else {
 				const copyName = name.replace(/\.pdf$/i, "") + " (marked up).pdf";
 				const { path, signedUrl } = await prepareUpload(folderId, copyName, blob.size);
@@ -196,19 +311,53 @@ function PdfScreen() {
 		["highlight", "Highlight", <Highlighter key="h" className="h-[18px] w-[18px]" />],
 		["pen", "Draw", <PenLine key="p" className="h-[18px] w-[18px]" />],
 		["text", "Text", <Type key="t" className="h-[18px] w-[18px]" />],
+		["pin", "Note", <MapPin key="n" className="h-[18px] w-[18px]" />],
 		["sign", "Sign", <Signature key="g" className="h-[18px] w-[18px]" />],
 	];
 
-	const toolButtons = tools.map(([t, label, icon]) => (
-		<button key={t} onClick={() => { setTool(t); if (t === "sign") setSigning(true); }} aria-pressed={tool === t} title={label} aria-label={label} className={cn("flex h-9 shrink-0 items-center gap-1.5 rounded-lg px-2.5 text-sm", tool === t ? "bg-sauti-teal-light text-sauti-dark" : "text-[#787774] hover:bg-black/5")}>{icon}<span className="text-xs sm:text-sm md:inline">{label}</span></button>
-	));
-	const colourDots = (tool === "highlight" || tool === "pen" || tool === "text") && (
-		<div className="ml-1 flex shrink-0 items-center gap-1.5">
-			{(tool === "text" || tool === "pen" ? ["#111827", "#dc2626", "#2563eb", "#16a34a"] : Object.values(COLORS)).map((c) => (
-				<button key={c} aria-label={`Colour ${c}`} aria-pressed={color === c} onClick={() => setColor(c)} className={cn("h-6 w-6 rounded-full ring-offset-1", color === c && "ring-2 ring-sauti-teal")} style={{ background: c }} />
+	const toolButtons = (
+		<>
+			{tools.map(([t, label, icon]) => (
+				<button key={t} onClick={() => { setTool(t); if (t === "sign") setSigning(true); }} aria-pressed={tool === t} title={label} aria-label={label} className={cn("flex h-9 shrink-0 items-center gap-1.5 rounded-lg px-2.5 text-sm", tool === t ? "bg-sauti-teal-light text-sauti-dark" : "text-[#787774] hover:bg-black/5")}>{icon}<span className="text-xs sm:text-sm md:inline">{label}</span></button>
 			))}
-		</div>
+			<button onClick={() => picture.current?.click()} title="Add a picture" aria-label="Add a picture" className="flex h-9 shrink-0 items-center gap-1.5 rounded-lg px-2.5 text-sm text-[#787774] hover:bg-black/5"><ImagePlus className="h-[18px] w-[18px]" /><span className="text-xs sm:text-sm md:inline">Picture</span></button>
+		</>
 	);
+
+	const applyColor = (c: string) => {
+		setColor(c);
+		if (sel && "color" in sel) commit((ms) => ms.map((m) => (m.id === sel.id && "color" in m ? { ...m, color: c } : m)));
+	};
+	const activeKind = sel?.kind ?? (tool === "highlight" ? "highlight" : tool === "pen" ? "pen" : tool === "text" ? "text" : null);
+	const palette = activeKind === "highlight" ? Object.values(COLORS) : INK;
+	const shownColor = sel && "color" in sel ? sel.color : color;
+	const textSize = sel?.kind === "text" ? sel.size : 14;
+	const penWidth = sel?.kind === "pen" ? sel.width : thickness;
+
+	const contextual = activeKind && activeKind !== "sign" && activeKind !== "pin" ? (
+		<div className="flex shrink-0 items-center gap-2">
+			<div className="flex shrink-0 items-center gap-1.5">
+				{palette.map((c) => (
+					<button key={c} aria-label={`Colour ${c}`} aria-pressed={shownColor === c} onClick={() => applyColor(c)} className={cn("h-6 w-6 rounded-full ring-offset-1", shownColor === c && "ring-2 ring-sauti-teal")} style={{ background: c }} />
+				))}
+			</div>
+			{activeKind === "text" && (
+				<div className="flex shrink-0 items-center gap-0.5 rounded-lg border border-black/10 bg-white px-0.5">
+					<button aria-label="Smaller text" className="flex h-7 w-7 items-center justify-center rounded hover:bg-black/5" onClick={() => sel?.kind === "text" && commit((ms) => ms.map((m) => (m.id === sel.id && m.kind === "text" ? { ...m, size: Math.max(6, m.size - 2) } : m)))}><Minus className="h-3.5 w-3.5" /></button>
+					<span className="w-7 text-center text-xs tabular-nums">{textSize}</span>
+					<button aria-label="Larger text" className="flex h-7 w-7 items-center justify-center rounded hover:bg-black/5" onClick={() => sel?.kind === "text" && commit((ms) => ms.map((m) => (m.id === sel.id && m.kind === "text" ? { ...m, size: Math.min(96, m.size + 2) } : m)))}><Plus className="h-3.5 w-3.5" /></button>
+					<button aria-label="Bold" aria-pressed={sel?.kind === "text" && !!sel.bold} className={cn("flex h-7 w-7 items-center justify-center rounded hover:bg-black/5", sel?.kind === "text" && sel.bold && "bg-sauti-teal-light")} onClick={() => sel?.kind === "text" && commit((ms) => ms.map((m) => (m.id === sel.id && m.kind === "text" ? { ...m, bold: !m.bold } : m)))}><Bold className="h-3.5 w-3.5" /></button>
+				</div>
+			)}
+			{activeKind === "pen" && (
+				<label className="flex shrink-0 items-center gap-1.5 text-xs text-[#787774]">Thickness
+					<input type="range" min={1} max={12} value={penWidth} className="w-20 accent-[#068297]"
+						onPointerDown={() => sel?.kind === "pen" && record()}
+						onChange={(e) => { const v = Number(e.target.value); setThickness(v); if (sel?.kind === "pen") live((ms) => ms.map((m) => (m.id === sel.id && m.kind === "pen" ? { ...m, width: v } : m))); }} />
+				</label>
+			)}
+		</div>
+	) : null;
 
 	return (
 		<div className="flex h-full min-h-0 flex-col bg-[#f4f4f2]">
@@ -219,8 +368,10 @@ function PdfScreen() {
 					<span className="mx-1 hidden h-5 w-px bg-black/10 sm:block" />
 					<div className="hidden items-center gap-1 sm:flex">{toolButtons}</div>
 					<span className="hidden flex-1 sm:block" />
-					<Button variant="ghost" size="icon" className="h-9 w-9 shrink-0" aria-label="Undo" disabled={!marks.length} onClick={() => setMarks((m) => m.slice(0, -1))}><Undo2 className="h-[18px] w-[18px]" /></Button>
-					<Button variant="ghost" size="icon" className="h-9 w-9 shrink-0" aria-label="Delete the selected mark" disabled={!selected} onClick={() => { setMarks((m) => m.filter((x) => x.id !== selected)); setSelected(null); }}><Trash2 className="h-[18px] w-[18px]" /></Button>
+					<Button variant="ghost" size="icon" className="h-9 w-9 shrink-0" aria-label="Undo" title="Undo (Ctrl+Z)" disabled={!past.current.length} onClick={undo}><Undo2 className="h-[18px] w-[18px]" /></Button>
+					<Button variant="ghost" size="icon" className="h-9 w-9 shrink-0" aria-label="Redo" title="Redo (Ctrl+Shift+Z)" disabled={!future.current.length} onClick={redo}><Redo2 className="h-[18px] w-[18px]" /></Button>
+					<Button variant="ghost" size="icon" className="hidden h-9 w-9 shrink-0 sm:inline-flex" aria-label="Duplicate the selected mark" title="Duplicate (Ctrl+D)" disabled={!selected} onClick={duplicate}><Copy className="h-[18px] w-[18px]" /></Button>
+					<Button variant="ghost" size="icon" className="h-9 w-9 shrink-0" aria-label="Delete the selected mark" title="Delete" disabled={!selected} onClick={remove}><Trash2 className="h-[18px] w-[18px]" /></Button>
 					<select value={zoom} onChange={(e) => setZoom(Number(e.target.value))} aria-label="Zoom" className="hidden h-9 rounded-lg border border-black/10 bg-white px-2 text-sm sm:block">
 						{[0.5, 0.75, 1, 1.25, 1.5, 2].map((z) => <option key={z} value={z}>{Math.round(z * 100)}%</option>)}
 					</select>
@@ -230,15 +381,16 @@ function PdfScreen() {
 				{/* On a phone the tools get their own scrolling row, like a mobile document app. */}
 				<div className="flex items-center gap-1 overflow-x-auto border-t border-black/[0.05] px-2 py-1 scrollbar-hide sm:hidden">
 					{toolButtons}
-					{colourDots}
+					{contextual}
 					<select value={zoom} onChange={(e) => setZoom(Number(e.target.value))} aria-label="Zoom" className="ml-auto h-9 shrink-0 rounded-lg border border-black/10 bg-white px-2 text-sm">
 						{[0.5, 0.75, 1, 1.25, 1.5, 2].map((z) => <option key={z} value={z}>{Math.round(z * 100)}%</option>)}
 					</select>
 				</div>
-				<div className="hidden items-center gap-1 px-3 pb-1.5 sm:flex">{colourDots}</div>
+				{contextual && <div className="hidden items-center gap-1 px-3 pb-1.5 sm:flex">{contextual}</div>}
 			</div>
+			<input ref={picture} type="file" accept="image/*" className="hidden" onChange={(e) => placePicture(e.target.files?.[0])} />
 
-			<div className="min-h-0 flex-1 touch-pan-x touch-pan-y overflow-auto overscroll-contain p-2 sm:p-4" style={{ WebkitOverflowScrolling: "touch" }}>
+			<div ref={scroller} className="min-h-0 flex-1 touch-pan-x touch-pan-y overflow-auto overscroll-contain p-2 sm:p-4" style={{ WebkitOverflowScrolling: "touch" }}>
 				{loading ? <MjengoLoader label="Opening the PDF" /> : (
 					<div className="mx-auto flex w-fit flex-col gap-4">
 						{pages.map((p, i) => (
@@ -251,10 +403,14 @@ function PdfScreen() {
 								marks={marks.filter((m) => m.page === i)}
 								tool={tool}
 								color={color}
+								thickness={thickness}
 								selected={selected}
 								onSelect={setSelected}
-								onAdd={add}
-								onChange={(id, patch) => setMarks((m) => m.map((x) => (x.id === id ? ({ ...x, ...patch } as Mark) : x)))}
+								onAdd={(m) => { add(m); if (m.kind === "text" || m.kind === "pin") { setSelected(m.id); setTool("select"); } }}
+								onBegin={record}
+								onLive={(id, patch) => live((ms) => ms.map((x) => (x.id === id ? ({ ...x, ...patch } as Mark) : x)))}
+								onEdit={(id, patch) => commit((ms) => ms.map((x) => (x.id === id ? ({ ...x, ...patch } as Mark) : x)))}
+								onDelete={(id) => { commit((ms) => ms.filter((x) => x.id !== id)); setSelected(null); }}
 								signature={signature}
 								onNeedSignature={() => setSigning(true)}
 							/>
@@ -268,39 +424,46 @@ function PdfScreen() {
 	);
 }
 
-function PageView({ index, size, zoom, canvasRef, marks, tool, color, selected, onSelect, onAdd, onChange, signature, onNeedSignature }: {
+type Drag = { id: string; sx: number; sy: number; orig: Mark; mode: "move" | "resize"; handle?: "nw" | "ne" | "sw" | "se"; moved: boolean; wasSelected: boolean };
+
+function PageView({ index, size, zoom, canvasRef, marks, tool, color, thickness, selected, onSelect, onAdd, onBegin, onLive, onEdit, onDelete, signature, onNeedSignature }: {
 	index: number; size: { w: number; h: number }; zoom: number; canvasRef: (el: HTMLCanvasElement | null) => void;
-	marks: Mark[]; tool: Tool; color: string; selected: string | null; onSelect: (id: string | null) => void; onAdd: (m: Mark) => void;
-	onChange: (id: string, patch: Partial<Mark>) => void; signature: string | null; onNeedSignature: () => void;
+	marks: Mark[]; tool: Tool; color: string; thickness: number; selected: string | null; onSelect: (id: string | null) => void; onAdd: (m: Mark) => void;
+	onBegin: () => void; onLive: (id: string, patch: Partial<Mark>) => void; onEdit: (id: string, patch: Partial<Mark>) => void; onDelete: (id: string) => void;
+	signature: string | null; onNeedSignature: () => void;
 }) {
 	const W = size.w * zoom;
 	const H = size.h * zoom;
 	const box = useRef<HTMLDivElement>(null);
+	const layer = useRef<HTMLDivElement>(null);
 	const [draft, setDraft] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
 	const [stroke, setStroke] = useState<[number, number][] | null>(null);
-	const [typing, setTyping] = useState<{ x: number; y: number; text: string } | null>(null);
+	/** Typing a new text or note (no id), or changing one that is already there (id). */
+	const [typing, setTyping] = useState<{ id?: string; kind: "text" | "pin"; x: number; y: number; text: string } | null>(null);
 	const start = useRef<{ x: number; y: number } | null>(null);
-	const typingInput = useRef<HTMLInputElement>(null);
+	const drag = useRef<Drag | null>(null);
+	const typingInput = useRef<HTMLTextAreaElement>(null);
 	// Focus after the click has finished, otherwise the browser takes the focus back and the box closes at once.
 	useEffect(() => {
 		if (!typing) return;
-		const t = setTimeout(() => typingInput.current?.focus(), 30);
+		const t = setTimeout(() => { typingInput.current?.focus(); typingInput.current?.select(); }, 30);
 		return () => clearTimeout(t);
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [typing === null]);
 
 	const pos = (e: React.PointerEvent): [number, number] => {
 		const r = box.current!.getBoundingClientRect();
-		return [Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)), Math.min(1, Math.max(0, (e.clientY - r.top) / r.height))];
+		return [clamp((e.clientX - r.left) / r.width, 0, 1), clamp((e.clientY - r.top) / r.height, 0, 1)];
 	};
 
 	const down = (e: React.PointerEvent) => {
-		if ((e.target as HTMLElement).closest("[data-mark]")) return;
+		if ((e.target as HTMLElement).closest("[data-mark], [data-typing]")) return;
 		const [x, y] = pos(e);
 		onSelect(null);
 		if (tool === "highlight") { start.current = { x, y }; setDraft({ x, y, w: 0, h: 0 }); (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); }
 		else if (tool === "pen") { setStroke([[x, y]]); (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); }
-		else if (tool === "text") { e.preventDefault(); setTyping({ x, y, text: "" }); }
+		else if (tool === "text") { e.preventDefault(); setTyping({ kind: "text", x, y, text: "" }); }
+		else if (tool === "pin") { e.preventDefault(); setTyping({ kind: "pin", x, y, text: "" }); }
 		else if (tool === "sign") {
 			if (!signature) return onNeedSignature();
 			const w = 0.28;
@@ -308,51 +471,149 @@ function PageView({ index, size, zoom, canvasRef, marks, tool, color, selected, 
 			onAdd({ id: uid(), page: index, kind: "sign", x: Math.min(x, 1 - w), y: Math.min(y, 1 - h), w, h, dataUrl: signature });
 		}
 	};
+
+	const beginDrag = (e: React.PointerEvent, m: Mark, mode: Drag["mode"], handle?: Drag["handle"]) => {
+		e.stopPropagation();
+		const [sx, sy] = pos(e);
+		drag.current = { id: m.id, sx, sy, orig: m, mode, handle, moved: false, wasSelected: selected === m.id };
+		onSelect(m.id);
+		layer.current?.setPointerCapture(e.pointerId);
+	};
+
 	const move = (e: React.PointerEvent) => {
 		const [x, y] = pos(e);
+		const d = drag.current;
+		if (d) {
+			const dx = x - d.sx, dy = y - d.sy;
+			if (!d.moved) {
+				if (Math.abs(dx) + Math.abs(dy) < 0.003) return;
+				d.moved = true;
+				onBegin();
+			}
+			const o = d.orig;
+			if (d.mode === "move") {
+				const b = bounds(o);
+				const mx = clamp(dx, -b.x, 1 - b.x - b.w), my = clamp(dy, -b.y, 1 - b.y - b.h);
+				if (o.kind === "pen") onLive(o.id, { points: o.points.map(([px, py]) => [px + mx, py + my] as [number, number]) });
+				else onLive(o.id, { x: (o as { x: number }).x + mx, y: (o as { y: number }).y + my } as Partial<Mark>);
+			} else if (o.kind === "highlight") {
+				let nx = o.x, ny = o.y, nw = o.w, nh = o.h;
+				if (d.handle?.includes("e")) nw = Math.max(0.01, o.w + dx);
+				if (d.handle?.includes("w")) { nx = clamp(o.x + dx, 0, o.x + o.w - 0.01); nw = o.x + o.w - nx; }
+				if (d.handle?.includes("s")) nh = Math.max(0.005, o.h + dy);
+				if (d.handle?.includes("n")) { ny = clamp(o.y + dy, 0, o.y + o.h - 0.005); nh = o.y + o.h - ny; }
+				onLive(o.id, { x: nx, y: ny, w: Math.min(nw, 1 - nx), h: Math.min(nh, 1 - ny) });
+			} else if (o.kind === "sign") {
+				const sign = d.handle?.includes("w") ? -1 : 1;
+				const f = Math.max(0.15, (o.w + dx * sign) / o.w);
+				const nw = Math.min(1, o.w * f), nh = Math.min(1, o.h * f);
+				const nx = d.handle?.includes("w") ? o.x + o.w - nw : o.x;
+				const ny = d.handle?.includes("n") ? o.y + o.h - nh : o.y;
+				onLive(o.id, { x: clamp(nx, 0, 1 - nw), y: clamp(ny, 0, 1 - nh), w: nw, h: nh });
+			} else if (o.kind === "text") {
+				onLive(o.id, { size: clamp(Math.round(o.size + (dx * size.w) / 5), 6, 96) });
+			}
+			return;
+		}
 		if (draft && start.current) setDraft({ x: Math.min(x, start.current.x), y: Math.min(y, start.current.y), w: Math.abs(x - start.current.x), h: Math.abs(y - start.current.y) });
 		else if (stroke) setStroke((s) => (s ? [...s, [x, y]] : s));
 	};
+
 	const up = () => {
+		const d = drag.current;
+		if (d) {
+			drag.current = null;
+			// A tap on a text or note that was already selected changes it, like tapping text in the design editor.
+			if (!d.moved && d.wasSelected && (d.orig.kind === "text" || d.orig.kind === "pin")) {
+				setTyping({ id: d.orig.id, kind: d.orig.kind, x: d.orig.x, y: d.orig.y, text: d.orig.text });
+			}
+			return;
+		}
 		if (draft && draft.w > 0.004 && draft.h > 0.003) onAdd({ id: uid(), page: index, kind: "highlight", color, ...draft });
-		if (stroke && stroke.length > 1) onAdd({ id: uid(), page: index, kind: "pen", points: stroke, color });
+		if (stroke && stroke.length > 1) onAdd({ id: uid(), page: index, kind: "pen", points: stroke, color, width: thickness });
 		setDraft(null); setStroke(null); start.current = null;
 	};
-	const commitText = () => {
-		if (typing && typing.text.trim()) onAdd({ id: uid(), page: index, kind: "text", x: typing.x, y: typing.y, text: typing.text, size: 14, color });
+
+	const commitTyping = () => {
+		const t = typing;
 		setTyping(null);
+		if (!t) return;
+		const text = t.text.replace(/\s+$/, "");
+		if (t.id) {
+			if (text.trim()) onEdit(t.id, { text } as Partial<Mark>);
+			else onDelete(t.id);
+		} else if (text.trim()) {
+			onAdd(t.kind === "text" ? { id: uid(), page: index, kind: "text", x: t.x, y: t.y, text, size: 14, color: INK.includes(color) ? color : INK[0] } : { id: uid(), page: index, kind: "pin", x: t.x, y: t.y, text });
+		}
 	};
 
 	const cursor = tool === "select" ? "default" : tool === "text" ? "text" : "crosshair";
+	const touchNone = tool === "highlight" || tool === "pen" || drag.current !== null;
+	const handles = (m: Mark) => {
+		if (m.kind !== "highlight" && m.kind !== "sign" && m.kind !== "text") return null;
+		const corners: Drag["handle"][] = m.kind === "text" ? ["se"] : ["nw", "ne", "sw", "se"];
+		return corners.map((h) => (
+			<span key={h} data-mark onPointerDown={(e) => beginDrag(e, m, "resize", h)} aria-hidden
+				className="absolute z-10 h-3.5 w-3.5 touch-none rounded-sm border-2 border-sauti-teal bg-white"
+				style={{ [h!.includes("n") ? "top" : "bottom"]: -7, [h!.includes("w") ? "left" : "right"]: -7, cursor: h === "nw" || h === "se" ? "nwse-resize" : "nesw-resize" }} />
+		));
+	};
+
 	return (
-		<div ref={box} className="relative bg-white shadow-md" style={{ width: W, height: H }}>
+		<div ref={box} data-page={index} className="relative bg-white shadow-md" style={{ width: W, height: H }}>
 			<canvas ref={canvasRef} style={{ width: W, height: H }} className="absolute inset-0" />
-			<div className={cn("absolute inset-0", tool === "highlight" || tool === "pen" ? "touch-none" : "touch-pan-x touch-pan-y")} style={{ cursor }} onPointerDown={down} onPointerMove={move} onPointerUp={up}>
+			<div ref={layer} className={cn("absolute inset-0", touchNone ? "touch-none" : "touch-pan-x touch-pan-y")} style={{ cursor }} onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={up}>
 				{marks.map((m) => {
-					const sel = selected === m.id;
-					if (m.kind === "highlight") return <div key={m.id} data-mark onPointerDown={(e) => { e.stopPropagation(); onSelect(m.id); }} className={cn("absolute", sel && "outline outline-2 outline-sauti-teal")} style={{ left: `${m.x * 100}%`, top: `${m.y * 100}%`, width: `${m.w * 100}%`, height: `${m.h * 100}%`, background: m.color, opacity: 0.4, cursor: "pointer" }} />;
-					if (m.kind === "text") return <div key={m.id} data-mark onPointerDown={(e) => { e.stopPropagation(); onSelect(m.id); }} className={cn("absolute whitespace-pre font-sans leading-none", sel && "outline outline-2 outline-sauti-teal")} style={{ left: `${m.x * 100}%`, top: `${m.y * 100}%`, fontSize: m.size * zoom, color: m.color, cursor: "pointer" }}>{m.text}</div>;
-					if (m.kind === "sign") return <img key={m.id} data-mark src={m.dataUrl} alt="Signature" draggable={false} onPointerDown={(e) => { e.stopPropagation(); onSelect(m.id); }} className={cn("absolute", sel && "outline outline-2 outline-sauti-teal")} style={{ left: `${m.x * 100}%`, top: `${m.y * 100}%`, width: `${m.w * 100}%`, height: `${m.h * 100}%`, cursor: "pointer" }} />;
+					const isSel = selected === m.id;
+					const ring = isSel ? "outline outline-2 outline-offset-2 outline-sauti-teal" : "hover:outline hover:outline-1 hover:outline-offset-2 hover:outline-sauti-teal/50";
+					const common = { "data-mark": true, onPointerDown: (e: React.PointerEvent) => beginDrag(e, m, "move"), onDoubleClick: () => (m.kind === "text" || m.kind === "pin") && setTyping({ id: m.id, kind: m.kind, x: m.x, y: m.y, text: m.text }) };
+					if (m.kind === "highlight") return <div key={m.id} {...common} className={cn("absolute touch-none", ring)} style={{ left: `${m.x * 100}%`, top: `${m.y * 100}%`, width: `${m.w * 100}%`, height: `${m.h * 100}%`, background: m.color + "66", cursor: "move" }}>{isSel && handles(m)}</div>;
+					if (m.kind === "text") {
+						if (typing?.id === m.id) return null;
+						return <div key={m.id} {...common} className={cn("absolute touch-none select-none whitespace-pre font-sans leading-[1.2]", ring)} style={{ left: `${m.x * 100}%`, top: `${m.y * 100}%`, fontSize: m.size * zoom, color: m.color, fontWeight: m.bold ? 700 : 400, cursor: "move" }}>{m.text}{isSel && handles(m)}</div>;
+					}
+					if (m.kind === "sign") return <div key={m.id} {...common} className={cn("absolute touch-none", ring)} style={{ left: `${m.x * 100}%`, top: `${m.y * 100}%`, width: `${m.w * 100}%`, height: `${m.h * 100}%`, cursor: "move" }}><img src={m.dataUrl} alt="Signature or picture" draggable={false} className="h-full w-full select-none" />{isSel && handles(m)}</div>;
+					if (m.kind === "pin") {
+						if (typing?.id === m.id) return null;
+						return (
+							<div key={m.id} {...common} className="absolute touch-none" style={{ left: `${m.x * 100}%`, top: `${m.y * 100}%`, cursor: "move" }}>
+								<span className={cn("flex h-6 w-6 -translate-x-1/2 -translate-y-full items-center justify-center rounded-full rounded-bl-none border border-amber-600 bg-amber-300 text-amber-950 shadow", isSel && "ring-2 ring-sauti-teal ring-offset-1")}><MapPin className="h-3.5 w-3.5" /></span>
+								{isSel && <span className="absolute left-3 top-1 z-10 w-48 whitespace-pre-wrap rounded-lg border border-amber-200 bg-amber-50 p-2 text-xs text-amber-950 shadow-lg">{m.text}<span className="mt-1 block text-[10px] text-amber-700">Tap again to edit</span></span>}
+							</div>
+						);
+					}
 					return null;
 				})}
 				<svg className="pointer-events-none absolute inset-0 h-full w-full" viewBox="0 0 1 1" preserveAspectRatio="none">
 					{marks.filter((m): m is Extract<Mark, { kind: "pen" }> => m.kind === "pen").map((m) => (
-						<polyline key={m.id} points={m.points.map((p) => p.join(",")).join(" ")} fill="none" stroke={m.color} strokeWidth={0.003} vectorEffect="non-scaling-stroke" style={{ strokeWidth: 2 }} />
+						<polyline key={m.id} points={m.points.map((p) => p.join(",")).join(" ")} fill="none" stroke={m.color} strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" style={{ strokeWidth: m.width * Math.max(0.6, zoom) }} />
 					))}
-					{stroke && <polyline points={stroke.map((p) => p.join(",")).join(" ")} fill="none" stroke={color} vectorEffect="non-scaling-stroke" style={{ strokeWidth: 2 }} />}
+					{stroke && <polyline points={stroke.map((p) => p.join(",")).join(" ")} fill="none" stroke={color} strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" style={{ strokeWidth: thickness * Math.max(0.6, zoom) }} />}
 				</svg>
+				{/* Pens are picked up from a transparent box over the stroke, so they can be moved too. */}
+				{marks.filter((m): m is Extract<Mark, { kind: "pen" }> => m.kind === "pen").map((m) => {
+					const b = bounds(m);
+					const isSel = selected === m.id;
+					return <div key={`${m.id}-hit`} data-mark onPointerDown={(e) => beginDrag(e, m, "move")} className={cn("absolute touch-none", isSel ? "outline outline-2 outline-offset-4 outline-sauti-teal" : "hover:outline hover:outline-1 hover:outline-offset-4 hover:outline-sauti-teal/50")} style={{ left: `${b.x * 100}%`, top: `${b.y * 100}%`, width: `${Math.max(b.w, 0.01) * 100}%`, height: `${Math.max(b.h, 0.01) * 100}%`, cursor: "move" }} />;
+				})}
 				{draft && <div className="absolute" style={{ left: `${draft.x * 100}%`, top: `${draft.y * 100}%`, width: `${draft.w * 100}%`, height: `${draft.h * 100}%`, background: color, opacity: 0.4 }} />}
 				{typing && (
-					<input
+					<textarea
+						data-typing
 						ref={typingInput}
 						onPointerDown={(e) => e.stopPropagation()}
 						value={typing.text}
 						onChange={(e) => setTyping({ ...typing, text: e.target.value })}
-						onBlur={commitText}
-						onKeyDown={(e) => { if (e.key === "Enter") commitText(); if (e.key === "Escape") setTyping(null); }}
-						className="absolute min-w-[120px] rounded border border-sauti-teal bg-white/90 px-1 outline-none"
-						style={{ left: `${typing.x * 100}%`, top: `${typing.y * 100}%`, fontSize: 14 * zoom, color }}
-						aria-label="Text to place"
+						onBlur={commitTyping}
+						onKeyDown={(e) => {
+							if ((e.key === "Enter" && !e.shiftKey && typing.kind === "text") || (e.key === "Enter" && (e.ctrlKey || e.metaKey))) { e.preventDefault(); commitTyping(); }
+							if (e.key === "Escape") { e.preventDefault(); setTyping(null); }
+						}}
+						rows={Math.max(1, typing.text.split("\n").length)}
+						placeholder={typing.kind === "pin" ? "Write a note" : "Type here"}
+						className={cn("absolute z-20 resize-none rounded border border-sauti-teal bg-white/95 px-1 leading-[1.2] shadow outline-none", typing.kind === "pin" ? "min-w-[180px] bg-amber-50" : "min-w-[120px]")}
+						style={{ left: `${typing.x * 100}%`, top: `${typing.y * 100}%`, fontSize: typing.kind === "pin" ? 13 : (marks.find((m) => m.id === typing.id && m.kind === "text") as Extract<Mark, { kind: "text" }> | undefined)?.size ? (marks.find((m) => m.id === typing.id) as Extract<Mark, { kind: "text" }>).size * zoom : 14 * zoom, color: typing.kind === "text" ? ((marks.find((m) => m.id === typing.id) as Extract<Mark, { kind: "text" }> | undefined)?.color ?? (INK.includes(color) ? color : INK[0])) : undefined }}
+						aria-label={typing.kind === "pin" ? "Note text" : "Text to place"}
 					/>
 				)}
 			</div>
