@@ -7,7 +7,7 @@ import { MjengoLoader } from "../../_components/MjengoLoader";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { ActiveSelection, cache, Canvas, Circle, FabricImage, Gradient, Group, Line, Path, PencilBrush, Rect, Shadow, Textbox, Triangle, filters, type FabricObject } from "fabric";
-import { AlignCenter, AlignLeft, AlignRight, ArrowLeft, Bold, Copy, Download, Image as ImageIcon, Italic, Gift, Layers, LayoutTemplate, Loader2, Redo2, Save, Shapes, Sparkles, Trash2, Type, Undo2, Upload } from "lucide-react";
+import { AlignCenter, AlignHorizontalJustifyCenter, AlignLeft, AlignRight, ArrowLeft, ArrowUpDown, Bold, ChevronDown, ChevronUp, Eraser, Eye, EyeOff, GripVertical, Group as GroupIcon, MoveVertical, Scissors, SlidersHorizontal, Ungroup, Wand2, Copy, Download, Image as ImageIcon, Italic, Gift, Layers, LayoutTemplate, Loader2, Redo2, Save, Shapes, Sparkles, Trash2, Type, Undo2, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Input } from "@/components/ui/input";
@@ -902,7 +902,7 @@ function DesignEditor() {
 								{sep}
 								{([["left", AlignLeft], ["center", AlignCenter], ["right", AlignRight]] as const).map(([a, Icon]) => <button key={a} onClick={() => set({ textAlign: a })} aria-label={`Align ${a}`} aria-pressed={o.textAlign === a} className={tgl(o.textAlign === a)}><Icon className="h-4 w-4" /></button>)}
 								<Popover>
-									<PopoverTrigger asChild><button className="h-8 shrink-0 rounded-lg px-2 text-xs font-medium hover:bg-serene-neutral-100">Spacing</button></PopoverTrigger>
+									<PopoverTrigger asChild><button aria-label="Spacing" title="Spacing" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg hover:bg-serene-neutral-100"><MoveVertical className="h-[18px] w-[18px]" /></button></PopoverTrigger>
 									<PopoverContent align="start" className="w-56 space-y-3 p-3">
 										<label className="block text-xs text-serene-neutral-600">Letter spacing<input type="range" min={-50} max={500} step={10} value={t?.charSpacing ?? 0} onChange={(e) => set({ charSpacing: Number(e.target.value) })} className="mt-1 w-full accent-[#7D2AE8]" /></label>
 										<label className="block text-xs text-serene-neutral-600">Line spacing<input type="range" min={0.8} max={2.5} step={0.05} value={t?.lineHeight ?? 1.2} onChange={(e) => set({ lineHeight: Number(e.target.value) })} className="mt-1 w-full accent-[#7D2AE8]" /></label>
@@ -911,11 +911,11 @@ function DesignEditor() {
 							</>
 						)}
 						{sep}
-						{o.type === "image" && <button onClick={() => void removeBg()} className="h-8 shrink-0 rounded-lg bg-[#7D2AE8]/10 px-2.5 text-xs font-semibold text-[#7D2AE8] hover:bg-[#7D2AE8]/15">Remove background</button>}
-						{o.type === "image" && <button onClick={splitSelected} className="h-8 shrink-0 rounded-lg px-2 text-xs font-medium hover:bg-serene-neutral-100">Split into layers</button>}
+						{o.type === "image" && <button onClick={() => void removeBg()} aria-label="Remove background" title="Remove background" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#7D2AE8]/10 text-[#7D2AE8] hover:bg-[#7D2AE8]/15"><Eraser className="h-[18px] w-[18px]" /></button>}
+						{o.type === "image" && <button onClick={splitSelected} aria-label="Split into layers" title="Split into layers" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg hover:bg-serene-neutral-100"><Scissors className="h-[18px] w-[18px]" /></button>}
 						{o.type === "image" && (
 							<Popover>
-								<PopoverTrigger asChild><button className="h-8 shrink-0 rounded-lg px-2 text-xs font-medium hover:bg-serene-neutral-100">Adjust</button></PopoverTrigger>
+								<PopoverTrigger asChild><button aria-label="Adjust" title="Adjust" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg hover:bg-serene-neutral-100"><SlidersHorizontal className="h-[18px] w-[18px]" /></button></PopoverTrigger>
 								<PopoverContent align="start" className="w-64 space-y-3 p-3">
 									{([["Brightness", "Brightness", "brightness", -0.5, 0.5, 0, () => filters.Brightness], ["Contrast", "Contrast", "contrast", -0.5, 0.5, 0, () => filters.Contrast], ["Saturation", "Saturation", "saturation", -1, 1, 0, () => filters.Saturation], ["Blur", "Blur", "blur", 0, 0.5, 0, () => filters.Blur]] as const).map(([label, type, prop, min, max, d, cls]) => (
 										<label key={type} className="block text-xs text-serene-neutral-600">{label}
@@ -940,7 +940,7 @@ function DesignEditor() {
 							</Popover>
 						)}
 						<Popover>
-							<PopoverTrigger asChild><button className="h-8 shrink-0 rounded-lg px-2 text-xs font-medium hover:bg-serene-neutral-100">Effects</button></PopoverTrigger>
+							<PopoverTrigger asChild><button aria-label="Effects" title="Effects" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg hover:bg-serene-neutral-100"><Wand2 className="h-[18px] w-[18px]" /></button></PopoverTrigger>
 							<PopoverContent align="start" className="w-64 space-y-3 p-3">
 								{(() => {
 									const sh = useShadow(o);
@@ -980,16 +980,16 @@ function DesignEditor() {
 							</PopoverContent>
 						</Popover>
 						<Popover>
-							<PopoverTrigger asChild><button className="h-8 shrink-0 rounded-lg px-2 text-xs font-medium hover:bg-serene-neutral-100">Align</button></PopoverTrigger>
+							<PopoverTrigger asChild><button aria-label="Align" title="Align" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg hover:bg-serene-neutral-100"><AlignHorizontalJustifyCenter className="h-[18px] w-[18px]" /></button></PopoverTrigger>
 							<PopoverContent align="start" className="w-52 p-2">
 								<div className="grid grid-cols-3 gap-1.5">
 									{([["left", "Left"], ["center", "Centre"], ["right", "Right"], ["top", "Top"], ["middle", "Middle"], ["bottom", "Bottom"]] as const).map(([k, l]) => <button key={k} onClick={() => alignPage(k)} className="h-8 rounded-lg border border-serene-neutral-200 text-xs hover:bg-serene-neutral-50">{l}</button>)}
 								</div>
 							</PopoverContent>
 						</Popover>
-						{(o.type === "activeselection" || o.type === "group") && <button onClick={groupSel} className="h-8 shrink-0 rounded-lg px-2 text-xs font-medium hover:bg-serene-neutral-100">{o.type === "group" ? "Ungroup" : "Group"}</button>}
+						{(o.type === "activeselection" || o.type === "group") && <button onClick={groupSel} aria-label={o.type === "group" ? "Ungroup" : "Group"} title={o.type === "group" ? "Ungroup" : "Group"} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg hover:bg-serene-neutral-100">{o.type === "group" ? <Ungroup className="h-[18px] w-[18px]" /> : <GroupIcon className="h-[18px] w-[18px]" />}</button>}
 						<Popover>
-							<PopoverTrigger asChild><button className="h-8 shrink-0 rounded-lg px-2 text-xs font-medium hover:bg-serene-neutral-100">Position</button></PopoverTrigger>
+							<PopoverTrigger asChild><button aria-label="Position" title="Position" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg hover:bg-serene-neutral-100"><ArrowUpDown className="h-[18px] w-[18px]" /></button></PopoverTrigger>
 							<PopoverContent align="start" className="w-56 space-y-2 p-3">
 								<div className="grid grid-cols-2 gap-1.5">
 									<button className="h-8 rounded-lg border border-serene-neutral-200 text-xs hover:bg-serene-neutral-50" onClick={() => { const c = canvas.current; if (c && o) { c.bringObjectToFront(o); c.requestRenderAll(); snapshot(); } }}>To front</button>
@@ -1298,17 +1298,40 @@ function DesignEditor() {
 					</div>
 					<Popover>
 						<PopoverTrigger asChild><button aria-label="Layers" className="absolute bottom-12 right-3 z-10 flex h-9 items-center gap-1.5 rounded-full bg-white px-3 text-xs font-semibold text-serene-neutral-700 shadow-md ring-1 ring-black/10 hover:bg-serene-neutral-50"><Layers className="h-4 w-4" /> Layers</button></PopoverTrigger>
-						<PopoverContent align="end" side="top" className="max-h-80 w-72 overflow-y-auto p-1.5">
+						<PopoverContent align="end" side="top" className="max-h-96 w-80 overflow-y-auto p-1.5">
 							{(canvas.current?.getObjects() ?? []).length === 0 && <p className="p-3 text-xs text-serene-neutral-500">Nothing on the page yet.</p>}
-							{[...(canvas.current?.getObjects() ?? [])].reverse().map((ob, i) => {
+							{[...(canvas.current?.getObjects() ?? [])].reverse().map((ob, i, all) => {
 								const kind = ob.type === "textbox" ? "Text" : ob.type === "image" ? "Picture" : ob.type === "circle" ? "Circle" : ob.type === "rect" ? "Shape" : ob.type === "path" ? "Graphic" : "Shape";
 								const label = ob.type === "textbox" ? String((ob as Textbox).text ?? "").slice(0, 28) || "Text" : kind;
 								const active = canvas.current?.getActiveObject() === ob;
+								const total = all.length;
+								// The list shows the top layer first; the canvas counts from the bottom.
+								const objIndex = total - 1 - i;
+								const moveTo = (to: number) => { const c = canvas.current; if (!c) return; c.moveObjectTo(ob, Math.max(0, Math.min(total - 1, to))); c.requestRenderAll(); snapshot(); setSaved(false); bump((n) => n + 1); };
 								return (
-									<div key={i} className={cn("group flex items-center gap-1 rounded-lg px-2 py-1.5 text-sm", active ? "bg-sauti-teal-light" : "hover:bg-serene-neutral-100")}>
+									<div
+										key={i}
+										draggable
+										onDragStart={(e) => { e.dataTransfer.setData("text/plain", String(objIndex)); e.dataTransfer.effectAllowed = "move"; }}
+										onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = "move"; }}
+										onDrop={(e) => {
+											e.preventDefault();
+											const from = Number(e.dataTransfer.getData("text/plain"));
+											const c = canvas.current;
+											if (!c || Number.isNaN(from) || from === objIndex) return;
+											const moving = c.getObjects()[from];
+											if (!moving) return;
+											c.moveObjectTo(moving, objIndex);
+											c.requestRenderAll(); snapshot(); setSaved(false); bump((n) => n + 1);
+										}}
+										className={cn("group flex items-center gap-1 rounded-lg px-1.5 py-1 text-sm", active ? "bg-sauti-teal-light" : "hover:bg-serene-neutral-100")}
+									>
+										<span className="cursor-grab text-serene-neutral-300 active:cursor-grabbing" aria-hidden><GripVertical className="h-4 w-4" /></span>
 										<button className="min-w-0 flex-1 truncate text-left" onClick={() => { canvas.current?.setActiveObject(ob); canvas.current?.requestRenderAll(); bump((n) => n + 1); }}><span className="mr-1.5 text-xs text-serene-neutral-400">{kind}</span>{ob.type === "textbox" ? label : ""}</button>
-										<button aria-label={ob.visible === false ? "Show" : "Hide"} className="px-1 text-xs text-serene-neutral-500 hover:text-serene-neutral-900" onClick={() => { ob.set({ visible: ob.visible === false }); canvas.current?.requestRenderAll(); snapshot(); bump((n) => n + 1); }}>{ob.visible === false ? "Show" : "Hide"}</button>
-										<button aria-label="Delete layer" className="px-1 text-xs text-red-600" onClick={() => { canvas.current?.remove(ob); canvas.current?.requestRenderAll(); bump((n) => n + 1); }}>Delete</button>
+										<button aria-label="Move up" disabled={objIndex >= total - 1} className="flex h-6 w-6 items-center justify-center rounded text-serene-neutral-500 hover:bg-white disabled:opacity-30" onClick={() => moveTo(objIndex + 1)}><ChevronUp className="h-4 w-4" /></button>
+										<button aria-label="Move down" disabled={objIndex <= 0} className="flex h-6 w-6 items-center justify-center rounded text-serene-neutral-500 hover:bg-white disabled:opacity-30" onClick={() => moveTo(objIndex - 1)}><ChevronDown className="h-4 w-4" /></button>
+										<button aria-label={ob.visible === false ? "Show" : "Hide"} className="flex h-6 w-6 items-center justify-center rounded text-serene-neutral-500 hover:bg-white" onClick={() => { ob.set({ visible: ob.visible === false }); canvas.current?.requestRenderAll(); snapshot(); bump((n) => n + 1); }}>{ob.visible === false ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</button>
+										<button aria-label="Delete layer" className="flex h-6 w-6 items-center justify-center rounded text-red-600 hover:bg-red-50" onClick={() => { canvas.current?.remove(ob); canvas.current?.requestRenderAll(); snapshot(); bump((n) => n + 1); }}><Trash2 className="h-4 w-4" /></button>
 									</div>
 								);
 							})}
