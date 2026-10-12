@@ -9,10 +9,12 @@ import { ClipboardList, LayoutGrid, List as ListIcon, Loader2, Plus, Sparkles } 
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
-import { createForm, generateForm, listForms, type FormRow } from "@/app/actions/mjengo-forms";
+import { createForm, createFromTemplate, designSystemsForForms, generateForm, listForms, type FormRow } from "@/app/actions/mjengo-forms";
+import { FORM_TEMPLATES } from "@/lib/forms/templates";
 import { unwrap } from "@/lib/action-result";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Check } from "lucide-react";
 
 const STATUS: Record<FormRow["status"], { label: string; tone: string }> = {
 	draft: { label: "Draft", tone: "bg-slate-100 text-slate-700" },
@@ -31,6 +33,14 @@ export default function FormsPage() {
 	const [aiOpen, setAiOpen] = useState(false);
 	const [aiText, setAiText] = useState("");
 	const [aiBusy, setAiBusy] = useState(false);
+	const [chooser, setChooser] = useState(false);
+	const [tplBusy, setTplBusy] = useState<string | null>(null);
+	// Create with AI: optionally start from a template and follow a design system or written guidelines.
+	const [aiTemplate, setAiTemplate] = useState<string | null>(null);
+	const [aiDesign, setAiDesign] = useState<string | null>(null);
+	const [aiGuidelines, setAiGuidelines] = useState("");
+	const [systems, setSystems] = useState<{ id: string; name: string; colors: string[] }[]>([]);
+	useEffect(() => { designSystemsForForms().then(setSystems).catch(() => setSystems([])); }, []);
 
 	useEffect(() => {
 		listForms().then(setForms).catch(() => setForms([]));
@@ -61,7 +71,7 @@ export default function FormsPage() {
 						<button onClick={() => changeView("list")} aria-pressed={view === "list"} aria-label="List" className={cn("flex h-7 w-7 items-center justify-center rounded-md", view === "list" ? "bg-sauti-teal text-white" : "text-serene-neutral-600")}><ListIcon className="h-4 w-4" /></button>
 					</div>
 					<Button onClick={() => setAiOpen(true)} variant="outline" size="sm" className="h-8 gap-1.5 px-3 text-xs"><Sparkles className="h-4 w-4" /> Create with AI</Button>
-					<Button onClick={create} disabled={busy} size="sm" className="h-8 gap-1.5 bg-sauti-teal px-3 text-xs hover:bg-sauti-dark">{busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />} New form</Button>
+					<Button onClick={() => setChooser(true)} disabled={busy} size="sm" className="h-8 gap-1.5 bg-sauti-teal px-3 text-xs hover:bg-sauti-dark">{busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />} New form</Button>
 				</div>
 			</div>
 
@@ -125,10 +135,62 @@ export default function FormsPage() {
 					</ul>
 				</div>
 			)}
+			<Dialog open={chooser} onOpenChange={(o) => !tplBusy && setChooser(o)}>
+				<DialogContent className="max-h-[90vh] max-w-3xl overflow-y-auto">
+					<DialogHeader><DialogTitle>Start a form</DialogTitle><DialogDescription>Pick a template, or start with a blank page. Everything can be changed afterwards.</DialogDescription></DialogHeader>
+					<div className="grid gap-3 sm:grid-cols-2">
+						<button type="button" disabled={!!tplBusy} onClick={create} className="flex flex-col items-start gap-1 rounded-2xl border border-dashed border-serene-neutral-300 p-4 text-left transition hover:border-sauti-teal/60 hover:bg-sauti-teal-light/20">
+							<span className="flex h-9 w-9 items-center justify-center rounded-xl bg-serene-neutral-100"><Plus className="h-4 w-4" /></span>
+							<span className="font-semibold">Blank form</span>
+							<span className="text-xs text-serene-neutral-500">Start empty and add your own questions.</span>
+						</button>
+						{FORM_TEMPLATES.map((t) => (
+							<button key={t.id} type="button" disabled={!!tplBusy} onClick={async () => {
+								setTplBusy(t.id);
+								try { router.push(`/dashboard/mjengo/forms/${await unwrap(createFromTemplate(t.id))}`); }
+								catch (e) { toast({ title: "Could not create the form", description: e instanceof Error ? e.message : undefined, variant: "destructive" }); setTplBusy(null); }
+							}} className="flex flex-col items-start gap-1 rounded-2xl border border-serene-neutral-200 p-4 text-left transition hover:border-sauti-teal/60 hover:bg-sauti-teal-light/20 disabled:opacity-60">
+								<span className="flex w-full items-center justify-between"><span className="flex h-9 w-9 items-center justify-center rounded-xl bg-sauti-teal-light text-sauti-teal">{tplBusy === t.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <ClipboardList className="h-4 w-4" />}</span><span className="rounded-full bg-serene-neutral-100 px-2 py-0.5 text-[11px] font-semibold text-serene-neutral-600">{t.kind}</span></span>
+								<span className="font-semibold">{t.name}</span>
+								<span className="text-xs text-serene-neutral-500">{t.blurb}</span>
+								<span className="text-[11px] text-serene-neutral-400">{t.questions.length} questions</span>
+							</button>
+						))}
+					</div>
+					<div className="flex items-center justify-between rounded-xl bg-serene-neutral-50 p-3 text-sm">
+						<span>Want it written for you?</span>
+						<Button variant="outline" size="sm" className="gap-1.5" onClick={() => { setChooser(false); setAiOpen(true); }}><Sparkles className="h-4 w-4" /> Create with AI</Button>
+					</div>
+				</DialogContent>
+			</Dialog>
+
 			<Dialog open={aiOpen} onOpenChange={(o) => !aiBusy && setAiOpen(o)}>
-				<DialogContent className="max-w-lg">
-					<DialogHeader><DialogTitle>Create a form with AI</DialogTitle><DialogDescription>Say what the form is for and who will fill it in. You can change every question afterwards.</DialogDescription></DialogHeader>
-					<Textarea rows={5} autoFocus value={aiText} onChange={(e) => setAiText(e.target.value)} placeholder="A feedback form for people who attended our legal clinic last week, including how easy it was to reach us and what we should do better." />
+				<DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
+					<DialogHeader><DialogTitle>Create a form with AI</DialogTitle><DialogDescription>Say what the form is for and who will fill it in. Start from a template and follow your design if you like. You can change every question afterwards.</DialogDescription></DialogHeader>
+					<div className="space-y-4">
+						<Textarea rows={4} autoFocus value={aiText} onChange={(e) => setAiText(e.target.value)} placeholder="A feedback form for people who attended our legal clinic last week, including how easy it was to reach us and what we should do better." />
+						<div>
+							<p className="mb-1.5 text-sm font-medium">Start from a template <span className="font-normal text-serene-neutral-500">(optional)</span></p>
+							<div className="flex flex-wrap gap-2">
+								{FORM_TEMPLATES.map((t) => (
+									<button key={t.id} type="button" onClick={() => setAiTemplate((cur) => (cur === t.id ? null : t.id))} aria-pressed={aiTemplate === t.id} className={cn("flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm", aiTemplate === t.id ? "border-sauti-teal bg-sauti-teal-light/50 font-medium" : "border-serene-neutral-200 text-serene-neutral-600")}>{aiTemplate === t.id && <Check className="h-3.5 w-3.5" />}{t.name}</button>
+								))}
+							</div>
+						</div>
+						<div>
+							<p className="mb-1.5 text-sm font-medium">Design <span className="font-normal text-serene-neutral-500">(optional)</span></p>
+							{systems.length > 0 && (
+								<div className="mb-2 flex flex-wrap gap-2">
+									{systems.map((d) => (
+										<button key={d.id} type="button" onClick={() => setAiDesign((cur) => (cur === d.id ? null : d.id))} aria-pressed={aiDesign === d.id} className={cn("flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm", aiDesign === d.id ? "border-sauti-teal bg-sauti-teal-light/50 font-medium" : "border-serene-neutral-200 text-serene-neutral-600")}>
+											<span className="flex">{d.colors.slice(0, 4).map((c) => <i key={c} className="-ml-1 h-3.5 w-3.5 rounded-full ring-1 ring-white first:ml-0" style={{ background: c }} />)}</span>{d.name}
+										</button>
+									))}
+								</div>
+							)}
+							<Textarea rows={2} value={aiGuidelines} onChange={(e) => setAiGuidelines(e.target.value)} placeholder="Or paste your brand guidelines, or describe the look: calm teal and warm yellow, friendly." className="text-sm" />
+						</div>
+					</div>
 					<DialogFooter>
 						<Button variant="outline" onClick={() => setAiOpen(false)} disabled={aiBusy}>Cancel</Button>
 						<Button
@@ -136,7 +198,7 @@ export default function FormsPage() {
 							disabled={aiBusy || aiText.trim().length < 8}
 							onClick={async () => {
 								setAiBusy(true);
-								try { router.push(`/dashboard/mjengo/forms/${await unwrap(generateForm(aiText))}`); }
+								try { router.push(`/dashboard/mjengo/forms/${await unwrap(generateForm(aiText, { templateId: aiTemplate, designSystemId: aiDesign, guidelines: aiGuidelines || null }))}`); }
 								catch (e) { toast({ title: "Could not create the form", description: e instanceof Error ? e.message : undefined, variant: "destructive" }); setAiBusy(false); }
 							}}
 						>{aiBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />} Create</Button>

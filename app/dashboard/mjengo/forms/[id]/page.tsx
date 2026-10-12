@@ -291,6 +291,16 @@ function QuestionsTab({ formId, description, onDescription, questions, onChange,
 		}
 	};
 	const [type, setType] = useState<QuestionType>("short");
+	// Drag a question by its handle to a new place; the arrows do the same for keyboards and touch.
+	const [dragFrom, setDragFrom] = useState<number | null>(null);
+	const [dragOver, setDragOver] = useState<number | null>(null);
+	const moveTo = (from: number, to: number) => {
+		if (from === to || from < 0 || to < 0 || from >= questions.length || to >= questions.length) return;
+		const next = [...questions];
+		const [item] = next.splice(from, 1);
+		next.splice(to, 0, item);
+		onChange(next);
+	};
 	const update = (i: number, patch: Partial<Question>) => onChange(questions.map((q, j) => (j === i ? { ...q, ...patch } : q)));
 	const move = (i: number, d: -1 | 1) => {
 		const j = i + d;
@@ -328,9 +338,31 @@ function QuestionsTab({ formId, description, onDescription, questions, onChange,
 			<WelcomeEditor formId={formId} welcome={settings.welcome} onChange={(w) => onSettings({ ...settings, welcome: w })} device={device} onFocus={() => onActive("welcome")} />
 
 			{questions.map((q, i) => (
-				<section key={q.id} onFocusCapture={() => onActive(q.id)} onClick={() => onActive(q.id)} className="rounded-2xl border border-serene-neutral-200/70 bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04)] p-4 shadow-sm">
+				<section
+					key={q.id}
+					onFocusCapture={() => onActive(q.id)}
+					onClick={() => onActive(q.id)}
+					onDragOver={(e) => { if (dragFrom === null) return; e.preventDefault(); e.dataTransfer.dropEffect = "move"; if (dragOver !== i) setDragOver(i); }}
+					onDrop={(e) => { e.preventDefault(); if (dragFrom !== null) moveTo(dragFrom, i); setDragFrom(null); setDragOver(null); }}
+					className={cn("rounded-2xl border bg-white p-4 shadow-[0_1px_2px_rgba(16,24,40,0.04)] transition", dragFrom === i && "opacity-50", dragOver === i && dragFrom !== null && dragFrom !== i ? "border-sauti-teal ring-2 ring-sauti-teal/30" : "border-serene-neutral-200/70")}
+				>
 					<div className="flex items-start gap-2">
-						<GripVertical className="mt-2.5 h-4 w-4 shrink-0 text-serene-neutral-300" aria-hidden />
+						<span
+							draggable
+							role="button"
+							tabIndex={0}
+							aria-label={`Drag question ${i + 1} to move it. Arrow keys also move it.`}
+							onDragStart={(e) => {
+								const card = (e.currentTarget as HTMLElement).closest("section");
+								if (card) e.dataTransfer.setDragImage(card, 24, 24);
+								e.dataTransfer.effectAllowed = "move";
+								e.dataTransfer.setData("text/plain", String(i));
+								setDragFrom(i);
+							}}
+							onDragEnd={() => { setDragFrom(null); setDragOver(null); }}
+							onKeyDown={(e) => { if (e.key === "ArrowUp") { e.preventDefault(); move(i, -1); } else if (e.key === "ArrowDown") { e.preventDefault(); move(i, 1); } }}
+							className="mt-1.5 flex h-7 w-6 shrink-0 cursor-grab touch-none items-center justify-center rounded-md text-serene-neutral-400 hover:bg-serene-neutral-100 active:cursor-grabbing"
+						><GripVertical className="h-4 w-4" aria-hidden /></span>
 						<div className="min-w-0 flex-1 space-y-3">
 							<div className="flex flex-col gap-2 sm:flex-row">
 								<Input value={q.label} onChange={(e) => update(i, { label: e.target.value })} placeholder="Question" className="flex-1 bg-serene-neutral-50 font-medium" aria-label={`Question ${i + 1}`} />

@@ -7,6 +7,7 @@ import { requireAdminActor } from '@/lib/access/super-admin';
 import { guard } from '@/lib/action-result';
 import { askAi } from '@/lib/mjengo/ai';
 import { sanitiseQuestions, sanitiseTheme, sanitiseWelcome, type FormSettings, type Question } from '@/lib/forms/schema';
+import { questionsFrom, templateById } from '@/lib/forms/templates';
 
 export interface FormRow {
   id: string;
@@ -180,12 +181,68 @@ export async function designSystemsForForms(): Promise<{ id: string; name: strin
 const QUESTION_TYPES = 'short, paragraph, choice, checkbox, dropdown, scale, date, email, number';
 
 /** A first draft of a form from a plain description. The questions can be edited afterwards like any other. */
-async function generate_(prompt: string): Promise<string> {
+export interface FormStartOptions {
+  /** A ready-made form to start from (the AI adapts it to the description). */
+  templateId?: string | null;
+  /** A saved design system whose colours style the form. */
+  designSystemId?: string | null;
+  /** Brand guideline text or a short description of the look. */
+  guidelines?: string | null;
+}
+
+/** Accent colour (and button colour) for a new form, from a design system or from guideline text. */
+async function designFor(opts: FormStartOptions): Promise<Partial<FormSettings>> {
+  let colours: string[] = [];
+  if (opts.designSystemId) {
+    const { data } = await looseAdmin().from('mjengo_design_systems').select('colors').eq('id', opts.designSystemId).maybeSingle();
+    colours = ((data?.colors ?? []) as string[]).filter((c) => /^#[0-9a-fA-F]{6}$/.test(c));
+  }
+  if (!colours.length && opts.guidelines?.trim()) {
+    try {
+      const raw = await askAi('Pick the main brand colours named or implied by the text. Answer with JSON {"colours": ["#RRGGBB", ...]} with 1 to 4 colours, the primary first.', opts.guidelines.slice(0, 4000), 200, { json: true, temperature: 0.2 });
+      colours = ((JSON.parse(raw) as { colours?: string[] }).colours ?? []).filter((c) => /^#[0-9a-fA-F]{6}$/.test(c));
+    } catch { /* default look */ }
+  }
+  if (!colours.length) return {};
+  return { style: { accent: colours[0], designSystem: opts.designSystemId ?? null }, theme: { buttonColor: colours[0] } };
+}
+
+async function insertForm(actor: { id: string; email: string }, title: string, description: string | null, questions: Question[], settings: Record<string, unknown>, action: string): Promise<string> {
+  const db = looseAdmin();
+  for (let i = 0; i < 5; i++) {
+    const { data, error } = await db
+      .from('mjengo_forms')
+      .insert({ slug: makeSlug(), title: title.slice(0, 120), description, created_by: actor.id, questions, settings })
+      .select('id, title')
+      .single();
+    if (!error && data) {
+      await logAudit({ actorId: actor.id, actorEmail: actor.email, action, targetType: 'form', targetId: data.id, targetLabel: data.title });
+      refresh();
+      return data.id as string;
+    }
+  }
+  throw new Error('Could not create the form.');
+}
+
+/** A new form from a template, as it is or in the colours of a design system. */
+async function fromTemplate_(templateId: string, opts: FormStartOptions = {}): Promise<string> {
+  const actor = await requireAdminActor();
+  const t = templateById(templateId);
+  if (!t) throw new Error('That template does not exist.');
+  const design = await designFor(opts);
+  const settings = { confirmation: 'Thank you. Your response has been recorded.', ...t.settings, ...design };
+  return insertForm(actor, t.title, t.description, questionsFrom(t), settings, 'mjengo.form.from_template');
+}
+
+async function generate_(prompt: string, opts: FormStartOptions = {}): Promise<string> {
   const actor = await requireAdminActor();
   const key = process.env.OPENROUTER_API_KEY;
   if (!key) throw new Error('AI is not set up on this site yet.');
   const about = prompt.trim().slice(0, 1500);
   if (about.length < 8) throw new Error('Describe what the form is for.');
+  const tpl = opts.templateId ? templateById(opts.templateId) : null;
+  const seed = tpl ? { title: tpl.title, questions: tpl.questions.map((x) => ({ type: x.type, label: x.label, required: x.required, options: x.options })) } : null;
+  const design = await designFor(opts);
 
   const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
     method: 'POST',
@@ -202,7 +259,7 @@ async function generate_(prompt: string): Promise<string> {
           role: 'system',
           content: `You design short, respectful forms for Sauti Salama, a survivor-led organisation in Kenya. Reply with one JSON object: {"title": string, "description": string, "questions": [{"type": one of ${QUESTION_TYPES}, "label": string, "help"?: string, "required": boolean, "options"?: string[] (for choice, checkbox, dropdown), "scale"?: {"min": number, "max": number, "minLabel"?: string, "maxLabel"?: string}}]}. Ask only what is needed, between 4 and 12 questions, in plain words. Never ask for identifying details unless the description requires them. Never use em dashes or en dashes.`,
         },
-        { role: 'user', content: about },
+        { role: 'user', content: about + (seed ? `\n\nStart from this template and adapt it to the description (keep what fits, change or add what does not):\n${JSON.stringify(seed)}` : '') },
       ],
     }),
   });
@@ -228,7 +285,7 @@ async function generate_(prompt: string): Promise<string> {
         description: parsed.description ? clean(String(parsed.description)).slice(0, 2000) : null,
         created_by: actor.id,
         questions,
-        settings: { confirmation: 'Thank you. Your response has been recorded.' },
+        settings: { confirmation: 'Thank you. Your response has been recorded.', ...(tpl?.settings ?? {}), ...design },
       })
       .select('id, title')
       .single();
@@ -267,6 +324,7 @@ async function poster_(formId: string, assetId: string | null): Promise<{ url: s
 }
 
 export const generateForm = guard(generate_);
+export const createFromTemplate = guard(fromTemplate_);
 export const linkPoster = guard(poster_);
 
 async function seen_(formId: string) {
