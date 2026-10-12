@@ -384,60 +384,73 @@ function DesignEditor() {
 	const canUndo = history.current.at > 0;
 	const canRedo = history.current.at < history.current.stack.length - 1;
 
+	const propBar = (cls: string) => (
+						<div className={cn("flex min-h-12 shrink-0 items-center gap-1.5 bg-white px-3 py-1.5 max-sm:overflow-x-auto max-sm:border-t sm:min-h-11 sm:flex-wrap sm:border-b border-serene-neutral-100", cls)}>
+			{!o ? (
+				<>
+					<span className="hidden text-xs text-serene-neutral-500 sm:inline">Click something on the page to change its colour, font or size. Press Delete to remove it.</span>
+					<Input value={name} onChange={(e) => setName(e.target.value)} aria-label="Design name" className="h-9 min-w-[8rem] flex-1 text-sm sm:hidden" />
+					<select value={size.id} onChange={(e) => changeSize(SIZES.find((s) => s.id === e.target.value)!)} aria-label="Size" className="h-9 max-w-[9rem] shrink-0 rounded-md border border-serene-neutral-200 bg-white px-2 text-sm sm:hidden">
+						{SIZES.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
+					</select>
+				</>
+			) : (
+				<>
+					<div className="flex shrink-0 items-center gap-1">
+						{PALETTE.map((c) => <button key={c} aria-label={`Colour ${c}`} onClick={() => set(o.type === "line" ? { stroke: c } : { fill: c })} className="h-5 w-5 rounded-full border border-black/10" style={{ background: c }} />)}
+						<input type="color" aria-label="Custom colour" onChange={(e) => set(o.type === "line" ? { stroke: e.target.value } : { fill: e.target.value })} className="h-6 w-8 cursor-pointer rounded border border-serene-neutral-200 p-0.5" />
+					</div>
+					{isText && (
+						<>
+							<span className="mx-1 h-5 w-px bg-black/10" />
+							<select value={o.fontFamily} onChange={(e) => set({ fontFamily: e.target.value })} aria-label="Font" className="h-8 rounded-md border border-serene-neutral-200 bg-white px-2 text-sm">{FONTS.map((f) => <option key={f}>{f}</option>)}</select>
+							<Input type="number" value={Math.round(o.fontSize ?? 40)} onChange={(e) => set({ fontSize: Number(e.target.value) })} aria-label="Size" className="h-8 w-20 text-sm" />
+							<button onClick={() => set({ fontWeight: o.fontWeight === "bold" ? "normal" : "bold" })} aria-pressed={o.fontWeight === "bold"} aria-label="Bold" className={cn("flex h-8 w-8 items-center justify-center rounded-md", o.fontWeight === "bold" ? "bg-sauti-teal-light" : "hover:bg-serene-neutral-100")}><Bold className="h-4 w-4" /></button>
+							<button onClick={() => set({ fontStyle: o.fontStyle === "italic" ? "normal" : "italic" })} aria-pressed={o.fontStyle === "italic"} aria-label="Italic" className={cn("flex h-8 w-8 items-center justify-center rounded-md", o.fontStyle === "italic" ? "bg-sauti-teal-light" : "hover:bg-serene-neutral-100")}><Italic className="h-4 w-4" /></button>
+							{([["left", AlignLeft], ["center", AlignCenter], ["right", AlignRight]] as const).map(([a, Icon]) => <button key={a} onClick={() => set({ textAlign: a })} aria-label={`Align ${a}`} aria-pressed={o.textAlign === a} className={cn("flex h-8 w-8 items-center justify-center rounded-md", o.textAlign === a ? "bg-sauti-teal-light" : "hover:bg-serene-neutral-100")}><Icon className="h-4 w-4" /></button>)}
+						</>
+					)}
+					<span className="mx-1 h-5 w-px bg-black/10" />
+					<label className="flex items-center gap-1.5 text-xs text-serene-neutral-600">Opacity<input type="range" min={0.1} max={1} step={0.05} value={o.opacity ?? 1} onChange={(e) => set({ opacity: Number(e.target.value) })} className="w-20 accent-[#7D2AE8]" /></label>
+					<button onClick={() => { const c = canvas.current; if (c && o) { c.bringObjectForward(o); c.renderAll(); snapshot(); } }} className="h-8 rounded-md px-2 text-xs hover:bg-serene-neutral-100">Forward</button>
+					<button onClick={() => { const c = canvas.current; if (c && o) { c.sendObjectBackwards(o); c.renderAll(); snapshot(); } }} className="h-8 rounded-md px-2 text-xs hover:bg-serene-neutral-100">Back</button>
+					<button aria-label="Delete" onClick={() => { const c = canvas.current; if (c && o) { c.remove(o); c.discardActiveObject(); c.renderAll(); } }} className="flex h-8 w-8 items-center justify-center rounded-md text-red-600 hover:bg-red-50"><Trash2 className="h-4 w-4" /></button>
+				</>
+			)}
+		</div>
+	);
+
 	return (
 		<div className="flex h-full min-h-0 flex-col overflow-hidden bg-white">
-			{/* Canva-style header */}
-			<div className="flex shrink-0 flex-wrap items-center gap-2 px-3 py-2 text-white" style={{ background: `linear-gradient(90deg, ${CANVA.teal}, ${CANVA.purple})` }}>
-				<Button asChild variant="ghost" size="icon" className="h-8 w-8 text-white hover:bg-white/20 hover:text-white" aria-label="Back"><Link href="/dashboard/mjengo/design"><ArrowLeft className="h-[18px] w-[18px]" /></Link></Button>
-				<Input value={name} onChange={(e) => setName(e.target.value)} aria-label="Design name" className="h-8 w-44 border-transparent bg-white/15 text-sm font-medium text-white placeholder:text-white/70 focus-visible:ring-white/60" />
-				<select value={size.id} onChange={(e) => changeSize(SIZES.find((s) => s.id === e.target.value)!)} aria-label="Size" className="h-8 rounded-md border border-white/30 bg-white/15 px-2 text-sm text-white">
+			{/* Canva-style header: a slim bar on phones, with the name and size moved into the tool strip */}
+			<div className="flex shrink-0 items-center gap-1 px-2 py-1.5 text-white sm:gap-2 sm:px-3 sm:py-2" style={{ background: `linear-gradient(90deg, ${CANVA.teal}, ${CANVA.purple})` }}>
+				<Button asChild variant="ghost" size="icon" className="h-9 w-9 shrink-0 text-white hover:bg-white/20 hover:text-white sm:h-8 sm:w-8" aria-label="Back"><Link href="/dashboard/mjengo/design"><ArrowLeft className="h-[18px] w-[18px]" /></Link></Button>
+				<Input value={name} onChange={(e) => setName(e.target.value)} aria-label="Design name" className="hidden h-8 w-44 border-transparent bg-white/15 text-sm font-medium text-white placeholder:text-white/70 focus-visible:ring-white/60 sm:block" />
+				<select value={size.id} onChange={(e) => changeSize(SIZES.find((s) => s.id === e.target.value)!)} aria-label="Size" className="hidden h-8 rounded-md border border-white/30 bg-white/15 px-2 text-sm text-white sm:block">
 					{SIZES.map((s) => <option key={s.id} value={s.id} className="text-black">{s.label}</option>)}
 				</select>
-				<Button variant="ghost" size="icon" className="h-8 w-8 text-white hover:bg-white/20 hover:text-white" aria-label="Undo" disabled={!canUndo} onClick={() => restore(history.current.at - 1)}><Undo2 className="h-[18px] w-[18px]" /></Button>
-				<Button variant="ghost" size="icon" className="h-8 w-8 text-white hover:bg-white/20 hover:text-white" aria-label="Redo" disabled={!canRedo} onClick={() => restore(history.current.at + 1)}><Redo2 className="h-[18px] w-[18px]" /></Button>
-				<span className="flex-1" />
-				<Button variant="ghost" size="sm" className="h-8 gap-1.5 text-white hover:bg-white/20 hover:text-white" onClick={saveAsTemplate} disabled={busy !== null}><Copy className="h-4 w-4" /><span className="hidden sm:inline">Save as template</span></Button>
-				<Button variant="ghost" size="sm" className="h-8 gap-1.5 text-white hover:bg-white/20 hover:text-white" onClick={download}><Download className="h-4 w-4" /><span className="hidden sm:inline">Download</span></Button>
-				<span className="hidden text-xs text-white/80 sm:inline">{saved ? "Saved" : "Unsaved changes"}</span>
-				<Button variant="ghost" size="sm" className="h-8 gap-1.5 text-white hover:bg-white/20 hover:text-white" onClick={saveDesign} disabled={busy !== null}><Save className="h-4 w-4" /> Save</Button>
-				<Button size="sm" className="h-8 gap-1.5 bg-white text-[#7D2AE8] hover:bg-white/90" onClick={saveToStudio} disabled={busy !== null}>{busy === "save" ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImageIcon className="h-4 w-4" />} Save picture</Button>
+				<Button variant="ghost" size="icon" className="h-9 w-9 shrink-0 text-white hover:bg-white/20 hover:text-white sm:h-8 sm:w-8" aria-label="Undo" disabled={!canUndo} onClick={() => restore(history.current.at - 1)}><Undo2 className="h-[18px] w-[18px]" /></Button>
+				<Button variant="ghost" size="icon" className="h-9 w-9 shrink-0 text-white hover:bg-white/20 hover:text-white sm:h-8 sm:w-8" aria-label="Redo" disabled={!canRedo} onClick={() => restore(history.current.at + 1)}><Redo2 className="h-[18px] w-[18px]" /></Button>
+				<span className="min-w-0 flex-1 truncate px-1 text-sm font-medium sm:hidden">{name}</span>
+				<span className="hidden flex-1 sm:block" />
+				<Button variant="ghost" size="sm" className="hidden h-8 gap-1.5 text-white hover:bg-white/20 hover:text-white sm:inline-flex" onClick={saveAsTemplate} disabled={busy !== null}><Copy className="h-4 w-4" /><span className="hidden lg:inline">Save as template</span></Button>
+				<Button variant="ghost" size="icon" className="h-9 w-9 shrink-0 text-white hover:bg-white/20 hover:text-white sm:hidden" aria-label="Download" onClick={download}><Download className="h-[18px] w-[18px]" /></Button>
+				<Button variant="ghost" size="sm" className="hidden h-8 gap-1.5 text-white hover:bg-white/20 hover:text-white sm:inline-flex" onClick={download}><Download className="h-4 w-4" /><span className="hidden lg:inline">Download</span></Button>
+				<span className="hidden text-xs text-white/80 lg:inline">{saved ? "Saved" : "Unsaved changes"}</span>
+				<Button variant="ghost" size="sm" className="h-9 shrink-0 gap-1.5 text-white hover:bg-white/20 hover:text-white sm:h-8" onClick={saveDesign} disabled={busy !== null}><Save className="h-4 w-4" /><span className="hidden sm:inline">Save</span></Button>
+				<Button size="sm" className="h-9 shrink-0 gap-1.5 bg-white text-[#7D2AE8] hover:bg-white/90 sm:h-8" onClick={saveToStudio} disabled={busy !== null} aria-label="Save picture">{busy === "save" ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImageIcon className="h-4 w-4" />}<span className="hidden sm:inline">Save picture</span></Button>
 			</div>
 
-			{/* Property bar */}
-			<div className="flex min-h-11 shrink-0 flex-wrap items-center gap-1.5 border-b border-serene-neutral-100 bg-white px-3 py-1.5">
-				{!o ? <span className="text-xs text-serene-neutral-500">Click something on the page to change its colour, font or size. Press Delete to remove it.</span> : (
-					<>
-						<div className="flex items-center gap-1">
-							{PALETTE.map((c) => <button key={c} aria-label={`Colour ${c}`} onClick={() => set(o.type === "line" ? { stroke: c } : { fill: c })} className="h-5 w-5 rounded-full border border-black/10" style={{ background: c }} />)}
-							<input type="color" aria-label="Custom colour" onChange={(e) => set(o.type === "line" ? { stroke: e.target.value } : { fill: e.target.value })} className="h-6 w-8 cursor-pointer rounded border border-serene-neutral-200 p-0.5" />
-						</div>
-						{isText && (
-							<>
-								<span className="mx-1 h-5 w-px bg-black/10" />
-								<select value={o.fontFamily} onChange={(e) => set({ fontFamily: e.target.value })} aria-label="Font" className="h-8 rounded-md border border-serene-neutral-200 bg-white px-2 text-sm">{FONTS.map((f) => <option key={f}>{f}</option>)}</select>
-								<Input type="number" value={Math.round(o.fontSize ?? 40)} onChange={(e) => set({ fontSize: Number(e.target.value) })} aria-label="Size" className="h-8 w-20 text-sm" />
-								<button onClick={() => set({ fontWeight: o.fontWeight === "bold" ? "normal" : "bold" })} aria-pressed={o.fontWeight === "bold"} aria-label="Bold" className={cn("flex h-8 w-8 items-center justify-center rounded-md", o.fontWeight === "bold" ? "bg-sauti-teal-light" : "hover:bg-serene-neutral-100")}><Bold className="h-4 w-4" /></button>
-								<button onClick={() => set({ fontStyle: o.fontStyle === "italic" ? "normal" : "italic" })} aria-pressed={o.fontStyle === "italic"} aria-label="Italic" className={cn("flex h-8 w-8 items-center justify-center rounded-md", o.fontStyle === "italic" ? "bg-sauti-teal-light" : "hover:bg-serene-neutral-100")}><Italic className="h-4 w-4" /></button>
-								{([["left", AlignLeft], ["center", AlignCenter], ["right", AlignRight]] as const).map(([a, Icon]) => <button key={a} onClick={() => set({ textAlign: a })} aria-label={`Align ${a}`} aria-pressed={o.textAlign === a} className={cn("flex h-8 w-8 items-center justify-center rounded-md", o.textAlign === a ? "bg-sauti-teal-light" : "hover:bg-serene-neutral-100")}><Icon className="h-4 w-4" /></button>)}
-							</>
-						)}
-						<span className="mx-1 h-5 w-px bg-black/10" />
-						<label className="flex items-center gap-1.5 text-xs text-serene-neutral-600">Opacity<input type="range" min={0.1} max={1} step={0.05} value={o.opacity ?? 1} onChange={(e) => set({ opacity: Number(e.target.value) })} className="w-20 accent-[#7D2AE8]" /></label>
-						<button onClick={() => { const c = canvas.current; if (c && o) { c.bringObjectForward(o); c.renderAll(); snapshot(); } }} className="h-8 rounded-md px-2 text-xs hover:bg-serene-neutral-100">Forward</button>
-						<button onClick={() => { const c = canvas.current; if (c && o) { c.sendObjectBackwards(o); c.renderAll(); snapshot(); } }} className="h-8 rounded-md px-2 text-xs hover:bg-serene-neutral-100">Back</button>
-						<button aria-label="Delete" onClick={() => { const c = canvas.current; if (c && o) { c.remove(o); c.discardActiveObject(); c.renderAll(); } }} className="flex h-8 w-8 items-center justify-center rounded-md text-red-600 hover:bg-red-50"><Trash2 className="h-4 w-4" /></button>
-					</>
-				)}
-			</div>
+			{propBar("max-sm:hidden")}
 
-			<div className="flex min-h-0 flex-1">
-				{/* Rail and panel */}
-				<nav aria-label="Design tools" className="flex w-16 shrink-0 flex-col items-center gap-1 border-r border-serene-neutral-100 bg-[#0E1318] py-2">
+			<div className="flex min-h-0 flex-1 max-sm:flex-col-reverse">
+				{/* Rail and panel: a column on the left on desktop, a bar along the bottom on phones */}
+				<nav aria-label="Design tools" className="flex shrink-0 items-center gap-1 border-serene-neutral-100 bg-[#0E1318] py-2 max-sm:h-16 max-sm:w-full max-sm:flex-row max-sm:overflow-x-auto max-sm:border-t max-sm:bg-white max-sm:px-1 max-sm:py-1 sm:w-16 sm:flex-col sm:border-r">
 					{rail.map(([k, label, icon]) => (
-						<button key={k} onClick={() => setPanel((cur) => (cur === k ? null : k))} aria-pressed={panel === k} className={cn("flex w-14 flex-col items-center gap-1 rounded-xl py-2 text-[11px]", panel === k ? "bg-white/15 text-white" : "text-white/65 hover:bg-white/10")}>{icon}{label}</button>
+						<button key={k} onClick={() => setPanel((cur) => (cur === k ? null : k))} aria-pressed={panel === k} className={cn("flex w-14 shrink-0 flex-col items-center gap-1 rounded-xl py-2 text-[11px] max-sm:w-[4.5rem] max-sm:py-1.5", panel === k ? "bg-white/15 text-white max-sm:bg-[#7D2AE8]/10 max-sm:text-[#7D2AE8]" : "text-white/65 hover:bg-white/10 max-sm:text-[#475569] max-sm:hover:bg-black/5")}>{icon}{label}</button>
 					))}
 				</nav>
-				<aside className={cn("shrink-0 overflow-y-auto border-serene-neutral-100 bg-white p-3 sm:w-64 sm:border-r", panel ? "max-sm:fixed max-sm:inset-x-0 max-sm:bottom-0 max-sm:z-30 max-sm:max-h-[45dvh] max-sm:border-t max-sm:shadow-2xl" : "hidden")}>
+				<aside className={cn("shrink-0 overflow-y-auto border-serene-neutral-100 bg-white p-3 sm:w-64 sm:border-r", panel ? "max-sm:fixed max-sm:inset-x-0 max-sm:bottom-16 max-sm:z-30 max-sm:max-h-[45dvh] max-sm:rounded-t-2xl max-sm:border-t max-sm:shadow-2xl" : "hidden")}>
 					{panel === "templates" && (
 						<div className="space-y-4">
 							<div>
@@ -515,6 +528,8 @@ function DesignEditor() {
 						</div>
 					)}
 				</aside>
+
+				{propBar("sm:hidden")}
 
 				{/* Page */}
 				<div ref={host} className="flex min-w-0 flex-1 items-center justify-center overflow-auto bg-[#EBECF0] p-2 sm:p-4">
