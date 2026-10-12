@@ -1,6 +1,6 @@
 "use client";
 
-import { MjengoLoader, ListSkeleton, ReaderSkeleton } from "../../_components/MjengoLoader";
+import { MjengoLoader } from "../../_components/MjengoLoader";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { format, isThisWeek, isToday, isYesterday, startOfDay } from "date-fns";
 import {
@@ -23,6 +23,7 @@ import { Composer, type ComposeSeed, type ThreadMsg } from "./Composer";
 import { ConnectDialog, LabelDialog, LABEL_COLORS, SettingsDialog, ViewDialog } from "./Dialogs";
 import { getMailPrefs, getSignature, mailBootstrap, type MailPrefs, type SignatureState } from "./api";
 import { PersonChip } from "./PersonChip";
+import { ThreadMessage } from "./Thread";
 import { unwrap } from "@/lib/action-result";
 import { addContactFromMail } from "@/app/actions/mjengo-contacts";
 import { listLabels, saveLabel, deleteLabel, setMessageLabel, type LabelRow } from "./api";
@@ -107,6 +108,8 @@ export function MailApp() {
 
 	const [layout, setLayout] = useState<Layout>("side");
 	const [compose, setCompose] = useState<ComposeSeed | null>(null);
+	// A reply is written in the conversation itself, under the messages it answers.
+	const [reply, setReply] = useState<ComposeSeed | null>(null);
 	const [connectOpen, setConnectOpen] = useState(false);
 	const [settingsOpen, setSettingsOpen] = useState(false);
 	const [viewEdit, setViewEdit] = useState<Partial<ViewRow> | null>(null);
@@ -339,7 +342,8 @@ export function MailApp() {
 		return () => clearTimeout(t);
 	}, [accountId, rows, selected?.uid]);
 
-	const close = () => { setSelected(null); setDetail(null); };
+	const close = () => { setSelected(null); setDetail(null); setReply(null); };
+	useEffect(() => { setReply(null); }, [selected?.uid]);
 
 	/* ---- actions */
 	const act = useCallback(async (m: MessageRow, action: MailAction) => {
@@ -394,8 +398,7 @@ export function MailApp() {
 				mine: c.from.address.toLowerCase() === me,
 			})),
 		];
-		setCompose(
-			forward
+		const seed: ComposeSeed = forward
 				? { subject: `Fwd: ${subject}`, html: `<p></p><p>---------- Forwarded message ----------</p>${d.html ?? d.text}` }
 				: {
 					to: sender ? [sender] : [],
@@ -406,8 +409,9 @@ export function MailApp() {
 					inReplyTo: d.messageId,
 					references: [...d.references, ...(d.messageId ? [d.messageId] : [])],
 					replyTo: selected ? { mailbox: selected.mailbox, uid: selected.uid } : null,
-				}
-		);
+				};
+		if (forward) setCompose(seed);
+		else setReply({ ...seed, thread });
 	};
 
 	const summarise = async () => {
@@ -525,6 +529,23 @@ export function MailApp() {
 		</div>
 	);
 
+	const inlineReply = reply && accountId ? (
+		<Composer
+			key={`reply-${reply.replyTo?.uid ?? "x"}`}
+			inline
+			accounts={accounts}
+			accountId={accountId}
+			seed={{ ...reply, thread: [] }}
+			snippets={snippets}
+			signature={signature?.html ?? ""}
+			undoSeconds={prefs.undoSeconds}
+			onReopen={(seed) => setReply(seed)}
+			onPopOut={() => { setCompose(reply); setReply(null); }}
+			onClose={() => setReply(null)}
+			onSent={() => { setReply(null); if (active.config.mailbox === "sent") loadList(false); }}
+		/>
+	) : null;
+
 const Pane = (
 		<ReadingPane
 			teamIds={teamIds} team={team}
@@ -546,6 +567,8 @@ const Pane = (
 			onClose={close} onSummarise={summarise} onOpen={(m) => open(m)} onAct={(a) => selected && act(selected, a)}
 			onReply={(all) => detail && startReply(detail, all)} onForward={() => detail && startReply(detail, false, true)}
 			onLoadImages={() => { setAllowImages(true); if (selected) open(selected, true); }} full={effectiveLayout === "full"}
+				meAddress={(accounts.find((a) => a.id === accountId)?.email ?? "").toLowerCase()}
+				inlineReply={inlineReply}
 		/>
 	);
 
@@ -575,7 +598,7 @@ const Pane = (
 				{offline && <div role="status" className="border-b border-amber-100 bg-amber-50 px-4 py-2 text-xs font-medium text-amber-900">You are offline, or the mail server cannot be reached. Showing mail saved on this device. <button className="ml-2 underline" onClick={() => loadList(false)}>Try again</button></div>}
 				<div className="min-h-0 flex-1 overflow-y-auto">
 					{loadError && <div className="m-4 rounded-xl bg-red-50 p-4 text-sm text-red-700">{loadError} <button className="ml-2 underline" onClick={() => loadList(false)}>Try again</button></div>}
-					{!loadError && loading && rows.length === 0 && <ListSkeleton rows={10} className="px-3 lg:px-5" />}
+					{!loadError && loading && rows.length === 0 && <MjengoLoader label="Loading your mail" compact />}
 					{!loadError && !loading && rows.length === 0 && (
 						<div className="flex h-full flex-col items-center justify-center gap-2 p-10 text-center text-serene-neutral-500"><MailOpen className="h-10 w-10 text-serene-neutral-300" /><p className="font-medium text-serene-neutral-700">{debouncedQ ? "Nothing matches your search" : "Nothing here"}</p><p className="text-sm">{debouncedQ ? "Try different words." : "New mail will appear as it arrives."}</p></div>
 					)}
@@ -689,13 +712,14 @@ function HoverBtn({ label, onClick, children }: { label: string; onClick: () => 
 	return <button onClick={(e) => { e.stopPropagation(); onClick(); }} title={label} aria-label={label} className="rounded-md p-1.5 text-serene-neutral-600 hover:bg-serene-neutral-100">{children}</button>;
 }
 
-function ReadingPane({ teamIds, team, onWrite, onAddContact, onPrev, onNext, hasPrev, hasNext, onAutoLabelSimilar, labels, selectedLabels, onToggleLabel, onNewLabel, selected, detail, busy, accountId, conversation, summary, summaryBusy, allowImages, onClose, onSummarise, onOpen, onAct, onReply, onForward, onLoadImages, full }: {
+function ReadingPane({ teamIds, team, onWrite, onAddContact, onPrev, onNext, hasPrev, hasNext, onAutoLabelSimilar, labels, selectedLabels, onToggleLabel, onNewLabel, selected, detail, busy, accountId, conversation, summary, summaryBusy, allowImages, onClose, onSummarise, onOpen, onAct, onReply, onForward, onLoadImages, full, meAddress, inlineReply }: {
 	teamIds: (a: string[]) => (string | undefined)[]; team: ReturnType<typeof useTeam>;
 	onWrite: (address: string) => void; onAddContact: (name: string, address: string) => void;
 	onPrev: () => void; onNext: () => void; hasPrev: boolean; hasNext: boolean; onAutoLabelSimilar: () => void;
 	labels: LabelRow[]; selectedLabels: string[]; onToggleLabel: (id: string, on: boolean) => void; onNewLabel: () => void;
 	selected: MessageRow | null; detail: Detail | null; busy: boolean; accountId: string; conversation: MessageRow[]; summary: string | null; summaryBusy: boolean; allowImages: boolean;
 	onClose: () => void; onSummarise: () => void; onOpen: (m: MessageRow) => void; onAct: (a: MailAction) => void; onReply: (all: boolean) => void; onForward: () => void; onLoadImages: () => void; full: boolean;
+	meAddress: string; inlineReply: React.ReactNode | null;
 }) {
 	const frame = useRef<HTMLIFrameElement>(null);
 	const [h, setH] = useState(300);
@@ -747,7 +771,7 @@ function ReadingPane({ teamIds, team, onWrite, onAddContact, onPrev, onNext, has
 			</header>
 
 			<div className="min-h-0 flex-1 overflow-y-auto">
-				{busy && !detail && <><span className="sr-only" role="status">Opening message</span><ReaderSkeleton /></>}
+				{busy && !detail && <MjengoLoader label="Opening message" compact />}
 				{detail && (
 					<article className="mx-auto max-w-3xl px-6 pb-10 pt-3">
 						<h2 className="text-[28px] font-semibold leading-tight tracking-[-0.01em] text-[#37352f]">{detail.subject}</h2>
@@ -763,51 +787,29 @@ function ReadingPane({ teamIds, team, onWrite, onAddContact, onPrev, onNext, has
 							<p className="mt-4 flex items-center gap-2 text-sm text-[#787774]"><Loader2 className="h-4 w-4 animate-spin" /> Summarising...</p>
 						) : null}
 
-						<div className="mt-4 flex items-start gap-3">
-							<AvatarStack size="md" ids={teamIds([...detail.from, ...detail.to, ...detail.cc].map((x) => x.address))} team={team} max={5} className="mt-0.5" />
-							<div className="min-w-0 flex-1">
-								<p className="text-[15px] text-[#37352f]">
-									{detail.from[0] ? <PersonChip name={detail.from[0].name} address={detail.from[0].address} onWrite={onWrite} onAddContact={onAddContact} className="font-medium" /> : null}{" "}
-									<span className="text-[13px] text-[#9b9a97]">&lt;{detail.from[0]?.address}&gt;</span>
-								</p>
-								<p className="flex flex-wrap items-center gap-x-1 text-[15px] text-[#9b9a97]">
-									<span>To</span>
-									{detail.to.length === 0 ? <span>me</span> : detail.to.map((t, k) => <span key={t.address + k} className="inline-flex items-center"><PersonChip name={t.name} address={t.address} onWrite={onWrite} onAddContact={onAddContact} className="text-[#787774]" />{k < detail.to.length - 1 ? "," : ""}</span>)}
-									{detail.cc.length > 0 && <span>, Cc</span>}
-									{detail.cc.map((t, k) => <span key={t.address + k} className="inline-flex items-center"><PersonChip name={t.name} address={t.address} onWrite={onWrite} onAddContact={onAddContact} className="text-[#787774]" />{k < detail.cc.length - 1 ? "," : ""}</span>)}
-								</p>
-							</div>
-							<span className="shrink-0 text-[15px] text-[#9b9a97]">{detail.date ? format(new Date(detail.date), "MMM d") : ""}</span>
-						</div>
-
-{detail.hasRemoteImages && !allowImages && (
-							<div className="mt-4 flex items-center gap-3 rounded-xl bg-amber-50 p-3 text-sm text-amber-900">Images are hidden to protect your privacy.<Button size="sm" variant="outline" className="ml-auto" onClick={onLoadImages}>Show images</Button></div>
-						)}
-
-						<iframe ref={frame} title="Message" sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox" srcDoc={doc} onLoad={measure} style={{ height: h }} className="mt-4 w-full border-0" />
-
-						{detail.attachments.filter((a) => !a.inline).length > 0 && (
-							<ul className="mt-4 flex flex-wrap gap-2">
-								{detail.attachments.filter((a) => !a.inline).map((a) => (
-									<li key={a.index}>
-										<a href={`/api/mjengo/mail/attachment?account=${accountId}&mailbox=${encodeURIComponent(selected?.mailbox ?? "")}&uid=${detail.uid}&i=${a.index}`} className="flex items-center gap-2 rounded-xl border border-serene-neutral-200 px-3 py-2 text-sm hover:bg-serene-neutral-50">
-											<Paperclip className="h-4 w-4 text-serene-neutral-500" /><span className="max-w-[200px] truncate">{a.filename}</span><span className="text-xs text-serene-neutral-400">{a.size > 1048576 ? `${(a.size / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(a.size / 1024))} KB`}</span>
-										</a>
-									</li>
-								))}
-							</ul>
-						)}
-
-						{conversation.length > 0 && (
-							<section className="mt-6 border-t border-black/[0.07] pt-4">
-								<h3 className="mb-1 text-xs font-semibold uppercase tracking-wider text-[#9b9a97]">Earlier in this conversation ({conversation.length})</h3>
-								<ul className="divide-y divide-black/[0.06]">
-									{[...conversation].sort((x, y) => (y.date ?? "").localeCompare(x.date ?? "")).map((c) => (
-										<ThreadItem key={c.uid} c={c} accountId={accountId} onOpen={() => onOpen(c)} />
+						{/* The conversation, the way Apple Mail lays it out: one message after another, each message once,
+						    older ones folded to a line, the quoted history folded under "See more". */}
+						<ThreadStack
+							selected={selected}
+							detail={detail}
+							conversation={conversation}
+							accountId={accountId}
+							meAddress={meAddress}
+							onReply={onReply}
+							onForward={onForward}
+							inlineReply={inlineReply}
+							attachments={detail.attachments.filter((x) => !x.inline).length > 0 ? (
+								<ul className="mt-3 flex flex-wrap gap-2">
+									{detail.attachments.filter((x) => !x.inline).map((att) => (
+										<li key={att.index}>
+											<a href={`/api/mjengo/mail/attachment?account=${accountId}&mailbox=${encodeURIComponent(selected?.mailbox ?? "")}&uid=${detail.uid}&i=${att.index}`} className="flex items-center gap-2 rounded-xl border border-black/10 px-3 py-2 text-sm hover:bg-black/[0.03]">
+												<Paperclip className="h-4 w-4 text-[#787774]" /><span className="max-w-[200px] truncate">{att.filename}</span><span className="text-xs text-[#9b9a97]">{att.size > 1048576 ? `${(att.size / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(att.size / 1024))} KB`}</span>
+											</a>
+										</li>
 									))}
 								</ul>
-							</section>
-						)}
+							) : null}
+						/>
 
 					</article>
 				)}
@@ -816,54 +818,100 @@ function ReadingPane({ teamIds, team, onWrite, onAddContact, onPrev, onNext, has
 	);
 }
 
-/** One earlier message of a conversation: a collapsed row that opens in place, as in Gmail. */
-function ThreadItem({ c, accountId, onOpen }: { c: MessageRow; accountId: string; onOpen: () => void }) {
-	const [open, setOpen] = useState(false);
-	const [d, setD] = useState<Detail | null>(null);
-	const [busy, setBusy] = useState(false);
-	const frame = useRef<HTMLIFrameElement>(null);
-	const [h, setH] = useState(160);
-	const toggle = async () => {
-		const next = !open;
-		setOpen(next);
-		if (next && !d) {
-			setBusy(true);
-			try { setD(await getMessageDetail(accountId, c.mailbox, c.uid, true)); } catch { setOpen(false); } finally { setBusy(false); }
-		}
-	};
-	const doc = d
-		? `<!doctype html><html><head><meta charset="utf-8"><base target="_blank"><style>body{margin:0;font:15px/1.6 -apple-system,Segoe UI,Roboto,sans-serif;color:#1f2937;word-wrap:break-word}img{max-width:100%;height:auto}blockquote{margin:8px 0;padding-left:12px;border-left:3px solid #e5e7eb;color:#6b7280}a{color:#068297}pre{white-space:pre-wrap}table{max-width:100%}</style></head><body>${d.html ?? `<pre style="font:inherit">${d.text.replace(/[&<>]/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[ch]!)}</pre>`}</body></html>`
-		: "";
-	// One colour per sender, so a long thread reads as a conversation between people.
-	const tints = ["border-[#7D2AE8] bg-[#F6F0FF]/60", "border-[#F59E0B] bg-[#FFF8E6]/70", "border-[#EC4899] bg-[#FFF0F7]/70", "border-[#3B82F6] bg-[#EFF5FF]/70", "border-[#10B981] bg-[#ECFBF4]/70"];
-	const tint = tints[[...c.from.address.toLowerCase()].reduce((n, ch) => n + ch.charCodeAt(0), 0) % tints.length];
+/**
+ * The conversation in reading order. The message being read is open; the one just before it is open too, as
+ * context; everything else is a single line. More than two older messages fold under "N earlier messages".
+ * A bar at the bottom starts a reply right there.
+ */
+function ThreadStack({ selected, detail, conversation, accountId, meAddress, onReply, onForward, inlineReply, attachments }: {
+	selected: MessageRow | null; detail: Detail; conversation: MessageRow[]; accountId: string; meAddress: string;
+	onReply: (all: boolean) => void; onForward: () => void; inlineReply: React.ReactNode | null; attachments: React.ReactNode;
+}) {
+	const [newestFirst, setNewestFirst] = useState(false);
+	const [opened, setOpened] = useState<Record<string, boolean>>({});
+	const [showOlder, setShowOlder] = useState(false);
+	const current = useRef<HTMLDivElement>(null);
+	useEffect(() => { try { setNewestFirst(localStorage.getItem("ss_mail_newest_first") === "1"); } catch { /* default */ } }, []);
+	const flip = () => { const n = !newestFirst; setNewestFirst(n); try { localStorage.setItem("ss_mail_newest_first", n ? "1" : "0"); } catch { /* ignore */ } };
+
+	const curKey = selected ? `${selected.mailbox}:${selected.uid}` : "cur";
+	const asc = useMemo(() => {
+		const rows = conversation.filter((c) => !selected || !(c.mailbox === selected.mailbox && c.uid === selected.uid));
+		return rows.sort((x, y) => (x.date ?? "").localeCompare(y.date ?? ""));
+	}, [conversation, selected]);
+	const when = detail.date ?? selected?.date ?? "";
+	const before = asc.filter((c) => (c.date ?? "") <= when);
+	const after = asc.filter((c) => (c.date ?? "") > when);
+	const previous = before[before.length - 1];
+	const hidden = before.length > 2 && !showOlder ? before.slice(0, before.length - 2) : [];
+	const visibleBefore = before.filter((c) => !hidden.includes(c));
+
+	const key = (c: MessageRow) => `${c.mailbox}:${c.uid}`;
+	const isOpen = (c: MessageRow) => opened[key(c)] ?? (previous ? key(c) === key(previous) : false);
+	const me = (c: MessageRow) => c.from.address.toLowerCase() === meAddress;
+
+	// The message being read comes into view, with the earlier lines folded above it.
+	useEffect(() => { current.current?.scrollIntoView({ block: "start" }); }, [curKey]);
+
+	const row = (c: MessageRow) => (
+		<ThreadMessage key={key(c)} m={c} accountId={accountId} mine={me(c)} open={isOpen(c)} onOpenChange={(o) => setOpened((cur) => ({ ...cur, [key(c)]: o }))} />
+	);
+	const currentRow = selected ? (
+		<div key="current" ref={current}>
+			<ul>
+				<ThreadMessage
+					m={{ ...selected, from: detail.from[0] ?? selected.from }}
+					accountId={accountId}
+					mine={(detail.from[0]?.address ?? "").toLowerCase() === meAddress}
+					open
+					isCurrent
+					detail={detail}
+					onOpenChange={() => undefined}
+					onReply={() => onReply(false)}
+					onReplyAll={() => onReply(true)}
+					onForward={onForward}
+				>{attachments}</ThreadMessage>
+			</ul>
+		</div>
+	) : null;
+
+	const older = hidden.length > 0 && (
+		<button onClick={() => setShowOlder(true)} className="my-2 flex w-full items-center gap-3 rounded-lg px-1 py-2 text-left text-[13px] font-medium text-[#068297] hover:bg-black/[0.03]">
+			<span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#E6F4F6] text-xs">{hidden.length}</span>
+			{hidden.length} earlier message{hidden.length === 1 ? "" : "s"}
+		</button>
+	);
+
+	const stack = newestFirst
+		? [<ul key="after">{[...after].reverse().map(row)}</ul>, currentRow, <ul key="before">{[...visibleBefore].reverse().map(row)}</ul>, older]
+		: [older, <ul key="before">{visibleBefore.map(row)}</ul>, currentRow, <ul key="after">{after.map(row)}</ul>];
+
+	const total = asc.length + 1;
+	const names = Array.from(new Set([detail.from[0], ...asc.map((c) => c.from)].filter(Boolean).map((a) => (a!.address.toLowerCase() === meAddress ? "You" : a!.name || a!.address))));
+
 	return (
-		<li className={cn("my-1.5 overflow-hidden rounded-lg border-l-4 pr-2", tint)}>
-			<button onClick={toggle} aria-expanded={open} className="flex w-full items-center gap-3 py-2.5 pl-2 text-left text-sm hover:bg-black/[0.03]">
-				<ChevronDown className={cn("h-4 w-4 shrink-0 text-[#9b9a97] transition-transform", !open && "-rotate-90")} />
-				<span className="w-32 shrink-0 truncate font-medium text-[#37352f]">{displayName(c.from)}</span>
-				<span className="min-w-0 flex-1 truncate text-[#787774]">{c.subject}</span>
-				<span className="shrink-0 text-xs text-[#9b9a97]">{rowTime(c.date)}</span>
-			</button>
-			{open && (
-				<div className="pb-4 pl-7">
-					{busy && <p className="flex items-center gap-2 py-3 text-sm text-[#787774]"><Loader2 className="h-4 w-4 animate-spin" /> Opening...</p>}
-					{d && (
-						<>
-							<iframe
-								ref={frame}
-								title={`Message from ${displayName(c.from)}`}
-								sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox"
-								srcDoc={doc}
-								onLoad={() => { const dd = frame.current?.contentDocument; if (dd?.body) setH(Math.max(100, dd.documentElement.scrollHeight + 8)); }}
-								style={{ height: h }}
-								className="w-full border-0"
-							/>
-							<button onClick={onOpen} className="mt-1 text-xs font-medium text-sauti-teal hover:underline">Open this message on its own</button>
-						</>
-					)}
+		<div className="mt-3">
+			{total > 1 && (
+				<div className="flex items-center gap-2 border-b border-black/[0.06] pb-2 text-[13px] text-[#787774]">
+					<span className="font-medium text-[#37352f]">{total} messages</span>
+					<span className="truncate">{names.slice(0, 4).join(", ")}{names.length > 4 ? ` +${names.length - 4}` : ""}</span>
+					<span className="flex-1" />
+					<button onClick={flip} className="rounded-md px-2 py-1 text-xs hover:bg-black/5">{newestFirst ? "Newest at the top" : "Newest at the bottom"}</button>
 				</div>
 			)}
-		</li>
+			{stack}
+
+			<div className="mt-5 pb-8">
+				{inlineReply ?? (
+					<div className="flex items-center gap-2 rounded-2xl border border-black/10 bg-[#FAFAF8] p-2">
+						<button onClick={() => onReply(false)} className="flex h-10 flex-1 items-center gap-2 rounded-xl px-3 text-left text-sm text-[#787774] hover:bg-white">
+							<Reply className="h-4 w-4" /> Reply to {detail.from[0] ? (detail.from[0].name || detail.from[0].address) : "sender"}
+						</button>
+						<button onClick={() => onReply(true)} className="flex h-10 items-center gap-1.5 rounded-xl px-3 text-sm text-[#37352f] hover:bg-white"><ReplyAll className="h-4 w-4" /> <span className="hidden sm:inline">Reply all</span></button>
+						<button onClick={onForward} className="flex h-10 items-center gap-1.5 rounded-xl px-3 text-sm text-[#37352f] hover:bg-white"><Forward className="h-4 w-4" /> <span className="hidden sm:inline">Forward</span></button>
+					</div>
+				)}
+			</div>
+		</div>
 	);
 }

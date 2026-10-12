@@ -94,13 +94,13 @@ const TONES: { mode: RewriteMode; label: string; hint: string }[] = [
 
 /** A colour for each person in the conversation, so who said what is clear at a glance. */
 const SHADES = [
-	{ bar: "border-[#7D2AE8]", bg: "bg-[#F6F0FF]", dot: "bg-[#7D2AE8]", text: "text-[#5B1FB3]" },
-	{ bar: "border-[#F59E0B]", bg: "bg-[#FFF8E6]", dot: "bg-[#F59E0B]", text: "text-[#92580A]" },
-	{ bar: "border-[#EC4899]", bg: "bg-[#FFF0F7]", dot: "bg-[#EC4899]", text: "text-[#A3205F]" },
-	{ bar: "border-[#3B82F6]", bg: "bg-[#EFF5FF]", dot: "bg-[#3B82F6]", text: "text-[#1D4FA8]" },
-	{ bar: "border-[#10B981]", bg: "bg-[#ECFBF4]", dot: "bg-[#10B981]", text: "text-[#0B6B4B]" },
+	{ bar: "border-[#CDBDF0]", bg: "bg-[#FBF9FF]", dot: "bg-[#B79CEB]", text: "text-[#5B3E99]" },
+	{ bar: "border-[#F0D8AE]", bg: "bg-[#FFFCF6]", dot: "bg-[#E8B866]", text: "text-[#8A5A12]" },
+	{ bar: "border-[#F0C4D6]", bg: "bg-[#FFFAFC]", dot: "bg-[#E58DB0]", text: "text-[#A23B68]" },
+	{ bar: "border-[#BFD3F3]", bg: "bg-[#FAFCFF]", dot: "bg-[#86A9E8]", text: "text-[#2F5DA8]" },
+	{ bar: "border-[#B5E0CD]", bg: "bg-[#F8FDFA]", dot: "bg-[#6CC3A0]", text: "text-[#2A7A5A]" },
 ];
-const MINE = { bar: "border-sauti-teal", bg: "bg-[#E8F6F8]", dot: "bg-sauti-teal", text: "text-sauti-dark" };
+const MINE = { bar: "border-[#A9D6DE]", bg: "bg-[#F6FBFC]", dot: "bg-[#5FB7C4]", text: "text-[#0B6272]" };
 const initialsOf = (n: string) => n.split(/[\s@.]+/).filter(Boolean).slice(0, 2).map((x) => x[0]?.toUpperCase()).join("") || "?";
 const plain = (html: string) => (typeof window === "undefined" ? html : new DOMParser().parseFromString(html, "text/html").body.textContent ?? "");
 const paragraphs = (text: string) => text.split(/\n{2,}/).map((p) => `<p>${p.replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[c]!).replace(/\n/g, "<br>")}</p>`).join("");
@@ -126,7 +126,7 @@ function ThreadCard({ m, accountId, shade, defaultOpen }: { m: ThreadMsg; accoun
 	}, [open, html, accountId, m.mailbox, m.uid]);
 	const snippet = html ? plain(html).replace(/\s+/g, " ").trim().slice(0, 110) : "";
 	return (
-		<li className={cn("overflow-hidden rounded-xl border-l-4", shade.bar, shade.bg)}>
+		<li className={cn("overflow-hidden rounded-xl border-l-2", shade.bar, shade.bg)}>
 			<button onClick={() => setOpen((v) => !v)} aria-expanded={open} className="flex w-full items-center gap-2 px-3 py-2 text-left">
 				<span className={cn("flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[10px] font-bold text-white", shade.dot)}>{initialsOf(m.name || m.address)}</span>
 				<span className="min-w-0 flex-1">
@@ -138,7 +138,7 @@ function ThreadCard({ m, accountId, shade, defaultOpen }: { m: ThreadMsg; accoun
 			</button>
 			{open && (
 				<div className="px-3 pb-3">
-					{busy || html === null ? <div className="space-y-2 py-1"><div className="mj-skel h-3 w-3/4 rounded" /><div className="mj-skel h-3 w-full rounded" /><div className="mj-skel h-3 w-2/3 rounded" /></div> : (
+					{busy || html === null ? <p className="flex items-center gap-2 py-2 text-xs text-serene-neutral-500"><Loader2 className="h-3.5 w-3.5 animate-spin" /> Opening...</p> : (
 						<iframe ref={frame} title={`Message from ${m.name || m.address}`} sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox" srcDoc={cardFrame(html)} onLoad={() => { const d = frame.current?.contentDocument; if (d?.body) setH(Math.min(420, Math.max(60, d.documentElement.scrollHeight + 6))); }} style={{ height: h }} className="w-full border-0" />
 					)}
 				</div>
@@ -151,7 +151,7 @@ function ThreadCard({ m, accountId, shade, defaultOpen }: { m: ThreadMsg; accoun
  * Compose window with a block editor: type "/" for headings, lists, to-dos, quotes, dividers and your
  * saved snippets. Cmd/Ctrl+Enter sends.
  */
-export function Composer({ accounts, accountId, seed, snippets, signature = "", undoSeconds = 0, onReopen, onClose, onSent }: { accounts: AccountView[]; accountId: string; seed: ComposeSeed; snippets: SnippetRow[]; signature?: string; undoSeconds?: number; onReopen?: (seed: ComposeSeed) => void; onClose: () => void; onSent: () => void }) {
+export function Composer({ accounts, accountId, seed, snippets, signature = "", undoSeconds = 0, onReopen, onClose, onSent, inline = false, onPopOut }: { accounts: AccountView[]; accountId: string; seed: ComposeSeed; snippets: SnippetRow[]; signature?: string; undoSeconds?: number; onReopen?: (seed: ComposeSeed) => void; onClose: () => void; onSent: () => void; inline?: boolean; onPopOut?: () => void }) {
 	const { toast } = useToast();
 	const [from, setFrom] = useState(accountId);
 	const [to, setTo] = useState((seed.to ?? []).join(", "));
@@ -175,6 +175,8 @@ export function Composer({ accounts, accountId, seed, snippets, signature = "", 
 	const [suggestions, setSuggestions] = useState<ReplySuggestion[] | null>(null);
 	const [tone, setTone] = useState<RewriteMode | null>(null);
 	const [dragging, setDragging] = useState(false);
+	const [showFields, setShowFields] = useState(!inline);
+	const [withQuote, setWithQuote] = useState(true);
 	const fileInput = useRef<HTMLInputElement>(null);
 	const editorRef = useRef<Editor | null>(null);
 	const thread = seed.thread ?? [];
@@ -338,7 +340,7 @@ export function Composer({ accounts, accountId, seed, snippets, signature = "", 
 				cc: splitAddresses(cc),
 				bcc: splitAddresses(bcc),
 				subject,
-				html: editor.getHTML() + (seed.quoteHtml ?? ""),
+				html: editor.getHTML() + (withQuote ? seed.quoteHtml ?? "" : ""),
 				inReplyTo: seed.inReplyTo,
 				references: seed.references,
 				attachments: await Promise.all(files.map(async (f) => ({ filename: f.name, contentBase64: await toBase64(f), contentType: f.type || "application/octet-stream" }))),
@@ -458,7 +460,7 @@ export function Composer({ accounts, accountId, seed, snippets, signature = "", 
 	const fmt = (active: boolean) => cn(toolBtn, active && "bg-sauti-teal-light text-sauti-dark");
 	const threadList = (
 		<ul className="space-y-2">
-			{thread.map((t, i) => <ThreadCard key={t.key} m={t} accountId={accountId} shade={shadeFor(t)} defaultOpen={i === 0 && expanded} />)}
+			{thread.map((t, i) => <ThreadCard key={t.key} m={t} accountId={accountId} shade={shadeFor(t)} defaultOpen={i === 0} />)}
 		</ul>
 	);
 
@@ -466,34 +468,41 @@ export function Composer({ accounts, accountId, seed, snippets, signature = "", 
 		<>
 			{expanded && <div className="fixed inset-0 z-40 bg-black/30" onClick={() => setExpanded(false)} aria-hidden />}
 			<div
-				role="dialog"
-				aria-label="New message"
+				role={inline ? "form" : "dialog"}
+				aria-label={inline ? "Reply" : "New message"}
 				onDragOver={(e) => { if (e.dataTransfer.types.includes("Files")) { e.preventDefault(); setDragging(true); } }}
 				onDragLeave={(e) => { if (e.currentTarget === e.target) setDragging(false); }}
 				onDrop={onDrop}
-				className={cn(
-					"fixed z-50 flex flex-col overflow-hidden bg-[#FBFAF7] shadow-2xl ring-1 ring-black/10 transition-[width,height] duration-200",
-					"inset-0 sm:inset-auto sm:rounded-2xl",
-					expanded ? "sm:inset-x-[max(1rem,calc(50vw-640px))] sm:bottom-6 sm:top-6" : "sm:bottom-4 sm:right-4 sm:w-[720px]",
-					!expanded && (minimised ? "sm:h-12" : "sm:h-[min(86vh,780px)]")
-				)}
+				className={inline
+					? "relative flex flex-col overflow-hidden rounded-2xl border border-black/10 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.04)]"
+					: cn(
+						"fixed z-50 flex flex-col overflow-hidden bg-[#FBFAF7] shadow-2xl ring-1 ring-black/10 transition-[width,height] duration-200",
+						"inset-0 sm:inset-auto sm:rounded-2xl",
+						expanded ? "sm:inset-x-[max(1rem,calc(50vw-640px))] sm:bottom-6 sm:top-6" : "sm:bottom-4 sm:right-4 sm:w-[720px]",
+						!expanded && (minimised ? "sm:h-12" : "sm:h-[min(86vh,780px)]")
+					)}
 			>
-				<div className="h-1 shrink-0 bg-gradient-to-r from-sauti-teal via-[#7D2AE8] to-[#FFDE59]" />
 				<header className="flex items-center gap-2 border-b border-black/[0.06] bg-white px-4 py-2 pt-[max(0.5rem,env(safe-area-inset-top))]">
-					<p className="min-w-0 flex-1 truncate text-sm font-semibold text-serene-neutral-800">{subject || "New message"}</p>
-					{thread.length > 0 && !expanded && (
+					{inline ? (
+						<p className="min-w-0 flex-1 truncate text-sm text-serene-neutral-700"><span className="text-serene-neutral-400">Reply to </span><span className="font-semibold">{to.split(",")[0]?.trim() || "sender"}</span>{splitAddresses(to).length > 1 ? <span className="text-serene-neutral-400"> +{splitAddresses(to).length - 1}</span> : null}</p>
+					) : (
+						<p className="min-w-0 flex-1 truncate text-sm font-semibold text-serene-neutral-800">{subject || "New message"}</p>
+					)}
+					{inline && <Button variant="ghost" size="sm" className="h-8 text-xs text-serene-neutral-600" onClick={() => setShowFields((v) => !v)}>{showFields ? "Hide details" : "Details"}</Button>}
+					{inline && onPopOut && <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onPopOut} aria-label="Open in a window" title="Open in a window"><Maximize2 className="h-4 w-4" /></Button>}
+					{thread.length > 0 && !expanded && !inline && (
 						<button onClick={() => setThreadOpen((v) => !v)} aria-expanded={threadOpen} className="flex items-center gap-1.5 rounded-full border border-black/10 px-2.5 py-1 text-xs font-medium text-serene-neutral-700 hover:bg-black/5">
 							Conversation <span className="rounded-full bg-black/5 px-1.5">{thread.length}</span>
 						</button>
 					)}
-					<Button variant="ghost" size="icon" className="hidden h-8 w-8 sm:inline-flex" onClick={() => setExpanded((v) => !v)} aria-label={expanded ? "Make smaller" : "Expand"} title={expanded ? "Make smaller" : "Expand"}>{expanded ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}</Button>
-					{!expanded && <Button variant="ghost" size="icon" className="hidden h-8 w-8 sm:inline-flex" onClick={() => setMinimised((v) => !v)} aria-label="Minimise" title="Minimise"><Minus className="h-4 w-4" /></Button>}
-					<Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => (!editor?.getText().trim() && !subject && !to) || window.confirm("Discard this message?") ? onClose() : undefined} aria-label="Close"><X className="h-4 w-4" /></Button>
+					{!inline && <Button variant="ghost" size="icon" className="hidden h-8 w-8 sm:inline-flex" onClick={() => setExpanded((v) => !v)} aria-label={expanded ? "Make smaller" : "Expand"} title={expanded ? "Make smaller" : "Expand"}>{expanded ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}</Button>}
+					{!expanded && !inline && <Button variant="ghost" size="icon" className="hidden h-8 w-8 sm:inline-flex" onClick={() => setMinimised((v) => !v)} aria-label="Minimise" title="Minimise"><Minus className="h-4 w-4" /></Button>}
+					<Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => (!editor?.getText().trim() && !subject && !to) || inline || window.confirm("Discard this message?") ? onClose() : undefined} aria-label={inline ? "Discard reply" : "Close"}><X className="h-4 w-4" /></Button>
 				</header>
 
 				{!minimised && (
 					<>
-						<div className="space-y-px border-b border-black/[0.06] bg-white text-sm">
+						<div className={cn("space-y-px border-b border-black/[0.06] bg-white text-sm", inline && !showFields && "hidden")}>
 							<Row label="From">
 								<select value={from} onChange={(e) => setFrom(e.target.value)} className="w-full bg-transparent py-2 outline-none">
 									{accounts.map((a) => <option key={a.id} value={a.id}>{a.email}</option>)}
@@ -513,7 +522,7 @@ export function Composer({ accounts, accountId, seed, snippets, signature = "", 
 
 						<div className="relative flex min-h-0 flex-1">
 							{/* The writing area: a sheet of paper on a soft dotted desk */}
-							<div className="min-w-0 flex-1 overflow-y-auto bg-[radial-gradient(circle_at_1px_1px,rgba(6,130,151,0.10)_1px,transparent_0)] [background-size:20px_20px] p-3 sm:p-4">
+							<div className={cn("min-w-0 flex-1", inline ? "bg-white p-3" : "overflow-y-auto bg-[radial-gradient(circle_at_1px_1px,rgba(6,130,151,0.10)_1px,transparent_0)] [background-size:20px_20px] p-3 sm:p-4")}>
 								{suggestions && suggestions.length > 0 && empty && (
 									<div className="mb-3">
 										<p className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-serene-neutral-600"><Sparkles className="h-3.5 w-3.5 text-sauti-teal" /> Suggested replies</p>
@@ -527,11 +536,11 @@ export function Composer({ accounts, accountId, seed, snippets, signature = "", 
 										</div>
 									</div>
 								)}
-								{suggestions === null && seed.replyTo && empty && <div className="mb-3 flex gap-2"><div className="mj-skel h-[74px] w-56 rounded-xl" /><div className="mj-skel h-[74px] w-56 rounded-xl" /></div>}
+								{suggestions === null && seed.replyTo && empty && <p className="mb-3 flex items-center gap-2 text-xs text-serene-neutral-500"><Loader2 className="h-3.5 w-3.5 animate-spin" /> Reading the email to suggest replies...</p>}
 
 								{thread.length > 0 && threadOpen && !expanded && <div className="mb-3 max-h-56 overflow-y-auto rounded-xl border border-black/[0.06] bg-white/80 p-2"><p className="mb-1.5 flex items-center gap-2 px-1 text-[11px] font-semibold uppercase tracking-wider text-serene-neutral-500">Conversation<span className="flex">{people.map((a, i) => <i key={a} className={cn("-ml-0.5 h-2.5 w-2.5 rounded-full ring-1 ring-white first:ml-0", (a === me ? MINE : SHADES[i % SHADES.length]).dot)} />)}</span></p>{threadList}</div>}
 
-								<div className="rounded-xl bg-white px-4 py-3 shadow-sm ring-1 ring-black/[0.06]">
+								<div className={cn("bg-white px-4 py-3", !inline && "rounded-xl shadow-sm ring-1 ring-black/[0.06]")}>
 									{rich && (
 										<div className="-mx-2 -mt-1 mb-2 flex flex-wrap items-center gap-0.5 border-b border-black/[0.06] px-1 pb-2">
 											<Button variant="ghost" size="icon" className={toolBtn} onClick={() => editor?.chain().focus().undo().run()} aria-label="Undo"><Undo2 className="h-4 w-4" /></Button>
@@ -589,7 +598,10 @@ export function Composer({ accounts, accountId, seed, snippets, signature = "", 
 								</div>
 
 								{seed.quoteHtml && (
-									<p className="mt-3 flex items-center gap-1.5 px-1 text-xs text-serene-neutral-500"><FileText className="h-3.5 w-3.5" /> The message you are answering is added below your reply when you send.</p>
+									<label className="mt-3 flex cursor-pointer items-center gap-2 px-1 text-xs text-serene-neutral-500">
+										<input type="checkbox" checked={withQuote} onChange={(e) => setWithQuote(e.target.checked)} className="h-3.5 w-3.5 accent-[#068297]" />
+										<FileText className="h-3.5 w-3.5" /> Include the message I am answering below my reply
+									</label>
 								)}
 							</div>
 

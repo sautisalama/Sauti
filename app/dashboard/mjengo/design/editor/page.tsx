@@ -5,8 +5,9 @@ import { MjengoLoader } from "../../_components/MjengoLoader";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Canvas, Circle, FabricImage, Gradient, Line, Path, Rect, Textbox, Triangle, type FabricObject } from "fabric";
-import { AlignCenter, AlignLeft, AlignRight, ArrowLeft, Bold, Copy, Download, Image as ImageIcon, Italic, Gift, LayoutTemplate, Loader2, Redo2, Save, Shapes, Sparkles, Trash2, Type, Undo2, Upload } from "lucide-react";
+import { AlignCenter, AlignLeft, AlignRight, ArrowLeft, Bold, Copy, Download, Image as ImageIcon, Italic, Gift, Layers, LayoutTemplate, Loader2, Redo2, Save, Shapes, Sparkles, Trash2, Type, Undo2, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { unwrap } from "@/lib/action-result";
@@ -14,11 +15,12 @@ import { cn } from "@/lib/utils";
 import { putToSignedUrl } from "@/lib/client/upload";
 import { deleteTemplate, listTemplates, saveTemplate, studioRegister, studioUpload, type TemplateRow } from "@/app/actions/mjengo-templates";
 import { listAssets, type AssetRow } from "@/app/actions/mjengo-ai";
-import { sceneDataUrl, TEMPLATES, type DesignTemplate } from "@/lib/mjengo/design-templates";
+import { encodeSrc, sceneDataUrl, TEMPLATES, type DesignTemplate } from "@/lib/mjengo/design-templates";
 import { ensureFont } from "@/lib/mjengo/fonts";
 import { TemplatePreview } from "@/components/design/TemplatePreview";
 import { inspireImage } from "@/app/actions/mjengo-inspire";
 import { InspirePanel } from "./_InspirePanel";
+import { splitIntoLayers, type LayerSplit } from "@/lib/client/split-layers";
 import { ElementsPanel, TextPanel, UploadsPanel, type ShapeKind, type TextPreset } from "./_Panels";
 import { CONCEPTS, conceptTemplate, generateTemplate, templateFromId } from "@/lib/mjengo/design-generator";
 import { FONT_OPTIONS } from "@/lib/mjengo/fonts";
@@ -58,12 +60,13 @@ function buildFrom(t: DesignTemplate): Builder {
 				const ghost = l.t === "rect" && l.fill === "transparent";
 				const o = new Rect({ ...TL, left: l.x * w, top: l.y * h, width: l.w * w, height: l.h * h, fill: ghost ? "rgba(0,0,0,0)" : l.fill, stroke: ghost ? ink : undefined, strokeWidth: ghost ? 3 : 0, opacity: ghost ? 0.3 : 1, rx: r, ry: r });
 				c.add(o);
-				if (l.t === "photo" && l.scene) {
+				if (l.t === "photo" && (l.scene || l.src)) {
 					// A picture in the slot: drawn as a real image so it can be replaced or moved like any photo.
 					const at = c.getObjects().length;
-					FabricImage.fromURL(sceneDataUrl(l.scene, l.fill, 400, Math.max(120, Math.round((400 * (l.h * h)) / (l.w * w))))).then((img) => {
+					FabricImage.fromURL(l.src ? encodeSrc(l.src) : sceneDataUrl(l.scene ?? "hills", l.fill, 400, Math.max(120, Math.round((400 * (l.h * h)) / (l.w * w)))), { crossOrigin: "anonymous" }).then((img) => {
 						const k = Math.max((l.w * w) / (img.width ?? 1), (l.h * h) / (img.height ?? 1));
-						img.set({ ...TL, left: l.x * w, top: l.y * h, scaleX: k, scaleY: k, clipPath: new Rect({ ...TL, left: l.x * w, top: l.y * h, width: l.w * w, height: l.h * h, rx: r, ry: r, absolutePositioned: true }) });
+						// Cover the slot and keep the middle of the picture.
+						img.set({ ...TL, left: l.x * w - ((img.width ?? 0) * k - l.w * w) / 2, top: l.y * h - ((img.height ?? 0) * k - l.h * h) / 2, scaleX: k, scaleY: k, clipPath: new Rect({ ...TL, left: l.x * w, top: l.y * h, width: l.w * w, height: l.h * h, rx: r, ry: r, absolutePositioned: true }) });
 						c.insertAt(Math.min(at, c.getObjects().length), img);
 						c.requestRenderAll();
 					}).catch(() => undefined);
@@ -241,25 +244,91 @@ function DesignEditor() {
 		snapshot();
 	};
 
-	// A picture picked from Pinterest arrives as an editable image on a fresh page.
+	/** One flat picture, full bleed, sent to the back. The fallback when it cannot be split. */
+	const placeSingle = async (data: string) => {
+		const c = canvas.current;
+		if (!c) return;
+		const img = await FabricImage.fromURL(data);
+		const sz = sizeRef.current;
+		const k = Math.max(sz.w / (img.width ?? 1), sz.h / (img.height ?? 1));
+		img.set({ ...TL, scaleX: k, scaleY: k, left: (sz.w - (img.width ?? 0) * k) / 2, top: (sz.h - (img.height ?? 0) * k) / 2 });
+		c.add(img);
+		c.sendObjectToBack(img);
+		c.requestRenderAll();
+	};
+
+	/** Backdrop, subject and each line of text as separate, editable layers. */
+	const placeSplit = async (sp: LayerSplit, over?: FabricObject | null) => {
+		const c = canvas.current;
+		if (!c) return;
+		const sz = sizeRef.current;
+		const box = over ? { x: over.left ?? 0, y: over.top ?? 0, w: over.getScaledWidth(), h: over.getScaledHeight() } : { x: 0, y: 0, w: sz.w, h: sz.h };
+		const k = over ? Math.min(box.w / sp.width, box.h / sp.height) : Math.max(box.w / sp.width, box.h / sp.height);
+		const ox = box.x + (box.w - sp.width * k) / 2;
+		const oy = box.y + (box.h - sp.height * k) / 2;
+		const at = over ? c.getObjects().indexOf(over) : 0;
+		if (over) c.remove(over);
+		history.current.lock = true;
+		const back = await FabricImage.fromURL(sp.backdrop);
+		back.set({ ...TL, left: ox, top: oy, scaleX: k, scaleY: k });
+		c.insertAt(Math.max(0, at), back);
+		if (sp.subject) {
+			const sub = await FabricImage.fromURL(sp.subject);
+			sub.set({ ...TL, left: ox, top: oy, scaleX: k, scaleY: k });
+			c.insertAt(Math.max(0, at) + 1, sub);
+		}
+		for (const t of sp.texts) {
+			const big = t.size * k > sz.h * 0.05;
+			c.add(text(t.text, { left: ox + t.x * k, top: oy + t.y * k - t.size * k * 0.12, width: Math.max(40, t.w * k * 1.12), fontSize: t.size * k, fill: t.color, fontWeight: big ? "bold" : "normal", fontFamily: "Inter" }));
+		}
+		history.current.lock = false;
+		c.discardActiveObject();
+		fit();
+		snapshot();
+		setSaved(false);
+	};
+
+	const [splitting, setSplitting] = useState<string | null>(null);
+	const skipSplit = useRef(false);
+	const splitAndPlace = async (data: string, over?: FabricObject | null) => {
+		skipSplit.current = false;
+		setSplitting("Getting ready");
+		try {
+			const sp = await splitIntoLayers(data, (m) => setSplitting(m));
+			if (skipSplit.current) throw new Error("skipped");
+			if (!sp.subject && sp.texts.length === 0) throw new Error("nothing to split");
+			await placeSplit(sp, over);
+			toast({ title: "Split into layers", description: `${sp.subject ? "Subject and background" : "Picture"}${sp.texts.length ? `, ${sp.texts.length} line${sp.texts.length === 1 ? "" : "s"} of text` : ""}. Click any piece to edit it.` });
+		} catch (e) {
+			if (!over) await placeSingle(data);
+			if (!(e instanceof Error) || (e.message !== "skipped" && e.message !== "nothing to split")) toast({ title: "Kept as one picture", description: "The layers could not be separated on this device." });
+			else if (e.message === "nothing to split") toast({ title: "Kept as one picture", description: "No separate subject or text was found in it." });
+		} finally {
+			setSplitting(null);
+		}
+	};
+
+	// A picture picked from the inspiration arrives split into layers, ready to change.
 	useEffect(() => {
 		if (!inspire) return;
 		let on = true;
 		unwrap(inspireImage(inspire)).then(async (data) => {
-			const c = canvas.current;
-			if (!c || !on) return;
-			const img = await FabricImage.fromURL(data);
-			const k = Math.max(size.w / (img.width ?? 1), size.h / (img.height ?? 1));
-			img.scale(k);
-			img.set({ ...TL, left: (size.w - (img.width ?? 0) * k) / 2, top: (size.h - (img.height ?? 0) * k) / 2 });
-			c.add(img);
-			c.sendObjectToBack(img);
-			c.renderAll();
+			if (!on) return;
 			setName("Inspired design");
+			await splitAndPlace(data);
 		}).catch(() => toast({ title: "Could not use that picture", variant: "destructive" }));
 		return () => { on = false; };
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [inspire]);
+
+	/** The selected picture, split into layers in place. */
+	const splitSelected = async () => {
+		const sel = canvas.current?.getActiveObject();
+		if (!sel || sel.type !== "image") return;
+		const img = sel as FabricImage;
+		const data = img.toDataURL({ format: "png", multiplier: 1 });
+		await splitAndPlace(data, img);
+	};
 
 	const applyBuilt = (b: (typeof BUILT_IN)[number]) => {
 		const c = canvas.current;
@@ -476,7 +545,8 @@ function DesignEditor() {
 						</>
 					)}
 					<span className="mx-1 h-5 w-px bg-black/10" />
-					<label className="flex items-center gap-1.5 text-xs text-serene-neutral-600">Opacity<input type="range" min={0.1} max={1} step={0.05} value={o.opacity ?? 1} onChange={(e) => set({ opacity: Number(e.target.value) })} className="w-20 accent-[#7D2AE8]" /></label>
+					{o.type === "image" && <button onClick={splitSelected} className="h-8 shrink-0 rounded-md bg-[#7D2AE8]/10 px-2.5 text-xs font-semibold text-[#7D2AE8] hover:bg-[#7D2AE8]/15">Split into layers</button>}
+						<label className="flex items-center gap-1.5 text-xs text-serene-neutral-600">Opacity<input type="range" min={0.1} max={1} step={0.05} value={o.opacity ?? 1} onChange={(e) => set({ opacity: Number(e.target.value) })} className="w-20 accent-[#7D2AE8]" /></label>
 					<button onClick={() => { const c = canvas.current; if (c && o) { c.bringObjectForward(o); c.renderAll(); snapshot(); } }} className="h-8 rounded-md px-2 text-xs hover:bg-serene-neutral-100">Forward</button>
 					<button onClick={() => { const c = canvas.current; if (c && o) { c.sendObjectBackwards(o); c.renderAll(); snapshot(); } }} className="h-8 rounded-md px-2 text-xs hover:bg-serene-neutral-100">Back</button>
 					<button aria-label="Delete" onClick={() => { const c = canvas.current; if (c && o) { c.remove(o); c.discardActiveObject(); c.renderAll(); } }} className="flex h-8 w-8 items-center justify-center rounded-md text-red-600 hover:bg-red-50"><Trash2 className="h-4 w-4" /></button>
@@ -486,7 +556,7 @@ function DesignEditor() {
 	);
 
 	return (
-		<div className="flex h-full min-h-0 flex-col overflow-hidden bg-white">
+		<div className="relative flex h-full min-h-0 flex-col overflow-hidden bg-white">
 			{/* Canva-style header: a slim bar on phones, with the name and size moved into the tool strip */}
 			<div className="flex shrink-0 items-center gap-1 px-2 py-1.5 text-white sm:gap-2 sm:px-3 sm:py-2" style={{ background: `linear-gradient(90deg, ${CANVA.teal}, ${CANVA.purple})` }}>
 				<Button asChild variant="ghost" size="icon" className="h-9 w-9 shrink-0 text-white hover:bg-white/20 hover:text-white sm:h-8 sm:w-8" aria-label="Back"><Link href="/dashboard/mjengo/design"><ArrowLeft className="h-[18px] w-[18px]" /></Link></Button>
@@ -624,8 +694,36 @@ function DesignEditor() {
 					<div className="absolute inset-0 flex items-center justify-center overflow-auto p-4">
 						<div className="shrink-0 shadow-xl"><canvas ref={el} /></div>
 					</div>
+					<Popover>
+						<PopoverTrigger asChild><button aria-label="Layers" className="absolute bottom-3 right-3 z-10 flex h-9 items-center gap-1.5 rounded-full bg-white px-3 text-xs font-semibold text-serene-neutral-700 shadow-md ring-1 ring-black/10 hover:bg-serene-neutral-50"><Layers className="h-4 w-4" /> Layers</button></PopoverTrigger>
+						<PopoverContent align="end" side="top" className="max-h-80 w-72 overflow-y-auto p-1.5">
+							{(canvas.current?.getObjects() ?? []).length === 0 && <p className="p-3 text-xs text-serene-neutral-500">Nothing on the page yet.</p>}
+							{[...(canvas.current?.getObjects() ?? [])].reverse().map((ob, i) => {
+								const kind = ob.type === "textbox" ? "Text" : ob.type === "image" ? "Picture" : ob.type === "circle" ? "Circle" : ob.type === "rect" ? "Shape" : ob.type === "path" ? "Graphic" : "Shape";
+								const label = ob.type === "textbox" ? String((ob as Textbox).text ?? "").slice(0, 28) || "Text" : kind;
+								const active = canvas.current?.getActiveObject() === ob;
+								return (
+									<div key={i} className={cn("group flex items-center gap-1 rounded-lg px-2 py-1.5 text-sm", active ? "bg-sauti-teal-light" : "hover:bg-serene-neutral-100")}>
+										<button className="min-w-0 flex-1 truncate text-left" onClick={() => { canvas.current?.setActiveObject(ob); canvas.current?.requestRenderAll(); bump((n) => n + 1); }}><span className="mr-1.5 text-xs text-serene-neutral-400">{kind}</span>{ob.type === "textbox" ? label : ""}</button>
+										<button aria-label={ob.visible === false ? "Show" : "Hide"} className="px-1 text-xs text-serene-neutral-500 hover:text-serene-neutral-900" onClick={() => { ob.set({ visible: ob.visible === false }); canvas.current?.requestRenderAll(); snapshot(); bump((n) => n + 1); }}>{ob.visible === false ? "Show" : "Hide"}</button>
+										<button aria-label="Delete layer" className="px-1 text-xs text-red-600" onClick={() => { canvas.current?.remove(ob); canvas.current?.requestRenderAll(); bump((n) => n + 1); }}>Delete</button>
+									</div>
+								);
+							})}
+						</PopoverContent>
+					</Popover>
 				</div>
 			</div>
+			{splitting && (
+				<div className="absolute inset-0 z-50 flex items-center justify-center bg-white/80 backdrop-blur-sm">
+					<div className="w-[min(92vw,380px)] rounded-2xl border border-serene-neutral-200 bg-white p-6 text-center shadow-xl">
+						<MjengoLoader compact label="Splitting into layers" />
+						<p className="text-sm font-semibold text-sauti-dark">Splitting into layers</p>
+						<p className="mt-1 text-xs text-serene-neutral-500">{splitting}. This runs on your device and the first time takes a little longer.</p>
+						<Button variant="outline" size="sm" className="mt-4" onClick={() => { skipSplit.current = true; }}>Keep it as one picture</Button>
+					</div>
+				</div>
+			)}
 			<PostThis open={!!postFor} assetId={postFor} about={name} onClose={() => setPostFor(null)} />
 		</div>
 	);

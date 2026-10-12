@@ -3,7 +3,7 @@
  * copy, so a few dozen ingredients make thousands of different, coherent templates. Everything it makes is
  * ordinary layers, so every result is editable in the same way as a hand drawn template.
  */
-import type { DesignTemplate, Layer, SizeId } from './design-templates';
+import { PHOTO_POOL, type DesignTemplate, type Layer, type SizeId } from './design-templates';
 
 export interface Concept {
   id: string;
@@ -62,7 +62,7 @@ const COPY: Copy[] = [
   { category: 'Awareness', kicker: 'FIVE SIGNS', head: 'Know the signs of control', body: 'Isolation, money control, constant checking, threats, fear.', cta: 'Read more', stat: '5' },
 ];
 
-type Maker = (c: Concept, k: Copy, size: SizeId) => { layers: Layer[]; bg: string; bg2?: string };
+type Maker = (c: Concept, k: Copy, size: SizeId, photo: string) => { layers: Layer[]; bg: string; bg2?: string };
 
 const wide = (s: SizeId) => s === 'linkedin' || s === 'facebook' || s === 'x';
 const tall = (s: SizeId) => s === 'story' || s === 'tiktok' || s === 'poster';
@@ -113,10 +113,10 @@ const MAKERS: Maker[] = [
     ] };
   },
   // photo panel + text card
-  (c, k, s) => {
+  (c, k, s, photo) => {
     const w = wide(s);
     return { bg: c.bg, bg2: c.bg2, layers: [
-      { t: 'photo', x: w ? 0.52 : 0.08, y: w ? 0 : 0.06, w: w ? 0.48 : 0.84, h: w ? 1 : 0.46, fill: c.accent2, r: w ? 0 : 0.04, scene: 'hills' },
+      { t: 'photo', x: w ? 0.52 : 0.08, y: w ? 0 : 0.06, w: w ? 0.48 : 0.84, h: w ? 1 : 0.46, fill: c.accent2, r: w ? 0 : 0.04, scene: 'hills', src: photo },
       { t: 'text', x: 0.07, y: w ? 0.16 : 0.58, w: w ? 0.4 : 0.84, text: k.head, size: w ? 0.1 : tall(s) ? 0.045 : 0.06, color: c.ink, bold: true, lh: 1.1, font: c.head },
       { t: 'text', x: 0.07, y: w ? 0.56 : 0.78, w: w ? 0.4 : 0.84, text: k.body, size: w ? 0.05 : 0.03, color: c.ink, lh: 1.3, font: c.body },
       { t: 'rect', x: 0.07, y: w ? 0.78 : 0.9, w: w ? 0.2 : 0.3, h: w ? 0.11 : 0.06, fill: c.accent, r: 0.3 },
@@ -131,6 +131,17 @@ const MAKERS: Maker[] = [
     { t: 'text', x: 0.12, y: wide(s) ? 0.38 : 0.34, w: 0.76, text: k.head, size: wide(s) ? 0.085 : tall(s) ? 0.042 : 0.058, color: c.ink, bold: true, lh: 1.18, font: c.head },
     { t: 'text', x: 0.12, y: wide(s) ? 0.78 : 0.7, w: 0.76, text: k.body, size: wide(s) ? 0.04 : 0.026, color: c.ink, font: c.body },
   ] }),
+  // full photograph, words over a soft shade
+  (c, k, s, photo) => {
+    const w = wide(s);
+    return { bg: c.ink, layers: [
+      { t: 'photo', x: 0, y: 0, w: 1, h: 1, fill: c.accent2, scene: 'people', src: photo },
+      { t: 'rect', x: 0, y: w ? 0 : 0.42, w: 1, h: w ? 1 : 0.58, fill: 'rgba(8,12,16,0.55)' },
+      { t: 'text', x: 0.08, y: w ? 0.12 : 0.5, w: 0.6, text: k.kicker, size: w ? 0.055 : 0.03, color: c.accent2 === '#FFFFFF' ? c.accent : c.accent2, bold: true, spacing: 250, font: c.body },
+      { t: 'text', x: 0.08, y: w ? 0.26 : 0.56, w: w ? 0.62 : 0.84, text: k.head, size: w ? 0.12 : tall(s) ? 0.055 : 0.075, color: '#FFFFFF', bold: true, lh: 1.08, font: c.head },
+      { t: 'text', x: 0.08, y: w ? 0.74 : 0.84, w: w ? 0.58 : 0.84, text: k.body, size: w ? 0.052 : 0.03, color: '#F3F4F6', lh: 1.3, font: c.body },
+    ] };
+  },
   // stripe banner
   (c, k, s) => ({ bg: c.bg, bg2: c.bg2, layers: [
     { t: 'rect', x: 0, y: wide(s) ? 0.34 : 0.4, w: 1, h: wide(s) ? 0.32 : 0.2, fill: c.accent },
@@ -152,6 +163,8 @@ function rng(seed: number) {
   };
 }
 
+const _unused = 0;
+void _unused;
 const SIZES_FOR: SizeId[] = ['instagram', 'story', 'linkedin', 'facebook', 'x', 'poster', 'tiktok'];
 
 /** Make one template from a seed. Optionally fix the concept, the size or the category. */
@@ -162,7 +175,8 @@ export function generateTemplate(seed: number, opts: { concept?: string; size?: 
   const copy = (pool.length ? pool : COPY)[Math.floor(r() * (pool.length || COPY.length))];
   const size = opts.size ?? SIZES_FOR[Math.floor(r() * SIZES_FOR.length)];
   const makeIdx = Math.floor(r() * MAKERS.length);
-  const made = MAKERS[makeIdx](concept, copy, size);
+  const photo = PHOTO_POOL[Math.floor(r() * PHOTO_POOL.length)].src;
+  const made = MAKERS[makeIdx](concept, copy, size, photo);
   return {
     id: `gen-${seed}-${concept.id}-${size}`,
     name: `${concept.name} ${copy.category === 'Quotes' ? 'quote' : copy.kicker.toLowerCase().replace(/\b\w/g, (m) => m.toUpperCase())}`,
@@ -186,6 +200,6 @@ export function templateFromId(id: string): DesignTemplate | null {
 export function conceptTemplate(conceptId: string, size: SizeId = 'instagram', variant = 0): DesignTemplate {
   const c = CONCEPTS.find((x) => x.id === conceptId) ?? CONCEPTS[0];
   const copy = COPY[variant % COPY.length];
-  const made = MAKERS[variant % MAKERS.length](c, copy, size);
+  const made = MAKERS[variant % MAKERS.length](c, copy, size, PHOTO_POOL[(variant * 5) % PHOTO_POOL.length].src);
   return { id: `concept-${c.id}-${size}-${variant}`, name: c.name, category: copy.category, size, bg: made.bg, bg2: made.bg2, layers: made.layers };
 }

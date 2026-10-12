@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ASPECT, sceneDataUrl, type DesignTemplate } from "@/lib/mjengo/design-templates";
+import { ASPECT, encodeSrc, sceneDataUrl, type DesignTemplate } from "@/lib/mjengo/design-templates";
 import { ensureFont } from "@/lib/mjengo/fonts";
 import { cn } from "@/lib/utils";
 
@@ -39,7 +39,7 @@ export function TemplatePreview({ template, className }: { template: DesignTempl
 				if (l.t === "photo") {
 					return (
 						// eslint-disable-next-line @next/next/no-img-element
-						<img key={i} alt="" src={sceneDataUrl(l.scene ?? "hills", l.fill, 400, Math.max(120, Math.round((400 * (l.h * a.h)) / (l.w * a.w))))} style={{ ...base, width: pct(l.w), height: pct(l.h), objectFit: "cover", borderRadius: radius(l) }} />
+						<img key={i} alt="" loading="lazy" src={l.src ? encodeSrc(l.src) : sceneDataUrl(l.scene ?? "hills", l.fill, 400, Math.max(120, Math.round((400 * (l.h * a.h)) / (l.w * a.w))))} style={{ ...base, width: pct(l.w), height: pct(l.h), objectFit: "cover", borderRadius: radius(l) }} />
 					);
 				}
 				if (l.t === "circle") return <div key={i} style={{ ...base, width: `${l.d * 100}cqw`, height: `${l.d * 100}cqw`, background: l.fill, borderRadius: "9999px" }} />;

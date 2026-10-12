@@ -20,11 +20,32 @@ export type Layer =
   | { t: 'rect'; x: number; y: number; w: number; h: number; fill: string; r?: number }
   | { t: 'circle'; x: number; y: number; d: number; fill: string }
   /** A stand-in for a photo: a tinted block you replace with a picture. */
-  | { t: 'photo'; x: number; y: number; w: number; h: number; fill: string; r?: number; scene?: Scene }
+  | { t: 'photo'; x: number; y: number; w: number; h: number; fill: string; r?: number; scene?: Scene; /** A real picture; the scene is the fallback. */ src?: string }
   | { t: 'line'; x: number; y: number; w: number; color: string; th: number }
   | { t: 'text'; x: number; y: number; w: number; text: string; size: number; color: string; bold?: boolean; italic?: boolean; spacing?: number; align?: 'left' | 'center' | 'right'; lh?: number; font?: string };
 
 export type Scene = 'hills' | 'portrait' | 'city' | 'people';
+
+/**
+ * Pictures that ship with the app, from Sauti Salama's own events and programmes, so a template starts with
+ * real people and places instead of shapes. Replace any of them with a photo from Photos or Uploads.
+ */
+export const PHOTO_POOL: { src: string; label: string }[] = [
+  { src: '/events/impact/climate-care/community-mobilisation.jpeg', label: 'Community meeting' },
+  { src: '/events/impact/climate-care/women-solar-kits.jpeg', label: 'Women with solar kits' },
+  { src: '/events/impact/climate-care/solar-demo.jpeg', label: 'Solar demonstration' },
+  { src: '/events/impact/malkia teaching child.jpeg', label: 'Teaching a child' },
+  { src: '/events/impact/teaching chess to children.jpeg', label: 'Children learning' },
+  { src: '/events/impact/end femicide march.jpeg', label: 'March' },
+  { src: '/events/impact/16-days of activism 2.jpeg', label: '16 days of activism' },
+  { src: '/events/impact/oliver-teaching-tech.jpg', label: 'Digital skills' },
+  { src: '/landing/landing.jpeg', label: 'Community' },
+  { src: '/landing/landing2.jpeg', label: 'Together' },
+  { src: '/blog/empowerment.jpeg', label: 'Empowerment' },
+  { src: '/blog/justice.jpg', label: 'Justice' },
+];
+
+export const encodeSrc = (src: string) => src.split('/').map((p) => encodeURIComponent(p)).join('/');
 
 export interface DesignTemplate {
   id: string;
@@ -97,7 +118,7 @@ export const TEMPLATES: DesignTemplate[] = [
   {
     id: 'donate', name: 'Donation appeal', category: 'Fundraising', size: 'facebook', bg: ROSE,
     layers: [
-      { t: 'photo', x: 0.58, y: 0, w: 0.42, h: 1, fill: '#FF8FB0', scene: 'people' },
+      { t: 'photo', x: 0.58, y: 0, w: 0.42, h: 1, fill: '#FF8FB0', scene: 'people', src: PHOTO_POOL[0].src },
       { t: 'text', x: 0.06, y: 0.12, w: 0.5, text: 'Your gift keeps a safe line open', size: 0.12, color: W, bold: true, lh: 1.1 },
       { t: 'text', x: 0.06, y: 0.58, w: 0.48, text: 'KES 1,000 pays for one counselling session.', size: 0.055, color: W },
       { t: 'rect', x: 0.06, y: 0.76, w: 0.26, h: 0.13, fill: INK, r: 0.01 },
@@ -126,7 +147,7 @@ export const TEMPLATES: DesignTemplate[] = [
     id: 'workshop', name: 'Workshop flyer', category: 'Posters', size: 'poster', bg: W,
     layers: [
       { t: 'rect', x: 0, y: 0, w: 1, h: 0.46, fill: P },
-      { t: 'photo', x: 0.1, y: 0.1, w: 0.8, h: 0.5, fill: '#9B5CF0', r: 0.03, scene: 'hills' },
+      { t: 'photo', x: 0.1, y: 0.1, w: 0.8, h: 0.5, fill: '#9B5CF0', r: 0.03, scene: 'hills', src: PHOTO_POOL[3].src },
       { t: 'text', x: 0.1, y: 0.66, w: 0.8, text: 'Community safety workshop', size: 0.058, color: INK, bold: true, lh: 1.1 },
       { t: 'text', x: 0.1, y: 0.8, w: 0.8, text: 'Saturday 12 December, 10:00 am\nKibera Community Hall', size: 0.026, color: '#4B5563', lh: 1.4 },
       { t: 'text', x: 0.1, y: 0.92, w: 0.8, text: 'Free entry. Everyone is welcome.', size: 0.024, color: P, bold: true },
@@ -157,7 +178,7 @@ export const TEMPLATES: DesignTemplate[] = [
     id: 'testimonial', name: 'Testimonial', category: 'Quotes', size: 'linkedin', bg: W,
     layers: [
       { t: 'rect', x: 0, y: 0, w: 0.035, h: 1, fill: T },
-      { t: 'photo', x: 0.08, y: 0.2, w: 0.2, h: 0.4, fill: '#00C4CC', r: 0.5, scene: 'portrait' },
+      { t: 'photo', x: 0.08, y: 0.2, w: 0.2, h: 0.4, fill: '#00C4CC', r: 0.5, scene: 'portrait', src: PHOTO_POOL[8].src },
       { t: 'text', x: 0.34, y: 0.15, w: 0.58, text: 'I did not know where to turn until Sauti Salama answered.', size: 0.1, color: INK, bold: true, lh: 1.15 },
       { t: 'text', x: 0.34, y: 0.7, w: 0.58, text: 'A community member, shared with permission', size: 0.052, color: '#6B7280' },
     ],
