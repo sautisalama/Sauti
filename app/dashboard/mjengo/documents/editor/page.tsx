@@ -53,6 +53,7 @@ function EditorScreen() {
 	const initialFile = params.get("file");
 	const folderParam = params.get("folder");
 	const templateId = params.get("template");
+	const draftKey = params.get("draft");
 
 	const ref = useRef<WordcraftEditorRef>(null);
 	const [shareOpen, setShareOpen] = useState(false);
@@ -62,7 +63,7 @@ function EditorScreen() {
 	const [folderId, setFolderId] = useState<string | null>(folderParam);
 	const [level, setLevel] = useState<"view" | "share" | "edit">("edit");
 	const [doc, setDoc] = useState<{ name: string; data: ArrayBuffer } | null>(null);
-	const [loading, setLoading] = useState(!!initialFile || !!templateId);
+	const [loading, setLoading] = useState(!!initialFile || !!templateId || !!draftKey);
 
 	// A new document that starts from a template.
 	useEffect(() => {
@@ -83,6 +84,21 @@ function EditorScreen() {
 		})();
 		return () => { cancelled = true; };
 	}, [templateId, initialFile]);
+
+	// A draft handed over by another screen (a form report, say) opens as a new document.
+	useEffect(() => {
+		if (!draftKey || initialFile) return;
+		try {
+			const raw = sessionStorage.getItem(`ss_draft_${draftKey}`);
+			if (raw) {
+				const d = JSON.parse(raw) as { title: string; html: string };
+				const html = `<!doctype html><html><head><meta charset="utf-8"><title>${d.title}</title></head><body>${d.html}</body></html>`;
+				setDoc({ name: `${d.title}.html`, data: new TextEncoder().encode(html).buffer as ArrayBuffer });
+				setName(`${d.title.replace(/[\\/:*?"<>|]+/g, " ")}.docx`);
+			}
+		} catch { /* nothing to open */ }
+		setLoading(false);
+	}, [draftKey, initialFile]);
 
 	// Open an existing file from the vault.
 	useEffect(() => {

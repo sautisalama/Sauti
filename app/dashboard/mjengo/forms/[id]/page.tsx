@@ -7,7 +7,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { format } from "date-fns";
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import {
-	ArrowLeft, ArrowDown, ArrowUp, Check, Copy, Download, Eye, GripVertical, ImagePlus, Loader2, Plus, QrCode, Search, Share2, Trash2, X,
+	ArrowLeft, ArrowDown, ArrowUp, Check, ChevronDown, Copy, Download, Eye, FileBarChart2, FileSpreadsheet, FileText, GripVertical, ImagePlus, Loader2, Plus, QrCode, Search, Share2, Trash2, X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,11 +24,19 @@ import { QrShare } from "@/components/chat/QrShare";
 import { FormRenderer } from "@/components/forms/FormRenderer";
 import { TYPE_LABEL, displayAnswer, hasOptions, newQuestion, type FormSettings, type Question, type QuestionType } from "@/lib/forms/schema";
 import { perDay, summarise, toCsv } from "@/lib/forms/analytics";
-import { markResponsesSeen, deleteForm, deleteResponse, designSystemsForForms, exportedCsv, formImageUpload, linkPoster, getForm, getResponses, saveForm, setFormStatus, type FormRow, type ResponseRow } from "@/app/actions/mjengo-forms";
+import { markResponsesSeen, deleteForm, deleteResponse, designSystemsForForms, exportedCsv, formImageUpload, linkPoster, getForm, getResponses, saveForm, setFormStatus, formReport, type FormRow, type ResponseRow } from "@/app/actions/mjengo-forms";
 import { putToSignedUrl } from "@/lib/client/upload";
 import { unwrap } from "@/lib/action-result";
 import { listAssets, type AssetRow } from "@/app/actions/mjengo-ai";
 import { PostThis } from "../../_components/PostThis";
+import { AvatarStack, useTeam } from "../../_components/People";
+import { useUser } from "@/hooks/useUser";
+import { useFormLive } from "./_live";
+import { Markdown } from "../../_components/Markdown";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import * as XLSX from "xlsx";
+import { searchFiles, prepareUpload, registerUpload, prepareReplace, finishReplace } from "../../vault/api";
 
 type Save = "saved" | "saving" | "error";
 
@@ -48,6 +56,21 @@ export default function FormEditorPage() {
 	const [share, setShare] = useState(false);
 	const [postTogether, setPostTogether] = useState(false);
 	const loaded = useRef(false);
+	const team = useTeam();
+	const me = useUser();
+	const meName = [(me?.profile as { first_name?: string | null } | null | undefined)?.first_name, (me?.profile as { last_name?: string | null } | null | undefined)?.last_name].filter(Boolean).join(" ") || me?.email || "Someone";
+	const { peers } = useFormLive({
+		formId: id,
+		me: me?.id ? { id: me.id, name: meName } : null,
+		ready: !!form,
+		state: { title, description, questions, settings },
+		apply: (p) => {
+			if (p.title !== undefined) setTitle(p.title);
+			if (p.description !== undefined) setDescription(p.description);
+			if (p.questions) setQuestions(p.questions);
+			if (p.settings) setSettings(p.settings);
+		},
+	});
 
 	useEffect(() => {
 		getForm(id).then((f) => {
@@ -113,7 +136,32 @@ export default function FormEditorPage() {
 			<div className="flex items-center gap-1 border-b border-black/[0.07] pb-2">
 				<Link href="/dashboard/mjengo/forms" aria-label="All forms" title="All forms" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-[#787774] hover:bg-black/5"><ArrowLeft className="h-[18px] w-[18px]" /></Link>
 				<Input value={title} onChange={(e) => setTitle(e.target.value)} aria-label="Form title" className="h-8 min-w-0 flex-1 border-transparent bg-transparent px-2 text-[15px] font-semibold shadow-none hover:border-black/10 focus-visible:border-sauti-teal focus-visible:ring-0" />
-				<span className="hidden shrink-0 px-1 text-xs text-[#9b9a97] sm:inline" aria-live="polite">{save === "saving" ? "Saving..." : save === "error" ? "Not saved" : "Saved"}</span>
+									<Popover>
+						<PopoverTrigger asChild>
+							<button aria-label="Who has access" className="flex shrink-0 items-center gap-1.5 rounded-lg px-1.5 py-1 hover:bg-black/5">
+								<AvatarStack ids={team.map((t) => t.id)} team={team} max={4} size="md" />
+								{peers.length > 1 && <span className="flex items-center gap-1 text-[11px] font-medium text-emerald-700"><i className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" />{peers.length} here</span>}
+							</button>
+						</PopoverTrigger>
+						<PopoverContent align="end" className="w-72 p-3">
+							<p className="mb-2 text-xs font-semibold uppercase tracking-wider text-serene-neutral-500">Who has access</p>
+							<p className="mb-2 text-xs text-serene-neutral-500">Every Mjengo administrator can edit this form and read its responses.</p>
+							<ul className="max-h-60 space-y-1 overflow-y-auto">
+								{team.map((t) => {
+									const here = peers.some((p) => p.id === t.id);
+									return (
+										<li key={t.id} className="flex items-center gap-2 rounded-lg px-1.5 py-1 text-sm">
+											<AvatarStack ids={[t.id]} team={team} size="md" />
+											<span className="min-w-0 flex-1 truncate">{t.name}</span>
+											{t.id === form.created_by && <span className="rounded-full bg-sauti-teal-light px-2 py-0.5 text-[10px] font-semibold text-sauti-dark">Owner</span>}
+											{here && <span className="flex items-center gap-1 text-[11px] text-emerald-700"><i className="h-1.5 w-1.5 rounded-full bg-emerald-500" /> editing now</span>}
+										</li>
+									);
+								})}
+							</ul>
+						</PopoverContent>
+					</Popover>
+					<span className="hidden shrink-0 px-1 text-xs text-[#9b9a97] sm:inline" aria-live="polite">{save === "saving" ? "Saving..." : save === "error" ? "Not saved" : "Saved"}</span>
 				<button onClick={() => setPreview(true)} aria-label="Preview" title="Preview" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-[#787774] hover:bg-black/5"><Eye className="h-[18px] w-[18px]" /></button>
 				<button onClick={() => setShare(true)} disabled={form.status === "draft"} aria-label="Share" title={form.status === "draft" ? "Publish first to share" : "Share"} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-[#787774] hover:bg-black/5 disabled:opacity-40"><Share2 className="h-[18px] w-[18px]" /></button>
 				<span className="mx-1 h-5 w-px shrink-0 bg-black/10" />
@@ -125,7 +173,7 @@ export default function FormEditorPage() {
 			</div>
 
 			<Tabs defaultValue="questions">
-				<TabsList className="h-9 w-full justify-start gap-1 overflow-x-auto rounded-none border-b border-black/[0.07] bg-transparent p-0 sm:w-auto">
+				<TabsList className="h-auto w-full flex-wrap justify-start gap-1 rounded-none border-b border-black/[0.07] bg-transparent p-0">
 					<TabsTrigger value="questions" className="h-9 rounded-none border-b-2 border-transparent px-3 text-sm data-[state=active]:border-sauti-teal data-[state=active]:bg-transparent data-[state=active]:text-sauti-dark data-[state=active]:shadow-none">Questions</TabsTrigger>
 					<TabsTrigger value="responses" className="h-9 rounded-none border-b-2 border-transparent px-3 text-sm data-[state=active]:border-sauti-teal data-[state=active]:bg-transparent data-[state=active]:text-sauti-dark data-[state=active]:shadow-none">Responses{responses ? ` (${responses.length})` : ""}</TabsTrigger>
 					<TabsTrigger value="analytics" className="h-9 rounded-none border-b-2 border-transparent px-3 text-sm data-[state=active]:border-sauti-teal data-[state=active]:bg-transparent data-[state=active]:text-sauti-dark data-[state=active]:shadow-none">Analytics</TabsTrigger>
@@ -307,7 +355,64 @@ function QuestionsTab({ formId, description, onDescription, questions, onChange,
 
 function ResponsesTab({ formId, title, questions, collectEmail, responses, onChanged }: { formId: string; title: string; questions: Question[]; collectEmail: boolean; responses: ResponseRow[] | null; onChanged: () => void }) {
 	const { toast } = useToast();
-	const [q, setQ] = useState("");
+		const [q, setQ] = useState("");
+	const [reportOpen, setReportOpen] = useState(false);
+	const [report, setReport] = useState<{ title: string; markdown: string } | null>(null);
+	const [reportBusy, setReportBusy] = useState(false);
+	const [sheetBusy, setSheetBusy] = useState(false);
+
+	const rowsFor = () => {
+		const head = ["Submitted", ...(collectEmail ? ["Email"] : []), ...questions.map((qq) => qq.label || TYPE_LABEL[qq.type])];
+		const body = (responses ?? []).map((r) => [format(new Date(r.created_at), "yyyy-MM-dd HH:mm"), ...(collectEmail ? [r.respondent_email ?? ""] : []), ...questions.map((qq) => displayAnswer(qq, r.answers[qq.id]))]);
+		return [head, ...body];
+	};
+	const workbook = () => {
+		const ws = XLSX.utils.aoa_to_sheet(rowsFor());
+		ws["!cols"] = rowsFor()[0].map((h) => ({ wch: Math.min(40, Math.max(12, String(h).length + 4)) }));
+		const wb = XLSX.utils.book_new();
+		XLSX.utils.book_append_sheet(wb, ws, "Responses");
+		return wb;
+	};
+	const fileName = `${(title || "Form").replace(/[\\/:*?"<>|]+/g, " ").trim()} responses.xlsx`;
+	const downloadXlsx = () => {
+		const out = XLSX.write(workbook(), { type: "array", bookType: "xlsx" }) as ArrayBuffer;
+		const a = document.createElement("a");
+		a.href = URL.createObjectURL(new Blob([out], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }));
+		a.download = fileName;
+		a.click();
+		URL.revokeObjectURL(a.href);
+		exportedCsv(formId).catch(() => undefined);
+	};
+	/** Keeps one spreadsheet for this form in Files: updated in place when it is already there, then opened. */
+	const openSpreadsheet = async () => {
+		setSheetBusy(true);
+		try {
+			const out = new Uint8Array(XLSX.write(workbook(), { type: "array", bookType: "xlsx" }) as ArrayBuffer);
+			const mime = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+			const blob = new File([out], fileName, { type: mime });
+			const hit = (await searchFiles(fileName)).find((f) => f.name === fileName && f.level === "edit");
+			let id: string;
+			if (hit) {
+				const { signedUrl } = await prepareReplace(hit.id);
+				await putToSignedUrl(signedUrl, blob);
+				await finishReplace(hit.id, blob.size);
+				id = hit.id;
+			} else {
+				const { path, signedUrl } = await prepareUpload(null, fileName, blob.size);
+				await putToSignedUrl(signedUrl, blob);
+				id = (await registerUpload(null, path, fileName, blob.size, mime)).id;
+			}
+			window.location.assign(`/dashboard/mjengo/files/sheet?file=${id}`);
+		} catch (e) {
+			toast({ title: "Could not open the spreadsheet", description: e instanceof Error ? e.message : undefined, variant: "destructive" });
+			setSheetBusy(false);
+		}
+	};
+	const makeReport = async () => {
+		setReportBusy(true);
+		try { setReport(await formReport(formId)); } catch (e) { toast({ title: "Could not write the report", description: e instanceof Error ? e.message : undefined, variant: "destructive" }); } finally { setReportBusy(false); }
+	};
+	useEffect(() => { if (reportOpen && !report && !reportBusy) void makeReport(); }, [reportOpen]); // eslint-disable-line react-hooks/exhaustive-deps
 
 	const shown = useMemo(() => {
 		const term = q.trim().toLowerCase();
@@ -337,8 +442,36 @@ function ResponsesTab({ formId, title, questions, collectEmail, responses, onCha
 					<Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search answers" className="pl-9" />
 				</div>
 				<span className="text-sm text-serene-neutral-500">{shown.length} of {responses.length}</span>
-				<Button variant="outline" size="sm" className="gap-1.5" onClick={download}><Download className="h-4 w-4" /> Export CSV</Button>
+								<Button size="sm" className="gap-1.5 bg-sauti-teal text-white hover:bg-sauti-dark" onClick={() => setReportOpen(true)}><FileBarChart2 className="h-4 w-4" /> <span className="hidden sm:inline">Report</span></Button>
+				<DropdownMenu>
+					<DropdownMenuTrigger asChild><Button size="sm" className="gap-1.5 bg-[#37352f] text-white hover:bg-black"><Download className="h-4 w-4" /> Export <ChevronDown className="h-3.5 w-3.5" /></Button></DropdownMenuTrigger>
+					<DropdownMenuContent align="end" className="w-60">
+						<DropdownMenuItem onClick={openSpreadsheet} disabled={sheetBusy}><FileSpreadsheet className="mr-2 h-4 w-4" /> Open as a spreadsheet in Files</DropdownMenuItem>
+						<DropdownMenuItem onClick={downloadXlsx}><FileSpreadsheet className="mr-2 h-4 w-4" /> Download Excel (.xlsx)</DropdownMenuItem>
+						<DropdownMenuItem onClick={download}><Download className="mr-2 h-4 w-4" /> Download CSV</DropdownMenuItem>
+					</DropdownMenuContent>
+				</DropdownMenu>
 			</div>
+						<Dialog open={reportOpen} onOpenChange={(o) => { setReportOpen(o); if (!o) setReport(null); }}>
+				<DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
+					<DialogHeader><DialogTitle>{report?.title ?? "Report"}</DialogTitle></DialogHeader>
+					{reportBusy || !report ? <MjengoLoader label="Writing the report" compact /> : (
+						<div className="space-y-4">
+							<div className="rounded-xl bg-[#FAFAF8] p-4 text-sm leading-relaxed"><Markdown text={report.markdown} /></div>
+							<div className="flex flex-wrap justify-end gap-2">
+								<Button variant="outline" className="gap-1.5" onClick={() => navigator.clipboard.writeText(report.markdown).then(() => toast({ title: "Copied" }))}><Copy className="h-4 w-4" /> Copy</Button>
+								<Button variant="outline" className="gap-1.5" onClick={makeReport}>Write again</Button>
+								<Button className="gap-1.5 bg-sauti-teal hover:bg-sauti-dark" onClick={() => {
+									const html = `<h1>${report.title.replace(/[<>&]/g, "")}</h1>${report.markdown.replace(/^## (.*)$/gm, "<h2>$1</h2>").replace(/^- (.*)$/gm, "<li>$1</li>").replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>").split(/\n{2,}/).map((b) => (b.startsWith("<h2>") || b.startsWith("<li>") ? b : `<p>${b.replace(/\n/g, "<br>")}</p>`)).join("")}`;
+									const key = Math.random().toString(36).slice(2, 10);
+									try { sessionStorage.setItem(`ss_draft_${key}`, JSON.stringify({ title: report.title, html })); } catch { /* too large */ }
+									window.location.assign(`/dashboard/mjengo/documents/editor?draft=${key}`);
+								}}><FileText className="h-4 w-4" /> Open as a document</Button>
+							</div>
+						</div>
+					)}
+				</DialogContent>
+			</Dialog>
 			<div className="overflow-x-auto rounded-2xl border border-serene-neutral-200/70 bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04)]">
 				<table className="w-full min-w-[640px] text-sm">
 					<thead className="bg-serene-neutral-50 text-left text-xs uppercase tracking-wide text-serene-neutral-500">

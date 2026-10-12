@@ -5,6 +5,7 @@ import { looseAdmin } from '@/lib/loose-db';
 import { logAudit } from '@/lib/access/audit';
 import { requireAdminActor } from '@/lib/access/super-admin';
 import { guard } from '@/lib/action-result';
+import { askAi } from '@/lib/mjengo/ai';
 import { sanitiseQuestions, type FormSettings, type Question } from '@/lib/forms/schema';
 
 export interface FormRow {
@@ -15,6 +16,7 @@ export interface FormRow {
   status: 'draft' | 'open' | 'closed';
   questions: Question[];
   settings: FormSettings;
+  created_by?: string | null;
   created_at: string;
   updated_at: string;
   response_count: number;
@@ -270,3 +272,40 @@ async function seen_(formId: string) {
 }
 
 export const markResponsesSeen = guard(seen_);
+
+
+/**
+ * A written report from a form's responses: how many, who and when, what each question shows, and the themes
+ * in open answers. The numbers come from the data; the AI only writes them up, and is told not to add any.
+ */
+export async function formReport(formId: string): Promise<{ title: string; markdown: string }> {
+  await requireAdminActor();
+  const db = looseAdmin();
+  const { data: f } = await db.from('mjengo_forms').select('title, description, questions').eq('id', formId).maybeSingle();
+  if (!f) throw new Error('That form does not exist.');
+  const { data: rs } = await db.from('mjengo_form_responses').select('answers, created_at, respondent_email').eq('form_id', formId).order('created_at', { ascending: false }).limit(2000);
+  const responses = (rs ?? []) as { answers: Record<string, unknown>; created_at: string; respondent_email: string | null }[];
+  if (responses.length === 0) throw new Error('There are no responses to report on yet.');
+  const { summarise } = await import('@/lib/forms/analytics');
+  const questions = (f.questions ?? []) as Question[];
+  const sums = summarise(questions, responses as never);
+  const dates = responses.map((r) => r.created_at).sort();
+  const lines: string[] = [
+    `Form: ${f.title}`,
+    `Responses: ${responses.length} (first ${dates[0].slice(0, 10)}, latest ${dates[dates.length - 1].slice(0, 10)})`,
+  ];
+  for (const q of sums) {
+    const head = `Q: ${q.question.label} [${q.question.type}] answered ${q.answered}, skipped ${q.skipped}`;
+    if (q.tallies?.length) lines.push(`${head}\n${q.tallies.map((t) => `  - ${t.label}: ${t.count} (${t.pct}%)`).join('\n')}${q.stats ? `\n  average ${q.stats.avg.toFixed(1)}, range ${q.stats.min} to ${q.stats.max}` : ''}`);
+    else if (q.stats) lines.push(`${head}\n  average ${q.stats.avg.toFixed(1)}, range ${q.stats.min} to ${q.stats.max}`);
+    else if (q.samples?.length) lines.push(`${head}\n${q.samples.slice(0, 12).map((x) => `  - ${String(x).slice(0, 240)}`).join('\n')}`);
+    else lines.push(head);
+  }
+  const markdown = await askAi(
+    'You write a short, clear report for a non-profit team from survey results. Use plain Markdown with these headings: ## Overview, ## What people told us, ## Themes in their own words, ## What to do next. Use only the figures given: never invent numbers, quotes or names. Quote open answers sparingly and only as given. Keep the whole report under 450 words. Do not identify individuals.',
+    lines.join('\n\n').slice(0, 14000),
+    1100,
+    { temperature: 0.3 }
+  );
+  return { title: `${f.title}: responses report`, markdown };
+}
