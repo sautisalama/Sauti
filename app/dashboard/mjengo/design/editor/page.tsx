@@ -116,6 +116,9 @@ function DesignEditor() {
 		return SIZES.find((x) => x.id === want) ?? SIZES[0];
 	});
 	const [ideaSeed, setIdeaSeed] = useState(1);
+	const [zoomMul, setZoomMul] = useState(1);
+	const zoomRef = useRef(1);
+	zoomRef.current = zoomMul;
 	const sizeRef = useRef(size);
 	sizeRef.current = size;
 	const [panel, setPanel] = useState<Panel | null>("templates");
@@ -160,7 +163,8 @@ function DesignEditor() {
 		if (!c || !box) return;
 		const sz = sizeRef.current;
 		if (box.clientWidth < 80 || box.clientHeight < 80) return;
-		const s = Math.max(0.05, Math.min((box.clientWidth - 32) / sz.w, (box.clientHeight - 32) / sz.h, 1));
+		const base = Math.min((box.clientWidth - 32) / sz.w, (box.clientHeight - 36 - 96) / sz.h, 1);
+		const s = Math.max(0.05, base * zoomRef.current);
 		c.setDimensions({ width: Math.round(sz.w * s), height: Math.round(sz.h * s) });
 		// clear() and loadFromJSON() reset the view, so the zoom is always set again here.
 		c.setViewportTransform([s, 0, 0, s, 0, 0]);
@@ -193,7 +197,7 @@ function DesignEditor() {
 		return () => { ro.disconnect(); c.dispose(); canvas.current = null; };
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, []);
-	useEffect(() => { fit(); }, [fit, size]);
+	useEffect(() => { fit(); }, [fit, size, zoomMul]);
 
 	useEffect(() => {
 		unwrap(listTemplates("design")).then(async (rows) => {
@@ -524,42 +528,90 @@ function DesignEditor() {
 	const canUndo = history.current.at > 0;
 	const canRedo = history.current.at < history.current.stack.length - 1;
 
-	const propBar = (cls: string) => (
-						<div className={cn("flex min-h-12 shrink-0 items-center gap-1.5 bg-white px-3 py-1.5 max-sm:overflow-x-auto max-sm:border-t sm:min-h-11 sm:flex-wrap sm:border-b border-serene-neutral-100", cls)}>
-			{!o ? (
-				<>
-					<span className="hidden text-xs text-serene-neutral-500 sm:inline">Click something on the page to change its colour, font or size. Press Delete to remove it.</span>
-					<Input value={name} onChange={(e) => setName(e.target.value)} aria-label="Design name" className="h-9 min-w-[8rem] flex-1 text-sm sm:hidden" />
-					<select value={size.id} onChange={(e) => changeSize(SIZES.find((s) => s.id === e.target.value)!)} aria-label="Size" className="h-9 max-w-[9rem] shrink-0 rounded-md border border-serene-neutral-200 bg-white px-2 text-sm sm:hidden">
-						{SIZES.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
-					</select>
-				</>
-			) : (
-				<>
-					<div className="flex shrink-0 items-center gap-1">
-						{PALETTE.map((c) => <button key={c} aria-label={`Colour ${c}`} onClick={() => set(o.type === "line" ? { stroke: c } : { fill: c })} className="h-5 w-5 rounded-full border border-black/10" style={{ background: c }} />)}
-						<input type="color" aria-label="Custom colour" onChange={(e) => set(o.type === "line" ? { stroke: e.target.value } : { fill: e.target.value })} className="h-6 w-8 cursor-pointer rounded border border-serene-neutral-200 p-0.5" />
-					</div>
-					{isText && (
-						<>
-							<span className="mx-1 h-5 w-px bg-black/10" />
-							<FontPicker value={o.fontFamily ?? "Inter"} onChange={(f) => void changeFont(f)} />
-							<Input type="number" value={Math.round(o.fontSize ?? 40)} onChange={(e) => set({ fontSize: Number(e.target.value) })} aria-label="Size" className="h-8 w-20 text-sm" />
-							<button onClick={() => set({ fontWeight: o.fontWeight === "bold" ? "normal" : "bold" })} aria-pressed={o.fontWeight === "bold"} aria-label="Bold" className={cn("flex h-8 w-8 items-center justify-center rounded-md", o.fontWeight === "bold" ? "bg-sauti-teal-light" : "hover:bg-serene-neutral-100")}><Bold className="h-4 w-4" /></button>
-							<button onClick={() => set({ fontStyle: o.fontStyle === "italic" ? "normal" : "italic" })} aria-pressed={o.fontStyle === "italic"} aria-label="Italic" className={cn("flex h-8 w-8 items-center justify-center rounded-md", o.fontStyle === "italic" ? "bg-sauti-teal-light" : "hover:bg-serene-neutral-100")}><Italic className="h-4 w-4" /></button>
-							{([["left", AlignLeft], ["center", AlignCenter], ["right", AlignRight]] as const).map(([a, Icon]) => <button key={a} onClick={() => set({ textAlign: a })} aria-label={`Align ${a}`} aria-pressed={o.textAlign === a} className={cn("flex h-8 w-8 items-center justify-center rounded-md", o.textAlign === a ? "bg-sauti-teal-light" : "hover:bg-serene-neutral-100")}><Icon className="h-4 w-4" /></button>)}
-						</>
-					)}
-					<span className="mx-1 h-5 w-px bg-black/10" />
-					{o.type === "image" && <button onClick={splitSelected} className="h-8 shrink-0 rounded-md bg-[#7D2AE8]/10 px-2.5 text-xs font-semibold text-[#7D2AE8] hover:bg-[#7D2AE8]/15">Split into layers</button>}
-						<label className="flex items-center gap-1.5 text-xs text-serene-neutral-600">Opacity<input type="range" min={0.1} max={1} step={0.05} value={o.opacity ?? 1} onChange={(e) => set({ opacity: Number(e.target.value) })} className="w-20 accent-[#7D2AE8]" /></label>
-					<button onClick={() => { const c = canvas.current; if (c && o) { c.bringObjectForward(o); c.renderAll(); snapshot(); } }} className="h-8 rounded-md px-2 text-xs hover:bg-serene-neutral-100">Forward</button>
-					<button onClick={() => { const c = canvas.current; if (c && o) { c.sendObjectBackwards(o); c.renderAll(); snapshot(); } }} className="h-8 rounded-md px-2 text-xs hover:bg-serene-neutral-100">Back</button>
-					<button aria-label="Delete" onClick={() => { const c = canvas.current; if (c && o) { c.remove(o); c.discardActiveObject(); c.renderAll(); } }} className="flex h-8 w-8 items-center justify-center rounded-md text-red-600 hover:bg-red-50"><Trash2 className="h-4 w-4" /></button>
-				</>
-			)}
-		</div>
-	);
+	/** The context toolbar: what you can do to the thing selected, as a floating pill on desktop. */
+	const propBar = (cls: string, floating = false) => {
+		const sep = <span className="mx-0.5 h-5 w-px shrink-0 bg-black/10" />;
+		const tgl = (on: boolean) => cn("flex h-8 w-8 shrink-0 items-center justify-center rounded-lg", on ? "bg-[#7D2AE8]/10 text-[#7D2AE8]" : "hover:bg-serene-neutral-100");
+		const fill = o ? (o.type === "line" ? (o.stroke as string) : (o.fill as string)) : "#000000";
+		const colourValue = typeof fill === "string" && fill.startsWith("#") ? fill : "#7D2AE8";
+		const t = o as unknown as Textbox | null;
+		return (
+			<div className={cn("flex shrink-0 items-center gap-1 bg-white px-2.5 py-1.5", floating ? "rounded-2xl border border-black/10 shadow-[0_8px_30px_rgba(0,0,0,0.12)]" : "min-h-12 max-sm:overflow-x-auto max-sm:border-t", cls)}>
+				{!o ? (
+					<>
+						<Input value={name} onChange={(e) => setName(e.target.value)} aria-label="Design name" className="h-9 min-w-[8rem] flex-1 text-sm" />
+						<select value={size.id} onChange={(e) => changeSize(SIZES.find((s) => s.id === e.target.value)!)} aria-label="Size" className="h-9 max-w-[9rem] shrink-0 rounded-md border border-serene-neutral-200 bg-white px-2 text-sm">
+							{SIZES.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
+						</select>
+					</>
+				) : (
+					<>
+						{isText && (
+							<>
+								<FontPicker value={o.fontFamily ?? "Inter"} onChange={(f) => void changeFont(f)} />
+								{sep}
+								<div className="flex shrink-0 items-center rounded-lg border border-serene-neutral-200">
+									<button aria-label="Smaller" onClick={() => set({ fontSize: Math.max(4, Math.round((o.fontSize ?? 40) - 2)) })} className="flex h-8 w-7 items-center justify-center hover:bg-serene-neutral-100">-</button>
+									<input type="number" value={Math.round(o.fontSize ?? 40)} onChange={(e) => set({ fontSize: Number(e.target.value) })} aria-label="Font size" className="h-8 w-12 border-x border-serene-neutral-200 bg-transparent text-center text-sm outline-none" />
+									<button aria-label="Larger" onClick={() => set({ fontSize: Math.round((o.fontSize ?? 40) + 2) })} className="flex h-8 w-7 items-center justify-center hover:bg-serene-neutral-100">+</button>
+								</div>
+								{sep}
+							</>
+						)}
+						<Popover>
+							<PopoverTrigger asChild>
+								<button aria-label="Colour" className="flex h-8 shrink-0 items-center gap-1.5 rounded-lg px-1.5 hover:bg-serene-neutral-100"><span className="h-6 w-6 rounded-full border border-black/15" style={{ background: colourValue }} />{!isText && <span className="text-xs text-serene-neutral-600">Colour</span>}</button>
+							</PopoverTrigger>
+							<PopoverContent align="start" className="w-60 p-3">
+								<p className="mb-2 text-xs font-semibold text-serene-neutral-600">Colour</p>
+								<div className="grid grid-cols-6 gap-1.5">
+									{PALETTE.map((c) => <button key={c} aria-label={`Colour ${c}`} onClick={() => set(o.type === "line" ? { stroke: c } : { fill: c })} className="aspect-square rounded-full border border-black/10 hover:scale-110" style={{ background: c }} />)}
+								</div>
+								<label className="mt-3 flex items-center gap-2 text-xs text-serene-neutral-600">Custom
+									<input type="color" value={colourValue} onChange={(e) => set(o.type === "line" ? { stroke: e.target.value } : { fill: e.target.value })} className="h-7 w-12 cursor-pointer rounded border border-serene-neutral-200 p-0.5" />
+								</label>
+							</PopoverContent>
+						</Popover>
+						{isText && (
+							<>
+								{sep}
+								<button onClick={() => set({ fontWeight: o.fontWeight === "bold" ? "normal" : "bold" })} aria-pressed={o.fontWeight === "bold"} aria-label="Bold" className={tgl(o.fontWeight === "bold")}><Bold className="h-4 w-4" /></button>
+								<button onClick={() => set({ fontStyle: o.fontStyle === "italic" ? "normal" : "italic" })} aria-pressed={o.fontStyle === "italic"} aria-label="Italic" className={tgl(o.fontStyle === "italic")}><Italic className="h-4 w-4" /></button>
+								<button onClick={() => set({ underline: !t?.underline })} aria-pressed={!!t?.underline} aria-label="Underline" className={tgl(!!t?.underline)}><span className="text-sm font-semibold underline">U</span></button>
+								<button onClick={() => set({ linethrough: !t?.linethrough })} aria-pressed={!!t?.linethrough} aria-label="Strikethrough" className={tgl(!!t?.linethrough)}><span className="text-sm font-semibold line-through">S</span></button>
+								<button onClick={() => { const cur = String(t?.text ?? ""); const up = cur === cur.toUpperCase(); set({ text: up ? cur.toLowerCase() : cur.toUpperCase() }); }} aria-label="Change case" className={tgl(false)}><span className="text-xs font-semibold">aA</span></button>
+								{sep}
+								{([["left", AlignLeft], ["center", AlignCenter], ["right", AlignRight]] as const).map(([a, Icon]) => <button key={a} onClick={() => set({ textAlign: a })} aria-label={`Align ${a}`} aria-pressed={o.textAlign === a} className={tgl(o.textAlign === a)}><Icon className="h-4 w-4" /></button>)}
+								<Popover>
+									<PopoverTrigger asChild><button className="h-8 shrink-0 rounded-lg px-2 text-xs font-medium hover:bg-serene-neutral-100">Spacing</button></PopoverTrigger>
+									<PopoverContent align="start" className="w-56 space-y-3 p-3">
+										<label className="block text-xs text-serene-neutral-600">Letter spacing<input type="range" min={-50} max={500} step={10} value={t?.charSpacing ?? 0} onChange={(e) => set({ charSpacing: Number(e.target.value) })} className="mt-1 w-full accent-[#7D2AE8]" /></label>
+										<label className="block text-xs text-serene-neutral-600">Line spacing<input type="range" min={0.8} max={2.5} step={0.05} value={t?.lineHeight ?? 1.2} onChange={(e) => set({ lineHeight: Number(e.target.value) })} className="mt-1 w-full accent-[#7D2AE8]" /></label>
+									</PopoverContent>
+								</Popover>
+							</>
+						)}
+						{sep}
+						{o.type === "image" && <button onClick={splitSelected} className="h-8 shrink-0 rounded-lg bg-[#7D2AE8]/10 px-2.5 text-xs font-semibold text-[#7D2AE8] hover:bg-[#7D2AE8]/15">Split into layers</button>}
+						<Popover>
+							<PopoverTrigger asChild><button className="h-8 shrink-0 rounded-lg px-2 text-xs font-medium hover:bg-serene-neutral-100">Position</button></PopoverTrigger>
+							<PopoverContent align="start" className="w-56 space-y-2 p-3">
+								<div className="grid grid-cols-2 gap-1.5">
+									<button className="h-8 rounded-lg border border-serene-neutral-200 text-xs hover:bg-serene-neutral-50" onClick={() => { const c = canvas.current; if (c && o) { c.bringObjectToFront(o); c.requestRenderAll(); snapshot(); } }}>To front</button>
+									<button className="h-8 rounded-lg border border-serene-neutral-200 text-xs hover:bg-serene-neutral-50" onClick={() => { const c = canvas.current; if (c && o) { c.sendObjectToBack(o); c.requestRenderAll(); snapshot(); } }}>To back</button>
+									<button className="h-8 rounded-lg border border-serene-neutral-200 text-xs hover:bg-serene-neutral-50" onClick={() => { const c = canvas.current; if (c && o) { c.bringObjectForward(o); c.requestRenderAll(); snapshot(); } }}>Forward</button>
+									<button className="h-8 rounded-lg border border-serene-neutral-200 text-xs hover:bg-serene-neutral-50" onClick={() => { const c = canvas.current; if (c && o) { c.sendObjectBackwards(o); c.requestRenderAll(); snapshot(); } }}>Backward</button>
+									<button className="h-8 rounded-lg border border-serene-neutral-200 text-xs hover:bg-serene-neutral-50" onClick={() => { const c = canvas.current; if (c && o) { c.centerObjectH(o); o.setCoords(); c.requestRenderAll(); snapshot(); } }}>Centre across</button>
+									<button className="h-8 rounded-lg border border-serene-neutral-200 text-xs hover:bg-serene-neutral-50" onClick={() => { const c = canvas.current; if (c && o) { c.centerObjectV(o); o.setCoords(); c.requestRenderAll(); snapshot(); } }}>Centre down</button>
+								</div>
+								<label className="block text-xs text-serene-neutral-600">Transparency<input type="range" min={0.1} max={1} step={0.05} value={o.opacity ?? 1} onChange={(e) => set({ opacity: Number(e.target.value) })} className="mt-1 w-full accent-[#7D2AE8]" /></label>
+							</PopoverContent>
+						</Popover>
+					</>
+				)}
+			</div>
+		);
+	};
 
 	return (
 		<div className="relative flex h-full min-h-0 flex-col overflow-hidden bg-white">
@@ -582,7 +634,6 @@ function DesignEditor() {
 				<Button size="sm" className="h-9 shrink-0 gap-1.5 bg-white text-[#7D2AE8] hover:bg-white/90 sm:h-8" onClick={saveToStudio} disabled={busy !== null} aria-label="Save picture">{busy === "save" ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImageIcon className="h-4 w-4" />}<span className="hidden sm:inline">Save picture</span></Button>
 			</div>
 
-			{propBar("max-sm:hidden")}
 
 			<div className="flex min-h-0 flex-1 max-sm:flex-col-reverse">
 				{/* Rail and panel: a column on the left on desktop, a bar along the bottom on phones */}
@@ -697,11 +748,40 @@ function DesignEditor() {
 
 				{/* Page */}
 				<div ref={host} className="relative min-h-0 min-w-0 flex-1 overflow-hidden bg-[#EBECF0]">
-					<div className="absolute inset-0 flex items-center justify-center overflow-auto p-4">
+					{o && <div className="pointer-events-none absolute inset-x-0 top-3 z-20 hidden justify-center px-3 sm:flex"><div className="pointer-events-auto max-w-full overflow-x-auto">{propBar("", true)}</div></div>}
+					<div className="absolute inset-x-0 bottom-9 top-0 flex items-center justify-center overflow-auto p-4 pt-16">
 						<div className="shrink-0 shadow-xl"><canvas ref={el} /></div>
 					</div>
+					{(() => {
+						// A small toolbar rides above the selected object: lock, duplicate, delete.
+						if (!o || !host.current || !el.current) return null;
+						const hr = host.current.getBoundingClientRect();
+						const cr = el.current.getBoundingClientRect();
+						const z = canvas.current?.getZoom() ?? 1;
+						const ac = o.aCoords;
+						const x = Math.max(70, Math.min(hr.width - 70, cr.left - hr.left + (((ac.tl.x + ac.br.x) / 2) * z)));
+						const y = Math.max(64, cr.top - hr.top + Math.min(ac.tl.y, ac.br.y) * z - 44);
+						const locked = !!o.lockMovementX;
+						return (
+							<div className="absolute z-20 flex -translate-x-1/2 items-center gap-0.5 rounded-xl border border-black/10 bg-white p-0.5 shadow-lg" style={{ left: x, top: y }}>
+								<button aria-label={locked ? "Unlock" : "Lock"} title={locked ? "Unlock" : "Lock"} className={cn("flex h-8 w-8 items-center justify-center rounded-lg text-xs font-semibold hover:bg-serene-neutral-100", locked && "bg-[#7D2AE8]/10 text-[#7D2AE8]")} onClick={() => { o.set({ lockMovementX: !locked, lockMovementY: !locked, lockRotation: !locked, lockScalingX: !locked, lockScalingY: !locked, hasControls: locked }); canvas.current?.requestRenderAll(); bump((n) => n + 1); }}>{locked ? "Unlock" : "Lock"}</button>
+								<button aria-label="Duplicate" title="Duplicate" className="flex h-8 items-center justify-center rounded-lg px-2 text-xs font-semibold hover:bg-serene-neutral-100" onClick={async () => { const c = canvas.current; if (!c) return; const copy = await o.clone(); copy.set({ left: (o.left ?? 0) + 24, top: (o.top ?? 0) + 24 }); c.add(copy); c.setActiveObject(copy); c.requestRenderAll(); }}>Duplicate</button>
+								<button aria-label="Delete" title="Delete" className="flex h-8 w-8 items-center justify-center rounded-lg text-red-600 hover:bg-red-50" onClick={() => { const c = canvas.current; if (c) { c.remove(o); c.discardActiveObject(); c.requestRenderAll(); } }}><Trash2 className="h-4 w-4" /></button>
+							</div>
+						);
+					})()}
+					<div className="absolute inset-x-0 bottom-0 z-10 flex h-9 items-center gap-3 border-t border-black/[0.07] bg-white px-3 text-xs text-serene-neutral-600">
+						<span className="hidden sm:inline">{size.label}</span>
+						<span className="flex-1" />
+						<button aria-label="Zoom out" onClick={() => setZoomMul((z) => Math.max(0.25, Math.round((z - 0.1) * 10) / 10))} className="flex h-6 w-6 items-center justify-center rounded hover:bg-serene-neutral-100">-</button>
+						<input type="range" min={0.25} max={2} step={0.05} value={zoomMul} onChange={(e) => setZoomMul(Number(e.target.value))} aria-label="Zoom" className="w-28 accent-[#7D2AE8]" />
+						<button aria-label="Zoom in" onClick={() => setZoomMul((z) => Math.min(2, Math.round((z + 0.1) * 10) / 10))} className="flex h-6 w-6 items-center justify-center rounded hover:bg-serene-neutral-100">+</button>
+						<button onClick={() => setZoomMul(1)} className="w-12 rounded px-1 text-center font-medium hover:bg-serene-neutral-100" title="Fit the page">{Math.round(scale * 100)}%</button>
+						<span className="hidden sm:inline">Page 1 / 1</span>
+						<button aria-label="Full screen" onClick={() => { const e = host.current?.parentElement?.parentElement; if (document.fullscreenElement) void document.exitFullscreen(); else void e?.requestFullscreen?.(); }} className="rounded px-1.5 py-0.5 font-medium hover:bg-serene-neutral-100">Full screen</button>
+					</div>
 					<Popover>
-						<PopoverTrigger asChild><button aria-label="Layers" className="absolute bottom-3 right-3 z-10 flex h-9 items-center gap-1.5 rounded-full bg-white px-3 text-xs font-semibold text-serene-neutral-700 shadow-md ring-1 ring-black/10 hover:bg-serene-neutral-50"><Layers className="h-4 w-4" /> Layers</button></PopoverTrigger>
+						<PopoverTrigger asChild><button aria-label="Layers" className="absolute bottom-12 right-3 z-10 flex h-9 items-center gap-1.5 rounded-full bg-white px-3 text-xs font-semibold text-serene-neutral-700 shadow-md ring-1 ring-black/10 hover:bg-serene-neutral-50"><Layers className="h-4 w-4" /> Layers</button></PopoverTrigger>
 						<PopoverContent align="end" side="top" className="max-h-80 w-72 overflow-y-auto p-1.5">
 							{(canvas.current?.getObjects() ?? []).length === 0 && <p className="p-3 text-xs text-serene-neutral-500">Nothing on the page yet.</p>}
 							{[...(canvas.current?.getObjects() ?? [])].reverse().map((ob, i) => {
