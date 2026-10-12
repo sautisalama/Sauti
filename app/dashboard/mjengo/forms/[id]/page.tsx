@@ -21,7 +21,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { QrShare } from "@/components/chat/QrShare";
-import { FormRenderer } from "@/components/forms/FormRenderer";
+import { DevicePreview, DeviceToggle, ModeToggle, ThemePanel, ViewEditor, WelcomeEditor } from "./_Design";
+import { toPublicForm } from "@/lib/forms/public-view";
+import type { Device } from "@/lib/forms/schema";
 import { TYPE_LABEL, displayAnswer, hasOptions, newQuestion, type FormSettings, type Question, type QuestionType } from "@/lib/forms/schema";
 import { perDay, summarise, toCsv } from "@/lib/forms/analytics";
 import { markResponsesSeen, deleteForm, deleteResponse, designSystemsForForms, exportedCsv, formImageUpload, linkPoster, getForm, getResponses, saveForm, setFormStatus, formReport, type FormRow, type ResponseRow } from "@/app/actions/mjengo-forms";
@@ -53,6 +55,8 @@ export default function FormEditorPage() {
 	const [save, setSave] = useState<Save>("saved");
 	const [responses, setResponses] = useState<ResponseRow[] | null>(null);
 	const [preview, setPreview] = useState(false);
+	const [device, setDevice] = useState<Device>("desktop");
+	const [activeId, setActiveId] = useState<string | null>(null);
 	const [share, setShare] = useState(false);
 	const [postTogether, setPostTogether] = useState(false);
 	const loaded = useRef(false);
@@ -128,7 +132,7 @@ export default function FormEditorPage() {
 	if (form === undefined) return <MjengoLoader label="Loading the form" />;
 	if (form === null) return <p className="py-20 text-center text-serene-neutral-500">That form no longer exists. <Link href="/dashboard/mjengo/forms" className="text-sauti-teal underline">Back to forms</Link></p>;
 
-	const previewForm = { slug: form.slug, title: title || "Untitled form", description: description || null, questions, collectEmail: !!settings.collectEmail, unavailable: null, confirmation: settings.confirmation || "Thank you.", layout: settings.layout === "single" ? "single" : "page", allowAnonymous: settings.allowAnonymous !== false, images: settings.images ?? [], accent: settings.style?.accent || "#068297", background: settings.style?.background || "#f4f7f8", responder: null } as const;
+	const previewSource = { slug: form.slug, title, description: description || null, questions, settings };
 
 	return (
 		<div className="space-y-4">
@@ -175,13 +179,33 @@ export default function FormEditorPage() {
 			<Tabs defaultValue="questions">
 				<TabsList className="h-auto w-full flex-wrap justify-start gap-1 rounded-none border-b border-black/[0.07] bg-transparent p-0">
 					<TabsTrigger value="questions" className="h-9 rounded-none border-b-2 border-transparent px-3 text-sm data-[state=active]:border-sauti-teal data-[state=active]:bg-transparent data-[state=active]:text-sauti-dark data-[state=active]:shadow-none">Questions</TabsTrigger>
+					<TabsTrigger value="design" className="h-9 rounded-none border-b-2 border-transparent px-3 text-sm data-[state=active]:border-sauti-teal data-[state=active]:bg-transparent data-[state=active]:text-sauti-dark data-[state=active]:shadow-none">Design</TabsTrigger>
 					<TabsTrigger value="responses" className="h-9 rounded-none border-b-2 border-transparent px-3 text-sm data-[state=active]:border-sauti-teal data-[state=active]:bg-transparent data-[state=active]:text-sauti-dark data-[state=active]:shadow-none">Responses{responses ? ` (${responses.length})` : ""}</TabsTrigger>
 					<TabsTrigger value="analytics" className="h-9 rounded-none border-b-2 border-transparent px-3 text-sm data-[state=active]:border-sauti-teal data-[state=active]:bg-transparent data-[state=active]:text-sauti-dark data-[state=active]:shadow-none">Analytics</TabsTrigger>
 					<TabsTrigger value="settings" className="h-9 rounded-none border-b-2 border-transparent px-3 text-sm data-[state=active]:border-sauti-teal data-[state=active]:bg-transparent data-[state=active]:text-sauti-dark data-[state=active]:shadow-none">Settings</TabsTrigger>
 				</TabsList>
 
 				<TabsContent value="questions" className="mt-4">
-					<QuestionsTab formId={id} description={description} onDescription={setDescription} questions={questions} onChange={setQuestions} settings={settings} onSettings={setSettings} />
+					<div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,440px)]">
+						<div className="min-w-0 space-y-3">
+							<ViewBar settings={settings} onSettings={setSettings} device={device} onDevice={setDevice} onPreview={() => setPreview(true)} />
+							<QuestionsTab formId={id} description={description} onDescription={setDescription} questions={questions} onChange={setQuestions} settings={settings} onSettings={setSettings} device={device} onActive={setActiveId} />
+						</div>
+						<aside className="hidden xl:block">
+							<div className="sticky top-4"><DevicePreview form={previewSource} device={device} focusId={activeId} /></div>
+						</aside>
+					</div>
+				</TabsContent>
+				<TabsContent value="design" className="mt-4">
+					<div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,440px)]">
+						<div className="min-w-0 space-y-3">
+							<ViewBar settings={settings} onSettings={setSettings} device={device} onDevice={setDevice} onPreview={() => setPreview(true)} />
+							<ThemePanel formId={id} settings={settings} onChange={setSettings} />
+						</div>
+						<aside className="hidden xl:block">
+							<div className="sticky top-4"><DevicePreview form={previewSource} device={device} focusId={activeId} /></div>
+						</aside>
+					</div>
 				</TabsContent>
 				<TabsContent value="responses" className="mt-4">
 					<ResponsesTab formId={id} title={title} questions={questions} collectEmail={!!settings.collectEmail} responses={responses} onChanged={loadResponses} />
@@ -195,9 +219,10 @@ export default function FormEditorPage() {
 			</Tabs>
 
 			<Dialog open={preview} onOpenChange={setPreview}>
-				<DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto bg-sauti-teal-light/60">
+				<DialogContent className="max-h-[92vh] max-w-3xl overflow-y-auto">
 					<DialogHeader><DialogTitle>Preview (nothing is submitted)</DialogTitle></DialogHeader>
-					<FormRenderer form={previewForm} preview />
+					<div className="flex justify-center"><DeviceToggle device={device} onChange={setDevice} /></div>
+					<DevicePreview form={previewSource} device={device} focusId={activeId} />
 				</DialogContent>
 			</Dialog>
 
@@ -228,7 +253,19 @@ export default function FormEditorPage() {
 
 /* ------------------------------------------------------------- Questions */
 
-function QuestionsTab({ formId, description, onDescription, questions, onChange, settings, onSettings }: { formId: string; description: string; onDescription: (v: string) => void; questions: Question[]; onChange: (q: Question[]) => void; settings: FormSettings; onSettings: (s: FormSettings) => void }) {
+function ViewBar({ settings, onSettings, device, onDevice, onPreview }: { settings: FormSettings; onSettings: (s: FormSettings) => void; device: Device; onDevice: (d: Device) => void; onPreview: () => void }) {
+	return (
+		<div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-serene-neutral-200/70 bg-white p-2.5 shadow-[0_1px_2px_rgba(16,24,40,0.04)]">
+			<div className="flex flex-wrap items-center gap-2">
+				<ModeToggle mode={settings.layout === "page" ? "page" : "single"} onChange={(m) => onSettings({ ...settings, layout: m })} />
+				<DeviceToggle device={device} onChange={onDevice} />
+			</div>
+			<Button type="button" variant="outline" size="sm" className="h-8 gap-1.5 text-xs xl:hidden" onClick={onPreview}><Eye className="h-3.5 w-3.5" /> Preview</Button>
+		</div>
+	);
+}
+
+function QuestionsTab({ formId, description, onDescription, questions, onChange, settings, onSettings, device, onActive }: { formId: string; description: string; onDescription: (v: string) => void; questions: Question[]; onChange: (q: Question[]) => void; settings: FormSettings; onSettings: (s: FormSettings) => void; device: Device; onActive: (id: string | null) => void }) {
 	const { toast } = useToast();
 	const [uploading, setUploading] = useState(false);
 	const pick = useRef<HTMLInputElement>(null);
@@ -287,8 +324,10 @@ function QuestionsTab({ formId, description, onDescription, questions, onChange,
 				</div>
 			</div>
 
+			<WelcomeEditor formId={formId} welcome={settings.welcome} onChange={(w) => onSettings({ ...settings, welcome: w })} device={device} onFocus={() => onActive("welcome")} />
+
 			{questions.map((q, i) => (
-				<section key={q.id} className="rounded-2xl border border-serene-neutral-200/70 bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04)] p-4 shadow-sm">
+				<section key={q.id} onFocusCapture={() => onActive(q.id)} onClick={() => onActive(q.id)} className="rounded-2xl border border-serene-neutral-200/70 bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04)] p-4 shadow-sm">
 					<div className="flex items-start gap-2">
 						<GripVertical className="mt-2.5 h-4 w-4 shrink-0 text-serene-neutral-300" aria-hidden />
 						<div className="min-w-0 flex-1 space-y-3">
@@ -325,6 +364,16 @@ function QuestionsTab({ formId, description, onDescription, questions, onChange,
 									<div><Label className="text-xs">High label</Label><Input value={q.scale?.maxLabel ?? ""} onChange={(e) => update(i, { scale: { ...(q.scale ?? { min: 1, max: 5 }), maxLabel: e.target.value } })} className="h-9" /></div>
 								</div>
 							)}
+
+							<details className="group rounded-xl border border-serene-neutral-100" open={!!q.media || !!q.view?.desktop?.media || !!q.view?.mobile?.media}>
+								<summary className="flex cursor-pointer list-none items-center gap-2 px-3 py-2 text-xs font-semibold text-serene-neutral-600 hover:bg-serene-neutral-50">
+									<ImagePlus className="h-3.5 w-3.5" /> Picture or video
+									{(q.media || q.view?.desktop?.media || q.view?.mobile?.media) && <span className="rounded-full bg-sauti-teal-light px-1.5 py-0.5 text-[10px] text-sauti-dark">added</span>}
+								</summary>
+								<div className="p-3 pt-0">
+									<ViewEditor formId={formId} item={q} device={device} onChange={(patch) => update(i, patch as Partial<Question>)} />
+								</div>
+							</details>
 
 							<div className="flex items-center justify-between border-t border-serene-neutral-100 pt-3">
 								<label className="flex items-center gap-2 text-sm"><Switch checked={q.required} onCheckedChange={(v) => update(i, { required: v })} /> Required</label>

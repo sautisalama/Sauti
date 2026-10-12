@@ -6,7 +6,7 @@ import { logAudit } from '@/lib/access/audit';
 import { requireAdminActor } from '@/lib/access/super-admin';
 import { guard } from '@/lib/action-result';
 import { askAi } from '@/lib/mjengo/ai';
-import { sanitiseQuestions, type FormSettings, type Question } from '@/lib/forms/schema';
+import { sanitiseQuestions, sanitiseTheme, sanitiseWelcome, type FormSettings, type Question } from '@/lib/forms/schema';
 
 export interface FormRow {
   id: string;
@@ -96,6 +96,8 @@ export async function saveForm(id: string, patch: { title?: string; description?
       allowAnonymous: s.allowAnonymous !== false,
       poster: s.poster ?? null,
       images: (s.images ?? []).filter((u) => typeof u === 'string' && /^https:\/\//.test(u)).slice(0, 6),
+      theme: sanitiseTheme(s.theme),
+      welcome: sanitiseWelcome(s.welcome),
       style: {
         accent: /^#[0-9a-fA-F]{6}$/.test(s.style?.accent ?? '') ? s.style!.accent : undefined,
         background: /^#[0-9a-fA-F]{6}$/.test(s.style?.background ?? '') ? s.style!.background : undefined,

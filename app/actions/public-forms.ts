@@ -3,7 +3,7 @@
 import { headers } from 'next/headers';
 import { looseAdmin } from '@/lib/loose-db';
 import { getActor } from '@/lib/access/super-admin';
-import { validateAnswers, type FormSettings, type Question } from '@/lib/forms/schema';
+import { sanitiseTheme, sanitiseWelcome, validateAnswers, type FormSettings, type FormTheme, type Question, type Welcome } from '@/lib/forms/schema';
 
 export interface PublicForm {
   slug: string;
@@ -19,6 +19,8 @@ export interface PublicForm {
   images: string[];
   accent: string;
   background: string;
+  theme: FormTheme;
+  welcome: Welcome | null;
   /** The signed-in person, if any: their email is what a response is recorded under unless they choose anonymous. */
   responder: { email: string; name: string } | null;
 }
@@ -72,6 +74,8 @@ export async function getPublicForm(slug: string): Promise<PublicForm | null> {
     images: (s.images ?? []).filter((u) => typeof u === 'string' && /^https:\/\//.test(u)).slice(0, 6),
     accent: /^#[0-9a-fA-F]{6}$/.test(s.style?.accent ?? '') ? (s.style!.accent as string) : '#068297',
     background: /^#[0-9a-fA-F]{6}$/.test(s.style?.background ?? '') ? (s.style!.background as string) : '#f4f7f8',
+    theme: sanitiseTheme(s.theme) ?? {},
+    welcome: (() => { const w = sanitiseWelcome(s.welcome); return w?.enabled ? w : null; })(),
     responder: await currentResponder(),
   };
 }
