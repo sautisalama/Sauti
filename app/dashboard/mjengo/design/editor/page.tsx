@@ -1,5 +1,7 @@
 "use client";
 
+import { ColourInput } from "@/components/mjengo/ColourInput";
+import { PaletteSources } from "@/components/mjengo/PaletteSources";
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { MjengoLoader } from "../../_components/MjengoLoader";
 import Link from "next/link";
@@ -1138,7 +1140,7 @@ function DesignEditor() {
 								<h3 className="mb-2 text-sm font-semibold">Background</h3>
 								<div className="flex flex-wrap gap-1.5">
 									{PALETTE.map((c) => <button key={c} aria-label={`Background ${c}`} onClick={() => setBackground(c)} className="h-7 w-7 rounded-full border border-black/10" style={{ background: c }} />)}
-									<input type="color" aria-label="Custom background" onChange={(e) => setBackground(e.target.value)} className="h-7 w-9 cursor-pointer rounded border border-serene-neutral-200 p-0.5" />
+									<ColourInput label="Custom background" value="#FFFFFF" onLive={(hex) => setBackground(hex)} onCommit={(hex) => setBackground(hex)} className="h-7 w-9 cursor-pointer rounded border border-serene-neutral-200 p-0.5" />
 								</div>
 								<div className="mt-2 grid grid-cols-4 gap-1.5">
 									{[["#7D2AE8", "#00C4CC"], ["#FF5C8A", "#FFDE59"], ["#0E1318", "#7D2AE8"], ["#068297", "#7FD3E0"], ["#FFF1DB", "#FFD9A8"], ["#1D4ED8", "#38BDF8"], ["#160B2E", "#2A1257"], ["#F1E8FD", "#FFFFFF"]].map(([a, b]) => (
@@ -1171,10 +1173,11 @@ function DesignEditor() {
 									{brand.colours.map((c, i) => (
 										<button key={c + i} onClick={() => { if (o) set(o.type === "line" ? { stroke: c } : { fill: c }); else setBackground(c); }} onContextMenu={(e) => { e.preventDefault(); saveBrand({ ...brand, colours: brand.colours.filter((_, k) => k !== i) }); }} title={`${c}. Click to apply, right click to remove.`} className="h-9 w-9 rounded-full border border-black/10 shadow-sm hover:scale-110" style={{ background: c }} />
 									))}
-									<label className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-full border border-dashed border-serene-neutral-300 text-serene-neutral-500 hover:border-[#7D2AE8]" title="Add a colour">+
-										<input type="color" className="sr-only" onChange={(e) => saveBrand({ ...brand, colours: [...brand.colours, e.target.value] })} />
+									<label className="relative flex h-9 w-9 cursor-pointer items-center justify-center overflow-hidden rounded-full border border-dashed border-serene-neutral-300 text-serene-neutral-500 hover:border-[#7D2AE8]" title="Add a colour: it is added once, when you close the picker">+
+										<ColourInput label="Add a brand colour" value="#7D2AE8" onCommit={(hex) => { if (!brand.colours.some((c) => c.toLowerCase() === hex.toLowerCase())) saveBrand({ ...brand, colours: [...brand.colours, hex] }); }} className="absolute inset-0 h-full w-full cursor-pointer opacity-0" />
 									</label>
 								</div>
+								<PaletteSources className="mt-3" imageUrl={brand.logo} onPick={(hex) => { if (o) set(o.type === "line" ? { stroke: hex } : { fill: hex }); else setBackground(hex); }} onPickAll={(hexes) => saveBrand({ ...brand, colours: [...new Set([...brand.colours, ...hexes])].slice(0, 24) })} />
 								<p className="mt-1 text-xs text-serene-neutral-500">Applies to what is selected, or to the background.</p>
 							</div>
 							<div>

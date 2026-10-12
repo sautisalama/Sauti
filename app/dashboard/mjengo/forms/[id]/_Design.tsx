@@ -1,5 +1,7 @@
 "use client";
 
+import { ColourInput } from "@/components/mjengo/ColourInput";
+import { PaletteSources } from "@/components/mjengo/PaletteSources";
 import { useEffect, useRef, useState } from "react";
 import { AlignCenter, AlignLeft, AlignRight, ImagePlus, Link2, Loader2, Monitor, Smartphone, Trash2, Video } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -248,7 +250,7 @@ function ColourRow({ label, value, fallback, onChange }: { label: string; value:
 			<Label className="text-xs">{label}</Label>
 			<div className="flex items-center gap-2">
 				{value && <button type="button" className="text-[11px] text-serene-neutral-500 hover:underline" onClick={() => onChange(undefined)}>Auto</button>}
-				<input type="color" aria-label={label} value={value ?? fallback} onChange={(e) => onChange(e.target.value)} className="h-7 w-10 cursor-pointer rounded border border-serene-neutral-200 bg-white p-0.5" />
+				<ColourInput label={label} value={value ?? fallback} onCommit={(hex) => onChange(hex)} className="h-7 w-10 cursor-pointer rounded border border-serene-neutral-200 bg-white p-0.5" />
 			</div>
 		</div>
 	);
@@ -307,6 +309,7 @@ export function ThemePanel({ formId, settings, onChange }: { formId: string; set
 						</button>
 					))}
 				</div>
+				<PaletteSources imageUrl={t.logo?.url} onPick={(hex) => onChange({ ...settings, style: { ...settings.style, accent: hex }, theme: { ...t, buttonColor: hex } })} />
 				<ColourRow label="Questions" value={t.questionColor} fallback="#111827" onChange={(v) => setTheme({ questionColor: v })} />
 				<ColourRow label="Answers" value={t.answerColor} fallback={accent} onChange={(v) => setTheme({ answerColor: v })} />
 				<ColourRow label="Buttons" value={t.buttonColor ?? accent} fallback={accent} onChange={(v) => setTheme({ buttonColor: v })} />

@@ -1,5 +1,6 @@
 "use client";
 
+import { ColourInput } from "@/components/mjengo/ColourInput";
 import { MjengoLoader } from "../../_components/MjengoLoader";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
@@ -693,7 +694,7 @@ function SettingsTab({ formId, settings, onChange, onDelete }: { formId: string;
 						{[...accents, ...palette].map((c) => (
 							<button key={c} type="button" aria-label={`Accent ${c}`} aria-pressed={settings.style?.accent === c} onClick={() => onChange({ ...settings, style: { ...settings.style, accent: c } })} className={cn("h-7 w-7 rounded-full ring-offset-2", settings.style?.accent === c && "ring-2 ring-sauti-teal")} style={{ background: c }} />
 						))}
-						<input type="color" aria-label="Custom colour" value={settings.style?.accent || "#068297"} onChange={(e) => onChange({ ...settings, style: { ...settings.style, accent: e.target.value } })} className="h-7 w-9 cursor-pointer rounded border border-serene-neutral-200 bg-white p-0.5" />
+						<ColourInput label="Custom colour" value={settings.style?.accent || "#068297"} onCommit={(hex) => onChange({ ...settings, style: { ...settings.style, accent: hex } })} className="h-7 w-9 cursor-pointer rounded border border-serene-neutral-200 bg-white p-0.5" />
 					</div>
 				</div>
 				{systems.length > 0 && (
