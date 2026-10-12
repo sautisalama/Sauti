@@ -20,7 +20,7 @@ export async function streamChat(opts: { system: string; user: string; maxTokens
 			messages: [{ role: "system", content: `${opts.system}\n${NO_DASH_RULE}` }, { role: "user", content: opts.user }],
 		}),
 	});
-	if (!upstream.ok || !upstream.body) return new Response("The AI service is unavailable right now.", { status: 502 });
+	if (!upstream.ok || !upstream.body) return new Response(upstream.status === 402 ? "The AI credit has run out. An administrator needs to top up OpenRouter." : "The AI service is unavailable right now.", { status: upstream.status === 402 ? 402 : 502 });
 
 	const enc = new TextEncoder();
 	const dec = new TextDecoder();

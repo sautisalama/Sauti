@@ -1,5 +1,6 @@
 "use client";
 
+import { OpenRouterBalance } from "./OpenRouterBalance";
 import Link from "next/link";
 import { useEffect } from "react";
 import { usePathname } from "next/navigation";
@@ -53,6 +54,7 @@ export function MjengoShell({ isSuper, children }: { isSuper: boolean; children:
 
 	return (
 		<div className={cn("flex min-h-dvh flex-col bg-serene-neutral-50", fullBleed && "h-dvh min-h-0")}>
+			<OpenRouterBalance />
 			{/* Phones have no side panel: the same sections as a scrolling strip. */}
 			<nav aria-label="Mjengo sections" className={cn("flex shrink-0 gap-1 overflow-x-auto snap-x snap-proximity overscroll-x-contain border-b border-serene-neutral-200 bg-white px-2 pb-1.5 pt-[max(0.5rem,env(safe-area-inset-top))] scrollbar-hide lg:hidden", (pathname.startsWith(`${BASE}/files/`) || pathname.startsWith(`${BASE}/documents/editor`) || pathname.startsWith(`${BASE}/design/editor`)) && "max-sm:hidden")}>
 {pathname !== BASE && (

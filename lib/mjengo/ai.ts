@@ -16,7 +16,7 @@ export async function askAi(system: string, user: string, maxTokens = 600, opts:
       messages: [{ role: 'system', content: `${system}\n${NO_DASH_RULE}` }, { role: 'user', content: user }],
     }),
   });
-  if (!res.ok) throw new Error('The AI service is unavailable right now.');
+  if (!res.ok) throw new Error(res.status === 402 ? 'The AI credit has run out. An administrator needs to top up OpenRouter.' : 'The AI service is unavailable right now.');
   const j = (await res.json()) as { choices?: { message?: { content?: string } }[] };
   return stripDashes((j.choices?.[0]?.message?.content ?? '').trim());
 }
