@@ -471,7 +471,7 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 								{permission === "denied" ? <p className="text-sm">Allow the camera and microphone in your browser to be seen and heard. You can still listen.</p> : (
 									<>
 										<span className="flex h-24 w-24 items-center justify-center rounded-full bg-sauti-teal text-3xl font-medium">{initials(name || "You")}</span>
-										<p className="text-lg">Camera is off</p>
+										<p className="text-sm sm:text-lg max-sm:mb-12">Camera is off</p>
 									</>
 								)}
 							</div>
@@ -714,7 +714,7 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 
 function Ctl({ icon, label, onClick, active, danger, className, flat }: { icon: React.ReactNode; label: string; onClick: () => void; active?: boolean; danger?: boolean; className?: string; flat?: boolean }) {
 	return (
-		<button onClick={onClick} aria-label={label} title={label} aria-pressed={active} className={cn("flex shrink-0 items-center justify-center transition", flat ? "h-11 w-11 rounded-full" : "h-12 w-12 rounded-full", danger ? "bg-[#ea4335] hover:bg-[#d93025]" : active ? "bg-[#7fd3e0] text-[#202124]" : flat ? "text-white hover:bg-white/10" : "bg-[#1B232B] hover:bg-[#27323b]", className)}>
+		<button onClick={onClick} aria-label={label} title={label} aria-pressed={active} className={cn("flex shrink-0 items-center justify-center transition", flat ? "h-11 w-11 rounded-full" : "h-12 w-12 rounded-full", danger ? "bg-[#ea4335] text-white hover:bg-[#d93025]" : active ? "bg-[#7fd3e0] text-[#0E1318]" : flat ? "text-white hover:bg-white/10" : "bg-[#1B232B] text-white hover:bg-[#27323b]", className)}>
 			{icon}
 		</button>
 	);

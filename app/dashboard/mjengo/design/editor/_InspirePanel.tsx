@@ -11,7 +11,7 @@ import { colourSchemes, inspireImage, inspireSearch, type InspireItem, type Pale
 import { SOURCE_INFO, type InspireSource } from "@/lib/mjengo/inspire-sources";
 
 type Mode = "photos" | "icons" | "stickers" | "colours";
-const PHOTO_SOURCES: InspireSource[] = ["unsplash", "pexels", "pixabay", "openverse"];
+const PHOTO_SOURCES: InspireSource[] = ["unsplash", "pixabay", "openverse"];
 
 /** Photos, icons, stickers and colour schemes from free sources, placed on the page as editable images. */
 export function InspirePanel({ onPlace, onColour, baseColour }: { onPlace: (dataUrl: string) => Promise<void>; onColour: (hex: string) => void; baseColour: string }) {

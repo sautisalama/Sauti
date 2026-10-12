@@ -28,14 +28,14 @@ export function OutOfOfficeSwitch({ userId }: { userId: string }) {
 		};
 	}, [userId]);
 
-	if (away === null || away) return null;
+	if (away === null) return null;
 
 	const change = async (next: boolean) => {
 		setBusy(true);
 		setAway(next);
 		try {
 			await toggleOutOfOffice(next);
-			toast({ title: "You are out of office", description: "You will not be matched to new cases or bookings until you turn it off." });
+			toast(next ? { title: "You are out of office", description: "You will not be matched to new cases or bookings until you turn it back on." } : { title: "You are taking new cases again", description: "Matching and bookings have resumed." });
 		} catch {
 			setAway(!next);
 			toast({ title: "Could not update", variant: "destructive" });
@@ -45,15 +45,15 @@ export function OutOfOfficeSwitch({ userId }: { userId: string }) {
 	};
 
 	return (
-		<div className="flex items-center justify-between gap-3 rounded-2xl border border-serene-neutral-100 bg-white px-4 py-3">
-			<div className="flex items-center gap-3">
-				<Moon className="h-4 w-4 text-amber-600" />
-				<div>
-					<p className="text-sm font-semibold text-serene-neutral-900">Taking new cases</p>
-					<p className="text-xs text-serene-neutral-500">Switch off to pause new matches and bookings</p>
+		<div className={`flex items-center justify-between gap-3 rounded-2xl border px-4 py-3 ${away ? "border-amber-200 bg-amber-50" : "border-serene-neutral-100 bg-white"}`}>
+			<div className="flex min-w-0 items-center gap-3">
+				<Moon className="h-4 w-4 shrink-0 text-amber-600" />
+				<div className="min-w-0">
+					<p className="text-sm font-semibold text-serene-neutral-900">{away ? "Paused: not taking new cases" : "Taking new cases"}</p>
+					<p className="text-xs text-serene-neutral-500">{away ? "Switch on to resume matches and bookings" : "Switch off to pause new matches and bookings"}</p>
 				</div>
 			</div>
-			<Switch checked={!away} disabled={busy} onCheckedChange={(on) => change(!on)} aria-label="Taking new cases" />
+			<Switch className="shrink-0" checked={!away} disabled={busy} onCheckedChange={(on) => change(!on)} aria-label="Taking new cases" />
 		</div>
 	);
 }

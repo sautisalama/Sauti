@@ -26,8 +26,8 @@ const need = (source: InspireSource) => {
 };
 
 async function getJson<T>(url: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(url, { ...init, signal: AbortSignal.timeout(20_000) });
-  if (!res.ok) throw new Error(res.status === 401 || res.status === 403 ? 'That service refused the key.' : res.status === 429 ? 'That service is busy. Try again in a minute.' : 'That service did not answer.');
+  const res = await fetch(url, { ...init, headers: { 'User-Agent': 'SautiSalama/1.0 (https://sautisalama.org)', Accept: 'application/json', ...(init?.headers ?? {}) }, signal: AbortSignal.timeout(20_000) });
+  if (!res.ok) throw new Error(res.status === 401 || res.status === 403 ? (url.includes('openverse') ? 'Openverse did not accept the request. Try again shortly.' : 'That service refused the key.') : res.status === 429 ? 'That service is busy. Try again in a minute.' : 'That service did not answer.');
   return (await res.json()) as T;
 }
 

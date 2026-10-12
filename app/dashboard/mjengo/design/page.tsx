@@ -78,7 +78,7 @@ export default function DesignHome() {
 	const [ideas, setIdeas] = useState(12);
 	const [shuffle, setShuffle] = useState(0);
 	const [mood, setMood] = useState("All");
-	const [src, setSrc] = useState<"pinterest" | "site" | "designs" | InspireSource>("pinterest");
+	const [src, setSrc] = useState<"pinterest" | "site" | "designs" | InspireSource>("designs");
 	const [openAs, setOpenAs] = useState<"auto" | SizeId>("auto");
 	const [section, setSection] = useState<"all" | "templates" | "inspire" | "yours" | "schedule">("all");
 	const [ratios, setRatios] = useState<Record<string, number>>({});
@@ -92,7 +92,7 @@ export default function DesignHome() {
 			: unwrap(inspireSearch(from, q || "poster design")).then((r): Pin[] => r.map((x) => ({ id: x.id, title: x.title, image: x.full, link: x.link })));
 		job.then(setPins).catch((e) => { setPins([]); setPinErr(e instanceof Error ? e.message : "Could not load suggestions."); });
 	};
-	useEffect(() => { searchPins("social media poster design"); }, []);
+	useEffect(() => { searchPins("social media poster design", "pinterest"); }, []);
 
 	const sizeFor = (id: string): SizeId => {
 		if (openAs !== "auto") return openAs;
@@ -289,7 +289,7 @@ export default function DesignHome() {
 			}>
 				<div className="mb-3 flex flex-wrap items-center gap-2">
 					<div className="inline-flex flex-wrap rounded-lg border border-serene-neutral-200 bg-white p-0.5">
-						{([["pinterest", "Pinterest"], ["designs", "Adaptable designs"], ["site", "Sauti Salama"], ["unsplash", "Unsplash"], ["pexels", "Pexels"], ["pixabay", "Pixabay"], ["openverse", "Openverse"]] as const).map(([v, l]) => (
+						{([["designs", "Designs"], ["pinterest", "Pinterest"], ["site", "Sauti Salama"], ["unsplash", "Unsplash"], ["pixabay", "Pixabay"], ["openverse", "Openverse"]] as const).map(([v, l]) => (
 							<button key={v} onClick={() => { setSrc(v); if (v !== "designs" && v !== "site") searchPins(pinQ || "social media poster design", v); }} aria-pressed={src === v} className={cn("rounded-md px-3 py-1.5 text-xs font-semibold", src === v ? "bg-sauti-teal text-white" : "text-serene-neutral-600 hover:bg-serene-neutral-50")}>{l}</button>
 						))}
 					</div>

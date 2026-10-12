@@ -31,6 +31,11 @@ const TABS = [
 
 export function MjengoShell({ isSuper, children }: { isSuper: boolean; children: React.ReactNode }) {
 	const pathname = usePathname() ?? "";
+	// On a phone the strip scrolls freely and the current section rests in the middle.
+	useEffect(() => {
+		const el = document.querySelector<HTMLElement>('nav[aria-label="Mjengo sections"] [aria-current="page"]');
+		el?.scrollIntoView({ inline: "center", block: "nearest", behavior: "smooth" });
+	}, [pathname]);
 	// Retheme shadcn controls (also in portals) while the suite is open.
 	useEffect(() => {
 		document.documentElement.classList.add("mjengo-theme");
@@ -49,10 +54,12 @@ export function MjengoShell({ isSuper, children }: { isSuper: boolean; children:
 	return (
 		<div className={cn("flex min-h-dvh flex-col bg-serene-neutral-50", fullBleed && "h-dvh min-h-0")}>
 			{/* Phones have no side panel: the same sections as a scrolling strip. */}
-			<nav aria-label="Mjengo sections" className="flex shrink-0 gap-1 overflow-x-auto border-b border-serene-neutral-200 bg-white px-2 pb-1.5 pt-[max(0.5rem,env(safe-area-inset-top))] scrollbar-hide lg:hidden">
-				<Link href="/dashboard" className="flex shrink-0 items-center gap-1.5 rounded-full px-3 py-2 text-sm font-medium text-serene-neutral-500">
-					<ArrowLeft className="h-4 w-4" /> Dashboard
-				</Link>
+			<nav aria-label="Mjengo sections" className={cn("flex shrink-0 gap-1 overflow-x-auto snap-x snap-proximity overscroll-x-contain border-b border-serene-neutral-200 bg-white px-2 pb-1.5 pt-[max(0.5rem,env(safe-area-inset-top))] scrollbar-hide lg:hidden", (pathname.startsWith(`${BASE}/files/`) || pathname.startsWith(`${BASE}/documents/editor`) || pathname.startsWith(`${BASE}/design/editor`)) && "max-sm:hidden")}>
+{pathname !== BASE && (
+					<button onClick={() => { if (window.history.length > 1) window.history.back(); else window.location.assign(BASE); }} className="flex shrink-0 items-center gap-1.5 rounded-full px-3 py-2 text-sm font-medium text-serene-neutral-500">
+						<ArrowLeft className="h-4 w-4" /> Back
+					</button>
+				)}
 				{TABS.filter((t) => !t.superOnly || isSuper).map((t) => {
 					const active = t.exact ? pathname === t.href : pathname.startsWith(t.href);
 					return (
@@ -61,7 +68,7 @@ export function MjengoShell({ isSuper, children }: { isSuper: boolean; children:
 							href={t.href}
 							aria-current={active ? "page" : undefined}
 							className={cn(
-								"flex shrink-0 touch-manipulation items-center gap-2 rounded-full px-3.5 py-2 text-sm font-medium transition-colors",
+								"flex shrink-0 snap-center touch-manipulation items-center gap-2 rounded-full px-3.5 py-2 text-sm font-medium transition-colors",
 								active ? "bg-sauti-teal-light text-sauti-teal" : "text-serene-neutral-600 hover:bg-serene-neutral-100"
 							)}
 						>

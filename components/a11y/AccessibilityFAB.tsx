@@ -70,6 +70,8 @@ export default function AccessibilityFAB() {
 		a11y.set({ textScale: n });
 	};
 
+    if (pathname?.startsWith("/dashboard/mjengo") || pathname?.startsWith("/meet")) return null;
+
     if (isProtected) {
         return (
             <div className="hidden lg:block">
