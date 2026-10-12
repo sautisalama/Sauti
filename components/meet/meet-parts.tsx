@@ -36,7 +36,7 @@ export function ReactionPicker({ onPick, onClose }: { onPick: (emoji: string) =>
 					<button key={e} onClick={() => onPick(e)} aria-label={`React ${e}`} className="flex h-9 w-9 items-center justify-center rounded-lg text-xl transition hover:scale-125 hover:bg-[#f1f3f4] active:scale-95">{e}</button>
 				))}
 			</div>
-			<p className="mt-2 text-[11px] text-[#5f6368]">Tap again and again for a burst. Three people sending the same one sets off a celebration.</p>
+			<p className="mt-2 text-[11px] text-[#5f6368]">Keep tapping: every tap sends more, and bigger.</p>
 		</div>
 	);
 }
@@ -51,7 +51,7 @@ export function ReactionLayer({ items }: { items: FloatingReaction[] }) {
 			{items.map((r) => (
 				<div key={r.id} className="meet-float absolute bottom-24 flex flex-col items-center" style={{ left: `${r.x}%`, animation: `meet-float 3.2s ease-out ${r.delay}ms both` }}>
 					<span style={{ fontSize: r.size }} className="drop-shadow-lg">{r.emoji}</span>
-					<span className="mt-0.5 max-w-[8rem] truncate rounded-full bg-black/55 px-2 py-0.5 text-[11px] font-medium text-white">{r.name}</span>
+					{r.name && <span className="mt-0.5 max-w-[8rem] truncate rounded-full bg-black/55 px-2 py-0.5 text-[11px] font-medium text-white">{r.name}</span>}
 				</div>
 			))}
 		</div>

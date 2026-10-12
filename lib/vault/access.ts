@@ -12,7 +12,7 @@ const max = (a: Level | null, b: Level | null): Level | null => (!a ? b : !b ? a
 const fromGeneral = (g: General): Level | null => (g === 'admins_share' ? 'share' : g === 'admins_view' ? 'view' : null);
 
 export interface FolderNode { id: string; parent_id: string | null; name: string; owner_id: string; general_access: General; drive_folder_id: string | null; drive_link: string | null }
-export interface FileNode { id: string; folder_id: string | null; name: string; storage_path: string; mime: string | null; size: number; owner_id: string; general_access: General; created_at: string; updated_at: string; last_opened_at: string | null; drive_file_id: string | null; drive_link: string | null }
+export interface FileNode { id: string; folder_id: string | null; name: string; storage_path: string; mime: string | null; size: number; owner_id: string; general_access: General; created_at: string; updated_at: string; last_opened_at: string | null; drive_file_id: string | null; drive_link: string | null; tags?: string[]; meeting_code?: string | null; link_access?: 'off' | 'view' | 'edit' }
 interface Perm { resource_type: ResType; resource_id: string; user_id: string; level: Level }
 
 /** Everything needed to answer "what can this person do here" without further queries. */
@@ -26,7 +26,7 @@ export async function loadIndex(): Promise<VaultIndex> {
   const db = looseAdmin();
   const [f, fl, p] = await Promise.all([
     db.from('vault_folders').select('id, parent_id, name, owner_id, general_access, drive_folder_id, drive_link'),
-    db.from('vault_files').select('id, folder_id, name, storage_path, mime, size, owner_id, general_access, created_at, updated_at, last_opened_at, drive_file_id, drive_link'),
+    db.from('vault_files').select('id, folder_id, name, storage_path, mime, size, owner_id, general_access, created_at, updated_at, last_opened_at, drive_file_id, drive_link, tags, meeting_code, link_access'),
     db.from('vault_permissions').select('resource_type, resource_id, user_id, level'),
   ]);
   return {

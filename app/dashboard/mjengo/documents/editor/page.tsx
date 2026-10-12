@@ -15,6 +15,7 @@ import { useToast } from "@/hooks/use-toast";
 import { putToSignedUrl } from "@/lib/client/upload";
 import { ArrowLeft } from "lucide-react";
 import { DocAssist } from "./_DocAssist";
+import { DocBar } from "./_DocBar";
 import { ShareDialog } from "../../_components/ShareDialog";
 import { finishReplace, getFileUrl, prepareReplace, prepareUpload, registerUpload } from "../../vault/api";
 
@@ -58,7 +59,8 @@ function EditorScreen() {
 
 	const ref = useRef<WordcraftEditorRef>(null);
 	const [shareOpen, setShareOpen] = useState(false);
-	const [copied, setCopied] = useState(false);
+	const [versionsOpen, setVersionsOpen] = useState(false);
+	const [metaKey, setMetaKey] = useState(0);
 	const [fileId, setFileId] = useState<string | null>(initialFile);
 	const [name, setName] = useState("Untitled document.docx");
 	const [folderId, setFolderId] = useState<string | null>(folderParam);
@@ -202,8 +204,9 @@ function EditorScreen() {
 					</button>
 					{fileId && level !== "view" && <button onClick={() => setShareOpen(true)} className="flex h-9 items-center gap-1.5 rounded-full bg-sauti-teal px-3.5 text-sm font-semibold text-white">Share</button>}
 				</div>
-				<div className="relative min-h-0 flex-1 overflow-hidden">
-					<WordcraftEditor
+									{fileId && <DocBar fileId={fileId} name={name} canShare={level !== "view"} refreshKey={metaKey} onShare={() => setShareOpen(true)} onHistory={() => setVersionsOpen(true)} />}
+					<div className="relative min-h-0 flex-1 overflow-hidden">
+						<WordcraftEditor
 						ref={ref}
 						height="100%"
 						document={doc}
@@ -211,7 +214,9 @@ function EditorScreen() {
 						autoSave={level === "edit"}
 						user={person}
 						// Version history is kept on the server per document, so everyone sees the same list.
-						versionHistory={fileId ? { store: httpVersionStore(`/api/mjengo/docs/versions/${fileId}`), documentId: fileId, interval: 120_000 } : true}
+													versionHistory={fileId ? { store: httpVersionStore(`/api/mjengo/docs/versions/${fileId}`), documentId: fileId, interval: 120_000 } : true}
+							versionsOpen={versionsOpen}
+							onVersionsOpenChange={setVersionsOpen}
 						ai={ai}
 						collaboration={collab?.collaboration ?? null}
 						onSave={onSave}
@@ -220,16 +225,7 @@ function EditorScreen() {
 						fallback={(e) => <div className="p-6 text-sm text-red-700">The editor could not start: {e.message}. It needs a current browser with WebGL2 or WebGPU.</div>}
 					/>
 					<DocAssist editor={ref} />
-					{fileId && (
-						<div className="absolute bottom-14 left-3 z-30 hidden items-center gap-1.5 sm:bottom-16 sm:flex">
-							<button
-								onClick={() => { const url = `${window.location.origin}/dashboard/mjengo/documents/editor?file=${fileId}`; navigator.clipboard.writeText(url).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1600); toast({ title: "Link copied", description: "Anyone with access who opens it edits this same document, live." }); }).catch(() => undefined); }}
-								className="flex h-9 items-center gap-1.5 rounded-full border border-black/10 bg-white px-3 text-sm font-medium text-[#37352f] shadow-sm hover:bg-[#f7f7f5]"
-							>{copied ? "Copied" : "Copy link"}</button>
-							{level !== "view" && <button onClick={() => setShareOpen(true)} className="flex h-9 items-center gap-1.5 rounded-full bg-sauti-teal px-3.5 text-sm font-semibold text-white shadow-sm hover:bg-sauti-dark">Share</button>}
-						</div>
-					)}
-					<ShareDialog item={shareOpen && fileId ? ({ type: "file", id: fileId, name } as never) : null} onClose={() => setShareOpen(false)} />
+					<ShareDialog item={shareOpen && fileId ? ({ type: "file", id: fileId, name } as never) : null} onClose={() => { setShareOpen(false); setMetaKey((k) => k + 1); }} />
 				</div>
 				</>
 			)}

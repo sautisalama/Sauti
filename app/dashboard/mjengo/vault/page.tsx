@@ -384,6 +384,7 @@ export default function VaultPage() {
 									<TypeIcon name={i.name} big />
 									<span className="line-clamp-2 w-full break-words text-sm font-medium text-serene-neutral-900">{i.name}</span>
 									<span className="text-xs text-serene-neutral-500">{i.size != null ? fmtBytes(i.size) : ""}{i.updatedAt ? ` · ${format(new Date(i.updatedAt), "d MMM")}` : ""}</span>
+									{!!i.tags?.length && <span className="flex flex-wrap justify-center gap-1">{i.tags.slice(0, 2).map((t) => <span key={t} className="rounded-full bg-sauti-teal-light px-2 py-0.5 text-[10px] font-medium text-sauti-teal">{t}</span>)}</span>}
 								</button>
 								<div className="flex items-center gap-1">{i.driveLink && <DriveBadge href={i.driveLink} />}{(i.shared || i.people.length > 1) && <AvatarStack ids={i.people} team={team} max={3} />}</div>
 								<div className="absolute right-1.5 top-1.5">{rowMenu(i)}</div>
@@ -400,6 +401,7 @@ export default function VaultPage() {
 										<span className="min-w-0">
 											<span className="block truncate text-sm font-medium text-serene-neutral-900">{i.name}</span>
 											<span className="block truncate text-xs text-serene-neutral-500">{i.size != null ? `${fmtBytes(i.size)} · ` : ""}{i.ownerName}{i.updatedAt ? ` · ${format(new Date(i.updatedAt), "d MMM yyyy")}` : ""}</span>
+											{!!i.tags?.length && <span className="mt-0.5 flex flex-wrap gap-1">{i.tags.slice(0, 3).map((t) => <span key={t} className="rounded-full bg-sauti-teal-light px-2 py-0.5 text-[10px] font-medium text-sauti-teal">{t}</span>)}</span>}
 										</span>
 									</button>
 									{i.driveLink && <DriveBadge href={i.driveLink} />}

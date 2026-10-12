@@ -1,7 +1,7 @@
 import * as raw from "@/app/actions/vault";
 import { unwrap } from "@/lib/action-result";
 
-export type { VaultItem, VaultListing, AccessView, AccessEntry, PersonRow, RecipientCheck } from "@/app/actions/vault";
+export type { VaultItem, VaultListing, AccessView, AccessEntry, PersonRow, RecipientCheck, FileMeta } from "@/app/actions/vault";
 
 export const listVault = (...a: Parameters<typeof raw.listVault>) => unwrap(raw.listVault(...a));
 export const createFolder = (...a: Parameters<typeof raw.createFolder>) => unwrap(raw.createFolder(...a));
@@ -19,3 +19,7 @@ export const checkRecipients = (...a: Parameters<typeof raw.checkRecipients>) =>
 export const grantViewTo = (...a: Parameters<typeof raw.grantViewTo>) => unwrap(raw.grantViewTo(...a));
 export const prepareReplace = (...a: Parameters<typeof raw.prepareReplace>) => unwrap(raw.prepareReplace(...a));
 export const finishReplace = (...a: Parameters<typeof raw.finishReplace>) => unwrap(raw.finishReplace(...a));
+export const fileMeta = (...a: Parameters<typeof raw.fileMeta>) => unwrap(raw.fileMeta(...a));
+export const setFileMeta = (...a: Parameters<typeof raw.setFileMeta>) => unwrap(raw.setFileMeta(...a));
+export const inviteByLink = (...a: Parameters<typeof raw.inviteByLink>) => unwrap(raw.inviteByLink(...a));
+export const recentFiles = (...a: Parameters<typeof raw.recentFiles>) => unwrap(raw.recentFiles(...a));

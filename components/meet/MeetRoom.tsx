@@ -136,12 +136,14 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 			const now = Date.now();
 			recent.current = [...recent.current.filter((r) => now - r.at < 2500), { emoji, at: now }];
 			const combo = recent.current.filter((r) => r.emoji === emoji).length;
-			const n = combo >= 3 ? 7 : 1;
+			// Every extra tap sends more, and bigger: a streak of taps fills the screen like Google Meet.
+			const n = Math.min(18, 1 + (combo - 1) * 2);
+			const base = Math.min(96, 34 + (combo - 1) * 7);
 			const made: FloatingReaction[] = Array.from({ length: n }, (_, i) => ({
 				id: `${id}-${now}-${i}-${Math.random().toString(36).slice(2, 6)}`,
-				emoji, name: i === 0 ? name : "", x: 8 + Math.random() * 78, size: combo >= 3 ? 44 + Math.round(Math.random() * 20) : 34, delay: i * 90,
+				emoji, name: i === 0 ? name : "", x: 8 + Math.random() * 78, size: Math.round(base * (0.8 + Math.random() * 0.5)), delay: i * 60,
 			}));
-			setFloating((cur) => [...cur.slice(-40), ...made]);
+			setFloating((cur) => [...cur.slice(-90), ...made]);
 			setTimeout(() => setFloating((cur) => cur.filter((f) => !made.some((m) => m.id === f.id))), 3600 + n * 90);
 			setTileReact((cur) => ({ ...cur, [id]: emoji }));
 			setTimeout(() => setTileReact((cur) => { if (cur[id] !== emoji) return cur; const { [id]: _drop, ...rest } = cur; return rest; }), 4000);

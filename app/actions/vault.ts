@@ -35,6 +35,9 @@ export interface VaultItem {
   lastOpenedAt?: string | null;
   /** Owner first, then everyone it is shared with directly. */
   people: string[];
+  tags?: string[];
+  meetingCode?: string | null;
+  linkAccess?: 'off' | 'view' | 'edit';
 }
 
 export interface VaultListing {
@@ -88,7 +91,7 @@ function toItems(c: Ctx, folders: FolderNode[], files: FileNode[]): VaultItem[] 
   }
   for (const f of files) {
     const l = lvl(c, 'file', f.id);
-    if (l) out.push({ type: 'file', id: f.id, name: f.name, level: l, ownerId: f.owner_id, ownerName: c.names.get(f.owner_id) ?? 'Unknown', shared: f.general_access !== 'restricted' || sharedIds.has(`file:${f.id}`), general: f.general_access, size: f.size, mime: f.mime, createdAt: f.created_at, updatedAt: f.updated_at, lastOpenedAt: f.last_opened_at, driveLink: f.drive_link, people: peopleOf(c, 'file', f.id, f.owner_id) });
+    if (l) out.push({ type: 'file', id: f.id, name: f.name, level: l, ownerId: f.owner_id, ownerName: c.names.get(f.owner_id) ?? 'Unknown', shared: f.general_access !== 'restricted' || sharedIds.has(`file:${f.id}`), general: f.general_access, size: f.size, mime: f.mime, createdAt: f.created_at, updatedAt: f.updated_at, lastOpenedAt: f.last_opened_at, driveLink: f.drive_link, people: peopleOf(c, 'file', f.id, f.owner_id), tags: f.tags ?? [], meetingCode: f.meeting_code ?? null, linkAccess: f.link_access ?? 'off' });
   }
   return out.sort((a, b) => (a.type === b.type ? a.name.localeCompare(b.name) : a.type === 'folder' ? -1 : 1));
 }
@@ -299,6 +302,108 @@ async function setGeneralAccess_(type: ResType, id: string, general: General) {
   await logAudit({ actorId: c.actor.id, actorEmail: c.actor.email, action: 'vault.general_access', targetType: `vault_${type}`, targetId: id, targetLabel: node?.name, details: { general } });
 }
 
+
+export interface FileMeta {
+  id: string;
+  name: string;
+  tags: string[];
+  meetingCode: string | null;
+  linkAccess: 'off' | 'view' | 'edit';
+  general: General;
+  level: Level;
+  owner: { id: string; name: string; avatar: string | null };
+  /** Everyone with access of their own (explicit or from a parent folder), for the avatars at the top. */
+  people: { id: string; name: string; avatar: string | null; level: Level }[];
+}
+
+/** What the top bar of a document shows: labels, meeting, link setting and who has access. Needs view. */
+async function fileMeta_(id: string): Promise<FileMeta> {
+  const c = await ctx();
+  const level = need(c, 'file', id, 'view', 'open it');
+  const f = c.ix.files.get(id);
+  if (!f) throw new Error('That file no longer exists.');
+  const chain = new Set<string>();
+  let cur = f.folder_id;
+  while (cur && !chain.has(cur)) { chain.add(cur); cur = c.ix.folders.get(cur)?.parent_id ?? null; }
+  const best = new Map<string, Level>();
+  for (const p of c.ix.perms) {
+    const hit = (p.resource_type === 'file' && p.resource_id === id) || (p.resource_type === 'folder' && chain.has(p.resource_id));
+    if (!hit || p.user_id === f.owner_id) continue;
+    const prev = best.get(p.user_id);
+    if (!prev || RANK[p.level] > RANK[prev]) best.set(p.user_id, p.level);
+  }
+  const ids = [f.owner_id, ...best.keys()];
+  const { data: profs } = await looseAdmin().from('profiles').select('id, first_name, last_name, email, avatar_url').in('id', ids);
+  const info = new Map((profs ?? []).map((p: { id: string; first_name: string | null; last_name: string | null; email: string | null; avatar_url: string | null }) => [p.id, { name: [p.first_name, p.last_name].filter(Boolean).join(' ') || p.email || 'Someone', avatar: p.avatar_url }]));
+  return {
+    id, name: f.name, tags: f.tags ?? [], meetingCode: f.meeting_code ?? null, linkAccess: f.link_access ?? 'off', general: f.general_access, level,
+    owner: { id: f.owner_id, name: info.get(f.owner_id)?.name ?? 'Owner', avatar: info.get(f.owner_id)?.avatar ?? null },
+    people: [...best.entries()].map(([uid, l]) => ({ id: uid, name: info.get(uid)?.name ?? 'Someone', avatar: info.get(uid)?.avatar ?? null, level: l })),
+  };
+}
+
+/** Labels and meeting need edit rights; the link setting needs share rights. */
+async function setFileMeta_(id: string, patch: { tags?: string[]; meetingCode?: string | null; linkAccess?: 'off' | 'view' | 'edit' }) {
+  const c = await ctx();
+  const f = c.ix.files.get(id);
+  if (!f) throw new Error('That file no longer exists.');
+  const update: Record<string, unknown> = {};
+  if (patch.tags !== undefined) {
+    need(c, 'file', id, 'edit', 'label it');
+    update.tags = [...new Set(patch.tags.map((t) => t.trim().replace(/\s+/g, ' ').slice(0, 30)).filter(Boolean))].slice(0, 12);
+  }
+  if (patch.meetingCode !== undefined) {
+    need(c, 'file', id, 'edit', 'tag a meeting');
+    const code = patch.meetingCode ? patch.meetingCode.trim().toLowerCase().replace(/^.*\/meet\//, '').replace(/[?#].*$/, '') : null;
+    if (code && !/^[a-z0-9]{3}-[a-z0-9]{4}-[a-z0-9]{3}$/.test(code)) throw new Error('That is not a meeting link or code.');
+    if (code) {
+      const { data: m } = await looseAdmin().from('mjengo_meetings').select('code').eq('code', code).maybeSingle();
+      if (!m) throw new Error('That meeting does not exist.');
+    }
+    update.meeting_code = code;
+  }
+  if (patch.linkAccess !== undefined) {
+    need(c, 'file', id, 'share', 'change link sharing');
+    if (!['off', 'view', 'edit'].includes(patch.linkAccess)) throw new Error('Unknown link setting.');
+    if (patch.linkAccess === 'edit' && lvl(c, 'file', id) !== 'edit') throw new Error('Only people who can edit may let others edit through a link.');
+    update.link_access = patch.linkAccess;
+  }
+  if (!Object.keys(update).length) return;
+  await looseAdmin().from('vault_files').update(update).eq('id', id);
+  await logAudit({ actorId: c.actor.id, actorEmail: c.actor.email, action: 'vault.meta', targetType: 'vault_file', targetId: id, targetLabel: f.name, details: update });
+}
+
+/**
+ * People who are not administrators cannot be given a place in the vault. They are invited through the link
+ * instead: link sharing is switched on at the chosen level if it was off, and they are emailed the link.
+ */
+async function inviteByLink_(id: string, emails: string[], level: 'view' | 'edit', note?: string): Promise<{ sent: number; linkAccess: 'off' | 'view' | 'edit' }> {
+  const c = await ctx();
+  need(c, 'file', id, 'share', 'invite people');
+  const f = c.ix.files.get(id);
+  if (!f) throw new Error('That file no longer exists.');
+  if (level === 'edit') need(c, 'file', id, 'edit', 'let others edit');
+  const current = f.link_access ?? 'off';
+  const next: 'off' | 'view' | 'edit' = current === 'edit' ? 'edit' : level === 'edit' ? 'edit' : current === 'view' ? 'view' : level;
+  if (next !== current) await looseAdmin().from('vault_files').update({ link_access: next }).eq('id', id);
+  const clean = [...new Set(emails.map((e) => e.trim().toLowerCase()).filter((e) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)))].slice(0, 25);
+  if (clean.length) {
+    void sendAccessEmail({ kind: /\.(docx?|odt|rtf)$/i.test(f.name) ? 'document' : 'file', to: clean, by: c.actor.name, title: f.name, url: `/d/${id}`, note, detail: next === 'edit' ? 'Anyone with the link can edit.' : 'Anyone with the link can view.' });
+  }
+  await logAudit({ actorId: c.actor.id, actorEmail: c.actor.email, action: 'vault.link_invite', targetType: 'vault_file', targetId: id, targetLabel: f.name, details: { count: clean.length, level: next } });
+  return { sent: clean.length, linkAccess: next };
+}
+
+/** Everything you can open, most recently used first, so pickers can show the latest files with no search. */
+async function recentFiles_(limit = 30): Promise<{ id: string; name: string; size: number; level: Level; updatedAt: string; tags: string[] }[]> {
+  const c = await ctx();
+  return [...c.ix.files.values()]
+    .filter((f) => lvl(c, 'file', f.id))
+    .sort((a, b) => (b.last_opened_at ?? b.updated_at).localeCompare(a.last_opened_at ?? a.updated_at))
+    .slice(0, Math.min(100, limit))
+    .map((f) => ({ id: f.id, name: f.name, size: f.size, level: lvl(c, 'file', f.id)!, updatedAt: f.updated_at, tags: f.tags ?? [] }));
+}
+
 export interface PersonRow { id: string; name: string; email: string }
 async function listPeople_(): Promise<PersonRow[]> {
   const actor = await requireAdminActor();
@@ -313,7 +418,7 @@ async function searchFiles_(q: string): Promise<{ id: string; name: string; size
   const c = await ctx();
   const term = q.trim().toLowerCase();
   return [...c.ix.files.values()]
-    .filter((f) => !term || f.name.toLowerCase().includes(term))
+    .filter((f) => !term || f.name.toLowerCase().includes(term) || (f.tags ?? []).some((t) => t.toLowerCase().includes(term)) || (f.meeting_code ?? '') === term)
     .map((f) => ({ f, l: lvl(c, 'file', f.id) }))
     .filter((x): x is { f: FileNode; l: Level } => !!x.l)
     .sort((a, b) => b.f.created_at.localeCompare(a.f.created_at))
@@ -377,6 +482,10 @@ export const getAccess = guard(getAccess_);
 export const setPermission = guard(setPermission_);
 export const setGeneralAccess = guard(setGeneralAccess_);
 export const listPeople = guard(listPeople_);
+export const fileMeta = guard(fileMeta_);
+export const setFileMeta = guard(setFileMeta_);
+export const inviteByLink = guard(inviteByLink_);
+export const recentFiles = guard(recentFiles_);
 export const searchFiles = guard(searchFiles_);
 export const checkRecipients = guard(checkRecipients_);
 export const grantViewTo = guard(grantViewTo_);

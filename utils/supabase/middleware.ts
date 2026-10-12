@@ -78,6 +78,7 @@ export async function updateSession(request: NextRequest) {
 		"/manifest.webmanifest",
 		"/~offline",
 		"/f", // public forms from the Mjengo suite
+		"/d", // documents shared with anyone who has the link
 		"/meet", // call links work for guests
 		"/join", // group invite pages show a preview before asking you to sign in
 	];
