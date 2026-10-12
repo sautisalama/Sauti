@@ -234,7 +234,8 @@ function DesignEditor() {
 			const c = canvas.current;
 			if (!row || !d?.json || !c) return;
 			const match = SIZES.find((x) => x.w === d.w && x.h === d.h);
-			if (match) setSize(match); else if (d.w && d.h) setSize({ id: "custom", label: "Custom", w: d.w, h: d.h } as never);
+			const next = match ?? (d.w && d.h ? ({ id: "custom", label: "Custom", w: d.w, h: d.h } as never) : null);
+			if (next) { sizeRef.current = next; setSize(next); }
 			setName(isCopy ? `${row.name} copy` : row.name);
 			history.current.lock = true;
 			await c.loadFromJSON(d.json as never);
@@ -432,9 +433,14 @@ function DesignEditor() {
 	const applyBuilt = (b: (typeof BUILT_IN)[number]) => {
 		const c = canvas.current;
 		if (!c) return;
+		// A template brings its own page: the page takes its shape instead of squeezing the template into the
+		// current one (a story template must not end up on a square).
+		const own = SIZES.find((x) => x.id === b.template.size);
+		const target = b.id !== "plain" && own ? own : size;
+		if (target.id !== size.id) { sizeRef.current = target; setSize(target); }
 		history.current.lock = true;
 		c.clear();
-		b.build(c, size.w, size.h);
+		b.build(c, target.w, target.h);
 		history.current.lock = false;
 		fit();
 		snapshot();
@@ -459,7 +465,8 @@ function DesignEditor() {
 		const d = t.data as { json?: unknown; w?: number; h?: number };
 		if (!c || !d.json) return;
 		const match = SIZES.find((s) => s.w === d.w && s.h === d.h);
-		if (match) setSize(match); else if (d.w && d.h) setSize({ id: "custom", label: "Custom", w: d.w, h: d.h } as never);
+		const next = match ?? (d.w && d.h ? ({ id: "custom", label: "Custom", w: d.w, h: d.h } as never) : null);
+		if (next) { sizeRef.current = next; setSize(next); }
 		history.current.lock = true;
 		await c.loadFromJSON(d.json as never);
 		history.current.lock = false;
