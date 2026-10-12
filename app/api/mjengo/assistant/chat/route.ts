@@ -8,7 +8,7 @@ import { readableFile } from "@/lib/mjengo/files-text";
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
-const FREE_TOKENS = Number(process.env.MJENGO_AI_FREE_TOKENS ?? 50000);
+const FREE_TOKENS = Number(process.env.MJENGO_AI_FREE_TOKENS ?? 500);
 const SHARED_MODEL = process.env.OPENROUTER_MODEL ?? "qwen/qwen3.7-flash";
 const IMAGE_MODEL = "google/gemini-2.5-flash-image-preview";
 const BUCKET = "mjengo-docs";
