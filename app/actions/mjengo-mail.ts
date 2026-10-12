@@ -728,11 +728,13 @@ export interface LabelRow {
   name: string;
   color: string;
   instruction: string | null;
+  /** Set when this label stands for a project: emails tagged with it are that project's mail. */
+  project_id?: string | null;
 }
 
 async function listLabels_(): Promise<LabelRow[]> {
   const actor = await requireAdminActor();
-  const { data } = await looseAdmin().from('mail_labels').select('id, name, color, instruction').eq('owner_id', actor.id).order('created_at');
+  const { data } = await looseAdmin().from('mail_labels').select('id, name, color, instruction, project_id').eq('owner_id', actor.id).order('created_at');
   return (data ?? []) as LabelRow[];
 }
 
@@ -743,7 +745,7 @@ async function saveLabel_(id: string | null, v: { name: string; color?: string; 
   const row = { name, color: v.color || 'purple', instruction: v.instruction?.trim().slice(0, 600) || null };
   const db = looseAdmin();
   const q = id ? db.from('mail_labels').update(row).eq('id', id).eq('owner_id', actor.id) : db.from('mail_labels').insert({ ...row, owner_id: actor.id });
-  const { data, error } = await q.select('id, name, color, instruction').single();
+  const { data, error } = await q.select('id, name, color, instruction, project_id').single();
   if (error || !data) throw new Error('Could not save the label.');
   return data as LabelRow;
 }
@@ -761,6 +763,70 @@ async function setMessageLabel_(accountId: string, messageId: string, labelId: s
   if (!label) throw new Error('That label no longer exists.');
   if (on) await db.from('mail_message_labels').upsert({ owner_id: actor.id, account_id: accountId, message_id: messageId, label_id: labelId });
   else await db.from('mail_message_labels').delete().eq('account_id', accountId).eq('message_id', messageId).eq('label_id', labelId).eq('owner_id', actor.id);
+}
+
+export interface ProjectLite { id: string; name: string; status: string }
+
+async function listProjects_(): Promise<ProjectLite[]> {
+  await requireAdminActor();
+  const { data } = await looseAdmin().from('mjengo_projects').select('id, name, status').order('created_at', { ascending: false }).limit(200);
+  return (data ?? []) as ProjectLite[];
+}
+
+/** The label that stands for a project, made the first time a message is tagged with it. */
+async function projectLabel_(projectId: string): Promise<LabelRow> {
+  const actor = await requireAdminActor();
+  const db = looseAdmin();
+  const { data: have } = await db.from('mail_labels').select('id, name, color, instruction, project_id').eq('owner_id', actor.id).eq('project_id', projectId).maybeSingle();
+  if (have) return have as LabelRow;
+  const { data: proj } = await db.from('mjengo_projects').select('name').eq('id', projectId).maybeSingle();
+  if (!proj) throw new Error('That project no longer exists.');
+  const { data, error } = await db.from('mail_labels').insert({ owner_id: actor.id, name: String(proj.name).slice(0, 40), color: 'blue', instruction: null, project_id: projectId }).select('id, name, color, instruction, project_id').single();
+  if (error || !data) throw new Error('Could not tag the message with that project.');
+  return data as LabelRow;
+}
+
+export interface GrantLite { id: string; title: string; funder: string | null; link: string | null }
+
+async function listGrantsLite_(): Promise<GrantLite[]> {
+  await requireAdminActor();
+  const { data } = await looseAdmin().from('mjengo_grants').select('id, title, funder, link').order('created_at', { ascending: false }).limit(200);
+  return (data ?? []) as GrantLite[];
+}
+
+/**
+ * A link found in a tagged email, put where it belongs: as a new opportunity (its details are read from the
+ * page), as a new grant, or as the link of a grant that already exists and has none.
+ */
+async function linkToWork_(target: { kind: 'opportunity' | 'grant'; grantId?: string | null }, url: string, subject: string): Promise<{ kind: 'opportunity' | 'grant'; id: string; title: string }> {
+  const actor = await requireAdminActor();
+  let clean: string;
+  try { clean = new URL(url).toString(); } catch { throw new Error('That is not a valid web address.'); }
+  if (!/^https?:/i.test(clean)) throw new Error('Only web links can be added.');
+  const title = subject.replace(/^(re|fwd?):\s*/i, '').trim().slice(0, 140) || 'From an email';
+  const db = looseAdmin();
+  if (target.kind === 'opportunity') {
+    const { data, error } = await db.from('mjengo_opportunities').insert({ title, kind: 'grant', status: 'new', source_url: clean, created_by: actor.id, owner_id: actor.id }).select('id, title').single();
+    if (error || !data) throw new Error('Could not add the opportunity.');
+    // Fill its empty fields from the page, as when a link is pasted into a new opportunity. Best effort.
+    try {
+      const { verifyOpportunityRow } = await import('@/lib/mjengo/opportunity-run');
+      await verifyOpportunityRow(data.id as string, { url: clean });
+    } catch { /* the opportunity still exists with its link */ }
+    await logAudit({ actorId: actor.id, actorEmail: actor.email, action: 'mjengo.opportunity.from_mail', targetType: 'opportunity', targetId: data.id, targetLabel: data.title });
+    return { kind: 'opportunity', id: data.id as string, title: data.title as string };
+  }
+  if (target.grantId) {
+    const { data: g } = await db.from('mjengo_grants').select('id, title, link').eq('id', target.grantId).maybeSingle();
+    if (!g) throw new Error('That grant no longer exists.');
+    await db.from('mjengo_grants').update({ link: clean }).eq('id', g.id);
+    await logAudit({ actorId: actor.id, actorEmail: actor.email, action: 'mjengo.grant.link_from_mail', targetType: 'grant', targetId: g.id, targetLabel: g.title });
+    return { kind: 'grant', id: g.id as string, title: g.title as string };
+  }
+  const { data, error } = await db.from('mjengo_grants').insert({ title, status: 'idea', link: clean, created_by: actor.id, owner_id: actor.id }).select('id, title').single();
+  if (error || !data) throw new Error('Could not add the grant.');
+  await logAudit({ actorId: actor.id, actorEmail: actor.email, action: 'mjengo.grant.from_mail', targetType: 'grant', targetId: data.id, targetLabel: data.title });
+  return { kind: 'grant', id: data.id as string, title: data.title as string };
 }
 
 export interface AutoLabelMatch { messageId: string; from: string; subject: string }
@@ -1010,6 +1076,10 @@ export const summariseMessage = guard(summariseMessage_);
 export const draftReply = guard(draftReply_);
 export const suggestReplies = guard(suggestReplies_);
 export const listLabels = guard(listLabels_);
+export const listMailProjects = guard(listProjects_);
+export const projectLabel = guard(projectLabel_);
+export const listGrantsLite = guard(listGrantsLite_);
+export const linkToWork = guard(linkToWork_);
 export const saveLabel = guard(saveLabel_);
 export const deleteLabel = guard(deleteLabel_);
 export const setMessageLabel = guard(setMessageLabel_);
@@ -1029,7 +1099,7 @@ export const updateAccountServers = guard(updateServers_);
 /** Everything the mail screen needs to start, in one round trip (server actions run one at a time). */
 async function mailBootstrap_() {
   await requireAdminActor();
-  const [accounts, views, snippets, labels, signature] = await Promise.all([listAccounts_(), listViews_(), listSnippets_(), listLabels_(), getSignature_().catch(() => null)]);
-  return { accounts, views, snippets, labels, signature };
+  const [accounts, views, snippets, labels, signature, projects] = await Promise.all([listAccounts_(), listViews_(), listSnippets_(), listLabels_(), getSignature_().catch(() => null), listProjects_().catch(() => [] as ProjectLite[])]);
+  return { accounts, views, snippets, labels, signature, projects };
 }
 export const mailBootstrap = guard(mailBootstrap_);

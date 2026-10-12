@@ -4,7 +4,7 @@ import { MjengoLoader } from "../../_components/MjengoLoader";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { format, isThisWeek, isToday, isYesterday, startOfDay } from "date-fns";
 import {
-	Archive, Check, ArrowLeft, ChevronDown, ChevronUp, ChevronsRight, Clock, ListFilter, MoreHorizontal, RotateCw, SlidersHorizontal, Command as CommandIcon, Edit3, FileText, Flag, Forward, Inbox, Loader2, Mail, MailOpen, Menu, Paperclip, Pencil, Plus, Reply, ReplyAll, Search, Send, Settings, ShieldAlert, Sparkles, Star, Tag, Trash2, User, X,
+	Archive, Check, ArrowLeft, ChevronDown, ChevronUp, ChevronsRight, Clock, ListFilter, MoreHorizontal, RotateCw, SlidersHorizontal, Command as CommandIcon, Edit3, FileText, Flag, Forward, Inbox, Loader2, Mail, MailOpen, Menu, Paperclip, Pencil, Plus, Reply, ReplyAll, Search, Send, Settings, ShieldAlert, FolderKanban, Sparkles, Star, Tag, Trash2, User, X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -26,7 +26,7 @@ import { PersonChip } from "./PersonChip";
 import { AiSummary, ThreadMessage } from "./Thread";
 import { unwrap } from "@/lib/action-result";
 import { addContactFromMail } from "@/app/actions/mjengo-contacts";
-import { listLabels, saveLabel, deleteLabel, setMessageLabel, type LabelRow } from "./api";
+import { listLabels, saveLabel, deleteLabel, setMessageLabel, projectLabel, listGrantsLite, linkToWork, type LabelRow, type ProjectLite, type GrantLite } from "./api";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { AccountSwitcher } from "./AccountSwitcher";
 import { detailKey, listKey, mailStore, mergeFresh, prefetchDetails, setMailUnread } from "./mail-store";
@@ -82,6 +82,9 @@ export function MailApp() {
 	const [prefs, setPrefs] = useState<MailPrefs>({ undoSeconds: 5, replyDefault: "reply", conversationView: true, density: "comfortable", blocked: [] });
 		const [labels, setLabels] = useState<LabelRow[]>([]);
 	const [labelEdit, setLabelEdit] = useState<Partial<LabelRow> | null>(null);
+	const [projects, setProjects] = useState<ProjectLite[]>([]);
+	// A link in an email that was tagged as a grant or an opportunity: offered a place in the suite.
+	const [workPrompt, setWorkPrompt] = useState<{ url: string; subject: string; links: string[] } | null>(null);
 	const [dropOn, setDropOn] = useState<string | null>(null);
 	const [onlyUnread, setOnlyUnread] = useState(false);
 	const [viewKey, setViewKey] = useState("inbox");
@@ -173,6 +176,7 @@ export function MailApp() {
 				setViews(b.views);
 				setSnippets(b.snippets);
 				setLabels(b.labels);
+				setProjects((b as { projects?: ProjectLite[] }).projects ?? []);
 				if (b.signature) setSignature(b.signature);
 			})
 			.catch(() => setAccounts([]));
@@ -366,6 +370,17 @@ export function MailApp() {
 		}
 	}, [accountId, rows, selected, layout, open, toast]);
 
+	/** Tag a message with a project: the project's own label is made the first time. */
+	const toggleProject = async (messageId: string, projectId: string, on: boolean, uid?: number) => {
+		try {
+			const label = await projectLabel(projectId);
+			setLabels((cur) => (cur.some((l) => l.id === label.id) ? cur : [...cur, label]));
+			await toggleLabel(messageId, label.id, on, uid);
+		} catch (e) {
+			toast({ title: "Could not tag the project", description: e instanceof Error ? e.message : undefined, variant: "destructive" });
+		}
+	};
+
 	/** Add or remove a label on a message; reflected straight away in the list. */
 	const toggleLabel = async (messageId: string, labelId: string, on: boolean, uid?: number) => {
 		if (!accountId) return;
@@ -374,7 +389,13 @@ export function MailApp() {
 		if (selected && selected.messageId === messageId) setSelected((s) => (s ? apply(s) : s));
 		try {
 			await setMessageLabel(accountId, messageId, labelId, on);
-			if (on) toast({ title: `Labelled ${labels.find((l) => l.id === labelId)?.name ?? ""}` });
+			const lab = labels.find((l) => l.id === labelId);
+			if (on) toast({ title: `Labelled ${lab?.name ?? ""}` });
+			// Tagged as something that comes with a link (a grant, an opportunity): offer to put the link to work.
+			if (on && lab && (lab.project_id ? false : /grant|opportunit|fund|tender|fellowship|call for|proposal/i.test(lab.name)) && detail && selected?.messageId === messageId) {
+				const links = linksIn(detail.html ?? "", detail.text ?? "");
+				if (links.length) setWorkPrompt({ url: links[0], subject: detail.subject, links });
+			}
 		} catch (e) {
 			toast({ title: "Could not change the label", description: e instanceof Error ? e.message : undefined, variant: "destructive" });
 			loadList(false);
@@ -497,7 +518,7 @@ export function MailApp() {
 				<button onClick={() => setViewEdit({})} className="flex h-9 w-full items-center gap-3 rounded-md px-3 text-[15px] text-[#787774] hover:bg-black/5"><Plus className="h-[18px] w-[18px]" /> New view</button>
 
 				<Heading>Labels</Heading>
-				{labels.map((l) => (
+				{labels.filter((l) => !l.project_id).map((l) => (
 					<div
 						key={l.id}
 						onDragOver={(e) => { e.preventDefault(); setDropOn(l.id); }}
@@ -518,6 +539,18 @@ export function MailApp() {
 					</div>
 				))}
 				<button onClick={() => setLabelEdit({})} className="flex h-9 w-full items-center gap-3 rounded-md px-3 text-[15px] text-[#787774] hover:bg-black/5"><Plus className="h-[18px] w-[18px]" /> New label</button>
+
+				{labels.some((l) => l.project_id) && (
+					<>
+						<Heading>Projects</Heading>
+						{labels.filter((l) => l.project_id).map((l) => (
+							<button key={l.id} onClick={() => { setViewKey(`label:${l.id}`); setNavOpen(false); }} className={cn("flex h-9 w-full touch-manipulation items-center gap-3 rounded-md px-3 text-left text-[15px]", viewKey === `label:${l.id}` ? "bg-black/[0.06]" : "hover:bg-black/5")}>
+								<FolderKanban className="h-[18px] w-[18px] shrink-0 text-[#787774]" />
+								<span className="truncate">{l.name}</span>
+							</button>
+						))}
+					</>
+				)}
 
 				<Heading>Mail</Heading>
 				{BUILT_IN.filter((b) => b.section === "mail").map((b) => <NavItem key={b.key} active={viewKey === b.key} icon={b.icon} tone="text-[#787774]" label={b.label} onClick={() => { setViewKey(b.key); setNavOpen(false); }} />)}
@@ -563,7 +596,7 @@ const Pane = (
 			hasPrev={rows.findIndex((r) => r.uid === selected?.uid) > 0}
 			hasNext={rows.findIndex((r) => r.uid === selected?.uid) >= 0 && rows.findIndex((r) => r.uid === selected?.uid) < rows.length - 1}
 			onAutoLabelSimilar={() => { const f = detail?.from[0]; setLabelEdit({ name: f ? displayName(f) : "", instruction: f ? `Emails from ${displayName(f)} <${f.address}>` : "" }); }}
-			labels={labels} selectedLabels={rows.find((r) => r.uid === selected?.uid)?.labels ?? selected?.labels ?? []} onToggleLabel={(id, on) => selected?.messageId && toggleLabel(selected.messageId, id, on, selected.uid)} onNewLabel={() => setLabelEdit({})} selected={selected} detail={detail} busy={detailBusy} accountId={accountId!} conversation={conversation} summary={summary} summaryBusy={summaryBusy} allowImages={allowImages}
+			labels={labels} selectedLabels={rows.find((r) => r.uid === selected?.uid)?.labels ?? selected?.labels ?? []} onToggleLabel={(id, on) => selected?.messageId && toggleLabel(selected.messageId, id, on, selected.uid)} projects={projects} onToggleProject={(id, on) => selected?.messageId && toggleProject(selected.messageId, id, on, selected.uid)} onNewLabel={() => setLabelEdit({})} selected={selected} detail={detail} busy={detailBusy} accountId={accountId!} conversation={conversation} summary={summary} summaryBusy={summaryBusy} allowImages={allowImages}
 			onClose={close} onSummarise={summarise} onOpen={(m) => open(m)} onAct={(a) => selected && act(selected, a)}
 			onReply={(all) => detail && startReply(detail, all)} onForward={() => detail && startReply(detail, false, true)}
 			onLoadImages={() => { setAllowImages(true); if (selected) open(selected, true); }} full={effectiveLayout === "full"}
@@ -577,13 +610,19 @@ const Pane = (
 			<aside className="hidden w-[268px] shrink-0 border-r border-black/[0.06] lg:block">{sidebar}</aside>
 			<Sheet open={navOpen} onOpenChange={setNavOpen}><SheetContent side="left" className="w-[280px] p-0"><SheetTitle className="sr-only">Mail navigation</SheetTitle>{sidebar}</SheetContent></Sheet>
 
+			<WorkPrompt prompt={workPrompt} onClose={() => setWorkPrompt(null)} />
 			<main className={cn("flex min-w-0 flex-1 flex-col", selected && effectiveLayout === "full" && "hidden")}>
 				<header className="flex items-center gap-2 px-4 py-3 lg:px-6">
 					<Button variant="ghost" size="icon" className="h-9 w-9 lg:hidden" onClick={() => setNavOpen(true)} aria-label="Open menu"><Menu className="h-5 w-5" /></Button>
 					<active.icon className="h-5 w-5 text-[#787774]" />
 					<h2 className="truncate text-[17px] font-medium text-[#37352f]">{active.label}</h2>
 					{debouncedQ && <span className="hidden truncate rounded-full bg-black/5 px-2.5 py-1 text-xs text-[#787774] sm:inline">Searching “{debouncedQ}”</span>}
-					<div className="flex-1" />
+					<label className="mx-2 hidden h-9 min-w-[180px] max-w-md flex-1 cursor-text items-center gap-2 rounded-lg border border-black/10 bg-white px-3 text-sm focus-within:border-sauti-teal md:flex">
+						<Search className="h-4 w-4 shrink-0 text-[#787774]" />
+						<input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search this mailbox" aria-label="Search mail" className="min-w-0 flex-1 bg-transparent outline-none placeholder:text-[#9b9a97]" />
+						{q && <button type="button" aria-label="Clear search" onClick={() => setQ("")} className="text-[#787774] hover:text-[#37352f]"><X className="h-3.5 w-3.5" /></button>}
+					</label>
+					<div className="flex-1 md:hidden" />
 					<button
 						onClick={() => setLabelEdit(viewKey.startsWith("label:") ? labels.find((l) => `label:${l.id}` === viewKey) ?? {} : {})}
 						className="hidden h-8 items-center gap-2 rounded-lg border border-black/10 bg-white px-3 text-sm text-[#37352f] shadow-sm hover:bg-black/[0.03] sm:flex"
@@ -761,11 +800,11 @@ function HoverBtn({ label, onClick, children }: { label: string; onClick: () => 
 	return <button onClick={(e) => { e.stopPropagation(); onClick(); }} title={label} aria-label={label} className="rounded-md p-1.5 text-serene-neutral-600 hover:bg-serene-neutral-100">{children}</button>;
 }
 
-function ReadingPane({ teamIds, team, onWrite, onAddContact, onPrev, onNext, hasPrev, hasNext, onAutoLabelSimilar, labels, selectedLabels, onToggleLabel, onNewLabel, selected, detail, busy, accountId, conversation, summary, summaryBusy, allowImages, onClose, onSummarise, onOpen, onAct, onReply, onForward, onLoadImages, full, meAddress, inlineReply }: {
+function ReadingPane({ teamIds, team, onWrite, onAddContact, onPrev, onNext, hasPrev, hasNext, onAutoLabelSimilar, labels, selectedLabels, onToggleLabel, projects, onToggleProject, onNewLabel, selected, detail, busy, accountId, conversation, summary, summaryBusy, allowImages, onClose, onSummarise, onOpen, onAct, onReply, onForward, onLoadImages, full, meAddress, inlineReply }: {
 	teamIds: (a: string[]) => (string | undefined)[]; team: ReturnType<typeof useTeam>;
 	onWrite: (address: string) => void; onAddContact: (name: string, address: string) => void;
 	onPrev: () => void; onNext: () => void; hasPrev: boolean; hasNext: boolean; onAutoLabelSimilar: () => void;
-	labels: LabelRow[]; selectedLabels: string[]; onToggleLabel: (id: string, on: boolean) => void; onNewLabel: () => void;
+	labels: LabelRow[]; selectedLabels: string[]; onToggleLabel: (id: string, on: boolean) => void; projects: ProjectLite[]; onToggleProject: (id: string, on: boolean) => void; onNewLabel: () => void;
 	selected: MessageRow | null; detail: Detail | null; busy: boolean; accountId: string; conversation: MessageRow[]; summary: string | null; summaryBusy: boolean; allowImages: boolean;
 	onClose: () => void; onSummarise: () => void; onOpen: (m: MessageRow) => void; onAct: (a: MailAction) => void; onReply: (all: boolean) => void; onForward: () => void; onLoadImages: () => void; full: boolean;
 	meAddress: string; inlineReply: React.ReactNode | null;
@@ -805,12 +844,28 @@ function ReadingPane({ teamIds, team, onWrite, onAddContact, onPrev, onNext, has
 					<Popover>
 						<PopoverTrigger asChild><button aria-label="Labels" title="Label" className="flex h-8 w-8 items-center justify-center rounded-md text-[#787774] hover:bg-black/5 hover:text-[#37352f]"><Tag className="h-[18px] w-[18px]" /></button></PopoverTrigger>
 						<PopoverContent align="end" className="w-60 p-1.5">
-							{labels.map((l) => { const on = selectedLabels.includes(l.id); return (
+							{labels.filter((l) => !l.project_id).map((l) => { const on = selectedLabels.includes(l.id); return (
 								<button key={l.id} onClick={() => onToggleLabel(l.id, !on)} className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-black/5">
 									<span className={cn("h-2.5 w-2.5 rounded-full", LABEL_COLORS[l.color]?.dot ?? "bg-sauti-teal")} /><span className="flex-1 truncate">{l.name}</span>{on && <Check className="h-4 w-4 text-sauti-teal" />}
 								</button>
 							); })}
 							<button onClick={onNewLabel} className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm text-[#787774] hover:bg-black/5"><Plus className="h-4 w-4" /> New label</button>
+							{projects.length > 0 && (
+								<>
+									<p className="mt-1 border-t border-black/[0.06] px-2 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wide text-[#9b9a97]">Projects</p>
+									<div className="max-h-48 overflow-y-auto">
+										{projects.map((pr) => {
+											const lab = labels.find((l) => l.project_id === pr.id);
+											const on = !!lab && selectedLabels.includes(lab.id);
+											return (
+												<button key={pr.id} onClick={() => onToggleProject(pr.id, !on)} className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-black/5">
+													<FolderKanban className="h-3.5 w-3.5 shrink-0 text-[#787774]" /><span className="flex-1 truncate">{pr.name}</span>{on && <Check className="h-4 w-4 text-sauti-teal" />}
+												</button>
+											);
+										})}
+									</div>
+								</>
+							)}
 						</PopoverContent>
 					</Popover>
 					<span className="flex-1" />
@@ -966,5 +1021,78 @@ function ThreadStack({ selected, detail, conversation, accountId, meAddress, onR
 				)}
 			</div>
 		</div>
+	);
+}
+
+
+/** Links in a message, newest first from the body: tracking and unsubscribe links are left out. */
+function linksIn(html: string, text: string): string[] {
+	const found: string[] = [];
+	const add = (u: string) => {
+		const url = u.replace(/[)>.,;]+$/, "");
+		if (!/^https?:\/\//i.test(url)) return;
+		if (/unsubscribe|optout|opt-out|preferences|mailto:|\.(png|jpe?g|gif|svg|webp)(\?|$)/i.test(url)) return;
+		if (!found.includes(url)) found.push(url);
+	};
+	for (const m of html.matchAll(/href=["'](https?:\/\/[^"']+)["']/gi)) add(m[1].replace(/&amp;/g, "&"));
+	for (const m of text.matchAll(/https?:\/\/[^\s<>"]+/gi)) add(m[0]);
+	return found.slice(0, 8);
+}
+
+/** "This email has a link. Where should it go?": an opportunity, a new grant, or the link of a grant that exists. */
+function WorkPrompt({ prompt, onClose }: { prompt: { url: string; subject: string; links: string[] } | null; onClose: () => void }) {
+	const { toast } = useToast();
+	const [url, setUrl] = useState("");
+	const [grants, setGrants] = useState<GrantLite[]>([]);
+	const [grantId, setGrantId] = useState("");
+	const [busy, setBusy] = useState(false);
+	useEffect(() => {
+		if (!prompt) return;
+		setUrl(prompt.url);
+		setGrantId("");
+		listGrantsLite().then(setGrants).catch(() => setGrants([]));
+	}, [prompt]);
+	if (!prompt) return null;
+	const go = async (kind: "opportunity" | "grant", id?: string) => {
+		setBusy(true);
+		try {
+			const r = await linkToWork({ kind, grantId: id ?? null }, url, prompt.subject);
+			toast({ title: kind === "opportunity" ? "Added to Opportunities" : id ? "Link added to the grant" : "Added to Grants", description: r.title });
+			onClose();
+		} catch (e) {
+			toast({ title: "Could not add it", description: e instanceof Error ? e.message : undefined, variant: "destructive" });
+		} finally {
+			setBusy(false);
+		}
+	};
+	return (
+		<Dialog open onOpenChange={(o) => !o && !busy && onClose()}>
+			<DialogContent className="max-w-md">
+				<DialogTitle>This email has a link. Add it to your work?</DialogTitle>
+				<div className="space-y-3 text-sm">
+					<p className="text-[#5f5e5b]">You tagged it as a grant or an opportunity. Pick the link, then where it belongs, and the details are filled in from the page.</p>
+					{prompt.links.length > 1 ? (
+						<Select value={url} onValueChange={setUrl}>
+							<SelectTrigger><SelectValue /></SelectTrigger>
+							<SelectContent>{prompt.links.map((l) => <SelectItem key={l} value={l}><span className="block max-w-[320px] truncate">{l}</span></SelectItem>)}</SelectContent>
+						</Select>
+					) : <p className="break-all rounded-lg bg-black/[0.04] p-2 text-xs">{url}</p>}
+					<div className="flex flex-col gap-2">
+						<Button disabled={busy} onClick={() => void go("opportunity")} className="justify-start gap-2 bg-sauti-teal hover:bg-sauti-dark">{busy && <Loader2 className="h-4 w-4 animate-spin" />} Add as a new opportunity</Button>
+						<Button disabled={busy} variant="outline" onClick={() => void go("grant")} className="justify-start">Add as a new grant</Button>
+						{grants.length > 0 && (
+							<div className="flex gap-2">
+								<Select value={grantId} onValueChange={setGrantId}>
+									<SelectTrigger className="flex-1"><SelectValue placeholder="Or add it to a grant that exists" /></SelectTrigger>
+									<SelectContent>{grants.map((g) => <SelectItem key={g.id} value={g.id}>{g.title}</SelectItem>)}</SelectContent>
+								</Select>
+								<Button disabled={busy || !grantId} variant="outline" onClick={() => void go("grant", grantId)}>Add</Button>
+							</div>
+						)}
+					</div>
+					<div className="flex justify-end"><Button variant="ghost" onClick={onClose} disabled={busy}>Not now</Button></div>
+				</div>
+			</DialogContent>
+		</Dialog>
 	);
 }

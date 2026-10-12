@@ -1,7 +1,7 @@
 import * as raw from '@/app/actions/mjengo-mail';
 import { unwrap } from '@/lib/action-result';
 
-export type { RewriteMode, ReplySuggestion, MailPrefs, AccountServers, UpdateServers, AutoLabelMatch, SignatureState, LabelRow, AccountView, AddAccountInput, MessageRow, ListQuery, MailAction, SendInput, ViewConfig, ViewRow, SnippetRow } from '@/app/actions/mjengo-mail';
+export type { ProjectLite, GrantLite, RewriteMode, ReplySuggestion, MailPrefs, AccountServers, UpdateServers, AutoLabelMatch, SignatureState, LabelRow, AccountView, AddAccountInput, MessageRow, ListQuery, MailAction, SendInput, ViewConfig, ViewRow, SnippetRow } from '@/app/actions/mjengo-mail';
 
 export const listAccounts = (...a: Parameters<typeof raw.listAccounts>) => unwrap(raw.listAccounts(...a));
 export const addAccount = (...a: Parameters<typeof raw.addAccount>) => unwrap(raw.addAccount(...a));
@@ -41,3 +41,7 @@ export const getMailPrefs = (...a: Parameters<typeof raw.getMailPrefs>) => unwra
 export const saveMailPrefs = (...a: Parameters<typeof raw.saveMailPrefs>) => unwrap(raw.saveMailPrefs(...a));
 export const getAccountServers = (...a: Parameters<typeof raw.getAccountServers>) => unwrap(raw.getAccountServers(...a));
 export const updateAccountServers = (...a: Parameters<typeof raw.updateAccountServers>) => unwrap(raw.updateAccountServers(...a));
+export const listMailProjects = (...a: Parameters<typeof raw.listMailProjects>) => unwrap(raw.listMailProjects(...a));
+export const projectLabel = (...a: Parameters<typeof raw.projectLabel>) => unwrap(raw.projectLabel(...a));
+export const listGrantsLite = (...a: Parameters<typeof raw.listGrantsLite>) => unwrap(raw.listGrantsLite(...a));
+export const linkToWork = (...a: Parameters<typeof raw.linkToWork>) => unwrap(raw.linkToWork(...a));
