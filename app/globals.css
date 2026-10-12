@@ -416,8 +416,8 @@ html.mjengo-theme .bg-sauti-orange { background-color: #068297; }
 html.mjengo-theme .hover\:bg-sauti-blue:hover { background-color: #0b2228; }
 html.mjengo-theme .border-sauti-blue { border-color: rgb(6 130 151 / 0.45); }
 html.mjengo-theme .text-sauti-blue { color: #068297; }
-html.mjengo-theme button:not([class*="text-"]):not(:disabled),
-html.mjengo-theme [role="menuitem"]:not([class*="text-"]) { color: #0b2228; }
+/* Buttons and menu items keep the colour they inherit or are given. (A rule here once forced dark text on every
+   button whose class list had no "text-" word, and "text-sm" counted, so controls on dark panels went black.) */
 
 /* The spreadsheet draws its own selection. The keyboard focus ring above landed on its hidden editor
    elements and left blue lines behind while scrolling sideways. */
