@@ -578,7 +578,7 @@ function Fold({ id, title, count, right, openMap, onToggle, defaultOpen = true, 
 					{title}
 					{count !== undefined && <span className="rounded-full bg-serene-neutral-100 px-2 py-0.5 text-xs font-medium text-serene-neutral-600">{count}</span>}
 				</button>
-				{open && right}
+				{open && right && <div className="flex min-w-0 flex-wrap items-center justify-end gap-2 max-sm:w-full max-sm:justify-start">{right}</div>}
 			</div>
 			{open && children}
 		</section>

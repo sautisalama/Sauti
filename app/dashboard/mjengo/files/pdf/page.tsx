@@ -238,7 +238,7 @@ function PdfScreen() {
 				<div className="hidden items-center gap-1 px-3 pb-1.5 sm:flex">{colourDots}</div>
 			</div>
 
-			<div className="min-h-0 flex-1 overflow-auto p-4">
+			<div className="min-h-0 flex-1 touch-pan-x touch-pan-y overflow-auto overscroll-contain p-2 sm:p-4" style={{ WebkitOverflowScrolling: "touch" }}>
 				{loading ? <MjengoLoader label="Opening the PDF" /> : (
 					<div className="mx-auto flex w-fit flex-col gap-4">
 						{pages.map((p, i) => (
