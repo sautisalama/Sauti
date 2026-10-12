@@ -13,6 +13,8 @@ import { SupabaseYProvider } from "@/lib/client/supabase-yjs";
 import { listTemplates } from "@/app/actions/mjengo-templates";
 import { useToast } from "@/hooks/use-toast";
 import { putToSignedUrl } from "@/lib/client/upload";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { DocAssist } from "./_DocAssist";
 import { finishReplace, getFileUrl, prepareReplace, prepareUpload, registerUpload } from "../../vault/api";
 
 /** Writing help runs on our server so the organisation key never reaches the browser. */
@@ -53,6 +55,7 @@ function EditorScreen() {
 	const templateId = params.get("template");
 
 	const ref = useRef<WordcraftEditorRef>(null);
+	const mobile = useIsMobile();
 	const [fileId, setFileId] = useState<string | null>(initialFile);
 	const [name, setName] = useState("Untitled document.docx");
 	const [folderId, setFolderId] = useState<string | null>(folderParam);
@@ -174,7 +177,7 @@ function EditorScreen() {
 			{loading ? (
 				<MjengoLoader label="Opening your document" className="h-full min-h-0" />
 			) : (
-				<div className="min-h-0 flex-1 overflow-hidden">
+				<div className="relative min-h-0 flex-1 overflow-hidden">
 					<WordcraftEditor
 						ref={ref}
 						height="100%"
@@ -182,6 +185,9 @@ function EditorScreen() {
 						guardUnload
 						autoSave={level === "edit"}
 						user={person}
+						// Phones get the tab strip and a short list of tabs, so the page keeps the room.
+						ribbon={mobile ? "tabs" : "full"}
+						hiddenTabs={mobile ? ["Draw", "References", "Mailings", "Zotero", "Help"] : []}
 						ai={ai}
 						collaboration={collab?.collaboration ?? null}
 						onSave={onSave}
@@ -189,6 +195,7 @@ function EditorScreen() {
 						loading={<MjengoLoader label="Starting the editor" hint="The first time takes a moment while it downloads." className="h-full min-h-0" />}
 						fallback={(e) => <div className="p-6 text-sm text-red-700">The editor could not start: {e.message}. It needs a current browser with WebGL2 or WebGPU.</div>}
 					/>
+					<DocAssist editor={ref} />
 				</div>
 			)}
 		</div>
