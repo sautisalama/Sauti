@@ -22,7 +22,20 @@
 			"text": "text",
 			"url": "url",
 			"files": [
-				{ "name": "files", "accept": ["application/pdf", ".pdf", ".doc", ".docx", ".xls", ".xlsx", ".csv", ".ppt", ".pptx", ".txt", ".md", "image/*"] }
+				{ "name": "files", "accept": [
+						"application/pdf",
+						"application/msword",
+						"application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+						"application/vnd.ms-excel",
+						"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+						"application/vnd.ms-powerpoint",
+						"application/vnd.openxmlformats-officedocument.presentationml.presentation",
+						"text/csv",
+						"text/plain",
+						"text/markdown",
+						"image/*",
+						".pdf", ".doc", ".docx", ".xls", ".xlsx", ".csv", ".ppt", ".pptx", ".txt", ".md"
+					] }
 			]
 		}
 	},
