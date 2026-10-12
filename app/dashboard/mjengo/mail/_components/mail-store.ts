@@ -1,9 +1,10 @@
 import { useSyncExternalStore } from "react";
-import { getMailboxes, listMessages, mailBootstrap, type MessageRow } from "./api";
+import { getMailboxes, getMessageDetail, getMessageDetails, listMessages, mailBootstrap, type MessageRow } from "./api";
 
 type Boot = Awaited<ReturnType<typeof mailBootstrap>>;
 type Boxes = Awaited<ReturnType<typeof getMailboxes>>;
 interface Page { items: MessageRow[]; total: number; at: number }
+export type Detail = Awaited<ReturnType<typeof getMessageDetail>>;
 
 /**
  * What the mail screen has already fetched this session. It lives outside React so leaving Mail and coming
@@ -14,7 +15,46 @@ export const mailStore = {
 	boot: null as Promise<Boot> | null,
 	boxes: new Map<string, Boxes & { at: number }>(),
 	lists: new Map<string, Page>(),
+	/** Message bodies already fetched, so opening one (or flipping through the list) shows at once. */
+	details: new Map<string, Detail>(),
+	/** The earlier messages of a conversation, by account, folder and subject. */
+	convos: new Map<string, MessageRow[]>(),
 };
+
+export const detailKey = (accountId: string, mailbox: string, uid: number) => `${accountId}:${mailbox}:${uid}`;
+
+const inflight = new Set<string>();
+
+/**
+ * Fetch the bodies of messages that are not cached yet, a few at a time and without marking them read.
+ * Skips what is already here or on its way.
+ */
+export async function prefetchDetails(accountId: string, rows: Pick<MessageRow, "mailbox" | "uid">[], limit = 12): Promise<void> {
+	const byBox = new Map<string, number[]>();
+	for (const r of rows) {
+		const k = detailKey(accountId, r.mailbox, r.uid);
+		if (mailStore.details.has(k) || inflight.has(k)) continue;
+		if ((byBox.get(r.mailbox)?.length ?? 0) >= limit) continue;
+		byBox.set(r.mailbox, [...(byBox.get(r.mailbox) ?? []), r.uid]);
+	}
+	for (const [mailbox, uids] of byBox) {
+		const keys = uids.map((u) => detailKey(accountId, mailbox, u));
+		keys.forEach((k) => inflight.add(k));
+		try {
+			const got = await getMessageDetails(accountId, mailbox, uids);
+			for (const d of got) mailStore.details.set(detailKey(accountId, mailbox, d.uid), d);
+		} catch {
+			// Best effort: opening a message fetches it as before.
+		} finally {
+			keys.forEach((k) => inflight.delete(k));
+		}
+	}
+	// Keep the cache from growing without limit.
+	if (mailStore.details.size > 120) {
+		const drop = Array.from(mailStore.details.keys()).slice(0, mailStore.details.size - 100);
+		drop.forEach((k) => mailStore.details.delete(k));
+	}
+}
 
 export const listKey = (accountId: string, viewKey: string, onlyUnread: boolean) => `${accountId}:${viewKey}:${onlyUnread ? 1 : 0}`;
 

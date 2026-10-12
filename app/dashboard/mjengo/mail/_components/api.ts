@@ -1,7 +1,7 @@
 import * as raw from '@/app/actions/mjengo-mail';
 import { unwrap } from '@/lib/action-result';
 
-export type { MailPrefs, AccountServers, UpdateServers, AutoLabelMatch, SignatureState, LabelRow, AccountView, AddAccountInput, MessageRow, ListQuery, MailAction, SendInput, ViewConfig, ViewRow, SnippetRow } from '@/app/actions/mjengo-mail';
+export type { RewriteMode, ReplySuggestion, MailPrefs, AccountServers, UpdateServers, AutoLabelMatch, SignatureState, LabelRow, AccountView, AddAccountInput, MessageRow, ListQuery, MailAction, SendInput, ViewConfig, ViewRow, SnippetRow } from '@/app/actions/mjengo-mail';
 
 export const listAccounts = (...a: Parameters<typeof raw.listAccounts>) => unwrap(raw.listAccounts(...a));
 export const addAccount = (...a: Parameters<typeof raw.addAccount>) => unwrap(raw.addAccount(...a));
@@ -9,6 +9,7 @@ export const removeAccount = (...a: Parameters<typeof raw.removeAccount>) => unw
 export const getMailboxes = (...a: Parameters<typeof raw.getMailboxes>) => unwrap(raw.getMailboxes(...a));
 export const listMessages = (...a: Parameters<typeof raw.listMessages>) => unwrap(raw.listMessages(...a));
 export const getMessageDetail = (...a: Parameters<typeof raw.getMessageDetail>) => unwrap(raw.getMessageDetail(...a));
+export const getMessageDetails = (...a: Parameters<typeof raw.getMessageDetails>) => unwrap(raw.getMessageDetails(...a));
 export const getConversation = (...a: Parameters<typeof raw.getConversation>) => unwrap(raw.getConversation(...a));
 export const actOnMessages = (...a: Parameters<typeof raw.actOnMessages>) => unwrap(raw.actOnMessages(...a));
 export const sendMail = (...a: Parameters<typeof raw.sendMail>) => unwrap(raw.sendMail(...a));
@@ -20,6 +21,7 @@ export const saveSnippet = (...a: Parameters<typeof raw.saveSnippet>) => unwrap(
 export const deleteSnippet = (...a: Parameters<typeof raw.deleteSnippet>) => unwrap(raw.deleteSnippet(...a));
 export const summariseMessage = (...a: Parameters<typeof raw.summariseMessage>) => unwrap(raw.summariseMessage(...a));
 export const draftReply = (...a: Parameters<typeof raw.draftReply>) => unwrap(raw.draftReply(...a));
+export const suggestReplies = (...a: Parameters<typeof raw.suggestReplies>) => unwrap(raw.suggestReplies(...a));
 export const oauthAvailability = (...a: Parameters<typeof raw.oauthAvailability>) => unwrap(raw.oauthAvailability(...a));
 export const listLabels = (...a: Parameters<typeof raw.listLabels>) => unwrap(raw.listLabels(...a));
 export const saveLabel = (...a: Parameters<typeof raw.saveLabel>) => unwrap(raw.saveLabel(...a));

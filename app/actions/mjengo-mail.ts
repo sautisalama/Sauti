@@ -428,19 +428,27 @@ async function getConversation_(accountId: string, mailbox: string, subject: str
   const key = normaliseSubject(subject);
   if (!key || acct.protocol === 'pop3') return [];
   return withImap(acct, async (c) => {
-    const lock = await c.getMailboxLock(mailbox);
+    // The folder it is in, and the Sent folder, so your own replies belong to the conversation too.
+    const paths = [mailbox];
     try {
-      const uids = ((await c.search({ subject: key }, { uid: true })) || []).sort((a, b) => b - a).slice(0, 15);
-      if (!uids.length) return [];
-      const out: MessageRow[] = [];
-      for await (const m of c.fetch(uids.join(','), { uid: true, envelope: true, flags: true, internalDate: true }, { uid: true })) {
-        const f = m.envelope?.from?.[0];
-        out.push({ uid: m.uid, mailbox, from: { name: f?.name || '', address: f?.address || '' }, subject: m.envelope?.subject || '', date: m.envelope?.date ? new Date(m.envelope.date).toISOString() : null, seen: m.flags?.has('\\Seen') ?? false, flagged: m.flags?.has('\\Flagged') ?? false, hasAttachments: false, messageId: m.envelope?.messageId ?? null, labels: [], thread: 1 });
+      const sent = (await c.list()).find((b) => b.specialUse === '\\Sent');
+      if (sent && sent.path !== mailbox) paths.push(sent.path);
+    } catch { /* no list: the open folder only */ }
+    const out: MessageRow[] = [];
+    for (const path of paths) {
+      const lock = await c.getMailboxLock(path);
+      try {
+        const uids = ((await c.search({ subject: key }, { uid: true })) || []).sort((x, y) => y - x).slice(0, 15);
+        if (!uids.length) continue;
+        for await (const m of c.fetch(uids.join(','), { uid: true, envelope: true, flags: true, internalDate: true }, { uid: true })) {
+          const f = m.envelope?.from?.[0];
+          out.push({ uid: m.uid, mailbox: path, from: { name: f?.name || '', address: f?.address || '' }, subject: m.envelope?.subject || '', date: m.envelope?.date ? new Date(m.envelope.date).toISOString() : null, seen: m.flags?.has('\\Seen') ?? false, flagged: m.flags?.has('\\Flagged') ?? false, hasAttachments: false, messageId: m.envelope?.messageId ?? null, labels: [], thread: 1 });
+        }
+      } finally {
+        lock.release();
       }
-      return out.filter((m) => normaliseSubject(m.subject) === key).sort((a, b) => b.uid - a.uid);
-    } finally {
-      lock.release();
     }
+    return out.filter((m) => normaliseSubject(m.subject) === key).sort((x, y) => (y.date ?? '').localeCompare(x.date ?? ''));
   });
 }
 
@@ -781,7 +789,9 @@ async function autoLabel_(accountId: string, mailbox: string, labelId: string): 
 }
 
 /** Highlight-to-improve in the composer. Only the selected text is sent. */
-async function rewriteText_(text: string, mode: 'improve' | 'shorter' | 'friendlier' | 'fix'): Promise<string> {
+export type RewriteMode = 'improve' | 'shorter' | 'friendlier' | 'fix' | 'formal' | 'official' | 'warm' | 'persuasive' | 'simpler' | 'longer' | 'revamp';
+
+async function rewriteText_(text: string, mode: RewriteMode): Promise<string> {
   await requireAdminActor();
   const t = text.trim().slice(0, 4000);
   if (!t) throw new Error('Select some text first.');
@@ -790,8 +800,15 @@ async function rewriteText_(text: string, mode: 'improve' | 'shorter' | 'friendl
     shorter: 'Make it shorter and clearer without losing the key points.',
     friendlier: 'Make it warmer and friendlier while staying professional.',
     fix: 'Fix spelling and grammar only. Change nothing else.',
+    formal: 'Rewrite in a formal, polite register suitable for a senior contact or a funder. Keep the meaning and the language.',
+    official: 'Rewrite as an official letter style message: precise, neutral and structured, with no slang or contractions. Keep the meaning and the language.',
+    warm: 'Rewrite with a warm, human, caring tone suitable for a survivor-centred organisation, still clear and professional. Keep the meaning and the language.',
+    persuasive: 'Rewrite to be more persuasive and confident, leading with the benefit to the reader, without exaggerating or inventing facts.',
+    simpler: 'Rewrite in plain, simple words and short sentences that anyone can follow. Keep the meaning and the language.',
+    longer: 'Expand it a little with helpful detail and a clear structure, without inventing facts. Keep the language.',
+    revamp: 'Completely revamp it: restructure for clarity, open with the main point, tighten the wording and end with a clear next step. Keep the meaning and the language.',
   };
-  const out = await ai(`You edit email text. ${how[mode]} Reply with only the rewritten text, no quotes or commentary.`, t, 600);
+  const out = await ai(`You edit email text. ${how[mode]} Use blank lines between paragraphs. Reply with only the rewritten text, no quotes or commentary.`, t, 900);
   return out || t;
 }
 
@@ -876,6 +893,25 @@ async function draftReply_(accountId: string, mailbox: string, uid: number, inst
     .join('');
 }
 
+export interface ReplySuggestion { label: string; body: string }
+
+/** Three short replies that fit the email, in the tone the sender used. */
+async function suggestReplies_(accountId: string, mailbox: string, uid: number): Promise<ReplySuggestion[]> {
+  const actor = await requireAdminActor();
+  const { text, subject, from } = await bodyText(accountId, mailbox, uid, actor.id);
+  const raw = await ai(
+    'You suggest replies for the team at Sauti Salama, a survivor-led GBV support organisation in Kenya. Reply with one JSON object {"replies":[{"label": string, "body": string}]} with exactly three different replies. "label" is two to four words naming the intent (for example Confirm, Ask for details, Decline politely). "body" is the reply: one to three sentences, matching the sender\'s tone and language, no subject, no sign-off name, no placeholders, no invented facts.',
+    `From ${from?.name || from?.address || 'the sender'}, subject "${subject}":\n${text.slice(0, 5000)}`,
+    700
+  );
+  try {
+    const j = JSON.parse(raw.match(/\{[\s\S]*\}/)?.[0] ?? '{}') as { replies?: { label?: string; body?: string }[] };
+    return (j.replies ?? []).filter((r) => r.body).slice(0, 3).map((r) => ({ label: String(r.label ?? 'Reply').slice(0, 40), body: String(r.body).slice(0, 800) }));
+  } catch {
+    return [];
+  }
+}
+
 /* Exported actions return { ok, data | error } so the message survives production builds. */
 export const listAccounts = guard(listAccounts_);
 export const oauthAvailability = guard(oauthAvailability_);
@@ -883,7 +919,35 @@ export const addAccount = guard(addAccount_);
 export const removeAccount = guard(removeAccount_);
 export const getMailboxes = guard(getMailboxes_);
 export const listMessages = guard(listMessages_);
+/**
+ * Several messages in one connection, without marking them read: used to have the next messages ready
+ * so that switching between emails is instant.
+ */
+async function getMessageDetails_(accountId: string, mailbox: string, uids: number[]): Promise<(ParsedMessage & { seen: boolean; flagged: boolean })[]> {
+  const actor = await requireAdminActor();
+  const acct = await loadAccount(accountId, actor.id);
+  const list = uids.slice(0, 12);
+  if (!list.length || acct.protocol === 'pop3') return [];
+  return withImap(acct, async (c) => {
+    const lock = await c.getMailboxLock(mailbox);
+    try {
+      const out: (ParsedMessage & { seen: boolean; flagged: boolean })[] = [];
+      for await (const msg of c.fetch(list.join(','), { uid: true, source: true, flags: true }, { uid: true })) {
+        if (!msg.source) continue;
+        try {
+          const parsed = await parseSource(msg.uid, msg.source, true);
+          out.push({ ...parsed, seen: msg.flags?.has('\Seen') ?? false, flagged: msg.flags?.has('\Flagged') ?? false });
+        } catch { /* skip one that will not parse */ }
+      }
+      return out;
+    } finally {
+      lock.release();
+    }
+  });
+}
+
 export const getMessageDetail = guard(getMessageDetail_);
+export const getMessageDetails = guard(getMessageDetails_);
 export const getConversation = guard(getConversation_);
 export const actOnMessages = guard(actOnMessages_);
 export const sendMail = guard(sendMail_);
@@ -895,6 +959,7 @@ export const saveSnippet = guard(saveSnippet_);
 export const deleteSnippet = guard(deleteSnippet_);
 export const summariseMessage = guard(summariseMessage_);
 export const draftReply = guard(draftReply_);
+export const suggestReplies = guard(suggestReplies_);
 export const listLabels = guard(listLabels_);
 export const saveLabel = guard(saveLabel_);
 export const deleteLabel = guard(deleteLabel_);

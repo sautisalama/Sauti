@@ -1,6 +1,6 @@
 "use client";
 
-import { MjengoLoader } from "../../_components/MjengoLoader";
+import { MjengoLoader, ListSkeleton, ReaderSkeleton } from "../../_components/MjengoLoader";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { format, isThisWeek, isToday, isYesterday, startOfDay } from "date-fns";
 import {
@@ -19,7 +19,7 @@ import {
 	actOnMessages, deleteView, getConversation, getMailboxes, getMessageDetail, listAccounts, listMessages, listSnippets, listViews, saveView, summariseMessage,
 	type AccountView, type MailAction, type MessageRow, type SnippetRow, type ViewConfig, type ViewRow,
 } from "./api";
-import { Composer, type ComposeSeed } from "./Composer";
+import { Composer, type ComposeSeed, type ThreadMsg } from "./Composer";
 import { ConnectDialog, LabelDialog, LABEL_COLORS, SettingsDialog, ViewDialog } from "./Dialogs";
 import { getMailPrefs, getSignature, mailBootstrap, type MailPrefs, type SignatureState } from "./api";
 import { PersonChip } from "./PersonChip";
@@ -28,7 +28,7 @@ import { addContactFromMail } from "@/app/actions/mjengo-contacts";
 import { listLabels, saveLabel, deleteLabel, setMessageLabel, type LabelRow } from "./api";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { AccountSwitcher } from "./AccountSwitcher";
-import { listKey, mailStore, mergeFresh, setMailUnread } from "./mail-store";
+import { detailKey, listKey, mailStore, mergeFresh, prefetchDetails, setMailUnread } from "./mail-store";
 import { AvatarStack, useTeam } from "../../_components/People";
 import { cacheDetail, cacheList, readDetail, readList } from "@/lib/mail/offline-cache";
 
@@ -95,6 +95,8 @@ export function MailApp() {
 	const [offline, setOffline] = useState(false);
 
 	const [selected, setSelected] = useState<MessageRow | null>(null);
+	const selectedRef = useRef<MessageRow | null>(null);
+	selectedRef.current = selected;
 	const [detail, setDetail] = useState<Detail | null>(null);
 	const [detailBusy, setDetailBusy] = useState(false);
 	// Remote images always load: this is the team's own mail and the images are part of the message.
@@ -275,17 +277,44 @@ export function MailApp() {
 	/* ---- opening a message */
 	const open = useCallback(async (m: MessageRow, images = true) => {
 		if (!accountId) return;
+		const key = detailKey(accountId, m.mailbox, m.uid);
+		const cached = mailStore.details.get(key);
 		setSelected(m);
-		setDetailBusy(true);
 		setSummary(null);
-		setConversation([]);
-		try {
-			const d = await getMessageDetail(accountId, m.mailbox, m.uid, images);
-			setDetail(d);
-			cacheDetail(`${accountId}:${m.mailbox}:${m.uid}`, d);
+		// What we already have is shown at once; the rest streams in behind it.
+		const convoKey = `${accountId}:${m.mailbox}:${cached?.subject ?? m.subject}`;
+		setConversation((mailStore.convos.get(convoKey) ?? []).filter((x) => x.uid !== m.uid));
+		if (cached) {
+			setDetail(cached);
+			setDetailBusy(false);
 			setRows((prev) => prev.map((r) => (r.uid === m.uid ? { ...r, seen: true } : r)));
-			if (!m.seen) setUnread((u) => Math.max(0, u - 1));
-			getConversation(accountId, m.mailbox, d.subject).then((c) => setConversation(c.filter((x) => x.uid !== m.uid))).catch(() => undefined);
+			if (!m.seen) {
+				setUnread((u) => Math.max(0, u - 1));
+				actOnMessages(accountId, m.mailbox, [m.uid], "read").catch(() => undefined);
+			}
+		} else {
+			setDetail(null);
+			setDetailBusy(true);
+		}
+		try {
+			if (!cached) {
+				const d = await getMessageDetail(accountId, m.mailbox, m.uid, images);
+				mailStore.details.set(key, d);
+				// The person may have moved on while this loaded.
+				if (selectedRef.current?.uid !== m.uid) return;
+				setDetail(d);
+				cacheDetail(`${accountId}:${m.mailbox}:${m.uid}`, d);
+				setRows((prev) => prev.map((r) => (r.uid === m.uid ? { ...r, seen: true } : r)));
+				if (!m.seen) setUnread((u) => Math.max(0, u - 1));
+			}
+			const subject = (mailStore.details.get(key) ?? cached)?.subject ?? m.subject;
+			const ck = `${accountId}:${m.mailbox}:${subject}`;
+			getConversation(accountId, m.mailbox, subject).then((c) => {
+				mailStore.convos.set(ck, c);
+				if (selectedRef.current?.uid === m.uid) setConversation(c.filter((x) => x.uid !== m.uid));
+				// Have the earlier messages ready before the thread is opened.
+				prefetchDetails(accountId, c.slice(0, 6)).catch(() => undefined);
+			}).catch(() => undefined);
 		} catch (e) {
 			const saved = readDetail<Detail>(`${accountId}:${m.mailbox}:${m.uid}`);
 			if (saved) {
@@ -299,6 +328,16 @@ export function MailApp() {
 			setDetailBusy(false);
 		}
 	}, [accountId, toast]);
+
+	// The message list keeps the next messages' bodies ready, so flipping between emails has no wait.
+	useEffect(() => {
+		if (!accountId || rows.length === 0) return;
+		const idx = selected ? rows.findIndex((r) => r.uid === selected.uid) : 0;
+		const from = Math.max(0, idx - 2);
+		const near = rows.slice(from, from + 14);
+		const t = setTimeout(() => { prefetchDetails(accountId, near).catch(() => undefined); }, 350);
+		return () => clearTimeout(t);
+	}, [accountId, rows, selected?.uid]);
 
 	const close = () => { setSelected(null); setDetail(null); };
 
@@ -342,8 +381,19 @@ export function MailApp() {
 	const startReply = (d: Detail, all: boolean, forward = false) => {
 		const me = accounts?.find((a) => a.id === accountId)?.email.toLowerCase();
 		const sender = d.from[0]?.address;
-		const quote = `<p></p><blockquote><p>On ${d.date ? format(new Date(d.date), "d MMM yyyy, HH:mm") : ""}, ${displayName(d.from[0] ?? { name: "", address: "" })} wrote:</p>${d.html ?? `<p>${d.text.replace(/\n/g, "<br>")}</p>`}</blockquote>`;
+		const bodyHtml = d.html ?? `<p>${d.text.replace(/\n/g, "<br>")}</p>`;
+		const quote = `<br><blockquote><p>On ${d.date ? format(new Date(d.date), "d MMM yyyy, HH:mm") : ""}, ${displayName(d.from[0] ?? { name: "", address: "" })} wrote:</p>${bodyHtml}</blockquote>`;
 		const subject = d.subject.replace(/^((re|fwd?):\s*)+/i, "");
+		// The conversation, newest first, each message with its own colour in the composer.
+		const here = selected;
+		const thread: ThreadMsg[] = [
+			...(here ? [{ key: `cur-${here.uid}`, mailbox: here.mailbox, uid: here.uid, name: displayName(d.from[0] ?? { name: "", address: "" }), address: d.from[0]?.address ?? "", date: d.date, html: bodyHtml, mine: d.from[0]?.address.toLowerCase() === me } as ThreadMsg] : []),
+			...conversation.map((c) => ({
+				key: `${c.mailbox}-${c.uid}`, mailbox: c.mailbox, uid: c.uid, name: displayName(c.from), address: c.from.address, date: c.date,
+				html: mailStore.details.get(detailKey(accountId!, c.mailbox, c.uid))?.html ?? undefined,
+				mine: c.from.address.toLowerCase() === me,
+			})),
+		];
 		setCompose(
 			forward
 				? { subject: `Fwd: ${subject}`, html: `<p></p><p>---------- Forwarded message ----------</p>${d.html ?? d.text}` }
@@ -351,7 +401,8 @@ export function MailApp() {
 					to: sender ? [sender] : [],
 					cc: all ? [...d.to, ...d.cc].map((a) => a.address).filter((a) => a && a.toLowerCase() !== me && a !== sender) : [],
 					subject: `Re: ${subject}`,
-					html: quote,
+					quoteHtml: quote,
+					thread,
 					inReplyTo: d.messageId,
 					references: [...d.references, ...(d.messageId ? [d.messageId] : [])],
 					replyTo: selected ? { mailbox: selected.mailbox, uid: selected.uid } : null,
@@ -524,7 +575,7 @@ const Pane = (
 				{offline && <div role="status" className="border-b border-amber-100 bg-amber-50 px-4 py-2 text-xs font-medium text-amber-900">You are offline, or the mail server cannot be reached. Showing mail saved on this device. <button className="ml-2 underline" onClick={() => loadList(false)}>Try again</button></div>}
 				<div className="min-h-0 flex-1 overflow-y-auto">
 					{loadError && <div className="m-4 rounded-xl bg-red-50 p-4 text-sm text-red-700">{loadError} <button className="ml-2 underline" onClick={() => loadList(false)}>Try again</button></div>}
-					{!loadError && loading && rows.length === 0 && <div className="space-y-px p-2">{Array.from({ length: 8 }).map((_, i) => <div key={i} className="h-11 animate-pulse rounded-lg bg-serene-neutral-50" />)}</div>}
+					{!loadError && loading && rows.length === 0 && <ListSkeleton rows={10} className="px-3 lg:px-5" />}
 					{!loadError && !loading && rows.length === 0 && (
 						<div className="flex h-full flex-col items-center justify-center gap-2 p-10 text-center text-serene-neutral-500"><MailOpen className="h-10 w-10 text-serene-neutral-300" /><p className="font-medium text-serene-neutral-700">{debouncedQ ? "Nothing matches your search" : "Nothing here"}</p><p className="text-sm">{debouncedQ ? "Try different words." : "New mail will appear as it arrives."}</p></div>
 					)}
@@ -696,7 +747,7 @@ function ReadingPane({ teamIds, team, onWrite, onAddContact, onPrev, onNext, has
 			</header>
 
 			<div className="min-h-0 flex-1 overflow-y-auto">
-				{busy && !detail && <MjengoLoader label="Opening message" compact />}
+				{busy && !detail && <><span className="sr-only" role="status">Opening message</span><ReaderSkeleton /></>}
 				{detail && (
 					<article className="mx-auto max-w-3xl px-6 pb-10 pt-3">
 						<h2 className="text-[28px] font-semibold leading-tight tracking-[-0.01em] text-[#37352f]">{detail.subject}</h2>
@@ -783,9 +834,12 @@ function ThreadItem({ c, accountId, onOpen }: { c: MessageRow; accountId: string
 	const doc = d
 		? `<!doctype html><html><head><meta charset="utf-8"><base target="_blank"><style>body{margin:0;font:15px/1.6 -apple-system,Segoe UI,Roboto,sans-serif;color:#1f2937;word-wrap:break-word}img{max-width:100%;height:auto}blockquote{margin:8px 0;padding-left:12px;border-left:3px solid #e5e7eb;color:#6b7280}a{color:#068297}pre{white-space:pre-wrap}table{max-width:100%}</style></head><body>${d.html ?? `<pre style="font:inherit">${d.text.replace(/[&<>]/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[ch]!)}</pre>`}</body></html>`
 		: "";
+	// One colour per sender, so a long thread reads as a conversation between people.
+	const tints = ["border-[#7D2AE8] bg-[#F6F0FF]/60", "border-[#F59E0B] bg-[#FFF8E6]/70", "border-[#EC4899] bg-[#FFF0F7]/70", "border-[#3B82F6] bg-[#EFF5FF]/70", "border-[#10B981] bg-[#ECFBF4]/70"];
+	const tint = tints[[...c.from.address.toLowerCase()].reduce((n, ch) => n + ch.charCodeAt(0), 0) % tints.length];
 	return (
-		<li>
-			<button onClick={toggle} aria-expanded={open} className="flex w-full items-center gap-3 py-2.5 text-left text-sm hover:bg-black/[0.03]">
+		<li className={cn("my-1.5 overflow-hidden rounded-lg border-l-4 pr-2", tint)}>
+			<button onClick={toggle} aria-expanded={open} className="flex w-full items-center gap-3 py-2.5 pl-2 text-left text-sm hover:bg-black/[0.03]">
 				<ChevronDown className={cn("h-4 w-4 shrink-0 text-[#9b9a97] transition-transform", !open && "-rotate-90")} />
 				<span className="w-32 shrink-0 truncate font-medium text-[#37352f]">{displayName(c.from)}</span>
 				<span className="min-w-0 flex-1 truncate text-[#787774]">{c.subject}</span>

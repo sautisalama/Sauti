@@ -424,3 +424,12 @@ html.mjengo-theme [role="menuitem"]:not([class*="text-"]) { color: #0b2228; }
 .univer-host, .univer-host * { outline: none !important; }
 .univer-host { contain: paint; overflow: hidden; }
 .univer-host canvas { outline: none !important; }
+
+/* Skeletons: one calm shimmer shared by every loading state in the suite. */
+@keyframes mj-shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+.mj-skel {
+	background: linear-gradient(90deg, #eeeeec 25%, #f7f7f5 37%, #eeeeec 63%);
+	background-size: 400% 100%;
+	animation: mj-shimmer 1.6s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) { .mj-skel { animation: none; } }
