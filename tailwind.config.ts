@@ -66,6 +66,7 @@ const config = {
              50: '#FAFAFA', // Main BG
              100: '#F4F4F5', // Card BG
              200: '#E4E4E7', // Borders
+             300: '#D4D4D8', // Switch tracks, strong borders
              400: '#A1A1AA', // Icons
              600: '#52525B', // Secondary Text
              900: '#18181B', // Primary Text

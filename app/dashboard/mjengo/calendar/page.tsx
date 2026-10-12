@@ -1,5 +1,6 @@
 "use client";
 
+import { RecipientField } from "../mail/_components/RecipientField";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import Link from "next/link";
@@ -363,7 +364,7 @@ function CreateDialog({ slot, onClose, onCreated }: { slot: { date: Date; from?:
 					{!block && <div className="flex items-start gap-2">
 						<Users className="mt-2 h-4 w-4 text-serene-neutral-500" />
 						<div className="flex-1 space-y-1">
-							<Input value={guests} onChange={(e) => setGuests(e.target.value)} placeholder="Add guests (emails, separated by commas)" aria-label="Guests" />
+							<div className="min-h-10 rounded-md border border-serene-neutral-200 bg-white px-2"><RecipientField value={guests} onChange={setGuests} placeholder="Add guests by name or email" /></div>
 							<p className="text-xs text-serene-neutral-500">Guests are invited by Google Calendar when it is connected.</p>
 						</div>
 					</div>}

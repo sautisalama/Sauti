@@ -1,5 +1,6 @@
 "use client";
 
+import { RecipientField } from "../mail/_components/RecipientField";
 import { useEffect, useState } from "react";
 import { format } from "date-fns";
 import { BellRing, CalendarPlus, Check, ChevronDown, Clock, Copy, FileText, Link2, Loader2, Paperclip, Plus, Trash2, UserPlus, Video, X } from "lucide-react";
@@ -225,7 +226,7 @@ export function MeetChooser({ open, onClose, initial }: { open: boolean; onClose
 									<div className="space-y-3 border-t border-black/[0.07] p-4">
 										{k === "people" && (
 											<>
-												<Input value={guests} onChange={(e) => { setGuests(e.target.value); setSaved(false); }} placeholder="Emails, separated by commas" aria-label="Participants" />
+												<div className="min-h-10 rounded-md border border-serene-neutral-200 bg-white px-2"><RecipientField value={guests} onChange={(v) => { setGuests(v); setSaved(false); }} placeholder="Add people by name or email" /></div>
 												<a href={`mailto:${guests.split(/[,;\s]+/).filter(Boolean).join(",")}?subject=${encodeURIComponent(title || "Join the call")}&body=${encodeURIComponent(`${description ? description + "\n\n" : ""}Join the call: ${link}`)}`} className="inline-block text-sm font-medium text-sauti-teal hover:underline">Send them the link by email</a>
 											</>
 										)}
@@ -302,7 +303,7 @@ export function MeetChooser({ open, onClose, initial }: { open: boolean; onClose
 							<span className="text-sm text-serene-neutral-500">to</span>
 							<Input type="time" value={to} onChange={(e) => setTo(e.target.value)} className="h-10 w-28" aria-label="Ends" />
 						</div>
-						<Input value={guests} onChange={(e) => setGuests(e.target.value)} placeholder="Guests' emails, separated by commas" aria-label="Guests" />
+						<div className="min-h-10 rounded-md border border-serene-neutral-200 bg-white px-2"><RecipientField value={guests} onChange={setGuests} placeholder="Add guests by name or email" /></div>
 						<div className="rounded-2xl border border-black/10 p-3">
 							<p className="mb-2 flex items-center gap-2 text-sm font-semibold"><BellRing className="h-4 w-4 text-sauti-teal" /> Alerts before it starts</p>
 							<div className="flex flex-wrap items-center gap-2 text-sm">

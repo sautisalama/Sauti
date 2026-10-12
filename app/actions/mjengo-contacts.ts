@@ -133,14 +133,33 @@ async function addContactFromMail_(name: string, email: string): Promise<Contact
   return data as ContactRow;
 }
 
-/** For recipient pickers: a few contacts matching what has been typed. */
-async function suggestContacts_(q: string): Promise<{ name: string; email: string }[]> {
+/** For recipient pickers: teammates and contacts matching what has been typed, teammates first. */
+async function suggestContacts_(q: string): Promise<{ name: string; email: string; avatar?: string | null; kind?: 'team' | 'contact' }[]> {
   await requireAdminActor();
   const term = q.trim().replace(/[%,()]/g, ' ');
-  let query = looseAdmin().from('mjengo_contacts').select('name, email').not('email', 'is', null).order('last_contacted_at', { ascending: false, nullsFirst: false }).limit(8);
-  if (term) query = query.or(`name.ilike.%${term}%,email.ilike.%${term}%`);
-  const { data } = await query;
-  return (data ?? []) as { name: string; email: string }[];
+  const db = looseAdmin();
+  let contactQ = db.from('mjengo_contacts').select('name, email').not('email', 'is', null).order('last_contacted_at', { ascending: false, nullsFirst: false }).limit(8);
+  let teamQ = db.from('profiles').select('first_name, last_name, email, avatar_url').eq('is_admin', true).not('email', 'is', null).limit(6);
+  if (term) {
+    contactQ = contactQ.or(`name.ilike.%${term}%,email.ilike.%${term}%`);
+    teamQ = teamQ.or(`first_name.ilike.%${term}%,last_name.ilike.%${term}%,email.ilike.%${term}%`);
+  }
+  const [{ data: contacts }, { data: team }] = await Promise.all([contactQ, teamQ]);
+  const out: { name: string; email: string; avatar?: string | null; kind: 'team' | 'contact' }[] = [];
+  const seen = new Set<string>();
+  for (const t of (team ?? []) as { first_name: string | null; last_name: string | null; email: string; avatar_url: string | null }[]) {
+    const email = t.email.toLowerCase();
+    if (seen.has(email)) continue;
+    seen.add(email);
+    out.push({ name: [t.first_name, t.last_name].filter(Boolean).join(' ') || email, email, avatar: t.avatar_url, kind: 'team' });
+  }
+  for (const c of (contacts ?? []) as { name: string; email: string }[]) {
+    const email = c.email.toLowerCase();
+    if (seen.has(email)) continue;
+    seen.add(email);
+    out.push({ name: c.name, email, kind: 'contact' });
+  }
+  return out.slice(0, 10);
 }
 
 export const listContacts = guard(listContacts_);

@@ -18,7 +18,7 @@ const addressOf = (s: string) => /<([^>]+)>/.exec(s)?.[1]?.trim() ?? s.trim();
  */
 export function RecipientField({ value, onChange, placeholder, autoFocus }: { value: string; onChange: (v: string) => void; placeholder?: string; autoFocus?: boolean }) {
 	const [draft, setDraft] = useState("");
-	const [hits, setHits] = useState<{ name: string; email: string }[]>([]);
+	const [hits, setHits] = useState<{ name: string; email: string; avatar?: string | null; kind?: string }[]>([]);
 	const [active, setActive] = useState(0);
 	const [focused, setFocused] = useState(false);
 	const names = useRef(new Map<string, string>());
@@ -109,8 +109,8 @@ export function RecipientField({ value, onChange, placeholder, autoFocus }: { va
 								onMouseEnter={() => setActive(i)}
 								className={cn("flex w-full items-center gap-3 rounded-lg px-2.5 py-2 text-left", i === active && "bg-sauti-teal-light/60")}
 							>
-								<span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-sauti-teal-light text-xs font-bold text-sauti-teal">{(h.name || h.email).charAt(0).toUpperCase()}</span>
-								<span className="min-w-0"><span className="block truncate text-sm font-medium text-serene-neutral-900">{h.name}</span><span className="block truncate text-xs text-serene-neutral-500">{h.email}</span></span>
+								<span className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full bg-sauti-teal-light text-xs font-bold text-sauti-teal">{h.avatar ? <img src={h.avatar} alt="" className="h-full w-full object-cover" /> : (h.name || h.email).charAt(0).toUpperCase()}</span>
+								<span className="min-w-0"><span className="block truncate text-sm font-medium text-serene-neutral-900">{h.name}</span><span className="block truncate text-xs text-serene-neutral-500">{h.email}{h.kind === "team" ? " · Team" : ""}</span></span>
 							</button>
 						</li>
 					))}
