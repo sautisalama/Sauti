@@ -16,14 +16,14 @@ import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import type { MailboxInfo } from "@/lib/mail/client";
 import {
-	actOnMessages, deleteView, getConversation, getMailboxes, getMessageDetail, listAccounts, listMessages, listSnippets, listViews, saveView, summariseMessage,
+	actOnMessages, deleteView, getThread, getMailboxes, getMessageDetail, listAccounts, listMessages, listSnippets, listViews, saveView, summariseMessage,
 	type AccountView, type MailAction, type MessageRow, type SnippetRow, type ViewConfig, type ViewRow,
 } from "./api";
 import { Composer, type ComposeSeed, type ThreadMsg } from "./Composer";
 import { ConnectDialog, LabelDialog, LABEL_COLORS, SettingsDialog, ViewDialog } from "./Dialogs";
 import { getMailPrefs, getSignature, mailBootstrap, type MailPrefs, type SignatureState } from "./api";
 import { PersonChip } from "./PersonChip";
-import { ThreadMessage } from "./Thread";
+import { AiSummary, ThreadMessage } from "./Thread";
 import { unwrap } from "@/lib/action-result";
 import { addContactFromMail } from "@/app/actions/mjengo-contacts";
 import { listLabels, saveLabel, deleteLabel, setMessageLabel, type LabelRow } from "./api";
@@ -312,11 +312,11 @@ export function MailApp() {
 			}
 			const subject = (mailStore.details.get(key) ?? cached)?.subject ?? m.subject;
 			const ck = `${accountId}:${m.mailbox}:${subject}`;
-			getConversation(accountId, m.mailbox, subject).then((c) => {
-				mailStore.convos.set(ck, c);
-				if (selectedRef.current?.uid === m.uid) setConversation(c.filter((x) => x.uid !== m.uid));
-				// Have the earlier messages ready before the thread is opened.
-				prefetchDetails(accountId, c.slice(0, 6)).catch(() => undefined);
+			getThread(accountId, m.mailbox, subject).then((t) => {
+				// Bodies first, then the list that points at them, so every row can show its text at once.
+				for (const d of t.details) mailStore.details.set(detailKey(accountId, d.mailbox, d.uid), d as never);
+				mailStore.convos.set(ck, t.rows);
+				if (selectedRef.current?.uid === m.uid) setConversation(t.rows.filter((x) => !(x.uid === m.uid && x.mailbox === m.mailbox)));
 			}).catch(() => undefined);
 		} catch (e) {
 			const saved = readDetail<Detail>(`${accountId}:${m.mailbox}:${m.uid}`);
@@ -535,7 +535,7 @@ export function MailApp() {
 			inline
 			accounts={accounts}
 			accountId={accountId}
-			seed={{ ...reply, thread: [] }}
+			seed={reply}
 			snippets={snippets}
 			signature={signature?.html ?? ""}
 			undoSeconds={prefs.undoSeconds}
@@ -607,7 +607,8 @@ const Pane = (
 							{g.label && <h3 className="border-b border-black/[0.07] pb-2 pt-6 text-[15px] text-[#787774]">{g.label}</h3>}
 							<ul>
 								{g.items.map((m) => (
-									<li key={m.uid} className="group relative" draggable={!!m.messageId} onDragStart={(e) => { if (m.messageId) { e.dataTransfer.setData("text/x-message-id", m.messageId); e.dataTransfer.effectAllowed = "copy"; } }}>
+									<SwipeRow key={m.uid} seen={m.seen} onArchive={() => act(m, "archive")} onToggleRead={() => act(m, m.seen ? "unread" : "read")}>
+<li className="group relative" draggable={!!m.messageId} onDragStart={(e) => { if (m.messageId) { e.dataTransfer.setData("text/x-message-id", m.messageId); e.dataTransfer.effectAllowed = "copy"; } }}>
 										<button onClick={() => open(m)} className={cn("-mx-2 flex w-[calc(100%+1rem)] touch-manipulation items-center gap-3 rounded-md px-2 text-left text-[15px]", prefs.density === "compact" ? "py-1.5" : "py-[11px]", " transition-colors hover:bg-black/[0.04]", selected?.uid === m.uid && "bg-black/[0.05]")}>
 											<span className={cn("h-[7px] w-[7px] shrink-0 rounded-full", m.seen ? "bg-transparent" : "bg-sauti-teal")} aria-label={m.seen ? undefined : "Unread"} />
 											<span className={cn("w-[34%] max-w-[300px] shrink-0 truncate text-[#37352f] sm:w-[28%]", !m.seen && "font-semibold")}>{displayName(m.from)}</span>
@@ -629,6 +630,7 @@ const Pane = (
 											{hover.includes("reply") && <HoverBtn label="Reply" onClick={async () => { await open(m); }}><Reply className="h-4 w-4" /></HoverBtn>}
 										</div>
 									</li>
+</SwipeRow>
 								))}
 							</ul>
 						</section>
@@ -668,7 +670,12 @@ const Pane = (
 				/>
 			)}
 
-			<CommandDialog open={cmdOpen} onOpenChange={setCmdOpen}>
+							{/* Phones: the compose button sits bottom right, as in Apple Mail */}
+				{!selected && !compose && (
+					<button onClick={() => setCompose({})} aria-label="New message" className="fixed bottom-[max(1.25rem,env(safe-area-inset-bottom))] right-5 z-20 flex h-14 w-14 items-center justify-center rounded-full bg-sauti-teal text-white shadow-lg active:scale-95 lg:hidden"><Edit3 className="h-6 w-6" /></button>
+				)}
+
+<CommandDialog open={cmdOpen} onOpenChange={setCmdOpen}>
 				<CommandInput placeholder="Search for an action or a view" />
 				<CommandList>
 					<CommandEmpty>No results.</CommandEmpty>
@@ -691,6 +698,48 @@ const Pane = (
 					</CommandGroup>
 				</CommandList>
 			</CommandDialog>
+		</div>
+	);
+}
+
+/**
+ * Swipe a row on a phone: left to archive, right to mark read or unread, as in Apple Mail. A short drag
+ * reveals the action; letting go past the threshold does it. Mice and keyboards are unaffected.
+ */
+function SwipeRow({ children, onArchive, onToggleRead, seen }: { children: React.ReactNode; onArchive: () => void; onToggleRead: () => void; seen: boolean }) {
+	const [dx, setDx] = useState(0);
+	const st = useRef<{ x: number; y: number; lock: "h" | "v" | null } | null>(null);
+	const T = 96;
+	const down = (e: React.TouchEvent) => { const t = e.touches[0]; st.current = { x: t.clientX, y: t.clientY, lock: null }; };
+	const move = (e: React.TouchEvent) => {
+		const f = st.current;
+		if (!f) return;
+		const t = e.touches[0];
+		const mx = t.clientX - f.x, my = t.clientY - f.y;
+		if (!f.lock) {
+			if (Math.abs(mx) < 8 && Math.abs(my) < 8) return;
+			f.lock = Math.abs(mx) > Math.abs(my) * 1.4 ? "h" : "v";
+		}
+		if (f.lock === "h") setDx(Math.max(-160, Math.min(160, mx)));
+	};
+	const up = () => {
+		const f = st.current;
+		st.current = null;
+		if (f?.lock === "h") {
+			if (dx <= -T) onArchive();
+			else if (dx >= T) onToggleRead();
+		}
+		setDx(0);
+	};
+	return (
+		<div className="relative overflow-hidden lg:overflow-visible" onTouchStart={down} onTouchMove={move} onTouchEnd={up} onTouchCancel={up}>
+			<div aria-hidden className={cn("absolute inset-0 flex items-center justify-between px-5 text-sm font-medium text-white lg:hidden", dx > 0 ? "bg-[#068297]" : dx < 0 ? "bg-[#8E8E93]" : "bg-transparent")}>
+				<span className={cn("flex items-center gap-2 transition-opacity", dx > 12 ? "opacity-100" : "opacity-0")}><MailOpen className="h-5 w-5" /> {seen ? "Unread" : "Read"}</span>
+				<span className={cn("flex items-center gap-2 transition-opacity", dx < -12 ? "opacity-100" : "opacity-0")}>Archive <Archive className="h-5 w-5" /></span>
+			</div>
+			<div className={cn("relative bg-white", dx === 0 && "transition-transform duration-200")} style={{ transform: dx ? `translateX(${dx}px)` : undefined, backgroundColor: undefined }}>
+				{children}
+			</div>
 		</div>
 	);
 }
@@ -781,11 +830,15 @@ function ReadingPane({ teamIds, team, onWrite, onAddContact, onPrev, onNext, has
 						</div>
 						<hr className="-mx-6 mt-4 border-black/[0.07]" />
 
-						{summary ? (
-							<p className="mt-4 flex gap-2 rounded-lg bg-black/[0.04] p-3 text-sm text-[#37352f]"><Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-[#787774]" />{summary}</p>
-						) : summaryBusy ? (
-							<p className="mt-4 flex items-center gap-2 text-sm text-[#787774]"><Loader2 className="h-4 w-4 animate-spin" /> Summarising...</p>
-						) : null}
+						<AiSummary
+							accountId={accountId}
+							mailbox={selected?.mailbox ?? ""}
+							uid={detail.uid}
+							subject={detail.subject}
+							from={detail.from[0] ? `${detail.from[0].name || ""} <${detail.from[0].address}>` : ""}
+							text={detail.text || (detail.html ?? "").replace(/<[^>]+>/g, " ")}
+							earlier={[...conversation].sort((x, y) => (x.date ?? "").localeCompare(y.date ?? "")).slice(-3).map((c) => ({ from: c.from.name || c.from.address, text: (mailStore.details.get(detailKey(accountId, c.mailbox, c.uid))?.text ?? "").slice(0, 600) })).filter((e) => e.text)}
+						/>
 
 						{/* The conversation, the way Apple Mail lays it out: one message after another, each message once,
 						    older ones folded to a line, the quoted history folded under "See more". */}
@@ -901,7 +954,7 @@ function ThreadStack({ selected, detail, conversation, accountId, meAddress, onR
 			)}
 			{stack}
 
-			<div className="mt-5 pb-8">
+			<div className="sticky bottom-0 z-10 mt-5 bg-white/90 pb-[max(1rem,env(safe-area-inset-bottom))] pt-2 backdrop-blur lg:static lg:bg-transparent lg:pb-8 lg:backdrop-blur-none">
 				{inlineReply ?? (
 					<div className="flex items-center gap-2 rounded-2xl border border-black/10 bg-[#FAFAF8] p-2">
 						<button onClick={() => onReply(false)} className="flex h-10 flex-1 items-center gap-2 rounded-xl px-3 text-left text-sm text-[#787774] hover:bg-white">

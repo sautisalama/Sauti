@@ -19,6 +19,8 @@ export const mailStore = {
 	details: new Map<string, Detail>(),
 	/** The earlier messages of a conversation, by account, folder and subject. */
 	convos: new Map<string, MessageRow[]>(),
+	/** AI summaries already written, so coming back to a message shows its summary at once. */
+	summaries: new Map<string, string>(),
 };
 
 export const detailKey = (accountId: string, mailbox: string, uid: number) => `${accountId}:${mailbox}:${uid}`;

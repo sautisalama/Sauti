@@ -10,6 +10,7 @@ export const getMailboxes = (...a: Parameters<typeof raw.getMailboxes>) => unwra
 export const listMessages = (...a: Parameters<typeof raw.listMessages>) => unwrap(raw.listMessages(...a));
 export const getMessageDetail = (...a: Parameters<typeof raw.getMessageDetail>) => unwrap(raw.getMessageDetail(...a));
 export const getMessageDetails = (...a: Parameters<typeof raw.getMessageDetails>) => unwrap(raw.getMessageDetails(...a));
+export const getThread = (...a: Parameters<typeof raw.getThread>) => unwrap(raw.getThread(...a));
 export const getConversation = (...a: Parameters<typeof raw.getConversation>) => unwrap(raw.getConversation(...a));
 export const actOnMessages = (...a: Parameters<typeof raw.actOnMessages>) => unwrap(raw.actOnMessages(...a));
 export const sendMail = (...a: Parameters<typeof raw.sendMail>) => unwrap(raw.sendMail(...a));

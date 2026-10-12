@@ -177,6 +177,10 @@ export function Composer({ accounts, accountId, seed, snippets, signature = "", 
 	const [dragging, setDragging] = useState(false);
 	const [showFields, setShowFields] = useState(!inline);
 	const [withQuote, setWithQuote] = useState(true);
+	const [drafting, setDrafting] = useState(false);
+	const [drafted, setDrafted] = useState(false);
+	const [guide, setGuide] = useState("");
+	const draftCtl = useRef<AbortController | null>(null);
 	const fileInput = useRef<HTMLInputElement>(null);
 	const editorRef = useRef<Editor | null>(null);
 	const thread = seed.thread ?? [];
@@ -436,18 +440,56 @@ export function Composer({ accounts, accountId, seed, snippets, signature = "", 
 		if (rest.length) setFiles((cur) => [...cur, ...rest]);
 	};
 
-	const writeWithAi = async () => {
-		if (!seed.replyTo || !editor) return;
-		setAiBusy(true);
+	/** Stream text from the mail AI route into the message, signature kept below. */
+	const streamInto = async (body: Record<string, unknown>) => {
+		if (!editor) return;
+		draftCtl.current?.abort();
+		const c = new AbortController();
+		draftCtl.current = c;
+		setDrafting(true);
 		try {
-			const html = await draftReply(from, seed.replyTo.mailbox, seed.replyTo.uid, aiPrompt);
-			editor.chain().focus().insertContentAt(0, html).run();
-			setAiPrompt("");
+			const res = await fetch("/api/mjengo/mail/ai", { method: "POST", signal: c.signal, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+			if (!res.ok || !res.body) throw new Error((await res.text().catch(() => "")) || "The AI service is unavailable.");
+			const reader = res.body.getReader();
+			const dec = new TextDecoder();
+			let acc = "";
+			for (;;) {
+				const { done, value } = await reader.read();
+				if (done) break;
+				acc += dec.decode(value, { stream: true });
+				editor.commands.setContent(`${paragraphs(acc.trim())}${signature ? `<p></p>${signature}` : ""}`, { emitUpdate: false });
+			}
+			setDrafted(true);
+			setSuggestions(null);
 		} catch (e) {
-			toast({ title: "Could not write a draft", description: e instanceof Error ? e.message : undefined, variant: "destructive" });
+			if (!c.signal.aborted) toast({ title: "Could not write that", description: e instanceof Error ? e.message : undefined, variant: "destructive" });
 		} finally {
-			setAiBusy(false);
+			if (draftCtl.current === c) setDrafting(false);
 		}
+	};
+
+	const sourceText = () => plain(seed.quoteHtml ?? "").replace(/\s+/g, " ").trim();
+	const earlierText = () => thread.slice(1).reverse().map((t) => ({ from: t.name || t.address, text: plain(t.html ?? "").replace(/\s+/g, " ").trim().slice(0, 600) })).filter((e) => e.text);
+
+	/** One tap and the reply starts appearing: no prompt to fill in first. */
+	const writeWithAi = (instruction?: string) => {
+		void streamInto({ task: "reply", subject, from: to.split(",")[0]?.trim(), text: sourceText(), earlier: earlierText(), instruction: instruction || undefined });
+	};
+
+	const currentBody = () => {
+		let text = editor?.getText({ blockSeparator: "\n\n" }) ?? "";
+		if (signature) {
+			const d = new DOMParser().parseFromString(signature, "text/html");
+			const first = (d.body.querySelector("p,div,h1,h2,h3,li")?.textContent ?? d.body.textContent ?? "").trim();
+			const cut = first ? text.lastIndexOf(first) : -1;
+			if (cut > 0) text = text.slice(0, cut).trim();
+		}
+		return text.trim();
+	};
+	const refine = (tone: "formalize" | "elaborate" | "shorten" | "recreate") => {
+		const draft = currentBody();
+		if (!draft) return toast({ title: "Write something first" });
+		void streamInto({ task: "refine", tone, draft, text: sourceText() });
 	};
 
 	const size = files.reduce((n, f) => n + f.size, 0);
@@ -538,7 +580,15 @@ export function Composer({ accounts, accountId, seed, snippets, signature = "", 
 								)}
 								{suggestions === null && seed.replyTo && empty && <p className="mb-3 flex items-center gap-2 text-xs text-serene-neutral-500"><Loader2 className="h-3.5 w-3.5 animate-spin" /> Reading the email to suggest replies...</p>}
 
-								{thread.length > 0 && threadOpen && !expanded && <div className="mb-3 max-h-56 overflow-y-auto rounded-xl border border-black/[0.06] bg-white/80 p-2"><p className="mb-1.5 flex items-center gap-2 px-1 text-[11px] font-semibold uppercase tracking-wider text-serene-neutral-500">Conversation<span className="flex">{people.map((a, i) => <i key={a} className={cn("-ml-0.5 h-2.5 w-2.5 rounded-full ring-1 ring-white first:ml-0", (a === me ? MINE : SHADES[i % SHADES.length]).dot)} />)}</span></p>{threadList}</div>}
+																{(drafted || drafting) && (
+									<div className="mb-3 flex flex-wrap items-center gap-1.5">
+										<span className="mr-1 flex items-center gap-1.5 text-xs font-semibold text-serene-neutral-600">{drafting ? <Loader2 className="h-3.5 w-3.5 animate-spin text-sauti-teal" /> : <Sparkles className="h-3.5 w-3.5 text-sauti-teal" />} {drafting ? "Writing" : "Refine"}</span>
+										{([["formalize", "Formalize"], ["elaborate", "Elaborate"], ["shorten", "Shorten"], ["recreate", "Recreate"]] as const).map(([k, l]) => (
+											<button key={k} disabled={drafting} onClick={() => refine(k)} className="rounded-full border border-black/10 bg-white px-3 py-1 text-xs font-medium text-serene-neutral-700 hover:border-sauti-teal/60 disabled:opacity-50">{l}</button>
+										))}
+									</div>
+								)}
+{thread.length > 0 && threadOpen && !expanded && !inline && <div className="mb-3 max-h-56 overflow-y-auto rounded-xl border border-black/[0.06] bg-white/80 p-2"><p className="mb-1.5 flex items-center gap-2 px-1 text-[11px] font-semibold uppercase tracking-wider text-serene-neutral-500">Conversation<span className="flex">{people.map((a, i) => <i key={a} className={cn("-ml-0.5 h-2.5 w-2.5 rounded-full ring-1 ring-white first:ml-0", (a === me ? MINE : SHADES[i % SHADES.length]).dot)} />)}</span></p>{threadList}</div>}
 
 								<div className={cn("bg-white px-4 py-3", !inline && "rounded-xl shadow-sm ring-1 ring-black/[0.06]")}>
 									{rich && (
@@ -670,14 +720,19 @@ export function Composer({ accounts, accountId, seed, snippets, signature = "", 
 								</PopoverContent>
 							</Popover>
 							{seed.replyTo && (
-								<Popover>
-									<PopoverTrigger asChild><Button variant="ghost" size="sm" className="h-8 gap-1.5 text-sauti-teal"><Sparkles className="h-4 w-4" /> <span className="hidden sm:inline">Write reply</span></Button></PopoverTrigger>
-									<PopoverContent align="start" className="w-72 space-y-2 p-3">
-										<p className="text-xs text-serene-neutral-600">Tell the AI what to say. The email you are replying to is sent to the AI service to write the draft.</p>
-										<Input value={aiPrompt} onChange={(e) => setAiPrompt(e.target.value)} placeholder="e.g. Thank them and propose Tuesday" onKeyDown={(e) => e.key === "Enter" && writeWithAi()} />
-										<Button size="sm" className="w-full gap-1.5" onClick={writeWithAi} disabled={aiBusy}>{aiBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />} Draft</Button>
-									</PopoverContent>
-								</Popover>
+								<>
+									<Button variant="ghost" size="sm" className="h-8 gap-1.5 text-sauti-teal" onClick={() => (drafting ? draftCtl.current?.abort() : writeWithAi(guide))}>
+										{drafting ? <><X className="h-4 w-4" /> <span className="hidden sm:inline">Stop</span></> : <><Sparkles className="h-4 w-4" /> <span className="hidden sm:inline">Write reply</span></>}
+									</Button>
+									<Popover>
+										<PopoverTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-6 text-serene-neutral-500" aria-label="Tell the AI what to say"><ChevronDown className="h-3.5 w-3.5" /></Button></PopoverTrigger>
+										<PopoverContent align="start" className="w-72 space-y-2 p-3">
+											<p className="text-xs text-serene-neutral-600">Optional: say what the reply should include. Leave it empty and it answers the email.</p>
+											<Input value={guide} onChange={(e) => setGuide(e.target.value)} placeholder="e.g. Thank them and propose Tuesday" onKeyDown={(e) => { if (e.key === "Enter") writeWithAi(guide); }} />
+											<Button size="sm" className="w-full gap-1.5" onClick={() => writeWithAi(guide)} disabled={drafting}>{drafting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />} Write it</Button>
+										</PopoverContent>
+									</Popover>
+								</>
 							)}
 							<div className="flex-1" />
 							<span className="hidden text-xs text-serene-neutral-400 md:inline">Ctrl+Enter</span>

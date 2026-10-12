@@ -452,6 +452,54 @@ async function getConversation_(accountId: string, mailbox: string, subject: str
   });
 }
 
+export interface ThreadDetail extends ParsedMessage { mailbox: string; seen: boolean; flagged: boolean }
+
+/**
+ * A whole conversation in one round trip: the headers of every message, and the bodies of the most recent
+ * ones, fetched over a single connection. Mail apps are quick at threads for the same reason: they do not ask
+ * for each message one at a time, they pull the thread down together and show it from what they hold.
+ */
+async function getThread_(accountId: string, mailbox: string, subject: string, limit = 10): Promise<{ rows: MessageRow[]; details: ThreadDetail[] }> {
+  const actor = await requireAdminActor();
+  const acct = await loadAccount(accountId, actor.id);
+  const key = normaliseSubject(subject);
+  if (!key || acct.protocol === 'pop3') return { rows: [], details: [] };
+  return withImap(acct, async (c) => {
+    const paths = [mailbox];
+    try {
+      const sent = (await c.list()).find((b) => b.specialUse === '\\Sent');
+      if (sent && sent.path !== mailbox) paths.push(sent.path);
+    } catch { /* the open folder only */ }
+
+    const rows: MessageRow[] = [];
+    const details: ThreadDetail[] = [];
+    for (const path of paths) {
+      const lock = await c.getMailboxLock(path);
+      try {
+        const uids = ((await c.search({ subject: key }, { uid: true })) || []).sort((x, y) => y - x).slice(0, 15);
+        if (!uids.length) continue;
+        const wantBodies = new Set(uids.slice(0, limit));
+        for await (const m of c.fetch(uids.join(','), { uid: true, envelope: true, flags: true, internalDate: true, source: wantBodies.size > 0 }, { uid: true })) {
+          const f = m.envelope?.from?.[0];
+          const subj = m.envelope?.subject || '';
+          if (normaliseSubject(subj) !== key) continue;
+          rows.push({ uid: m.uid, mailbox: path, from: { name: f?.name || '', address: f?.address || '' }, subject: subj, date: m.envelope?.date ? new Date(m.envelope.date).toISOString() : null, seen: m.flags?.has('\\Seen') ?? false, flagged: m.flags?.has('\\Flagged') ?? false, hasAttachments: false, messageId: m.envelope?.messageId ?? null, labels: [], thread: 1 });
+          if (m.source && wantBodies.has(m.uid)) {
+            try {
+              const parsed = await parseSource(m.uid, m.source, true);
+              details.push({ ...parsed, mailbox: path, seen: m.flags?.has('\\Seen') ?? false, flagged: m.flags?.has('\\Flagged') ?? false });
+            } catch { /* one message that will not parse */ }
+          }
+        }
+      } finally {
+        lock.release();
+      }
+    }
+    rows.sort((x, y) => (y.date ?? '').localeCompare(x.date ?? ''));
+    return { rows, details };
+  });
+}
+
 export type MailAction = 'archive' | 'trash' | 'spam' | 'read' | 'unread' | 'star' | 'unstar' | 'delete';
 
 async function actOnMessages_(accountId: string, mailbox: string, uids: number[], action: MailAction) {
@@ -949,6 +997,7 @@ async function getMessageDetails_(accountId: string, mailbox: string, uids: numb
 export const getMessageDetail = guard(getMessageDetail_);
 export const getMessageDetails = guard(getMessageDetails_);
 export const getConversation = guard(getConversation_);
+export const getThread = guard(getThread_);
 export const actOnMessages = guard(actOnMessages_);
 export const sendMail = guard(sendMail_);
 export const listViews = guard(listViews_);

@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { format, isToday, isThisYear } from "date-fns";
-import { ChevronDown, Forward, Loader2, Reply, ReplyAll } from "lucide-react";
+import { ChevronDown, Forward, Loader2, Reply, ReplyAll, Sparkles, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { messageDoc, softFor } from "@/lib/mail/thread";
 import { getMessageDetail, type MessageRow } from "./api";
@@ -127,5 +127,91 @@ export function ThreadMessage({
 				{children}
 			</div>
 		</li>
+	);
+}
+
+/**
+ * A summary at the top of a long message or thread, written as the page opens and streamed in, the way Gemini
+ * does it in Gmail: a one-line "TL;DR", a few key points and what is being asked. Short messages get a small
+ * "Summarise" chip instead, so nothing is sent to the AI service unless it helps.
+ */
+export function AiSummary({ accountId, mailbox, uid, subject, from, text, earlier }: {
+	accountId: string; mailbox: string; uid: number; subject: string; from: string; text: string; earlier: { from: string; text: string }[];
+}) {
+	const key = `${accountId}:${mailbox}:${uid}`;
+	const long = text.length > 700 || earlier.length >= 2;
+	const [out, setOut] = useState<string>(mailStore.summaries.get(key) ?? "");
+	const [busy, setBusy] = useState(false);
+	const [hidden, setHidden] = useState(false);
+	const [asked, setAsked] = useState(false);
+	const ctl = useRef<AbortController | null>(null);
+
+	const run = async () => {
+		ctl.current?.abort();
+		const c = new AbortController();
+		ctl.current = c;
+		setBusy(true);
+		setOut("");
+		try {
+			const res = await fetch("/api/mjengo/mail/ai", {
+				method: "POST",
+				signal: c.signal,
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ task: "summary", subject, from, text, earlier }),
+			});
+			if (!res.ok || !res.body) throw new Error("unavailable");
+			const reader = res.body.getReader();
+			const dec = new TextDecoder();
+			let acc = "";
+			for (;;) {
+				const { done, value } = await reader.read();
+				if (done) break;
+				acc += dec.decode(value, { stream: true });
+				setOut(acc);
+			}
+			mailStore.summaries.set(key, acc);
+		} catch {
+			if (!c.signal.aborted) setOut("");
+		} finally {
+			if (ctl.current === c) setBusy(false);
+		}
+	};
+
+	// Long messages are summarised as soon as they open; the answer is kept for next time.
+	useEffect(() => {
+		setHidden(false);
+		setAsked(false);
+		setOut(mailStore.summaries.get(key) ?? "");
+		if (!long || mailStore.summaries.has(key)) return;
+		const t = setTimeout(() => { void run(); }, 350);
+		return () => { clearTimeout(t); ctl.current?.abort(); };
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [key, long]);
+
+	if (hidden || !text.trim()) return null;
+	if (!out && !busy && !long && !asked) {
+		return (
+			<button onClick={() => { setAsked(true); void run(); }} className="mt-3 inline-flex items-center gap-1.5 rounded-full border border-black/10 px-3 py-1 text-xs font-medium text-[#787774] hover:bg-black/[0.03]">
+				<Sparkles className="h-3.5 w-3.5 text-[#068297]" /> Summarise
+			</button>
+		);
+	}
+	const lines = out.split("\n").map((l) => l.trim()).filter(Boolean);
+	const tldr = lines.find((l) => /^tl;?dr:/i.test(l))?.replace(/^tl;?dr:\s*/i, "") ?? (busy && lines.length === 0 ? "" : lines[0]);
+	const bullets = lines.filter((l) => /^[-*]\s+/.test(l)).map((l) => l.replace(/^[-*]\s+/, ""));
+	const needs = lines.find((l) => /^needs:/i.test(l))?.replace(/^needs:\s*/i, "");
+	return (
+		<section aria-label="Summary" className="mt-4 rounded-2xl border border-[#068297]/15 bg-[#F4FAFB] p-4">
+			<div className="mb-1.5 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-[#068297]">
+				<Sparkles className="h-3.5 w-3.5" /> Summary
+				{busy && <Loader2 className="h-3 w-3 animate-spin" />}
+				<span className="flex-1" />
+				{!busy && <button onClick={() => void run()} className="rounded px-1.5 py-0.5 text-[11px] normal-case tracking-normal text-[#787774] hover:bg-black/5">Redo</button>}
+				<button onClick={() => setHidden(true)} aria-label="Hide summary" className="rounded p-0.5 text-[#9b9a97] hover:bg-black/5"><X className="h-3.5 w-3.5" /></button>
+			</div>
+			{tldr ? <p className="text-[15px] font-medium leading-snug text-[#0b2228]">{tldr}</p> : busy ? <p className="text-sm text-[#787774]">Reading the thread...</p> : null}
+			{bullets.length > 0 && <ul className="mt-2 space-y-1 text-sm text-[#37352f]">{bullets.map((b, i) => <li key={i} className="flex gap-2"><span className="mt-2 h-1 w-1 shrink-0 rounded-full bg-[#068297]" />{b}</li>)}</ul>}
+			{needs && <p className="mt-2 rounded-lg bg-white px-3 py-1.5 text-sm text-[#37352f]"><span className="font-semibold text-[#068297]">Needs: </span>{needs}</p>}
+		</section>
 	);
 }
