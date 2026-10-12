@@ -3,7 +3,7 @@
 import { MjengoLoader } from "./MjengoLoader";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { AlertCircle, CheckSquare, ExternalLink, FileWarning, Kanban, List, Loader2, Plus, Search, Trash2 } from "lucide-react";
+import { AlertCircle, BadgeCheck, CheckSquare, ExternalLink, FileWarning, Kanban, List, Loader2, Plus, Search, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -18,6 +18,7 @@ import { cn } from "@/lib/utils";
 import { unwrap } from "@/lib/action-result";
 import { linkPreview, type LinkPreview } from "@/app/actions/mjengo-link-preview";
 import { DocumentsPanel } from "./DocumentsPanel";
+import { OpportunityVerifyCard } from "./OpportunityVerify";
 import { GrantCharts, type GrantLite } from "./GrantCharts";
 import { Avatars, DeadlineChip, STATUSES, StatusPill, money, type Kind } from "./shared";
 
@@ -264,7 +265,7 @@ export function EntityWorkspace({ kind }: { kind: Kind }) {
 							<li key={r.id}>
 								<button onClick={() => openRow(r)} className="flex w-full touch-manipulation flex-wrap items-center gap-x-4 gap-y-1 p-3 text-left hover:bg-serene-neutral-50 sm:flex-nowrap">
 									<div className="min-w-0 flex-1">
-										<p className="truncate text-sm font-semibold text-serene-neutral-900">{r[cfg.titleKey]}</p>
+										<p className="flex items-center gap-1.5 truncate text-sm font-semibold text-serene-neutral-900"><span className="truncate">{r[cfg.titleKey]}</span>{kind === "opportunity" && r.verification?.trust === "verified" && <BadgeCheck className="h-3.5 w-3.5 shrink-0 text-emerald-600" aria-label="Verified source" />}{kind === "opportunity" && r.verification && ["suspicious", "repost"].includes(r.verification.trust) && <AlertCircle className="h-3.5 w-3.5 shrink-0 text-amber-600" aria-label="Check the source" />}</p>
 										<p className="truncate text-xs text-serene-neutral-500">{r[cfg.subKey] || cfg.subLabel}</p>
 									</div>
 									<StatusPill kind={kind} value={r.status} />
@@ -296,11 +297,19 @@ export function EntityWorkspace({ kind }: { kind: Kind }) {
 								))}
 							</div>
 
-							{(kind === "opportunity" || kind === "grant") && (
+							{kind === "grant" && (
 								<LinkPreviewCard
-									url={String(editing.values[kind === "grant" ? "link" : "source_url"] ?? "")}
+									url={String(editing.values.link ?? "")}
 									values={editing.values}
 									onFill={(patch) => Object.entries(patch).forEach(([k, v]) => v != null && v !== "" && set(k, v))}
+								/>
+							)}
+							{kind === "opportunity" && (
+								<OpportunityVerifyCard
+									id={editing.id ?? null}
+									values={editing.values}
+									onFill={(patch) => Object.entries(patch).forEach(([k, v]) => v != null && v !== "" && set(k, v))}
+									onChanged={load}
 								/>
 							)}
 

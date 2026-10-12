@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
-import { NextResponse, type NextRequest } from "next/server";
+import { NextResponse, after, type NextRequest } from "next/server";
+import { verifyOpportunityRow } from "@/lib/mjengo/opportunity-run";
 import { getActor } from "@/lib/access/super-admin";
 import { looseAdmin } from "@/lib/loose-db";
 import { logAudit } from "@/lib/access/audit";
@@ -30,7 +31,10 @@ async function addOpportunity(actor: { id: string; email: string }, input: { tit
 		.single();
 	if (error || !data) return null;
 	await logAudit({ actorId: actor.id, actorEmail: actor.email, action: "opportunity.shared_in", targetType: "opportunity", targetId: data.id, targetLabel: data.title });
-	return data.id as string;
+	// Find out who it is really from once the person is back in the app: the post, the organisation's own website, the checks.
+	const newId = data.id as string;
+	after(async () => { await verifyOpportunityRow(newId).catch(() => undefined); });
+	return newId;
 }
 
 /** Shared files are saved to the person's vault (top level, flagged) so they appear in Files. */

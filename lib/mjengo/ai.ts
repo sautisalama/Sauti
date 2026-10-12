@@ -11,7 +11,9 @@ export async function askAi(system: string, user: string, maxTokens = 600, opts:
     body: JSON.stringify({
       model: process.env.OPENROUTER_MODEL ?? 'qwen/qwen3.7-flash',
       temperature: opts.temperature ?? 0.4,
-      max_tokens: maxTokens,
+      // Thinking models spend part of the budget reasoning; keep that small so the answer is not cut off.
+      reasoning: { effort: 'low' },
+      max_tokens: maxTokens + 1500,
       ...(opts.json ? { response_format: { type: 'json_object' } } : {}),
       messages: [{ role: 'system', content: `${system}\n${NO_DASH_RULE}` }, { role: 'user', content: user }],
     }),
