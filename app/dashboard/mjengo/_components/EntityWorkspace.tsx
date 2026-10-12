@@ -15,6 +15,8 @@ import { useToast } from "@/hooks/use-toast";
 import { clearOpportunityInbox } from "@/app/actions/mjengo-nav";
 import { deleteEntity, listAdmins, listEntities, saveEntity, type AdminLite, type EntityRow } from "@/app/actions/mjengo";
 import { cn } from "@/lib/utils";
+import { unwrap } from "@/lib/action-result";
+import { linkPreview, type LinkPreview } from "@/app/actions/mjengo-link-preview";
 import { DocumentsPanel } from "./DocumentsPanel";
 import { GrantCharts, type GrantLite } from "./GrantCharts";
 import { Avatars, DeadlineChip, STATUSES, StatusPill, money, type Kind } from "./shared";
@@ -294,6 +296,14 @@ export function EntityWorkspace({ kind }: { kind: Kind }) {
 								))}
 							</div>
 
+							{(kind === "opportunity" || kind === "grant") && (
+								<LinkPreviewCard
+									url={String(editing.values[kind === "grant" ? "link" : "source_url"] ?? "")}
+									values={editing.values}
+									onFill={(patch) => Object.entries(patch).forEach(([k, v]) => v != null && v !== "" && set(k, v))}
+								/>
+							)}
+
 							{editing.id ? (
 								<>
 									{kind === "project" && <ProjectMoney v={editing.values} />}
@@ -353,6 +363,51 @@ function Card({ kind, r, admins, onOpen, onDragStart, onDragEnd, dragging }: { k
 				{r.openTodos > 0 && <span className="inline-flex items-center gap-1 rounded-full bg-sauti-teal-light px-2 py-0.5 text-xs font-medium text-sauti-dark"><CheckSquare className="h-3 w-3" />{r.openTodos}</span>}
 			</div>
 			<div className="mt-2"><Avatars ids={[...new Set([r[ownerKey(kind)], r.created_by].filter(Boolean))] as string[]} admins={admins} /></div>
+		</div>
+	);
+}
+
+function LinkPreviewCard({ url, values, onFill }: { url: string; values: Record<string, any>; onFill: (patch: Record<string, unknown>) => void }) {
+	const [pv, setPv] = useState<LinkPreview | null>(null);
+	const [err, setErr] = useState<string | null>(null);
+	const [busy, setBusy] = useState(false);
+	useEffect(() => {
+		setPv(null); setErr(null);
+		if (!/^https?:\/\/[^\s.]+\.[^\s]+/i.test(url.trim())) return;
+		setBusy(true);
+		let live = true;
+		const t = setTimeout(() => {
+			unwrap(linkPreview(url.trim())).then((r) => live && setPv(r)).catch((e) => live && setErr(e instanceof Error ? e.message : "Could not read that link.")).finally(() => live && setBusy(false));
+		}, 700);
+		return () => { live = false; clearTimeout(t); setBusy(false); };
+	}, [url]);
+	if (!url.trim() || (!busy && !pv && !err)) return null;
+	if (busy) return <div className="flex items-center gap-2 rounded-xl border border-dashed border-serene-neutral-200 p-3 text-xs text-serene-neutral-500"><Loader2 className="h-4 w-4 animate-spin" /> Reading the link...</div>;
+	if (err) return <p className="rounded-xl border border-dashed border-serene-neutral-200 p-3 text-xs text-serene-neutral-500">{err}</p>;
+	if (!pv) return null;
+	const canFill = !!pv.title || !!pv.organisation || !!pv.description;
+	return (
+		<div className="overflow-hidden rounded-xl border border-serene-neutral-200 bg-white">
+			{pv.image && <img src={pv.image} alt="" loading="lazy" className="aspect-[1.91/1] w-full bg-serene-neutral-50 object-cover" onError={(e) => ((e.currentTarget as HTMLImageElement).style.display = "none")} />}
+			<div className="space-y-1.5 p-3">
+				<div className="flex items-center gap-2 text-xs text-serene-neutral-500">
+					{pv.favicon && <img src={pv.favicon} alt="" className="h-4 w-4 rounded-sm" onError={(e) => ((e.currentTarget as HTMLImageElement).style.display = "none")} />}
+					<span className="truncate">{pv.organisation ?? pv.siteName}</span>
+				</div>
+				{pv.title && <p className="line-clamp-2 text-sm font-semibold text-serene-neutral-900">{pv.title}</p>}
+				{pv.description && <p className="line-clamp-3 text-xs text-serene-neutral-600">{pv.description}</p>}
+				<div className="flex flex-wrap items-center gap-2 pt-1">
+					{canFill && (
+						<Button type="button" size="sm" variant="outline" onClick={() => onFill({
+							title: values.title || pv.title || values.title,
+							organisation: values.organisation || pv.organisation || values.organisation,
+							description: values.description || pv.description || values.description,
+							deadline: values.deadline || pv.deadline || values.deadline,
+						})}>Fill empty fields</Button>
+					)}
+					<a href={pv.url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs font-medium text-sauti-teal hover:underline">Open <ExternalLink className="h-3 w-3" /></a>
+				</div>
+			</div>
 		</div>
 	);
 }
