@@ -116,6 +116,7 @@ export function EnhancedSidebar({
 	const isAdminMode = dash?.isAdminMode || false;
 	const onMjengo = !!(pathname?.startsWith("/dashboard/mjengo") || pathname?.startsWith("/meet"));
 	const [mjengoSuper, setMjengoSuper] = useState(false);
+	const [mjengoAdmin, setMjengoAdmin] = useState(true);
 	const [suite, setSuite] = useState({ opportunities: 0, files: 0, notifications: 0, forms: 0, meetings: 0 });
 	const mailUnread = useMailUnread();
 	const liveNotes = useSuiteNotifications();
@@ -139,7 +140,7 @@ export function EnhancedSidebar({
 	}, [onMjengo, pathname]);
 	useEffect(() => {
 		if (!onMjengo) return;
-		mjengoNav().then((n) => setMjengoSuper(n.isSuper)).catch(() => setMjengoSuper(false));
+		mjengoNav().then((n) => { setMjengoSuper(n.isSuper); setMjengoAdmin(n.isAdmin); }).catch(() => setMjengoSuper(false));
 	}, [onMjengo]);
 	const supabase = useMemo(() => createClient(), []);
 	const userType = dash?.data?.profile?.user_type || user?.profile?.user_type || null;
@@ -259,7 +260,7 @@ export function EnhancedSidebar({
 	}, [dash?.data?.casesCount, dash?.data?.userId, role, user?.id, supabase]);
 
 	const getSidebarItems = useCallback((): SidebarItem[] => {
-		const isDashboard = pathname?.startsWith("/dashboard");
+		const isDashboard = pathname?.startsWith("/dashboard") || (pathname?.startsWith("/meet") && mjengoAdmin);
 		const isAdminRoute = pathname?.startsWith("/dashboard/admin") || (pathname?.startsWith("/dashboard/mjengo") || pathname?.startsWith("/meet"));
 
         // Onboarding State - Simplified Navigation
@@ -304,7 +305,7 @@ export function EnhancedSidebar({
 		}
 
 		// Mjengo suite: its own sections take the place of the platform options.
-		if ((pathname?.startsWith("/dashboard/mjengo") || pathname?.startsWith("/meet"))) {
+		if (pathname?.startsWith("/dashboard/mjengo") || (pathname?.startsWith("/meet") && mjengoAdmin)) {
 			const B = "/dashboard/mjengo";
 			const items: SidebarItem[] = [
 				{ id: "mj-overview", label: "Overview", icon: LayoutDashboard, href: B, section: "main", group: "", hint: "Summary of grants, opportunities and projects" },
@@ -569,12 +570,12 @@ export function EnhancedSidebar({
 			...baseItems,
 
 		];
-	}, [pathname, role, casesCount, dash?.data?.unreadChatCount, dash?.data?.verification?.pendingCount, mjengoSuper]);
+	}, [pathname, role, casesCount, dash?.data?.unreadChatCount, dash?.data?.verification?.pendingCount, mjengoSuper, mjengoAdmin]);
 
 	// Compute items once per relevant inputs to avoid recomputing on each render
 	const sidebarItems = useMemo(
 		() => getSidebarItems(),
-		[pathname, role, casesCount, dash?.data?.unreadChatCount, getSidebarItems, mjengoSuper]
+		[pathname, role, casesCount, dash?.data?.unreadChatCount, getSidebarItems, mjengoSuper, mjengoAdmin]
 	);
 
 	const isActive = (item: SidebarItem) => {
