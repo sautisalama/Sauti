@@ -906,7 +906,7 @@ async function ai(system: string, user: string, maxTokens: number): Promise<stri
     method: 'POST',
     signal: AbortSignal.timeout(40_000),
     headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json', 'X-Title': 'Sauti Salama Mail' },
-    body: JSON.stringify({ model: process.env.OPENROUTER_MODEL ?? 'qwen/qwen3.7-flash', temperature: 0.4, max_tokens: maxTokens, messages: [{ role: 'system', content: `${system}
+    body: JSON.stringify({ model: process.env.OPENROUTER_MODEL ?? 'qwen/qwen3.7-flash', reasoning: { enabled: false }, temperature: 0.4, max_tokens: maxTokens, messages: [{ role: 'system', content: `${system}
 ${NO_DASH_RULE}` }, { role: 'user', content: user }] }),
   });
   if (!res.ok) throw new Error('The AI service is unavailable right now.');

@@ -138,6 +138,7 @@ async function caption_(about: string, channels: Channel[]): Promise<string> {
     headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json', 'X-Title': 'Sauti Salama Content' },
     body: JSON.stringify({
       model: process.env.OPENROUTER_MODEL ?? 'qwen/qwen3.7-flash',
+      reasoning: { enabled: false },
       temperature: 0.7,
       max_tokens: 400,
       messages: [

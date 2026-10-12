@@ -96,6 +96,8 @@ export async function POST(req: Request) {
 			},
 			body: JSON.stringify({
 				model: process.env.OPENROUTER_MODEL ?? DEFAULT_MODEL,
+				// Thinking models spend the whole budget reasoning and return nothing; answers are what is wanted here.
+				reasoning: { enabled: false },
 				messages: [{ role: "system", content: SYSTEM_PROMPT }, ...messages],
 				temperature: 0.5,
 				max_tokens: 600,

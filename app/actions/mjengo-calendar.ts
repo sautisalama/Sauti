@@ -205,6 +205,7 @@ async function icons_(titles: string[]): Promise<Record<string, string>> {
     headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json', 'X-Title': 'Sauti Salama Calendar' },
     body: JSON.stringify({
       model: process.env.OPENROUTER_MODEL ?? 'qwen/qwen3.7-flash',
+      reasoning: { enabled: false },
       temperature: 0,
       max_tokens: 900,
       response_format: { type: 'json_object' },

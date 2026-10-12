@@ -596,7 +596,7 @@ const Pane = (
 				</header>
 
 				{offline && <div role="status" className="border-b border-amber-100 bg-amber-50 px-4 py-2 text-xs font-medium text-amber-900">You are offline, or the mail server cannot be reached. Showing mail saved on this device. <button className="ml-2 underline" onClick={() => loadList(false)}>Try again</button></div>}
-				<div className="min-h-0 flex-1 overflow-y-auto">
+				<div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
 					{loadError && <div className="m-4 rounded-xl bg-red-50 p-4 text-sm text-red-700">{loadError} <button className="ml-2 underline" onClick={() => loadList(false)}>Try again</button></div>}
 					{!loadError && loading && rows.length === 0 && <MjengoLoader label="Loading your mail" compact />}
 					{!loadError && !loading && rows.length === 0 && (
@@ -819,7 +819,7 @@ function ReadingPane({ teamIds, team, onWrite, onAddContact, onPrev, onNext, has
 				</>}
 			</header>
 
-			<div className="min-h-0 flex-1 overflow-y-auto">
+			<div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
 				{busy && !detail && <MjengoLoader label="Opening message" compact />}
 				{detail && (
 					<article className="mx-auto max-w-3xl px-6 pb-10 pt-3">

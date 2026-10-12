@@ -33,7 +33,7 @@ export async function POST(request: Request) {
 		method: "POST",
 		signal: request.signal,
 		headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json", "X-Title": "Sauti Salama Documents" },
-		body: JSON.stringify({ model: MODEL, stream: true, temperature: 0.5, max_tokens: 1500, messages: [{ role: "system", content: system }, { role: "user", content: user }] }),
+		body: JSON.stringify({ model: MODEL, reasoning: { enabled: false }, stream: true, temperature: 0.5, max_tokens: 1500, messages: [{ role: "system", content: system }, { role: "user", content: user }] }),
 	});
 	if (!upstream.ok || !upstream.body) return new Response("The AI service is unavailable right now.", { status: 502 });
 

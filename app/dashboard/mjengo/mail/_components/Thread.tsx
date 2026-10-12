@@ -5,6 +5,7 @@ import { format, isToday, isThisYear } from "date-fns";
 import { ChevronDown, Forward, Loader2, Reply, ReplyAll, Sparkles, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { messageDoc, softFor } from "@/lib/mail/thread";
+import { fitFrame } from "@/lib/mail/frame";
 import { getMessageDetail, type MessageRow } from "./api";
 import { detailKey, mailStore, type Detail } from "./mail-store";
 
@@ -18,10 +19,13 @@ function Body({ html, text }: { html: string | null; text: string }) {
 	const frame = useRef<HTMLIFrameElement>(null);
 	const [h, setH] = useState(120);
 	const { doc } = useMemo(() => messageDoc({ html, text }), [html, text]);
-	const measure = () => {
-		const d = frame.current?.contentDocument;
-		if (d?.documentElement) setH(Math.max(60, d.documentElement.scrollHeight + 4));
-	};
+	const stop = useRef<(() => void) | null>(null);
+	useEffect(() => () => { stop.current?.(); }, []);
+	// A frame that finished loading before React attached onLoad still gets sized.
+	useEffect(() => {
+		const f = frame.current;
+		if (f && f.contentDocument?.readyState === "complete" && f.contentDocument.body?.childNodes.length) { stop.current?.(); stop.current = fitFrame(f, setH, { min: 40 }); }
+	}, [doc]);
 	return (
 		<iframe
 			ref={frame}
@@ -29,9 +33,9 @@ function Body({ html, text }: { html: string | null; text: string }) {
 			sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox"
 			srcDoc={doc}
 			onLoad={() => {
-				measure();
-				// Opening or closing "See more" changes the height.
-				frame.current?.contentDocument?.addEventListener("toggle", measure, true);
+				// Sized to the content only, kept right as images load and "See more" opens or closes.
+				stop.current?.();
+				if (frame.current) stop.current = fitFrame(frame.current, setH, { min: 40 });
 			}}
 			style={{ height: h }}
 			className="w-full border-0"

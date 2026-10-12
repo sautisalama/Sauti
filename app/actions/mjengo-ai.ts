@@ -7,7 +7,7 @@ import { encryptField } from '@/lib/security/crypto';
 import { ensurePrivateDocs, readableFile } from '@/lib/mjengo/files-text';
 
 const BUCKET = 'mjengo-docs';
-const FREE_TOKENS = Number(process.env.MJENGO_AI_FREE_TOKENS ?? 500);
+const FREE_TOKENS = Number(process.env.MJENGO_AI_FREE_TOKENS ?? 50000);
 
 export interface ThreadRow { id: string; title: string; design_system_id: string | null; updated_at: string; status: 'idle' | 'running' | 'failed'; error: string | null }
 export interface ChatMessage { id: string; role: 'user' | 'assistant'; content: string; asset_id: string | null; created_at: string }

@@ -84,6 +84,7 @@ async function searchWebsite(issuer: string, title: string | null): Promise<stri
       headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json', 'X-Title': 'Sauti Salama Suite' },
       body: JSON.stringify({
         model: process.env.OPENROUTER_MODEL ?? 'qwen/qwen3.7-flash',
+        reasoning: { enabled: false },
         temperature: 0,
         max_tokens: 300,
         plugins: [{ id: 'web', max_results: 4 }],

@@ -8,7 +8,7 @@ import { readableFile } from "@/lib/mjengo/files-text";
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
-const FREE_TOKENS = Number(process.env.MJENGO_AI_FREE_TOKENS ?? 500);
+const FREE_TOKENS = Number(process.env.MJENGO_AI_FREE_TOKENS ?? 50000);
 const SHARED_MODEL = process.env.OPENROUTER_MODEL ?? "qwen/qwen3.7-flash";
 const IMAGE_MODEL = "google/gemini-2.5-flash-image-preview";
 const BUCKET = "mjengo-docs";
@@ -153,7 +153,7 @@ export async function POST(request: Request) {
 				const res = await fetch(url, {
 					method: "POST",
 					headers: { Authorization: `Bearer ${key!.key}`, "Content-Type": "application/json", "X-Title": "Sauti Salama Assistant" },
-					body: JSON.stringify({ model, stream: true, stream_options: { include_usage: true }, max_tokens: maxTokens, temperature: 0.6, messages }),
+					body: JSON.stringify({ model, stream: true, stream_options: { include_usage: true }, max_tokens: maxTokens, temperature: 0.6, messages, ...(key!.provider === "openrouter" ? { reasoning: { enabled: false } } : {}) }),
 				});
 				if (!res.ok || !res.body) {
 					const err = await res.text().catch(() => "");

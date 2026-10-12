@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import { FRAME_CSS, fitFrame } from "@/lib/mail/frame";
 import { draftReply, getMessageDetail, rewriteText, sendMail, suggestReplies, type AccountView, type ReplySuggestion, type RewriteMode, type SnippetRow } from "./api";
 import { looksLikeMarkdown, markdownToHtml } from "@/lib/mail/markdown";
 import { createClient } from "@/utils/supabase/client";
@@ -105,7 +106,7 @@ const initialsOf = (n: string) => n.split(/[\s@.]+/).filter(Boolean).slice(0, 2)
 const plain = (html: string) => (typeof window === "undefined" ? html : new DOMParser().parseFromString(html, "text/html").body.textContent ?? "");
 const paragraphs = (text: string) => text.split(/\n{2,}/).map((p) => `<p>${p.replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[c]!).replace(/\n/g, "<br>")}</p>`).join("");
 
-const cardFrame = (html: string) => `<!doctype html><html><head><meta charset="utf-8"><base target="_blank"><style>body{margin:0;font:14px/1.55 -apple-system,Segoe UI,Roboto,sans-serif;color:#1f2937;word-wrap:break-word}img{max-width:100%;height:auto}blockquote{margin:6px 0;padding-left:10px;border-left:3px solid #d1d5db;color:#6b7280}a{color:#068297}table{max-width:100%}</style></head><body>${html}</body></html>`;
+const cardFrame = (html: string) => `<!doctype html><html><head><meta charset="utf-8"><base target="_blank"><style>body{margin:0;font:14px/1.55 -apple-system,Segoe UI,Roboto,sans-serif;color:#1f2937;word-wrap:break-word}img{max-width:100%;height:auto}blockquote{margin:6px 0;padding-left:10px;border-left:3px solid #d1d5db;color:#6b7280}${FRAME_CSS}table{max-width:100%}</style></head><body>${html}</body></html>`;
 
 /** One message of the conversation: a coloured card that opens in place. */
 function ThreadCard({ m, accountId, shade, defaultOpen }: { m: ThreadMsg; accountId: string; shade: (typeof SHADES)[number]; defaultOpen?: boolean }) {
@@ -139,7 +140,7 @@ function ThreadCard({ m, accountId, shade, defaultOpen }: { m: ThreadMsg; accoun
 			{open && (
 				<div className="px-3 pb-3">
 					{busy || html === null ? <p className="flex items-center gap-2 py-2 text-xs text-serene-neutral-500"><Loader2 className="h-3.5 w-3.5 animate-spin" /> Opening...</p> : (
-						<iframe ref={frame} title={`Message from ${m.name || m.address}`} sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox" srcDoc={cardFrame(html)} onLoad={() => { const d = frame.current?.contentDocument; if (d?.body) setH(Math.min(420, Math.max(60, d.documentElement.scrollHeight + 6))); }} style={{ height: h }} className="w-full border-0" />
+						<iframe ref={frame} title={`Message from ${m.name || m.address}`} sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox" srcDoc={cardFrame(html)} onLoad={() => { if (frame.current) fitFrame(frame.current, setH, { min: 60, max: 420 }); }} style={{ height: h }} className="w-full border-0" />
 					)}
 				</div>
 			)}

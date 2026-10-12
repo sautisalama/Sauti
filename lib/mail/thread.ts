@@ -1,3 +1,4 @@
+import { FRAME_CSS } from '@/lib/mail/frame';
 /**
  * Reading a conversation. Two ideas from the mail clients that get this right (Gmail, Superhuman, Hey):
  * show each message once, and fold away the text that only repeats an earlier message. This turns the
@@ -67,7 +68,7 @@ export function trimQuoted(html: string): { html: string; trimmed: boolean } {
 }
 
 const CSS = `body{margin:0;font:15px/1.65 -apple-system,Segoe UI,Roboto,sans-serif;color:#1f2937;word-wrap:break-word}
-img{max-width:100%;height:auto}a{color:#068297}pre{white-space:pre-wrap}table{max-width:100%}
+img{max-width:100%;height:auto}pre{white-space:pre-wrap}table{max-width:100%}
 blockquote{margin:8px 0;padding-left:12px;border-left:3px solid #A8C7FA;color:#6b7280}
 blockquote blockquote{border-left-color:#9AD5B8}
 blockquote blockquote blockquote{border-left-color:#F5C58A}
@@ -76,7 +77,8 @@ details.ss-quoted{margin-top:12px}
 details.ss-quoted>summary{display:inline-flex;align-items:center;gap:6px;cursor:pointer;list-style:none;padding:2px 10px;border-radius:999px;background:#f1f1ef;color:#787774;font-size:12px;user-select:none}
 details.ss-quoted>summary::-webkit-details-marker{display:none}
 details.ss-quoted>summary:hover{background:#e8e8e5}
-details.ss-quoted[open]>summary{margin-bottom:8px}`;
+details.ss-quoted[open]>summary{margin-bottom:8px}
+${FRAME_CSS}`;
 
 /** The full document a message is shown in, with quoted history folded. */
 export function messageDoc(opts: { html: string | null; text: string }): { doc: string; trimmed: boolean } {

@@ -14,6 +14,7 @@ export async function streamChat(opts: { system: string; user: string; maxTokens
 		headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json", "X-Title": "Sauti Salama Mail" },
 		body: JSON.stringify({
 			model: process.env.OPENROUTER_MODEL ?? "qwen/qwen3.7-flash",
+			reasoning: { enabled: false },
 			stream: true,
 			temperature: opts.temperature ?? 0.4,
 			max_tokens: opts.maxTokens,

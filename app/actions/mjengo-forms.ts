@@ -193,6 +193,7 @@ async function generate_(prompt: string): Promise<string> {
     headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json', 'X-Title': 'Sauti Salama Forms' },
     body: JSON.stringify({
       model: process.env.OPENROUTER_MODEL ?? 'qwen/qwen3.7-flash',
+      reasoning: { enabled: false },
       temperature: 0.4,
       max_tokens: 2500,
       response_format: { type: 'json_object' },
