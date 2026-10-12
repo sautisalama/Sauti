@@ -6,7 +6,10 @@ import { MeetRecorder } from "@/lib/client/meet-recorder";
 import { putToSignedUrl } from "@/lib/client/upload";
 import { prepareUpload, registerUpload } from "@/app/dashboard/mjengo/vault/api";
 import { attachRecording } from "@/app/actions/mjengo-meet";
-import { Accessibility, Captions, Circle, ExternalLink, MoreVertical, ShieldCheck, UserPlus, Check, Copy, Hand, Info, Loader2, Mail, MessageSquareText, Mic, MicOff, Minimize2, MonitorUp, PictureInPicture2, PhoneOff, SmartphoneNfc, Users, Video, VideoOff, Volume2, X } from "lucide-react";
+import { Accessibility, Captions, Circle, ExternalLink, MoreVertical, ShieldCheck, UserPlus, Check, Copy, Hand, Info, Loader2, Mail, MessageCircle, MessageSquareText, Mic, MicOff, Minimize2, MonitorUp, Pin, PinOff, PictureInPicture2, PhoneOff, Smile, SmartphoneNfc, UserMinus, Users, Video, VideoOff, Volume2, X } from "lucide-react";
+import { enterMeeting, checkMeetingEntry, listKnocks, decideKnock, decideAllKnocks, saveMeetingChat, type Knock } from "@/app/actions/meet-room";
+import { ChatPanel, ReactionLayer, ReactionPicker, type ChatMsg, type FloatingReaction } from "./meet-parts";
+import { callStore } from "@/lib/client/call-store";
 import { createClient } from "@/utils/supabase/client";
 import { unwrap } from "@/lib/action-result";
 import { saveTranscript, type TranscriptLine } from "@/app/actions/mjengo-meet";
@@ -14,7 +17,7 @@ import { cn } from "@/lib/utils";
 
 type SignalKind = "offer" | "answer" | "ice";
 interface Peer { id: string; name: string; companion?: boolean }
-interface Remote extends Peer { stream: MediaStream | null; muted: boolean; sharing?: boolean; hand?: boolean }
+interface Remote extends Peer { stream: MediaStream | null; muted: boolean; sharing?: boolean; hand?: boolean; cam?: boolean; host?: boolean; handAt?: number }
 interface Device { id: string; label: string }
 
 const ICE: RTCIceServer[] = [
@@ -27,15 +30,15 @@ const ICE: RTCIceServer[] = [
 const LANGS = [["en-KE", "English (Kenya)"], ["en-US", "English (US)"], ["en-GB", "English (UK)"], ["sw-KE", "Kiswahili"]] as const;
 
 /** A small peer-to-peer call room: preview and device choice, video or voice, companion mode, sharing, captions. */
-export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, description = "", resources = [] }: { code: string; mode: "video" | "voice"; title: string | null; defaultName: string; canSave: boolean; embedded?: boolean; description?: string; resources?: { label: string; url: string }[] }) {
+export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, description = "", resources = [], autoJoin = false, startMic = true, startCam = true }: { code: string; mode: "video" | "voice"; title: string | null; defaultName: string; canSave: boolean; embedded?: boolean; description?: string; resources?: { label: string; url: string }[]; autoJoin?: boolean; startMic?: boolean; startCam?: boolean }) {
 	const [name, setName] = useState(defaultName);
 	const [joined, setJoined] = useState(false);
-	const [micOn, setMicOn] = useState(true);
-	const [camOn, setCamOn] = useState(mode === "video");
+	const [micOn, setMicOn] = useState(startMic);
+	const [camOn, setCamOn] = useState(mode === "video" && startCam);
 	const [sharing, setSharing] = useState(false);
 	const [remotes, setRemotes] = useState<Remote[]>([]);
 	const [captionsOn, setCaptionsOn] = useState(false);
-	const [panel, setPanel] = useState<"none" | "transcript" | "people" | "info">("none");
+	const [panel, setPanel] = useState<"none" | "transcript" | "people" | "info" | "chat">("none");
 	const [handUp, setHandUp] = useState(false);
 	const [a11yOpen, setA11yOpen] = useState(false);
 	const [moreOpen, setMoreOpen] = useState(false);
@@ -56,6 +59,29 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 	const [copied, setCopied] = useState(false);
 	const [shareOpen, setShareOpen] = useState(false);
 	const [speechOk, setSpeechOk] = useState(true);
+	// Admission, host controls, chat, reactions and pinning.
+	const [entry, setEntry] = useState<"idle" | "checking" | "waiting" | "denied">("idle");
+	const [entryError, setEntryError] = useState("");
+	const [isHost, setIsHost] = useState(false);
+	const [knocks, setKnocks] = useState<Knock[]>([]);
+	const [chat, setChat] = useState<ChatMsg[]>([]);
+	const [unreadChat, setUnreadChat] = useState(0);
+	const [reactOpen, setReactOpen] = useState(false);
+	const [floating, setFloating] = useState<FloatingReaction[]>([]);
+	const [tileReact, setTileReact] = useState<Record<string, string>>({});
+	const [pinned, setPinned] = useState<string | null>(null);
+	const presentAfter = useRef(false);
+	const hostIds = useRef(new Set<string>());
+	const chatRef = useRef<ChatMsg[]>([]);
+	const chatSaved = useRef(0);
+	const recent = useRef<{ emoji: string; at: number }[]>([]);
+	const stateRef = useRef({ muted: !startMic, cam: mode === "video" && startCam, sharing: false, hand: false });
+	chatRef.current = chat;
+	const leaveRef = useRef<() => Promise<void>>(async () => undefined);
+	const toggleMicRef = useRef<() => void>(() => undefined);
+	const toggleCamRef = useRef<() => void>(() => undefined);
+	const toggleHandRef = useRef<() => void>(() => undefined);
+	const beginRef = useRef<(k: string, h: boolean, p?: boolean) => Promise<void>>(async () => undefined);
 
 	// Lobby
 	const [cams, setCams] = useState<Device[]>([]);
@@ -96,9 +122,30 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 	const setRemote = useCallback((id: string, patch: Partial<Remote>) => {
 		setRemotes((cur) => {
 			if (cur.some((r) => r.id === id)) return cur.map((r) => (r.id === id ? { ...r, ...patch } : r));
-			return [...cur, { id, name: patch.name ?? "Guest", stream: patch.stream ?? null, muted: false, companion: patch.companion }];
+			return [...cur, { id, name: patch.name ?? "Guest", stream: patch.stream ?? null, muted: false, cam: true, companion: patch.companion, host: patch.host }];
 		});
 	}, []);
+
+	/** Tell everyone how this device is now (microphone, camera, presenting, hand). Late joiners get it again. */
+		const pushState = useCallback((patch: Partial<typeof stateRef.current>) => {
+			stateRef.current = { ...stateRef.current, ...patch };
+			send("state", { id: myId.current, ...stateRef.current });
+		}, [send]);
+
+		const showReaction = useCallback((id: string, emoji: string, name: string) => {
+			const now = Date.now();
+			recent.current = [...recent.current.filter((r) => now - r.at < 2500), { emoji, at: now }];
+			const combo = recent.current.filter((r) => r.emoji === emoji).length;
+			const n = combo >= 3 ? 7 : 1;
+			const made: FloatingReaction[] = Array.from({ length: n }, (_, i) => ({
+				id: `${id}-${now}-${i}-${Math.random().toString(36).slice(2, 6)}`,
+				emoji, name: i === 0 ? name : "", x: 8 + Math.random() * 78, size: combo >= 3 ? 44 + Math.round(Math.random() * 20) : 34, delay: i * 90,
+			}));
+			setFloating((cur) => [...cur.slice(-40), ...made]);
+			setTimeout(() => setFloating((cur) => cur.filter((f) => !made.some((m) => m.id === f.id))), 3600 + n * 90);
+			setTileReact((cur) => ({ ...cur, [id]: emoji }));
+			setTimeout(() => setTileReact((cur) => { if (cur[id] !== emoji) return cur; const { [id]: _drop, ...rest } = cur; return rest; }), 4000);
+		}, []);
 
 	/* ------------------------------------------------------------ lobby preview */
 
@@ -205,7 +252,25 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 		}
 	}, [connect, send]);
 
+	/** Ask the server whether this person may come in (invited people do at once; others wait to be admitted). */
 	const join = async (present = false) => {
+		presentAfter.current = present;
+		setEntry("checking");
+		setEntryError("");
+		try {
+			const r = await unwrap(enterMeeting(code, myId.current, name));
+			if (r.status === "in") { setEntry("idle"); await begin(r.key, r.host, present); }
+			else if (r.status === "denied") setEntry("denied");
+			else setEntry("waiting");
+		} catch (e) {
+			setEntry("idle");
+			setEntryError(e instanceof Error ? e.message : "Could not join the call.");
+		}
+	};
+
+	const begin = async (roomKeyValue: string, host: boolean, present = false) => {
+		setIsHost(host);
+		if (host) hostIds.current.add(myId.current);
 		stopPreview();
 		try {
 			const stream = await navigator.mediaDevices.getUserMedia({
@@ -221,28 +286,48 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 			setCamOn(false);
 		}
 
-		const ch = createClient().channel(`meet:${code}`, { config: { broadcast: { self: false }, presence: { key: myId.current } } });
+		const ch = createClient().channel(`meet:${code}:${roomKeyValue}`, { config: { broadcast: { self: false }, presence: { key: myId.current } } });
 		channel.current = ch;
 		ch.on("broadcast", { event: "signal" }, ({ payload }) => onSignal(payload))
 			.on("broadcast", { event: "caption" }, ({ payload }) => addLine(payload as TranscriptLine))
 			.on("broadcast", { event: "rec" }, ({ payload }) => setRecBy(payload.on ? String(payload.by ?? "Someone") : null))
-			.on("broadcast", { event: "state" }, ({ payload }) => setRemote(payload.id, { muted: !!payload.muted, sharing: !!payload.sharing, hand: !!payload.hand }))
+			.on("broadcast", { event: "state" }, ({ payload }) => setRemote(payload.id, { muted: !!payload.muted, sharing: !!payload.sharing, hand: !!payload.hand, cam: payload.cam !== false, handAt: payload.hand ? Date.now() : undefined }))
+			.on("broadcast", { event: "chat" }, ({ payload }) => {
+				const l = payload as ChatMsg;
+				setChat((cur) => (cur.some((x) => x.id === l.id) ? cur : [...cur, { ...l, mine: false }]));
+				setUnreadChat((n) => n + 1);
+			})
+			.on("broadcast", { event: "react" }, ({ payload }) => showReaction(String(payload.id), String(payload.emoji).slice(0, 8), String(payload.name ?? "Someone")))
+			.on("broadcast", { event: "ctl" }, ({ payload }) => {
+				// Only the host's instructions are followed.
+				if (!hostIds.current.has(String(payload.from))) return;
+				const mine = payload.to === myId.current || payload.to === "all";
+				if (!mine) return;
+				if (payload.action === "mute") { micOnRef.current = false; setMicOn(false); local.current?.getAudioTracks().forEach((t) => (t.enabled = false)); pushState({ muted: true }); }
+				if (payload.action === "remove") void leaveRef.current();
+			})
 			.on("presence", { event: "join" }, ({ key, newPresences }) => {
 				if (key === myId.current) return;
-				const p = newPresences[0] as unknown as { name?: string; companion?: boolean };
+				const p = newPresences[0] as unknown as { name?: string; companion?: boolean; host?: boolean };
+				if (p?.host) hostIds.current.add(key);
 				connect({ id: key, name: p?.name ?? "Guest", companion: p?.companion }, true);
+				setRemote(key, { host: !!p?.host });
+				// The newcomer is told how this device is now once it is listening.
+				setTimeout(() => pushState({}), 900);
 			})
 			.on("presence", { event: "leave" }, ({ key }) => {
+				hostIds.current.delete(key);
 				pcs.current.get(key)?.close();
 				pcs.current.delete(key);
 				setRemotes((cur) => cur.filter((r) => r.id !== key));
 			})
-			.subscribe(async (status) => { if (status === "SUBSCRIBED") await ch.track({ name: shownName, companion }); });
+			.subscribe(async (status) => { if (status === "SUBSCRIBED") { await ch.track({ name: shownName, companion, host }); pushState({ muted: !micOnRef.current, cam: camOnRef.current && !!local.current?.getVideoTracks().length }); } });
 		setJoined(true);
 		setReadyOpen(true);
 		if (present) setTimeout(() => { void toggleShareRef.current(); }, 600);
 	};
 
+	beginRef.current = begin;
 	useEffect(() => { if (joined && localVideo.current && local.current) localVideo.current.srcObject = local.current; }, [joined, camOn, sharing]);
 
 	/* ------------------------------------------------------------ captions */
@@ -280,12 +365,14 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 		const next = !micOn;
 		setMicOn(next);
 		local.current?.getAudioTracks().forEach((t) => (t.enabled = next));
-		send("state", { id: myId.current, muted: !next, sharing, hand: handUp });
+		pushState({ muted: !next });
 	};
 	const toggleCam = () => {
 		const next = !camOn;
 		setCamOn(next);
 		local.current?.getVideoTracks().forEach((t) => (t.enabled = next));
+		camOnRef.current = next;
+		pushState({ cam: next && !!local.current?.getVideoTracks().length });
 	};
 
 	const replaceVideo = async (track: MediaStreamTrack | null) => {
@@ -300,12 +387,12 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 		screenStream.current = null;
 		if (localVideo.current && local.current) localVideo.current.srcObject = local.current;
 		setSharing(false);
-		send("state", { id: myId.current, muted: !micOnRef.current, sharing: false, hand: handUp });
+		pushState({ sharing: false });
 	};
 	const toggleHand = () => {
 		const next = !handUp;
 		setHandUp(next);
-		send("state", { id: myId.current, muted: !micOnRef.current, sharing, hand: next });
+		pushState({ hand: next });
 	};
 	const toggleShare = async () => {
 		toggleShareRef.current = toggleShare;
@@ -317,18 +404,128 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 			screenStream.current = screen;
 			track.onended = () => { void stopShare(); };
 			setSharing(true);
-			send("state", { id: myId.current, muted: !micOnRef.current, sharing: true, hand: handUp });
+			pushState({ sharing: true });
 		} catch { /* cancelled */ }
 	};
 
-	/** Picture in picture: the browser's own floating video of whoever is on screen. */
-	const pip = async () => {
+	/** The browser's own floating video of whoever is on screen (a small extra, from the more menu). */
+	const popOutVideo = async () => {
 		const el = (document.querySelector("video[data-remote='1']") as HTMLVideoElement | null) ?? localVideo.current;
 		try {
 			if (document.pictureInPictureElement) await document.exitPictureInPicture();
 			else await el?.requestPictureInPicture();
 		} catch { /* not supported or no video yet */ }
 	};
+
+	/**
+	 * Picture in picture for the whole suite: the call becomes a small window that stays on every page, so
+	 * people keep working in the other suites. Guests (no suite) get the browser's own floating video.
+	 */
+	const dockCall = async () => {
+		if (embedded) { window.parent.postMessage({ type: "meet:minimize" }, window.location.origin); return; }
+		if (!canSave) { void popOutVideo(); return; }
+		callStore.open(code, mode, { minimized: true, mic: micOnRef.current, cam: camOnRef.current });
+		await persist(false);
+		if (recorder.current) await stopRecording();
+		stopPreview();
+		screenStream.current?.getTracks().forEach((t) => t.stop());
+		pcs.current.forEach((pc) => pc.close());
+		pcs.current.clear();
+		local.current?.getTracks().forEach((t) => t.stop());
+		local.current = null;
+		channel.current?.unsubscribe();
+		let back = "/dashboard/mjengo";
+		try { const r = new URL(document.referrer); if (r.origin === window.location.origin && !r.pathname.startsWith("/meet")) back = r.pathname + r.search; } catch { /* no referrer */ }
+		window.location.assign(back);
+	};
+
+	// Join straight away when the call was handed over from the full page or opened from the small window.
+	const autoRan = useRef(false);
+	useEffect(() => {
+		if (!autoJoin || autoRan.current || !name.trim()) return;
+		autoRan.current = true;
+		void join(false);
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [autoJoin]);
+
+	// Keyboard shortcuts, as in other call apps: M microphone, V camera, H hand, C captions, R reactions, T chat.
+	useEffect(() => {
+		if (!joined) return;
+		const onKey = (e: KeyboardEvent) => {
+			const el = e.target as HTMLElement | null;
+			if (el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.tagName === "SELECT" || el.isContentEditable)) return;
+			if (e.ctrlKey || e.metaKey || e.altKey) return;
+			const k = e.key.toLowerCase();
+			if (k === "m") toggleMicRef.current();
+			else if (k === "v") toggleCamRef.current();
+			else if (k === "h") toggleHandRef.current();
+			else if (k === "c") setCaptionsOn((v) => !v);
+			else if (k === "r") setReactOpen((v) => !v);
+			else if (k === "t") setPanel((p) => (p === "chat" ? "none" : "chat"));
+			else if (k === "escape") { setReactOpen(false); setMoreOpen(false); }
+		};
+		window.addEventListener("keydown", onKey);
+		return () => window.removeEventListener("keydown", onKey);
+	}, [joined]);
+
+	const sendChat = (text: string) => {
+		const line: ChatMsg = { id: `${myId.current}-${Date.now()}`, name: shownName, text: text.slice(0, 1000), at: new Date().toISOString(), mine: true };
+		setChat((cur) => [...cur, line]);
+		send("chat", { ...line, mine: false });
+	};
+	const react = (emoji: string) => {
+		showReaction("me", emoji, shownName);
+		send("react", { id: myId.current, emoji, name: shownName });
+	};
+	useEffect(() => { if (panel === "chat") setUnreadChat(0); }, [panel, chat.length]);
+
+	// People waiting to come in are shown to everyone who may let them in.
+	useEffect(() => {
+		if (!joined) return;
+		let on = true;
+		const poll = () => { if (document.hidden) return; unwrap(listKnocks(code)).then((k) => on && setKnocks(k)).catch(() => undefined); };
+		poll();
+		const t = setInterval(poll, 3500);
+		return () => { on = false; clearInterval(t); };
+	}, [joined, code]);
+	const hostCtl = (to: string, action: "mute" | "remove") => send("ctl", { from: myId.current, to, action });
+	const decide = (k: Knock, admit: boolean) => {
+		setKnocks((cur) => cur.filter((x) => x.guestKey !== k.guestKey));
+		void unwrap(decideKnock(code, k.guestKey, admit)).catch(() => undefined);
+	};
+	const decideAll = (admit: boolean) => { setKnocks([]); void unwrap(decideAllKnocks(code, admit)).catch(() => undefined); };
+
+	// A guest in the waiting room checks every few seconds whether they have been let in.
+	useEffect(() => {
+		if (entry !== "waiting") return;
+		let on = true;
+		const t = setInterval(async () => {
+			try {
+				const r = await unwrap(checkMeetingEntry(code, myId.current));
+				if (!on) return;
+				if (r.status === "in") { setEntry("idle"); await beginRef.current(r.key, false, presentAfter.current); }
+				else if (r.status === "denied") setEntry("denied");
+			} catch { /* try again */ }
+		}, 2500);
+		return () => { on = false; clearInterval(t); };
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [entry, code]);
+
+	// Keep the messages with the meeting.
+	useEffect(() => {
+		if (!joined || !canSave) return;
+		const t = setInterval(() => {
+			const fresh = chatRef.current.slice(chatSaved.current);
+			if (!fresh.length) return;
+			chatSaved.current = chatRef.current.length;
+			void unwrap(saveMeetingChat(code, fresh.map(({ id, name, text, at }) => ({ id, name, text, at })))).catch(() => { chatSaved.current = Math.max(0, chatSaved.current - fresh.length); });
+		}, 20_000);
+		return () => clearInterval(t);
+	}, [joined, canSave, code]);
+
+	toggleMicRef.current = toggleMic;
+	toggleCamRef.current = toggleCam;
+	toggleHandRef.current = toggleHand;
 
 	const persist = useCallback(async (end: boolean) => {
 		if (!canSave) return;
@@ -424,6 +621,7 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 		window.location.assign(home);
 	}, [persist, embedded, home, stopRecording]);
 
+	leaveRef.current = leave;
 	useEffect(() => () => {
 		stopPreview();
 		pcs.current.forEach((pc) => pc.close());
@@ -431,6 +629,10 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 		channel.current?.unsubscribe();
 	}, []);
 
+	const handOrder = remotes.filter((r) => r.hand).sort((a, b) => (a.handAt ?? 0) - (b.handAt ?? 0));
+	const tile = (r: Remote) => (
+		<RemoteTile key={r.id} r={r} sinkId={speakerId} audioOn={speakerOn} reaction={tileReact[r.id]} pinned={pinned === r.id} onPin={() => setPinned((p) => (p === r.id ? null : r.id))} />
+	);
 	const tiles = remotes.length + 1;
 	const cols = tiles <= 1 ? "grid-cols-1" : tiles <= 4 ? "grid-cols-1 sm:grid-cols-2" : "grid-cols-2 lg:grid-cols-3";
 	const mailto = `mailto:?subject=${encodeURIComponent(title || "Join the call")}&body=${encodeURIComponent(`Join the call: ${link}`)}`;
@@ -455,6 +657,33 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 						<span><span className="block text-lg">Your meeting is safe</span><span className="block text-sm text-[#5f6368]">No one can join a meeting unless invited or admitted by the host</span></span>
 					</div>
 				</div>
+			</main>
+		);
+	}
+
+	if (!joined && (entry === "waiting" || entry === "denied")) {
+		return (
+			<main className="flex min-h-dvh flex-col items-center justify-center bg-white px-6 text-center text-[#202124]">
+				{entry === "waiting" ? (
+					<>
+						<span className="mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-[#e0f2f5]"><Loader2 className="h-9 w-9 animate-spin text-[#068297]" /></span>
+						<h1 className="text-2xl font-medium sm:text-3xl">Asking to join…</h1>
+						<p className="mt-2 max-w-sm text-sm text-[#5f6368]">You will be let in as soon as someone in the call admits you. You can leave this screen open.</p>
+						<p className="mt-6 text-sm font-medium">{title || code}</p>
+						<p className="text-xs text-[#5f6368]">Joining as {name}</p>
+						<button onClick={() => setEntry("idle")} className="mt-8 h-11 rounded-full border border-[#dadce0] px-6 text-sm font-medium text-[#068297] hover:bg-[#f1fafb]">Cancel</button>
+					</>
+				) : (
+					<>
+						<span className="mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-[#fce8e6]"><ShieldCheck className="h-9 w-9 text-[#d93025]" /></span>
+						<h1 className="text-2xl font-medium sm:text-3xl">You can&apos;t join this call</h1>
+						<p className="mt-2 max-w-sm text-sm text-[#5f6368]">Your request to join was declined.</p>
+						<div className="mt-8 flex gap-3">
+							<button onClick={() => setEntry("idle")} className="h-11 rounded-full border border-[#dadce0] px-6 text-sm font-medium text-[#068297] hover:bg-[#f1fafb]">Back</button>
+							<button onClick={() => window.location.assign(home)} className="h-11 rounded-full bg-[#068297] px-6 text-sm font-medium text-white">Return to home screen</button>
+						</div>
+					</>
+				)}
 			</main>
 		);
 	}
@@ -505,15 +734,14 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 						<input value={name} onChange={(e) => setName(e.target.value)} placeholder="How should people see you?" className="h-12 w-full rounded-lg border border-[#dadce0] px-3 text-base outline-none focus:border-[#068297] focus:ring-1 focus:ring-[#068297]" />
 					</label>
 					<div className="flex flex-wrap justify-center gap-3 lg:justify-start">
-						<button onClick={() => join(false)} disabled={!name.trim()} className="h-12 rounded-full bg-[#068297] px-7 text-sm font-medium text-white shadow-sm hover:bg-[#056d7e] disabled:opacity-40">{companion ? "Join as companion" : "Join now"}</button>
-						<button onClick={() => join(true)} disabled={!name.trim() || companion} className="flex h-12 items-center gap-2 rounded-full border border-[#dadce0] px-6 text-sm font-medium text-[#068297] hover:bg-[#f1fafb] disabled:opacity-40"><MonitorUp className="h-4 w-4" /> Present</button>
+						<button onClick={() => join(false)} disabled={!name.trim() || entry === "checking"} className="h-12 rounded-full bg-[#068297] px-7 text-sm font-medium text-white shadow-sm hover:bg-[#056d7e] disabled:opacity-40">{entry === "checking" ? "Joining…" : companion ? "Join as companion" : "Join now"}</button>
+						<button onClick={() => join(true)} disabled={!name.trim() || companion || entry === "checking"} className="flex h-12 items-center gap-2 rounded-full border border-[#dadce0] px-6 text-sm font-medium text-[#068297] hover:bg-[#f1fafb] disabled:opacity-40"><MonitorUp className="h-4 w-4" /> Present</button>
 					</div>
-					{canSave && (
+					{entryError && <p role="alert" className="max-w-sm text-sm text-[#d93025]">{entryError}</p>}
 						<label className="flex max-w-sm cursor-pointer items-start gap-3 text-left">
-							<input type="checkbox" checked={companion} onChange={(e) => { setCompanion(e.target.checked); if (e.target.checked) setSpeakerOn(false); }} className="mt-1 h-4 w-4 accent-[#068297]" />
-							<span className="text-sm"><span className="flex items-center gap-1.5 font-medium"><SmartphoneNfc className="h-4 w-4" /> Companion mode</span><span className="block text-xs text-[#5f6368]">Use this device as an extra camera and microphone for the call you are in on your computer. Its speaker stays off to avoid echo.</span></span>
+							<input type="checkbox" checked={companion} onChange={(e) => { setCompanion(e.target.checked); if (e.target.checked) { setSpeakerOn(false); setMicOn(false); } else setMicOn(true); }} className="mt-1 h-4 w-4 accent-[#068297]" />
+							<span className="text-sm"><span className="flex items-center gap-1.5 font-medium"><SmartphoneNfc className="h-4 w-4" /> Companion mode</span><span className="block text-xs text-[#5f6368]">Already in this call on a computer? Join from this device to share its camera, present, chat and react. The microphone and speaker start off so there is no echo.</span></span>
 						</label>
-					)}
 					<p className="max-w-sm text-xs text-[#5f6368]">Captions and accessibility tools are off until you turn them on inside the call. Calls go directly between people in the call.</p>
 				</div>
 			</div></main>
@@ -528,9 +756,12 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 	const clock = format(new Date(), "h:mm a");
 
 	const selfTile = (
-		<div className="relative flex h-full min-h-[110px] w-full items-center justify-center overflow-hidden rounded-xl bg-[#1B232B] max-md:min-h-0">
+		<div className="group relative flex h-full min-h-[110px] w-full items-center justify-center overflow-hidden rounded-xl bg-[#1B232B] max-md:min-h-0">
 			<video ref={localVideo} data-rec-video="1" autoPlay playsInline muted className={cn("h-full w-full object-cover", !sharing && "-scale-x-100", !(camOn || sharing) && "hidden")} />
 			{!(camOn || sharing) && <span className="flex h-16 w-16 items-center justify-center rounded-full bg-sauti-teal text-xl font-medium">{initials(shownName)}</span>}
+			{!(camOn || sharing) && <span className="absolute left-2 top-2 flex items-center gap-1 rounded-md bg-black/60 px-2 py-1 text-xs"><VideoOff className="h-3 w-3" /> Camera off</span>}
+			{tileReact.me && <span className="absolute right-2 bottom-2 text-3xl drop-shadow">{tileReact.me}</span>}
+			<button onClick={() => setPinned((p) => (p === "me" ? null : "me"))} aria-label={pinned === "me" ? "Unpin" : "Pin yourself"} className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-black/50 opacity-0 transition hover:bg-black/70 focus:opacity-100 group-hover:opacity-100">{pinned === "me" ? <PinOff className="h-3.5 w-3.5" /> : <Pin className="h-3.5 w-3.5" />}</button>
 			<span className="absolute bottom-2 left-3 flex items-center gap-1.5 text-sm font-medium text-white drop-shadow">{!micOn && <MicOff className="h-3.5 w-3.5" />}{shownName} (you)</span>
 			{handUp && <span className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-[#068297]"><Hand className="h-4 w-4" /></span>}
 		</div>
@@ -538,6 +769,22 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 
 	return (
 		<div className={cn("fixed inset-0 z-[100] flex h-dvh flex-col bg-[#0E1318] text-white", a11y.reduceMotion && "[&_*]:!transition-none [&_*]:!animate-none")}>
+			<ReactionLayer items={floating} />
+			{reactOpen && <div className="md:hidden"><div className="fixed inset-0 z-30" onClick={() => setReactOpen(false)} /><div className="fixed inset-x-0 bottom-20 z-40 flex justify-center"><div className="relative"><ReactionPicker onPick={react} onClose={() => setReactOpen(false)} /></div></div></div>}
+			{knocks.length > 0 && (
+				<div role="alert" className="absolute left-1/2 top-14 z-40 w-[min(92vw,24rem)] -translate-x-1/2 space-y-2 rounded-2xl bg-white p-3 text-[#202124] shadow-2xl">
+					<p className="px-1 text-sm font-medium">{knocks.length === 1 ? "Someone wants to join" : `${knocks.length} people want to join`}</p>
+					{knocks.slice(0, 4).map((k) => (
+						<div key={k.guestKey} className="flex items-center gap-2">
+							<span className="flex h-9 w-9 items-center justify-center rounded-full bg-[#5f6368] text-xs text-white">{initials(k.name)}</span>
+							<span className="min-w-0 flex-1 truncate text-sm">{k.name}</span>
+							<button onClick={() => decide(k, false)} className="h-8 rounded-full px-3 text-sm font-medium text-[#5f6368] hover:bg-black/5">Deny</button>
+							<button onClick={() => decide(k, true)} className="h-8 rounded-full bg-[#068297] px-3.5 text-sm font-medium text-white hover:bg-[#056d7e]">Admit</button>
+						</div>
+					))}
+					{knocks.length > 1 && <button onClick={() => decideAll(true)} className="w-full rounded-full border border-[#dadce0] py-1.5 text-sm font-medium text-[#068297] hover:bg-[#f1fafb]">Admit all</button>}
+				</div>
+			)}
 			{(recording || recBy || saving) && (
 				<div role="status" className="absolute left-1/2 top-3 z-30 flex -translate-x-1/2 items-center gap-2 rounded-full bg-black/70 px-3.5 py-1.5 text-xs font-medium text-white backdrop-blur">
 					<span className={cn("h-2 w-2 rounded-full", saving ? "bg-amber-400" : "animate-pulse bg-[#ea4335]")} />
@@ -576,13 +823,21 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 							</div>
 							<div className="flex shrink-0 gap-2 overflow-x-auto lg:w-56 lg:flex-col lg:overflow-y-auto">
 								<div className="h-28 w-44 shrink-0 lg:h-32 lg:w-full">{selfTile}</div>
-								{remotes.filter((r) => r.id !== presenter.id).map((r) => <div key={r.id} className="h-28 w-44 shrink-0 lg:h-32 lg:w-full"><RemoteTile r={r} sinkId={speakerId} audioOn={speakerOn} /></div>)}
+								{remotes.filter((r) => r.id !== presenter.id).map((r) => <div key={r.id} className="h-28 w-44 shrink-0 lg:h-32 lg:w-full">{tile(r)}</div>)}
 							</div>
 						</div>
-					) : (
-						<div className={cn("grid h-full min-h-0 auto-rows-fr gap-3", cols, remotes.length > 0 && "max-md:grid-cols-1 max-md:gap-1.5")}>
+											) : pinned && (pinned === "me" || remotes.some((r) => r.id === pinned)) ? (
+							<div className="flex h-full min-h-0 flex-col gap-3 lg:flex-row">
+								<div className="relative min-h-0 flex-1 overflow-hidden rounded-2xl">{pinned === "me" ? selfTile : tile(remotes.find((r) => r.id === pinned)!)}</div>
+								<div className="flex shrink-0 gap-2 overflow-x-auto lg:w-56 lg:flex-col lg:overflow-y-auto">
+									{pinned !== "me" && <div className="h-28 w-44 shrink-0 lg:h-32 lg:w-full">{selfTile}</div>}
+									{remotes.filter((r) => r.id !== pinned).map((r) => <div key={r.id} className="h-28 w-44 shrink-0 lg:h-32 lg:w-full">{tile(r)}</div>)}
+								</div>
+							</div>
+						) : (
+							<div className={cn("grid h-full min-h-0 auto-rows-fr gap-3", cols, remotes.length > 0 && "max-md:grid-cols-1 max-md:gap-1.5")}>
 							<div className={cn("min-h-0", remotes.length > 0 && "max-md:fixed max-md:bottom-24 max-md:right-3 max-md:z-20 max-md:h-36 max-md:w-24 max-md:overflow-hidden max-md:rounded-xl max-md:shadow-xl max-md:ring-1 max-md:ring-white/20")}>{selfTile}</div>
-							{remotes.map((r) => <RemoteTile key={r.id} r={r} sinkId={speakerId} audioOn={speakerOn} />)}
+							{remotes.map((r) => tile(r))}
 						</div>
 					)}
 				</div>
@@ -590,23 +845,53 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 				{panel !== "none" && !embedded && (
 					<aside className="fixed inset-x-0 bottom-0 z-40 flex h-[70dvh] flex-col overflow-hidden rounded-t-2xl bg-white text-[#202124] shadow-2xl md:static md:m-3 md:ml-0 md:h-auto md:w-80 md:shrink-0 md:rounded-xl md:shadow-none">
 						<div className="flex items-center justify-between border-b border-[#dadce0] px-4 py-3 text-base">
-							{panel === "transcript" ? "Transcript" : panel === "info" ? "Meeting details" : "People"}
+							{panel === "transcript" ? "Transcript" : panel === "info" ? "Meeting details" : panel === "chat" ? "Messages" : "People"}
 							<button onClick={() => setPanel("none")} aria-label="Close" className="flex h-8 w-8 items-center justify-center rounded-full hover:bg-black/5"><X className="h-4 w-4" /></button>
 						</div>
-						{panel === "transcript" && (
-							<div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4 text-sm">
+													{panel === "chat" && <ChatPanel lines={chat} onSend={sendChat} />}
+							{panel === "transcript" && (
+								<div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4 text-sm">
 								{!speechOk && <p className="text-amber-700">Live captions need Chrome, Edge or Safari. Others in the call may still see your words.</p>}
 								{lines.length === 0 && <p className="text-[#5f6368]">{captionsOn ? "What people say appears here as they speak." : "Captions are off, so nothing is being transcribed on this device. Turn them on in the bar below."}</p>}
 								{lines.map((l) => (<p key={l.id}><span className="font-medium text-[#068297]">{l.name}</span> <span>{l.text}</span></p>))}
 							</div>
 						)}
 						{panel === "people" && (
-							<ul className="space-y-1 p-3 text-sm">
-								<li className="flex items-center gap-3 rounded-lg p-2"><span className="flex h-8 w-8 items-center justify-center rounded-full bg-sauti-teal text-xs text-white">{initials(shownName)}</span>{shownName} (you)</li>
-								{remotes.map((r) => <li key={r.id} className="flex items-center gap-3 rounded-lg p-2"><span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#5f6368] text-xs text-white">{initials(r.name)}</span><span className="flex-1">{r.name}</span>{r.hand && <Hand className="h-4 w-4 text-[#068297]" />}{r.muted && <MicOff className="h-4 w-4 text-[#5f6368]" />}</li>)}
-							</ul>
-						)}
-						{panel === "info" && (
+								<div className="min-h-0 flex-1 overflow-y-auto">
+									{isHost && remotes.length > 0 && (
+										<div className="flex items-center justify-between border-b border-[#e8eaed] px-4 py-2 text-xs">
+											<span className="text-[#5f6368]">You are the host</span>
+											<button onClick={() => hostCtl("all", "mute")} className="rounded-full border border-[#dadce0] px-3 py-1 font-medium text-[#068297] hover:bg-[#f1fafb]">Mute everyone</button>
+										</div>
+									)}
+									{handOrder.length > 0 && (
+										<div className="border-b border-[#e8eaed] px-4 py-2 text-xs">
+											<p className="mb-1 font-medium text-[#5f6368]">Hands up, in order</p>
+											{handOrder.map((r, i) => <p key={r.id} className="flex items-center gap-2 py-0.5 text-sm"><Hand className="h-3.5 w-3.5 text-[#068297]" />{i + 1}. {r.name}</p>)}
+										</div>
+									)}
+									<ul className="space-y-1 p-3 text-sm">
+										<li className="flex items-center gap-3 rounded-lg p-2"><span className="flex h-8 w-8 items-center justify-center rounded-full bg-sauti-teal text-xs text-white">{initials(shownName)}</span><span className="flex-1">{shownName} (you){isHost ? " · Host" : ""}</span>{!micOn && <MicOff className="h-4 w-4 text-[#5f6368]" />}{!camOn && <VideoOff className="h-4 w-4 text-[#5f6368]" />}</li>
+										{remotes.map((r) => (
+											<li key={r.id} className="group flex items-center gap-3 rounded-lg p-2 hover:bg-[#f8f9fa]">
+												<span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#5f6368] text-xs text-white">{initials(r.name)}</span>
+												<span className="min-w-0 flex-1 truncate">{r.name}{r.host ? " · Host" : ""}{r.companion ? " · Companion" : ""}</span>
+												{r.hand && <Hand className="h-4 w-4 text-[#068297]" />}
+												{r.muted && <MicOff className="h-4 w-4 text-[#5f6368]" />}
+												{r.cam === false && <VideoOff className="h-4 w-4 text-[#5f6368]" />}
+												<button onClick={() => setPinned((p) => (p === r.id ? null : r.id))} aria-label={pinned === r.id ? "Unpin" : "Pin"} className="flex h-7 w-7 items-center justify-center rounded-full text-[#5f6368] hover:bg-black/5">{pinned === r.id ? <PinOff className="h-4 w-4" /> : <Pin className="h-4 w-4" />}</button>
+												{isHost && (
+													<>
+														<button onClick={() => hostCtl(r.id, "mute")} disabled={r.muted} aria-label={`Mute ${r.name}`} title="Mute" className="flex h-7 w-7 items-center justify-center rounded-full text-[#5f6368] hover:bg-black/5 disabled:opacity-30"><MicOff className="h-4 w-4" /></button>
+														<button onClick={() => hostCtl(r.id, "remove")} aria-label={`Remove ${r.name}`} title="Remove from the call" className="flex h-7 w-7 items-center justify-center rounded-full text-[#d93025] hover:bg-[#fce8e6]"><UserMinus className="h-4 w-4" /></button>
+													</>
+												)}
+											</li>
+										))}
+									</ul>
+								</div>
+							)}
+							{panel === "info" && (
 							<div className="space-y-3 p-4 text-sm">
 								<p className="font-medium">{title || "Meeting"}</p>
 								{description && <p className="whitespace-pre-wrap text-[#444746]">{description}</p>}
@@ -661,10 +946,18 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 					</div>
 					{canSave && <Ctl onClick={() => (recording ? void stopRecording() : startRecording())} label={recording ? "Stop recording" : "Record the meeting"} icon={recording ? <span className="h-3.5 w-3.5 rounded-sm bg-white" /> : <Circle className="h-5 w-5 fill-[#ea4335] text-[#ea4335]" />} active={false} danger={recording} className="hidden md:flex" />}
 					<Ctl onClick={() => setMoreOpen(true)} label="More options" icon={<MoreVertical className="h-5 w-5" />} className="md:hidden" />
-					<Ctl onClick={pip} label="Picture in picture" icon={<PictureInPicture2 className="h-5 w-5" />} className="hidden md:flex" />
+					<div className="relative hidden md:block">
+							<Ctl onClick={() => setReactOpen((v) => !v)} label="Send a reaction (R)" icon={<Smile className="h-5 w-5" />} active={reactOpen} />
+							{reactOpen && <ReactionPicker onPick={react} onClose={() => setReactOpen(false)} />}
+						</div>
+						<Ctl onClick={dockCall} label={canSave || embedded ? "Picture in picture: keep the call while you work in other suites" : "Picture in picture"} icon={<PictureInPicture2 className="h-5 w-5" />} className="hidden md:flex" />
 					<button onClick={leave} aria-label="Leave call" title="Leave call" className="flex h-12 w-16 items-center justify-center rounded-full bg-[#ea4335] hover:bg-[#d93025]"><PhoneOff className="h-5 w-5" /></button>
 				</div>
 				<div className="hidden items-center gap-1 md:flex">
+					<div className="relative">
+						<Ctl onClick={() => setPanel((p) => (p === "chat" ? "none" : "chat"))} label="Messages (T)" icon={<MessageCircle className="h-5 w-5" />} active={panel === "chat"} flat />
+						{unreadChat > 0 && panel !== "chat" && <span className="pointer-events-none absolute right-0.5 top-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-[#ea4335] px-1 text-[10px] font-bold">{unreadChat > 9 ? "9+" : unreadChat}</span>}
+					</div>
 					<Ctl onClick={() => setPanel((p) => (p === "info" ? "none" : "info"))} label="Meeting details" icon={<Info className="h-5 w-5" />} active={panel === "info"} flat />
 					<Ctl onClick={() => setPanel((p) => (p === "people" ? "none" : "people"))} label="People" icon={<Users className="h-5 w-5" />} active={panel === "people"} flat />
 					<Ctl onClick={() => setPanel((p) => (p === "transcript" ? "none" : "transcript"))} label="Transcript" icon={<MessageSquareText className="h-5 w-5" />} active={panel === "transcript"} flat />
@@ -693,6 +986,9 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 							[handUp ? "Lower hand" : "Raise hand", <Hand key="h" className="h-5 w-5" />, () => { toggleHand(); setMoreOpen(false); }, handUp],
 							[captionsOn ? "Turn off captions" : "Turn on captions", <Captions key="c" className="h-5 w-5" />, () => setCaptionsOn((v) => !v), captionsOn],
 							...(canSave ? [[recording ? "Stop recording" : "Record the meeting", <Circle key="rec" className="h-5 w-5 fill-[#ea4335] text-[#ea4335]" />, () => { setMoreOpen(false); if (recording) void stopRecording(); else startRecording(); }, recording]] : []),
+							["Reactions", <Smile key="re" className="h-5 w-5" />, () => { setMoreOpen(false); setReactOpen(true); }, false],
+							["Messages", <MessageCircle key="ch" className="h-5 w-5" />, () => { setPanel("chat"); setMoreOpen(false); }, panel === "chat"],
+							["Picture in picture", <PictureInPicture2 key="pp" className="h-5 w-5" />, () => { setMoreOpen(false); void dockCall(); }, false],
 							["People", <Users key="u" className="h-5 w-5" />, () => { setPanel("people"); setMoreOpen(false); }, false],
 							["Meeting details", <Info key="i" className="h-5 w-5" />, () => { setPanel("info"); setMoreOpen(false); }, false],
 							["Transcript", <MessageSquareText key="t" className="h-5 w-5" />, () => { setPanel("transcript"); setMoreOpen(false); }, false],
@@ -732,20 +1028,50 @@ function ScreenPreview({ stream }: { stream: MediaStream | null }) {
 
 function initials(n: string) { return n.trim().split(/\s+/).map((p) => p[0]).slice(0, 2).join("").toUpperCase() || "?"; }
 
-function RemoteTile({ r, sinkId, audioOn }: { r: Remote; sinkId: string; audioOn: boolean }) {
+/** True while the person is talking: a quiet analyser on their audio, checked a few times a second. */
+function useSpeaking(stream: MediaStream | null, muted: boolean) {
+	const [on, setOn] = useState(false);
+	useEffect(() => {
+		if (!stream || muted || !stream.getAudioTracks().length) { setOn(false); return; }
+		let ctx: AudioContext | null = null;
+		let timer: ReturnType<typeof setInterval> | null = null;
+		try {
+			ctx = new AudioContext();
+			const an = ctx.createAnalyser();
+			an.fftSize = 256;
+			ctx.createMediaStreamSource(stream).connect(an);
+			const buf = new Uint8Array(an.frequencyBinCount);
+			timer = setInterval(() => {
+				an.getByteFrequencyData(buf);
+				const avg = buf.reduce((x, y) => x + y, 0) / buf.length;
+				setOn((cur) => (cur === avg > 14 ? cur : avg > 14));
+			}, 180);
+		} catch { /* no analyser */ }
+		return () => { if (timer) clearInterval(timer); ctx?.close().catch(() => undefined); };
+	}, [stream, muted]);
+	return on;
+}
+
+function RemoteTile({ r, sinkId, audioOn, reaction, pinned, onPin }: { r: Remote; sinkId: string; audioOn: boolean; reaction?: string; pinned: boolean; onPin: () => void }) {
 	const ref = useRef<HTMLVideoElement>(null);
-	const hasVideo = !!r.stream?.getVideoTracks().some((t) => t.readyState === "live" && !t.muted);
+	// The other person's own word on their camera wins: a switched-off camera still sends black frames.
+	const hasVideo = r.cam !== false && !!r.stream?.getVideoTracks().some((t) => t.readyState === "live" && !t.muted);
+	const speaking = useSpeaking(r.stream, r.muted);
 	useEffect(() => { if (ref.current && r.stream) ref.current.srcObject = r.stream; }, [r.stream]);
 	useEffect(() => {
 		const el = ref.current as (HTMLVideoElement & { setSinkId?: (id: string) => Promise<void> }) | null;
 		if (el?.setSinkId && sinkId) el.setSinkId(sinkId).catch(() => undefined);
 	}, [sinkId]);
 	return (
-		<div className="relative flex min-h-[120px] items-center justify-center overflow-hidden rounded-2xl bg-[#2a2a2a]">
+		<div className={cn("group relative flex h-full min-h-[120px] items-center justify-center overflow-hidden rounded-2xl bg-[#2a2a2a] ring-2 transition", speaking ? "ring-[#7fd3e0]" : "ring-transparent")}>
 			<video ref={ref} data-remote="1" data-rec-video="1" autoPlay playsInline muted={!audioOn} className={cn("h-full w-full object-cover", !hasVideo && "invisible absolute")} />
 			{!hasVideo && <span className="flex h-16 w-16 items-center justify-center rounded-full bg-[#4b5563] text-xl font-semibold">{initials(r.name)}</span>}
+			{r.cam === false && <span className="absolute left-2 top-2 flex items-center gap-1 rounded-md bg-black/60 px-2 py-1 text-xs"><VideoOff className="h-3 w-3" /> Camera off</span>}
 			{!r.stream && <Loader2 className="absolute right-3 top-3 h-4 w-4 animate-spin text-white/60" />}
-			<span className="absolute bottom-2 left-2 flex items-center gap-1.5 rounded-md bg-black/60 px-2 py-1 text-xs">{r.muted && <MicOff className="h-3 w-3" />}{r.name}</span>
+			{r.hand && <span className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-[#068297]"><Hand className="h-4 w-4" /></span>}
+			{reaction && <span className="absolute bottom-2 right-2 text-3xl drop-shadow">{reaction}</span>}
+			<button onClick={onPin} aria-label={pinned ? `Unpin ${r.name}` : `Pin ${r.name}`} className={cn("absolute right-2 flex h-7 w-7 items-center justify-center rounded-full bg-black/50 opacity-0 transition hover:bg-black/70 focus:opacity-100 group-hover:opacity-100", r.hand ? "top-11" : "top-2")}>{pinned ? <PinOff className="h-3.5 w-3.5" /> : <Pin className="h-3.5 w-3.5" />}</button>
+			<span className="absolute bottom-2 left-2 flex max-w-[80%] items-center gap-1.5 rounded-md bg-black/60 px-2 py-1 text-xs">{r.muted && <MicOff className="h-3 w-3 shrink-0" />}<span className="truncate">{r.name}</span></span>
 		</div>
 	);
 }

@@ -7,9 +7,9 @@ import { MeetRoom } from "@/components/meet/MeetRoom";
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Call | Sauti Salama", robots: { index: false, follow: false } };
 
-export default async function MeetPage({ params, searchParams }: { params: Promise<{ code: string }>; searchParams: Promise<{ embed?: string }> }) {
+export default async function MeetPage({ params, searchParams }: { params: Promise<{ code: string }>; searchParams: Promise<{ embed?: string; autojoin?: string; mic?: string; cam?: string }> }) {
 	const { code } = await params;
-	const { embed } = await searchParams;
+	const { embed, autojoin, mic, cam } = await searchParams;
 	if (!/^[a-z0-9]{3}-[a-z0-9]{4}-[a-z0-9]{3}$/.test(code)) notFound();
 	const { data } = await looseAdmin().from("mjengo_meetings").select("title, mode, ended_at, description, resources").eq("code", code).maybeSingle();
 	if (!data) notFound();
@@ -24,6 +24,9 @@ export default async function MeetPage({ params, searchParams }: { params: Promi
 			defaultName={actor?.name ?? ""}
 			canSave={!!actor?.isAdmin}
 			embedded={embed === "1"}
+			autoJoin={autojoin === "1"}
+			startMic={mic !== "0"}
+			startCam={cam !== "0"}
 		/>
 	);
 }
