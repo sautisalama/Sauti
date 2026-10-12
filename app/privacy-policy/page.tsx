@@ -15,7 +15,7 @@ export default function PrivacyPolicy() {
 						
 						<div className="prose prose-lg max-w-none">
 							<p className="text-gray-600 mb-6 text-center">
-								<strong>Last Updated:</strong> {new Date().toLocaleDateString()}
+								<strong>Last Updated:</strong> 12 October 2026
 							</p>
 
 							<div className="space-y-8">
@@ -125,6 +125,33 @@ export default function PrivacyPolicy() {
 									</ul>
 									<p className="text-gray-700 leading-relaxed">
 										Despite our security measures, no method of transmission over the internet is 100% secure. We cannot guarantee absolute security but are committed to protecting your information to the best of our ability.
+									</p>
+								</section>
+
+								<section id="google-user-data">
+									<h2 className="text-2xl font-semibold text-gray-800 mb-4">5A. Google user data</h2>
+									<p className="text-gray-700 leading-relaxed mb-4">
+										Sauti Salama staff and professionals can connect their own Google account to our platform. This section explains what we access when they do, and why.
+									</p>
+									<h3 className="text-xl font-medium text-gray-700 mb-3">What we access</h3>
+									<ul className="list-disc pl-6 text-gray-700 space-y-2 mb-4">
+										<li><strong>Gmail</strong> (scope <code>https://mail.google.com/</code>): messages and folders in the account the user connects, so they can read, search, reply to, archive and delete mail inside our team mail client. We connect over IMAP and SMTP with OAuth, which needs this scope.</li>
+										<li><strong>Google Calendar</strong> (scopes <code>calendar.events</code> and <code>calendar.readonly</code>): the user&apos;s calendars and events, so we can create, update and cancel appointment and meeting events on their calendar and show when they are free.</li>
+										<li><strong>Basic profile</strong> (<code>openid</code>, email and profile): to sign in and to show the user&apos;s name and email address.</li>
+									</ul>
+									<h3 className="text-xl font-medium text-gray-700 mb-3">How we use it</h3>
+									<p className="text-gray-700 leading-relaxed mb-4">
+										Google user data is used only to provide these user-facing features to the person who connected the account. Optional features that the user starts themselves, such as summarising or drafting a reply to a message, act only on the message the user chose. We do not sell Google user data, we do not use it for advertising or to build advertising profiles, and we do not use it to train generalised AI or machine-learning models. We do not allow people to read a user&apos;s Google data, except where the user asks us to, where it is needed for security or to follow the law, or where the data is aggregated and anonymised.
+									</p>
+									<h3 className="text-xl font-medium text-gray-700 mb-3">Limited Use</h3>
+									<p className="text-gray-700 leading-relaxed mb-4">
+										Sauti Salama&apos;s use and transfer to any other app of information received from Google APIs will adhere to the{" "}
+										<a className="text-blue-700 underline" href="https://developers.google.com/terms/api-services-user-data-policy#additional_requirements_for_specific_api_scopes" target="_blank" rel="noreferrer">Google API Services User Data Policy</a>, including the Limited Use requirements.
+									</p>
+									<h3 className="text-xl font-medium text-gray-700 mb-3">Storage, sharing and removal</h3>
+									<p className="text-gray-700 leading-relaxed">
+										Connection tokens are stored encrypted and are used only to act for the user who connected the account. Mail is read from Google when it is needed. Recently opened messages are cached only in the user&apos;s own browser so they stay readable without a connection, and we do not keep a copy of mail on our servers. A user can disconnect their account in the app at any time, and can also remove our access at{" "}
+										<a className="text-blue-700 underline" href="https://myaccount.google.com/permissions" target="_blank" rel="noreferrer">myaccount.google.com/permissions</a>. When an account is disconnected we delete the stored tokens. To ask for any other Google-related data to be deleted, write to privacy@sautisalama.org.
 									</p>
 								</section>
 

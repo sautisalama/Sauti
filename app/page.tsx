@@ -12,7 +12,7 @@ export const revalidate = 300;
  * and Charity ID in the footer are present in the initial HTML.
  */
 export const metadata: Metadata = {
-	title: "GBV Support in Kenya — Free & Confidential Help for Survivors",
+	title: { absolute: "Sauti Salama | GBV Support in Kenya — Free & Confidential Help for Survivors" },
 	description:
 		"Sauti Salama is a survivor-led Kenyan non-profit in Nairobi offering free, confidential gender-based violence support: counselling, safe shelter referrals, legal aid and anonymous reporting. Get help today.",
 	alternates: { canonical: "/" },
