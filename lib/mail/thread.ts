@@ -84,7 +84,7 @@ ${FRAME_CSS}`;
 export function messageDoc(opts: { html: string | null; text: string }): { doc: string; trimmed: boolean } {
   const raw = opts.html ?? `<pre style="font:inherit">${esc(opts.text)}</pre>`;
   const { html, trimmed } = trimQuoted(raw);
-  return { doc: `<!doctype html><html><head><meta charset="utf-8"><base target="_blank"><style>${CSS}</style></head><body>${html}</body></html>`, trimmed };
+  return { doc: `<!doctype html><html><head><meta charset="utf-8"><meta name="referrer" content="no-referrer"><base target="_blank"><style>${CSS}</style></head><body>${html}</body></html>`, trimmed };
 }
 
 /** Soft, low-saturation tints for the people in a conversation: enough to tell them apart, never loud. */

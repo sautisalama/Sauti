@@ -199,15 +199,33 @@ const toAddresses = (v: ParsedMail['from'] | ParsedMail['to'] | undefined): Addr
   return list.map((a) => ({ name: a.name || '', address: a.address || '' }));
 };
 
-/** Email HTML is untrusted: keep formatting, drop scripts/forms/handlers, optionally block remote images. */
+/**
+ * Email HTML is untrusted: keep formatting and pictures, drop scripts, forms and handlers. Pictures always load
+ * (this is the team's own mail), including ones written as //host/x.png, with srcset, as table backgrounds or
+ * in the message's own style block; insecure http pictures are upgraded to https. The message is shown in a
+ * frame with no scripts, so its CSS cannot reach the app.
+ */
 export function cleanHtml(html: string, allowImages: boolean): string {
+  const upgrade = (u: string | undefined) => (u ? u.replace(/^\s*http:\/\//i, 'https://') : u);
   return sanitizeHtml(html, {
-    allowedTags: sanitizeHtml.defaults.allowedTags.concat(['img', 'span', 'font', 'center', 'style', 'table', 'thead', 'tbody', 'tr', 'td', 'th', 'h1', 'h2', 'h3']).filter((t) => t !== 'style'),
-    allowedAttributes: { '*': ['style', 'align', 'width', 'height', 'bgcolor', 'color', 'class'], a: ['href', 'name', 'target', 'rel'], img: ['src', 'alt', 'width', 'height'], td: ['colspan', 'rowspan', 'align', 'valign'], th: ['colspan', 'rowspan'] },
+    allowedTags: sanitizeHtml.defaults.allowedTags.concat(['img', 'span', 'font', 'center', 'style', 'table', 'thead', 'tbody', 'tr', 'td', 'th', 'h1', 'h2', 'h3', 'picture', 'source']),
+    allowedAttributes: {
+      '*': ['style', 'align', 'width', 'height', 'bgcolor', 'color', 'class', 'background', 'valign', 'border', 'cellpadding', 'cellspacing', 'dir'],
+      a: ['href', 'name', 'target', 'rel'],
+      img: ['src', 'srcset', 'alt', 'width', 'height', 'style', 'border', 'align'],
+      source: ['srcset', 'media', 'type'],
+      td: ['colspan', 'rowspan', 'align', 'valign'],
+      th: ['colspan', 'rowspan'],
+    },
     allowedSchemes: ['http', 'https', 'mailto', 'tel', 'cid', 'data'],
     allowedSchemesByTag: { img: allowImages ? ['http', 'https', 'cid', 'data'] : ['cid', 'data'] },
-    transformTags: { a: sanitizeHtml.simpleTransform('a', { target: '_blank', rel: 'noopener noreferrer nofollow' }) },
-    allowProtocolRelative: false,
+    allowedSchemesAppliedToAttributes: ['href', 'src', 'background'],
+    transformTags: {
+      a: sanitizeHtml.simpleTransform('a', { target: '_blank', rel: 'noopener noreferrer nofollow' }),
+      img: (tag, attribs) => ({ tagName: 'img', attribs: { ...attribs, ...(attribs.src ? { src: upgrade(attribs.src)! } : {}) } }),
+    },
+    allowProtocolRelative: true,
+    allowVulnerableTags: true,
   });
 }
 
