@@ -4,7 +4,7 @@ import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { MjengoLoader } from "../../_components/MjengoLoader";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { Canvas, Circle, FabricImage, Gradient, Line, Path, Rect, Textbox, Triangle, type FabricObject } from "fabric";
+import { ActiveSelection, Canvas, Circle, FabricImage, Gradient, Group, Line, Path, PencilBrush, Rect, Shadow, Textbox, Triangle, filters, type FabricObject } from "fabric";
 import { AlignCenter, AlignLeft, AlignRight, ArrowLeft, Bold, Copy, Download, Image as ImageIcon, Italic, Gift, Layers, LayoutTemplate, Loader2, Redo2, Save, Shapes, Sparkles, Trash2, Type, Undo2, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -20,7 +20,9 @@ import { ensureFont } from "@/lib/mjengo/fonts";
 import { TemplatePreview } from "@/components/design/TemplatePreview";
 import { inspireImage } from "@/app/actions/mjengo-inspire";
 import { InspirePanel } from "./_InspirePanel";
-import { splitIntoLayers, type LayerSplit } from "@/lib/client/split-layers";
+import { removeBackground, splitIntoLayers, type LayerSplit } from "@/lib/client/split-layers";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { PDFDocument } from "pdf-lib";
 import { ElementsPanel, FontPicker, TextPanel, UploadsPanel, type ShapeKind, type TextPreset } from "./_Panels";
 import { CONCEPTS, conceptTemplate, generateTemplate, templateFromId } from "@/lib/mjengo/design-generator";
 import { FONT_OPTIONS } from "@/lib/mjengo/fonts";
@@ -40,7 +42,7 @@ const SIZES = [
 	{ id: "poster", label: "A4 poster", w: 1240, h: 1754 },
 ] as const;
 
-type Panel = "templates" | "text" | "shapes" | "uploads" | "inspire";
+type Panel = "templates" | "text" | "shapes" | "uploads" | "inspire" | "brand";
 type Builder = (c: Canvas, w: number, h: number) => void;
 
 // Fabric 7 positions objects by their centre unless told otherwise; everything here is placed by its top-left corner.
@@ -116,6 +118,15 @@ function DesignEditor() {
 		return SIZES.find((x) => x.id === want) ?? SIZES[0];
 	});
 	const [ideaSeed, setIdeaSeed] = useState(1);
+	const [uiReady, setUiReady] = useState(false);
+	useEffect(() => setUiReady(true), []);
+	const [drawing, setDrawing] = useState<{ on: boolean; color: string; width: number }>({ on: false, color: "#0E1318", width: 8 });
+	const [guides, setGuides] = useState<{ v: number | null; h: number | null }>({ v: null, h: null });
+	const [magic, setMagic] = useState<string | null>(null);
+	const [checks, setChecks] = useState<{ ok: boolean; items: string[] } | null>(null);
+	const [brand, setBrand] = useState<{ colours: string[]; fonts: string[]; logo: string | null }>({ colours: ["#068297", "#7D2AE8", "#FFDE59", "#0E1318", "#FFFFFF"], fonts: ["Poppins", "Inter"], logo: "/Logo.png" });
+	useEffect(() => { try { const b = localStorage.getItem("ss_design_brand"); if (b) setBrand(JSON.parse(b)); } catch { /* defaults */ } }, []);
+	const saveBrand = (b: typeof brand) => { setBrand(b); try { localStorage.setItem("ss_design_brand", JSON.stringify(b)); } catch { /* ignore */ } };
 	const [zoomMul, setZoomMul] = useState(1);
 	const zoomRef = useRef(1);
 	zoomRef.current = zoomMul;
@@ -209,7 +220,7 @@ function DesignEditor() {
 			const c = canvas.current;
 			if (!row || !d?.json || !c) return;
 			const match = SIZES.find((x) => x.w === d.w && x.h === d.h);
-			if (match) setSize(match);
+			if (match) setSize(match); else if (d.w && d.h) setSize({ id: "custom", label: "Custom", w: d.w, h: d.h } as never);
 			setName(isCopy ? `${row.name} copy` : row.name);
 			history.current.lock = true;
 			await c.loadFromJSON(d.json as never);
@@ -221,19 +232,83 @@ function DesignEditor() {
 		unwrap(listAssets()).then(setAssets).catch(() => setAssets([]));
 	}, []);
 
-	// Keyboard: delete, undo, redo.
+	// Keyboard: the shortcuts people know from Canva and Figma.
+	const clip = useRef<FabricObject | null>(null);
 	useEffect(() => {
-		const onKey = (e: KeyboardEvent) => {
-			if ((e.target as HTMLElement)?.closest("input, textarea, select")) return;
+		const onKey = async (e: KeyboardEvent) => {
+			if ((e.target as HTMLElement)?.closest("input, textarea, select, [contenteditable=true]")) return;
 			const c = canvas.current;
-			const active = c?.getActiveObject() as (FabricObject & { isEditing?: boolean }) | undefined;
-			if ((e.key === "Delete" || e.key === "Backspace") && active && !active.isEditing) { c?.remove(active); c?.discardActiveObject(); c?.renderAll(); }
-			if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") { e.preventDefault(); restore(history.current.at + (e.shiftKey ? 1 : -1)); }
+			if (!c) return;
+			const active = c.getActiveObject() as (FabricObject & { isEditing?: boolean }) | undefined;
+			if (active?.isEditing) return;
+			const mod = e.ctrlKey || e.metaKey;
+			const k = e.key.toLowerCase();
+			if ((e.key === "Delete" || e.key === "Backspace") && active) { e.preventDefault(); const objs = active.type === "activeselection" ? (active as ActiveSelection).getObjects() : [active]; c.discardActiveObject(); objs.forEach((x) => c.remove(x)); c.requestRenderAll(); return; }
+			if (mod && k === "z") { e.preventDefault(); restore(history.current.at + (e.shiftKey ? 1 : -1)); return; }
+			if (mod && k === "y") { e.preventDefault(); restore(history.current.at + 1); return; }
+			if (mod && k === "s") { e.preventDefault(); void saveDesignRef.current(false); return; }
+			if (mod && k === "a") { e.preventDefault(); c.discardActiveObject(); const all = c.getObjects().filter((x) => x.selectable !== false); if (all.length) { c.setActiveObject(new ActiveSelection(all, { canvas: c })); c.requestRenderAll(); } return; }
+			if (mod && k === "c" && active) { e.preventDefault(); clip.current = await active.clone(); return; }
+			if (mod && k === "v" && clip.current) { e.preventDefault(); const copy = await clip.current.clone(); copy.set({ left: (copy.left ?? 0) + 24, top: (copy.top ?? 0) + 24 }); clip.current = copy; c.add(copy); c.setActiveObject(copy); c.requestRenderAll(); return; }
+			if (mod && k === "d" && active) { e.preventDefault(); const copy = await active.clone(); copy.set({ left: (active.left ?? 0) + 24, top: (active.top ?? 0) + 24 }); c.add(copy); c.setActiveObject(copy); c.requestRenderAll(); return; }
+			if (mod && k === "g") { e.preventDefault(); groupRef.current(); return; }
+			if (e.key === "Escape") { c.discardActiveObject(); c.requestRenderAll(); return; }
+			if (active && e.key.startsWith("Arrow")) {
+				e.preventDefault();
+				const step = e.shiftKey ? 10 : 1;
+				const dx = e.key === "ArrowLeft" ? -step : e.key === "ArrowRight" ? step : 0;
+				const dy = e.key === "ArrowUp" ? -step : e.key === "ArrowDown" ? step : 0;
+				active.set({ left: (active.left ?? 0) + dx, top: (active.top ?? 0) + dy });
+				active.setCoords();
+				c.requestRenderAll();
+				snapshot();
+				return;
+			}
+			if (active && e.key === "]") { c.bringObjectForward(active); c.requestRenderAll(); snapshot(); }
+			if (active && e.key === "[") { c.sendObjectBackwards(active); c.requestRenderAll(); snapshot(); }
 		};
 		window.addEventListener("keydown", onKey);
 		return () => window.removeEventListener("keydown", onKey);
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, []);
+
+	// Smart guides: objects snap to the page's edges and middle while they move.
+	useEffect(() => {
+		const c = canvas.current;
+		if (!c) return;
+		const onMove = (ev: { target?: FabricObject }) => {
+			const o2 = ev.target;
+			if (!o2) return;
+			const z = c.getZoom() || 1;
+			const T = 6 / z;
+			const W = sizeRef.current.w, H = sizeRef.current.h;
+			const ac = o2.getCoords();
+			const xs = ac.map((p) => p.x), ys = ac.map((p) => p.y);
+			const l = Math.min(...xs), r = Math.max(...xs), t = Math.min(...ys), b = Math.max(...ys);
+			const cx = (l + r) / 2, cy = (t + b) / 2;
+			let v: number | null = null, h: number | null = null;
+			for (const [pos, target] of [[l, 0], [cx, W / 2], [r, W]] as const) if (Math.abs(pos - target) < T) { o2.set({ left: (o2.left ?? 0) + (target - pos) }); v = target; break; }
+			for (const [pos, target] of [[t, 0], [cy, H / 2], [b, H]] as const) if (Math.abs(pos - target) < T) { o2.set({ top: (o2.top ?? 0) + (target - pos) }); h = target; break; }
+			setGuides({ v, h });
+		};
+		const clear = () => setGuides({ v: null, h: null });
+		c.on("object:moving", onMove as never);
+		c.on("mouse:up", clear);
+		return () => { c.off("object:moving", onMove as never); c.off("mouse:up", clear); };
+	}, []);
+
+	// Freehand drawing.
+	useEffect(() => {
+		const c = canvas.current;
+		if (!c) return;
+		c.isDrawingMode = drawing.on;
+		if (drawing.on) {
+			const brush = new PencilBrush(c);
+			brush.color = drawing.color;
+			brush.width = drawing.width;
+			c.freeDrawingBrush = brush;
+		}
+	}, [drawing]);
 
 	/* ------------------------------------------------------------ actions */
 	const changeSize = (s: (typeof SIZES)[number]) => {
@@ -370,7 +445,7 @@ function DesignEditor() {
 		const d = t.data as { json?: unknown; w?: number; h?: number };
 		if (!c || !d.json) return;
 		const match = SIZES.find((s) => s.w === d.w && s.h === d.h);
-		if (match) setSize(match);
+		if (match) setSize(match); else if (d.w && d.h) setSize({ id: "custom", label: "Custom", w: d.w, h: d.h } as never);
 		history.current.lock = true;
 		await c.loadFromJSON(d.json as never);
 		history.current.lock = false;
@@ -452,7 +527,220 @@ function DesignEditor() {
 		snapshot();
 		bump((n) => n + 1);
 	};
-	const dataUrl = () => canvas.current!.toDataURL({ format: "png", multiplier: 1 / scale });
+	const dataUrl = (mult = 1, format: "png" | "jpeg" = "png") => canvas.current!.toDataURL({ format, quality: 0.92, multiplier: mult / scale });
+	const flat = (fn: () => void) => { const c = canvas.current; if (!c) return; c.discardActiveObject(); c.requestRenderAll(); fn(); };
+	const fileBase = () => (name || "design").replace(/[\\/:*?"<>|]+/g, " ").trim();
+	const saveBlob = (blob: Blob, filename: string) => { const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = filename; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 20_000); };
+
+	/** Download in the format asked for: PNG, a sharper 2x PNG, transparent PNG, JPG, SVG or a one-page PDF. */
+	const exportAs = async (kind: "png" | "png2" | "transparent" | "jpg" | "svg" | "pdf") => {
+		const c = canvas.current;
+		if (!c) return;
+		flat(() => undefined);
+		try {
+			if (kind === "svg") {
+				const svg = c.toSVG({ width: `${size.w}`, height: `${size.h}`, viewBox: { x: 0, y: 0, width: size.w, height: size.h } } as never);
+				saveBlob(new Blob([svg], { type: "image/svg+xml" }), `${fileBase()}.svg`);
+			} else if (kind === "pdf") {
+				const png = await (await fetch(dataUrl(1))).arrayBuffer();
+				const doc = await PDFDocument.create();
+				const pg = doc.addPage([size.w * 0.75, size.h * 0.75]);
+				const img = await doc.embedPng(png);
+				pg.drawImage(img, { x: 0, y: 0, width: pg.getWidth(), height: pg.getHeight() });
+				saveBlob(new Blob([new Uint8Array(await doc.save())], { type: "application/pdf" }), `${fileBase()}.pdf`);
+			} else if (kind === "transparent") {
+				const prev = c.backgroundColor;
+				c.backgroundColor = "rgba(0,0,0,0)";
+				c.requestRenderAll();
+				const url = dataUrl(1);
+				c.backgroundColor = prev;
+				c.requestRenderAll();
+				saveBlob(await (await fetch(url)).blob(), `${fileBase()} transparent.png`);
+			} else {
+				const blob = await (await fetch(kind === "jpg" ? dataUrl(1, "jpeg") : dataUrl(kind === "png2" ? 2 : 1))).blob();
+				saveBlob(blob, `${fileBase()}${kind === "png2" ? "@2x" : ""}.${kind === "jpg" ? "jpg" : "png"}`);
+			}
+		} catch (e) {
+			toast({ title: "Could not download", description: e instanceof Error ? e.message : undefined, variant: "destructive" });
+		}
+	};
+
+	/** Keep a copy of the design as it is now, without changing which design is open. */
+	const saveCopy = async (label: string) => {
+		const c = canvas.current;
+		if (!c) return;
+		const thumb = c.toDataURL({ format: "jpeg", quality: 0.7, multiplier: Math.min(1, 360 / size.w) / scale });
+		await unwrap(saveTemplate(null, { kind: "design", name: `${name || "Untitled design"} ${label}`, data: { json: c.toJSON(), w: size.w, h: size.h, thumb, template: false } }));
+	};
+
+	const groupSel = () => {
+		const c = canvas.current;
+		const sel = c?.getActiveObject();
+		if (!c || !sel) return;
+		if (sel.type === "activeselection") {
+			const objs = (sel as ActiveSelection).getObjects();
+			c.discardActiveObject();
+			objs.forEach((x) => c.remove(x));
+			const g = new Group(objs);
+			c.add(g);
+			c.setActiveObject(g);
+		} else if (sel.type === "group") {
+			const g = sel as Group;
+			const objs = g.removeAll();
+			c.discardActiveObject();
+			c.remove(g);
+			objs.forEach((x) => c.add(x));
+			c.setActiveObject(new ActiveSelection(objs, { canvas: c }));
+		}
+		c.requestRenderAll();
+		snapshot();
+		bump((n) => n + 1);
+	};
+	const groupRef = useRef(groupSel);
+	groupRef.current = groupSel;
+
+	const alignPage = (to: "left" | "center" | "right" | "top" | "middle" | "bottom") => {
+		const c = canvas.current;
+		const t = c?.getActiveObject();
+		if (!c || !t) return;
+		const co = t.getCoords();
+		const xs = co.map((p) => p.x), ys = co.map((p) => p.y);
+		const l = Math.min(...xs), r = Math.max(...xs), tp = Math.min(...ys), bt = Math.max(...ys);
+		const W = size.w, H = size.h;
+		const dx = to === "left" ? -l : to === "right" ? W - r : to === "center" ? W / 2 - (l + r) / 2 : 0;
+		const dy = to === "top" ? -tp : to === "bottom" ? H - bt : to === "middle" ? H / 2 - (tp + bt) / 2 : 0;
+		t.set({ left: (t.left ?? 0) + dx, top: (t.top ?? 0) + dy });
+		t.setCoords();
+		c.requestRenderAll();
+		snapshot();
+	};
+
+	/** Remove the background from the selected picture. Runs on this device. */
+	const removeBg = async () => {
+		const c = canvas.current;
+		const sel = c?.getActiveObject();
+		if (!c || !sel || sel.type !== "image") return;
+		const img = sel as FabricImage;
+		setMagic("Removing the background (the first time downloads a small model)");
+		try {
+			const out = await removeBackground(img.toDataURL({ format: "png", multiplier: 1 }));
+			if (!out) throw new Error("No subject found");
+			const next = await FabricImage.fromURL(out);
+			const k = img.getScaledWidth() / (next.width ?? 1);
+			next.set({ left: img.left, top: img.top, originX: img.originX, originY: img.originY, scaleX: k, scaleY: k, angle: img.angle });
+			const at = c.getObjects().indexOf(img);
+			c.remove(img);
+			c.insertAt(at, next);
+			c.setActiveObject(next);
+			c.requestRenderAll();
+			snapshot();
+		} catch {
+			toast({ title: "Could not remove the background", description: "No clear subject was found, or this device could not run the model.", variant: "destructive" });
+		} finally {
+			setMagic(null);
+		}
+	};
+
+	/** Ask the writing model for text: streams back and returns the whole answer. */
+	const aiText = async (prompt: string, selection: string) => {
+		const res = await fetch("/api/mjengo/ai/complete", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ prompt, action: "write", selection, document: "" }) });
+		if (!res.ok || !res.body) throw new Error("The AI service is unavailable.");
+		const reader = res.body.getReader();
+		const dec = new TextDecoder();
+		let acc = "";
+		for (;;) { const { done, value } = await reader.read(); if (done) break; acc += dec.decode(value, { stream: true }); }
+		return acc.trim().replace(/^["“]|["”]$/g, "");
+	};
+	const writeWithAi = async (instruction: string) => {
+		const c = canvas.current;
+		const t = c?.getActiveObject() as Textbox | undefined;
+		if (!c || !t || !("text" in t)) return toast({ title: "Select some text first" });
+		setMagic("Writing");
+		try {
+			const out = await aiText(`${instruction}. Keep it short enough to fit on a social media graphic. Reply with only the new text.`, String(t.text ?? ""));
+			t.set({ text: out });
+			t.initDimensions();
+			c.requestRenderAll();
+			snapshot();
+		} catch (e) {
+			toast({ title: "Could not write", description: e instanceof Error ? e.message : undefined, variant: "destructive" });
+		} finally { setMagic(null); }
+	};
+	const translateAll = async (lang: string) => {
+		const c = canvas.current;
+		if (!c) return;
+		const texts = c.getObjects().filter((x) => x.type === "textbox") as Textbox[];
+		if (!texts.length) return toast({ title: "There is no text to translate" });
+		setMagic(`Translating to ${lang}`);
+		try {
+			for (const t of texts) {
+				const out = await aiText(`Translate this text into ${lang}. Keep the tone and meaning. Reply with only the translation.`, String(t.text ?? ""));
+				if (out) { t.set({ text: out }); t.initDimensions(); }
+			}
+			c.requestRenderAll();
+			snapshot();
+		} catch (e) {
+			toast({ title: "Could not translate", description: e instanceof Error ? e.message : undefined, variant: "destructive" });
+		} finally { setMagic(null); }
+	};
+
+	const lum = (hex: string) => {
+		const m = /^#?([0-9a-f]{6})$/i.exec(hex);
+		if (!m) return 0;
+		const n = parseInt(m[1], 16);
+		const f = (v: number) => { const x = v / 255; return x <= 0.03928 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4; };
+		return 0.2126 * f((n >> 16) & 255) + 0.7152 * f((n >> 8) & 255) + 0.0722 * f(n & 255);
+	};
+	/** Accessibility: is the text readable against what is behind it, and is any of it too small? */
+	const checkDesign = () => {
+		const c = canvas.current;
+		if (!c) return;
+		const items: string[] = [];
+		const texts = c.getObjects().filter((x) => x.type === "textbox") as Textbox[];
+		const bg = typeof c.backgroundColor === "string" ? c.backgroundColor : "#FFFFFF";
+		const hexOf = (v: unknown) => (typeof v === "string" && /^#[0-9a-f]{6}$/i.test(v) ? v : null);
+		for (const t of texts) {
+			const fg = hexOf(t.fill);
+			if (!fg) continue;
+			// What is directly under the text: the nearest filled shape that covers its middle, else the page.
+			const cx = (t.left ?? 0) + t.getScaledWidth() / 2, cy = (t.top ?? 0) + t.getScaledHeight() / 2;
+			const under = [...c.getObjects()].slice(0, c.getObjects().indexOf(t)).reverse().find((x) => (x.type === "rect" || x.type === "circle") && hexOf(x.fill) && x.containsPoint({ x: cx, y: cy } as never));
+			const back = hexOf(under?.fill) ?? hexOf(bg) ?? "#FFFFFF";
+			const [hi, lo] = [lum(fg), lum(back)].sort((a, b) => b - a);
+			const ratio = (hi + 0.05) / (lo + 0.05);
+			const px = (t.fontSize ?? 20) * (t.scaleY ?? 1);
+			const large = px >= size.h * 0.045;
+			const label = `"${String(t.text ?? "").slice(0, 28)}"`;
+			if (ratio < (large ? 3 : 4.5)) items.push(`${label} is hard to read: contrast ${ratio.toFixed(1)} to 1 (aim for ${large ? "3" : "4.5"}).`);
+			if (px < size.h * 0.02) items.push(`${label} is very small for a social post.`);
+		}
+		if (texts.length === 0) items.push("There is no text on the page.");
+		setChecks({ ok: items.length === 0, items });
+	};
+
+	/** Swap one picture's filters. A neutral value removes the filter. */
+	const setFilter = (img: FabricImage, type: string, make: (() => unknown) | null) => {
+		img.filters = (img.filters ?? []).filter((f) => f.type !== type);
+		if (make) img.filters.push(make() as never);
+		img.applyFilters();
+		canvas.current?.requestRenderAll();
+		snapshot();
+		bump((n) => n + 1);
+	};
+	const filterVal = (img: FabricImage, type: string, prop: string, d: number) => {
+		const f = img.filters?.find((x) => x.type === type) as unknown as Record<string, number> | undefined;
+		return f ? (f[prop] ?? d) : d;
+	};
+	const cropTo = (img: FabricImage, shape: "none" | "circle" | "rounded") => {
+		const w = img.width ?? 100, h = img.height ?? 100;
+		img.clipPath = shape === "none" ? undefined : shape === "circle"
+			? new Circle({ radius: Math.min(w, h) / 2, originX: "center", originY: "center" })
+			: new Rect({ width: w, height: h, rx: Math.min(w, h) * 0.12, ry: Math.min(w, h) * 0.12, originX: "center", originY: "center" });
+		img.dirty = true;
+		canvas.current?.requestRenderAll();
+		snapshot();
+	};
+	const useShadow = (o2: FabricObject) => o2.shadow as Shadow | null;
 
 	const download = () => {
 		canvas.current?.discardActiveObject();
@@ -482,8 +770,8 @@ function DesignEditor() {
 	};
 
 	/** Keep the design (not just a picture of it) so it can be reopened and changed. */
-	const saveDesign = async () => {
-		setBusy("save");
+	const saveDesign = async (silent = false) => {
+		if (!silent) setBusy("save");
 		try {
 			const c = canvas.current!;
 			c.discardActiveObject();
@@ -493,13 +781,21 @@ function DesignEditor() {
 			setDesignId(row.id);
 			setSaved(true);
 			window.history.replaceState(null, "", `/dashboard/mjengo/design/editor?id=${row.id}`);
-			toast({ title: "Design saved" });
+			if (!silent) toast({ title: "Design saved" });
 		} catch (e) {
-			toast({ title: "Could not save", description: e instanceof Error ? e.message : undefined, variant: "destructive" });
+			if (!silent) toast({ title: "Could not save", description: e instanceof Error ? e.message : undefined, variant: "destructive" });
 		} finally {
-			setBusy(null);
+			if (!silent) setBusy(null);
 		}
 	};
+	const saveDesignRef = useRef(saveDesign);
+	saveDesignRef.current = saveDesign;
+	// Changes are kept as you work, once the design has been saved the first time.
+	useEffect(() => {
+		if (saved || !designId) return;
+		const t = setTimeout(() => { void saveDesignRef.current(true); }, 5000);
+		return () => clearTimeout(t);
+	}, [saved, designId, zoomMul]);
 
 	const saveAsTemplate = async () => {
 		const n = window.prompt("Name this template", name);
@@ -524,6 +820,7 @@ function DesignEditor() {
 		["text", "Text", <Type key="x" className="h-5 w-5" />],
 		["inspire", "Photos", <Sparkles key="n" className="h-5 w-5" />],
 		["uploads", "Uploads", <Upload key="u" className="h-5 w-5" />],
+		["brand", "Brand", <ImageIcon key="b" className="h-5 w-5" />],
 	];
 	const canUndo = history.current.at > 0;
 	const canRedo = history.current.at < history.current.stack.length - 1;
@@ -592,7 +889,83 @@ function DesignEditor() {
 							</>
 						)}
 						{sep}
-						{o.type === "image" && <button onClick={splitSelected} className="h-8 shrink-0 rounded-lg bg-[#7D2AE8]/10 px-2.5 text-xs font-semibold text-[#7D2AE8] hover:bg-[#7D2AE8]/15">Split into layers</button>}
+						{o.type === "image" && <button onClick={() => void removeBg()} className="h-8 shrink-0 rounded-lg bg-[#7D2AE8]/10 px-2.5 text-xs font-semibold text-[#7D2AE8] hover:bg-[#7D2AE8]/15">Remove background</button>}
+						{o.type === "image" && <button onClick={splitSelected} className="h-8 shrink-0 rounded-lg px-2 text-xs font-medium hover:bg-serene-neutral-100">Split into layers</button>}
+						{o.type === "image" && (
+							<Popover>
+								<PopoverTrigger asChild><button className="h-8 shrink-0 rounded-lg px-2 text-xs font-medium hover:bg-serene-neutral-100">Adjust</button></PopoverTrigger>
+								<PopoverContent align="start" className="w-64 space-y-3 p-3">
+									{([["Brightness", "Brightness", "brightness", -0.5, 0.5, 0, () => filters.Brightness], ["Contrast", "Contrast", "contrast", -0.5, 0.5, 0, () => filters.Contrast], ["Saturation", "Saturation", "saturation", -1, 1, 0, () => filters.Saturation], ["Blur", "Blur", "blur", 0, 0.5, 0, () => filters.Blur]] as const).map(([label, type, prop, min, max, d, cls]) => (
+										<label key={type} className="block text-xs text-serene-neutral-600">{label}
+											<input type="range" min={min} max={max} step={0.02} value={filterVal(o as unknown as FabricImage, type, prop, d)} onChange={(e) => { const v = Number(e.target.value); const C = cls() as unknown as new (o: Record<string, number>) => unknown; setFilter(o as unknown as FabricImage, type, v === d ? null : () => new C({ [prop]: v })); }} className="mt-1 w-full accent-[#7D2AE8]" />
+										</label>
+									))}
+									<div className="flex flex-wrap gap-1.5">
+										<button className="h-8 rounded-lg border border-serene-neutral-200 px-2.5 text-xs hover:bg-serene-neutral-50" onClick={() => { const im = o as unknown as FabricImage; setFilter(im, "Grayscale", im.filters?.some((f) => f.type === "Grayscale") ? null : () => new filters.Grayscale()); }}>Black and white</button>
+										<button className="h-8 rounded-lg border border-serene-neutral-200 px-2.5 text-xs hover:bg-serene-neutral-50" onClick={() => { const im = o as unknown as FabricImage; im.filters = []; im.applyFilters(); canvas.current?.requestRenderAll(); snapshot(); bump((n) => n + 1); }}>Reset</button>
+									</div>
+									<div>
+										<p className="mb-1 text-xs text-serene-neutral-600">Crop to a shape</p>
+										<div className="flex gap-1.5">
+											{([["none", "Rectangle"], ["rounded", "Rounded"], ["circle", "Circle"]] as const).map(([k, l]) => <button key={k} className="h-8 rounded-lg border border-serene-neutral-200 px-2.5 text-xs hover:bg-serene-neutral-50" onClick={() => cropTo(o as unknown as FabricImage, k)}>{l}</button>)}
+										</div>
+									</div>
+									<div className="flex gap-1.5">
+										<button className="h-8 rounded-lg border border-serene-neutral-200 px-2.5 text-xs hover:bg-serene-neutral-50" onClick={() => set({ flipX: !(o as unknown as { flipX?: boolean }).flipX })}>Flip across</button>
+										<button className="h-8 rounded-lg border border-serene-neutral-200 px-2.5 text-xs hover:bg-serene-neutral-50" onClick={() => set({ flipY: !(o as unknown as { flipY?: boolean }).flipY })}>Flip down</button>
+									</div>
+								</PopoverContent>
+							</Popover>
+						)}
+						<Popover>
+							<PopoverTrigger asChild><button className="h-8 shrink-0 rounded-lg px-2 text-xs font-medium hover:bg-serene-neutral-100">Effects</button></PopoverTrigger>
+							<PopoverContent align="start" className="w-64 space-y-3 p-3">
+								{(() => {
+									const sh = useShadow(o);
+									const setShadow = (patch: Partial<{ color: string; blur: number; offsetX: number; offsetY: number }> | null) => set({ shadow: patch === null ? null : new Shadow({ color: sh?.color ?? "rgba(0,0,0,0.35)", blur: sh?.blur ?? 20, offsetX: sh?.offsetX ?? 8, offsetY: sh?.offsetY ?? 8, ...patch }) });
+									return (
+										<>
+											<div>
+												<div className="mb-1 flex items-center justify-between text-xs font-semibold text-serene-neutral-700">Shadow<button className="rounded px-1.5 py-0.5 text-[11px] font-medium text-[#7D2AE8] hover:bg-[#7D2AE8]/10" onClick={() => setShadow(sh ? null : {})}>{sh ? "Remove" : "Add"}</button></div>
+												{sh && (
+													<div className="space-y-1.5">
+														<label className="block text-xs text-serene-neutral-600">Blur<input type="range" min={0} max={80} value={sh.blur} onChange={(e) => setShadow({ blur: Number(e.target.value) })} className="w-full accent-[#7D2AE8]" /></label>
+														<label className="block text-xs text-serene-neutral-600">Distance across<input type="range" min={-60} max={60} value={sh.offsetX} onChange={(e) => setShadow({ offsetX: Number(e.target.value) })} className="w-full accent-[#7D2AE8]" /></label>
+														<label className="block text-xs text-serene-neutral-600">Distance down<input type="range" min={-60} max={60} value={sh.offsetY} onChange={(e) => setShadow({ offsetY: Number(e.target.value) })} className="w-full accent-[#7D2AE8]" /></label>
+													</div>
+												)}
+											</div>
+											<div>
+												<p className="mb-1 text-xs font-semibold text-serene-neutral-700">Outline</p>
+												<div className="flex items-center gap-2">
+													<input type="color" value={typeof o.stroke === "string" && o.stroke.startsWith("#") ? o.stroke : "#000000"} onChange={(e) => set({ stroke: e.target.value, strokeWidth: o.strokeWidth || 4, paintFirst: "stroke" })} className="h-7 w-10 cursor-pointer rounded border border-serene-neutral-200 p-0.5" />
+													<input type="range" min={0} max={30} value={o.strokeWidth ?? 0} onChange={(e) => set({ strokeWidth: Number(e.target.value), stroke: o.stroke || "#000000", paintFirst: "stroke" })} className="flex-1 accent-[#7D2AE8]" />
+												</div>
+											</div>
+											{o.type === "rect" && (
+												<label className="block text-xs font-semibold text-serene-neutral-700">Corner roundness
+													<input type="range" min={0} max={200} value={(o as unknown as Rect).rx ?? 0} onChange={(e) => set({ rx: Number(e.target.value), ry: Number(e.target.value) })} className="mt-1 w-full accent-[#7D2AE8]" />
+												</label>
+											)}
+											<label className="block text-xs font-semibold text-serene-neutral-700">Blend
+												<select value={(o.globalCompositeOperation as string) || "source-over"} onChange={(e) => set({ globalCompositeOperation: e.target.value })} className="mt-1 h-8 w-full rounded-md border border-serene-neutral-200 bg-white px-2 text-sm font-normal">
+													{[["source-over", "Normal"], ["multiply", "Multiply"], ["screen", "Screen"], ["overlay", "Overlay"], ["darken", "Darken"], ["lighten", "Lighten"], ["color-dodge", "Colour dodge"], ["difference", "Difference"]].map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+												</select>
+											</label>
+										</>
+									);
+								})()}
+							</PopoverContent>
+						</Popover>
+						<Popover>
+							<PopoverTrigger asChild><button className="h-8 shrink-0 rounded-lg px-2 text-xs font-medium hover:bg-serene-neutral-100">Align</button></PopoverTrigger>
+							<PopoverContent align="start" className="w-52 p-2">
+								<div className="grid grid-cols-3 gap-1.5">
+									{([["left", "Left"], ["center", "Centre"], ["right", "Right"], ["top", "Top"], ["middle", "Middle"], ["bottom", "Bottom"]] as const).map(([k, l]) => <button key={k} onClick={() => alignPage(k)} className="h-8 rounded-lg border border-serene-neutral-200 text-xs hover:bg-serene-neutral-50">{l}</button>)}
+								</div>
+							</PopoverContent>
+						</Popover>
+						{(o.type === "activeselection" || o.type === "group") && <button onClick={groupSel} className="h-8 shrink-0 rounded-lg px-2 text-xs font-medium hover:bg-serene-neutral-100">{o.type === "group" ? "Ungroup" : "Group"}</button>}
 						<Popover>
 							<PopoverTrigger asChild><button className="h-8 shrink-0 rounded-lg px-2 text-xs font-medium hover:bg-serene-neutral-100">Position</button></PopoverTrigger>
 							<PopoverContent align="start" className="w-56 space-y-2 p-3">
@@ -615,25 +988,89 @@ function DesignEditor() {
 
 	return (
 		<div className="relative flex h-full min-h-0 flex-col overflow-hidden bg-white">
-			{/* Canva-style header: a slim bar on phones, with the name and size moved into the tool strip */}
-			<div className="flex shrink-0 items-center gap-1 px-2 py-1.5 text-white sm:gap-2 sm:px-3 sm:py-2" style={{ background: `linear-gradient(90deg, ${CANVA.teal}, ${CANVA.purple})` }}>
-				<Button asChild variant="ghost" size="icon" className="h-9 w-9 shrink-0 text-white hover:bg-white/20 hover:text-white sm:h-8 sm:w-8" aria-label="Back"><Link href="/dashboard/mjengo/design"><ArrowLeft className="h-[18px] w-[18px]" /></Link></Button>
-				<Input value={name} onChange={(e) => setName(e.target.value)} aria-label="Design name" className="hidden h-8 w-44 border-transparent bg-white/15 text-sm font-medium text-white placeholder:text-white/70 focus-visible:ring-white/60 sm:block" />
-				<select value={size.id} onChange={(e) => changeSize(SIZES.find((s) => s.id === e.target.value)!)} aria-label="Size" className="hidden h-8 rounded-md border border-white/30 bg-white/15 px-2 text-sm text-white sm:block">
-					{SIZES.map((s) => <option key={s.id} value={s.id} className="text-black">{s.label}</option>)}
-				</select>
+			{/* One calm bar: File, Resize, Magic and Share hold what used to be eight buttons. */}
+			<div className="flex shrink-0 items-center gap-0.5 px-2 py-1.5 text-white sm:gap-1 sm:px-3 sm:py-2" style={{ background: `linear-gradient(90deg, ${CANVA.teal}, ${CANVA.purple})` }}>
+				<Button asChild variant="ghost" size="icon" className="h-9 w-9 shrink-0 text-white hover:bg-white/20 hover:text-white sm:h-8 sm:w-8" aria-label="Back to Design"><Link href="/dashboard/mjengo/design"><ArrowLeft className="h-[18px] w-[18px]" /></Link></Button>
+
+				<DropdownMenu>
+					<DropdownMenuTrigger asChild><button className="h-9 shrink-0 rounded-md px-2.5 text-sm font-medium hover:bg-white/20 sm:h-8">File</button></DropdownMenuTrigger>
+					<DropdownMenuContent align="start" className="w-60">
+						<DropdownMenuItem asChild><Link href="/dashboard/mjengo/design">New design</Link></DropdownMenuItem>
+						<DropdownMenuItem onClick={() => void saveDesign(false)}>Save <span className="ml-auto text-xs text-serene-neutral-400">Ctrl S</span></DropdownMenuItem>
+						<DropdownMenuItem onClick={saveAsTemplate}>Save as a template</DropdownMenuItem>
+						<DropdownMenuItem onClick={async () => { try { await saveCopy("copy"); toast({ title: "Copy saved" }); } catch { toast({ title: "Could not copy", variant: "destructive" }); } }}>Make a copy</DropdownMenuItem>
+						<DropdownMenuSeparator />
+						<DropdownMenuLabel className="text-xs text-serene-neutral-500">Download</DropdownMenuLabel>
+						<DropdownMenuItem onClick={() => void exportAs("png")}>PNG</DropdownMenuItem>
+						<DropdownMenuItem onClick={() => void exportAs("png2")}>PNG, double size</DropdownMenuItem>
+						<DropdownMenuItem onClick={() => void exportAs("transparent")}>PNG, transparent background</DropdownMenuItem>
+						<DropdownMenuItem onClick={() => void exportAs("jpg")}>JPG</DropdownMenuItem>
+						<DropdownMenuItem onClick={() => void exportAs("pdf")}>PDF</DropdownMenuItem>
+						<DropdownMenuItem onClick={() => void exportAs("svg")}>SVG (vector)</DropdownMenuItem>
+					</DropdownMenuContent>
+				</DropdownMenu>
+
+				<DropdownMenu>
+					<DropdownMenuTrigger asChild><button className="h-9 shrink-0 rounded-md px-2.5 text-sm font-medium hover:bg-white/20 sm:h-8">Resize</button></DropdownMenuTrigger>
+					<DropdownMenuContent align="start" className="w-60">
+						<DropdownMenuLabel className="text-xs text-serene-neutral-500">Resize this design (a copy of the original is kept)</DropdownMenuLabel>
+						{SIZES.map((sz) => (
+							<DropdownMenuItem key={sz.id} onClick={async () => { if (sz.id === size.id) return; try { await saveCopy(`(${size.label})`); } catch { /* resize anyway */ } changeSize(sz); }}>
+								<span className={cn(size.id === sz.id && "font-semibold text-sauti-teal")}>{sz.label}</span><span className="ml-auto text-xs text-serene-neutral-400">{sz.w} x {sz.h}</span>
+							</DropdownMenuItem>
+						))}
+						<DropdownMenuSeparator />
+						<DropdownMenuItem onClick={() => {
+							const v = window.prompt("Custom size in pixels, like 1500x500", `${size.w}x${size.h}`);
+							const m = v && /^(\d{2,5})\s*[x*,]\s*(\d{2,5})$/i.exec(v.trim());
+							if (m) changeSize({ id: "custom", label: "Custom", w: Math.min(6000, Number(m[1])), h: Math.min(6000, Number(m[2])) } as never);
+						}}>Custom size...</DropdownMenuItem>
+					</DropdownMenuContent>
+				</DropdownMenu>
+
+				<DropdownMenu>
+					<DropdownMenuTrigger asChild><button className="flex h-9 shrink-0 items-center gap-1 rounded-md px-2.5 text-sm font-medium hover:bg-white/20 sm:h-8"><Sparkles className="h-3.5 w-3.5" /> Magic</button></DropdownMenuTrigger>
+					<DropdownMenuContent align="start" className="w-64">
+						<DropdownMenuLabel className="text-xs text-serene-neutral-500">On the selected text</DropdownMenuLabel>
+						<DropdownMenuItem onClick={() => void writeWithAi("Write a stronger, clearer version of this text")}>Improve the wording</DropdownMenuItem>
+						<DropdownMenuItem onClick={() => void writeWithAi("Make this text shorter and punchier")}>Make it shorter</DropdownMenuItem>
+						<DropdownMenuItem onClick={() => void writeWithAi("Rewrite this text in a warm, caring tone")}>Make it warmer</DropdownMenuItem>
+						<DropdownMenuSeparator />
+						<DropdownMenuLabel className="text-xs text-serene-neutral-500">On the whole design</DropdownMenuLabel>
+						<DropdownMenuItem onClick={() => void translateAll("Swahili")}>Translate to Swahili</DropdownMenuItem>
+						<DropdownMenuItem onClick={() => void translateAll("English")}>Translate to English</DropdownMenuItem>
+						<DropdownMenuItem onClick={checkDesign}>Check readability and size</DropdownMenuItem>
+						<DropdownMenuSeparator />
+						<DropdownMenuLabel className="text-xs text-serene-neutral-500">On the selected picture</DropdownMenuLabel>
+						<DropdownMenuItem onClick={() => void removeBg()}>Remove the background</DropdownMenuItem>
+						<DropdownMenuItem onClick={() => void splitSelected()}>Split into layers</DropdownMenuItem>
+					</DropdownMenuContent>
+				</DropdownMenu>
+
+				<span className="mx-1 hidden h-5 w-px bg-white/30 sm:block" />
 				<Button variant="ghost" size="icon" className="h-9 w-9 shrink-0 text-white hover:bg-white/20 hover:text-white sm:h-8 sm:w-8" aria-label="Undo" disabled={!canUndo} onClick={() => restore(history.current.at - 1)}><Undo2 className="h-[18px] w-[18px]" /></Button>
 				<Button variant="ghost" size="icon" className="h-9 w-9 shrink-0 text-white hover:bg-white/20 hover:text-white sm:h-8 sm:w-8" aria-label="Redo" disabled={!canRedo} onClick={() => restore(history.current.at + 1)}><Redo2 className="h-[18px] w-[18px]" /></Button>
-				<span className="min-w-0 flex-1 truncate px-1 text-sm font-medium sm:hidden">{name}</span>
-				<span className="hidden flex-1 sm:block" />
-				<Button variant="ghost" size="sm" className="hidden h-8 gap-1.5 text-white hover:bg-white/20 hover:text-white sm:inline-flex" onClick={saveAsTemplate} disabled={busy !== null}><Copy className="h-4 w-4" /><span className="hidden lg:inline">Save as template</span></Button>
-				<Button variant="ghost" size="icon" className="h-9 w-9 shrink-0 text-white hover:bg-white/20 hover:text-white sm:hidden" aria-label="Download" onClick={download}><Download className="h-[18px] w-[18px]" /></Button>
-				<Button variant="ghost" size="sm" className="hidden h-8 gap-1.5 text-white hover:bg-white/20 hover:text-white sm:inline-flex" onClick={download}><Download className="h-4 w-4" /><span className="hidden lg:inline">Download</span></Button>
-				<span className="hidden text-xs text-white/80 lg:inline">{saved ? "Saved" : "Unsaved changes"}</span>
-				<Button variant="ghost" size="sm" className="h-9 shrink-0 gap-1.5 text-white hover:bg-white/20 hover:text-white sm:h-8" onClick={saveDesign} disabled={busy !== null}><Save className="h-4 w-4" /><span className="hidden sm:inline">Save</span></Button>
-				<Button size="sm" className="h-9 shrink-0 gap-1.5 bg-white text-[#7D2AE8] hover:bg-white/90 sm:h-8" onClick={saveToStudio} disabled={busy !== null} aria-label="Save picture">{busy === "save" ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImageIcon className="h-4 w-4" />}<span className="hidden sm:inline">Save picture</span></Button>
-			</div>
+				<span className="hidden shrink-0 px-1 text-xs text-white/80 md:inline" aria-live="polite">{busy ? "Saving..." : saved ? "All changes saved" : designId ? "Saving soon" : "Not saved yet"}</span>
 
+				<span className="flex-1" />
+				<Input value={name} onChange={(e) => setName(e.target.value)} aria-label="Design name" className="hidden h-8 w-52 shrink border-transparent bg-white/15 text-center text-sm font-medium text-white placeholder:text-white/70 focus-visible:ring-white/60 sm:block" />
+				<span className="flex-1" />
+
+				<DropdownMenu>
+					<DropdownMenuTrigger asChild>
+						<Button size="sm" className="h-9 shrink-0 gap-1.5 bg-white font-semibold text-[#7D2AE8] hover:bg-white/90 sm:h-8" disabled={busy !== null}>{busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />} Share</Button>
+					</DropdownMenuTrigger>
+					<DropdownMenuContent align="end" className="w-60">
+						<DropdownMenuItem onClick={saveToStudio}>Post or schedule it</DropdownMenuItem>
+						<DropdownMenuItem onClick={() => void saveDesign(false)}>Save the design</DropdownMenuItem>
+						<DropdownMenuSeparator />
+						<DropdownMenuLabel className="text-xs text-serene-neutral-500">Download</DropdownMenuLabel>
+						<DropdownMenuItem onClick={() => void exportAs("png")}>PNG</DropdownMenuItem>
+						<DropdownMenuItem onClick={() => void exportAs("jpg")}>JPG</DropdownMenuItem>
+						<DropdownMenuItem onClick={() => void exportAs("pdf")}>PDF</DropdownMenuItem>
+					</DropdownMenuContent>
+				</DropdownMenu>
+			</div>
 
 			<div className="flex min-h-0 flex-1 max-sm:flex-col-reverse">
 				{/* Rail and panel: a column on the left on desktop, a bar along the bottom on phones */}
@@ -662,7 +1099,7 @@ function DesignEditor() {
 									<button onClick={() => setIdeaSeed((n) => n + 1)} className="rounded-md px-2 py-0.5 text-xs font-medium text-[#7D2AE8] hover:bg-[#7D2AE8]/10">Shuffle</button>
 								</div>
 								<div className="grid grid-cols-2 gap-2">
-									{Array.from({ length: 6 }).map((_, i) => {
+									{Array.from({ length: uiReady ? 6 : 0 }).map((_, i) => {
 										const t = generateTemplate(ideaSeed * 31 + i, { size: size.id });
 										return (
 											<button key={t.id} onClick={() => applyIdea(t)} className="group text-left transition hover:-translate-y-0.5">
@@ -712,7 +1149,44 @@ function DesignEditor() {
 						</div>
 					)}
 					{panel === "text" && <TextPanel onPreset={addPreset} onFont={changeFont} current={isText ? (o?.fontFamily ?? null) : null} />}
-					{panel === "shapes" && <ElementsPanel onShape={addShape} onQr={(u) => addImage(u, 0.28)} onSvg={(u) => addImage(u, 0.2)} />}
+					{panel === "shapes" && <ElementsPanel onShape={addShape} onQr={(u) => addImage(u, 0.28)} onSvg={(u) => addImage(u, 0.2)} onDraw={() => setDrawing((d) => ({ ...d, on: true }))} />}
+					{panel === "brand" && (
+						<div className="space-y-5">
+							<div>
+								<h3 className="mb-2 text-sm font-semibold">Brand colours</h3>
+								<div className="flex flex-wrap gap-2">
+									{brand.colours.map((c, i) => (
+										<button key={c + i} onClick={() => { if (o) set(o.type === "line" ? { stroke: c } : { fill: c }); else setBackground(c); }} onContextMenu={(e) => { e.preventDefault(); saveBrand({ ...brand, colours: brand.colours.filter((_, k) => k !== i) }); }} title={`${c}. Click to apply, right click to remove.`} className="h-9 w-9 rounded-full border border-black/10 shadow-sm hover:scale-110" style={{ background: c }} />
+									))}
+									<label className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-full border border-dashed border-serene-neutral-300 text-serene-neutral-500 hover:border-[#7D2AE8]" title="Add a colour">+
+										<input type="color" className="sr-only" onChange={(e) => saveBrand({ ...brand, colours: [...brand.colours, e.target.value] })} />
+									</label>
+								</div>
+								<p className="mt-1 text-xs text-serene-neutral-500">Applies to what is selected, or to the background.</p>
+							</div>
+							<div>
+								<h3 className="mb-2 text-sm font-semibold">Brand fonts</h3>
+								<ul className="space-y-1">
+									{brand.fonts.map((f) => (
+										<li key={f} className="flex items-center gap-1">
+											<button onClick={() => void changeFont(f)} className="min-w-0 flex-1 truncate rounded-lg border border-serene-neutral-200 px-3 py-2 text-left text-lg hover:border-[#7D2AE8]" style={{ fontFamily: `"${f}", sans-serif` }}>{f}</button>
+											<button aria-label={`Remove ${f}`} onClick={() => saveBrand({ ...brand, fonts: brand.fonts.filter((x) => x !== f) })} className="px-2 text-xs text-serene-neutral-400 hover:text-red-600">Remove</button>
+										</li>
+									))}
+								</ul>
+								<div className="mt-2"><FontPicker value="Add a font" onChange={(f) => { void ensureFont(f); if (!brand.fonts.includes(f)) saveBrand({ ...brand, fonts: [...brand.fonts, f] }); }} /></div>
+							</div>
+							<div>
+								<h3 className="mb-2 text-sm font-semibold">Logo</h3>
+								{brand.logo ? (
+									<div className="flex items-center gap-3">
+										<button onClick={() => void addImage(brand.logo!, 0.22)} className="flex h-20 w-20 items-center justify-center rounded-xl border border-serene-neutral-200 bg-white p-2 hover:border-[#7D2AE8]" title="Add the logo to the page">{/* eslint-disable-next-line @next/next/no-img-element */}<img src={brand.logo} alt="Brand logo" className="max-h-full max-w-full object-contain" /></button>
+										<label className="cursor-pointer text-xs font-medium text-[#7D2AE8] hover:underline">Change<input type="file" accept="image/*" className="sr-only" onChange={(e) => { const f = e.target.files?.[0]; if (!f) return; const r = new FileReader(); r.onload = () => saveBrand({ ...brand, logo: String(r.result) }); r.readAsDataURL(f); }} /></label>
+									</div>
+								) : <label className="cursor-pointer text-sm font-medium text-[#7D2AE8]">Upload a logo<input type="file" accept="image/*" className="sr-only" onChange={(e) => { const f = e.target.files?.[0]; if (!f) return; const r = new FileReader(); r.onload = () => saveBrand({ ...brand, logo: String(r.result) }); r.readAsDataURL(f); }} /></label>}
+							</div>
+						</div>
+					)}
 					{panel === "uploads" && (
 						<>
 							<UploadsPanel onPick={(u) => addImage(u)} onUploadClick={() => fileInput.current?.click()} assets={assets} />
@@ -749,6 +1223,25 @@ function DesignEditor() {
 				{/* Page */}
 				<div ref={host} className="relative min-h-0 min-w-0 flex-1 overflow-hidden bg-[#EBECF0]">
 					{o && <div className="pointer-events-none absolute inset-x-0 top-3 z-20 hidden justify-center px-3 sm:flex"><div className="pointer-events-auto max-w-full overflow-x-auto">{propBar("", true)}</div></div>}
+					{drawing.on && (
+						<div className="absolute left-1/2 top-3 z-30 flex -translate-x-1/2 items-center gap-3 rounded-2xl border border-black/10 bg-white px-3 py-2 shadow-lg">
+							<span className="text-xs font-semibold text-sauti-dark">Drawing</span>
+							<input type="color" value={drawing.color} onChange={(e) => setDrawing((d) => ({ ...d, color: e.target.value }))} aria-label="Pen colour" className="h-7 w-9 cursor-pointer rounded border border-serene-neutral-200 p-0.5" />
+							<input type="range" min={1} max={60} value={drawing.width} onChange={(e) => setDrawing((d) => ({ ...d, width: Number(e.target.value) }))} aria-label="Pen width" className="w-28 accent-[#7D2AE8]" />
+							<button onClick={() => setDrawing((d) => ({ ...d, on: false }))} className="rounded-lg bg-sauti-teal px-3 py-1 text-xs font-semibold text-white">Done</button>
+						</div>
+					)}
+					{(guides.v !== null || guides.h !== null) && el.current && host.current && (() => {
+						const hr = host.current!.getBoundingClientRect();
+						const cr = el.current!.getBoundingClientRect();
+						const z = canvas.current?.getZoom() ?? 1;
+						return (
+							<>
+								{guides.v !== null && <div className="pointer-events-none absolute z-20 w-px bg-[#FF3D81]" style={{ left: cr.left - hr.left + guides.v * z, top: cr.top - hr.top, height: cr.height }} />}
+								{guides.h !== null && <div className="pointer-events-none absolute z-20 h-px bg-[#FF3D81]" style={{ top: cr.top - hr.top + guides.h * z, left: cr.left - hr.left, width: cr.width }} />}
+							</>
+						);
+					})()}
 					<div className="absolute inset-x-0 bottom-9 top-0 flex items-center justify-center overflow-auto p-4 pt-16">
 						<div className="shrink-0 shadow-xl"><canvas ref={el} /></div>
 					</div>
@@ -800,6 +1293,20 @@ function DesignEditor() {
 					</Popover>
 				</div>
 			</div>
+			{magic && (
+				<div className="absolute inset-0 z-50 flex items-center justify-center bg-white/70 backdrop-blur-sm">
+					<div className="rounded-2xl border border-serene-neutral-200 bg-white px-6 py-5 text-center shadow-xl"><Loader2 className="mx-auto h-6 w-6 animate-spin text-[#7D2AE8]" /><p className="mt-2 text-sm font-semibold text-sauti-dark">{magic}</p></div>
+				</div>
+			)}
+			{checks && (
+				<div className="absolute bottom-14 left-1/2 z-40 w-[min(92vw,460px)] -translate-x-1/2 rounded-2xl border border-serene-neutral-200 bg-white p-4 shadow-xl">
+					<div className="flex items-center gap-2">
+						<p className="flex-1 text-sm font-semibold text-sauti-dark">{checks.ok ? "Looks good: the text is readable and large enough" : `${checks.items.length} thing${checks.items.length === 1 ? "" : "s"} to look at`}</p>
+						<button onClick={() => setChecks(null)} className="rounded-md px-2 py-1 text-xs text-serene-neutral-500 hover:bg-serene-neutral-100">Close</button>
+					</div>
+					{!checks.ok && <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-serene-neutral-700">{checks.items.map((t, i) => <li key={i}>{t}</li>)}</ul>}
+				</div>
+			)}
 			{splitting && (
 				<div className="absolute inset-0 z-50 flex items-center justify-center bg-white/80 backdrop-blur-sm">
 					<div className="w-[min(92vw,380px)] rounded-2xl border border-serene-neutral-200 bg-white p-6 text-center shadow-xl">

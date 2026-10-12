@@ -104,7 +104,7 @@ const SHAPES: { k: ShapeKind; label: string; d: string }[] = [
 	{ k: "dashed", label: "Dashed", d: "M3 12h3M9 12h3M15 12h3" },
 ];
 
-export function ElementsPanel({ onShape, onQr, onSvg }: { onShape: (k: ShapeKind) => void; onQr: (dataUrl: string) => void; onSvg: (dataUrl: string) => void }) {
+export function ElementsPanel({ onShape, onQr, onSvg, onDraw }: { onShape: (k: ShapeKind) => void; onQr: (dataUrl: string) => void; onSvg: (dataUrl: string) => void; onDraw?: () => void }) {
 	const [text, setText] = useState("https://www.sautisalama.org");
 	const [fg, setFg] = useState("#0E1318");
 	const [bg, setBg] = useState("#FFFFFF");
@@ -137,6 +137,15 @@ export function ElementsPanel({ onShape, onQr, onSvg }: { onShape: (k: ShapeKind
 					))}
 				</div>
 			</div>
+
+			{onDraw && (
+				<button onClick={onDraw} className="flex w-full items-center gap-3 rounded-2xl border border-serene-neutral-200 bg-white p-3 text-left transition hover:border-[#7D2AE8]">
+					<span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#7D2AE8]/10 text-[#7D2AE8]">
+						<svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" /></svg>
+					</span>
+					<span><span className="block text-sm font-semibold">Draw</span><span className="block text-xs text-serene-neutral-500">Freehand pen with colour and width</span></span>
+				</button>
+			)}
 
 			<div className="rounded-2xl border border-serene-neutral-200 bg-[#FAFAF8] p-3">
 				<h3 className="mb-2 text-sm font-semibold">QR code</h3>

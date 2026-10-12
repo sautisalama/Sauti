@@ -241,3 +241,39 @@ export async function splitIntoLayers(src: string, onStep?: (message: string) =>
 
   return { width: W, height: H, backdrop: backdropCanvas.toDataURL('image/jpeg', 0.92), subject, texts };
 }
+
+/** Just the subject on a transparent background (a "remove background" tool). Null when nothing could be separated. */
+export async function removeBackground(src: string): Promise<string | null> {
+  const img = await load(src);
+  const k = Math.min(1, MAX / Math.max(img.naturalWidth, img.naturalHeight));
+  const W = Math.max(2, Math.round(img.naturalWidth * k)), H = Math.max(2, Math.round(img.naturalHeight * k));
+  const base = document.createElement('canvas');
+  base.width = W; base.height = H;
+  base.getContext('2d')!.drawImage(img, 0, 0, W, H);
+  const { pipeline } = await import('@huggingface/transformers');
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const remover: any = await pipeline('background-removal', 'Xenova/modnet');
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const out: any = await remover(base.toDataURL('image/png'));
+  const cut = Array.isArray(out) ? out[0] : out;
+  const oc = document.createElement('canvas');
+  oc.width = cut.width; oc.height = cut.height;
+  const octx = oc.getContext('2d')!;
+  if (cut.channels === 4) octx.putImageData(new ImageData(new Uint8ClampedArray(cut.data), cut.width, cut.height), 0, 0);
+  else {
+    const rgba = new Uint8ClampedArray(cut.width * cut.height * 4);
+    for (let p = 0; p < cut.width * cut.height; p++) { rgba[p * 4] = rgba[p * 4 + 1] = rgba[p * 4 + 2] = 255; rgba[p * 4 + 3] = cut.data[p * cut.channels]; }
+    octx.putImageData(new ImageData(rgba, cut.width, cut.height), 0, 0);
+  }
+  const sub = document.createElement('canvas');
+  sub.width = W; sub.height = H;
+  const sctx = sub.getContext('2d')!;
+  sctx.drawImage(oc, 0, 0, W, H);
+  const keep = document.createElement('canvas');
+  keep.width = W; keep.height = H;
+  const kx = keep.getContext('2d')!;
+  kx.drawImage(base, 0, 0);
+  kx.globalCompositeOperation = 'destination-in';
+  kx.drawImage(sub, 0, 0);
+  return keep.toDataURL('image/png');
+}
