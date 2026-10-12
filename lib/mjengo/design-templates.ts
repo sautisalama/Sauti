@@ -45,6 +45,25 @@ export const PHOTO_POOL: { src: string; label: string }[] = [
   { src: '/blog/justice.jpg', label: 'Justice' },
 ];
 
+/** Everything the site already shows: events, programmes, learning and blog pictures. Offered in Studio and Uploads. */
+export const WEBSITE_PHOTOS: { src: string; label: string; group: 'Events' | 'Programmes' | 'Learning' | 'Stories' }[] = [
+  ...PHOTO_POOL.slice(0, 8).map((p) => ({ ...p, group: 'Events' as const })),
+  { src: '/events/impact/Community -Letu.png', label: 'Community Letu', group: 'Events' },
+  { src: '/events/impact/startegic plan meeting.png', label: 'Strategic plan meeting', group: 'Events' },
+  { src: '/events/impact/at cop30.png', label: 'At COP30', group: 'Events' },
+  { src: '/events/programs/community-wangu.jpeg', label: 'Community Wangu', group: 'Programmes' },
+  { src: '/events/programs/survivors cafe program.png', label: 'Survivors cafe', group: 'Programmes' },
+  { src: '/events/programs/16 days of activism.png', label: '16 days of activism', group: 'Programmes' },
+  { src: '/events/programs/TFGBV Awareness.png', label: 'TFGBV awareness', group: 'Programmes' },
+  { src: '/events/programs/AI course.png', label: 'AI course', group: 'Learning' },
+  { src: '/events/impact/Learning Program - 748 registered learners.png', label: 'Learning programme', group: 'Learning' },
+  { src: '/blog/empowerment.jpeg', label: 'Empowerment', group: 'Stories' },
+  { src: '/blog/justice.jpg', label: 'Justice', group: 'Stories' },
+  { src: '/blog/certification.jpeg', label: 'Certification', group: 'Stories' },
+  { src: '/landing/landing.jpeg', label: 'Community', group: 'Stories' },
+  { src: '/landing/landing2.jpeg', label: 'Together', group: 'Stories' },
+];
+
 export const encodeSrc = (src: string) => src.split('/').map((p) => encodeURIComponent(p)).join('/');
 
 export interface DesignTemplate {

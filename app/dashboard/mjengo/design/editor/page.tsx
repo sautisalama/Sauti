@@ -247,7 +247,7 @@ function DesignEditor() {
 	/** One flat picture, full bleed, sent to the back. The fallback when it cannot be split. */
 	const placeSingle = async (data: string) => {
 		const c = canvas.current;
-		if (!c) return;
+		if (!c) return null;
 		const img = await FabricImage.fromURL(data);
 		const sz = sizeRef.current;
 		const k = Math.max(sz.w / (img.width ?? 1), sz.h / (img.height ?? 1));
@@ -255,6 +255,7 @@ function DesignEditor() {
 		c.add(img);
 		c.sendObjectToBack(img);
 		c.requestRenderAll();
+		return img;
 	};
 
 	/** Backdrop, subject and each line of text as separate, editable layers. */
@@ -263,9 +264,9 @@ function DesignEditor() {
 		if (!c) return;
 		const sz = sizeRef.current;
 		const box = over ? { x: over.left ?? 0, y: over.top ?? 0, w: over.getScaledWidth(), h: over.getScaledHeight() } : { x: 0, y: 0, w: sz.w, h: sz.h };
-		const k = over ? Math.min(box.w / sp.width, box.h / sp.height) : Math.max(box.w / sp.width, box.h / sp.height);
-		const ox = box.x + (box.w - sp.width * k) / 2;
-		const oy = box.y + (box.h - sp.height * k) / 2;
+		const k = over ? box.w / sp.width : Math.max(box.w / sp.width, box.h / sp.height);
+		const ox = over ? box.x : box.x + (box.w - sp.width * k) / 2;
+		const oy = over ? box.y : box.y + (box.h - sp.height * k) / 2;
 		const at = over ? c.getObjects().indexOf(over) : 0;
 		if (over) c.remove(over);
 		history.current.lock = true;
@@ -308,14 +309,19 @@ function DesignEditor() {
 		}
 	};
 
-	// A picture picked from the inspiration arrives split into layers, ready to change.
+	// A picture picked from the inspiration arrives at once, with an offer to split it into layers.
+	const [offer, setOffer] = useState<{ data: string; img: FabricObject } | null>(null);
 	useEffect(() => {
 		if (!inspire) return;
 		let on = true;
-		unwrap(inspireImage(inspire)).then(async (data) => {
+		const load = /^https?:|^\//.test(inspire) && !/pinimg|unsplash|pexels|pixabay|openverse|iconify|giphy/.test(inspire)
+			? Promise.resolve(inspire)
+			: unwrap(inspireImage(inspire));
+		load.then(async (data) => {
 			if (!on) return;
 			setName("Inspired design");
-			await splitAndPlace(data);
+			const img = await placeSingle(data);
+			if (img && on) setOffer({ data, img });
 		}).catch(() => toast({ title: "Could not use that picture", variant: "destructive" }));
 		return () => { on = false; };
 		// eslint-disable-next-line react-hooks/exhaustive-deps
@@ -722,6 +728,16 @@ function DesignEditor() {
 						<p className="mt-1 text-xs text-serene-neutral-500">{splitting}. This runs on your device and the first time takes a little longer.</p>
 						<Button variant="outline" size="sm" className="mt-4" onClick={() => { skipSplit.current = true; }}>Keep it as one picture</Button>
 					</div>
+				</div>
+			)}
+			{offer && !splitting && (
+				<div className="absolute bottom-4 left-1/2 z-40 flex w-[min(92vw,460px)] -translate-x-1/2 items-center gap-3 rounded-2xl border border-serene-neutral-200 bg-white p-3 shadow-xl">
+					<div className="min-w-0 flex-1">
+						<p className="text-sm font-semibold text-sauti-dark">Make this editable</p>
+						<p className="text-xs text-serene-neutral-500">Split it into a background, the subject and its text, each one a layer you can move or change.</p>
+					</div>
+					<Button size="sm" className="shrink-0 bg-[#7D2AE8] hover:bg-[#6a22c9]" onClick={() => { const o = offer; setOffer(null); void splitAndPlace(o.data, o.img); }}>Split into layers</Button>
+					<Button size="sm" variant="ghost" className="shrink-0" onClick={() => setOffer(null)}>Not now</Button>
 				</div>
 			)}
 			<PostThis open={!!postFor} assetId={postFor} about={name} onClose={() => setPostFor(null)} />

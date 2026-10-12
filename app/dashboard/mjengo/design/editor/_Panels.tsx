@@ -10,6 +10,7 @@ import { cn } from "@/lib/utils";
 import { FONT_OPTIONS, ensureFont } from "@/lib/mjengo/fonts";
 import { searchFiles, getFileUrl } from "../../vault/api";
 import type { AssetRow } from "@/app/actions/mjengo-ai";
+import { WEBSITE_PHOTOS, encodeSrc } from "@/lib/mjengo/design-templates";
 
 /* ------------------------------------------------------------------ Text */
 
@@ -224,6 +225,17 @@ export function UploadsPanel({ onPick, onUploadClick, assets }: { onPick: (url: 
 						))}
 					</div>
 				)}
+			</div>
+			<div>
+				<h3 className="mb-2 text-sm font-semibold">From the Sauti Salama website</h3>
+				<div className="grid grid-cols-3 gap-1.5">
+					{WEBSITE_PHOTOS.map((p) => (
+						<button key={p.src} onClick={() => onPick(window.location.origin + encodeSrc(p.src))} title={p.label} className="overflow-hidden rounded-lg border border-serene-neutral-200 hover:border-[#7D2AE8]">
+							{/* eslint-disable-next-line @next/next/no-img-element */}
+							<img src={encodeSrc(p.src)} alt={p.label} loading="lazy" className="aspect-square w-full object-cover" />
+						</button>
+					))}
+				</div>
 			</div>
 			<div>
 				<h3 className="mb-2 text-sm font-semibold">Made in Studio</h3>
