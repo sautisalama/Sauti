@@ -39,6 +39,10 @@ import { Markdown } from "../../_components/Markdown";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import * as XLSX from "xlsx";
+import { formReportPdf } from "@/lib/client/form-report-pdf";
+import { ShareDialog } from "../../_components/ShareDialog";
+import { fileMeta, type FileMeta } from "../../vault/api";
+import { FileText as FileTextIcon, UserPlus } from "lucide-react";
 import { searchFiles, prepareUpload, registerUpload, prepareReplace, finishReplace } from "../../vault/api";
 
 type Save = "saved" | "saving" | "error";
@@ -209,7 +213,7 @@ export default function FormEditorPage() {
 					</div>
 				</TabsContent>
 				<TabsContent value="responses" className="mt-4">
-					<ResponsesTab formId={id} title={title} questions={questions} collectEmail={!!settings.collectEmail} responses={responses} onChanged={loadResponses} />
+					<ResponsesTab accent={settings.style?.accent} formId={id} title={title} questions={questions} collectEmail={!!settings.collectEmail} responses={responses} onChanged={loadResponses} />
 				</TabsContent>
 				<TabsContent value="analytics" className="mt-4">
 					<AnalyticsTab questions={questions} responses={responses} />
@@ -435,13 +439,16 @@ function QuestionsTab({ formId, description, onDescription, questions, onChange,
 
 /* ------------------------------------------------------------- Responses */
 
-function ResponsesTab({ formId, title, questions, collectEmail, responses, onChanged }: { formId: string; title: string; questions: Question[]; collectEmail: boolean; responses: ResponseRow[] | null; onChanged: () => void }) {
+function ResponsesTab({ accent, formId, title, questions, collectEmail, responses, onChanged }: { accent?: string; formId: string; title: string; questions: Question[]; collectEmail: boolean; responses: ResponseRow[] | null; onChanged: () => void }) {
 	const { toast } = useToast();
 		const [q, setQ] = useState("");
 	const [reportOpen, setReportOpen] = useState(false);
 	const [report, setReport] = useState<{ title: string; markdown: string } | null>(null);
 	const [reportBusy, setReportBusy] = useState(false);
 	const [sheetBusy, setSheetBusy] = useState(false);
+	const [linked, setLinked] = useState<FileMeta | null | undefined>(undefined);
+	const [shareSheet, setShareSheet] = useState(false);
+	const [pdfBusy, setPdfBusy] = useState(false);
 
 	const rowsFor = () => {
 		const head = ["Submitted", ...(collectEmail ? ["Email"] : []), ...questions.map((qq) => qq.label || TYPE_LABEL[qq.type])];
@@ -452,10 +459,10 @@ function ResponsesTab({ formId, title, questions, collectEmail, responses, onCha
 		const ws = XLSX.utils.aoa_to_sheet(rowsFor());
 		ws["!cols"] = rowsFor()[0].map((h) => ({ wch: Math.min(40, Math.max(12, String(h).length + 4)) }));
 		const wb = XLSX.utils.book_new();
-		XLSX.utils.book_append_sheet(wb, ws, "Responses");
+		XLSX.utils.book_append_sheet(wb, ws, (title || "Responses").replace(/[\\/?*[\]:]+/g, " ").trim().slice(0, 31) || "Responses");
 		return wb;
 	};
-	const fileName = `${(title || "Form").replace(/[\\/:*?"<>|]+/g, " ").trim()} responses.xlsx`;
+	const fileName = `${(title || "Form").replace(/[\\/:*?"<>|]+/g, " ").trim()}.xlsx`;
 	const downloadXlsx = () => {
 		const out = XLSX.write(workbook(), { type: "array", bookType: "xlsx" }) as ArrayBuffer;
 		const a = document.createElement("a");
@@ -465,30 +472,56 @@ function ResponsesTab({ formId, title, questions, collectEmail, responses, onCha
 		URL.revokeObjectURL(a.href);
 		exportedCsv(formId).catch(() => undefined);
 	};
-	/** Keeps one spreadsheet for this form in Files: updated in place when it is already there, then opened. */
+	/** Writes the responses into the form's spreadsheet in Files (updated in place, created once). Returns its id. */
+	const syncSheet = async (): Promise<string> => {
+		const out = new Uint8Array(XLSX.write(workbook(), { type: "array", bookType: "xlsx" }) as ArrayBuffer);
+		const mime = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+		const blob = new File([out], fileName, { type: mime });
+		const hit = (await searchFiles(fileName)).find((f) => f.name === fileName && f.level === "edit");
+		if (hit) {
+			const { signedUrl } = await prepareReplace(hit.id);
+			await putToSignedUrl(signedUrl, blob);
+			await finishReplace(hit.id, blob.size);
+			return hit.id;
+		}
+		const { path, signedUrl } = await prepareUpload(null, fileName, blob.size);
+		await putToSignedUrl(signedUrl, blob);
+		return (await registerUpload(null, path, fileName, blob.size, mime)).id;
+	};
+	const loadLinked = async () => {
+		try {
+			const hit = (await searchFiles(fileName)).find((f) => f.name === fileName);
+			setLinked(hit ? await fileMeta(hit.id) : null);
+		} catch { setLinked(null); }
+	};
+	useEffect(() => { void loadLinked(); }, [fileName]); // eslint-disable-line react-hooks/exhaustive-deps
 	const openSpreadsheet = async () => {
 		setSheetBusy(true);
 		try {
-			const out = new Uint8Array(XLSX.write(workbook(), { type: "array", bookType: "xlsx" }) as ArrayBuffer);
-			const mime = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
-			const blob = new File([out], fileName, { type: mime });
-			const hit = (await searchFiles(fileName)).find((f) => f.name === fileName && f.level === "edit");
-			let id: string;
-			if (hit) {
-				const { signedUrl } = await prepareReplace(hit.id);
-				await putToSignedUrl(signedUrl, blob);
-				await finishReplace(hit.id, blob.size);
-				id = hit.id;
-			} else {
-				const { path, signedUrl } = await prepareUpload(null, fileName, blob.size);
-				await putToSignedUrl(signedUrl, blob);
-				id = (await registerUpload(null, path, fileName, blob.size, mime)).id;
-			}
+			const id = await syncSheet();
 			window.location.assign(`/dashboard/mjengo/files/sheet?file=${id}`);
 		} catch (e) {
 			toast({ title: "Could not open the spreadsheet", description: e instanceof Error ? e.message : undefined, variant: "destructive" });
 			setSheetBusy(false);
 		}
+	};
+	const refreshSheet = async () => {
+		setSheetBusy(true);
+		try { await syncSheet(); await loadLinked(); toast({ title: "Spreadsheet updated", description: fileName }); } catch (e) { toast({ title: "Could not update it", description: e instanceof Error ? e.message : undefined, variant: "destructive" }); } finally { setSheetBusy(false); }
+	};
+	/** A PDF with a chart for every choice question, with the written summary in front when it has been made. */
+	const downloadPdf = async (narrative?: string | null) => {
+		if (!responses) return;
+		setPdfBusy(true);
+		try {
+			const blob = formReportPdf({ title, questions, responses, narrative, accent });
+			const a = document.createElement("a");
+			a.href = URL.createObjectURL(blob);
+			a.download = `${(title || "Form").replace(/[\\/:*?"<>|]+/g, " ").trim()} report.pdf`;
+			a.click();
+			setTimeout(() => URL.revokeObjectURL(a.href), 10_000);
+			exportedCsv(formId).catch(() => undefined);
+		} finally { setPdfBusy(false); }
 	};
 	const makeReport = async () => {
 		setReportBusy(true);
@@ -531,6 +564,7 @@ function ResponsesTab({ formId, title, questions, collectEmail, responses, onCha
 						<DropdownMenuItem onClick={openSpreadsheet} disabled={sheetBusy}><FileSpreadsheet className="mr-2 h-4 w-4" /> Open as a spreadsheet in Files</DropdownMenuItem>
 						<DropdownMenuItem onClick={downloadXlsx}><FileSpreadsheet className="mr-2 h-4 w-4" /> Download Excel (.xlsx)</DropdownMenuItem>
 						<DropdownMenuItem onClick={download}><Download className="mr-2 h-4 w-4" /> Download CSV</DropdownMenuItem>
+						<DropdownMenuItem onClick={() => void downloadPdf(null)} disabled={pdfBusy}><FileTextIcon className="mr-2 h-4 w-4" /> Report as PDF with charts</DropdownMenuItem>
 					</DropdownMenuContent>
 				</DropdownMenu>
 			</div>
@@ -543,6 +577,7 @@ function ResponsesTab({ formId, title, questions, collectEmail, responses, onCha
 							<div className="flex flex-wrap justify-end gap-2">
 								<Button variant="outline" className="gap-1.5" onClick={() => navigator.clipboard.writeText(report.markdown).then(() => toast({ title: "Copied" }))}><Copy className="h-4 w-4" /> Copy</Button>
 								<Button variant="outline" className="gap-1.5" onClick={makeReport}>Write again</Button>
+								<Button variant="outline" className="gap-1.5" disabled={pdfBusy} onClick={() => void downloadPdf(report.markdown)}><FileTextIcon className="h-4 w-4" /> PDF with charts</Button>
 								<Button className="gap-1.5 bg-sauti-teal hover:bg-sauti-dark" onClick={() => {
 									const html = `<h1>${report.title.replace(/[<>&]/g, "")}</h1>${report.markdown.replace(/^## (.*)$/gm, "<h2>$1</h2>").replace(/^- (.*)$/gm, "<li>$1</li>").replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>").split(/\n{2,}/).map((b) => (b.startsWith("<h2>") || b.startsWith("<li>") ? b : `<p>${b.replace(/\n/g, "<br>")}</p>`)).join("")}`;
 									const key = Math.random().toString(36).slice(2, 10);
@@ -554,6 +589,26 @@ function ResponsesTab({ formId, title, questions, collectEmail, responses, onCha
 					)}
 				</DialogContent>
 			</Dialog>
+			<div className="flex flex-wrap items-center gap-3 rounded-2xl border border-serene-neutral-200/70 bg-white p-3">
+				<span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700"><FileSpreadsheet className="h-5 w-5" /></span>
+				<div className="min-w-0 flex-1">
+					<p className="truncate text-sm font-semibold text-serene-neutral-900">{linked ? linked.name : fileName}</p>
+					<p className="text-xs text-serene-neutral-500">{linked === undefined ? "Looking for the linked spreadsheet" : linked ? `Linked spreadsheet in Files, last responses added when you refresh it` : "Not created yet. It is made in Files with every response."}</p>
+				</div>
+				{linked && (
+					<button type="button" onClick={() => setShareSheet(true)} aria-label="Who has access to the spreadsheet" className="flex items-center rounded-full p-1 hover:bg-serene-neutral-100" title={[linked.owner.name, ...linked.people.map((p) => p.name)].join(", ")}>
+						<span className="flex -space-x-2">
+							{[{ id: linked.owner.id, name: linked.owner.name, avatar: linked.owner.avatar }, ...linked.people].slice(0, 4).map((p) => (
+								<span key={p.id} className="flex h-7 w-7 items-center justify-center overflow-hidden rounded-full bg-sauti-teal-light text-[10px] font-bold text-sauti-teal ring-2 ring-white">{p.avatar ? <img src={p.avatar} alt="" className="h-full w-full object-cover" /> : p.name.charAt(0).toUpperCase()}</span>
+							))}
+						</span>
+					</button>
+				)}
+				{linked && <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setShareSheet(true)}><UserPlus className="h-4 w-4" /> Access</Button>}
+				{linked && <Button size="sm" variant="outline" disabled={sheetBusy} onClick={refreshSheet}>{sheetBusy ? "Updating" : "Update"}</Button>}
+				<Button size="sm" className="gap-1.5 bg-emerald-700 text-white hover:bg-emerald-800" disabled={sheetBusy} onClick={openSpreadsheet}><FileSpreadsheet className="h-4 w-4" /> {linked ? "Open" : "Create and open"}</Button>
+			</div>
+			<ShareDialog item={shareSheet && linked ? ({ type: "file", id: linked.id, name: linked.name } as never) : null} onClose={() => { setShareSheet(false); void loadLinked(); }} />
 			<div className="overflow-x-auto rounded-2xl border border-serene-neutral-200/70 bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04)]">
 				<table className="w-full min-w-[640px] text-sm">
 					<thead className="bg-serene-neutral-50 text-left text-xs uppercase tracking-wide text-serene-neutral-500">
