@@ -14,6 +14,8 @@ import { cn } from "@/lib/utils";
 import { putToSignedUrl } from "@/lib/client/upload";
 import { deleteTemplate, listTemplates, saveTemplate, studioRegister, studioUpload, type TemplateRow } from "@/app/actions/mjengo-templates";
 import { listAssets, type AssetRow } from "@/app/actions/mjengo-ai";
+import { TEMPLATES, type DesignTemplate } from "@/lib/mjengo/design-templates";
+import { TemplatePreview } from "@/components/design/TemplatePreview";
 import { inspireImage } from "@/app/actions/mjengo-inspire";
 import { InspirePanel } from "./_InspirePanel";
 import { PostThis } from "../../_components/PostThis";
@@ -37,51 +39,29 @@ type Builder = (c: Canvas, w: number, h: number) => void;
 
 const text = (t: string, o: Partial<ConstructorParameters<typeof Textbox>[1]>) => new Textbox(t, { fontFamily: "Inter", fill: CANVA.ink, ...o });
 
-/** Starting layouts, drawn with the same objects people can edit afterwards. */
-export const BUILT_IN: { id: string; name: string; build: Builder; swatch: string }[] = [
-	{
-		id: "quote", name: "Quote card", swatch: CANVA.purple,
-		build: (c, w, h) => {
-			c.backgroundColor = CANVA.purple;
-			c.add(text("“", { left: w * 0.08, top: h * 0.08, fontSize: h * 0.22, fill: "#FFFFFF", fontWeight: "bold", width: w * 0.3 }));
-			c.add(text("Write the words that matter here.", { left: w * 0.08, top: h * 0.3, width: w * 0.84, fontSize: h * 0.075, fill: "#FFFFFF", fontWeight: "bold", lineHeight: 1.15 }));
-			c.add(text("Name, role", { left: w * 0.08, top: h * 0.78, width: w * 0.6, fontSize: h * 0.034, fill: "#EADCFF" }));
-		},
-	},
-	{
-		id: "announce", name: "Announcement", swatch: CANVA.teal,
-		build: (c, w, h) => {
-			c.backgroundColor = "#FFFFFF";
-			c.add(new Rect({ left: 0, top: 0, width: w, height: h * 0.34, fill: CANVA.teal }));
-			c.add(text("NEWS", { left: w * 0.08, top: h * 0.1, width: w * 0.6, fontSize: h * 0.07, fill: "#FFFFFF", fontWeight: "bold", charSpacing: 200 }));
-			c.add(text("Your headline goes here", { left: w * 0.08, top: h * 0.42, width: w * 0.84, fontSize: h * 0.085, fontWeight: "bold" }));
-			c.add(text("One or two lines to explain it, who it is for and when.", { left: w * 0.08, top: h * 0.66, width: w * 0.84, fontSize: h * 0.04, fill: "#4B5563" }));
-		},
-	},
-	{
-		id: "stat", name: "Big number", swatch: "#FFDE59",
-		build: (c, w, h) => {
-			c.backgroundColor = "#FFDE59";
-			c.add(text("1,240", { left: w * 0.08, top: h * 0.2, width: w * 0.84, fontSize: h * 0.26, fontWeight: "bold" }));
-			c.add(text("people reached this year", { left: w * 0.08, top: h * 0.62, width: w * 0.84, fontSize: h * 0.06, fontWeight: "bold" }));
-			c.add(text("Sauti Salama", { left: w * 0.08, top: h * 0.88, width: w * 0.6, fontSize: h * 0.035 }));
-		},
-	},
-	{
-		id: "event", name: "Event", swatch: CANVA.ink,
-		build: (c, w, h) => {
-			c.backgroundColor = CANVA.ink;
-			c.add(new Circle({ left: w * 0.62, top: -h * 0.12, radius: w * 0.32, fill: CANVA.purple }));
-			c.add(text("YOU ARE INVITED", { left: w * 0.08, top: h * 0.12, width: w * 0.7, fontSize: h * 0.035, fill: CANVA.teal, charSpacing: 250, fontWeight: "bold" }));
-			c.add(text("Event name", { left: w * 0.08, top: h * 0.35, width: w * 0.84, fontSize: h * 0.11, fill: "#FFFFFF", fontWeight: "bold" }));
-			c.add(text("Date  |  Time  |  Place", { left: w * 0.08, top: h * 0.7, width: w * 0.84, fontSize: h * 0.04, fill: "#D1D5DB" }));
-		},
-	},
-	{
-		id: "plain", name: "Plain white", swatch: "#FFFFFF",
-		build: (c) => { c.backgroundColor = "#FFFFFF"; },
-	},
-];
+/** Starting layouts, drawn with the same objects people can edit afterwards (the hub previews the same layers). */
+function buildFrom(t: DesignTemplate): Builder {
+	return (c, w, h) => {
+		c.backgroundColor = t.bg;
+		for (const l of t.layers) {
+			if (l.t === "rect" || l.t === "photo") {
+				const r = l.r ? l.r * Math.min(l.w * w, l.h * h) : 0;
+				const o = new Rect({ left: l.x * w, top: l.y * h, width: l.w * w, height: l.h * h, fill: l.fill, rx: r, ry: r });
+				c.add(o);
+			} else if (l.t === "circle") {
+				c.add(new Circle({ left: l.x * w, top: l.y * h, radius: (l.d * w) / 2, fill: l.fill }));
+			} else {
+				c.add(text(l.text, {
+					left: l.x * w, top: l.y * h, width: l.w * w, fontSize: l.size * h, fill: l.color,
+					fontWeight: l.bold ? "bold" : "normal", fontStyle: l.italic ? "italic" : "normal",
+					charSpacing: l.spacing ?? 0, textAlign: l.align ?? "left", lineHeight: l.lh ?? 1.2,
+				}));
+			}
+		}
+	};
+}
+
+export const BUILT_IN: { id: string; name: string; build: Builder; swatch: string; template: DesignTemplate }[] = TEMPLATES.map((t) => ({ id: t.id, name: t.name, build: buildFrom(t), swatch: t.bg, template: t }));
 
 function DesignEditor() {
 	const search = useSearchParams();
@@ -458,10 +438,10 @@ function DesignEditor() {
 							<div>
 								<h3 className="mb-2 text-sm font-semibold">Start from</h3>
 								<div className="grid grid-cols-2 gap-2">
-									{BUILT_IN.map((b) => (
-										<button key={b.id} onClick={() => applyBuilt(b)} className="overflow-hidden rounded-xl border border-serene-neutral-200 text-left hover:border-[#7D2AE8]">
-											<span className="block h-20" style={{ background: b.swatch, borderBottom: "1px solid rgba(0,0,0,.06)" }} />
-											<span className="block px-2 py-1.5 text-xs font-medium">{b.name}</span>
+									{BUILT_IN.filter((b) => b.id !== "plain").map((b) => (
+										<button key={b.id} onClick={() => applyBuilt(b)} className="group rounded-xl text-left transition hover:-translate-y-0.5">
+											<TemplatePreview template={b.template} className="group-hover:ring-[#7D2AE8]" />
+											<span className="mt-1 block truncate text-xs font-medium">{b.name}</span>
 										</button>
 									))}
 								</div>

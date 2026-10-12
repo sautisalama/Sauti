@@ -16,6 +16,8 @@ import { inspireSearch } from "@/app/actions/mjengo-inspire";
 import type { InspireSource } from "@/lib/mjengo/inspire-sources";
 import { Input } from "@/components/ui/input";
 import ContentPanel from "../content/page";
+import { ASPECT, CATEGORIES, TEMPLATES } from "@/lib/mjengo/design-templates";
+import { TemplatePreview } from "@/components/design/TemplatePreview";
 
 const SIZES = [
 	{ id: "instagram", label: "Instagram post", note: "1080 x 1080", w: 1080, h: 1080 },
@@ -25,13 +27,6 @@ const SIZES = [
 	{ id: "facebook", label: "Facebook post", note: "1200 x 630", w: 1200, h: 630 },
 	{ id: "x", label: "X post", note: "1600 x 900", w: 1600, h: 900 },
 	{ id: "poster", label: "A4 poster", note: "1240 x 1754", w: 1240, h: 1754 },
-];
-
-const STARTERS = [
-	{ id: "quote", name: "Quote card", swatch: "#7D2AE8" },
-	{ id: "announce", name: "Announcement", swatch: "#00C4CC" },
-	{ id: "stat", name: "Big number", swatch: "#FFDE59" },
-	{ id: "event", name: "Event", swatch: "#0E1318" },
 ];
 
 function Fold({ id, title, count, right, open, onToggle, children }: { id: string; title: string; count?: number; right?: React.ReactNode; open: boolean; onToggle: (id: string, next: boolean) => void; children: React.ReactNode }) {
@@ -71,6 +66,7 @@ export default function DesignHome() {
 	const [pins, setPins] = useState<Pin[] | null>(null);
 	const [pinErr, setPinErr] = useState<string | null>(null);
 	const [pinQ, setPinQ] = useState("");
+	const [cat, setCat] = useState<(typeof CATEGORIES)[number]>("All");
 	const [src, setSrc] = useState<"pinterest" | InspireSource>("pinterest");
 	const searchPins = (q: string, from: "pinterest" | InspireSource = src) => {
 		setPins(null); setPinErr(null);
@@ -126,19 +122,26 @@ export default function DesignHome() {
 				</div>
 			</Fold>
 
-			<Fold id="templates" title="Templates" count={STARTERS.length + templates.length} open={isOpen("templates")} onToggle={toggle}>
-				<div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-6">
-					{STARTERS.map((t) => (
-						<Link key={t.id} href={`/dashboard/mjengo/design/editor?template=${t.id}`} className="overflow-hidden rounded-2xl border border-serene-neutral-200/70 bg-white transition hover:border-[#7D2AE8]/50 hover:shadow-sm">
-							<span className="block h-24" style={{ background: t.swatch }} />
-							<span className="block px-3 py-2 text-sm font-medium">{t.name}</span>
+			<Fold id="templates" title="Templates" count={TEMPLATES.length - 1 + templates.length} open={isOpen("templates")} onToggle={toggle}>
+				<div className="mb-3 flex gap-1.5 overflow-x-auto pb-1 scrollbar-hide">
+					{CATEGORIES.map((c) => (
+						<button key={c} onClick={() => setCat(c)} aria-pressed={cat === c} className={cn("shrink-0 rounded-full border px-3.5 py-1.5 text-sm font-medium transition", cat === c ? "border-[#7D2AE8] bg-[#7D2AE8] text-white" : "border-serene-neutral-200 bg-white text-serene-neutral-700 hover:border-[#7D2AE8]/50")}>{c}</button>
+					))}
+				</div>
+				<div className="columns-2 gap-4 sm:columns-3 lg:columns-5">
+					{TEMPLATES.filter((t) => t.id !== "plain" && (cat === "All" || t.category === cat)).map((t) => (
+						<Link key={t.id} href={`/dashboard/mjengo/design/editor?template=${t.id}&size=${t.size}`} className="group mb-4 block break-inside-avoid">
+							<span className="block transition group-hover:-translate-y-0.5 group-hover:[&>div]:ring-[#7D2AE8] group-hover:[&>div]:shadow-md"><TemplatePreview template={t} /></span>
+							<span className="mt-1.5 block truncate text-sm font-medium text-serene-neutral-800">{t.name}</span>
+							<span className="block text-xs text-serene-neutral-500">{t.category} · {ASPECT[t.size].w} x {ASPECT[t.size].h}</span>
 						</Link>
 					))}
-					{templates.map((t) => (
-						<div key={t.id} className="group relative overflow-hidden rounded-2xl border border-serene-neutral-200/70 bg-white transition hover:border-[#7D2AE8]/50 hover:shadow-sm">
+					{cat === "All" && templates.map((t) => (
+						<div key={t.id} className="group relative mb-4 break-inside-avoid">
 							<Link href={`/dashboard/mjengo/design/editor?id=${t.id}&copy=1`} className="block">
-								{(t.data as { thumb?: string }).thumb ? <img src={(t.data as { thumb: string }).thumb} alt="" className="h-24 w-full object-cover" /> : <span className="block h-24 bg-serene-neutral-100" />}
-								<span className="block truncate px-3 py-2 text-sm font-medium">{t.name}</span>
+								{(t.data as { thumb?: string }).thumb ? <img src={(t.data as { thumb: string }).thumb} alt="" className="w-full rounded-lg bg-white shadow-sm ring-1 ring-black/5 transition group-hover:ring-[#7D2AE8]" /> : <span className="block aspect-square rounded-lg bg-serene-neutral-100" />}
+								<span className="mt-1.5 block truncate text-sm font-medium text-serene-neutral-800">{t.name}</span>
+								<span className="block text-xs text-serene-neutral-500">Your template</span>
 							</Link>
 							<button aria-label={`Delete ${t.name}`} onClick={() => remove(t)} className="absolute right-1.5 top-1.5 hidden h-7 w-7 items-center justify-center rounded-md bg-white text-red-600 shadow group-hover:flex"><Trash2 className="h-3.5 w-3.5" /></button>
 						</div>
