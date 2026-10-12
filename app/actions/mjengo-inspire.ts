@@ -25,6 +25,29 @@ const need = (source: InspireSource) => {
   return key;
 };
 
+/** Openverse gives a registered app more room than anonymous callers. The token is kept until it expires. */
+let openverseToken: { value: string; until: number } | null = null;
+async function openverseAuth(): Promise<RequestInit | undefined> {
+  const id = process.env.OPENVERSE_CLIENT_ID;
+  const secret = process.env.OPENVERSE_CLIENT_SECRET;
+  if (!id || !secret) return undefined;
+  if (!openverseToken || openverseToken.until < Date.now() + 60_000) {
+    try {
+      const res = await fetch('https://api.openverse.org/v1/auth_tokens/token/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'User-Agent': 'SautiSalama/1.0 (https://sautisalama.org)' },
+        body: new URLSearchParams({ grant_type: 'client_credentials', client_id: id, client_secret: secret }),
+        signal: AbortSignal.timeout(15_000),
+      });
+      if (res.ok) {
+        const j = (await res.json()) as { access_token?: string; expires_in?: number };
+        if (j.access_token) openverseToken = { value: j.access_token, until: Date.now() + (j.expires_in ?? 3600) * 1000 };
+      }
+    } catch { /* anonymous access still works */ }
+  }
+  return openverseToken ? { headers: { Authorization: `Bearer ${openverseToken.value}` } } : undefined;
+}
+
 async function getJson<T>(url: string, init?: RequestInit): Promise<T> {
   const res = await fetch(url, { ...init, headers: { 'User-Agent': 'SautiSalama/1.0 (https://sautisalama.org)', Accept: 'application/json', ...(init?.headers ?? {}) }, signal: AbortSignal.timeout(20_000) });
   if (!res.ok) throw new Error(res.status === 401 || res.status === 403 ? (url.includes('openverse') ? 'Openverse did not accept the request. Try again shortly.' : 'That service refused the key.') : res.status === 429 ? 'That service is busy. Try again in a minute.' : 'That service did not answer.');
@@ -54,7 +77,8 @@ async function search_(source: InspireSource, query: string, page = 1): Promise<
   }
   if (source === 'openverse') {
     const j = await getJson<{ results?: { id: string; title?: string; thumbnail?: string; creator?: string; license?: string; foreign_landing_url?: string }[] }>(
-      `https://api.openverse.org/v1/images/?${new URLSearchParams({ q, page_size: '24', page: String(pg), license_type: 'commercial,modification' })}`);
+      `https://api.openverse.org/v1/images/?${new URLSearchParams({ q, page_size: '24', page: String(pg), license_type: 'commercial,modification' })}`,
+      await openverseAuth());
     return (j.results ?? []).filter((r) => r.thumbnail).map((r) => ({ id: r.id, title: r.title || 'Image', thumb: r.thumbnail!, full: r.thumbnail!, credit: `${r.creator ? `By ${r.creator}, ` : ''}licence ${(r.license ?? '').toUpperCase()} (Openverse)`, link: r.foreign_landing_url ?? null }));
   }
   if (source === 'iconify') {
