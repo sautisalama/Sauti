@@ -12,6 +12,7 @@ import { unwrap } from "@/lib/action-result";
 import { cn } from "@/lib/utils";
 import { CHANNELS, CHANNEL_INFO, type Channel } from "@/lib/mjengo/channels";
 import * as content from "@/app/actions/mjengo-content";
+import { suggestTimes } from "@/lib/mjengo/best-times";
 
 /**
  * Asked once an image or banner has been made: where should it go? The website and each social network
@@ -25,12 +26,18 @@ export function PostThis({ assetId, about, open, onClose, extraLink }: { assetId
 	const [caption, setCaption] = useState("");
 	const [when, setWhen] = useState("");
 	const [busy, setBusy] = useState<"ai" | "go" | null>(null);
+	const [tags, setTags] = useState<content.SocialTag[]>([]);
+	const [taken, setTaken] = useState<Date[]>([]);
 
 	useEffect(() => {
 		if (!open) return;
 		setChosen([]); setWhen(""); setCaption("");
 		unwrap(content.channelsState()).then(setState).catch(() => setState(null));
+		unwrap(content.listSocialTags()).then(setTags).catch(() => setTags([]));
+		unwrap(content.listPosts()).then((p) => setTaken(p.filter((x) => x.scheduled_for && x.status !== "cancelled").map((x) => new Date(x.scheduled_for as string)))).catch(() => setTaken([]));
 	}, [open]);
+	const times = chosen.length ? suggestTimes(chosen, taken, new Date(), 4) : [];
+	const toLocal = (iso: string) => { const d = new Date(iso); const p = (n: number) => String(n).padStart(2, "0"); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`; };
 
 	const linked = (c: Channel) => c === "website" || !!state?.connections.some((x) => x.channel === c);
 	const toggle = (c: Channel) => setChosen((cur) => (cur.includes(c) ? cur.filter((x) => x !== c) : [...cur, c]));
@@ -52,6 +59,12 @@ export function PostThis({ assetId, about, open, onClose, extraLink }: { assetId
 				linkUrl: extraLink ?? null,
 				scheduledFor: mode === "schedule" && when ? new Date(when).toISOString() : null,
 				status: mode === "schedule" ? "scheduled" : "draft",
+				// The people and hashtags marked "always add" for each chosen network.
+				variants: Object.fromEntries(chosen.flatMap((c) => {
+					const mentions = tags.filter((t) => t.channel === c && t.kind === "mention" && t.auto).map((t) => t.value);
+					const hashtags = tags.filter((t) => t.channel === c && t.kind === "hashtag" && t.auto).map((t) => t.value);
+					return mentions.length || hashtags.length ? [[c, { ...(mentions.length ? { mentions } : {}), ...(hashtags.length ? { hashtags } : {}) }]] : [];
+				})),
 			}));
 			if (mode === "now") {
 				const r = await unwrap(content.publishPostNow(saved.id));
@@ -102,6 +115,14 @@ export function PostThis({ assetId, about, open, onClose, extraLink }: { assetId
 					<div className="space-y-1.5">
 						<label htmlFor="pt-when" className="text-xs font-semibold">Schedule for</label>
 						<Input id="pt-when" type="datetime-local" value={when} onChange={(e) => setWhen(e.target.value)} />
+						{times.length > 0 && (
+							<div className="pt-1">
+								<p className="mb-1 text-[11px] font-medium text-serene-neutral-500">Best times for {chosen.map((c) => CHANNEL_INFO[c].label).join(", ")} (Nairobi)</p>
+								<div className="flex flex-wrap gap-1.5">
+									{times.map((t) => <button key={t.iso} type="button" title={t.why} onClick={() => setWhen(toLocal(t.iso))} className={cn("rounded-full border px-2.5 py-1 text-xs font-medium", when === toLocal(t.iso) ? "border-sauti-teal bg-sauti-teal-light/50" : "border-serene-neutral-200 hover:border-sauti-teal/50")}>{t.label}</button>)}
+								</div>
+							</div>
+						)}
 					</div>
 				</div>
 				<DialogFooter className="gap-2">
