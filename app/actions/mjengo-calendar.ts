@@ -39,6 +39,9 @@ export interface NewEvent {
   videoCall?: boolean;
   /** Time kept free of meetings: shown as busy, and nobody is invited. */
   block?: boolean;
+  /** How many alerts to send before it starts (0 to 10), and how many minutes apart. The last one lands one step before the start. */
+  alerts?: number;
+  alertEvery?: number;
 }
 
 /** An authorised Google Calendar client for this person, refreshing the token when needed. */
@@ -128,6 +131,8 @@ async function create_(v: NewEvent): Promise<CalItem> {
   if (end < start) throw new Error('The event cannot end before it starts.');
   const attendees = [...new Set((v.attendees ?? []).map((x) => x.trim().toLowerCase()).filter((x) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(x)))].slice(0, 50);
   const db = looseAdmin();
+  const alertCount = Math.min(10, Math.max(0, Math.round(v.alerts ?? 1)));
+  const alertEvery = Math.min(1440, Math.max(1, Math.round(v.alertEvery ?? 15)));
 
   let code: string | null = null;
   if (v.videoCall && !v.block) {
@@ -148,7 +153,7 @@ async function create_(v: NewEvent): Promise<CalItem> {
       const body = v.allDay
         ? { start: { date: start.toISOString().slice(0, 10) }, end: { date: new Date(end.getTime() + 86400_000).toISOString().slice(0, 10) } }
         : { start: { dateTime: start.toISOString() }, end: { dateTime: end.toISOString() } };
-      const r = await cal.events.insert({ calendarId: 'primary', sendUpdates: 'all', requestBody: { summary: title, description: description ?? undefined, location: v.location || undefined, ...body, attendees: attendees.map((email) => ({ email })) } });
+      const r = await cal.events.insert({ calendarId: 'primary', sendUpdates: 'all', requestBody: { summary: title, description: description ?? undefined, location: v.location || undefined, ...body, attendees: attendees.map((email) => ({ email })), reminders: alertCount > 0 ? { useDefault: false, overrides: Array.from({ length: Math.min(5, alertCount) }, (_, i) => ({ method: 'popup', minutes: alertEvery * (i + 1) })) } : { useDefault: true } } });
       googleId = r.data.id ?? null;
     }
   } catch (e) {
@@ -158,6 +163,7 @@ async function create_(v: NewEvent): Promise<CalItem> {
   const { data, error } = await db.from('mjengo_events').insert({
     title, description, location: v.location?.trim().slice(0, 200) || null, starts_at: start.toISOString(), ends_at: end.toISOString(), all_day: !!v.allDay,
     kind: v.block ? 'block' : code ? 'meeting' : 'event', meeting_code: code, attendees: v.block ? [] : attendees, google_event_id: googleId, created_by: a.id,
+    alerts: v.block ? 0 : alertCount, alert_every_min: alertEvery,
   }).select('id, title, description, location, starts_at, ends_at, all_day, kind, meeting_code, attendees').single();
   if (error || !data) throw new Error('Could not save the event.');
   await logAudit({ actorId: a.id, actorEmail: a.email, action: 'calendar.event_created', targetType: 'event', targetId: data.id, targetLabel: title });

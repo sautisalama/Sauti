@@ -87,6 +87,27 @@ async function makeNotes_(code: string): Promise<string> {
   return notes;
 }
 
+export interface MeetHomeItem { key: string; title: string; code: string | null; start: string; end: string | null; kind: 'scheduled' | 'link' }
+
+/** What is on for one day: calendar meetings, and links made for later that day. */
+async function meetHome_(dayStart: string, dayEnd: string): Promise<MeetHomeItem[]> {
+  const a = await requireAdminActor();
+  const db = looseAdmin();
+  const [{ data: ev }, { data: mt }] = await Promise.all([
+    db.from('mjengo_events').select('id, title, starts_at, ends_at, meeting_code').not('meeting_code', 'is', null).gte('starts_at', dayStart).lt('starts_at', dayEnd).order('starts_at'),
+    db.from('mjengo_meetings').select('id, code, title, created_at').eq('created_by', a.id).gte('created_at', dayStart).lt('created_at', dayEnd).is('ended_at', null),
+  ]);
+  const events = (ev ?? []) as { id: string; title: string; starts_at: string; ends_at: string; meeting_code: string }[];
+  const have = new Set(events.map((e) => e.meeting_code));
+  return [
+    ...events.map((e) => ({ key: `e${e.id}`, title: e.title, code: e.meeting_code, start: e.starts_at, end: e.ends_at, kind: 'scheduled' as const })),
+    ...((mt ?? []) as { id: string; code: string; title: string | null; created_at: string }[])
+      .filter((m) => !have.has(m.code))
+      .map((m) => ({ key: `m${m.id}`, title: m.title || 'Meeting link', code: m.code, start: m.created_at, end: null, kind: 'link' as const })),
+  ].sort((x, y) => x.start.localeCompare(y.start));
+}
+
+export const meetHome = guard(meetHome_);
 export const meetingDetail = guard(meetingDetail_);
 export const makeMeetingNotes = guard(makeNotes_);
 export const createMeeting = guard(createMeeting_);

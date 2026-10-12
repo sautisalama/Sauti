@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { format } from "date-fns";
-import { Accessibility, Captions, MoreVertical, Check, Copy, Hand, Info, Loader2, Mail, MessageSquareText, Mic, MicOff, Minimize2, MonitorUp, PictureInPicture2, PhoneOff, SmartphoneNfc, Users, Video, VideoOff, Volume2, X } from "lucide-react";
+import { Accessibility, Captions, MoreVertical, ShieldCheck, UserPlus, Check, Copy, Hand, Info, Loader2, Mail, MessageSquareText, Mic, MicOff, Minimize2, MonitorUp, PictureInPicture2, PhoneOff, SmartphoneNfc, Users, Video, VideoOff, Volume2, X } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import { unwrap } from "@/lib/action-result";
 import { saveTranscript, type TranscriptLine } from "@/app/actions/mjengo-meet";
@@ -35,6 +35,9 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded }: 
 	const [handUp, setHandUp] = useState(false);
 	const [a11yOpen, setA11yOpen] = useState(false);
 	const [moreOpen, setMoreOpen] = useState(false);
+	const [left, setLeft] = useState(false);
+	const [readyOpen, setReadyOpen] = useState(false);
+	const [secs, setSecs] = useState(60);
 	const [a11y, setA11yState] = useState<{ size: "md" | "lg" | "xl"; contrast: boolean; reduceMotion: boolean }>({ size: "md", contrast: false, reduceMotion: false });
 	const setA11y = (v: typeof a11y) => { setA11yState(v); try { localStorage.setItem("ss_meet_a11y", JSON.stringify(v)); } catch { /* ignore */ } };
 	const screenStream = useRef<MediaStream | null>(null);
@@ -223,6 +226,7 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded }: 
 			})
 			.subscribe(async (status) => { if (status === "SUBSCRIBED") await ch.track({ name: shownName, companion }); });
 		setJoined(true);
+		setReadyOpen(true);
 		if (present) setTimeout(() => { void toggleShareRef.current(); }, 600);
 	};
 
@@ -328,6 +332,14 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded }: 
 		return () => clearInterval(t);
 	}, [joined, canSave, persist]);
 
+	const home = canSave ? "/meet" : "/";
+	useEffect(() => {
+		if (!left) return;
+		if (secs <= 0) { window.location.assign(home); return; }
+		const t = setTimeout(() => setSecs((n) => n - 1), 1000);
+		return () => clearTimeout(t);
+	}, [left, secs, home]);
+
 	const leave = useCallback(async () => {
 		await persist(true);
 		pcs.current.forEach((pc) => pc.close());
@@ -336,6 +348,8 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded }: 
 		channel.current?.unsubscribe();
 		setJoined(false);
 		setRemotes([]);
+		setReadyOpen(false);
+		if (!embedded) { setSecs(60); setLeft(true); }
 		if (embedded) window.parent.postMessage({ type: "meet:left" }, window.location.origin);
 	}, [persist, embedded]);
 
@@ -351,6 +365,28 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded }: 
 	const mailto = `mailto:?subject=${encodeURIComponent(title || "Join the call")}&body=${encodeURIComponent(`Join the call: ${link}`)}`;
 
 	/* ------------------------------------------------------------ lobby */
+
+	if (left && !joined) {
+		return (
+			<main className="flex min-h-dvh flex-col bg-white text-[#202124]">
+				<header className="flex items-center gap-3 px-5 pt-5">
+					<span className="relative flex h-11 w-11 items-center justify-center rounded-full border-[3px] border-[#1a73e8] text-sm" aria-hidden>{secs}</span>
+					<span className="text-sm text-[#5f6368]">Returning to home screen</span>
+				</header>
+				<div className="mx-auto mt-10 flex w-full max-w-xl flex-1 flex-col items-center px-5 text-center">
+					<h1 className="text-3xl font-normal sm:text-4xl">You left the meeting</h1>
+					<div className="mt-8 flex flex-wrap justify-center gap-3">
+						<button onClick={() => setLeft(false)} className="h-11 rounded-full border border-[#dadce0] px-6 text-sm font-medium text-[#1a73e8] hover:bg-[#f6fafe]">Rejoin</button>
+						<button onClick={() => window.location.assign(home)} className="h-11 rounded-full bg-[#1a73e8] px-6 text-sm font-medium text-white hover:bg-[#1765cc]">Return to home screen</button>
+					</div>
+					<div className="mt-12 flex w-full items-start gap-4 rounded-lg border border-[#dadce0] bg-[#f8f9fc] p-5 text-left">
+						<span className="mt-0.5 text-[#1a73e8]"><ShieldCheck className="h-8 w-8" /></span>
+						<span><span className="block text-lg">Your meeting is safe</span><span className="block text-sm text-[#5f6368]">No one can join a meeting unless invited or admitted by the host</span></span>
+					</div>
+				</div>
+			</main>
+		);
+	}
 
 	if (!joined) {
 		const chip = "flex h-9 max-w-[220px] items-center gap-2 rounded-full border border-[#dadce0] bg-white px-3 text-sm text-[#3c4043]";
@@ -431,6 +467,14 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded }: 
 
 	return (
 		<div className={cn("relative flex h-dvh flex-col bg-[#202124] text-white", a11y.reduceMotion && "[&_*]:!transition-none [&_*]:!animate-none")}>
+			<div className="hidden shrink-0 items-center gap-3 px-5 pt-3 text-base md:flex">
+				<span className="font-medium">{clock}</span>
+				<span className="text-white/40">|</span>
+				<span className="font-medium">{code}</span>
+				<button onClick={() => setPanel((p) => (p === "info" ? "none" : "info"))} aria-label="Meeting details" className="text-white/70 hover:text-white"><Info className="h-4 w-4" /></button>
+				<span className="flex-1" />
+				<button onClick={() => setPanel((p) => (p === "people" ? "none" : "people"))} aria-label="People" className="flex h-10 items-center gap-2 rounded-full bg-white/10 px-3 text-sm hover:bg-white/20"><Users className="h-4 w-4" />{remotes.length + 1}</button>
+			</div>
 			<div className="pointer-events-none absolute inset-x-0 top-0 z-10 flex items-center gap-2 bg-gradient-to-b from-black/60 to-transparent px-4 pb-6 pt-[max(0.75rem,env(safe-area-inset-top))] text-sm md:hidden">
 				<span className="min-w-0 flex-1 truncate font-medium">{title || code}</span>
 				<span className="text-white/70">{clock}</span>
@@ -505,7 +549,7 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded }: 
 
 			{/* Bottom bar, as in Google Meet: details on the left, controls in the middle, panels on the right. */}
 			<div className="flex shrink-0 items-center justify-between gap-2 px-3 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-1 sm:px-5 sm:pb-3">
-				<div className="hidden min-w-0 items-center gap-2 text-sm md:flex"><span>{clock}</span><span className="text-white/40">|</span><span className="truncate">{title || code}</span></div>
+				<div className="hidden min-w-0 items-center text-sm md:flex"><span className="max-w-[16rem] truncate text-white/80">{title}</span></div>
 				<div className="mx-auto flex items-center gap-2 md:mx-0">
 					<Ctl onClick={toggleMic} label={micOn ? "Turn off microphone" : "Turn on microphone"} icon={micOn ? <Mic className="h-5 w-5" /> : <MicOff className="h-5 w-5" />} danger={!micOn} />
 					<Ctl onClick={toggleCam} label={camOn ? "Turn off camera" : "Turn on camera"} icon={camOn ? <Video className="h-5 w-5" /> : <VideoOff className="h-5 w-5" />} danger={!camOn} />
@@ -542,6 +586,17 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded }: 
 					{embedded && <Ctl onClick={() => window.parent.postMessage({ type: "meet:minimize" }, window.location.origin)} label="Minimise" icon={<Minimize2 className="h-5 w-5" />} flat />}
 				</div>
 			</div>
+
+			{readyOpen && remotes.length === 0 && (
+				<div className="absolute bottom-24 left-3 right-3 z-30 rounded-lg bg-white p-5 text-[#202124] shadow-2xl md:right-auto md:w-[26rem]">
+					<div className="mb-4 flex items-center justify-between"><h2 className="text-lg">Your meeting&apos;s ready</h2><button onClick={() => setReadyOpen(false)} aria-label="Close" className="flex h-9 w-9 items-center justify-center rounded-full hover:bg-black/5"><X className="h-5 w-5" /></button></div>
+					<a href={mailto} className="mb-4 inline-flex h-11 items-center gap-2 rounded-full bg-[#0b57d0] px-5 text-sm font-medium text-white hover:bg-[#0a4cb8]"><UserPlus className="h-4 w-4" /> Add others</a>
+					<p className="mb-3 text-sm text-[#444746]">Or share this meeting link with others you want in the meeting</p>
+					<div className="flex items-center rounded-lg bg-[#f1f3f4] py-2 pl-3 pr-1 text-sm"><span className="min-w-0 flex-1 truncate">{link.replace(/^https?:\/\//, "")}</span><button onClick={() => { navigator.clipboard.writeText(link).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500); }); }} aria-label="Copy joining info" className="flex h-9 w-9 items-center justify-center rounded-full hover:bg-black/5">{copied ? <Check className="h-5 w-5" /> : <Copy className="h-5 w-5" />}</button></div>
+					<p className="mt-4 flex items-start gap-2 text-xs text-[#5f6368]"><ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-[#1a73e8]" /> Anyone with this link can join the call, so only share it with people you want in.</p>
+					{name && <p className="mt-3 text-xs text-[#5f6368]">Joined as {name}</p>}
+				</div>
+			)}
 
 			{moreOpen && (
 				<div className="fixed inset-0 z-50 md:hidden" onClick={() => setMoreOpen(false)}>

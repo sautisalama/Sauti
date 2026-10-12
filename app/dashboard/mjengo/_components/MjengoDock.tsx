@@ -4,11 +4,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { Bell, Calendar, GripVertical, Loader2, MessageCircle, Pin, PinOff, Video } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { useToast } from "@/hooks/use-toast";
-import { unwrap } from "@/lib/action-result";
 import { useDashboardData } from "@/components/providers/DashboardDataProvider";
 import { cn } from "@/lib/utils";
-import { createMeeting } from "@/app/actions/mjengo-meet";
+import { MeetChooser } from "./MeetChooser";
 import { useSuiteNotifications } from "@/lib/client/suite-notifications";
 
 type Edge = "left" | "right" | "bottom";
@@ -23,7 +21,6 @@ const BTN = "relative flex h-10 w-10 items-center justify-center rounded-xl text
  * always reachable, and the "Move" buttons do the same thing as dragging for keyboard users.
  */
 export function MjengoDock() {
-	const { toast } = useToast();
 	const dash = useDashboardData();
 	const [mounted, setMounted] = useState(false);
 	const [small, setSmall] = useState(false);
@@ -32,7 +29,7 @@ export function MjengoDock() {
 	const [pinned, setPinned] = useState(false);
 	const open = pinned || hover;
 	const [drag, setDrag] = useState<{ x: number; y: number } | null>(null);
-	const [starting, setStarting] = useState<"video" | null>(null);
+	const [chooser, setChooser] = useState(false);
 	const { unread } = useSuiteNotifications();
 	const moved = useRef(false);
 	const origin = useRef({ x: 0, y: 0 });
@@ -83,23 +80,6 @@ export function MjengoDock() {
 		save({ edge, at: Math.min(0.95, Math.max(0.05, edge === "bottom" ? x / w : y / h)) });
 	};
 
-	const start = async (mode: "video") => {
-		setStarting(mode);
-		try {
-			const { code } = await unwrap(createMeeting(mode, null));
-			const url = `${window.location.origin}/meet/${code}`;
-			navigator.clipboard?.writeText(url).catch(() => undefined);
-			// The call is its own page (/meet/...), opened right here so an installed app does not pop up a new window.
-			toast({ title: "Meeting ready", description: "The link is copied: send it to anyone you want in the call." });
-			setOpen(false);
-			window.location.assign(url);
-		} catch (e) {
-			toast({ title: "Could not start the call", description: e instanceof Error ? e.message : undefined, variant: "destructive" });
-		} finally {
-			setStarting(null);
-		}
-	};
-
 	const style = useMemo<React.CSSProperties>(() => {
 		if (drag) return { left: drag.x - 22, top: drag.y - 22 };
 		const lg = typeof window !== "undefined" && window.innerWidth >= 1024;
@@ -117,9 +97,10 @@ export function MjengoDock() {
 	const collapse = () => { if (hoverTimer.current) clearTimeout(hoverTimer.current); hoverTimer.current = setTimeout(() => setOpen(false), 220); };
 
 	if (!mounted) return null;
-	if (small) return <EdgeSheet unread={unread} onMeeting={() => start("video")} starting={starting === "video"} />;
+	if (small) return <><EdgeSheet unread={unread} onMeeting={() => setChooser(true)} starting={false} /><MeetChooser open={chooser} onClose={() => setChooser(false)} /></>;
 	return (
 		<TooltipProvider delayDuration={150}>
+			<MeetChooser open={chooser} onClose={() => setChooser(false)} />
 			{/* Hover (or tap the handle) to expand; move away to collapse. Drag the handle to put it on another edge. */}
 			<div
 				style={style}
@@ -150,7 +131,7 @@ export function MjengoDock() {
 						<Bell className="h-[18px] w-[18px]" />
 						{unread > 0 && <span className="absolute right-1 top-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-sauti-teal px-1 text-[10px] font-bold text-white">{unread > 9 ? "9+" : unread}</span>}
 					</Item>
-					<Item label="Meeting" hint="Start a meeting; turn the camera off for audio only" onClick={() => start("video")} busy={starting === "video"} side={side}><Video className="h-[18px] w-[18px]" /></Item>
+					<Item label="Meeting" hint="Start now, make a link for later, or schedule on the calendar" onClick={() => setChooser(true)} side={side}><Video className="h-[18px] w-[18px]" /></Item>
 					<Item label="Calendar" hint="Month view, events and meetings" href="/dashboard/mjengo/calendar" side={side}><Calendar className="h-[18px] w-[18px]" /></Item>
 				</div>
 			</div>
@@ -207,7 +188,7 @@ function EdgeSheet({ unread, onMeeting, starting }: { unread: number; onMeeting:
 	const items: { label: string; href?: string; run?: () => void; icon: React.ReactNode; badge?: number }[] = [
 		{ label: "Chats", href: "/dashboard/mjengo/chat", icon: <MessageCircle className="h-5 w-5" /> },
 		{ label: "Notifications", href: "/dashboard/mjengo/notifications", icon: <Bell className="h-5 w-5" />, badge: unread },
-		{ label: "Start a meeting", run: onMeeting, icon: starting ? <Loader2 className="h-5 w-5 animate-spin" /> : <Video className="h-5 w-5" /> },
+		{ label: "Meeting", run: onMeeting, icon: starting ? <Loader2 className="h-5 w-5 animate-spin" /> : <Video className="h-5 w-5" /> },
 		{ label: "Calendar", href: "/dashboard/mjengo/calendar", icon: <Calendar className="h-5 w-5" /> },
 	];
 
