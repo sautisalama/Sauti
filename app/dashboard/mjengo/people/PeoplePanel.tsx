@@ -107,9 +107,9 @@ export function PeoplePanel() {
 				<CardContent className="space-y-4">
 					<ul className="divide-y divide-serene-neutral-100 rounded-xl border border-serene-neutral-100">
 						{data.superAdmins.map((s) => (
-							<li key={s.id} className="flex items-center gap-3 p-3">
+							<li key={s.id} className="flex flex-wrap items-center gap-x-3 gap-y-2 p-3">
 								<div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-sauti-teal-light text-sm font-bold text-sauti-teal">{initials(s.name || s.email)}</div>
-								<div className="min-w-0 flex-1">
+								<div className="min-w-0 flex-1 basis-[10rem]">
 									<p className="truncate text-sm font-semibold text-serene-neutral-900">{s.name || s.email}</p>
 									<p className="truncate text-xs text-serene-neutral-500">
 										{s.name ? `${s.email} · ` : ""}
@@ -142,7 +142,7 @@ export function PeoplePanel() {
 						<p className="mb-1.5 text-xs font-semibold text-serene-neutral-600">
 							Add a super admin ({data.me.added} of {data.me.limit} used by you)
 						</p>
-						<div className="flex gap-2">
+						<div className="flex flex-col gap-2 sm:flex-row">
 							<Input
 								value={identifier}
 								onChange={(e) => setIdentifier(e.target.value)}
@@ -284,9 +284,9 @@ export function PeoplePanel() {
 function PersonRow({ p, busy, onAdmin, onType }: { p: PersonView; busy: boolean; onAdmin: (v: boolean) => void; onType: (t: "survivor" | "professional" | "ngo") => void }) {
 	return (
 		<li className="rounded-xl border border-serene-neutral-100 p-3">
-			<div className="flex items-center gap-3">
+			<div className="flex flex-wrap items-center gap-x-3 gap-y-2">
 				<div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-serene-neutral-100 text-sm font-bold text-serene-neutral-700">{initials(p.name)}</div>
-				<div className="min-w-0 flex-1">
+				<div className="min-w-0 flex-1 basis-[10rem]">
 					<p className="truncate text-sm font-semibold">{p.name}</p>
 					<p className="truncate text-xs text-serene-neutral-500">
 						{p.email}
@@ -315,7 +315,7 @@ function PersonRow({ p, busy, onAdmin, onType }: { p: PersonView; busy: boolean;
 						</Button>
 					)}
 					<Select value={p.userType ?? undefined} onValueChange={(v) => window.confirm(`Change ${p.name}'s account type to ${v}?`) && onType(v as "survivor" | "professional" | "ngo")} disabled={busy}>
-						<SelectTrigger className="h-9 w-[150px]">
+						<SelectTrigger className="h-9 w-full sm:w-[150px]">
 							<SelectValue placeholder="Account type" />
 						</SelectTrigger>
 						<SelectContent>

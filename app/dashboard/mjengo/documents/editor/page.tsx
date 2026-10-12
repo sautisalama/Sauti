@@ -13,6 +13,7 @@ import { SupabaseYProvider } from "@/lib/client/supabase-yjs";
 import { listTemplates } from "@/app/actions/mjengo-templates";
 import { useToast } from "@/hooks/use-toast";
 import { putToSignedUrl } from "@/lib/client/upload";
+import { ArrowLeft } from "lucide-react";
 import { DocAssist } from "./_DocAssist";
 import { ShareDialog } from "../../_components/ShareDialog";
 import { finishReplace, getFileUrl, prepareReplace, prepareUpload, registerUpload } from "../../vault/api";
@@ -194,6 +195,13 @@ function EditorScreen() {
 			{loading ? (
 				<MjengoLoader label="Opening your document" className="h-full min-h-0" />
 			) : (
+				<>
+				<div className="flex h-11 shrink-0 items-center justify-between border-b border-black/10 bg-white px-2 sm:hidden">
+					<button onClick={() => window.history.back()} className="flex h-9 items-center gap-1 rounded-full px-2 text-sm font-medium text-[#37352f]" aria-label="Back">
+						<ArrowLeft className="h-4 w-4" /> Back
+					</button>
+					{fileId && level !== "view" && <button onClick={() => setShareOpen(true)} className="flex h-9 items-center gap-1.5 rounded-full bg-sauti-teal px-3.5 text-sm font-semibold text-white">Share</button>}
+				</div>
 				<div className="relative min-h-0 flex-1 overflow-hidden">
 					<WordcraftEditor
 						ref={ref}
@@ -213,7 +221,7 @@ function EditorScreen() {
 					/>
 					<DocAssist editor={ref} />
 					{fileId && (
-						<div className="absolute bottom-14 left-3 z-30 flex items-center gap-1.5 sm:bottom-16">
+						<div className="absolute bottom-14 left-3 z-30 hidden items-center gap-1.5 sm:bottom-16 sm:flex">
 							<button
 								onClick={() => { const url = `${window.location.origin}/dashboard/mjengo/documents/editor?file=${fileId}`; navigator.clipboard.writeText(url).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1600); toast({ title: "Link copied", description: "Anyone with access who opens it edits this same document, live." }); }).catch(() => undefined); }}
 								className="flex h-9 items-center gap-1.5 rounded-full border border-black/10 bg-white px-3 text-sm font-medium text-[#37352f] shadow-sm hover:bg-[#f7f7f5]"
@@ -223,6 +231,7 @@ function EditorScreen() {
 					)}
 					<ShareDialog item={shareOpen && fileId ? ({ type: "file", id: fileId, name } as never) : null} onClose={() => setShareOpen(false)} />
 				</div>
+				</>
 			)}
 		</div>
 	);

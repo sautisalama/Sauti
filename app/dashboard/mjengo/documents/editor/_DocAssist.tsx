@@ -89,7 +89,7 @@ export function DocAssist({ editor }: { editor: React.RefObject<WordcraftEditorR
 				<button
 					onClick={() => setOpen(true)}
 					aria-label="Chat about this document"
-					className="absolute bottom-14 right-3 z-30 flex h-11 items-center gap-2 rounded-full border border-black/10 bg-white px-3.5 text-sm font-medium text-[#37352f] shadow-lg hover:bg-[#f7f7f5] sm:bottom-16"
+					className="absolute bottom-32 right-3 z-30 flex h-11 items-center gap-2 rounded-full border border-black/10 bg-white px-3.5 text-sm font-medium text-[#37352f] shadow-lg hover:bg-[#f7f7f5] sm:bottom-16"
 				>
 					<MessageSquare className="h-4 w-4" /> <span className="hidden sm:inline">Chat</span>
 				</button>
