@@ -50,6 +50,8 @@ function PdfScreen() {
 	const loadLibrary = useCallback(() => { unwrap(listSignatures()).then(setLibrary).catch(() => undefined); }, []);
 	useEffect(() => { loadLibrary(); }, [loadLibrary]);
 	const [zoom, setZoom] = useState(1.25);
+	// A phone starts with the whole page in view.
+	useEffect(() => { if (window.innerWidth < 640) setZoom(0.5); }, []);
 	const canvases = useRef<(HTMLCanvasElement | null)[]>([]);
 
 	// Load the file and measure the pages.
@@ -197,30 +199,43 @@ function PdfScreen() {
 		["sign", "Sign", <Signature key="g" className="h-[18px] w-[18px]" />],
 	];
 
+	const toolButtons = tools.map(([t, label, icon]) => (
+		<button key={t} onClick={() => { setTool(t); if (t === "sign") setSigning(true); }} aria-pressed={tool === t} title={label} aria-label={label} className={cn("flex h-9 shrink-0 items-center gap-1.5 rounded-lg px-2.5 text-sm", tool === t ? "bg-sauti-teal-light text-sauti-dark" : "text-[#787774] hover:bg-black/5")}>{icon}<span className="text-xs sm:text-sm md:inline">{label}</span></button>
+	));
+	const colourDots = (tool === "highlight" || tool === "pen" || tool === "text") && (
+		<div className="ml-1 flex shrink-0 items-center gap-1.5">
+			{(tool === "text" || tool === "pen" ? ["#111827", "#dc2626", "#2563eb", "#16a34a"] : Object.values(COLORS)).map((c) => (
+				<button key={c} aria-label={`Colour ${c}`} aria-pressed={color === c} onClick={() => setColor(c)} className={cn("h-6 w-6 rounded-full ring-offset-1", color === c && "ring-2 ring-sauti-teal")} style={{ background: c }} />
+			))}
+		</div>
+	);
+
 	return (
 		<div className="flex h-full min-h-0 flex-col bg-[#f4f4f2]">
-			<div className="flex shrink-0 flex-wrap items-center gap-1 border-b border-black/[0.07] bg-white px-3 py-1.5">
-				<Button asChild variant="ghost" size="icon" aria-label="Back to Files"><Link href="/dashboard/mjengo/vault"><ArrowLeft className="h-[18px] w-[18px]" /></Link></Button>
-				<span className="max-w-[200px] truncate px-1 text-[15px] font-medium text-[#37352f]">{name}</span>
-				<span className="mx-1 h-5 w-px bg-black/10" />
-				{tools.map(([t, label, icon]) => (
-					<button key={t} onClick={() => { setTool(t); if (t === "sign") setSigning(true); }} aria-pressed={tool === t} title={label} aria-label={label} className={cn("flex h-9 items-center gap-1.5 rounded-lg px-2.5 text-sm", tool === t ? "bg-sauti-teal-light text-sauti-dark" : "text-[#787774] hover:bg-black/5")}>{icon}<span className="hidden md:inline">{label}</span></button>
-				))}
-				{(tool === "highlight" || tool === "pen" || tool === "text") && (
-					<div className="ml-1 flex items-center gap-1">
-						{(tool === "text" || tool === "pen" ? ["#111827", "#dc2626", "#2563eb", "#16a34a"] : Object.values(COLORS)).map((c) => (
-							<button key={c} aria-label={`Colour ${c}`} aria-pressed={color === c} onClick={() => setColor(c)} className={cn("h-5 w-5 rounded-full ring-offset-1", color === c && "ring-2 ring-sauti-teal")} style={{ background: c }} />
-						))}
-					</div>
-				)}
-				<span className="flex-1" />
-				<Button variant="ghost" size="icon" aria-label="Undo" disabled={!marks.length} onClick={() => setMarks((m) => m.slice(0, -1))}><Undo2 className="h-[18px] w-[18px]" /></Button>
-				<Button variant="ghost" size="icon" aria-label="Delete the selected mark" disabled={!selected} onClick={() => { setMarks((m) => m.filter((x) => x.id !== selected)); setSelected(null); }}><Trash2 className="h-[18px] w-[18px]" /></Button>
-				<select value={zoom} onChange={(e) => setZoom(Number(e.target.value))} aria-label="Zoom" className="h-9 rounded-lg border border-black/10 bg-white px-2 text-sm">
-					{[0.75, 1, 1.25, 1.5, 2].map((z) => <option key={z} value={z}>{Math.round(z * 100)}%</option>)}
-				</select>
-				<Button variant="ghost" size="sm" className="gap-1.5" onClick={download} disabled={loading}><Download className="h-4 w-4" /><span className="hidden sm:inline">Download</span></Button>
-				<Button size="sm" className="gap-1.5 bg-sauti-teal hover:bg-sauti-dark" onClick={save} disabled={loading || saving || (!marks.length && level === "edit")}>{saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Save</Button>
+			<div className="shrink-0 border-b border-black/[0.07] bg-white">
+				<div className="flex items-center gap-1 px-2 py-1.5 sm:px-3">
+					<Button asChild variant="ghost" size="icon" className="h-9 w-9 shrink-0" aria-label="Back to Files"><Link href="/dashboard/mjengo/vault"><ArrowLeft className="h-[18px] w-[18px]" /></Link></Button>
+					<span className="min-w-0 flex-1 truncate px-1 text-[15px] font-medium text-[#37352f] sm:max-w-[240px] sm:flex-none">{name}</span>
+					<span className="mx-1 hidden h-5 w-px bg-black/10 sm:block" />
+					<div className="hidden items-center gap-1 sm:flex">{toolButtons}</div>
+					<span className="hidden flex-1 sm:block" />
+					<Button variant="ghost" size="icon" className="h-9 w-9 shrink-0" aria-label="Undo" disabled={!marks.length} onClick={() => setMarks((m) => m.slice(0, -1))}><Undo2 className="h-[18px] w-[18px]" /></Button>
+					<Button variant="ghost" size="icon" className="h-9 w-9 shrink-0" aria-label="Delete the selected mark" disabled={!selected} onClick={() => { setMarks((m) => m.filter((x) => x.id !== selected)); setSelected(null); }}><Trash2 className="h-[18px] w-[18px]" /></Button>
+					<select value={zoom} onChange={(e) => setZoom(Number(e.target.value))} aria-label="Zoom" className="hidden h-9 rounded-lg border border-black/10 bg-white px-2 text-sm sm:block">
+						{[0.5, 0.75, 1, 1.25, 1.5, 2].map((z) => <option key={z} value={z}>{Math.round(z * 100)}%</option>)}
+					</select>
+					<Button variant="ghost" size="sm" className="h-9 shrink-0 gap-1.5" aria-label="Download" onClick={download} disabled={loading}><Download className="h-4 w-4" /><span className="hidden sm:inline">Download</span></Button>
+					<Button size="sm" className="h-9 shrink-0 gap-1.5 bg-sauti-teal hover:bg-sauti-dark" onClick={save} disabled={loading || saving || (!marks.length && level === "edit")}>{saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Save</Button>
+				</div>
+				{/* On a phone the tools get their own scrolling row, like a mobile document app. */}
+				<div className="flex items-center gap-1 overflow-x-auto border-t border-black/[0.05] px-2 py-1 scrollbar-hide sm:hidden">
+					{toolButtons}
+					{colourDots}
+					<select value={zoom} onChange={(e) => setZoom(Number(e.target.value))} aria-label="Zoom" className="ml-auto h-9 shrink-0 rounded-lg border border-black/10 bg-white px-2 text-sm">
+						{[0.5, 0.75, 1, 1.25, 1.5, 2].map((z) => <option key={z} value={z}>{Math.round(z * 100)}%</option>)}
+					</select>
+				</div>
+				<div className="hidden items-center gap-1 px-3 pb-1.5 sm:flex">{colourDots}</div>
 			</div>
 
 			<div className="min-h-0 flex-1 overflow-auto p-4">
@@ -312,7 +327,7 @@ function PageView({ index, size, zoom, canvasRef, marks, tool, color, selected, 
 	return (
 		<div ref={box} className="relative bg-white shadow-md" style={{ width: W, height: H }}>
 			<canvas ref={canvasRef} style={{ width: W, height: H }} className="absolute inset-0" />
-			<div className="absolute inset-0 touch-none" style={{ cursor }} onPointerDown={down} onPointerMove={move} onPointerUp={up}>
+			<div className={cn("absolute inset-0", tool === "highlight" || tool === "pen" ? "touch-none" : "touch-pan-x touch-pan-y")} style={{ cursor }} onPointerDown={down} onPointerMove={move} onPointerUp={up}>
 				{marks.map((m) => {
 					const sel = selected === m.id;
 					if (m.kind === "highlight") return <div key={m.id} data-mark onPointerDown={(e) => { e.stopPropagation(); onSelect(m.id); }} className={cn("absolute", sel && "outline outline-2 outline-sauti-teal")} style={{ left: `${m.x * 100}%`, top: `${m.y * 100}%`, width: `${m.w * 100}%`, height: `${m.h * 100}%`, background: m.color, opacity: 0.4, cursor: "pointer" }} />;

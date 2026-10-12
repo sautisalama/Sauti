@@ -418,3 +418,9 @@ html.mjengo-theme .border-sauti-blue { border-color: rgb(6 130 151 / 0.45); }
 html.mjengo-theme .text-sauti-blue { color: #068297; }
 html.mjengo-theme button:not([class*="text-"]):not(:disabled),
 html.mjengo-theme [role="menuitem"]:not([class*="text-"]) { color: #0b2228; }
+
+/* The spreadsheet draws its own selection. The keyboard focus ring above landed on its hidden editor
+   elements and left blue lines behind while scrolling sideways. */
+.univer-host, .univer-host * { outline: none !important; }
+.univer-host { contain: paint; overflow: hidden; }
+.univer-host canvas { outline: none !important; }

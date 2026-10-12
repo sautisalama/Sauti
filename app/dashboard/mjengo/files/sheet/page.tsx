@@ -218,15 +218,15 @@ function SheetScreen() {
 		<div className="relative flex h-full min-h-0 flex-col bg-white">
 			<div className="flex shrink-0 items-center gap-2 border-b border-black/[0.07] px-3 py-1.5">
 				<Button asChild variant="ghost" size="icon" aria-label="Back to Files"><Link href="/dashboard/mjengo/vault"><ArrowLeft className="h-[18px] w-[18px]" /></Link></Button>
-				<Input value={name} onChange={(e) => setName(e.target.value)} aria-label="File name" className="h-9 max-w-xs border-transparent bg-transparent px-2 text-[15px] font-medium shadow-none hover:border-black/10 focus-visible:ring-1" />
-				{level !== "edit" && <span className="text-xs text-[#787774]">View only: saving makes your own copy</span>}
-				<span className="flex-1" />
-				<Button variant="ghost" size="sm" className="gap-1.5" onClick={download} disabled={loading}><Download className="h-4 w-4" /> Download</Button>
+				<Input value={name} onChange={(e) => setName(e.target.value)} aria-label="File name" className="h-9 min-w-0 flex-1 border-transparent sm:max-w-xs sm:flex-none bg-transparent px-2 text-[15px] font-medium shadow-none hover:border-black/10 focus-visible:ring-1" />
+				{level !== "edit" && <span className="hidden text-xs text-[#787774] sm:inline">View only: saving makes your own copy</span>}
+				<span className="hidden flex-1 sm:block" />
+				<Button variant="ghost" size="sm" className="gap-1.5" onClick={download} disabled={loading}><Download className="h-4 w-4" /> <span className="hidden sm:inline">Download</span></Button>
 				<Button size="sm" className="gap-1.5 bg-sauti-teal hover:bg-sauti-dark" onClick={save} disabled={loading || saving}>{saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Save</Button>
 			</div>
 			<div className="relative min-h-0 flex-1">
 				{loading && <div className="absolute inset-0 z-10 bg-white"><MjengoLoader label="Opening the spreadsheet" className="h-full" /></div>}
-				<div ref={host} className="h-full w-full" />
+				<div ref={host} className="univer-host h-full w-full" />
 			</div>
 			{/* The same sparkle at the bottom centre as the document editor, opening a prompt bar. */}
 			{!loading && (
