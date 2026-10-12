@@ -3,7 +3,7 @@
  * copy, so a few dozen ingredients make thousands of different, coherent templates. Everything it makes is
  * ordinary layers, so every result is editable in the same way as a hand drawn template.
  */
-import { PHOTO_POOL, type DesignTemplate, type Layer, type SizeId } from './design-templates';
+import { ASPECT, PHOTO_POOL, type DesignTemplate, type Layer, type SizeId } from './design-templates';
 
 export interface Concept {
   id: string;
@@ -75,7 +75,7 @@ const motif = (c: Concept, size: SizeId): Layer[] => {
     case 'bars': return [{ t: 'rect', x: 0, y: 0, w: w ? 0.03 : 1, h: w ? 1 : 0.025, fill: c.accent }, { t: 'rect', x: 0, y: w ? 0 : 0.975, w: w ? 0.012 : 1, h: w ? 1 : 0.025, fill: c.accent2 }];
     case 'frame': return [{ t: 'rect', x: 0.04, y: 0.05, w: 0.92, h: 0.9, fill: 'transparent', r: 0.02 }, { t: 'line', x: 0.08, y: 0.1, w: 0.14, color: c.accent, th: 0.008 }];
     case 'blob': return [{ t: 'circle', x: w ? 0.62 : 0.5, y: w ? 0.3 : 0.62, d: w ? 0.5 : 0.8, fill: c.accent }, { t: 'circle', x: w ? 0.8 : 0.1, y: w ? -0.1 : -0.18, d: w ? 0.24 : 0.4, fill: c.accent2 }];
-    default: return [{ t: 'rect', x: 0.08, y: 0.08, w: 0.14, h: 0.14, fill: c.accent }, { t: 'rect', x: 0.24, y: 0.08, w: 0.07, h: 0.14, fill: c.accent2 }];
+    default: { const sq = (hh: number) => ({ w: hh * (ASPECT[size].h / ASPECT[size].w), h: hh }); return [{ t: 'rect', x: 0.08, y: 0.07, ...sq(0.12), fill: c.accent }, { t: 'rect', x: 0.08 + sq(0.12).w + 0.015, y: 0.07, ...sq(0.06), fill: c.accent2 }]; }
   }
 };
 

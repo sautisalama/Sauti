@@ -4,7 +4,7 @@ import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { MjengoLoader } from "../../_components/MjengoLoader";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { ActiveSelection, Canvas, Circle, FabricImage, Gradient, Group, Line, Path, PencilBrush, Rect, Shadow, Textbox, Triangle, filters, type FabricObject } from "fabric";
+import { ActiveSelection, cache, Canvas, Circle, FabricImage, Gradient, Group, Line, Path, PencilBrush, Rect, Shadow, Textbox, Triangle, filters, type FabricObject } from "fabric";
 import { AlignCenter, AlignLeft, AlignRight, ArrowLeft, Bold, Copy, Download, Image as ImageIcon, Italic, Gift, Layers, LayoutTemplate, Loader2, Redo2, Save, Shapes, Sparkles, Trash2, Type, Undo2, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -81,6 +81,7 @@ function buildFrom(t: DesignTemplate): Builder {
 				if (l.font) {
 					const fam = l.font;
 					void ensureFont(fam).then(() => {
+						cache.clearFontCache(fam);
 						c.getObjects().forEach((o) => { if (o.type === "textbox" && (o as Textbox).fontFamily === fam) { o.set({ fontFamily: fam, dirty: true }); (o as Textbox).initDimensions(); o.setCoords(); } });
 						c.requestRenderAll();
 					});
@@ -114,7 +115,11 @@ function DesignEditor() {
 
 	const [size, setSize] = useState<(typeof SIZES)[number]>(() => {
 		if (typeof window === "undefined") return SIZES[0];
-		const want = new URLSearchParams(window.location.search).get("size");
+		const q = new URLSearchParams(window.location.search);
+		// The size in the link wins; otherwise a template brings its own size with it.
+		const tid = q.get("template");
+		const fromTemplate = tid ? (/^gen-\d+-[a-z-]+-([a-z]+)$/.exec(tid)?.[1] ?? TEMPLATES.find((t) => t.id === tid)?.size) : undefined;
+		const want = q.get("size") ?? fromTemplate;
 		return SIZES.find((x) => x.id === want) ?? SIZES[0];
 	});
 	const [ideaSeed, setIdeaSeed] = useState(1);
@@ -494,6 +499,7 @@ function DesignEditor() {
 	};
 	const changeFont = async (family: string) => {
 		await ensureFont(family);
+		cache.clearFontCache(family);
 		set({ fontFamily: family });
 		const t = canvas.current?.getActiveObject() as Textbox | undefined;
 		if (t && "initDimensions" in t) { t.initDimensions(); t.setCoords(); canvas.current?.requestRenderAll(); }
