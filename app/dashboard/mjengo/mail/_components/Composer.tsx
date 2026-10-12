@@ -687,7 +687,7 @@ export function Composer({ accounts, accountId, seed, snippets, signature = "", 
 							<Popover>
 								<PopoverTrigger asChild><Button variant="ghost" size="icon" className={toolBtn} aria-label="Attach from the vault" title="Attach from the vault"><HardDrive className="h-4 w-4" /></Button></PopoverTrigger>
 								<PopoverContent align="start" className="w-80 space-y-2 p-2">
-									<Input value={vaultQ} onChange={(e) => setVaultQ(e.target.value)} placeholder="Search the vault" aria-label="Search the vault" />
+									<Input value={vaultQ} onChange={(e) => setVaultQ(e.target.value)} placeholder="Your most recent files are shown. Type to search" aria-label="Search the vault" />
 									<ul className="max-h-60 overflow-y-auto">
 										{vaultHits.map((f) => (
 											<li key={f.id}><button onClick={() => addVault(f)} className="flex w-full flex-col rounded-md px-2 py-1.5 text-left text-sm hover:bg-serene-neutral-100"><span className="truncate font-medium">{f.name}</span><span className="text-xs text-serene-neutral-500">{f.folder ? `${f.folder} · ` : ""}you can {f.level === "view" ? "view" : f.level === "share" ? "view and share" : "edit"}</span></button></li>

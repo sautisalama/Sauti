@@ -3,7 +3,8 @@
 import { looseAdmin } from '@/lib/loose-db';
 import { guard } from '@/lib/action-result';
 import { logAudit } from '@/lib/access/audit';
-import { requireAdminActor } from '@/lib/access/super-admin';
+import { requireAdminActor, isSuperAdminEmail } from '@/lib/access/super-admin';
+import { sendAccessEmail } from '@/lib/mjengo/invite-email';
 
 export interface ContactRow {
   id: string;
@@ -17,6 +18,12 @@ export interface ContactRow {
   source: 'manual' | 'google' | 'csv' | 'mail';
   last_contacted_at: string | null;
   created_at: string;
+  /** 'team': every administrator sees it. 'private': only the people it was shared with, and its owner. */
+  visibility: 'team' | 'private';
+  created_by: string | null;
+  /** Your own part in it. */
+  mine: 'owner' | 'edit' | 'view' | 'team';
+  sharedWith: number;
 }
 
 export interface ContactInput {
@@ -29,7 +36,7 @@ export interface ContactInput {
   notes?: string | null;
 }
 
-const COLS = 'id, name, email, phone, organisation, title, tags, notes, source, last_contacted_at, created_at';
+const COLS = 'id, name, email, phone, organisation, title, tags, notes, source, last_contacted_at, created_at, visibility, created_by';
 const clean = (s: string | null | undefined, max = 200) => (s ?? '').trim().slice(0, max) || null;
 const emailOk = (e: string) => /^[^\s@,;]+@[^\s@,;]+\.[^\s@,;]+$/.test(e);
 
@@ -49,20 +56,52 @@ function normalise(v: ContactInput) {
   };
 }
 
+/** Contacts this person may see: everything shared with the team, their own, those shared with them, and (super admins) all. */
+async function visible(actor: { id: string; email: string }) {
+  const db = looseAdmin();
+  const [{ data: mine }, oversight] = await Promise.all([
+    db.from('mjengo_contact_access').select('contact_id, level').eq('user_id', actor.id),
+    isSuperAdminEmail(actor.email),
+  ]);
+  const access = new Map(((mine ?? []) as { contact_id: string; level: 'view' | 'edit' }[]).map((m) => [m.contact_id, m.level]));
+  return { access, oversight };
+}
+
+function shape(row: Record<string, unknown>, actor: { id: string }, access: Map<string, 'view' | 'edit'>, shared: Map<string, number>, oversight: boolean): ContactRow | null {
+  const id = row.id as string;
+  const owner = row.created_by === actor.id;
+  const vis = (row.visibility as 'team' | 'private') ?? 'team';
+  const lvl = access.get(id);
+  if (vis === 'private' && !owner && !lvl && !oversight) return null;
+  return { ...(row as unknown as ContactRow), visibility: vis, mine: owner ? 'owner' : lvl ?? (vis === 'team' ? 'team' : oversight ? 'edit' : 'view'), sharedWith: shared.get(id) ?? 0 };
+}
+
 async function listContacts_(q = ''): Promise<ContactRow[]> {
-  await requireAdminActor();
-  let query = looseAdmin().from('mjengo_contacts').select(COLS).order('name').limit(1000);
+  const actor = await requireAdminActor();
+  const db = looseAdmin();
+  let query = db.from('mjengo_contacts').select(COLS).order('name').limit(1500);
   const term = q.trim().replace(/[%,()]/g, ' ');
-  if (term) query = query.or(`name.ilike.%${term}%,email.ilike.%${term}%,organisation.ilike.%${term}%`);
-  const { data, error } = await query;
+  if (term) query = query.or(`name.ilike.%${term}%,email.ilike.%${term}%,organisation.ilike.%${term}%,tags.cs.{${term.toLowerCase()}}`);
+  const [{ data, error }, v] = await Promise.all([query, visible(actor)]);
   if (error) throw new Error('Could not load contacts.');
-  return (data ?? []) as ContactRow[];
+  const { data: counts } = await db.from('mjengo_contact_access').select('contact_id');
+  const shared = new Map<string, number>();
+  for (const c of (counts ?? []) as { contact_id: string }[]) shared.set(c.contact_id, (shared.get(c.contact_id) ?? 0) + 1);
+  return ((data ?? []) as Record<string, unknown>[]).map((r) => shape(r, actor, v.access, shared, v.oversight)).filter((r): r is ContactRow => !!r);
 }
 
 async function saveContact_(id: string | null, v: ContactInput): Promise<ContactRow> {
   const actor = await requireAdminActor();
   const row = normalise(v);
   const db = looseAdmin();
+  if (id) {
+    const { data: cur } = await db.from('mjengo_contacts').select('visibility, created_by').eq('id', id).maybeSingle();
+    if (!cur) throw new Error('That contact no longer exists.');
+    if (cur.visibility === 'private' && cur.created_by !== actor.id) {
+      const v = await visible(actor);
+      if (v.access.get(id) !== 'edit' && !v.oversight) throw new Error('You can see this contact but not change it.');
+    }
+  }
   const q = id
     ? db.from('mjengo_contacts').update({ ...row, updated_at: new Date().toISOString() }).eq('id', id)
     : db.from('mjengo_contacts').insert({ ...row, source: 'manual', created_by: actor.id });
@@ -72,7 +111,7 @@ async function saveContact_(id: string | null, v: ContactInput): Promise<Contact
     throw new Error('Could not save the contact.');
   }
   await logAudit({ actorId: actor.id, actorEmail: actor.email, action: id ? 'contact.updated' : 'contact.created', targetType: 'contact', targetId: data.id, targetLabel: data.name });
-  return data as ContactRow;
+  return { ...(data as unknown as ContactRow), mine: 'owner', sharedWith: 0 };
 }
 
 async function deleteContact_(id: string) {
@@ -135,16 +174,18 @@ async function addContactFromMail_(name: string, email: string): Promise<Contact
 
 /** For recipient pickers: teammates and contacts matching what has been typed, teammates first. */
 async function suggestContacts_(q: string): Promise<{ name: string; email: string; avatar?: string | null; kind?: 'team' | 'contact' }[]> {
-  await requireAdminActor();
+  const me = await requireAdminActor();
   const term = q.trim().replace(/[%,()]/g, ' ');
   const db = looseAdmin();
-  let contactQ = db.from('mjengo_contacts').select('name, email').not('email', 'is', null).order('last_contacted_at', { ascending: false, nullsFirst: false }).limit(8);
+  let contactQ = db.from('mjengo_contacts').select('name, email, id, visibility, created_by').not('email', 'is', null).order('last_contacted_at', { ascending: false, nullsFirst: false }).limit(8);
   let teamQ = db.from('profiles').select('first_name, last_name, email, avatar_url').eq('is_admin', true).not('email', 'is', null).limit(6);
   if (term) {
     contactQ = contactQ.or(`name.ilike.%${term}%,email.ilike.%${term}%`);
     teamQ = teamQ.or(`first_name.ilike.%${term}%,last_name.ilike.%${term}%,email.ilike.%${term}%`);
   }
-  const [{ data: contacts }, { data: team }] = await Promise.all([contactQ, teamQ]);
+  const [{ data: contactRows }, { data: team }, vis] = await Promise.all([contactQ, teamQ, visible(me)]);
+  const contacts = ((contactRows ?? []) as { name: string; email: string; id: string; visibility: string; created_by: string | null }[])
+    .filter((c) => c.visibility !== 'private' || c.created_by === me.id || vis.access.has(c.id) || vis.oversight);
   const out: { name: string; email: string; avatar?: string | null; kind: 'team' | 'contact' }[] = [];
   const seen = new Set<string>();
   for (const t of (team ?? []) as { first_name: string | null; last_name: string | null; email: string; avatar_url: string | null }[]) {
@@ -162,7 +203,66 @@ async function suggestContacts_(q: string): Promise<{ name: string; email: strin
   return out.slice(0, 10);
 }
 
+export interface ContactAccess {
+  visibility: 'team' | 'private';
+  owner: { id: string; name: string } | null;
+  people: { id: string; name: string; email: string; avatar: string | null; level: 'view' | 'edit' }[];
+  canManage: boolean;
+}
+
+async function ownerOrEditor(contactId: string, actor: { id: string; email: string }) {
+  const { data } = await looseAdmin().from('mjengo_contacts').select('name, visibility, created_by').eq('id', contactId).maybeSingle();
+  if (!data) throw new Error('That contact no longer exists.');
+  const v = await visible(actor);
+  const ok = data.created_by === actor.id || v.access.get(contactId) === 'edit' || v.oversight || data.visibility === 'team';
+  return { row: data as { name: string; visibility: 'team' | 'private'; created_by: string | null }, canManage: ok };
+}
+
+async function contactAccess_(contactId: string): Promise<ContactAccess> {
+  const actor = await requireAdminActor();
+  const { row, canManage } = await ownerOrEditor(contactId, actor);
+  const db = looseAdmin();
+  const { data: rows } = await db.from('mjengo_contact_access').select('user_id, level').eq('contact_id', contactId);
+  const ids = [...new Set([...(rows ?? []).map((r: { user_id: string }) => r.user_id), ...(row.created_by ? [row.created_by] : [])])];
+  const { data: profs } = ids.length ? await db.from('profiles').select('id, first_name, last_name, email, avatar_url').in('id', ids) : { data: [] };
+  const info = new Map(((profs ?? []) as { id: string; first_name: string | null; last_name: string | null; email: string | null; avatar_url: string | null }[]).map((p) => [p.id, { name: [p.first_name, p.last_name].filter(Boolean).join(' ') || p.email || 'Someone', email: p.email ?? '', avatar: p.avatar_url }]));
+  return {
+    visibility: row.visibility,
+    owner: row.created_by ? { id: row.created_by, name: info.get(row.created_by)?.name ?? 'Someone' } : null,
+    canManage,
+    people: ((rows ?? []) as { user_id: string; level: 'view' | 'edit' }[]).filter((r) => r.user_id !== row.created_by).map((r) => ({ id: r.user_id, level: r.level, name: info.get(r.user_id)?.name ?? 'Someone', email: info.get(r.user_id)?.email ?? '', avatar: info.get(r.user_id)?.avatar ?? null })),
+  };
+}
+
+async function setAccess_(contactId: string, userId: string, level: 'view' | 'edit' | null, notify = true): Promise<void> {
+  const actor = await requireAdminActor();
+  const { row, canManage } = await ownerOrEditor(contactId, actor);
+  if (!canManage) throw new Error('Only the owner or an editor can change who sees this contact.');
+  const db = looseAdmin();
+  const { data: target } = await db.from('profiles').select('email, is_admin').eq('id', userId).maybeSingle();
+  if (!target?.is_admin) throw new Error('Contacts can only be shared with administrators.');
+  if (level) await db.from('mjengo_contact_access').upsert({ contact_id: contactId, user_id: userId, level, granted_by: actor.id }, { onConflict: 'contact_id,user_id' });
+  else await db.from('mjengo_contact_access').delete().eq('contact_id', contactId).eq('user_id', userId);
+  await logAudit({ actorId: actor.id, actorEmail: actor.email, action: level ? 'contact.shared' : 'contact.unshared', targetType: 'contact', targetId: contactId, targetLabel: row.name, details: { with: target.email, level } });
+  if (notify && level && target.email) void sendAccessEmail({ kind: 'contact', to: [target.email], by: actor.name, title: row.name, url: '/dashboard/mjengo/contacts', detail: level === 'edit' ? 'You can view and edit this contact.' : 'You can view this contact.' });
+}
+
+async function setVisibility_(contactId: string, visibility: 'team' | 'private'): Promise<void> {
+  const actor = await requireAdminActor();
+  const { row, canManage } = await ownerOrEditor(contactId, actor);
+  if (!canManage) throw new Error('Only the owner or an editor can change who sees this contact.');
+  if (visibility !== 'team' && visibility !== 'private') throw new Error('Unknown setting.');
+  const db = looseAdmin();
+  await db.from('mjengo_contacts').update({ visibility }).eq('id', contactId);
+  // Going private keeps the person doing it able to see it.
+  if (visibility === 'private') await db.from('mjengo_contact_access').upsert({ contact_id: contactId, user_id: actor.id, level: 'edit', granted_by: actor.id }, { onConflict: 'contact_id,user_id', ignoreDuplicates: true });
+  await logAudit({ actorId: actor.id, actorEmail: actor.email, action: 'contact.visibility', targetType: 'contact', targetId: contactId, targetLabel: row.name, details: { visibility } });
+}
+
 export const listContacts = guard(listContacts_);
+export const contactAccess = guard(contactAccess_);
+export const setContactAccess = guard(setAccess_);
+export const setContactVisibility = guard(setVisibility_);
 export const saveContact = guard(saveContact_);
 export const deleteContact = guard(deleteContact_);
 export const importContacts = guard(importContacts_);

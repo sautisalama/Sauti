@@ -421,7 +421,7 @@ async function searchFiles_(q: string): Promise<{ id: string; name: string; size
     .filter((f) => !term || f.name.toLowerCase().includes(term) || (f.tags ?? []).some((t) => t.toLowerCase().includes(term)) || (f.meeting_code ?? '') === term)
     .map((f) => ({ f, l: lvl(c, 'file', f.id) }))
     .filter((x): x is { f: FileNode; l: Level } => !!x.l)
-    .sort((a, b) => b.f.created_at.localeCompare(a.f.created_at))
+    .sort((a, b) => (b.f.last_opened_at ?? b.f.updated_at ?? b.f.created_at).localeCompare(a.f.last_opened_at ?? a.f.updated_at ?? a.f.created_at))
     .slice(0, 40)
     .map(({ f, l }) => ({ id: f.id, name: f.name, size: f.size, level: l, folder: f.folder_id ? c.ix.folders.get(f.folder_id)?.name ?? null : null, driveLink: f.drive_link, people: peopleOf(c, 'file', f.id, f.owner_id) }));
 }

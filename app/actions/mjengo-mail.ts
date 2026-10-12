@@ -17,7 +17,7 @@ import { uidOf } from '@/lib/mail/pop3';
 import { simpleParser } from 'mailparser';
 import sanitizeHtml from 'sanitize-html';
 import { headers } from 'next/headers';
-import { touchContacts } from '@/lib/mjengo-contacts';
+import { touchContacts, autoAddTeamContacts } from '@/lib/mjengo-contacts';
 import { atLeast, levelFor, loadIndex, oversightFor, recipientLevels } from '@/lib/vault/access';
 
 /** Which one-click sign-ins this deployment has credentials for. */
@@ -645,6 +645,7 @@ async function sendMail_(input: SendInput) {
   }
   await logAudit({ actorId: actor.id, actorEmail: actor.email, action: 'mail.sent', targetType: 'mailbox', targetId: acct.id, targetLabel: acct.email, details: { to, subject: mail.subject.slice(0, 120), attachments: attachments.length, vault_links: linkIds, vault_attached: attachIds } });
   await touchContacts([...to, ...cc, ...bcc]);
+  await autoAddTeamContacts(actor.id, acct.email, [...to, ...cc]);
   return { success: true };
 }
 
