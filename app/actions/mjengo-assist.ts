@@ -73,24 +73,40 @@ const THEMES: Record<DeckTheme, { bg: string; title: string; text: string; accen
   night: { bg: '0E1318', title: 'FFFFFF', text: 'D1D5DB', accent: '00C4CC', band: '1B232B' },
 };
 
-interface Slide { title: string; bullets: string[]; notes?: string }
+interface Slide { title: string; bullets: string[]; notes?: string; image?: number | null }
+
+/** A look worked out from the person's own colours (a logo, photos, the brand): hex without the #. */
+export interface DeckLookInput { bg: string; title: string; text: string; accent: string; band: string }
+/** A picture the person added: photos are placed on slides that suit them, a logo goes on the cover and corners. */
+export interface DeckImageInput { name: string; kind: 'photo' | 'logo'; note?: string; dataUrl: string; width: number; height: number }
+
+const HEX6 = /^[0-9A-Fa-f]{6}$/;
+const IMG_URL = /^data:image\/(png|jpeg);base64,[A-Za-z0-9+/=]+$/;
 
 /** A finished .pptx from a topic: a title slide, content slides, and a closing slide. Returned as base64. */
-async function deck_(prompt: string, theme: DeckTheme, slides: number): Promise<{ name: string; base64: string; outline: { title: string; bullets: string[] }[] }> {
+async function deck_(prompt: string, theme: DeckTheme | DeckLookInput, slides: number, imagesIn: DeckImageInput[] = []): Promise<{ name: string; base64: string; outline: { title: string; bullets: string[] }[] }> {
   await requireModule('assistant');
   const topic = prompt.trim().slice(0, 1500);
   if (topic.length < 6) throw new Error('Say what the presentation is about.');
   const n = Math.min(14, Math.max(4, Math.round(slides) || 8));
-  const raw = await askAi(
-    `You write clear presentations for Sauti Salama, a survivor-led organisation in Kenya working on gender-based violence. Reply with one JSON object {"title": string, "subtitle": string, "slides": [{"title": string, "bullets": string[], "notes": string}]} with exactly ${n} content slides. Each slide has 3 to 5 short bullets (under 14 words each). "notes" are speaker notes of one or two sentences. Do not include identifying details of survivors. Do not invent statistics: leave a bracketed placeholder like [number] where a figure is needed.`,
+  const images = (imagesIn ?? []).slice(0, 8).filter((i) => i && IMG_URL.test(i.dataUrl) && i.dataUrl.length < 4_500_000).map((i) => ({ ...i, name: String(i.name ?? 'picture').slice(0, 60), note: String(i.note ?? '').slice(0, 160), width: Math.max(1, Number(i.width) || 1), height: Math.max(1, Number(i.height) || 1) }));
+  const photos = images.filter((i) => i.kind === 'photo');
+  const logo = images.find((i) => i.kind === 'logo') ?? null;
+  const photoList = photos.length ? ` Pictures the presenter supplied (use their index in "image"): ${photos.map((p, i) => `${i}: ${p.name}${p.note ? ` (${p.note})` : ''}`).join('; ')}. For each slide where a picture helps, set "image" to that picture's index (use each picture at most twice, and not on every slide); otherwise null.` : '';
+  const ask = () => askAi(
+    `You write clear presentations for Sauti Salama, a survivor-led organisation in Kenya working on gender-based violence. Reply with one JSON object {"title": string, "subtitle": string, "slides": [{"title": string, "bullets": string[], "notes": string, "image": number | null}]} with exactly ${n} content slides. Each slide has 3 to 5 short bullets (under 14 words each). "notes" are speaker notes of one or two sentences. Do not include identifying details of survivors. Do not invent statistics: leave a bracketed placeholder like [number] where a figure is needed.${photoList}`,
     topic,
-    3500,
-    { json: true, temperature: 0.5 }
+    5000,
+    { json: true, temperature: 0.4 }
   );
-  const j = parse<{ title?: string; subtitle?: string; slides?: Slide[] }>(raw);
+  // A model now and then returns JSON with a stray quote or a cut-off end: one more try is cheaper than an error.
+  let j: { title?: string; subtitle?: string; slides?: Slide[] };
+  try { j = parse<typeof j>(await ask()); } catch { j = parse<typeof j>(await ask()); }
   const body = (j.slides ?? []).slice(0, n).filter((s) => s && s.title);
   if (!body.length) throw new Error('No slides came back. Try describing it differently.');
-  const t = THEMES[theme] ?? THEMES.teal;
+  const custom = typeof theme === 'object' && theme && [theme.bg, theme.title, theme.text, theme.accent, theme.band].every((c) => HEX6.test(String(c)));
+  const t = custom ? (theme as DeckLookInput) : THEMES[theme as DeckTheme] ?? THEMES.teal;
+  const picOf = (d: { dataUrl: string }) => d.dataUrl.replace(/^data:/, '');
 
   const p = new PptxGenJS();
   p.layout = 'LAYOUT_WIDE';
@@ -101,17 +117,28 @@ async function deck_(prompt: string, theme: DeckTheme, slides: number): Promise<
   p.defineSlideMaster({ title: 'COVER', background: { color: t.bg }, objects: [{ rect: { x: 0, y: 4.9, w: 13.33, h: 2.6, fill: { color: t.band } } }, { rect: { x: 0, y: 4.8, w: 13.33, h: 0.1, fill: { color: t.accent } } }] });
 
   const cover = p.addSlide({ masterName: 'COVER' });
-  cover.addText(j.title ?? 'Presentation', { x: 0.8, y: 1.6, w: 11.7, h: 1.8, fontFace: 'Calibri', fontSize: 44, bold: true, color: t.title, valign: 'bottom' });
-  if (j.subtitle) cover.addText(j.subtitle, { x: 0.8, y: 3.5, w: 11.7, h: 0.9, fontFace: 'Calibri', fontSize: 22, color: t.text });
+  cover.addText(j.title ?? 'Presentation', { x: 0.8, y: 1.6, w: photos[0] ? 7.4 : 11.7, h: 1.8, fontFace: 'Calibri', fontSize: photos[0] ? 38 : 44, bold: true, color: t.title, valign: 'bottom' });
+  if (j.subtitle) cover.addText(j.subtitle, { x: 0.8, y: 3.5, w: photos[0] ? 7.4 : 11.7, h: 0.9, fontFace: 'Calibri', fontSize: 22, color: t.text });
   cover.addText('Sauti Salama', { x: 0.8, y: 5.6, w: 6, h: 0.6, fontFace: 'Calibri', fontSize: 18, bold: true, color: t.accent });
+  if (logo) {
+    const lh = 0.9, lw = Math.min(3.2, lh * (logo.width / logo.height));
+    cover.addImage({ data: picOf(logo), x: 0.8, y: 0.5, w: lw, h: lh });
+  }
+  if (photos[0]) cover.addImage({ data: picOf(photos[0]), x: 8.6, y: 0.5, w: 4.2, h: 4.1, sizing: { type: 'cover', w: 4.2, h: 4.1 } });
 
   body.forEach((s, i) => {
     const sl = p.addSlide({ masterName: 'CONTENT' });
     sl.addText(s.title, { x: 0.7, y: 0.45, w: 12, h: 1.0, fontFace: 'Calibri', fontSize: 32, bold: true, color: t.title, valign: 'middle' });
+    const pic = typeof s.image === 'number' && photos[s.image] ? photos[s.image] : null;
     sl.addText(
       (s.bullets ?? []).slice(0, 6).map((b) => ({ text: String(b), options: { bullet: { code: '25CF' }, breakLine: true } })),
-      { x: 0.9, y: 1.7, w: 11.4, h: 4.7, fontFace: 'Calibri', fontSize: 22, color: t.text, valign: 'top', paraSpaceAfter: 12 }
+      { x: 0.9, y: 1.7, w: pic ? 6.6 : 11.4, h: 4.7, fontFace: 'Calibri', fontSize: pic ? 20 : 22, color: t.text, valign: 'top', paraSpaceAfter: 12 }
     );
+    if (pic) sl.addImage({ data: picOf(pic), x: 8.0, y: 1.7, w: 4.6, h: 4.7, sizing: { type: 'cover', w: 4.6, h: 4.7 } });
+    if (logo) {
+      const lh = 0.5, lw = Math.min(1.8, lh * (logo.width / logo.height));
+      sl.addImage({ data: picOf(logo), x: 12.8 - lw, y: 0.3, w: lw, h: lh });
+    }
     sl.addText(String(i + 2), { x: 12.3, y: 6.9, w: 0.7, h: 0.4, fontSize: 12, color: t.accent, align: 'right' });
     if (s.notes) sl.addNotes(String(s.notes));
   });
@@ -119,6 +146,10 @@ async function deck_(prompt: string, theme: DeckTheme, slides: number): Promise<
   const end = p.addSlide({ masterName: 'COVER' });
   end.addText('Thank you', { x: 0.8, y: 2.0, w: 11.7, h: 1.6, fontFace: 'Calibri', fontSize: 48, bold: true, color: t.title });
   end.addText('Questions and conversation', { x: 0.8, y: 3.5, w: 11.7, h: 0.8, fontFace: 'Calibri', fontSize: 22, color: t.text });
+  if (logo) {
+    const lh = 1.0, lw = Math.min(3.4, lh * (logo.width / logo.height));
+    end.addImage({ data: picOf(logo), x: 0.8, y: 5.4, w: lw, h: lh });
+  }
 
   const bytes = (await p.write({ outputType: 'uint8array' })) as Uint8Array;
   const base64 = Buffer.from(await fixPptx(bytes)).toString('base64');

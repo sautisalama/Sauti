@@ -14,7 +14,7 @@ import { clearFilesInbox } from "@/app/actions/mjengo-nav";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import RequirementsPanel from "../documents/page";
 import { TemplatePicker } from "../_components/TemplatePicker";
-import { makeDeck, type DeckTheme } from "@/app/actions/mjengo-assist";
+import { DeckStudio } from "../_components/DeckStudio";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -440,7 +440,7 @@ export default function VaultPage() {
 				onClose={() => setPickDoc(false)}
 				onPick={(t) => { window.location.href = `/dashboard/mjengo/documents/editor${t ? `?template=${encodeURIComponent(t.id)}` : ""}${folderId ? `${t ? "&" : "?"}folder=${folderId}` : ""}`; }}
 			/>
-			<DeckDialog open={deck} onClose={() => setDeck(false)} folderId={folderId} onDone={() => { setDeck(false); load(); }} />
+			<DeckStudio open={deck} onClose={() => setDeck(false)} folderId={folderId} onDone={() => { setDeck(false); load(); }} />
 			<AddLinkDialog open={addLink} onClose={() => setAddLink(false)} folderId={folderId} onAdded={() => { setAddLink(false); load(); }} />
 
 			<NameDialog
@@ -653,71 +653,3 @@ function AddLinkDialog({ open, onClose, folderId, onAdded }: { open: boolean; on
 	);
 }
 
-const THEME_SWATCH: Record<DeckTheme, { label: string; a: string; b: string }> = {
-	teal: { label: "Teal", a: "#068297", b: "#E6F4F6" },
-	purple: { label: "Purple", a: "#7D2AE8", b: "#F1E8FD" },
-	sunrise: { label: "Sunrise", a: "#EA580C", b: "#FFEDD5" },
-	night: { label: "Night", a: "#00C4CC", b: "#0E1318" },
-};
-
-/** Describe a talk; the AI writes the slides and a PowerPoint file lands in Files, ready to open or download. */
-function DeckDialog({ open, onClose, folderId, onDone }: { open: boolean; onClose: () => void; folderId: string | null; onDone: () => void }) {
-	const { toast } = useToast();
-	const [topic, setTopic] = useState("");
-	const [slides, setSlides] = useState(8);
-	const [theme, setTheme] = useState<DeckTheme>("teal");
-	const [busy, setBusy] = useState(false);
-	const [outline, setOutline] = useState<{ title: string; bullets: string[] }[] | null>(null);
-	useEffect(() => { if (open) { setTopic(""); setOutline(null); } }, [open]);
-	return (
-		<Dialog open={open} onOpenChange={(o) => !o && !busy && onClose()}>
-			<DialogContent className="max-h-[90vh] max-w-lg overflow-y-auto">
-				<DialogHeader><DialogTitle>Presentation with AI</DialogTitle><DialogDescription>Say what it is about and who it is for. You get a PowerPoint file with speaker notes.</DialogDescription></DialogHeader>
-				{outline ? (
-					<div className="space-y-3">
-						<p className="text-sm text-serene-neutral-600">Saved to Files. Here is what is in it:</p>
-						<ol className="max-h-72 list-decimal space-y-1 overflow-y-auto pl-5 text-sm">{outline.map((o, i) => <li key={i}><span className="font-medium">{o.title}</span></li>)}</ol>
-						<DialogFooter><Button className="bg-sauti-teal hover:bg-sauti-dark" onClick={onDone}>Done</Button></DialogFooter>
-					</div>
-				) : (
-					<div className="space-y-3">
-						<Textarea rows={5} autoFocus value={topic} onChange={(e) => setTopic(e.target.value)} placeholder="A briefing for a county government partner on our legal aid clinics: what we do, results so far, and what we need from them." />
-						<div className="grid grid-cols-2 gap-3">
-							<label className="block text-xs font-medium text-serene-neutral-600">Slides<Input type="number" min={4} max={14} value={slides} onChange={(e) => setSlides(Number(e.target.value))} className="mt-1 h-9" /></label>
-							<div className="text-xs font-medium text-serene-neutral-600">Look
-								<div className="mt-1 flex gap-2">
-									{(Object.keys(THEME_SWATCH) as DeckTheme[]).map((k) => (
-										<button key={k} type="button" aria-label={THEME_SWATCH[k].label} aria-pressed={theme === k} onClick={() => setTheme(k)} className={cn("h-9 w-9 overflow-hidden rounded-lg border-2", theme === k ? "border-sauti-teal" : "border-transparent")} style={{ background: `linear-gradient(135deg, ${THEME_SWATCH[k].b} 50%, ${THEME_SWATCH[k].a} 50%)` }} />
-									))}
-								</div>
-							</div>
-						</div>
-						<DialogFooter>
-							<Button variant="outline" onClick={onClose} disabled={busy}>Cancel</Button>
-							<Button
-								className="gap-2 bg-sauti-teal hover:bg-sauti-dark"
-								disabled={busy || topic.trim().length < 6}
-								onClick={async () => {
-									setBusy(true);
-									try {
-										const r = await unwrap(makeDeck(topic, theme, slides));
-										const bytes = Uint8Array.from(atob(r.base64), (c) => c.charCodeAt(0));
-										const file = new File([bytes], r.name, { type: "application/vnd.openxmlformats-officedocument.presentationml.presentation" });
-										const { path, signedUrl } = await prepareUpload(folderId, r.name, file.size);
-										await putToSignedUrl(signedUrl, file);
-										await registerUpload(folderId, path, r.name, file.size, file.type);
-										setOutline(r.outline);
-									} catch (e) {
-										toast({ title: "Could not make the presentation", description: e instanceof Error ? e.message : undefined, variant: "destructive" });
-									} finally {
-										setBusy(false);
-									}
-								}}
-							>{busy && <Loader2 className="h-4 w-4 animate-spin" />} {busy ? "Writing the slides..." : "Create"}</Button>
-						</DialogFooter>
-					</div>
-				)}
-			</DialogContent>
-		</Dialog>
-	);
-}
