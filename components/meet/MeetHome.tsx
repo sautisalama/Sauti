@@ -123,6 +123,7 @@ export function MeetHome({ isAdmin }: { isAdmin: boolean }) {
 									</span>
 									<span className="flex flex-wrap items-center gap-1.5">
 										{m.ended_at && !m.recordingFileId && Date.now() - new Date(m.ended_at).getTime() < 15 * 60_000 && <a href={`/meet/${m.code}`} className="flex items-center gap-1 rounded-full bg-[#068297] px-2.5 py-1 text-xs font-semibold text-white hover:bg-[#056d7e]" title="You left a few minutes ago">Rejoin <span className="opacity-80">({Math.max(1, Math.round((Date.now() - new Date(m.ended_at).getTime()) / 60000))} min ago)</span></a>}
+										{m.remoteRecording && <Link href={`/meet/${m.code}/recording`} className="flex items-center gap-1 rounded-full bg-rose-50 px-2.5 py-1 text-xs font-medium text-rose-700 hover:bg-rose-100"><Clapperboard className="h-3 w-3" /> Recording</Link>}
 										{m.recordingFileId && <Link href={`/dashboard/mjengo/vault?open=${m.recordingFileId}`} className="flex items-center gap-1 rounded-full bg-rose-50 px-2.5 py-1 text-xs font-medium text-rose-700 hover:bg-rose-100"><Clapperboard className="h-3 w-3" /> Recording</Link>}
 										{(m.hasNotes || m.lines > 0) && <Link href={`/dashboard/mjengo/meetings?code=${m.code}`} className="flex items-center gap-1 rounded-full bg-sauti-teal-light px-2.5 py-1 text-xs font-medium text-sauti-dark hover:bg-sauti-teal-light/70"><NotebookText className="h-3 w-3" /> {m.hasNotes ? "Notes" : "Transcript"}</Link>}
 									</span>

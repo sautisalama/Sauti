@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { format } from "date-fns";
 import { MeetRecorder } from "@/lib/client/meet-recorder";
+import { sendRecording } from "@/lib/client/remote-recording";
+import { beginRemoteRecording, finishRemoteRecording } from "@/app/actions/meet-recording";
 import { putToSignedUrl } from "@/lib/client/upload";
 import { prepareUpload, registerUpload } from "@/app/dashboard/mjengo/vault/api";
 import { attachRecording } from "@/app/actions/mjengo-meet";
@@ -47,6 +49,7 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 	const [recBy, setRecBy] = useState<string | null>(null);
 	const [recSecs, setRecSecs] = useState(0);
 	const [saving, setSaving] = useState(false);
+	const [savePct, setSavePct] = useState<number | null>(null);
 	const recorder = useRef<MeetRecorder | null>(null);
 	const remotesRef = useRef<Remote[]>([]);
 	const [readyOpen, setReadyOpen] = useState(false);
@@ -628,8 +631,16 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 			if (blob.size < 2000) throw new Error("Nothing was recorded.");
 			const label = (title || code).replace(/[\\/:*?"<>|]+/g, " ").trim();
 			const file = `Recording ${label} ${format(new Date(), "yyyy-MM-dd HHmm")}.webm`;
-			try {
-				const { path, signedUrl } = await prepareUpload(null, file, blob.size);
+							let stored = false;
+				try {
+					const begun = await unwrap(beginRemoteRecording(code));
+					await sendRecording(begun.put, blob, (p) => setSavePct(p));
+					await unwrap(finishRemoteRecording(code, begun.name, blob.size));
+					stored = true;
+				} catch { /* the storage host is not set up or not reachable: Files is used */ }
+				if (stored) return;
+				try {
+					const { path, signedUrl } = await prepareUpload(null, file, blob.size);
 				await putToSignedUrl(signedUrl, new File([blob], file, { type: blob.type }));
 				const created = await registerUpload(null, path, file, blob.size, blob.type || "video/webm");
 				await unwrap(attachRecording(code, created.id));
@@ -644,6 +655,7 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 			/* nothing to keep */
 		} finally {
 			setSaving(false);
+			setSavePct(null);
 		}
 	}, [code, name, send, title]);
 
@@ -853,7 +865,7 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 			{(recording || recBy || saving) && (
 				<div role="status" className="absolute left-1/2 top-3 z-30 flex -translate-x-1/2 items-center gap-2 rounded-full bg-black/70 px-3.5 py-1.5 text-xs font-medium text-white backdrop-blur">
 					<span className={cn("h-2 w-2 rounded-full", saving ? "bg-amber-400" : "animate-pulse bg-[#ea4335]")} />
-					{saving ? "Saving the recording to Files" : recording ? `Recording ${String(Math.floor(recSecs / 60)).padStart(2, "0")}:${String(recSecs % 60).padStart(2, "0")}` : `${recBy} is recording this meeting`}
+					{saving ? `Saving the recording${savePct !== null ? ` ${savePct}%` : ""}` : recording ? `Recording ${String(Math.floor(recSecs / 60)).padStart(2, "0")}:${String(recSecs % 60).padStart(2, "0")}` : `${recBy} is recording this meeting`}
 				</div>
 			)}
 			<div className="hidden shrink-0 items-center gap-3 px-5 pt-3 text-base md:flex">

@@ -9,7 +9,7 @@ import { requireModule } from '@/lib/access/permissions';
 import { sendAccessEmail } from '@/lib/mjengo/invite-email';
 
 export interface TranscriptLine { id: string; name: string; text: string; at: string }
-export interface MeetingRow { id: string; code: string; title: string | null; mode: 'video' | 'voice'; created_at: string; ended_at: string | null; created_by: string | null; lines: number; hasNotes?: boolean; recordingFileId?: string | null }
+export interface MeetingRow { id: string; code: string; title: string | null; mode: 'video' | 'voice'; created_at: string; ended_at: string | null; created_by: string | null; lines: number; hasNotes?: boolean; recordingFileId?: string | null; remoteRecording?: boolean }
 
 const alphabet = 'abcdefghjkmnpqrstuvwxyz23456789';
 function newCode(): string {
@@ -35,11 +35,11 @@ async function createMeeting_(mode: 'video' | 'voice', title: string | null): Pr
 
 async function listMeetings_(): Promise<MeetingRow[]> {
   await requireModule('meet');
-  const { data } = await looseAdmin().from('mjengo_meetings').select('id, code, title, mode, created_at, ended_at, created_by, transcript, notes, recording_file_id').order('created_at', { ascending: false }).limit(80);
-  return ((data ?? []) as (Omit<MeetingRow, 'lines'> & { transcript: unknown[]; notes?: string | null; recording_file_id?: string | null })[])
-    .map(({ transcript, notes, recording_file_id, ...m }) => ({ ...m, lines: Array.isArray(transcript) ? transcript.length : 0, hasNotes: !!notes, recordingFileId: recording_file_id ?? null }))
+  const { data } = await looseAdmin().from('mjengo_meetings').select('id, code, title, mode, created_at, ended_at, created_by, transcript, notes, recording_file_id, remote_recording').order('created_at', { ascending: false }).limit(80);
+  return ((data ?? []) as (Omit<MeetingRow, 'lines'> & { transcript: unknown[]; notes?: string | null; recording_file_id?: string | null; remote_recording?: string | null })[])
+    .map(({ transcript, notes, recording_file_id, remote_recording, ...m }) => ({ ...m, lines: Array.isArray(transcript) ? transcript.length : 0, hasNotes: !!notes, recordingFileId: recording_file_id ?? null, remoteRecording: !!remote_recording }))
     // Only calls that were held: written down, noted or recorded.
-    .filter((m) => m.lines > 0 || m.hasNotes || !!m.recordingFileId);
+    .filter((m) => m.lines > 0 || m.hasNotes || !!m.recordingFileId || !!m.remoteRecording);
 }
 
 /** A finished recording, kept in Files, belongs to its meeting. */
