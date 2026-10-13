@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils";
 import { MjengoLoader } from "../../_components/MjengoLoader";
 import { getFileUrl } from "../../vault/api";
 import { fixPptx } from "@/lib/mjengo/pptx-fix";
+import { pptxProblem, readPptText, readPptxBasic, type BasicSlide } from "@/lib/mjengo/pptx-basic";
 
 type Previewer = {
 	renderNextSlide: () => void;
@@ -41,6 +42,8 @@ function Viewer() {
 	const [mode, setMode] = useState<"slide" | "list">("slide");
 	const [width, setWidth] = useState(0);
 	const [error, setError] = useState<string | null>(null);
+	// When the full viewer cannot draw a file, its text and pictures are still shown, slide by slide.
+	const [basic, setBasic] = useState<{ slides: BasicSlide[]; why: string } | null>(null);
 	const [count, setCount] = useState(0);
 	const [index, setIndex] = useState(0);
 	const [presenting, setPresenting] = useState(false);
@@ -74,12 +77,32 @@ function Viewer() {
 				const info = await getFileUrl(fileId);
 				setName(info.name);
 				setUrl(info.url);
-				if (/\.ppt$/i.test(info.name)) throw new Error("This is an older PowerPoint file (.ppt). Download it and save it as .pptx to view it here.");
 				const res = await fetch(info.url);
 				if (!res.ok) throw new Error("Could not download the file.");
 				const buf = await res.arrayBuffer();
 				if (cancelled) return;
+				if (/\.ppt$/i.test(info.name)) {
+					// The older binary format: its text is shown, since its layout cannot be redrawn here.
+					const slides = readPptText(buf);
+					if (!slides.length) throw new Error("No text could be read from this older PowerPoint file. Download it and save it as .pptx to view it here.");
+					setBasic({ slides, why: "This is an older PowerPoint file (.ppt), so its text is shown without the layout. Download it for the full slides." });
+					setError(null);
+					setLoading(false);
+					return;
+				}
 				bytes.current = await fixPptx(buf);
+				// A damaged package can make the full viewer loop and freeze the tab, so it is checked first.
+				const problem = await pptxProblem(bytes.current);
+				if (problem) {
+					const slides = await readPptxBasic(bytes.current);
+					if (slides.length) {
+						setBasic({ slides, why: "This presentation could not be drawn with its layout, so its text and pictures are shown. Download it for the full slides." });
+						setError(null);
+						setLoading(false);
+						return;
+					}
+					throw new Error(`This presentation cannot be opened (${problem}). Download it and check it in PowerPoint.`);
+				}
 				setError(null);
 				setLoading(false);
 				// Trigger the first draw.
@@ -99,7 +122,7 @@ function Viewer() {
 	// Draw from memory whenever the size or the layout changes.
 	useEffect(() => {
 		const buf = bytes.current;
-		if (!buf || !host.current || !width || error) return;
+		if (!buf || !host.current || !width || error || basic) return;
 		let cancelled = false;
 		(async () => {
 			try {
@@ -116,11 +139,20 @@ function Viewer() {
 				if (mode === "slide" && keep > 0 && keep < p.slideCount) p.renderSingleSlide(keep);
 				setIndex(mode === "slide" ? Math.max(0, p.currentIndex) : 0);
 			} catch (e) {
-				if (!cancelled) { console.error("pptx", e instanceof Error ? e.stack : e); setError(e instanceof Error ? e.message : "This presentation could not be drawn."); }
+				if (!cancelled) {
+					console.error("pptx", e instanceof Error ? e.stack : e);
+					// The full viewer could not draw it: fall back to the text and pictures.
+					try {
+						const slides = await readPptxBasic(buf);
+						if (!slides.length) throw new Error("empty");
+						previewer.current?.destroy(); previewer.current = null;
+						setBasic({ slides, why: "This presentation could not be drawn with its layout, so its text and pictures are shown. Download it for the full slides." });
+					} catch { setError(e instanceof Error ? e.message : "This presentation could not be drawn."); }
+				}
 			}
 		})();
 		return () => { cancelled = true; };
-	}, [width, mode, loading, error]);
+	}, [width, mode, loading, error, basic]);
 	useEffect(() => () => { previewer.current?.destroy(); previewer.current = null; }, []);
 
 	const go = useCallback((to: number | "next" | "prev" | "first" | "last") => {
@@ -217,7 +249,21 @@ function Viewer() {
 							{url && <Button asChild className="mt-4 gap-1.5"><a href={url} download={name}><Download className="h-4 w-4" /> Download the file</a></Button>}
 						</div>
 					)}
-					<div ref={host} className={cn("mx-auto flex w-fit flex-col items-center gap-4", error && "hidden")} />
+					{basic && !loading && (
+						<div className="mx-auto max-w-3xl space-y-3 pb-10">
+							<p className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900">{basic.why}</p>
+							{basic.slides.map((s, i) => (
+								<section key={i} className="rounded-2xl border border-black/10 bg-white p-5 shadow-sm">
+									<p className="text-xs font-semibold text-sauti-teal">Slide {i + 1}</p>
+									<h2 className="mt-0.5 text-lg font-semibold text-[#37352f]">{s.title}</h2>
+									{s.lines.length > 0 && <ul className="mt-2 list-disc space-y-1 pl-5 text-[15px] text-[#37352f]">{s.lines.map((l, k) => <li key={k}>{l}</li>)}</ul>}
+									{s.images.length > 0 && <div className="mt-3 flex flex-wrap gap-2">{s.images.map((src, k) => /* eslint-disable-next-line @next/next/no-img-element */ <img key={k} src={src} alt="" className="max-h-40 rounded-lg border border-black/10 object-contain" />)}</div>}
+									{s.notes && <p className="mt-3 whitespace-pre-wrap rounded-lg bg-serene-neutral-50 px-3 py-2 text-sm text-serene-neutral-600"><span className="font-semibold">Notes: </span>{s.notes}</p>}
+								</section>
+							))}
+						</div>
+					)}
+					<div ref={host} className={cn("mx-auto flex w-fit flex-col items-center gap-4", (error || basic) && "hidden")} />
 					{presenting && (
 						<>
 							{/* Tap the left or right half to move. */}
