@@ -173,6 +173,8 @@ function Viewer() {
 
 	return (
 		<div className={cn("flex h-full min-h-0 flex-col bg-[#f4f4f2]")}>
+			{/* The reader draws its own arrows and counter over the slide; the app has its own, so those are hidden. */}
+			<style>{`.pptx-preview-wrapper-next, .pptx-preview-wrapper-pagination { display: none !important; }`}</style>
 			<ShareDialog item={shareOpen && fileId ? ({ type: "file", id: fileId, name } as never) : null} onClose={() => setShareOpen(false)} />
 			{!presenting && (
 				<div className="flex shrink-0 flex-wrap items-center gap-1 border-b border-black/[0.07] bg-white px-3 py-1.5">
@@ -190,8 +192,8 @@ function Viewer() {
 						</>
 					)}
 					<Button size="sm" className="h-9 gap-1.5 bg-sauti-teal hover:bg-sauti-dark" onClick={() => void present()} disabled={loading || !!error || count === 0}><Play className="h-4 w-4" /> Present</Button>
-					{fileId && <Button variant="outline" size="sm" className="h-9 shrink-0 gap-1.5" onClick={() => setShareOpen(true)} aria-label="Share"><Share2 className="h-4 w-4" /><span className="hidden sm:inline">Share</span></Button>}
-					{url && <Button asChild variant="outline" size="sm" className="h-9 gap-1.5"><a href={url} download={name}><Download className="h-4 w-4" /> <span className="hidden sm:inline">Download</span></a></Button>}
+					{fileId && <Button variant="outline" size="sm" className="h-9 min-w-0 shrink-0 gap-1.5" onClick={() => setShareOpen(true)} aria-label="Share"><Share2 className="h-4 w-4" /><span className="hidden sm:inline">Share</span></Button>}
+					{url && <Button asChild variant="outline" size="sm" className="h-9 min-w-0 gap-1.5"><a href={url} download={name}><Download className="h-4 w-4" /> <span className="hidden sm:inline">Download</span></a></Button>}
 				</div>
 			)}
 			<div className="flex min-h-0 flex-1">
