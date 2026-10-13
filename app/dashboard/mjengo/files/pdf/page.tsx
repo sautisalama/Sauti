@@ -3,13 +3,14 @@
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { ArrowLeft, Bold, Copy, Download, Highlighter, Image as ImageIcon, ImagePlus, Loader2, MapPin, Minus, MousePointer2, PenLine, Plus, Redo2, Save, Share2, Signature, Trash2, Type, Undo2 } from "lucide-react";
+import { ArrowLeft, Bold, Copy, MessageSquarePlus, Download, Highlighter, Image as ImageIcon, ImagePlus, Loader2, MapPin, Minus, MousePointer2, PenLine, Plus, Redo2, Save, Share2, Signature, Trash2, Type, Undo2 } from "lucide-react";
 import { PDFDocument, PDFHexString, StandardFonts, rgb } from "pdf-lib";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import { CommentPins, CommentsPanel, usePdfComments, type Spot } from "./_Comments";
 import { putToSignedUrl } from "@/lib/client/upload";
 import { unwrap } from "@/lib/action-result";
 import { deleteSignature, listSignatures, saveSignatureImage, type SignatureRow } from "@/app/actions/mjengo-signatures";
@@ -50,6 +51,11 @@ function PdfScreen() {
 
 	const [name, setName] = useState("document.pdf");
 	const [level, setLevel] = useState<"view" | "share" | "edit">("edit");
+	// Comments live on the server, so everyone with access sees the same threads; they are separate from the marks.
+	const cm = usePdfComments(fileId);
+	const [commentsOpen, setCommentsOpen] = useState(false);
+	const [pendingSpot, setPendingSpot] = useState<Spot | null>(null);
+	const [activeComment, setActiveComment] = useState<string | null>(null);
 	const [folderId, setFolderId] = useState<string | null>(null);
 	const [bytes, setBytes] = useState<Uint8Array | null>(null);
 	const [pages, setPages] = useState<{ w: number; h: number }[]>([]);
@@ -377,6 +383,7 @@ function PdfScreen() {
 					<select value={zoom} onChange={(e) => setZoom(Number(e.target.value))} aria-label="Zoom" className="hidden h-9 rounded-lg border border-black/10 bg-white px-2 text-sm sm:block">
 						{[0.5, 0.75, 1, 1.25, 1.5, 2].map((z) => <option key={z} value={z}>{Math.round(z * 100)}%</option>)}
 					</select>
+					{fileId && <Button variant={commentsOpen ? "secondary" : "ghost"} size="sm" className="h-9 shrink-0 gap-1.5" aria-pressed={commentsOpen} aria-label="Comments" title="Comments: click on the page to leave one" onClick={() => { setCommentsOpen((v) => !v); setPendingSpot(null); }}><MessageSquarePlus className="h-4 w-4" /><span className="hidden sm:inline">Comments{cm.comments.filter((c) => !c.parentId && !c.resolved).length > 0 ? ` (${cm.comments.filter((c) => !c.parentId && !c.resolved).length})` : ""}</span></Button>}
 					{fileId && level !== "view" && <Button variant="outline" size="sm" className="h-9 shrink-0 gap-1.5" onClick={() => setShareOpen(true)} aria-label="Share"><Share2 className="h-4 w-4" /><span className="hidden sm:inline">Share</span></Button>}
 					<Button variant="ghost" size="sm" className="h-9 shrink-0 gap-1.5" aria-label="Download" onClick={download} disabled={loading}><Download className="h-4 w-4" /><span className="hidden sm:inline">Download</span></Button>
 					<Button size="sm" className="h-9 shrink-0 gap-1.5 bg-sauti-teal hover:bg-sauti-dark" onClick={save} disabled={loading || saving || (!marks.length && level === "edit")}>{saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Save</Button>
@@ -397,8 +404,8 @@ function PdfScreen() {
 				{loading ? <MjengoLoader label="Opening the PDF" /> : (
 					<div className="mx-auto flex w-fit flex-col gap-4">
 						{pages.map((p, i) => (
+							<div key={i} className="relative">
 							<PageView
-								key={i}
 								index={i}
 								size={p}
 								zoom={zoom}
@@ -417,11 +424,14 @@ function PdfScreen() {
 								signature={signature}
 								onNeedSignature={() => setSigning(true)}
 							/>
+							<CommentPins page={i} api={cm} active={activeComment} commenting={commentsOpen} pending={pendingSpot} onPick={(id) => { setActiveComment(id); setCommentsOpen(true); setPendingSpot(null); }} onSpot={(sp) => { setPendingSpot(sp); setActiveComment(null); }} />
+							</div>
 						))}
 					</div>
 				)}
 			</div>
 
+			{commentsOpen && fileId && <CommentsPanel api={cm} active={activeComment} onPick={setActiveComment} pending={pendingSpot} onCancelPending={() => setPendingSpot(null)} onClose={() => { setCommentsOpen(false); setPendingSpot(null); }} canResolve />}
 			<ShareDialog item={shareOpen && fileId ? ({ type: "file", id: fileId, name } as never) : null} onClose={() => setShareOpen(false)} />
 			<SignatureDialog open={signing} onClose={() => setSigning(false)} onDone={(url) => { setSignature(url); setSigning(false); setTool("sign"); }} library={library} onLibraryChanged={loadLibrary} />
 		</div>
