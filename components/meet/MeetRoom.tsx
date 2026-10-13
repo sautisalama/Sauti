@@ -7,7 +7,7 @@ import { putToSignedUrl } from "@/lib/client/upload";
 import { prepareUpload, registerUpload } from "@/app/dashboard/mjengo/vault/api";
 import { attachRecording } from "@/app/actions/mjengo-meet";
 import { Accessibility, Captions, Circle, ExternalLink, MoreVertical, ShieldCheck, UserPlus, Check, Copy, Hand, Info, Loader2, Mail, BarChart3, MessageCircle, MessageSquareText, Settings2, Mic, MicOff, Minimize2, MonitorUp, Pin, PinOff, PictureInPicture2, PhoneOff, Smile, SmartphoneNfc, UserMinus, Users, Video, VideoOff, Volume2, X } from "lucide-react";
-import { verifyHostToken, lockMeeting, enterMeeting, checkMeetingEntry, listKnocks, decideKnock, decideAllKnocks, saveMeetingChat, type Knock } from "@/app/actions/meet-room";
+import { makeCohost, verifyHostToken, lockMeeting, enterMeeting, checkMeetingEntry, listKnocks, decideKnock, decideAllKnocks, saveMeetingChat, type Knock } from "@/app/actions/meet-room";
 import { ChatPanel, PollPanel, ReactionLayer, ReactionPicker, type ChatMsg, type FloatingReaction, type Poll } from "./meet-parts";
 import { callStore } from "@/lib/client/call-store";
 import { createClient } from "@/utils/supabase/client";
@@ -63,6 +63,8 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 	const [entry, setEntry] = useState<"idle" | "checking" | "waiting" | "denied">("idle");
 	const [entryError, setEntryError] = useState("");
 	const [isHost, setIsHost] = useState(false);
+	const [cohostToken, setCohostToken] = useState<string | null>(null);
+	const canModerate = isHost || !!cohostToken;
 	const [locked, setLocked] = useState(false);
 	const [polls, setPolls] = useState<Poll[]>([]);
 	const [noise, setNoise] = useState(true);
@@ -313,7 +315,12 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 				setPolls((cur) => cur.map((x) => (x.id === v.id && x.open ? { ...x, votes: { ...x.votes, [v.voter]: v.option } } : x)));
 			})
 			.on("broadcast", { event: "pollend" }, ({ payload }) => setPolls((cur) => cur.map((x) => (x.id === (payload as { id: string }).id ? { ...x, open: false } : x))))
-			.on("broadcast", { event: "react" }, ({ payload }) => showReaction(String(payload.id), String(payload.emoji).slice(0, 8), String(payload.name ?? "Someone")))
+			.on("broadcast", { event: "cohost" }, ({ payload }) => {
+					const c = payload as { id: string; ht: string };
+					if (String(c.ht).split(".")[1] !== String(c.id)) return;
+					void unwrap(verifyHostToken(code, c.ht)).then((ok) => { if (ok) { hostIds.current.add(String(c.id)); setRemote(String(c.id), { host: true }); } }).catch(() => undefined);
+				})
+				.on("broadcast", { event: "react" }, ({ payload }) => showReaction(String(payload.id), String(payload.emoji).slice(0, 8), String(payload.name ?? "Someone")))
 			.on("broadcast", { event: "ctl" }, ({ payload }) => {
 				// Only the host's instructions are followed.
 				if (!hostIds.current.has(String(payload.from))) return;
@@ -321,6 +328,7 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 				if (!mine) return;
 				if (payload.action === "mute") { micOnRef.current = false; setMicOn(false); local.current?.getAudioTracks().forEach((t) => (t.enabled = false)); pushState({ muted: true }); }
 				if (payload.action === "remove" || payload.action === "end") void leaveRef.current();
+					if (payload.action === "cohost" && typeof payload.token === "string" && payload.to === myId.current) { setCohostToken(payload.token); send("cohost", { id: myId.current, ht: payload.token }); }
 			})
 			.on("presence", { event: "join" }, ({ key, newPresences }) => {
 				if (key === myId.current) return;
@@ -539,17 +547,18 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 	useEffect(() => {
 		if (!joined) return;
 		let on = true;
-		const poll = () => { if (document.hidden) return; unwrap(listKnocks(code)).then((k) => on && setKnocks(k)).catch(() => undefined); };
+		const poll = () => { if (document.hidden) return; unwrap(listKnocks(code, cohostToken)).then((k) => on && setKnocks(k)).catch(() => undefined); };
 		poll();
 		const t = setInterval(poll, 3500);
 		return () => { on = false; clearInterval(t); };
-	}, [joined, code]);
+			}, [joined, code, cohostToken]);
+	const addCohost = (peerId: string) => { void unwrap(makeCohost(code, peerId)).then((token) => { send("ctl", { from: myId.current, to: peerId, action: "cohost", token }); setRemote(peerId, { host: true }); hostIds.current.add(peerId); }).catch(() => undefined); };
 	const hostCtl = (to: string, action: "mute" | "remove" | "end") => send("ctl", { from: myId.current, to, action });
 	const decide = (k: Knock, admit: boolean) => {
 		setKnocks((cur) => cur.filter((x) => x.guestKey !== k.guestKey));
-		void unwrap(decideKnock(code, k.guestKey, admit)).catch(() => undefined);
+		void unwrap(decideKnock(code, k.guestKey, admit, cohostToken)).catch(() => undefined);
 	};
-	const decideAll = (admit: boolean) => { setKnocks([]); void unwrap(decideAllKnocks(code, admit)).catch(() => undefined); };
+	const decideAll = (admit: boolean) => { setKnocks([]); void unwrap(decideAllKnocks(code, admit, cohostToken)).catch(() => undefined); };
 
 	// A guest in the waiting room checks every few seconds whether they have been let in.
 	useEffect(() => {
@@ -929,10 +938,10 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 						)}
 						{panel === "people" && (
 								<div className="min-h-0 flex-1 overflow-y-auto">
-									{isHost && (
+									{canModerate && (
 										<div className="flex flex-wrap items-center gap-2 border-b border-[#e8eaed] px-4 py-2 text-xs">
-											<span className="mr-auto text-[#5f6368]">You are the host</span>
-											<button onClick={() => { const next = !locked; setLocked(next); void unwrap(lockMeeting(code, next)).catch(() => setLocked(!next)); }} aria-pressed={locked} className={cn("rounded-full border px-3 py-1 font-medium", locked ? "border-[#068297] bg-[#e0f2f5] text-[#068297]" : "border-[#dadce0] text-[#5f6368] hover:bg-[#f1fafb]")}>{locked ? "Call is locked" : "Lock the call"}</button>
+											<span className="mr-auto text-[#5f6368]">{isHost ? "You are the host" : "You are a co-host"}</span>
+											{isHost && <button onClick={() => { const next = !locked; setLocked(next); void unwrap(lockMeeting(code, next)).catch(() => setLocked(!next)); }} aria-pressed={locked} className={cn("rounded-full border px-3 py-1 font-medium", locked ? "border-[#068297] bg-[#e0f2f5] text-[#068297]" : "border-[#dadce0] text-[#5f6368] hover:bg-[#f1fafb]")}>{locked ? "Call is locked" : "Lock the call"}</button>}
 											{remotes.length > 0 && <button onClick={() => hostCtl("all", "mute")} className="rounded-full border border-[#dadce0] px-3 py-1 font-medium text-[#068297] hover:bg-[#f1fafb]">Mute everyone</button>}
 											{remotes.length > 0 && <button onClick={() => { hostCtl("all", "end"); setTimeout(() => void leaveRef.current(), 400); }} className="rounded-full bg-[#fce8e6] px-3 py-1 font-medium text-[#d93025] hover:bg-[#f9d6d2]">End for everyone</button>}
 										</div>
@@ -953,9 +962,10 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 												{r.muted && <MicOff className="h-4 w-4 text-[#5f6368]" />}
 												{r.cam === false && <VideoOff className="h-4 w-4 text-[#5f6368]" />}
 												<button onClick={() => setPinned((p) => (p === r.id ? null : r.id))} aria-label={pinned === r.id ? "Unpin" : "Pin"} className="flex h-7 w-7 items-center justify-center rounded-full text-[#5f6368] hover:bg-black/5">{pinned === r.id ? <PinOff className="h-4 w-4" /> : <Pin className="h-4 w-4" />}</button>
-												{isHost && (
-													<>
-														<button onClick={() => hostCtl(r.id, "mute")} disabled={r.muted} aria-label={`Mute ${r.name}`} title="Mute" className="flex h-7 w-7 items-center justify-center rounded-full text-[#5f6368] hover:bg-black/5 disabled:opacity-30"><MicOff className="h-4 w-4" /></button>
+												{canModerate && (
+																<>
+																	{isHost && !r.host && !r.companion && <button onClick={() => addCohost(r.id)} title="Make co-host" className="rounded-full border border-[#dadce0] px-2 py-0.5 text-[11px] font-medium text-[#068297] hover:bg-[#f1fafb]">Co-host</button>}
+																	<button onClick={() => hostCtl(r.id, "mute")} disabled={r.muted} aria-label={`Mute ${r.name}`} title="Mute" className="flex h-7 w-7 items-center justify-center rounded-full text-[#5f6368] hover:bg-black/5 disabled:opacity-30"><MicOff className="h-4 w-4" /></button>
 														<button onClick={() => hostCtl(r.id, "remove")} aria-label={`Remove ${r.name}`} title="Remove from the call" className="flex h-7 w-7 items-center justify-center rounded-full text-[#d93025] hover:bg-[#fce8e6]"><UserMinus className="h-4 w-4" /></button>
 													</>
 												)}

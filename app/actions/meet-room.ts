@@ -21,6 +21,18 @@ function roomKey(code: string): string {
 
 const CODE = /^[a-z0-9]{3}-[a-z0-9]{4}-[a-z0-9]{3}$/;
 
+/** A proof that a participant was made a co-host by the host. Bound to their peer id in the call. */
+function cohostMac(code: string, peerId: string): string {
+  const secret = process.env.DATA_ENCRYPTION_KEY || process.env.SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SERVICE_ROLE_KEY || '';
+  return createHmac('sha256', secret).update(`${VERSION}:cohost:${code}:${peerId}`).digest('hex').slice(0, 32);
+}
+
+function cohostOk(code: string, token?: string | null): boolean {
+  if (!token) return false;
+  const [tag, peer, mac] = String(token).split('.');
+  return tag === 'c' && !!peer && !!mac && mac === cohostMac(code, peer);
+}
+
 /** A proof that this person is the host, which other people in the call can check with the server. */
 function hostMac(code: string, userId: string): string {
   const secret = process.env.DATA_ENCRYPTION_KEY || process.env.SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SERVICE_ROLE_KEY || '';
@@ -81,26 +93,26 @@ async function check_(code: string, guestKey: string): Promise<Entry> {
 export interface Knock { guestKey: string; name: string; at: string }
 
 /** People waiting to come in. Only participants can see the list. */
-async function knocks_(code: string): Promise<Knock[]> {
+async function knocks_(code: string, cohostToken?: string | null): Promise<Knock[]> {
   const m = await meeting(code);
-  if (!(await participantOf(m))) return [];
+  if (!(await participantOf(m)) && !cohostOk(code, cohostToken)) return [];
   const { data } = await looseAdmin().from('mjengo_meeting_knocks').select('guest_key, name, created_at').eq('code', code).eq('status', 'pending').order('created_at');
   return ((data ?? []) as { guest_key: string; name: string; created_at: string }[]).map((k) => ({ guestKey: k.guest_key, name: k.name, at: k.created_at }));
 }
 
-async function decide_(code: string, guestKey: string, admit: boolean): Promise<void> {
+async function decide_(code: string, guestKey: string, admit: boolean, cohostToken?: string | null): Promise<void> {
   const m = await meeting(code);
   const me = await participantOf(m);
-  if (!me) throw new Error('Only people in the invitation can let others in.');
-  await looseAdmin().from('mjengo_meeting_knocks').update({ status: admit ? 'admitted' : 'denied', decided_by: me.id, decided_at: new Date().toISOString() }).eq('code', code).eq('guest_key', guestKey);
+  if (!me && !cohostOk(code, cohostToken)) throw new Error('Only people in the invitation can let others in.');
+  await looseAdmin().from('mjengo_meeting_knocks').update({ status: admit ? 'admitted' : 'denied', decided_by: me?.id ?? null, decided_at: new Date().toISOString() }).eq('code', code).eq('guest_key', guestKey);
 }
 
 /** Let in, or decline, everyone waiting. */
-async function decideAll_(code: string, admit: boolean): Promise<void> {
+async function decideAll_(code: string, admit: boolean, cohostToken?: string | null): Promise<void> {
   const m = await meeting(code);
   const me = await participantOf(m);
-  if (!me) throw new Error('Only people in the invitation can let others in.');
-  await looseAdmin().from('mjengo_meeting_knocks').update({ status: admit ? 'admitted' : 'denied', decided_by: me.id, decided_at: new Date().toISOString() }).eq('code', code).eq('status', 'pending');
+  if (!me && !cohostOk(code, cohostToken)) throw new Error('Only people in the invitation can let others in.');
+  await looseAdmin().from('mjengo_meeting_knocks').update({ status: admit ? 'admitted' : 'denied', decided_by: me?.id ?? null, decided_at: new Date().toISOString() }).eq('code', code).eq('status', 'pending');
 }
 
 export interface ChatLine { id: string; name: string; text: string; at: string }
@@ -127,12 +139,24 @@ async function lock_(code: string, locked: boolean): Promise<void> {
 /** Is this token really the host's? Other participants ask before they obey host controls. */
 async function verifyHost_(code: string, token: string): Promise<boolean> {
   if (!CODE.test(code)) return false;
+  if (cohostOk(code, token)) return true;
   const [id, mac] = String(token).split('.');
   if (!id || !mac) return false;
   const { data } = await looseAdmin().from('mjengo_meetings').select('created_by').eq('code', code).maybeSingle();
   return !!data && data.created_by === id && mac === hostMac(code, id);
 }
 
+/** The host makes someone in the call a co-host: the token proves it to the server and to everyone else. */
+async function cohost_(code: string, peerId: string): Promise<string> {
+  const m = await meeting(code);
+  const me = await participantOf(m);
+  if (!me?.host) throw new Error('Only the host can add a co-host.');
+  const peer = String(peerId).replace(/[^\w-]/g, '').slice(0, 80);
+  if (!peer) throw new Error('Pick someone in the call.');
+  return `c.${peer}.${cohostMac(code, peer)}`;
+}
+
+export const makeCohost = guard(cohost_);
 export const verifyHostToken = guard(verifyHost_);
 export const lockMeeting = guard(lock_);
 export const enterMeeting = guard(enter_);
