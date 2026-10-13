@@ -60,8 +60,8 @@ async function syncToDrive(actorId: string, ownerId: string, driveFileId: string
   void name;
 }
 
-async function ctx() {
-  const actor = await requireModule('files');
+async function ctx(level: 'view' | 'write' | 'owner' = 'view') {
+  const actor = await requireModule('files', level);
   const [ix, oversight, names] = await Promise.all([loadIndex(), oversightFor(actor.email), adminNames()]);
   return { actor, ix, oversight, names };
 }
@@ -121,7 +121,7 @@ async function listVault_(view: 'mine' | 'folder' | 'shared', folderId: string |
 }
 
 async function createFolder_(parentId: string | null, name: string): Promise<VaultItem> {
-  const c = await ctx();
+  const c = await ctx('write');
   const n = name.trim().slice(0, 120);
   if (!n) throw new Error('Name the folder.');
   if (parentId) need(c, 'folder', parentId, 'edit', 'add a folder here');
@@ -133,7 +133,7 @@ async function createFolder_(parentId: string | null, name: string): Promise<Vau
 
 /** Step 1 of an upload: a one-time signed URL under vault/<you>/, after checking you may write to the folder. */
 async function prepareUpload_(folderId: string | null, fileName: string, size: number): Promise<{ path: string; signedUrl: string }> {
-  const c = await ctx();
+  const c = await ctx('write');
   if (folderId) need(c, 'folder', folderId, 'edit', 'upload here');
   if (!(size > 0) || size > MAX_BYTES) throw new Error('Files can be up to 50 MB.');
   const safe = fileName.replace(/[^a-zA-Z0-9._-]+/g, '_').slice(-120) || 'file';
@@ -145,7 +145,7 @@ async function prepareUpload_(folderId: string | null, fileName: string, size: n
 
 /** Step 2: record the uploaded object. The path must be one we handed out to this person. */
 async function registerUpload_(folderId: string | null, path: string, name: string, size: number, mime: string | null): Promise<VaultItem> {
-  const c = await ctx();
+  const c = await ctx('write');
   if (!path.startsWith(`vault/${c.actor.id}/`)) throw new Error('That upload does not belong to you.');
   if (folderId) need(c, 'folder', folderId, 'edit', 'upload here');
   const n = name.trim().slice(0, 200) || 'Untitled';
@@ -156,7 +156,7 @@ async function registerUpload_(folderId: string | null, path: string, name: stri
 }
 
 async function renameItem_(type: ResType, id: string, name: string) {
-  const c = await ctx();
+  const c = await ctx('write');
   const n = name.trim().slice(0, 200);
   if (!n) throw new Error('Enter a name.');
   need(c, type, id, 'edit', 'rename it');
@@ -165,7 +165,7 @@ async function renameItem_(type: ResType, id: string, name: string) {
 }
 
 async function deleteItem_(type: ResType, id: string) {
-  const c = await ctx();
+  const c = await ctx('owner');
   need(c, type, id, 'edit', 'delete it');
   const db = looseAdmin();
   let paths: string[] = [];
@@ -202,7 +202,7 @@ async function getFileUrl_(id: string): Promise<{ url: string; name: string; lev
 
 /** Overwrite a file's contents (the document editor saving): a one-time signed URL that may replace the object. */
 async function prepareReplace_(id: string): Promise<{ signedUrl: string }> {
-  const c = await ctx();
+  const c = await ctx('write');
   need(c, 'file', id, 'edit', 'save changes to it');
   const f = c.ix.files.get(id);
   if (!f) throw new Error('That file no longer exists.');
@@ -212,7 +212,7 @@ async function prepareReplace_(id: string): Promise<{ signedUrl: string }> {
 }
 
 async function finishReplace_(id: string, size: number) {
-  const c = await ctx();
+  const c = await ctx('write');
   need(c, 'file', id, 'edit', 'save changes to it');
   const f = c.ix.files.get(id);
   await looseAdmin().from('vault_files').update({ size, updated_at: new Date().toISOString() }).eq('id', id);
@@ -263,7 +263,7 @@ async function getAccess_(type: ResType, id: string): Promise<AccessView> {
 
 /** Give, change or (level = null) remove one person's access. Share holders can grant view/share; only editors can grant edit. */
 async function setPermission_(type: ResType, id: string, userId: string, level: Level | null, notify = true, note?: string) {
-  const c = await ctx();
+  const c = await ctx('write');
   const mine = need(c, type, id, 'share', 'change who has access');
   const node = type === 'file' ? c.ix.files.get(id) : c.ix.folders.get(id);
   if (!node) throw new Error('That item no longer exists.');
@@ -295,7 +295,7 @@ async function setPermission_(type: ResType, id: string, userId: string, level: 
 }
 
 async function setGeneralAccess_(type: ResType, id: string, general: General) {
-  const c = await ctx();
+  const c = await ctx('write');
   need(c, type, id, 'share', 'change general access');
   if (!['restricted', 'admins_view', 'admins_share'].includes(general)) throw new Error('Unknown access setting.');
   const node = type === 'file' ? c.ix.files.get(id) : c.ix.folders.get(id);
@@ -345,7 +345,7 @@ async function fileMeta_(id: string): Promise<FileMeta> {
 
 /** Labels and meeting need edit rights; the link setting needs share rights. */
 async function setFileMeta_(id: string, patch: { tags?: string[]; meetingCode?: string | null; linkAccess?: 'off' | 'view' | 'edit' }) {
-  const c = await ctx();
+  const c = await ctx('write');
   const f = c.ix.files.get(id);
   if (!f) throw new Error('That file no longer exists.');
   const update: Record<string, unknown> = {};
@@ -379,7 +379,7 @@ async function setFileMeta_(id: string, patch: { tags?: string[]; meetingCode?: 
  * instead: link sharing is switched on at the chosen level if it was off, and they are emailed the link.
  */
 async function inviteByLink_(id: string, emails: string[], level: 'view' | 'edit', note?: string): Promise<{ sent: number; linkAccess: 'off' | 'view' | 'edit' }> {
-  const c = await ctx();
+  const c = await ctx('write');
   need(c, 'file', id, 'share', 'invite people');
   const f = c.ix.files.get(id);
   if (!f) throw new Error('That file no longer exists.');
@@ -451,7 +451,7 @@ async function checkRecipients_(fileIds: string[], emails: string[]): Promise<Re
 
 /** Grant view access to named recipients for these files (sender must hold share rights on each). */
 async function grantViewTo_(fileIds: string[], emails: string[]): Promise<{ granted: number; skipped: string[] }> {
-  const c = await ctx();
+  const c = await ctx('write');
   let granted = 0;
   const skipped: string[] = [];
   const db = looseAdmin();

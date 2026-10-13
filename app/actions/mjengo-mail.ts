@@ -59,7 +59,7 @@ export interface AddAccountInput {
 }
 
 async function addAccount_(input: AddAccountInput): Promise<AccountView> {
-  const actor = await requireModule('mail');
+  const actor = await requireModule('mail', 'write');
   const email = (input.email ?? '').trim().toLowerCase();
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error('Enter a valid email address.');
   if (!input.password) throw new Error('Enter the password (or app password).');
@@ -113,7 +113,7 @@ async function addAccount_(input: AddAccountInput): Promise<AccountView> {
 }
 
 async function removeAccount_(id: string) {
-  const actor = await requireModule('mail');
+  const actor = await requireModule('mail', 'owner');
   const { data } = await looseAdmin().from('mail_accounts').delete().eq('id', id).eq('owner_id', actor.id).select('email').maybeSingle();
   if (data) await logAudit({ actorId: actor.id, actorEmail: actor.email, action: 'mail.account_removed', targetType: 'mailbox', targetId: id, targetLabel: data.email });
 }
@@ -138,7 +138,7 @@ async function getPrefs_(): Promise<MailPrefs> {
 }
 
 async function savePrefs_(v: MailPrefs): Promise<MailPrefs> {
-  const a = await requireModule('mail');
+  const a = await requireModule('mail', 'write');
   const blocked = [...new Set(v.blocked.map((x) => x.trim().toLowerCase()).filter((x) => /^[^\s@]+@[^\s@]+\.[^\s@]+$|^@[^\s@]+\.[^\s@]+$/.test(x)))].slice(0, 200);
   const row = {
     owner_id: a.id,
@@ -186,7 +186,7 @@ export interface UpdateServers {
 
 /** Change a password mailbox's servers, port, security or password; the new settings are tested before they are kept. */
 async function updateServers_(id: string, v: UpdateServers): Promise<AccountServers> {
-  const a = await requireModule('mail');
+  const a = await requireModule('mail', 'write');
   const db = looseAdmin();
   const { data: cur } = await db.from('mail_accounts').select('*').eq('id', id).eq('owner_id', a.id).maybeSingle();
   if (!cur) throw new Error('That mailbox no longer exists.');
@@ -504,7 +504,7 @@ async function getThread_(accountId: string, mailbox: string, subject: string, l
 export type MailAction = 'archive' | 'trash' | 'spam' | 'read' | 'unread' | 'star' | 'unstar' | 'delete';
 
 async function actOnMessages_(accountId: string, mailbox: string, uids: number[], action: MailAction) {
-  const actor = await requireModule('mail');
+  const actor = await requireModule('mail', 'write');
   const acct = await loadAccount(accountId, actor.id);
   if (!uids.length) return;
   const set = uids.slice(0, 200).join(',');
@@ -569,7 +569,7 @@ const htmlToText = (html: string) =>
   html.replace(/<(br|\/p|\/div|\/h[1-6]|\/li)>/gi, '\n').replace(/<[^>]+>/g, '').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/\n{3,}/g, '\n\n').trim();
 
 async function sendMail_(input: SendInput) {
-  const actor = await requireModule('mail');
+  const actor = await requireModule('mail', 'write');
   const acct = await loadAccount(input.accountId, actor.id);
   const to = input.to.map((e) => e.trim()).filter(Boolean);
   const cc = (input.cc ?? []).map((e) => e.trim()).filter(Boolean);
@@ -678,7 +678,7 @@ async function listViews_(): Promise<ViewRow[]> {
 }
 
 async function saveView_(id: string | null, v: { name: string; icon?: string; config: ViewConfig }): Promise<ViewRow> {
-  const actor = await requireModule('mail');
+  const actor = await requireModule('mail', 'write');
   const name = v.name.trim().slice(0, 40);
   if (!name) throw new Error('Name the view.');
   const db = looseAdmin();
@@ -690,7 +690,7 @@ async function saveView_(id: string | null, v: { name: string; icon?: string; co
 }
 
 async function deleteView_(id: string) {
-  const actor = await requireModule('mail');
+  const actor = await requireModule('mail', 'owner');
   await looseAdmin().from('mail_views').delete().eq('id', id).eq('owner_id', actor.id);
 }
 
@@ -707,7 +707,7 @@ async function listSnippets_(): Promise<SnippetRow[]> {
 }
 
 async function saveSnippet_(id: string | null, name: string, bodyHtml: string): Promise<SnippetRow> {
-  const actor = await requireModule('mail');
+  const actor = await requireModule('mail', 'write');
   const n = name.trim().slice(0, 40);
   if (!n || !bodyHtml.trim()) throw new Error('A snippet needs a name and some content.');
   const db = looseAdmin();
@@ -719,7 +719,7 @@ async function saveSnippet_(id: string | null, name: string, bodyHtml: string): 
 }
 
 async function deleteSnippet_(id: string) {
-  const actor = await requireModule('mail');
+  const actor = await requireModule('mail', 'owner');
   await looseAdmin().from('mail_snippets').delete().eq('id', id).eq('owner_id', actor.id);
 }
 
@@ -741,7 +741,7 @@ async function listLabels_(): Promise<LabelRow[]> {
 }
 
 async function saveLabel_(id: string | null, v: { name: string; color?: string; instruction?: string | null }): Promise<LabelRow> {
-  const actor = await requireModule('mail');
+  const actor = await requireModule('mail', 'write');
   const name = v.name.trim().slice(0, 40);
   if (!name) throw new Error('Name the label.');
   const row = { name, color: v.color || 'purple', instruction: v.instruction?.trim().slice(0, 600) || null };
@@ -753,12 +753,12 @@ async function saveLabel_(id: string | null, v: { name: string; color?: string; 
 }
 
 async function deleteLabel_(id: string) {
-  const actor = await requireModule('mail');
+  const actor = await requireModule('mail', 'owner');
   await looseAdmin().from('mail_labels').delete().eq('id', id).eq('owner_id', actor.id);
 }
 
 async function setMessageLabel_(accountId: string, messageId: string, labelId: string, on: boolean) {
-  const actor = await requireModule('mail');
+  const actor = await requireModule('mail', 'write');
   await loadAccount(accountId, actor.id);
   const db = looseAdmin();
   const { data: label } = await db.from('mail_labels').select('id').eq('id', labelId).eq('owner_id', actor.id).maybeSingle();
@@ -827,7 +827,7 @@ async function listGrantsLite_(): Promise<GrantLite[]> {
  * page), as a new grant, or as the link of a grant that already exists and has none.
  */
 async function linkToWork_(target: { kind: 'opportunity' | 'grant'; grantId?: string | null }, url: string, subject: string): Promise<{ kind: 'opportunity' | 'grant'; id: string; title: string }> {
-  const actor = await requireModule('mail');
+  const actor = await requireModule('mail', 'write');
   let clean: string;
   try { clean = new URL(url).toString(); } catch { throw new Error('That is not a valid web address.'); }
   if (!/^https?:/i.test(clean)) throw new Error('Only web links can be added.');
@@ -888,7 +888,7 @@ async function previewAutoLabel_(accountId: string, mailbox: string, labelId: st
  * label's rule as "not this" examples so future matching improves.
  */
 async function confirmAutoLabel_(accountId: string, labelId: string, accept: string[], reject: { from: string; subject: string }[]): Promise<{ applied: number }> {
-  const actor = await requireModule('mail');
+  const actor = await requireModule('mail', 'write');
   await loadAccount(accountId, actor.id);
   const db = looseAdmin();
   const { data: label } = await db.from('mail_labels').select('id, instruction').eq('id', labelId).eq('owner_id', actor.id).maybeSingle();
@@ -905,7 +905,7 @@ async function confirmAutoLabel_(accountId: string, labelId: string, accept: str
 
 /** Apply a label to the recent messages that match its plain-language rule. Sender and subject are sent to the AI service. */
 async function autoLabel_(accountId: string, mailbox: string, labelId: string): Promise<{ matched: number; scanned: number }> {
-  const actor = await requireModule('mail');
+  const actor = await requireModule('mail', 'write');
   const db = looseAdmin();
   const { data: label } = await db.from('mail_labels').select('id, name, instruction').eq('id', labelId).eq('owner_id', actor.id).maybeSingle();
   if (!label) throw new Error('That label no longer exists.');
@@ -971,7 +971,7 @@ async function getSignature_(): Promise<SignatureState> {
 }
 
 async function saveSignature_(html: string): Promise<SignatureState> {
-  const actor = await requireModule('mail');
+  const actor = await requireModule('mail', 'write');
   const clean = sanitizeHtml(html.slice(0, 30000), {
     allowedTags: ['p', 'br', 'strong', 'b', 'em', 'i', 'u', 's', 'a', 'ul', 'ol', 'li', 'span', 'h1', 'h2', 'h3', 'div', 'img'],
     allowedAttributes: { a: ['href'], img: ['src', 'alt', 'width', 'height'], span: ['style'], p: ['style'], h1: ['style'], h2: ['style'], h3: ['style'], div: ['style'] },
@@ -987,7 +987,7 @@ async function saveSignature_(html: string): Promise<SignatureState> {
 }
 
 async function dismissSignaturePrompt_() {
-  const actor = await requireModule('mail');
+  const actor = await requireModule('mail', 'write');
   await looseAdmin().from('mail_signatures').upsert({ owner_id: actor.id, prompt_dismissed: true }, { onConflict: 'owner_id' });
 }
 
@@ -1049,7 +1049,7 @@ async function summariseMessage_(accountId: string, mailbox: string, uid: number
 }
 
 async function draftReply_(accountId: string, mailbox: string, uid: number, instruction: string): Promise<string> {
-  const actor = await requireModule('mail');
+  const actor = await requireModule('mail', 'write');
   const { text, subject, from } = await bodyText(accountId, mailbox, uid, actor.id);
   const ctx = await threadContext(accountId, mailbox, uid, subject, actor.id);
   const out = await ai(
@@ -1067,7 +1067,7 @@ export interface ReplySuggestion { label: string; body: string }
 
 /** Three short replies that fit the email, in the tone the sender used. */
 async function suggestReplies_(accountId: string, mailbox: string, uid: number): Promise<ReplySuggestion[]> {
-  const actor = await requireModule('mail');
+  const actor = await requireModule('mail', 'write');
   const { text, subject, from } = await bodyText(accountId, mailbox, uid, actor.id);
   const ctx = await threadContext(accountId, mailbox, uid, subject, actor.id);
   const raw = await ai(

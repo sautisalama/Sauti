@@ -128,7 +128,7 @@ async function month_(fromIso: string, toIso: string): Promise<CalMonth> {
 
 /** Create an event the way Google does: title, time, guests, place and an optional video call link. */
 async function create_(v: NewEvent): Promise<CalItem> {
-  const a = await requireModule('calendar');
+  const a = await requireModule('calendar', 'write');
   const title = v.title.trim().slice(0, 200);
   if (!title) throw new Error('Give the event a title.');
   const start = new Date(v.start);
@@ -189,7 +189,7 @@ async function create_(v: NewEvent): Promise<CalItem> {
 }
 
 async function remove_(id: string) {
-  const a = await requireModule('calendar');
+  const a = await requireModule('calendar', 'owner');
   const raw = id.replace(/^ev:/, '');
   const db = looseAdmin();
   const { data } = await db.from('mjengo_events').select('google_event_id, title, created_by').eq('id', raw).maybeSingle();

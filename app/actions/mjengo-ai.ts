@@ -45,19 +45,19 @@ async function signAssets(ids: string[]): Promise<Record<string, string>> {
 }
 
 async function renameThread_(id: string, title: string) {
-  const a = await requireModule('assistant');
+  const a = await requireModule('assistant', 'write');
   const t = title.trim().slice(0, 80);
   if (!t) throw new Error('Give the chat a name.');
   await looseAdmin().from('mjengo_ai_threads').update({ title: t }).eq('id', id).eq('owner_id', a.id);
 }
 
 async function deleteThread_(id: string) {
-  const a = await requireModule('assistant');
+  const a = await requireModule('assistant', 'owner');
   await looseAdmin().from('mjengo_ai_threads').delete().eq('id', id).eq('owner_id', a.id);
 }
 
 async function setThreadDesign_(id: string, designSystemId: string | null) {
-  const a = await requireModule('assistant');
+  const a = await requireModule('assistant', 'write');
   await looseAdmin().from('mjengo_ai_threads').update({ design_system_id: designSystemId }).eq('id', id).eq('owner_id', a.id);
 }
 
@@ -76,7 +76,7 @@ async function getSettings_(): Promise<AiSettings> {
 }
 
 async function saveKey_(provider: 'openrouter' | 'openai', apiKey: string, model: string | null) {
-  const a = await requireModule('assistant');
+  const a = await requireModule('assistant', 'write');
   const key = apiKey.trim();
   if (key.length < 20 || /\s/.test(key)) throw new Error('That does not look like an API key.');
   if (provider === 'openai' && !key.startsWith('sk-')) throw new Error('OpenAI keys start with "sk-".');
@@ -93,7 +93,7 @@ async function saveKey_(provider: 'openrouter' | 'openai', apiKey: string, model
 }
 
 async function removeKey_() {
-  const a = await requireModule('assistant');
+  const a = await requireModule('assistant', 'owner');
   await looseAdmin().from('mjengo_ai_settings').update({ provider: null, api_key_enc: null, refresh_token_enc: null, model: null }).eq('owner_id', a.id);
 }
 
@@ -117,7 +117,7 @@ async function designFiles_(designSystemId: string): Promise<DesignFile[]> {
 
 /** Use a file already in the vault (or one just uploaded to Private docs) to steer a design system. */
 async function attachDesignFile_(designSystemId: string, fileId: string): Promise<DesignFile> {
-  const a = await requireModule('assistant');
+  const a = await requireModule('assistant', 'write');
   const f = await readableFile(a.id, a.email, fileId, 6000);
   const { error } = await looseAdmin().from('mjengo_design_system_files').upsert(
     { design_system_id: designSystemId, file_id: fileId, excerpt: f.text || null, added_by: a.id },
@@ -139,7 +139,7 @@ async function listDesignSystems_(): Promise<DesignSystem[]> {
 }
 
 async function saveDesignSystem_(id: string | null, v: { name: string; description?: string | null; colors?: string[]; fonts?: string | null; voice?: string | null; notes?: string | null }): Promise<DesignSystem> {
-  const a = await requireModule('assistant');
+  const a = await requireModule('assistant', 'write');
   const name = v.name.trim().slice(0, 80);
   if (!name) throw new Error('Name the design system.');
   const colors = (v.colors ?? []).map((c) => c.trim()).filter((c) => /^#[0-9a-fA-F]{3,8}$/.test(c)).slice(0, 12);
@@ -151,7 +151,7 @@ async function saveDesignSystem_(id: string | null, v: { name: string; descripti
 }
 
 async function deleteDesignSystem_(id: string) {
-  await requireModule('assistant');
+  await requireModule('assistant', 'owner');
   await looseAdmin().from('mjengo_design_systems').delete().eq('id', id);
 }
 
@@ -164,7 +164,7 @@ async function listAssets_(): Promise<AssetRow[]> {
 }
 
 async function deleteAsset_(id: string) {
-  await requireModule('assistant');
+  await requireModule('assistant', 'owner');
   const db = looseAdmin();
   const { data } = await db.from('mjengo_assets').select('path').eq('id', id).maybeSingle();
   if (data?.path) await db.storage.from(BUCKET).remove([data.path]);

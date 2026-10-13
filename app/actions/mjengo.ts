@@ -212,7 +212,7 @@ export async function listEntities(kind: Kind): Promise<EntityRow[]> {
 }
 
 export async function saveEntity(kind: Kind, id: string | null, values: Record<string, unknown>) {
-  const actor = await requireModule(MODULE_OF[kind]);
+  const actor = await requireModule(MODULE_OF[kind], 'write');
   const db = looseAdmin();
   const data = clean(kind, values);
   if (id) {
@@ -247,7 +247,7 @@ export async function saveEntity(kind: Kind, id: string | null, values: Record<s
 }
 
 export async function deleteEntity(kind: Kind, id: string) {
-  const actor = await requireModule(MODULE_OF[kind]);
+  const actor = await requireModule(MODULE_OF[kind], 'owner');
   const db = looseAdmin();
   const { data: row } = await db.from(TABLE[kind]).select('*').eq('id', id).maybeSingle();
   if (!row) return { success: true };
@@ -682,7 +682,7 @@ export async function getEntityAccess(kind: Kind, id: string): Promise<EntityAcc
 
 /** Who may see it (the whole team or only people added) and which details stay hidden from the others. */
 export async function setEntityControls(kind: Kind, id: string, controls: { visibility?: 'team' | 'restricted'; hidden?: string[] }) {
-  const actor = await requireModule(MODULE_OF[kind]);
+  const actor = await requireModule(MODULE_OF[kind], 'write');
   const { row, canManage } = await ownerCheck(kind, id, actor);
   if (!canManage) throw new Error('Only the person who added it can change who sees it.');
   const update: Record<string, unknown> = {};
@@ -699,7 +699,7 @@ export async function setEntityControls(kind: Kind, id: string, controls: { visi
 }
 
 export async function setEntityAccess(kind: Kind, id: string, userId: string, level: 'view' | 'edit' | null, notify = true) {
-  const actor = await requireModule(MODULE_OF[kind]);
+  const actor = await requireModule(MODULE_OF[kind], 'write');
   const { row, canManage } = await ownerCheck(kind, id, actor);
   if (!canManage) throw new Error('Only the person who added it can change who sees it.');
   const db = looseAdmin();
@@ -737,7 +737,7 @@ export async function listAssignments(fellowshipId: string): Promise<AssignmentR
 }
 
 export async function saveAssignment(fellowshipId: string, id: string | null, v: { title?: string; dueDate?: string | null; status?: AssignmentRow['status']; notes?: string | null }): Promise<AssignmentRow> {
-  const actor = await requireModule('fellowships');
+  const actor = await requireModule('fellowships', 'write');
   const db = looseAdmin();
   const row: Record<string, unknown> = {};
   if (v.title !== undefined) {
@@ -766,7 +766,7 @@ export async function saveAssignment(fellowshipId: string, id: string | null, v:
 }
 
 export async function deleteAssignment(fellowshipId: string, id: string) {
-  const actor = await requireModule('fellowships');
+  const actor = await requireModule('fellowships', 'owner');
   await looseAdmin().from('mjengo_fellowship_assignments').delete().eq('id', id).eq('fellowship_id', fellowshipId);
   await audit(actor, 'assignment.deleted', 'fellowship', fellowshipId, id);
 }

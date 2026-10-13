@@ -51,7 +51,7 @@ async function filesHub_(): Promise<FilesHub> {
 }
 
 async function renameDriveFolder_(id: string, name: string) {
-  const a = await requireModule('files');
+  const a = await requireModule('files', 'write');
   const n = name.trim().slice(0, 120);
   if (!n) throw new Error('Give the folder a name.');
   const token = await driveToken(a.id);
@@ -62,14 +62,14 @@ async function renameDriveFolder_(id: string, name: string) {
 }
 
 async function disconnectDrive_() {
-  const a = await requireModule('files');
+  const a = await requireModule('files', 'owner');
   await dropDriveConnection(a.id);
   await logAudit({ actorId: a.id, actorEmail: a.email, action: 'drive.disconnected', targetType: 'drive' });
 }
 
 /** Copy a vault folder (and its files) to Google Drive as a folder of the same name. */
 async function shareFolderToDrive_(folderId: string): Promise<{ link: string | null; copied: number; skipped: number }> {
-  const a = await requireModule('files');
+  const a = await requireModule('files', 'write');
   const token = await driveToken(a.id);
   if (!token) throw new Error('Connect Google Drive first.');
   const [ix, oversight] = await Promise.all([loadIndex(), oversightFor(a.email)]);

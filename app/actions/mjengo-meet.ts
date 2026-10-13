@@ -20,7 +20,7 @@ function newCode(): string {
 
 /** Start a call. The returned code is the shareable link: /meet/<code>. */
 async function createMeeting_(mode: 'video' | 'voice', title: string | null): Promise<{ code: string }> {
-  const a = await requireModule('meet');
+  const a = await requireModule('meet', 'write');
   const db = looseAdmin();
   for (let i = 0; i < 5; i++) {
     const code = newCode();
@@ -44,7 +44,7 @@ async function listMeetings_(): Promise<MeetingRow[]> {
 
 /** A finished recording, kept in Files, belongs to its meeting. */
 async function attachRecording_(code: string, fileId: string): Promise<void> {
-  const a = await requireModule('meet');
+  const a = await requireModule('meet', 'write');
   const { error } = await looseAdmin().from('mjengo_meetings').update({ recording_file_id: fileId, recorded_at: new Date().toISOString(), recorded_by: a.id }).eq('code', code);
   if (error) throw new Error('Could not attach the recording to the meeting.');
   await logAudit({ actorId: a.id, actorEmail: a.email, action: 'meeting.recorded', targetType: 'meeting', targetLabel: code });
@@ -52,7 +52,7 @@ async function attachRecording_(code: string, fileId: string): Promise<void> {
 
 /** Keep what was said. Several people may save: lines are merged by id. */
 async function saveTranscript_(code: string, lines: TranscriptLine[], end: boolean) {
-  const actor = await requireModule('meet');
+  const actor = await requireModule('meet', 'write');
   const db = looseAdmin();
   const { data } = await db.from('mjengo_meetings').select('id, transcript, participants').eq('code', code).maybeSingle();
   if (!data) throw new Error('That call does not exist.');
@@ -82,7 +82,7 @@ async function meetingDetail_(code: string): Promise<MeetingDetail> {
 
 /** Write (or rewrite) the notes now, and tell everyone who took part. */
 async function makeNotes_(code: string): Promise<string> {
-  const a = await requireModule('meet');
+  const a = await requireModule('meet', 'write');
   const { notesFor } = await import('@/lib/mjengo/meeting-jobs');
   const { sendNotification } = await import('@/lib/notifications');
   const db = looseAdmin();
@@ -129,7 +129,7 @@ async function getPlan_(code: string): Promise<MeetingPlan> {
 
 /** Description, invited people and resources for a meeting. People and links are cleaned before they are kept. */
 async function savePlan_(code: string, plan: { title?: string | null; description: string; invitees: string[]; resources: MeetingResource[] }): Promise<MeetingPlan> {
-  const a = await requireModule('meet');
+  const a = await requireModule('meet', 'write');
   const invitees = [...new Set(plan.invitees.map((x) => x.trim().toLowerCase()).filter((x) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(x)))].slice(0, 50);
   const resources = plan.resources
     .map((r) => ({ label: String(r.label ?? '').trim().slice(0, 120), url: String(r.url ?? '').trim().slice(0, 1000) }))

@@ -64,7 +64,7 @@ export async function getForm(id: string): Promise<FormRow | null> {
 }
 
 export async function createForm(title?: string): Promise<string> {
-  const actor = await requireModule('forms');
+  const actor = await requireModule('forms', 'write');
   const db = looseAdmin();
   for (let i = 0; i < 5; i++) {
     const { data, error } = await db
@@ -82,7 +82,7 @@ export async function createForm(title?: string): Promise<string> {
 }
 
 export async function saveForm(id: string, patch: { title?: string; description?: string | null; questions?: Question[]; settings?: FormSettings }) {
-  const actor = await requireModule('forms');
+  const actor = await requireModule('forms', 'write');
   const update: Record<string, unknown> = {};
   if (patch.title !== undefined) update.title = patch.title.trim().slice(0, 120) || 'Untitled form';
   if (patch.description !== undefined) update.description = patch.description ? patch.description.slice(0, 2000) : null;
@@ -115,7 +115,7 @@ export async function saveForm(id: string, patch: { title?: string; description?
 }
 
 export async function setFormStatus(id: string, status: 'draft' | 'open' | 'closed') {
-  const actor = await requireModule('forms');
+  const actor = await requireModule('forms', 'write');
   const db = looseAdmin();
   if (status === 'open') {
     const { data } = await db.from('mjengo_forms').select('questions').eq('id', id).maybeSingle();
@@ -130,7 +130,7 @@ export async function setFormStatus(id: string, status: 'draft' | 'open' | 'clos
 }
 
 export async function deleteForm(id: string) {
-  const actor = await requireModule('forms');
+  const actor = await requireModule('forms', 'owner');
   const db = looseAdmin();
   const { data } = await db.from('mjengo_forms').select('title').eq('id', id).maybeSingle();
   await db.from('mjengo_forms').delete().eq('id', id);
@@ -151,7 +151,7 @@ export async function getResponses(formId: string): Promise<ResponseRow[]> {
 }
 
 export async function deleteResponse(formId: string, responseId: string) {
-  const actor = await requireModule('forms');
+  const actor = await requireModule('forms', 'owner');
   await looseAdmin().from('mjengo_form_responses').delete().eq('id', responseId).eq('form_id', formId);
   await logAudit({ actorId: actor.id, actorEmail: actor.email, action: 'mjengo.form.response_deleted', targetType: 'form', targetId: formId });
 }
@@ -227,7 +227,7 @@ async function insertForm(actor: { id: string; email: string }, title: string, d
 
 /** A new form from a template, as it is or in the colours of a design system. */
 async function fromTemplate_(templateId: string, opts: FormStartOptions = {}): Promise<string> {
-  const actor = await requireModule('forms');
+  const actor = await requireModule('forms', 'write');
   const t = templateById(templateId);
   if (!t) throw new Error('That template does not exist.');
   const design = await designFor(opts);
@@ -236,7 +236,7 @@ async function fromTemplate_(templateId: string, opts: FormStartOptions = {}): P
 }
 
 async function generate_(prompt: string, opts: FormStartOptions = {}): Promise<string> {
-  const actor = await requireModule('forms');
+  const actor = await requireModule('forms', 'write');
   const key = process.env.OPENROUTER_API_KEY;
   if (!key) throw new Error('AI is not set up on this site yet.');
   const about = prompt.trim().slice(0, 1500);
@@ -301,7 +301,7 @@ async function generate_(prompt: string, opts: FormStartOptions = {}): Promise<s
 
 /** Link a poster from Studio to a form: it is copied where the public can see it and shown at the top. */
 async function poster_(formId: string, assetId: string | null): Promise<{ url: string | null }> {
-  await requireModule('forms');
+  await requireModule('forms', 'write');
   const db = looseAdmin();
   const { data: f } = await db.from('mjengo_forms').select('settings').eq('id', formId).maybeSingle();
   if (!f) throw new Error('That form no longer exists.');

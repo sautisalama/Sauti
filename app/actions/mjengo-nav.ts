@@ -9,7 +9,7 @@ export async function mjengoNav(): Promise<{ isAdmin: boolean; isSuper: boolean;
   const actor = await getActor();
   if (!actor?.isAdmin) return { isAdmin: false, isSuper: false, allowed: null };
   const perms = await permissionsFor(actor.id, actor.email);
-  return { isAdmin: true, isSuper: await isSuperAdminEmail(actor.email), allowed: perms === 'all' ? null : [...perms] };
+  return { isAdmin: true, isSuper: await isSuperAdminEmail(actor.email), allowed: perms === 'all' ? null : [...perms.keys()] };
 }
 
 export interface SuiteCounts {

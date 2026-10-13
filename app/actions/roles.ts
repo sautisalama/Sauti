@@ -4,7 +4,7 @@ import { looseAdmin } from '@/lib/loose-db';
 import { guard } from '@/lib/action-result';
 import { logAudit } from '@/lib/access/audit';
 import { requireSuperAdmin } from '@/lib/access/super-admin';
-import { MODULE_KEYS, MODULES, moduleLabel } from '@/lib/access/permissions';
+import { MODULES, moduleLabel, parsePermission } from '@/lib/access/permissions';
 import { sendNoticeEmail } from '@/lib/mjengo/invite-email';
 
 export interface RoleView {
@@ -36,7 +36,7 @@ async function save_(id: string | null, v: { name: string; description?: string 
   const a = await requireSuperAdmin();
   const name = v.name.trim().slice(0, 60);
   if (!name) throw new Error('Name the role.');
-  const permissions = [...new Set(v.permissions.filter((p) => MODULE_KEYS.includes(p as never)))];
+  const permissions = [...new Set(v.permissions.map((p) => parsePermission(p)).filter((p): p is NonNullable<ReturnType<typeof parsePermission>> => !!p).map((p) => `${p.key}:${p.level}`))];
   const db = looseAdmin();
   const row = { name, description: v.description?.trim().slice(0, 300) || null, permissions };
   const { error } = id ? await db.from('mjengo_roles').update(row).eq('id', id) : await db.from('mjengo_roles').insert({ ...row, created_by: a.id });
@@ -67,7 +67,7 @@ async function assign_(roleId: string, userId: string, on: boolean, notify: bool
   else await db.from('mjengo_role_members').delete().eq('role_id', roleId).eq('user_id', userId);
   await logAudit({ actorId: a.id, actorEmail: a.email, action: on ? 'role.assigned' : 'role.removed', targetType: 'role', targetLabel: role.name, details: { user: person.email } });
   if (notify && person.email) {
-    const perms = (role.permissions as string[]).map(moduleLabel);
+    const perms = (role.permissions as string[]).map((p) => { const x = parsePermission(p); return x ? `${moduleLabel(x.key)} (${x.level})` : p; });
     await sendNoticeEmail({
       to: [person.email],
       by: a.name,
