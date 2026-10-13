@@ -8,7 +8,7 @@ import { MjengoLoader } from "../../_components/MjengoLoader";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { ActiveSelection, cache, Canvas, Circle, FabricImage, Gradient, Group, Line, Path, PencilBrush, Rect, Shadow, Textbox, Triangle, filters, type FabricObject } from "fabric";
-import { AlignCenter, AlignJustify, AlignHorizontalJustifyCenter, AlignLeft, AlignRight, ArrowLeft, ArrowUpDown, Bold, ChevronDown, ChevronUp, Eraser, Eye, EyeOff, GripVertical, Group as GroupIcon, MoveVertical, Scissors, SlidersHorizontal, Ungroup, Wand2, Copy, Download, Image as ImageIcon, Italic, Gift, Layers, LayoutTemplate, Loader2, Redo2, Save, Shapes, Sparkles, Trash2, Type, Undo2, Upload } from "lucide-react";
+import { AlignCenter, AlignJustify, AlignHorizontalJustifyCenter, AlignLeft, AlignRight, ArrowLeft, ArrowUpDown, Bold, ChevronDown, ChevronUp, Eraser, Eye, EyeOff, GripVertical, Group as GroupIcon, MoveVertical, Scissors, SlidersHorizontal, Ungroup, Wand2, Copy, Lock, Unlock, Download, Image as ImageIcon, Italic, Gift, Layers, LayoutTemplate, Loader2, Redo2, Save, Shapes, Sparkles, Trash2, Type, Undo2, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Input } from "@/components/ui/input";
@@ -231,7 +231,12 @@ function DesignEditor() {
 		const c = new Canvas(el.current, { width: size.w * 0.5, height: size.h * 0.5, backgroundColor: "#FFFFFF", preserveObjectStacking: true });
 		canvas.current = c;
 		(window as unknown as { __designCanvas?: Canvas }).__designCanvas = c;
-		const onSel = () => setSelected(c.getActiveObject() ?? null);
+		const onSel = () => {
+			const a = c.getActiveObject();
+			// A multi-selection is made on the spot, so it gets the same frame and round handles as a single object.
+			if (a) styleSelection(a);
+			setSelected(a ?? null);
+		};
 		c.on("selection:created", onSel);
 		c.on("selection:updated", onSel);
 		c.on("selection:cleared", () => setSelected(null));
@@ -1413,9 +1418,10 @@ function DesignEditor() {
 						const y = Math.max(64, cr.top - hr.top + Math.min(ac.tl.y, ac.br.y) * z - 44);
 						const locked = !!o.lockMovementX;
 						return (
-							<div className="absolute z-20 flex -translate-x-1/2 items-center gap-0.5 rounded-xl border border-black/10 bg-white p-0.5 shadow-lg" style={{ left: x, top: y }}>
-								<button aria-label={locked ? "Unlock" : "Lock"} title={locked ? "Unlock" : "Lock"} className={cn("flex h-8 w-8 items-center justify-center rounded-lg text-xs font-semibold hover:bg-serene-neutral-100", locked && "bg-[#7D2AE8]/10 text-[#7D2AE8]")} onClick={() => { o.set({ lockMovementX: !locked, lockMovementY: !locked, lockRotation: !locked, lockScalingX: !locked, lockScalingY: !locked, hasControls: locked }); canvas.current?.requestRenderAll(); bump((n) => n + 1); }}>{locked ? "Unlock" : "Lock"}</button>
-								<button aria-label="Duplicate" title="Duplicate" className="flex h-8 items-center justify-center rounded-lg px-2 text-xs font-semibold hover:bg-serene-neutral-100" onClick={async () => { const c = canvas.current; if (!c) return; const copy = await o.clone(); copy.set({ left: (o.left ?? 0) + 24, top: (o.top ?? 0) + 24 }); c.add(copy); c.setActiveObject(copy); c.requestRenderAll(); }}>Duplicate</button>
+							<div className="absolute z-20 flex -translate-x-1/2 items-center gap-1 rounded-xl border border-black/10 bg-white p-1 shadow-lg" style={{ left: x, top: y }}>
+								<button aria-label={locked ? "Unlock" : "Lock"} title={locked ? "Unlock" : "Lock"} className={cn("flex h-8 w-8 items-center justify-center rounded-lg hover:bg-serene-neutral-100", locked && "bg-[#7D2AE8]/10 text-[#7D2AE8]")} onClick={() => { o.set({ lockMovementX: !locked, lockMovementY: !locked, lockRotation: !locked, lockScalingX: !locked, lockScalingY: !locked, hasControls: locked }); canvas.current?.requestRenderAll(); bump((n) => n + 1); }}>{locked ? <Unlock className="h-4 w-4" /> : <Lock className="h-4 w-4" />}</button>
+								<button aria-label="Duplicate" title="Duplicate" className="flex h-8 w-8 items-center justify-center rounded-lg hover:bg-serene-neutral-100" onClick={async () => { const c = canvas.current; if (!c) return; const copy = await o.clone(); copy.set({ left: (o.left ?? 0) + 24, top: (o.top ?? 0) + 24 }); c.add(copy); c.setActiveObject(copy); c.requestRenderAll(); }}><Copy className="h-4 w-4" /></button>
+								{(o.type === "activeselection" || o.type === "group") && <button onClick={groupSel} aria-label={o.type === "group" ? "Ungroup" : "Group"} title={o.type === "group" ? "Ungroup" : "Group"} className="flex h-8 w-8 items-center justify-center rounded-lg hover:bg-serene-neutral-100">{o.type === "group" ? <Ungroup className="h-4 w-4" /> : <GroupIcon className="h-4 w-4" />}</button>}
 								<button aria-label="Delete" title="Delete" className="flex h-8 w-8 items-center justify-center rounded-lg text-red-600 hover:bg-red-50" onClick={() => { const c = canvas.current; if (c) { c.remove(o); c.discardActiveObject(); c.requestRenderAll(); } }}><Trash2 className="h-4 w-4" /></button>
 							</div>
 						);
