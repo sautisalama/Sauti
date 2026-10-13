@@ -48,7 +48,9 @@ async function extract_(raw: string): Promise<FundDetails> {
   const title = str(j.title, 160); if (title) out.title = title;
   const org = str(j.organisation, 120); if (org) out.organisation = org;
   const desc = str(j.description, 600); if (desc) out.description = desc;
-  const amt = Number(j.amount); if (Number.isFinite(amt) && amt > 0) out.amount = Math.round(amt);
+  // An amount is only kept when its digits are really in the page, so a guess never becomes a figure.
+  const amt = Math.round(Number(j.amount));
+  if (Number.isFinite(amt) && amt > 0 && body.replace(/[,\s.]/g, '').includes(String(amt))) out.amount = amt;
   if (typeof j.currency === 'string' && ['USD', 'KES', 'EUR', 'GBP'].includes(j.currency)) out.currency = j.currency as FundDetails['currency'];
   if (typeof j.deadline === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(j.deadline)) out.deadline = j.deadline;
   const sectors = list(j.sectors, 6); if (sectors.length) out.sectors = sectors;
