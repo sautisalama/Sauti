@@ -35,6 +35,33 @@ async function table_(prompt: string, context: string): Promise<{ rows: (string 
   return { rows, note: j.note ?? 'Done.' };
 }
 
+export interface FormulaHelp { formula: string; explanation: string; insight: string; alternatives: string[] }
+
+/**
+ * A formula for what the person wants, written against the data that is actually on the sheet, with a short
+ * note about what that data looks like (blanks, text where numbers are expected, outliers).
+ */
+async function formula_(request: string, data: string, cell: string): Promise<FormulaHelp> {
+  await requireModule('assistant');
+  const ask = request.trim().slice(0, 600);
+  if (ask.length < 3) throw new Error('Say what you want to work out.');
+  const raw = await askAi(
+    'You help people write spreadsheet formulas (Excel and Google Sheets syntax). Reply with one JSON object {"formula": string starting with "=", "explanation": string (one or two plain sentences, no jargon), "insight": string (one or two sentences about the data given: blanks, text where numbers should be, odd values, totals worth knowing; say "No issues seen." if none), "alternatives": string[] (up to 2 other formulas)}. Use only cell references that exist in the data shown. Do not invent data.',
+    `The formula goes in cell ${cell || 'the active cell'}.\n\nData on the sheet (cell addresses then values, tab separated):\n${data.slice(0, 6000) || '(empty)'}\n\nWhat they want: ${ask}`,
+    700,
+    { json: true, temperature: 0.2 }
+  );
+  const j = parse<{ formula?: string; explanation?: string; insight?: string; alternatives?: unknown }>(raw);
+  const formula = String(j.formula ?? '').trim();
+  if (!formula.startsWith('=')) throw new Error('No formula came back. Try describing it differently.');
+  return {
+    formula: formula.slice(0, 500),
+    explanation: String(j.explanation ?? '').slice(0, 400),
+    insight: String(j.insight ?? '').slice(0, 500),
+    alternatives: (Array.isArray(j.alternatives) ? j.alternatives : []).map(String).filter((f) => f.startsWith('=')).slice(0, 2),
+  };
+}
+
 /* ------------------------------------------------------------ Presentations */
 
 export type DeckTheme = 'teal' | 'purple' | 'sunrise' | 'night';
@@ -135,4 +162,5 @@ async function pinImage_(url: string): Promise<string> {
 export const pinterestSearch = guard(pins_);
 export const pinterestImage = guard(pinImage_);
 export const aiTable = guard(table_);
+export const aiFormula = guard(formula_);
 export const makeDeck = guard(deck_);
