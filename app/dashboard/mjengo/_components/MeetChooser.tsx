@@ -1,6 +1,7 @@
 "use client";
 
 import { RecipientField } from "../mail/_components/RecipientField";
+import { ReminderList } from "@/components/mjengo/ReminderList";
 import { useEffect, useState } from "react";
 import { format } from "date-fns";
 import { BellRing, CalendarPlus, Check, ChevronDown, Clock, Copy, FileText, Link2, Loader2, Paperclip, Plus, Trash2, UserPlus, Video, X } from "lucide-react";
@@ -40,8 +41,7 @@ export function MeetChooser({ open, onClose, initial }: { open: boolean; onClose
 	const [from, setFrom] = useState("09:00");
 	const [to, setTo] = useState("09:30");
 	const [guests, setGuests] = useState("");
-	const [alerts, setAlerts] = useState(2);
-	const [every, setEvery] = useState(10);
+	const [reminders, setReminders] = useState<number[]>([10, 1440]);
 	const [link, setLink] = useState("");
 	const [copied, setCopied] = useState(false);
 	const [code, setCode] = useState("");
@@ -111,8 +111,7 @@ export function MeetChooser({ open, onClose, initial }: { open: boolean; onClose
 				end: end.toISOString(),
 				attendees: guests.split(/[,;\s]+/).filter(Boolean),
 				videoCall: true,
-				alerts,
-				alertEvery: every,
+				reminders,
 			}));
 			if (item.meetingCode) { setLink(urlFor(item.meetingCode)); copy(urlFor(item.meetingCode)); }
 			setStep("done");
@@ -156,7 +155,7 @@ export function MeetChooser({ open, onClose, initial }: { open: boolean; onClose
 				start: start.toISOString(), end: end.toISOString(),
 				attendees: guests.split(/[,;\s]+/).filter(Boolean),
 				description: [description.trim(), extra].filter(Boolean).join("\n\n") || null,
-				meetingCode: code, alerts, alertEvery: every,
+				meetingCode: code, reminders,
 			}));
 			setOnCalendar(true);
 			setSaved(true);
@@ -272,11 +271,7 @@ export function MeetChooser({ open, onClose, initial }: { open: boolean; onClose
 													<span className="text-sm text-serene-neutral-500">to</span>
 													<Input type="time" value={to} onChange={(e) => setTo(e.target.value)} className="h-10 w-28" aria-label="Ends" />
 												</div>
-												<div className="flex flex-wrap items-center gap-2 text-sm">
-													<BellRing className="h-4 w-4 text-serene-neutral-500" />
-													<select value={alerts} onChange={(e) => setAlerts(Number(e.target.value))} aria-label="Number of alerts" className="h-9 rounded-md border border-serene-neutral-200 bg-white px-2">{[0, 1, 2, 3, 4, 5, 8, 10].map((n) => <option key={n} value={n}>{n === 0 ? "No alerts" : `${n} alert${n === 1 ? "" : "s"}`}</option>)}</select>
-													{alerts > 0 && <select value={every} onChange={(e) => setEvery(Number(e.target.value))} aria-label="Time between alerts" className="h-9 rounded-md border border-serene-neutral-200 bg-white px-2">{EVERY.map((m) => <option key={m} value={m}>every {everyLabel(m)}</option>)}</select>}
-												</div>
+												<div className="flex items-start gap-2"><BellRing className="mt-2 h-4 w-4 shrink-0 text-serene-neutral-500" /><ReminderList value={reminders} onChange={setReminders} emptyHint="No reminders" /></div>
 												<p className="text-xs text-serene-neutral-500">Participants, the description and the resources go on the event too.</p>
 												<Button className="gap-2 bg-sauti-teal hover:bg-sauti-dark" onClick={addToCalendar} disabled={busy || onCalendar}>{busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <CalendarPlus className="h-4 w-4" />} {onCalendar ? "Added" : "Add to calendar"}</Button>
 											</>
@@ -305,22 +300,9 @@ export function MeetChooser({ open, onClose, initial }: { open: boolean; onClose
 						</div>
 						<div className="min-h-10 rounded-md border border-serene-neutral-200 bg-white px-2"><RecipientField value={guests} onChange={setGuests} placeholder="Add guests by name or email" /></div>
 						<div className="rounded-2xl border border-black/10 p-3">
-							<p className="mb-2 flex items-center gap-2 text-sm font-semibold"><BellRing className="h-4 w-4 text-sauti-teal" /> Alerts before it starts</p>
-							<div className="flex flex-wrap items-center gap-2 text-sm">
-								<label className="flex items-center gap-2">How many
-									<select value={alerts} onChange={(e) => setAlerts(Number(e.target.value))} className="h-9 rounded-md border border-serene-neutral-200 bg-white px-2">
-										{[0, 1, 2, 3, 4, 5, 8, 10].map((n) => <option key={n} value={n}>{n === 0 ? "None" : n}</option>)}
-									</select>
-								</label>
-								<label className={cn("flex items-center gap-2", alerts === 0 && "opacity-40")}>How often
-									<select value={every} disabled={alerts === 0} onChange={(e) => setEvery(Number(e.target.value))} className="h-9 rounded-md border border-serene-neutral-200 bg-white px-2">
-										{EVERY.map((m) => <option key={m} value={m}>Every {everyLabel(m)}</option>)}
-									</select>
-								</label>
-							</div>
-							<p className="mt-2 text-xs text-serene-neutral-500">
-								{alerts === 0 ? "No reminders will be sent." : `You and your guests get ${alerts} alert${alerts === 1 ? "" : "s"}, ${every >= 1440 ? "a day" : everyLabel(every)} apart. The last one comes ${everyLabel(every)} before the start.`}
-							</p>
+							<p className="mb-2 flex items-center gap-2 text-sm font-semibold"><BellRing className="h-4 w-4 text-sauti-teal" /> Reminders</p>
+							<ReminderList value={reminders} onChange={setReminders} emptyHint="No reminders will be sent." />
+							<p className="mt-2 text-xs text-serene-neutral-500">You and your guests on the team are reminded at each of these times.</p>
 						</div>
 						<div className="flex justify-end gap-2">
 							<Button variant="ghost" onClick={() => setStep("choose")}>Back</Button>

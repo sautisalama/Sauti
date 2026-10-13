@@ -1,13 +1,15 @@
 'use server';
 
 import { getActor, isSuperAdminEmail } from '@/lib/access/super-admin';
+import { permissionsFor } from '@/lib/access/permissions';
 import { looseAdmin } from '@/lib/loose-db';
 
 /** Which Mjengo sections the signed-in person sees in the side navigation. */
-export async function mjengoNav(): Promise<{ isAdmin: boolean; isSuper: boolean }> {
+export async function mjengoNav(): Promise<{ isAdmin: boolean; isSuper: boolean; /** Module keys this person may use, or null for everything. */ allowed: string[] | null }> {
   const actor = await getActor();
-  if (!actor?.isAdmin) return { isAdmin: false, isSuper: false };
-  return { isAdmin: true, isSuper: await isSuperAdminEmail(actor.email) };
+  if (!actor?.isAdmin) return { isAdmin: false, isSuper: false, allowed: null };
+  const perms = await permissionsFor(actor.id, actor.email);
+  return { isAdmin: true, isSuper: await isSuperAdminEmail(actor.email), allowed: perms === 'all' ? null : [...perms] };
 }
 
 export interface SuiteCounts {

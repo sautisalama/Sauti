@@ -4,6 +4,7 @@ import { looseAdmin } from '@/lib/loose-db';
 import { guard } from '@/lib/action-result';
 import { logAudit } from '@/lib/access/audit';
 import { requireAdminActor } from '@/lib/access/super-admin';
+import { requireModule } from '@/lib/access/permissions';
 import { atLeast, descendants, levelFor, loadIndex, oversightFor } from '@/lib/vault/access';
 import {
   createFolder as driveCreateFolder, driveConnection, driveToken, dropDriveConnection, ensureRootFolder, listFolders, renameFolder, uploadFile,
@@ -20,7 +21,7 @@ export interface FilesHub {
 
 /** The top of the Files page: your five most recent files and your Google Drive folders. */
 async function filesHub_(): Promise<FilesHub> {
-  const a = await requireAdminActor();
+  const a = await requireModule('files');
   const [ix, oversight] = await Promise.all([loadIndex(), oversightFor(a.email)]);
   const recent = [...ix.files.values()]
     .filter((f) => atLeast(levelFor(ix, a.id, 'file', f.id, oversight), 'view'))
@@ -50,7 +51,7 @@ async function filesHub_(): Promise<FilesHub> {
 }
 
 async function renameDriveFolder_(id: string, name: string) {
-  const a = await requireAdminActor();
+  const a = await requireModule('files');
   const n = name.trim().slice(0, 120);
   if (!n) throw new Error('Give the folder a name.');
   const token = await driveToken(a.id);
@@ -61,14 +62,14 @@ async function renameDriveFolder_(id: string, name: string) {
 }
 
 async function disconnectDrive_() {
-  const a = await requireAdminActor();
+  const a = await requireModule('files');
   await dropDriveConnection(a.id);
   await logAudit({ actorId: a.id, actorEmail: a.email, action: 'drive.disconnected', targetType: 'drive' });
 }
 
 /** Copy a vault folder (and its files) to Google Drive as a folder of the same name. */
 async function shareFolderToDrive_(folderId: string): Promise<{ link: string | null; copied: number; skipped: number }> {
-  const a = await requireAdminActor();
+  const a = await requireModule('files');
   const token = await driveToken(a.id);
   if (!token) throw new Error('Connect Google Drive first.');
   const [ix, oversight] = await Promise.all([loadIndex(), oversightFor(a.email)]);

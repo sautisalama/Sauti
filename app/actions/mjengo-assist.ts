@@ -3,6 +3,7 @@
 import PptxGenJS from 'pptxgenjs';
 import { guard } from '@/lib/action-result';
 import { requireAdminActor } from '@/lib/access/super-admin';
+import { requireModule } from '@/lib/access/permissions';
 import { askAi } from '@/lib/mjengo/ai';
 
 const parse = <T,>(raw: string): T => {
@@ -19,7 +20,7 @@ const parse = <T,>(raw: string): T => {
 
 /** A block of cells for a spreadsheet, from a plain request. Values only (text, numbers or formulas starting with =). */
 async function table_(prompt: string, context: string): Promise<{ rows: (string | number)[][]; note: string }> {
-  await requireAdminActor();
+  await requireModule('assistant');
   const ask = prompt.trim().slice(0, 1200);
   if (ask.length < 4) throw new Error('Say what you want in the sheet.');
   const raw = await askAi(
@@ -48,7 +49,7 @@ interface Slide { title: string; bullets: string[]; notes?: string }
 
 /** A finished .pptx from a topic: a title slide, content slides, and a closing slide. Returned as base64. */
 async function deck_(prompt: string, theme: DeckTheme, slides: number): Promise<{ name: string; base64: string; outline: { title: string; bullets: string[] }[] }> {
-  await requireAdminActor();
+  await requireModule('assistant');
   const topic = prompt.trim().slice(0, 1500);
   if (topic.length < 6) throw new Error('Say what the presentation is about.');
   const n = Math.min(14, Math.max(4, Math.round(slides) || 8));
@@ -102,7 +103,7 @@ export interface Pin { id: string; title: string; image: string; link: string | 
 
 /** Design inspiration from Pinterest. Needs PINTEREST_ACCESS_TOKEN (a Pinterest app with the pins:read scope). */
 async function pins_(query: string): Promise<Pin[]> {
-  await requireAdminActor();
+  await requireModule('assistant');
   const token = process.env.PINTEREST_ACCESS_TOKEN;
   if (!token) throw new Error('Pinterest is not connected on this site yet. Add a Pinterest access token to switch on suggestions.');
   const term = query.trim().slice(0, 100) || 'social media poster design';
@@ -121,7 +122,7 @@ async function pins_(query: string): Promise<Pin[]> {
 
 /** A pin picture as a data address, so it can be placed on the canvas and edited without cross-site limits. */
 async function pinImage_(url: string): Promise<string> {
-  await requireAdminActor();
+  await requireModule('assistant');
   const u = new URL(url);
   if (!/(^|\.)pinimg\.com$/.test(u.hostname)) throw new Error('That is not a Pinterest picture.');
   const res = await fetch(u, { signal: AbortSignal.timeout(20_000) });

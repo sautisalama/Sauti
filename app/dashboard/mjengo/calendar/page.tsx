@@ -1,6 +1,7 @@
 "use client";
 
 import { RecipientField } from "../mail/_components/RecipientField";
+import { ReminderList } from "@/components/mjengo/ReminderList";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import Link from "next/link";
@@ -295,13 +296,12 @@ function CreateDialog({ slot, onClose, onCreated }: { slot: { date: Date; from?:
 	const [guests, setGuests] = useState("");
 	const [place, setPlace] = useState("");
 	const [notes, setNotes] = useState("");
-	const [alerts, setAlerts] = useState(1);
-	const [every, setEvery] = useState(15);
+	const [reminders, setReminders] = useState<number[]>([10]);
 	const [busy, setBusy] = useState(false);
 
 	useEffect(() => {
 		if (!day) return;
-		setTitle(""); setDate(format(day, "yyyy-MM-dd")); setFrom(slot?.from ?? "09:00"); setTo(slot?.to ?? "10:00"); setAllDay(false); setVideo(true); setBlock(false); setGuests(""); setPlace(""); setNotes(""); setAlerts(1); setEvery(15);
+		setTitle(""); setDate(format(day, "yyyy-MM-dd")); setFrom(slot?.from ?? "09:00"); setTo(slot?.to ?? "10:00"); setAllDay(false); setVideo(true); setBlock(false); setGuests(""); setPlace(""); setNotes(""); setReminders([10]);
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [slot]);
 
@@ -320,8 +320,7 @@ function CreateDialog({ slot, onClose, onCreated }: { slot: { date: Date; from?:
 				attendees: guests.split(/[,;\s]+/).filter(Boolean),
 				videoCall: video && !block,
 				block,
-				alerts: block ? 0 : alerts,
-				alertEvery: every,
+				reminders: block ? [] : reminders,
 			}));
 			toast({ title: "Event created" });
 			await onCreated();
@@ -369,16 +368,9 @@ function CreateDialog({ slot, onClose, onCreated }: { slot: { date: Date; from?:
 						</div>
 					</div>}
 					{!block && (
-						<div className="flex flex-wrap items-center gap-2 text-sm">
-							<BellRing className="h-4 w-4 text-serene-neutral-500" />
-							<select value={alerts} onChange={(e) => setAlerts(Number(e.target.value))} aria-label="Number of alerts" className="h-9 rounded-md border border-serene-neutral-200 bg-white px-2">
-								{[0, 1, 2, 3, 4, 5, 8, 10].map((n) => <option key={n} value={n}>{n === 0 ? "No alerts" : `${n} alert${n === 1 ? "" : "s"}`}</option>)}
-							</select>
-							{alerts > 0 && (
-								<select value={every} onChange={(e) => setEvery(Number(e.target.value))} aria-label="Time between alerts" className="h-9 rounded-md border border-serene-neutral-200 bg-white px-2">
-									{[5, 10, 15, 30, 60, 120, 1440].map((m) => <option key={m} value={m}>every {m === 1440 ? "day" : m >= 60 ? `${m / 60} h` : `${m} min`}</option>)}
-								</select>
-							)}
+						<div className="flex items-start gap-2">
+							<BellRing className="mt-2 h-4 w-4 shrink-0 text-serene-neutral-500" />
+							<ReminderList value={reminders} onChange={setReminders} emptyHint="No reminders" />
 						</div>
 					)}
 					<div className="flex items-center gap-2"><MapPin className="h-4 w-4 text-serene-neutral-500" /><Input value={place} onChange={(e) => setPlace(e.target.value)} placeholder="Add location" aria-label="Location" /></div>

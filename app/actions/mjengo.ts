@@ -4,11 +4,14 @@ import { revalidatePath } from 'next/cache';
 import { looseAdmin } from '@/lib/loose-db';
 import { logAudit } from '@/lib/access/audit';
 import { isSuperAdminEmail, requireAdminActor, type Actor } from '@/lib/access/super-admin';
+import { requireModule, type ModuleKey } from '@/lib/access/permissions';
+import { sendAccessEmail } from '@/lib/mjengo/invite-email';
 
-export type Kind = 'grant' | 'opportunity' | 'project';
+export type Kind = 'grant' | 'opportunity' | 'project' | 'fellowship';
 
-const TABLE: Record<Kind, string> = { grant: 'mjengo_grants', opportunity: 'mjengo_opportunities', project: 'mjengo_projects' };
-const LABEL_FIELD: Record<Kind, string> = { grant: 'title', opportunity: 'title', project: 'name' };
+const TABLE: Record<Kind, string> = { grant: 'mjengo_grants', opportunity: 'mjengo_opportunities', project: 'mjengo_projects', fellowship: 'mjengo_fellowships' };
+const LABEL_FIELD: Record<Kind, string> = { grant: 'title', opportunity: 'title', project: 'name', fellowship: 'title' };
+const MODULE_OF: Record<Kind, ModuleKey> = { grant: 'grants', opportunity: 'opportunities', project: 'projects', fellowship: 'fellowships' };
 
 type Field = { key: string; type: 'text' | 'number' | 'date' | 'enum' | 'uuid' | 'int'; options?: string[] };
 const CURRENCIES = ['USD', 'KES', 'EUR', 'GBP'];
@@ -53,7 +56,39 @@ const FIELDS: Record<Kind, Field[]> = {
     { key: 'description', type: 'text' },
     { key: 'notes', type: 'text' },
   ],
+  fellowship: [
+    { key: 'title', type: 'text' },
+    { key: 'host', type: 'text' },
+    { key: 'status', type: 'enum', options: ['applying', 'accepted', 'active', 'completed', 'declined', 'withdrawn'] },
+    { key: 'stipend', type: 'number' },
+    { key: 'currency', type: 'enum', options: CURRENCIES },
+    { key: 'start_date', type: 'date' },
+    { key: 'deadline', type: 'date' },
+    { key: 'owner_id', type: 'uuid' },
+    { key: 'link', type: 'text' },
+    { key: 'description', type: 'text' },
+    { key: 'notes', type: 'text' },
+  ],
 };
+
+/** Details the person who added something may keep from everyone else, per item. */
+export const HIDEABLE: Record<Kind, string[]> = {
+  grant: ['amount', 'funder', 'deadline', 'decision_date', 'owner_id', 'link', 'description', 'notes'],
+  opportunity: ['value', 'organisation', 'deadline', 'owner_id', 'source_url', 'description', 'notes'],
+  project: ['budget', 'spent', 'lead_id', 'grant_id', 'description', 'notes'],
+  fellowship: ['stipend', 'host', 'deadline', 'owner_id', 'link', 'description', 'notes'],
+};
+
+type Mine = 'owner' | 'edit' | 'view' | 'team';
+
+/** What this person is to one record: its owner, an editor, a viewer, or just a member of the team it is open to. */
+async function myPart(kind: Kind, row: { id: string; created_by: string | null; visibility?: string }, actor: Actor, oversight: boolean, access: Map<string, 'view' | 'edit'>): Promise<Mine | null> {
+  if (row.created_by === actor.id) return 'owner';
+  if (oversight) return 'edit';
+  const lvl = access.get(`${kind}:${row.id}`);
+  if (lvl) return lvl;
+  return row.visibility === 'restricted' ? null : 'team';
+}
 
 /** Keep only known fields and coerce them, so a crafted request can't write anything else. */
 function clean(kind: Kind, input: Record<string, unknown>) {
@@ -149,10 +184,26 @@ async function docSummaries(kind: Kind, ids: string[]) {
 }
 
 export async function listEntities(kind: Kind): Promise<EntityRow[]> {
-  await requireAdminActor();
+  const actor = await requireModule(MODULE_OF[kind]);
   const db = looseAdmin();
-  const { data } = await db.from(TABLE[kind]).select('*').order('created_at', { ascending: false });
-  const rows = (data ?? []) as { id: string }[];
+  const [{ data }, oversight, { data: acc }] = await Promise.all([
+    db.from(TABLE[kind]).select('*').order('created_at', { ascending: false }),
+    isSuperAdminEmail(actor.email),
+    db.from('mjengo_entity_access').select('entity_type, entity_id, level').eq('user_id', actor.id).eq('entity_type', kind),
+  ]);
+  const access = new Map(((acc ?? []) as { entity_type: string; entity_id: string; level: 'view' | 'edit' }[]).map((r) => [`${r.entity_type}:${r.entity_id}`, r.level]));
+  const all = (data ?? []) as { id: string; created_by: string | null; visibility?: string; hidden_fields?: string[] }[];
+  const shaped: Record<string, unknown>[] = [];
+  for (const r of all) {
+    const mine = await myPart(kind, r, actor, oversight, access);
+    if (!mine) continue;
+    const hidden = mine === 'owner' || oversight ? [] : (r.hidden_fields ?? []);
+    const out: Record<string, unknown> = { ...r, _mine: mine };
+    for (const k of hidden) out[k] = null;
+    out._hidden = hidden;
+    shaped.push(out);
+  }
+  const rows = shaped as { id: string }[];
   const docs = await docSummaries(kind, rows.map((r) => r.id));
   const { data: todos } = await db.from('mjengo_todos').select('entity_id').eq('entity_type', kind).neq('status', 'done');
   const open = new Map<string, number>();
@@ -161,9 +212,19 @@ export async function listEntities(kind: Kind): Promise<EntityRow[]> {
 }
 
 export async function saveEntity(kind: Kind, id: string | null, values: Record<string, unknown>) {
-  const actor = await requireAdminActor();
+  const actor = await requireModule(MODULE_OF[kind]);
   const db = looseAdmin();
   const data = clean(kind, values);
+  if (id) {
+    const { data: cur } = await db.from(TABLE[kind]).select('id, created_by, visibility, hidden_fields').eq('id', id).maybeSingle();
+    if (!cur) throw new Error('That no longer exists.');
+    const oversight = await isSuperAdminEmail(actor.email);
+    const { data: acc } = await db.from('mjengo_entity_access').select('level').eq('entity_type', kind).eq('entity_id', id).eq('user_id', actor.id).maybeSingle();
+    const part = await myPart(kind, cur as never, actor, oversight, new Map(acc ? [[`${kind}:${id}`, acc.level as 'view' | 'edit']] : []));
+    if (!part || part === 'view') throw new Error('You can see this but not change it.');
+    // Details the owner keeps hidden cannot be written by anyone else.
+    if (part !== 'owner' && !oversight) for (const k of (cur.hidden_fields ?? []) as string[]) delete data[k];
+  }
   const labelKey = LABEL_FIELD[kind];
   if (!id && !data[labelKey]) throw new Error('Give it a name.');
   if (id && labelKey in values && !data[labelKey]) throw new Error('The name cannot be empty.');
@@ -186,10 +247,11 @@ export async function saveEntity(kind: Kind, id: string | null, values: Record<s
 }
 
 export async function deleteEntity(kind: Kind, id: string) {
-  const actor = await requireAdminActor();
+  const actor = await requireModule(MODULE_OF[kind]);
   const db = looseAdmin();
   const { data: row } = await db.from(TABLE[kind]).select('*').eq('id', id).maybeSingle();
   if (!row) return { success: true };
+  if (row.visibility === 'restricted' && row.created_by && row.created_by !== actor.id && !(await isSuperAdminEmail(actor.email))) throw new Error('Only the person who added it can delete it.');
 
   const { data: docs } = await db.from('mjengo_documents').select('file_path').eq('entity_type', kind).eq('entity_id', id);
   const paths = (docs ?? []).map((d: { file_path: string | null }) => d.file_path).filter(Boolean) as string[];
@@ -227,7 +289,7 @@ export interface DocRow {
 async function labelsFor(rows: { entity_type: Kind; entity_id: string }[]) {
   const db = looseAdmin();
   const out = new Map<string, string>();
-  for (const kind of ['grant', 'opportunity', 'project'] as Kind[]) {
+  for (const kind of ['grant', 'opportunity', 'project', 'fellowship'] as Kind[]) {
     const ids = Array.from(new Set(rows.filter((r) => r.entity_type === kind).map((r) => r.entity_id)));
     if (!ids.length) continue;
     const { data } = await db.from(TABLE[kind]).select(`id, ${LABEL_FIELD[kind]}`).in('id', ids);
@@ -361,7 +423,7 @@ export async function getTodoBoard(): Promise<{ me: string; isSuper: boolean; ad
 
   // Everything a task can be linked to.
   const links: { kind: Kind; id: string; label: string }[] = [];
-  for (const kind of ['grant', 'opportunity', 'project'] as Kind[]) {
+  for (const kind of ['grant', 'opportunity', 'project', 'fellowship'] as Kind[]) {
     const { data } = await db.from(TABLE[kind]).select(`id, ${LABEL_FIELD[kind]}`).order('created_at', { ascending: false }).limit(200);
     for (const e of (data ?? []) as unknown as Record<string, string>[]) links.push({ kind, id: e.id, label: e[LABEL_FIELD[kind]] });
   }
@@ -560,4 +622,132 @@ export async function getOverview(): Promise<Overview> {
     openTodos: T.filter((t) => t.status !== 'done').length,
     myTodos: T.filter((t) => t.status !== 'done' && t.assignee_ids?.includes(actor.id)).length,
   };
+}
+
+
+/* ------------------------------------------------------- Who sees a record */
+
+export interface EntityAccess {
+  visibility: 'team' | 'restricted';
+  hidden: string[];
+  hideable: string[];
+  owner: { id: string; name: string } | null;
+  people: { id: string; name: string; email: string; avatar: string | null; level: 'view' | 'edit' }[];
+  canManage: boolean;
+}
+
+async function ownerCheck(kind: Kind, id: string, actor: Actor) {
+  const { data } = await looseAdmin().from(TABLE[kind]).select('id, created_by, visibility, hidden_fields').eq('id', id).maybeSingle();
+  if (!data) throw new Error('That no longer exists.');
+  const canManage = data.created_by === actor.id || (await isSuperAdminEmail(actor.email));
+  return { row: data as { id: string; created_by: string | null; visibility: 'team' | 'restricted'; hidden_fields: string[] }, canManage };
+}
+
+export async function getEntityAccess(kind: Kind, id: string): Promise<EntityAccess> {
+  const actor = await requireModule(MODULE_OF[kind]);
+  const { row, canManage } = await ownerCheck(kind, id, actor);
+  const db = looseAdmin();
+  const { data: rows } = await db.from('mjengo_entity_access').select('user_id, level').eq('entity_type', kind).eq('entity_id', id);
+  const ids = [...new Set([...(rows ?? []).map((r: { user_id: string }) => r.user_id), ...(row.created_by ? [row.created_by] : [])])];
+  const { data: profs } = ids.length ? await db.from('profiles').select('id, first_name, last_name, email, avatar_url').in('id', ids) : { data: [] };
+  const info = new Map(((profs ?? []) as { id: string; first_name: string | null; last_name: string | null; email: string | null; avatar_url: string | null }[]).map((p) => [p.id, { name: [p.first_name, p.last_name].filter(Boolean).join(' ') || p.email || 'Someone', email: p.email ?? '', avatar: p.avatar_url }]));
+  return {
+    visibility: row.visibility,
+    hidden: row.hidden_fields ?? [],
+    hideable: HIDEABLE[kind],
+    owner: row.created_by ? { id: row.created_by, name: info.get(row.created_by)?.name ?? 'Someone' } : null,
+    canManage,
+    people: ((rows ?? []) as { user_id: string; level: 'view' | 'edit' }[]).filter((r) => r.user_id !== row.created_by).map((r) => ({ id: r.user_id, level: r.level, name: info.get(r.user_id)?.name ?? 'Someone', email: info.get(r.user_id)?.email ?? '', avatar: info.get(r.user_id)?.avatar ?? null })),
+  };
+}
+
+/** Who may see it (the whole team or only people added) and which details stay hidden from the others. */
+export async function setEntityControls(kind: Kind, id: string, controls: { visibility?: 'team' | 'restricted'; hidden?: string[] }) {
+  const actor = await requireModule(MODULE_OF[kind]);
+  const { row, canManage } = await ownerCheck(kind, id, actor);
+  if (!canManage) throw new Error('Only the person who added it can change who sees it.');
+  const update: Record<string, unknown> = {};
+  if (controls.visibility) {
+    if (!['team', 'restricted'].includes(controls.visibility)) throw new Error('Unknown setting.');
+    update.visibility = controls.visibility;
+  }
+  if (controls.hidden) update.hidden_fields = controls.hidden.filter((k) => HIDEABLE[kind].includes(k));
+  if (!Object.keys(update).length) return;
+  const db = looseAdmin();
+  await db.from(TABLE[kind]).update(update).eq('id', id);
+  await audit(actor, `${kind}.access_changed`, kind, id, undefined, update);
+  void row;
+}
+
+export async function setEntityAccess(kind: Kind, id: string, userId: string, level: 'view' | 'edit' | null, notify = true) {
+  const actor = await requireModule(MODULE_OF[kind]);
+  const { row, canManage } = await ownerCheck(kind, id, actor);
+  if (!canManage) throw new Error('Only the person who added it can change who sees it.');
+  const db = looseAdmin();
+  const { data: target } = await db.from('profiles').select('email, is_admin').eq('id', userId).maybeSingle();
+  if (!target?.is_admin) throw new Error('It can only be shared with administrators.');
+  if (level) await db.from('mjengo_entity_access').upsert({ entity_type: kind, entity_id: id, user_id: userId, level, granted_by: actor.id }, { onConflict: 'entity_type,entity_id,user_id' });
+  else await db.from('mjengo_entity_access').delete().eq('entity_type', kind).eq('entity_id', id).eq('user_id', userId);
+  const { data: ent } = await db.from(TABLE[kind]).select(LABEL_FIELD[kind]).eq('id', id).maybeSingle();
+  const title = ent ? String((ent as unknown as Record<string, string>)[LABEL_FIELD[kind]]) : kind;
+  await audit(actor, level ? `${kind}.shared` : `${kind}.unshared`, kind, id, title, { with: target.email, level });
+  if (notify && level && target.email) void sendAccessEmail({ kind, to: [target.email], by: actor.name, title, url: `/dashboard/mjengo/${kind === 'opportunity' ? 'opportunities' : `${kind}s`}`, detail: level === 'edit' ? 'You can view and edit it.' : 'You can view it.' });
+  void row;
+}
+
+
+/* ------------------------------------------------- Fellowship assignments */
+
+export interface AssignmentRow {
+  id: string;
+  fellowship_id: string;
+  title: string;
+  due_date: string | null;
+  status: 'todo' | 'in_progress' | 'submitted' | 'accepted' | 'revise';
+  notes: string | null;
+  submitted_at: string | null;
+}
+
+const ASSIGNMENT_STATUS = ['todo', 'in_progress', 'submitted', 'accepted', 'revise'];
+
+/** Things that are due for a fellowship: reports, essays, forms, check-ins. Newest due date last. */
+export async function listAssignments(fellowshipId: string): Promise<AssignmentRow[]> {
+  await requireModule('fellowships');
+  const { data } = await looseAdmin().from('mjengo_fellowship_assignments').select('id, fellowship_id, title, due_date, status, notes, submitted_at').eq('fellowship_id', fellowshipId).order('due_date', { ascending: true, nullsFirst: false });
+  return (data ?? []) as AssignmentRow[];
+}
+
+export async function saveAssignment(fellowshipId: string, id: string | null, v: { title?: string; dueDate?: string | null; status?: AssignmentRow['status']; notes?: string | null }): Promise<AssignmentRow> {
+  const actor = await requireModule('fellowships');
+  const db = looseAdmin();
+  const row: Record<string, unknown> = {};
+  if (v.title !== undefined) {
+    const t = v.title.trim().slice(0, 200);
+    if (!t) throw new Error('Name the assignment.');
+    row.title = t;
+  }
+  if (v.dueDate !== undefined) {
+    if (v.dueDate && !/^\d{4}-\d{2}-\d{2}$/.test(v.dueDate)) throw new Error('That is not a date.');
+    row.due_date = v.dueDate || null;
+  }
+  if (v.status !== undefined) {
+    if (!ASSIGNMENT_STATUS.includes(v.status)) throw new Error('Unknown status.');
+    row.status = v.status;
+    row.submitted_at = v.status === 'submitted' ? new Date().toISOString() : null;
+  }
+  if (v.notes !== undefined) row.notes = v.notes?.trim().slice(0, 2000) || null;
+  const cols = 'id, fellowship_id, title, due_date, status, notes, submitted_at';
+  const q = id
+    ? db.from('mjengo_fellowship_assignments').update(row).eq('id', id).eq('fellowship_id', fellowshipId)
+    : db.from('mjengo_fellowship_assignments').insert({ ...row, fellowship_id: fellowshipId, created_by: actor.id });
+  const { data, error } = await q.select(cols).single();
+  if (error || !data) throw new Error('Could not save the assignment.');
+  await audit(actor, id ? 'assignment.updated' : 'assignment.created', 'fellowship', fellowshipId, String(data.title));
+  return data as AssignmentRow;
+}
+
+export async function deleteAssignment(fellowshipId: string, id: string) {
+  const actor = await requireModule('fellowships');
+  await looseAdmin().from('mjengo_fellowship_assignments').delete().eq('id', id).eq('fellowship_id', fellowshipId);
+  await audit(actor, 'assignment.deleted', 'fellowship', fellowshipId, id);
 }

@@ -4,6 +4,7 @@ import { looseAdmin } from '@/lib/loose-db';
 import { guard } from '@/lib/action-result';
 import { logAudit } from '@/lib/access/audit';
 import { requireAdminActor, isSuperAdminEmail } from '@/lib/access/super-admin';
+import { requireModule } from '@/lib/access/permissions';
 import { sendAccessEmail } from '@/lib/mjengo/invite-email';
 
 export interface ContactRow {
@@ -77,7 +78,7 @@ function shape(row: Record<string, unknown>, actor: { id: string }, access: Map<
 }
 
 async function listContacts_(q = ''): Promise<ContactRow[]> {
-  const actor = await requireAdminActor();
+  const actor = await requireModule('contacts');
   const db = looseAdmin();
   let query = db.from('mjengo_contacts').select(COLS).order('name').limit(1500);
   const term = q.trim().replace(/[%,()]/g, ' ');
@@ -91,7 +92,7 @@ async function listContacts_(q = ''): Promise<ContactRow[]> {
 }
 
 async function saveContact_(id: string | null, v: ContactInput): Promise<ContactRow> {
-  const actor = await requireAdminActor();
+  const actor = await requireModule('contacts');
   const row = normalise(v);
   const db = looseAdmin();
   if (id) {
@@ -115,14 +116,14 @@ async function saveContact_(id: string | null, v: ContactInput): Promise<Contact
 }
 
 async function deleteContact_(id: string) {
-  const actor = await requireAdminActor();
+  const actor = await requireModule('contacts');
   const { data } = await looseAdmin().from('mjengo_contacts').delete().eq('id', id).select('name').maybeSingle();
   if (data) await logAudit({ actorId: actor.id, actorEmail: actor.email, action: 'contact.deleted', targetType: 'contact', targetId: id, targetLabel: data.name });
 }
 
 /** Bulk add (CSV or mail): contacts whose email already exists are skipped, not overwritten. */
 async function importContacts_(rows: ContactInput[], source: 'csv' | 'google' | 'mail'): Promise<{ added: number; skipped: number }> {
-  const actor = await requireAdminActor();
+  const actor = await requireModule('contacts');
   const db = looseAdmin();
   const prepared: ReturnType<typeof normalise>[] = [];
   const seen = new Set<string>();
@@ -156,7 +157,7 @@ async function importContacts_(rows: ContactInput[], source: 'csv' | 'google' | 
 
 /** Add someone seen in a received email. Returns the existing contact if there is one. */
 async function addContactFromMail_(name: string, email: string): Promise<ContactRow> {
-  const actor = await requireAdminActor();
+  const actor = await requireModule('contacts');
   const addr = email.trim().toLowerCase();
   if (!emailOk(addr)) throw new Error('That is not a valid email address.');
   const db = looseAdmin();
@@ -174,7 +175,7 @@ async function addContactFromMail_(name: string, email: string): Promise<Contact
 
 /** For recipient pickers: teammates and contacts matching what has been typed, teammates first. */
 async function suggestContacts_(q: string): Promise<{ name: string; email: string; avatar?: string | null; kind?: 'team' | 'contact' }[]> {
-  const me = await requireAdminActor();
+  const me = await requireModule('contacts');
   const term = q.trim().replace(/[%,()]/g, ' ');
   const db = looseAdmin();
   let contactQ = db.from('mjengo_contacts').select('name, email, id, visibility, created_by').not('email', 'is', null).order('last_contacted_at', { ascending: false, nullsFirst: false }).limit(8);
@@ -219,7 +220,7 @@ async function ownerOrEditor(contactId: string, actor: { id: string; email: stri
 }
 
 async function contactAccess_(contactId: string): Promise<ContactAccess> {
-  const actor = await requireAdminActor();
+  const actor = await requireModule('contacts');
   const { row, canManage } = await ownerOrEditor(contactId, actor);
   const db = looseAdmin();
   const { data: rows } = await db.from('mjengo_contact_access').select('user_id, level').eq('contact_id', contactId);
@@ -235,7 +236,7 @@ async function contactAccess_(contactId: string): Promise<ContactAccess> {
 }
 
 async function setAccess_(contactId: string, userId: string, level: 'view' | 'edit' | null, notify = true): Promise<void> {
-  const actor = await requireAdminActor();
+  const actor = await requireModule('contacts');
   const { row, canManage } = await ownerOrEditor(contactId, actor);
   if (!canManage) throw new Error('Only the owner or an editor can change who sees this contact.');
   const db = looseAdmin();
@@ -248,7 +249,7 @@ async function setAccess_(contactId: string, userId: string, level: 'view' | 'ed
 }
 
 async function setVisibility_(contactId: string, visibility: 'team' | 'private'): Promise<void> {
-  const actor = await requireAdminActor();
+  const actor = await requireModule('contacts');
   const { row, canManage } = await ownerOrEditor(contactId, actor);
   if (!canManage) throw new Error('Only the owner or an editor can change who sees this contact.');
   if (visibility !== 'team' && visibility !== 'private') throw new Error('Unknown setting.');

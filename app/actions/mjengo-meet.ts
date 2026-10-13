@@ -5,6 +5,7 @@ import { looseAdmin } from '@/lib/loose-db';
 import { guard } from '@/lib/action-result';
 import { logAudit } from '@/lib/access/audit';
 import { requireAdminActor } from '@/lib/access/super-admin';
+import { requireModule } from '@/lib/access/permissions';
 import { sendAccessEmail } from '@/lib/mjengo/invite-email';
 
 export interface TranscriptLine { id: string; name: string; text: string; at: string }
@@ -19,7 +20,7 @@ function newCode(): string {
 
 /** Start a call. The returned code is the shareable link: /meet/<code>. */
 async function createMeeting_(mode: 'video' | 'voice', title: string | null): Promise<{ code: string }> {
-  const a = await requireAdminActor();
+  const a = await requireModule('meet');
   const db = looseAdmin();
   for (let i = 0; i < 5; i++) {
     const code = newCode();
@@ -33,7 +34,7 @@ async function createMeeting_(mode: 'video' | 'voice', title: string | null): Pr
 }
 
 async function listMeetings_(): Promise<MeetingRow[]> {
-  await requireAdminActor();
+  await requireModule('meet');
   const { data } = await looseAdmin().from('mjengo_meetings').select('id, code, title, mode, created_at, ended_at, created_by, transcript, notes, recording_file_id').order('created_at', { ascending: false }).limit(80);
   return ((data ?? []) as (Omit<MeetingRow, 'lines'> & { transcript: unknown[]; notes?: string | null; recording_file_id?: string | null })[])
     .map(({ transcript, notes, recording_file_id, ...m }) => ({ ...m, lines: Array.isArray(transcript) ? transcript.length : 0, hasNotes: !!notes, recordingFileId: recording_file_id ?? null }))
@@ -43,7 +44,7 @@ async function listMeetings_(): Promise<MeetingRow[]> {
 
 /** A finished recording, kept in Files, belongs to its meeting. */
 async function attachRecording_(code: string, fileId: string): Promise<void> {
-  const a = await requireAdminActor();
+  const a = await requireModule('meet');
   const { error } = await looseAdmin().from('mjengo_meetings').update({ recording_file_id: fileId, recorded_at: new Date().toISOString(), recorded_by: a.id }).eq('code', code);
   if (error) throw new Error('Could not attach the recording to the meeting.');
   await logAudit({ actorId: a.id, actorEmail: a.email, action: 'meeting.recorded', targetType: 'meeting', targetLabel: code });
@@ -51,7 +52,7 @@ async function attachRecording_(code: string, fileId: string): Promise<void> {
 
 /** Keep what was said. Several people may save: lines are merged by id. */
 async function saveTranscript_(code: string, lines: TranscriptLine[], end: boolean) {
-  const actor = await requireAdminActor();
+  const actor = await requireModule('meet');
   const db = looseAdmin();
   const { data } = await db.from('mjengo_meetings').select('id, transcript, participants').eq('code', code).maybeSingle();
   if (!data) throw new Error('That call does not exist.');
@@ -63,7 +64,7 @@ async function saveTranscript_(code: string, lines: TranscriptLine[], end: boole
 }
 
 async function getTranscript_(code: string): Promise<{ title: string | null; lines: TranscriptLine[] }> {
-  await requireAdminActor();
+  await requireModule('meet');
   const { data } = await looseAdmin().from('mjengo_meetings').select('title, transcript').eq('code', code).maybeSingle();
   if (!data) throw new Error('That call does not exist.');
   return { title: data.title, lines: (data.transcript ?? []) as TranscriptLine[] };
@@ -72,7 +73,7 @@ async function getTranscript_(code: string): Promise<{ title: string | null; lin
 export interface MeetingDetail extends MeetingRow { notes: string | null; transcript: TranscriptLine[]; notes_shared_at: string | null }
 
 async function meetingDetail_(code: string): Promise<MeetingDetail> {
-  await requireAdminActor();
+  await requireModule('meet');
   const { data } = await looseAdmin().from('mjengo_meetings').select('id, code, title, mode, created_at, ended_at, created_by, transcript, notes, notes_shared_at, recording_file_id').eq('code', code).maybeSingle();
   if (!data) throw new Error('That call does not exist.');
   const transcript = (data.transcript ?? []) as TranscriptLine[];
@@ -81,7 +82,7 @@ async function meetingDetail_(code: string): Promise<MeetingDetail> {
 
 /** Write (or rewrite) the notes now, and tell everyone who took part. */
 async function makeNotes_(code: string): Promise<string> {
-  const a = await requireAdminActor();
+  const a = await requireModule('meet');
   const { notesFor } = await import('@/lib/mjengo/meeting-jobs');
   const { sendNotification } = await import('@/lib/notifications');
   const db = looseAdmin();
@@ -100,7 +101,7 @@ export interface MeetHomeItem { key: string; title: string; code: string | null;
 
 /** What is on for one day: calendar meetings, and links made for later that day. */
 async function meetHome_(dayStart: string, dayEnd: string): Promise<MeetHomeItem[]> {
-  const a = await requireAdminActor();
+  const a = await requireModule('meet');
   const db = looseAdmin();
   const [{ data: ev }, { data: mt }] = await Promise.all([
     db.from('mjengo_events').select('id, title, starts_at, ends_at, meeting_code').not('meeting_code', 'is', null).gte('starts_at', dayStart).lt('starts_at', dayEnd).order('starts_at'),
@@ -120,7 +121,7 @@ export interface MeetingResource { label: string; url: string }
 export interface MeetingPlan { code: string; title: string | null; description: string; invitees: string[]; resources: MeetingResource[] }
 
 async function getPlan_(code: string): Promise<MeetingPlan> {
-  await requireAdminActor();
+  await requireModule('meet');
   const { data } = await looseAdmin().from('mjengo_meetings').select('code, title, description, invitees, resources').eq('code', code).maybeSingle();
   if (!data) throw new Error('That call does not exist.');
   return { code: data.code, title: data.title, description: data.description ?? '', invitees: (data.invitees ?? []) as string[], resources: (data.resources ?? []) as MeetingResource[] };
@@ -128,7 +129,7 @@ async function getPlan_(code: string): Promise<MeetingPlan> {
 
 /** Description, invited people and resources for a meeting. People and links are cleaned before they are kept. */
 async function savePlan_(code: string, plan: { title?: string | null; description: string; invitees: string[]; resources: MeetingResource[] }): Promise<MeetingPlan> {
-  const a = await requireAdminActor();
+  const a = await requireModule('meet');
   const invitees = [...new Set(plan.invitees.map((x) => x.trim().toLowerCase()).filter((x) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(x)))].slice(0, 50);
   const resources = plan.resources
     .map((r) => ({ label: String(r.label ?? '').trim().slice(0, 120), url: String(r.url ?? '').trim().slice(0, 1000) }))

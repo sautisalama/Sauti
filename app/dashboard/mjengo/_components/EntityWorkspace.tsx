@@ -1,9 +1,10 @@
 "use client";
 
+import { EntityReminders } from "@/components/mjengo/EntityReminders";
 import { MjengoLoader } from "./MjengoLoader";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { AlertCircle, BadgeCheck, CheckSquare, ExternalLink, FileWarning, Kanban, List, Loader2, Plus, Search, Trash2 } from "lucide-react";
+import { AlertCircle, BadgeCheck, CheckSquare, EyeOff, ExternalLink, FileWarning, Kanban, List, Loader2, Plus, Search, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -21,12 +22,13 @@ import { DocumentsPanel } from "./DocumentsPanel";
 import { OpportunityVerifyCard } from "./OpportunityVerify";
 import { GrantCharts, type GrantLite } from "./GrantCharts";
 import { Avatars, DeadlineChip, STATUSES, StatusPill, money, type Kind } from "./shared";
+import { EntityAccessPanel, FellowshipAssignments } from "./EntityExtras";
 
 type FieldDef = { key: string; label: string; type: "text" | "textarea" | "number" | "date" | "select" | "owner" | "grant" | "url"; options?: { value: string; label: string }[]; wide?: boolean };
 
 const CURRENCY: FieldDef = { key: "currency", label: "Currency", type: "select", options: ["USD", "KES", "EUR", "GBP"].map((c) => ({ value: c, label: c })) };
 
-const CONFIG: Record<Kind, { noun: string; plural: string; titleKey: string; subKey: string; subLabel: string; fields: FieldDef[]; amountKey?: string }> = {
+const CONFIG = {
 	grant: {
 		noun: "grant",
 		plural: "Grants",
@@ -90,6 +92,28 @@ const CONFIG: Record<Kind, { noun: string; plural: string; titleKey: string; sub
 			{ key: "notes", label: "Notes", type: "textarea", wide: true },
 		],
 	},
+} as unknown as Record<Kind, { noun: string; plural: string; titleKey: string; subKey: string; subLabel: string; fields: FieldDef[]; amountKey?: string }>;
+
+CONFIG.fellowship = {
+	noun: "fellowship",
+	plural: "Fellowships",
+	titleKey: "title",
+	subKey: "host",
+	subLabel: "Host",
+	amountKey: "stipend",
+	fields: [
+		{ key: "title", label: "Fellowship", type: "text", wide: true },
+		{ key: "host", label: "Host organisation", type: "text" },
+		{ key: "status", label: "Status", type: "select", options: STATUSES.fellowship.map((s) => ({ value: s.value, label: s.label })) },
+		{ key: "stipend", label: "Stipend or grant", type: "number" },
+		CURRENCY,
+		{ key: "start_date", label: "Starts", type: "date" },
+		{ key: "deadline", label: "Ends or next deadline", type: "date" },
+		{ key: "owner_id", label: "Who is responsible", type: "owner" },
+		{ key: "link", label: "Programme link", type: "url", wide: true },
+		{ key: "description", label: "About it", type: "textarea", wide: true },
+		{ key: "notes", label: "Notes", type: "textarea", wide: true },
+	],
 };
 
 const dueKey = (kind: Kind) => (kind === "project" ? "end_date" : "deadline");
@@ -292,7 +316,9 @@ export function EntityWorkspace({ kind }: { kind: Kind }) {
 								{cfg.fields.map((f) => (
 									<div key={f.key} className={cn("space-y-1.5", f.wide && "sm:col-span-2")}>
 										<Label htmlFor={`f-${f.key}`} className="text-xs font-semibold text-serene-neutral-600">{f.label}</Label>
-										<FieldInput f={f} value={editing.values[f.key]} onChange={(v) => set(f.key, v)} admins={admins} grants={grants} />
+										{((editing.values._hidden as string[] | undefined) ?? []).includes(f.key)
+											? <p className="flex h-10 items-center gap-2 rounded-md border border-dashed border-amber-200 bg-amber-50/60 px-3 text-sm text-amber-800"><EyeOff className="h-4 w-4" /> Hidden by whoever added it</p>
+											: <FieldInput f={f} value={editing.values[f.key]} onChange={(v) => set(f.key, v)} admins={admins} grants={grants} />}
 									</div>
 								))}
 							</div>
@@ -316,7 +342,13 @@ export function EntityWorkspace({ kind }: { kind: Kind }) {
 							{editing.id ? (
 								<>
 									{kind === "project" && <ProjectMoney v={editing.values} />}
+									{kind === "fellowship" && <FellowshipAssignments fellowshipId={editing.id} />}
+									<EntityAccessPanel kind={kind} id={editing.id} />
 									<DocumentsPanel kind={kind} entityId={editing.id} onChange={load} />
+									<div className="rounded-xl border border-serene-neutral-100 p-3">
+										<p className="mb-2 text-sm font-semibold text-serene-neutral-900">Reminders</p>
+										<EntityReminders type={kind} id={editing.id} />
+									</div>
 									<Link href="/dashboard/mjengo/todos" className="flex items-center gap-2 rounded-xl border border-serene-neutral-100 p-3 text-sm text-serene-neutral-700 hover:bg-serene-neutral-50">
 										<CheckSquare className="h-4 w-4 text-sauti-teal" />
 										{(rows.find((r) => r.id === editing.id)?.openTodos ?? 0)} open to-dos linked to this {cfg.noun}

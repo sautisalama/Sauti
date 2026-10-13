@@ -7,6 +7,7 @@ import { looseAdmin } from '@/lib/loose-db';
 import { guard } from '@/lib/action-result';
 import { logAudit } from '@/lib/access/audit';
 import { requireAdminActor } from '@/lib/access/super-admin';
+import { requireModule } from '@/lib/access/permissions';
 import { getCalendarTokens, saveCalendarTokens } from '@/lib/calendar/tokens';
 import { createOAuth2ClientFromTokens, isGoogleCalendarConfigured } from '@/lib/google-calendar-oauth';
 
@@ -43,6 +44,8 @@ export interface NewEvent {
   /** How many alerts to send before it starts (0 to 10), and how many minutes apart. The last one lands one step before the start. */
   alerts?: number;
   alertEvery?: number;
+  /** Minutes before the start, one entry per reminder (like Google Calendar). Overrides alerts and alertEvery. */
+  reminders?: number[];
   /** Put an existing meeting on the calendar instead of making a new link. */
   meetingCode?: string;
 }
@@ -71,7 +74,7 @@ function meetCode() {
 
 /** Everything on the calendar between two instants: events, Google events, deadlines, due tasks and posts. */
 async function month_(fromIso: string, toIso: string): Promise<CalMonth> {
-  const a = await requireAdminActor();
+  const a = await requireModule('calendar');
   const db = looseAdmin();
   const from = fromIso.slice(0, 10);
   const to = toIso.slice(0, 10);
@@ -125,7 +128,7 @@ async function month_(fromIso: string, toIso: string): Promise<CalMonth> {
 
 /** Create an event the way Google does: title, time, guests, place and an optional video call link. */
 async function create_(v: NewEvent): Promise<CalItem> {
-  const a = await requireAdminActor();
+  const a = await requireModule('calendar');
   const title = v.title.trim().slice(0, 200);
   if (!title) throw new Error('Give the event a title.');
   const start = new Date(v.start);
@@ -136,6 +139,7 @@ async function create_(v: NewEvent): Promise<CalItem> {
   const db = looseAdmin();
   const alertCount = Math.min(10, Math.max(0, Math.round(v.alerts ?? 1)));
   const alertEvery = Math.min(1440, Math.max(1, Math.round(v.alertEvery ?? 15)));
+  const reminders = [...new Set((v.reminders ?? []).map((m) => Math.round(Number(m))).filter((m) => Number.isFinite(m) && m >= 0 && m <= 40320))].sort((x, y) => y - x).slice(0, 5);
 
   let code: string | null = null;
   if (v.meetingCode && !v.block) {
@@ -161,7 +165,7 @@ async function create_(v: NewEvent): Promise<CalItem> {
       const body = v.allDay
         ? { start: { date: start.toISOString().slice(0, 10) }, end: { date: new Date(end.getTime() + 86400_000).toISOString().slice(0, 10) } }
         : { start: { dateTime: start.toISOString() }, end: { dateTime: end.toISOString() } };
-      const r = await cal.events.insert({ calendarId: 'primary', sendUpdates: 'all', requestBody: { summary: title, description: description ?? undefined, location: v.location || undefined, ...body, attendees: attendees.map((email) => ({ email })), reminders: alertCount > 0 ? { useDefault: false, overrides: Array.from({ length: Math.min(5, alertCount) }, (_, i) => ({ method: 'popup', minutes: alertEvery * (i + 1) })) } : { useDefault: true } } });
+      const r = await cal.events.insert({ calendarId: 'primary', sendUpdates: 'all', requestBody: { summary: title, description: description ?? undefined, location: v.location || undefined, ...body, attendees: attendees.map((email) => ({ email })), reminders: reminders.length ? { useDefault: false, overrides: reminders.map((m) => ({ method: 'popup', minutes: m })) } : alertCount > 0 ? { useDefault: false, overrides: Array.from({ length: Math.min(5, alertCount) }, (_, i) => ({ method: 'popup', minutes: alertEvery * (i + 1) })) } : { useDefault: true } } });
       googleId = r.data.id ?? null;
     }
   } catch (e) {
@@ -171,7 +175,7 @@ async function create_(v: NewEvent): Promise<CalItem> {
   const { data, error } = await db.from('mjengo_events').insert({
     title, description, location: v.location?.trim().slice(0, 200) || null, starts_at: start.toISOString(), ends_at: end.toISOString(), all_day: !!v.allDay,
     kind: v.block ? 'block' : code ? 'meeting' : 'event', meeting_code: code, attendees: v.block ? [] : attendees, google_event_id: googleId, created_by: a.id,
-    alerts: v.block ? 0 : alertCount, alert_every_min: alertEvery,
+    alerts: v.block ? 0 : reminders.length ? 0 : alertCount, alert_every_min: alertEvery, reminders: v.block ? [] : reminders,
   }).select('id, title, description, location, starts_at, ends_at, all_day, kind, meeting_code, attendees').single();
   if (error || !data) throw new Error('Could not save the event.');
   await logAudit({ actorId: a.id, actorEmail: a.email, action: 'calendar.event_created', targetType: 'event', targetId: data.id, targetLabel: title });
@@ -185,7 +189,7 @@ async function create_(v: NewEvent): Promise<CalItem> {
 }
 
 async function remove_(id: string) {
-  const a = await requireAdminActor();
+  const a = await requireModule('calendar');
   const raw = id.replace(/^ev:/, '');
   const db = looseAdmin();
   const { data } = await db.from('mjengo_events').select('google_event_id, title, created_by').eq('id', raw).maybeSingle();
@@ -202,7 +206,7 @@ const ICON_KEYS = ['meeting', 'call', 'travel', 'deadline', 'writing', 'review',
 
 /** An icon key per event title, chosen by the AI from what the activity is. Unknown or failed titles are left out. */
 async function icons_(titles: string[]): Promise<Record<string, string>> {
-  await requireAdminActor();
+  await requireModule('calendar');
   const list = [...new Set(titles.map((t) => t.trim().slice(0, 100)).filter(Boolean))].slice(0, 40);
   const key = process.env.OPENROUTER_API_KEY;
   if (!list.length || !key) return {};

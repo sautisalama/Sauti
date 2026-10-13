@@ -2,6 +2,7 @@
 
 import { guard } from '@/lib/action-result';
 import { requireAdminActor } from '@/lib/access/super-admin';
+import { requireModule } from '@/lib/access/permissions';
 
 import { SOURCE_INFO, type InspireSource } from '@/lib/mjengo/inspire-sources';
 
@@ -55,7 +56,7 @@ async function getJson<T>(url: string, init?: RequestInit): Promise<T> {
 }
 
 async function search_(source: InspireSource, query: string, page = 1): Promise<InspireItem[]> {
-  await requireAdminActor();
+  await requireModule('design');
   const q = query.trim().slice(0, 100) || (source === 'iconify' ? 'star' : source === 'giphy' ? 'celebrate' : 'community');
   const key = need(source);
   const pg = Math.max(1, Math.min(20, Math.round(page)));
@@ -99,7 +100,7 @@ const IMAGE_HOSTS = [/(^|\.)pinimg\.com$/, /^images\.unsplash\.com$/, /^images\.
 
 /** A picture from one of the inspiration sources as a data address, so it can sit on the canvas and be exported. */
 async function image_(url: string, track?: string): Promise<string> {
-  await requireAdminActor();
+  await requireModule('design');
   const u = new URL(url);
   if (u.protocol !== 'https:' || !IMAGE_HOSTS.some((re) => re.test(u.hostname))) throw new Error('That picture is not from a supported source.');
   const res = await fetch(u, { signal: AbortSignal.timeout(25_000) });
@@ -120,7 +121,7 @@ export interface Palette { name: string; colors: string[] }
 
 /** Colours that go with a base colour (TheColorAPI), a few schemes at once. */
 async function palettes_(hex: string): Promise<Palette[]> {
-  await requireAdminActor();
+  await requireModule('design');
   const h = hex.replace('#', '');
   if (!/^[0-9a-fA-F]{6}$/.test(h)) throw new Error('Pick a colour first.');
   const modes: [string, string][] = [['analogic', 'Neighbours'], ['complement', 'Opposites'], ['triad', 'Triad'], ['quad', 'Four corners'], ['monochrome', 'Shades']];

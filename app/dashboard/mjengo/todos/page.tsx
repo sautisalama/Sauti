@@ -1,5 +1,6 @@
 "use client";
 
+import { EntityReminders } from "@/components/mjengo/EntityReminders";
 import { MjengoLoader } from "../_components/MjengoLoader";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { format, parseISO, addDays } from "date-fns";
@@ -341,6 +342,7 @@ function TodoSheet({ todo, board, onClose, onSaved, fail }: { todo: Task | null;
 							<Label className="flex items-center gap-1.5 text-xs font-semibold"><Bell className="h-3.5 w-3.5" /> Remind me on</Label>
 							<Input type="date" value={v.remind_on ?? ""} onChange={(e) => setV({ ...v, remind_on: e.target.value || null })} />
 							<p className="text-xs text-serene-neutral-500">Due tasks are always reminded the morning before, the day itself and the day after.</p>
+							{v.id && <div className="pt-1"><p className="mb-1 text-xs font-semibold">More reminders before it is due</p><EntityReminders type="todo" id={v.id} /></div>}
 						</div>
 
 						<div className="space-y-1.5">

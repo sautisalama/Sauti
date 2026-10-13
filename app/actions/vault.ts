@@ -4,6 +4,7 @@ import { looseAdmin } from '@/lib/loose-db';
 import { guard } from '@/lib/action-result';
 import { logAudit } from '@/lib/access/audit';
 import { requireAdminActor } from '@/lib/access/super-admin';
+import { requireModule } from '@/lib/access/permissions';
 import {
   RANK, adminByEmail, atLeast, descendants, levelFor, loadIndex, oversightFor, pathTo,
   recipientLevels,
@@ -60,7 +61,7 @@ async function syncToDrive(actorId: string, ownerId: string, driveFileId: string
 }
 
 async function ctx() {
-  const actor = await requireAdminActor();
+  const actor = await requireModule('files');
   const [ix, oversight, names] = await Promise.all([loadIndex(), oversightFor(actor.email), adminNames()]);
   return { actor, ix, oversight, names };
 }
@@ -406,7 +407,7 @@ async function recentFiles_(limit = 30): Promise<{ id: string; name: string; siz
 
 export interface PersonRow { id: string; name: string; email: string }
 async function listPeople_(): Promise<PersonRow[]> {
-  const actor = await requireAdminActor();
+  const actor = await requireModule('files');
   const { data } = await looseAdmin().from('profiles').select('id, email, first_name, last_name').eq('is_admin', true).order('first_name');
   return (data ?? [])
     .filter((p: { id: string }) => p.id !== actor.id)

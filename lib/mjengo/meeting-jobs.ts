@@ -47,29 +47,30 @@ export async function shareMeetingNotes(): Promise<{ done: number }> {
   return { done };
 }
 
-/** Events starting in the next quarter of an hour: a reminder to the creator and to guests on the team. */
+/**
+ * Event reminders. Each event has a list of offsets (minutes before the start, as many as the person chose,
+ * like Google Calendar). Older events that only have "N alerts, M minutes apart" are read as the same thing.
+ */
 export async function remindEvents(): Promise<{ sent: number }> {
   const db = looseAdmin();
   const now = new Date();
-  // Events that start within the longest possible alert window.
-  const horizon = new Date(now.getTime() + 10 * 1440 * 60_000);
+  // Events that start within the longest possible reminder window (a week and a bit, or ten legacy alerts a day apart).
+  const horizon = new Date(now.getTime() + 14 * 1440 * 60_000);
   const { data } = await db
     .from('mjengo_events')
-    .select('id, title, starts_at, kind, meeting_code, attendees, created_by, alerts, alert_every_min, alerts_sent')
+    .select('id, title, starts_at, kind, meeting_code, attendees, created_by, alerts, alert_every_min, alerts_sent, reminders, reminders_sent')
     .neq('kind', 'block')
-    .gt('alerts', 0)
     .gt('starts_at', now.toISOString())
     .lte('starts_at', horizon.toISOString());
-  type Row = { id: string; title: string; starts_at: string; kind: string; meeting_code: string | null; attendees: string[]; created_by: string | null; alerts: number; alert_every_min: number; alerts_sent: number };
+  type Row = { id: string; title: string; starts_at: string; kind: string; meeting_code: string | null; attendees: string[]; created_by: string | null; alerts: number; alert_every_min: number; alerts_sent: number; reminders: number[]; reminders_sent: number[] };
   let sent = 0;
   for (const e of (data ?? []) as Row[]) {
-    if (e.alerts_sent >= e.alerts) continue;
     const start = new Date(e.starts_at).getTime();
-    const step = Math.max(1, e.alert_every_min) * 60_000;
-    // Alert i (0-based) is due (alerts - i) steps before the start. Send the latest one that is due.
-    let due = -1;
-    for (let i = e.alerts_sent; i < e.alerts; i++) if (now.getTime() >= start - (e.alerts - i) * step) due = i;
-    if (due < 0) continue;
+    const legacy = !e.reminders?.length;
+    const offsets = legacy ? Array.from({ length: Math.max(0, e.alerts) }, (_, i) => (e.alerts - i) * Math.max(1, e.alert_every_min)) : e.reminders;
+    const done = new Set<number>(legacy ? offsets.slice(0, e.alerts_sent) : e.reminders_sent ?? []);
+    const due = offsets.filter((o) => !done.has(o) && now.getTime() >= start - o * 60_000);
+    if (!due.length) continue;
     const ids = new Set<string>();
     if (e.created_by) ids.add(e.created_by);
     if (e.attendees?.length) {
@@ -77,12 +78,13 @@ export async function remindEvents(): Promise<{ sent: number }> {
       (ps ?? []).forEach((p: { id: string }) => ids.add(p.id));
     }
     const mins = Math.max(1, Math.round((start - now.getTime()) / 60_000));
-    const when = mins >= 120 ? `${Math.round(mins / 60)} hours` : mins >= 60 ? `${Math.floor(mins / 60)} hour${mins >= 120 ? 's' : ''} ${mins % 60} min` : `${mins} minute${mins === 1 ? '' : 's'}`;
+    const when = mins >= 2880 ? `${Math.round(mins / 1440)} days` : mins >= 120 ? `${Math.round(mins / 60)} hours` : mins >= 60 ? `1 hour ${mins % 60} min` : `${mins} minute${mins === 1 ? '' : 's'}`;
     await Promise.all([...ids].map((userId) => sendNotification({
       userId, type: 'todo_due', title: `Starting in ${when}`, message: e.title,
       link: e.meeting_code ? `/meet/${e.meeting_code}` : '/dashboard/mjengo/calendar', sendEmail: false,
     }).catch(() => undefined)));
-    await db.from('mjengo_events').update({ alerts_sent: due + 1, reminded_at: now.toISOString() }).eq('id', e.id);
+    const patch = legacy ? { alerts_sent: Math.min(e.alerts, e.alerts_sent + due.length) } : { reminders_sent: [...done, ...due] };
+    await db.from('mjengo_events').update({ ...patch, reminded_at: now.toISOString() }).eq('id', e.id);
     sent += ids.size;
   }
   return { sent };

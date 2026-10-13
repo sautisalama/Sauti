@@ -4,7 +4,7 @@ import { OpenRouterBalance } from "./OpenRouterBalance";
 import Link from "next/link";
 import { useEffect } from "react";
 import { usePathname } from "next/navigation";
-import { ArrowLeft, ClipboardList, Briefcase, CheckSquare, FileText, HardDrive, FolderKanban, LayoutDashboard, Lightbulb, Mail, ScrollText, ShieldCheck, Sparkles, CalendarClock, Users, MessageCircle, Bell, Megaphone, Palette, Video } from "lucide-react";
+import { ArrowLeft, GraduationCap, ClipboardList, Briefcase, CheckSquare, FileText, HardDrive, FolderKanban, LayoutDashboard, Lightbulb, Mail, ScrollText, ShieldCheck, Sparkles, CalendarClock, Users, MessageCircle, Bell, Megaphone, Palette, Video } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { MjengoDock } from "./MjengoDock";
 import { startSuiteNotifications } from "@/lib/client/suite-notifications";
@@ -22,6 +22,7 @@ const TABS = [
 	{ href: `${BASE}/grants`, label: "Grants", icon: Briefcase },
 	{ href: `${BASE}/opportunities`, label: "Opportunities", icon: Lightbulb },
 	{ href: `${BASE}/projects`, label: "Projects", icon: FolderKanban },
+	{ href: `${BASE}/fellowships`, label: "Fellowships", icon: GraduationCap },
 	{ href: `${BASE}/forms`, label: "Forms", icon: ClipboardList },
 	{ href: `${BASE}/todos`, label: "To-dos", icon: CheckSquare },
 	{ href: `${BASE}/assistant`, label: "Assistant", icon: Sparkles },

@@ -4,13 +4,14 @@ import { differenceInCalendarDays, format, parseISO } from "date-fns";
 import { CalendarClock } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-export type Kind = "grant" | "opportunity" | "project";
+export type Kind = "grant" | "opportunity" | "project" | "fellowship";
 
-export const KIND_LABEL: Record<Kind, string> = { grant: "Grant", opportunity: "Opportunity", project: "Project" };
+export const KIND_LABEL: Record<Kind, string> = { grant: "Grant", opportunity: "Opportunity", project: "Project", fellowship: "Fellowship" };
 export const KIND_HREF: Record<Kind, string> = {
 	grant: "/dashboard/mjengo/grants",
 	opportunity: "/dashboard/mjengo/opportunities",
 	project: "/dashboard/mjengo/projects",
+	fellowship: "/dashboard/mjengo/fellowships",
 };
 
 export interface StatusDef {
@@ -52,7 +53,16 @@ export const PROJECT_STATUSES: StatusDef[] = [
 	{ value: "cancelled", label: "Cancelled", tone: "bg-rose-100 text-rose-800", color: "#f43f5e" },
 ];
 
-export const STATUSES: Record<Kind, StatusDef[]> = { grant: GRANT_STATUSES, opportunity: OPPORTUNITY_STATUSES, project: PROJECT_STATUSES };
+export const FELLOWSHIP_STATUSES: StatusDef[] = [
+	{ value: "applying", label: "Applying", tone: "bg-slate-100 text-slate-700", color: "#94a3b8" },
+	{ value: "accepted", label: "Accepted", tone: "bg-sky-100 text-sky-800", color: "#38bdf8" },
+	{ value: "active", label: "Active", tone: "bg-emerald-100 text-emerald-800", color: "#10b981" },
+	{ value: "completed", label: "Completed", tone: "bg-sauti-teal-light text-sauti-dark", color: "#068297" },
+	{ value: "declined", label: "Declined", tone: "bg-rose-100 text-rose-800", color: "#f43f5e" },
+	{ value: "withdrawn", label: "Withdrawn", tone: "bg-neutral-100 text-neutral-600", color: "#a3a3a3" },
+];
+
+export const STATUSES: Record<Kind, StatusDef[]> = { grant: GRANT_STATUSES, opportunity: OPPORTUNITY_STATUSES, project: PROJECT_STATUSES, fellowship: FELLOWSHIP_STATUSES };
 
 export const statusDef = (kind: Kind, value: string) => STATUSES[kind].find((s) => s.value === value) ?? STATUSES[kind][0];
 

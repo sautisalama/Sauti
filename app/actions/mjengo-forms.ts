@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { looseAdmin } from '@/lib/loose-db';
 import { logAudit } from '@/lib/access/audit';
 import { requireAdminActor } from '@/lib/access/super-admin';
+import { requireModule } from '@/lib/access/permissions';
 import { guard } from '@/lib/action-result';
 import { askAi } from '@/lib/mjengo/ai';
 import { sanitiseQuestions, sanitiseTheme, sanitiseWelcome, type FormSettings, type Question } from '@/lib/forms/schema';
@@ -50,20 +51,20 @@ async function withCounts(rows: Omit<FormRow, 'response_count' | 'last_response_
 }
 
 export async function listForms(): Promise<FormRow[]> {
-  await requireAdminActor();
+  await requireModule('forms');
   const { data } = await looseAdmin().from('mjengo_forms').select('*').order('updated_at', { ascending: false });
   return withCounts((data ?? []) as Omit<FormRow, 'response_count' | 'last_response_at'>[]);
 }
 
 export async function getForm(id: string): Promise<FormRow | null> {
-  await requireAdminActor();
+  await requireModule('forms');
   const { data } = await looseAdmin().from('mjengo_forms').select('*').eq('id', id).maybeSingle();
   if (!data) return null;
   return (await withCounts([data as Omit<FormRow, 'response_count' | 'last_response_at'>]))[0];
 }
 
 export async function createForm(title?: string): Promise<string> {
-  const actor = await requireAdminActor();
+  const actor = await requireModule('forms');
   const db = looseAdmin();
   for (let i = 0; i < 5; i++) {
     const { data, error } = await db
@@ -81,7 +82,7 @@ export async function createForm(title?: string): Promise<string> {
 }
 
 export async function saveForm(id: string, patch: { title?: string; description?: string | null; questions?: Question[]; settings?: FormSettings }) {
-  const actor = await requireAdminActor();
+  const actor = await requireModule('forms');
   const update: Record<string, unknown> = {};
   if (patch.title !== undefined) update.title = patch.title.trim().slice(0, 120) || 'Untitled form';
   if (patch.description !== undefined) update.description = patch.description ? patch.description.slice(0, 2000) : null;
@@ -114,7 +115,7 @@ export async function saveForm(id: string, patch: { title?: string; description?
 }
 
 export async function setFormStatus(id: string, status: 'draft' | 'open' | 'closed') {
-  const actor = await requireAdminActor();
+  const actor = await requireModule('forms');
   const db = looseAdmin();
   if (status === 'open') {
     const { data } = await db.from('mjengo_forms').select('questions').eq('id', id).maybeSingle();
@@ -129,7 +130,7 @@ export async function setFormStatus(id: string, status: 'draft' | 'open' | 'clos
 }
 
 export async function deleteForm(id: string) {
-  const actor = await requireAdminActor();
+  const actor = await requireModule('forms');
   const db = looseAdmin();
   const { data } = await db.from('mjengo_forms').select('title').eq('id', id).maybeSingle();
   await db.from('mjengo_forms').delete().eq('id', id);
@@ -139,7 +140,7 @@ export async function deleteForm(id: string) {
 
 /** Up to 5,000 newest responses: enough for the table, export and analytics. */
 export async function getResponses(formId: string): Promise<ResponseRow[]> {
-  await requireAdminActor();
+  await requireModule('forms');
   const { data } = await looseAdmin()
     .from('mjengo_form_responses')
     .select('id, answers, respondent_email, created_at')
@@ -150,19 +151,19 @@ export async function getResponses(formId: string): Promise<ResponseRow[]> {
 }
 
 export async function deleteResponse(formId: string, responseId: string) {
-  const actor = await requireAdminActor();
+  const actor = await requireModule('forms');
   await looseAdmin().from('mjengo_form_responses').delete().eq('id', responseId).eq('form_id', formId);
   await logAudit({ actorId: actor.id, actorEmail: actor.email, action: 'mjengo.form.response_deleted', targetType: 'form', targetId: formId });
 }
 
 export async function exportedCsv(formId: string): Promise<void> {
-  const actor = await requireAdminActor();
+  const actor = await requireModule('forms');
   await logAudit({ actorId: actor.id, actorEmail: actor.email, action: 'mjengo.form.exported', targetType: 'form', targetId: formId });
 }
 
 /** A one-time upload link for an image shown with a form. The image is public, like the form itself. */
 export async function formImageUpload(formId: string, fileName: string): Promise<{ signedUrl: string; publicUrl: string }> {
-  await requireAdminActor();
+  await requireModule('forms');
   const safe = fileName.replace(/[^\w.\-]+/g, '_').slice(-80) || 'image';
   const path = `forms/${formId}/${Date.now()}-${safe}`;
   const db = looseAdmin();
@@ -173,7 +174,7 @@ export async function formImageUpload(formId: string, fileName: string): Promise
 
 /** Colours and notes from the saved design systems, for styling a form. */
 export async function designSystemsForForms(): Promise<{ id: string; name: string; colors: string[] }[]> {
-  await requireAdminActor();
+  await requireModule('forms');
   const { data } = await looseAdmin().from('mjengo_design_systems').select('id, name, colors').order('name');
   return (data ?? []) as { id: string; name: string; colors: string[] }[];
 }
@@ -226,7 +227,7 @@ async function insertForm(actor: { id: string; email: string }, title: string, d
 
 /** A new form from a template, as it is or in the colours of a design system. */
 async function fromTemplate_(templateId: string, opts: FormStartOptions = {}): Promise<string> {
-  const actor = await requireAdminActor();
+  const actor = await requireModule('forms');
   const t = templateById(templateId);
   if (!t) throw new Error('That template does not exist.');
   const design = await designFor(opts);
@@ -235,7 +236,7 @@ async function fromTemplate_(templateId: string, opts: FormStartOptions = {}): P
 }
 
 async function generate_(prompt: string, opts: FormStartOptions = {}): Promise<string> {
-  const actor = await requireAdminActor();
+  const actor = await requireModule('forms');
   const key = process.env.OPENROUTER_API_KEY;
   if (!key) throw new Error('AI is not set up on this site yet.');
   const about = prompt.trim().slice(0, 1500);
@@ -300,7 +301,7 @@ async function generate_(prompt: string, opts: FormStartOptions = {}): Promise<s
 
 /** Link a poster from Studio to a form: it is copied where the public can see it and shown at the top. */
 async function poster_(formId: string, assetId: string | null): Promise<{ url: string | null }> {
-  await requireAdminActor();
+  await requireModule('forms');
   const db = looseAdmin();
   const { data: f } = await db.from('mjengo_forms').select('settings').eq('id', formId).maybeSingle();
   if (!f) throw new Error('That form no longer exists.');
@@ -328,7 +329,7 @@ export const createFromTemplate = guard(fromTemplate_);
 export const linkPoster = guard(poster_);
 
 async function seen_(formId: string) {
-  await requireAdminActor();
+  await requireModule('forms');
   await looseAdmin().from('mjengo_forms').update({ responses_seen_at: new Date().toISOString() }).eq('id', formId);
 }
 
@@ -340,7 +341,7 @@ export const markResponsesSeen = guard(seen_);
  * in open answers. The numbers come from the data; the AI only writes them up, and is told not to add any.
  */
 export async function formReport(formId: string): Promise<{ title: string; markdown: string }> {
-  await requireAdminActor();
+  await requireModule('forms');
   const db = looseAdmin();
   const { data: f } = await db.from('mjengo_forms').select('title, description, questions').eq('id', formId).maybeSingle();
   if (!f) throw new Error('That form does not exist.');

@@ -117,6 +117,7 @@ export function EnhancedSidebar({
 	const onMjengo = !!(pathname?.startsWith("/dashboard/mjengo") || pathname?.startsWith("/meet"));
 	const [mjengoSuper, setMjengoSuper] = useState(false);
 	const [mjengoAdmin, setMjengoAdmin] = useState(true);
+	const [mjengoAllowed, setMjengoAllowed] = useState<string[] | null>(null);
 	const [suite, setSuite] = useState({ opportunities: 0, files: 0, notifications: 0, forms: 0, meetings: 0 });
 	const mailUnread = useMailUnread();
 	const liveNotes = useSuiteNotifications();
@@ -140,7 +141,7 @@ export function EnhancedSidebar({
 	}, [onMjengo, pathname]);
 	useEffect(() => {
 		if (!onMjengo) return;
-		mjengoNav().then((n) => { setMjengoSuper(n.isSuper); setMjengoAdmin(n.isAdmin); }).catch(() => setMjengoSuper(false));
+		mjengoNav().then((n) => { setMjengoSuper(n.isSuper); setMjengoAdmin(n.isAdmin); setMjengoAllowed(n.allowed); }).catch(() => setMjengoSuper(false));
 	}, [onMjengo]);
 	const supabase = useMemo(() => createClient(), []);
 	const userType = dash?.data?.profile?.user_type || user?.profile?.user_type || null;
@@ -319,6 +320,7 @@ export function EnhancedSidebar({
 				{ id: "mj-grants", group: "Work", label: "Grants", icon: Briefcase, href: `${B}/grants`, section: "main", hint: "Track grant applications and deadlines" },
 				{ id: "mj-opps", group: "Work", label: "Opportunities", icon: Lightbulb, href: `${B}/opportunities`, section: "main", hint: "Funding and partnership leads", badge: counts.opportunities || undefined },
 				{ id: "mj-projects", group: "Work", label: "Projects", icon: FolderKanban, href: `${B}/projects`, section: "main", hint: "Projects, milestones and documents" },
+				{ id: "mj-fellowships", group: "Work", label: "Fellowships", icon: GraduationCap, href: `${B}/fellowships`, section: "main", hint: "Fellowships and what is due for each" },
 				{ id: "mj-forms", group: "Work", label: "Forms", icon: ClipboardList, href: `${B}/forms`, section: "main", hint: "Build forms and see responses", badge: suite.forms || undefined },
 				{ id: "mj-todos", group: "Work", label: "To-dos", icon: CheckSquare, href: `${B}/todos`, section: "main", hint: "Tasks and shared responsibilities" },
 				{ id: "mj-design", group: "Create", label: "Design", icon: Palette, href: `${B}/design`, section: "main", hint: "Posters, banners and scheduled content" },
@@ -330,7 +332,9 @@ export function EnhancedSidebar({
 				);
 			}
 			items.push({ id: "mj-back", label: "Back to dashboard", icon: ArrowLeft, href: "/dashboard", section: "secondary", separator: true, hint: "Leave the Mjengo suite" });
-			return items;
+			// Roles: only the parts of the suite this person has been given.
+			const MODULE_OF: Record<string, string> = { "mj-assistant": "assistant", "mj-mail": "mail", "mj-contacts": "contacts", "mj-meet": "meet", "mj-calendar": "calendar", "mj-files": "files", "mj-grants": "grants", "mj-opps": "opportunities", "mj-projects": "projects", "mj-fellowships": "fellowships", "mj-forms": "forms", "mj-todos": "todos", "mj-design": "design" };
+			return mjengoAllowed ? items.filter((it) => !MODULE_OF[it.id] || mjengoAllowed.includes(MODULE_OF[it.id])) : items;
 		}
 
 		// Admin Dashboard Navigation
@@ -570,12 +574,12 @@ export function EnhancedSidebar({
 			...baseItems,
 
 		];
-	}, [pathname, role, casesCount, dash?.data?.unreadChatCount, dash?.data?.verification?.pendingCount, mjengoSuper, mjengoAdmin]);
+	}, [pathname, role, casesCount, dash?.data?.unreadChatCount, dash?.data?.verification?.pendingCount, mjengoSuper, mjengoAdmin, mjengoAllowed]);
 
 	// Compute items once per relevant inputs to avoid recomputing on each render
 	const sidebarItems = useMemo(
 		() => getSidebarItems(),
-		[pathname, role, casesCount, dash?.data?.unreadChatCount, getSidebarItems, mjengoSuper, mjengoAdmin]
+		[pathname, role, casesCount, dash?.data?.unreadChatCount, getSidebarItems, mjengoSuper, mjengoAdmin, mjengoAllowed]
 	);
 
 	const isActive = (item: SidebarItem) => {

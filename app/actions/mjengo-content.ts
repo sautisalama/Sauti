@@ -4,6 +4,7 @@ import { looseAdmin } from '@/lib/loose-db';
 import { guard } from '@/lib/action-result';
 import { logAudit } from '@/lib/access/audit';
 import { requireAdminActor } from '@/lib/access/super-admin';
+import { requireModule } from '@/lib/access/permissions';
 
 import { CHANNELS, CHANNEL_INFO, type Channel, type Variant } from '@/lib/mjengo/channels';
 import { availableProviders } from '@/lib/mjengo/channel-oauth';
@@ -39,7 +40,7 @@ export interface PostInput {
 const COLS = 'id, title, body, channels, media, scheduled_for, status, posted_at, created_by, created_at, variants, results, link_url';
 
 async function listPosts_(): Promise<PostRow[]> {
-  await requireAdminActor();
+  await requireModule('design');
   const { data } = await looseAdmin().from('mjengo_posts').select(COLS).order('scheduled_for', { ascending: true, nullsFirst: false }).limit(1000);
   return (data ?? []) as PostRow[];
 }
@@ -77,7 +78,7 @@ function normalise(v: PostInput) {
 }
 
 async function savePost_(id: string | null, v: PostInput): Promise<PostRow> {
-  const a = await requireAdminActor();
+  const a = await requireModule('design');
   const row = normalise(v);
   const db = looseAdmin();
   const q = id
@@ -90,13 +91,13 @@ async function savePost_(id: string | null, v: PostInput): Promise<PostRow> {
 }
 
 async function markPosted_(id: string) {
-  const a = await requireAdminActor();
+  const a = await requireModule('design');
   const { data } = await looseAdmin().from('mjengo_posts').update({ status: 'posted', posted_at: new Date().toISOString() }).eq('id', id).select('title, body').maybeSingle();
   if (data) await logAudit({ actorId: a.id, actorEmail: a.email, action: 'post.posted', targetType: 'post', targetId: id, targetLabel: data.title ?? data.body.slice(0, 60) });
 }
 
 async function deletePost_(id: string) {
-  const a = await requireAdminActor();
+  const a = await requireModule('design');
   const { data } = await looseAdmin().from('mjengo_posts').delete().eq('id', id).select('title, body').maybeSingle();
   if (data) await logAudit({ actorId: a.id, actorEmail: a.email, action: 'post.deleted', targetType: 'post', targetId: id, targetLabel: data.title ?? data.body.slice(0, 60) });
 }
@@ -105,20 +106,20 @@ export interface ConnectionRow { id: string; channel: Channel; account_name: str
 export interface ChannelsState { connections: ConnectionRow[]; available: { linkedin: boolean; x: boolean; meta: boolean; tiktok: boolean } }
 
 async function channels_(): Promise<ChannelsState> {
-  await requireAdminActor();
+  await requireModule('design');
   const { data } = await looseAdmin().from('mjengo_channel_connections').select('id, channel, account_name, connected_at').order('connected_at');
   return { connections: (data ?? []) as ConnectionRow[], available: availableProviders() };
 }
 
 async function disconnect_(id: string) {
-  const a = await requireAdminActor();
+  const a = await requireModule('design');
   const { data } = await looseAdmin().from('mjengo_channel_connections').delete().eq('id', id).select('channel, account_name').maybeSingle();
   if (data) await logAudit({ actorId: a.id, actorEmail: a.email, action: 'channel.disconnected', targetType: 'channel', targetLabel: `${data.channel} ${data.account_name ?? ''}`.trim() });
 }
 
 /** Publish now to every channel that has a connected account; returns what happened per channel. */
 async function publishNow_(id: string): Promise<PostRow['results']> {
-  const a = await requireAdminActor();
+  const a = await requireModule('design');
   const { data } = await looseAdmin().from('mjengo_posts').select('id, title, body, channels, media, variants, link_url, results, status, created_by').eq('id', id).maybeSingle();
   if (!data) throw new Error('That post no longer exists.');
   if (!data.body?.trim()) throw new Error('Write the post first.');
@@ -129,7 +130,7 @@ async function publishNow_(id: string): Promise<PostRow['results']> {
 
 /** A caption for a post, written for the chosen networks. Plain text, no dashes, ready to edit. */
 async function caption_(about: string, channels: Channel[]): Promise<string> {
-  await requireAdminActor();
+  await requireModule('design');
   const key = process.env.OPENROUTER_API_KEY;
   if (!key) throw new Error('AI is not set up on this site yet.');
   const where = channels.length ? channels.join(', ') : 'social media';
@@ -156,13 +157,13 @@ async function caption_(about: string, channels: Channel[]): Promise<string> {
 export interface SocialTag { id: string; channel: Channel; kind: 'mention' | 'hashtag'; value: string; label: string | null; auto: boolean }
 
 async function tags_(): Promise<SocialTag[]> {
-  await requireAdminActor();
+  await requireModule('design');
   const { data } = await looseAdmin().from('mjengo_social_tags').select('id, channel, kind, value, label, auto').order('kind').order('value');
   return (data ?? []) as SocialTag[];
 }
 
 async function saveTag_(v: { channel: Channel; kind: 'mention' | 'hashtag'; value: string; label?: string | null; auto?: boolean }, id?: string | null): Promise<SocialTag> {
-  const a = await requireAdminActor();
+  const a = await requireModule('design');
   if (!CHANNELS.includes(v.channel)) throw new Error('Unknown network.');
   const value = v.value.trim().replace(/^[#@]+/, '').replace(/\s+/g, '');
   if (!/^[A-Za-z0-9._-]{1,60}$/.test(value)) throw new Error('Use letters, numbers, dots, dashes or underscores.');
@@ -175,13 +176,13 @@ async function saveTag_(v: { channel: Channel; kind: 'mention' | 'hashtag'; valu
 }
 
 async function deleteTag_(id: string) {
-  await requireAdminActor();
+  await requireModule('design');
   await looseAdmin().from('mjengo_social_tags').delete().eq('id', id);
 }
 
 /** Rewrite the shared text in the voice and shape of one network, keeping the facts. */
 async function adapt_(text: string, channel: Channel): Promise<string> {
-  await requireAdminActor();
+  await requireModule('design');
   const info = CHANNEL_INFO[channel];
   const { askAi } = await import('@/lib/mjengo/ai');
   const rules: Record<Channel, string> = {
