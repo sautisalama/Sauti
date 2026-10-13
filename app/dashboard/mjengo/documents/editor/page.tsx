@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { WordcraftEditor, httpVersionStore, type SavedFile, type WordcraftEditorRef } from "@gamine/wordcraft-react";
 import * as Y from "yjs";
 import type { AiOptions } from "@gamine/wordcraft-react";
+import { designSystemsForForms } from "@/app/actions/mjengo-forms";
 import { yjsCollaboration } from "@gamine/wordcraft-react/collab";
 import { MjengoLoader } from "../../_components/MjengoLoader";
 import { createClient } from "@/utils/supabase/client";
@@ -48,6 +49,31 @@ const colorFor = (s: string) => COLORS[[...s].reduce((a, c) => a + c.charCodeAt(
 
 const extOf = (n: string) => n.split(".").pop()?.toLowerCase() ?? "";
 
+/** The organisation's letterhead and the colours of every saved design system, handed to AI Studio. */
+async function loadBrand(): Promise<Pick<AiOptions, "letterhead" | "palettes">> {
+	const out: Pick<AiOptions, "letterhead" | "palettes"> = {};
+	try {
+		let logo: string | undefined;
+		try {
+			const r = await fetch("/Logo.png");
+			if (r.ok) {
+				const blob = await r.blob();
+				logo = await new Promise<string>((resolve, reject) => { const fr = new FileReader(); fr.onload = () => resolve(String(fr.result)); fr.onerror = reject; fr.readAsDataURL(blob); });
+			}
+		} catch { /* a letterhead without the logo is still a letterhead */ }
+		out.letterhead = { name: "Sauti Salama", tagline: "Breaking the Silence, Building a Brighter Future", contact: "sautisalama.org", logo, logoWidth: 56, align: "left", rule: true };
+	} catch { /* defaults */ }
+	try {
+		const r = await designSystemsForForms();
+		const hex = (c: string) => c.replace(/^#/, "").toUpperCase();
+		const palettes = r
+			.filter((d) => (d.colors ?? []).length)
+			.map((d) => ({ id: `ds-${d.id}`, name: d.name, primary: hex(d.colors[0]), secondary: hex(d.colors[1] ?? d.colors[0]), accent: hex(d.colors[2] ?? d.colors[0]), muted: "6B7280" }));
+		if (palettes.length) out.palettes = [{ id: "sauti", name: "Sauti Salama", primary: "0F3B44", secondary: "068297", accent: "068297", muted: "6B7280" }, ...palettes];
+	} catch { /* built-in palettes */ }
+	return out;
+}
+
 /** The WordCraft document editor, saving into the vault so sharing, folders and email attachments all apply. */
 function EditorScreen() {
 	const { toast } = useToast();
@@ -60,6 +86,13 @@ function EditorScreen() {
 	const ref = useRef<WordcraftEditorRef>(null);
 	const [shareOpen, setShareOpen] = useState(false);
 	const [versionsOpen, setVersionsOpen] = useState(false);
+	const [brand, setBrand] = useState<Pick<AiOptions, "letterhead" | "palettes"> | null>(null);
+	useEffect(() => {
+		let on = true;
+		Promise.race([loadBrand(), new Promise<Pick<AiOptions, "letterhead" | "palettes">>((res) => setTimeout(() => res({}), 2500))]).then((b) => on && setBrand(b));
+		return () => { on = false; };
+	}, []);
+	const aiOptions = useMemo<AiOptions>(() => ({ ...ai, ...(brand ?? {}) }), [brand]);
 	const [metaKey, setMetaKey] = useState(0);
 	const [fileId, setFileId] = useState<string | null>(initialFile);
 	const [name, setName] = useState("Untitled document.docx");
@@ -194,7 +227,7 @@ function EditorScreen() {
 
 	return (
 		<div className="flex h-full min-h-0 flex-col bg-white">
-			{loading ? (
+			{loading || !brand ? (
 				<MjengoLoader label="Opening your document" className="h-full min-h-0" />
 			) : (
 				<>
@@ -217,7 +250,7 @@ function EditorScreen() {
 													versionHistory={fileId ? { store: httpVersionStore(`/api/mjengo/docs/versions/${fileId}`), documentId: fileId, interval: 120_000 } : true}
 							versionsOpen={versionsOpen}
 							onVersionsOpenChange={setVersionsOpen}
-						ai={ai}
+						ai={aiOptions}
 						collaboration={collab?.collaboration ?? null}
 						onSave={onSave}
 						onError={(e) => toast({ title: "The editor reported a problem", description: e.message, variant: "destructive" })}
