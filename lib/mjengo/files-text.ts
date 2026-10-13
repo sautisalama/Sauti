@@ -1,5 +1,5 @@
 import { looseAdmin } from '@/lib/loose-db';
-import { atLeast, levelFor, loadIndex, oversightFor } from '@/lib/vault/access';
+import { atLeast, descendants, levelFor, loadIndex, oversightFor } from '@/lib/vault/access';
 
 const BUCKET = 'mjengo-docs';
 
@@ -37,6 +37,25 @@ export async function readableFile(actorId: string, actorEmail: string, fileId: 
   if (!f) throw new Error('That file no longer exists.');
   if (!atLeast(levelFor(ix, actorId, 'file', fileId, oversight), 'view')) throw new Error('You do not have access to that file.');
   return { id: f.id, name: f.name, text: await extractText(f.storage_path, f.name, f.mime, max) };
+}
+
+/**
+ * The readable files inside a vault folder (and its sub-folders) that this person may open, newest first.
+ * Only vault folders can be given; each file is read for a limited amount of text.
+ */
+export async function readableFolder(actorId: string, actorEmail: string, folderId: string, files = 6, perFile = 3500): Promise<{ folder: string; files: { id: string; name: string; text: string }[]; total: number }> {
+  const [ix, oversight] = await Promise.all([loadIndex(), oversightFor(actorEmail)]);
+  const folder = ix.folders.get(folderId);
+  if (!folder) throw new Error('That folder no longer exists.');
+  if (!atLeast(levelFor(ix, actorId, 'folder', folderId, oversight), 'view')) throw new Error('You do not have access to that folder.');
+  const { files: all } = descendants(ix, folderId);
+  const mine = all
+    .filter((f) => atLeast(levelFor(ix, actorId, 'file', f.id, oversight), 'view'))
+    .filter((f) => /\.(pdf|docx|txt|md|csv|json|html)$/i.test(f.name) || (f.mime ?? '').startsWith('text/'))
+    .sort((a, b) => (b.updated_at ?? '').localeCompare(a.updated_at ?? ''));
+  const out: { id: string; name: string; text: string }[] = [];
+  for (const f of mine.slice(0, files)) out.push({ id: f.id, name: f.name, text: await extractText(f.storage_path, f.name, f.mime, perFile) });
+  return { folder: folder.name, files: out, total: mine.length };
 }
 
 /** The person's private folder for what they feed the assistant; created on first use. */

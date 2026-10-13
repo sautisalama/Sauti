@@ -1,5 +1,7 @@
 "use client";
 
+import { Folder as FolderIcon } from "lucide-react";
+import { VaultPicker } from "../_components/VaultPicker";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import logo from "@/public/logo-small.png";
@@ -63,7 +65,9 @@ export default function AssistantPage() {
 	const [manageDesigns, setManageDesigns] = useState(false);
 	const [rail, setRail] = useState(false);
 	const [postFor, setPostFor] = useState<{ id: string; about: string } | null>(null);
-	const [attached, setAttached] = useState<{ id: string; name: string }[]>([]);
+	const [attached, setAttached] = useState<{ id: string; name: string; kind?: "file" | "folder" }[]>([]);
+	const [pickVault, setPickVault] = useState(false);
+	const [menuOpen, setMenuOpen] = useState(false);
 	const [uploading, setUploading] = useState(false);
 	const filePick = useRef<HTMLInputElement>(null);
 	const scroller = useRef<HTMLDivElement>(null);
@@ -131,7 +135,7 @@ export default function AssistantPage() {
 				const { path, signedUrl } = await prepareUpload(folder, f.name, f.size);
 				await putToSignedUrl(signedUrl, f);
 				const created = await registerUpload(folder, path, f.name, f.size, f.type || null);
-				setAttached((a) => [...a, { id: created.id, name: f.name }].slice(0, 3));
+				setAttached((a) => [...a, { id: created.id, name: f.name }].slice(0, 5));
 			}
 		} catch (e) {
 			toast({ title: "Could not add the document", description: e instanceof Error ? e.message : undefined, variant: "destructive" });
@@ -159,7 +163,7 @@ export default function AssistantPage() {
 				method: "POST",
 				signal: ctl.signal,
 				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({ threadId: active, message: text, mode, designSystemId: designId, fileIds: attached.map((a) => a.id) }),
+				body: JSON.stringify({ threadId: active, message: text, mode, designSystemId: designId, fileIds: attached.filter((a) => a.kind !== "folder").map((a) => a.id), folderIds: attached.filter((a) => a.kind === "folder").map((a) => a.id) }),
 			});
 			if (!res.body) throw new Error("No answer came back.");
 			const reader = res.body.getReader();
@@ -333,12 +337,19 @@ export default function AssistantPage() {
 							{attached.length > 0 && (
 								<div className="flex flex-wrap gap-1.5 px-2 pb-1">
 									{attached.map((a) => (
-										<span key={a.id} className="flex max-w-[220px] items-center gap-1.5 rounded-full bg-[#f4f4f2] py-1 pl-2.5 pr-1 text-xs text-[#37352f]"><FileText className="h-3.5 w-3.5 shrink-0" /><span className="truncate">{a.name}</span><button type="button" aria-label={`Remove ${a.name}`} onClick={() => setAttached((x) => x.filter((y) => y.id !== a.id))} className="rounded-full p-0.5 hover:bg-black/10"><X className="h-3 w-3" /></button></span>
+										<span key={a.id} className="flex max-w-[220px] items-center gap-1.5 rounded-full bg-[#f4f4f2] py-1 pl-2.5 pr-1 text-xs text-[#37352f]">{a.kind === "folder" ? <FolderIcon className="h-3.5 w-3.5 shrink-0 text-amber-500" /> : <FileText className="h-3.5 w-3.5 shrink-0" />}<span className="truncate">{a.name}</span><button type="button" aria-label={`Remove ${a.name}`} onClick={() => setAttached((x) => x.filter((y) => y.id !== a.id))} className="rounded-full p-0.5 hover:bg-black/10"><X className="h-3 w-3" /></button></span>
 									))}
 								</div>
 							)}
 							<div className="flex items-center gap-1 px-1">
-								<button type="button" onClick={() => filePick.current?.click()} disabled={uploading} aria-label="Add a document" title="Add a document (kept in Private docs)" className="flex h-8 w-8 items-center justify-center rounded-full text-[#787774] hover:bg-black/5">{uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Paperclip className="h-4 w-4" />}</button>
+								<Popover open={menuOpen} onOpenChange={setMenuOpen}>
+									<PopoverTrigger asChild><button type="button" disabled={uploading} aria-label="Attach files or a folder" title="Attach files or a folder" className="flex h-8 w-8 items-center justify-center rounded-full text-[#787774] hover:bg-black/5">{uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Paperclip className="h-4 w-4" />}</button></PopoverTrigger>
+									<PopoverContent align="start" side="top" className="w-64 p-1.5">
+										<button type="button" onClick={() => { setMenuOpen(false); setPickVault(true); }} className="flex w-full items-center gap-3 rounded-md px-2.5 py-2 text-left text-sm hover:bg-black/5"><FolderIcon className="h-4 w-4 text-amber-500" /><span><span className="block font-medium">From Files</span><span className="block text-xs text-[#787774]">Documents and folders in the vault</span></span></button>
+										<button type="button" onClick={() => { setMenuOpen(false); filePick.current?.click(); }} className="flex w-full items-center gap-3 rounded-md px-2.5 py-2 text-left text-sm hover:bg-black/5"><Paperclip className="h-4 w-4 text-[#787774]" /><span><span className="block font-medium">From this device</span><span className="block text-xs text-[#787774]">Kept in your Private docs</span></span></button>
+									</PopoverContent>
+								</Popover>
+								<VaultPicker open={pickVault} onClose={() => setPickVault(false)} allowFolders max={5} title="Attach from Files" already={attached.map((a) => a.id)} onPick={(items) => setAttached((cur) => [...cur, ...items.map((i) => ({ id: i.id, name: i.name, kind: i.kind }))].slice(0, 5))} />
 								<input ref={filePick} type="file" multiple accept=".pdf,.docx,.txt,.md,.csv,application/pdf" className="hidden" onChange={(e) => attachFiles(e.target.files)} />
 								<button type="button" onClick={() => setMode((m) => (m === "image" ? "chat" : "image"))} aria-pressed={mode === "image"} className={cn("flex h-8 items-center gap-1.5 rounded-full px-3 text-sm", mode === "image" ? "bg-sauti-teal-light text-sauti-teal" : "text-[#787774] hover:bg-black/5")}>
 									<ImageIcon className="h-4 w-4" /> Image

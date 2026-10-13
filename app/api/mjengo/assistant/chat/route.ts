@@ -3,7 +3,7 @@ import { getActor } from "@/lib/access/super-admin";
 import { looseAdmin } from "@/lib/loose-db";
 import { decryptField, encryptField } from "@/lib/security/crypto";
 import { NO_DASH_RULE, stripDashes } from "@/lib/plain-text";
-import { readableFile } from "@/lib/mjengo/files-text";
+import { readableFile, readableFolder } from "@/lib/mjengo/files-text";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -28,7 +28,7 @@ export async function POST(request: Request) {
 	const actor = await getActor();
 	if (!actor?.isAdmin) return new Response(line({ t: "error", message: "Please sign in again." }), { status: 401 });
 
-	let body: { threadId?: string | null; message?: string; mode?: "chat" | "image"; designSystemId?: string | null; fileIds?: string[] };
+	let body: { threadId?: string | null; message?: string; mode?: "chat" | "image"; designSystemId?: string | null; fileIds?: string[]; folderIds?: string[] };
 	try { body = await request.json(); } catch { return new Response(line({ t: "error", message: "Bad request." }), { status: 400 }); }
 	const text = (body.message ?? "").trim().slice(0, 6000);
 	if (!text) return new Response(line({ t: "error", message: "Write a message first." }), { status: 400 });
@@ -106,11 +106,16 @@ export async function POST(request: Request) {
 	for (const fid of (body.fileIds ?? []).slice(0, 3)) {
 		try { attached.push(await readableFile(actor.id, actor.email, fid, 6000)); } catch { /* skip files they cannot open */ }
 	}
-	const withFiles = attached.length
-		? `${attached.map((f) => `Attached file "${f.name}":\n${f.text || "(the contents could not be read)"}`).join("\n\n")}\n\n${text}`
+	// Folders from the vault: their readable files, a few of them, are read for context.
+	const folders: { folder: string; files: { id: string; name: string; text: string }[]; total: number }[] = [];
+	for (const fid of (body.folderIds ?? []).slice(0, 2)) {
+		try { folders.push(await readableFolder(actor.id, actor.email, fid)); } catch { /* skip folders they cannot open */ }
+	}
+	const withFiles = attached.length || folders.length
+		? `${attached.map((f) => `Attached file "${f.name}":\n${f.text || "(the contents could not be read)"}`).join("\n\n")}${folders.map((d) => `\n\nAttached folder "${d.folder}" (${d.files.length} of ${d.total} readable files):\n${d.files.map((f) => `- "${f.name}":\n${f.text || "(the contents could not be read)"}`).join("\n\n")}`).join("")}\n\n${text}`
 		: text;
 
-	await db.from("mjengo_ai_messages").insert({ thread_id: threadId, role: "user", content: text, file_ids: attached.map((f) => f.id) });
+	await db.from("mjengo_ai_messages").insert({ thread_id: threadId, role: "user", content: text, file_ids: [...attached.map((f) => f.id), ...folders.flatMap((d) => d.files.map((f) => f.id))] });
 	await db.from("mjengo_ai_threads").update({ status: "running", error: null }).eq("id", threadId);
 
 	const enc = new TextEncoder();
