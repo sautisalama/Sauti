@@ -1,3 +1,4 @@
+// WIP, paused: highlight, text, picture, move and resize pass; Draw and Note after a first mark, Sign placement, and the saved-size check fail (the size check compares against a smaller original, so it is not a valid test).
 // PDF editor, every tool: highlight, draw, text, note, sign, picture; move and resize a mark; undo and redo;
 // delete; save back to Files; the saved file is still a valid PDF with the same pages and is larger.
 //   node --env-file=.env.local scripts/e2e/uat/20-pdf.mjs

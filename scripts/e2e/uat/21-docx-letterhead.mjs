@@ -1,3 +1,4 @@
+// WIP, paused: the editor was still on "Starting the editor" after 150 s in the last run (see the upload-tray snapshot fix just before it), so the letterhead steps were never reached.
 // A Word document gets the organisation letterhead from the brand: open the editor on a .docx, open AI Studio,
 // apply the letterhead, save, and check that the saved file's header carries the organisation name.
 //   node --env-file=.env.local scripts/e2e/uat/21-docx-letterhead.mjs
