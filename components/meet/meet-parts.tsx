@@ -97,3 +97,51 @@ export function ChatPanel({ lines, onSend }: { lines: ChatMsg[]; onSend: (text: 
 		</div>
 	);
 }
+
+/* ---------------------------------------------------------------- polls */
+
+export interface Poll { id: string; question: string; options: string[]; by: string; votes: Record<string, number>; open: boolean }
+
+/** Quick polls inside the call: anyone can ask, everyone votes once (and may change it), results update live. */
+export function PollPanel({ polls, me, onCreate, onVote, onClose }: { polls: Poll[]; me: string; onCreate: (q: string, options: string[]) => void; onVote: (pollId: string, option: number) => void; onClose: (pollId: string) => void }) {
+	const [q, setQ] = useState("");
+	const [opts, setOpts] = useState(["", ""]);
+	const ready = q.trim() && opts.filter((o) => o.trim()).length >= 2;
+	return (
+		<div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4 text-sm">
+			{polls.map((p) => {
+				const total = Object.keys(p.votes).length;
+				const mine = p.votes[me];
+				return (
+					<div key={p.id} className="rounded-xl border border-[#dadce0] p-3">
+						<p className="font-medium">{p.question}</p>
+						<p className="mb-2 text-[11px] text-[#5f6368]">{p.by} asked · {total} vote{total === 1 ? "" : "s"}{p.open ? "" : " · closed"}</p>
+						<div className="space-y-1.5">
+							{p.options.map((o, i) => {
+								const n = Object.values(p.votes).filter((v) => v === i).length;
+								const pct = total ? Math.round((n / total) * 100) : 0;
+								return (
+									<button key={i} disabled={!p.open} onClick={() => onVote(p.id, i)} className={cn("relative w-full overflow-hidden rounded-lg border px-3 py-2 text-left", mine === i ? "border-[#068297]" : "border-[#dadce0] hover:border-[#068297]/50")}>
+										<span className="absolute inset-y-0 left-0 bg-[#e0f2f5]" style={{ width: `${pct}%` }} />
+										<span className="relative flex justify-between gap-2"><span>{o}</span><span className="text-xs text-[#5f6368]">{n} · {pct}%</span></span>
+									</button>
+								);
+							})}
+						</div>
+						{p.open && p.by === "You" && <button onClick={() => onClose(p.id)} className="mt-2 text-xs font-medium text-[#068297] hover:underline">End the poll</button>}
+					</div>
+				);
+			})}
+			<div className="space-y-2 rounded-xl bg-[#f8f9fa] p-3">
+				<p className="text-xs font-semibold uppercase tracking-wide text-[#5f6368]">Ask a question</p>
+				<input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Your question" aria-label="Poll question" className="h-9 w-full rounded-lg border border-[#dadce0] bg-white px-3 outline-none focus:border-[#068297]" />
+				{opts.map((o, i) => <input key={i} value={o} onChange={(e) => setOpts(opts.map((x, j) => (j === i ? e.target.value : x)))} placeholder={`Option ${i + 1}`} aria-label={`Option ${i + 1}`} className="h-9 w-full rounded-lg border border-[#dadce0] bg-white px-3 outline-none focus:border-[#068297]" />)}
+				<div className="flex items-center gap-2">
+					{opts.length < 6 && <button onClick={() => setOpts([...opts, ""])} className="text-xs font-medium text-[#068297] hover:underline">Add an option</button>}
+					<span className="flex-1" />
+					<button disabled={!ready} onClick={() => { onCreate(q.trim(), opts.map((x) => x.trim()).filter(Boolean)); setQ(""); setOpts(["", ""]); }} className="h-9 rounded-full bg-[#068297] px-4 text-sm font-medium text-white disabled:opacity-40">Start poll</button>
+				</div>
+			</div>
+		</div>
+	);
+}

@@ -10,6 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { MjengoLoader } from "../../_components/MjengoLoader";
 import { getFileUrl } from "../../vault/api";
+import { fixPptx } from "@/lib/mjengo/pptx-fix";
 
 type Previewer = {
 	renderNextSlide: () => void;
@@ -78,7 +79,7 @@ function Viewer() {
 				if (!res.ok) throw new Error("Could not download the file.");
 				const buf = await res.arrayBuffer();
 				if (cancelled) return;
-				bytes.current = buf;
+				bytes.current = await fixPptx(buf);
 				setError(null);
 				setLoading(false);
 				// Trigger the first draw.
@@ -115,7 +116,7 @@ function Viewer() {
 				if (mode === "slide" && keep > 0 && keep < p.slideCount) p.renderSingleSlide(keep);
 				setIndex(mode === "slide" ? Math.max(0, p.currentIndex) : 0);
 			} catch (e) {
-				if (!cancelled) setError(e instanceof Error ? e.message : "This presentation could not be drawn.");
+				if (!cancelled) { console.error("pptx", e instanceof Error ? e.stack : e); setError(e instanceof Error ? e.message : "This presentation could not be drawn."); }
 			}
 		})();
 		return () => { cancelled = true; };

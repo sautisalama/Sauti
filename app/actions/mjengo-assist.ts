@@ -5,6 +5,7 @@ import { guard } from '@/lib/action-result';
 import { requireAdminActor } from '@/lib/access/super-admin';
 import { requireModule } from '@/lib/access/permissions';
 import { askAi } from '@/lib/mjengo/ai';
+import { fixPptx } from '@/lib/mjengo/pptx-fix';
 
 const parse = <T,>(raw: string): T => {
   try {
@@ -119,7 +120,8 @@ async function deck_(prompt: string, theme: DeckTheme, slides: number): Promise<
   end.addText('Thank you', { x: 0.8, y: 2.0, w: 11.7, h: 1.6, fontFace: 'Calibri', fontSize: 48, bold: true, color: t.title });
   end.addText('Questions and conversation', { x: 0.8, y: 3.5, w: 11.7, h: 0.8, fontFace: 'Calibri', fontSize: 22, color: t.text });
 
-  const base64 = (await p.write({ outputType: 'base64' })) as string;
+  const bytes = (await p.write({ outputType: 'uint8array' })) as Uint8Array;
+  const base64 = Buffer.from(await fixPptx(bytes)).toString('base64');
   const name = `${(j.title ?? 'Presentation').replace(/[\\/:*?"<>|]+/g, ' ').trim().slice(0, 80) || 'Presentation'}.pptx`;
   return { name, base64, outline: body.map((s) => ({ title: s.title, bullets: s.bullets ?? [] })) };
 }

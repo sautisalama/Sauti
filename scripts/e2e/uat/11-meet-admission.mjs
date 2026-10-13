@@ -53,6 +53,15 @@ try {
 	await host.getByText("Camera off").first().waitFor({ timeout: 20000 });
 	check("The host sees that the guest's camera is off", true);
 
+	// Polls: a question asked by the guest reaches the host.
+	await guest.getByRole("button", { name: "Polls" }).click();
+	await guest.getByLabel("Poll question").fill("Lunch?");
+	await guest.getByLabel("Option 1").fill("Yes");
+	await guest.getByLabel("Option 2").fill("No");
+	await guest.getByRole("button", { name: "Start poll" }).click();
+	await host.getByText("Lunch?").waitFor({ timeout: 20000 });
+	check("A poll reaches everyone", true);
+
 	// Host controls: mute everyone is offered.
 	await host.getByRole("button", { name: "People" }).first().click();
 	check("Host controls are shown", (await host.getByText("Mute everyone").count()) > 0);

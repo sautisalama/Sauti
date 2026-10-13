@@ -6,9 +6,9 @@ import { MeetRecorder } from "@/lib/client/meet-recorder";
 import { putToSignedUrl } from "@/lib/client/upload";
 import { prepareUpload, registerUpload } from "@/app/dashboard/mjengo/vault/api";
 import { attachRecording } from "@/app/actions/mjengo-meet";
-import { Accessibility, Captions, Circle, ExternalLink, MoreVertical, ShieldCheck, UserPlus, Check, Copy, Hand, Info, Loader2, Mail, MessageCircle, MessageSquareText, Mic, MicOff, Minimize2, MonitorUp, Pin, PinOff, PictureInPicture2, PhoneOff, Smile, SmartphoneNfc, UserMinus, Users, Video, VideoOff, Volume2, X } from "lucide-react";
+import { Accessibility, Captions, Circle, ExternalLink, MoreVertical, ShieldCheck, UserPlus, Check, Copy, Hand, Info, Loader2, Mail, BarChart3, MessageCircle, MessageSquareText, Settings2, Mic, MicOff, Minimize2, MonitorUp, Pin, PinOff, PictureInPicture2, PhoneOff, Smile, SmartphoneNfc, UserMinus, Users, Video, VideoOff, Volume2, X } from "lucide-react";
 import { lockMeeting, enterMeeting, checkMeetingEntry, listKnocks, decideKnock, decideAllKnocks, saveMeetingChat, type Knock } from "@/app/actions/meet-room";
-import { ChatPanel, ReactionLayer, ReactionPicker, type ChatMsg, type FloatingReaction } from "./meet-parts";
+import { ChatPanel, PollPanel, ReactionLayer, ReactionPicker, type ChatMsg, type FloatingReaction, type Poll } from "./meet-parts";
 import { callStore } from "@/lib/client/call-store";
 import { createClient } from "@/utils/supabase/client";
 import { unwrap } from "@/lib/action-result";
@@ -38,7 +38,7 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 	const [sharing, setSharing] = useState(false);
 	const [remotes, setRemotes] = useState<Remote[]>([]);
 	const [captionsOn, setCaptionsOn] = useState(false);
-	const [panel, setPanel] = useState<"none" | "transcript" | "people" | "info" | "chat">("none");
+	const [panel, setPanel] = useState<"none" | "transcript" | "people" | "info" | "chat" | "polls" | "settings">("none");
 	const [handUp, setHandUp] = useState(false);
 	const [a11yOpen, setA11yOpen] = useState(false);
 	const [moreOpen, setMoreOpen] = useState(false);
@@ -64,6 +64,9 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 	const [entryError, setEntryError] = useState("");
 	const [isHost, setIsHost] = useState(false);
 	const [locked, setLocked] = useState(false);
+	const [polls, setPolls] = useState<Poll[]>([]);
+	const [noise, setNoise] = useState(true);
+	const [echo, setEcho] = useState(true);
 	const [knocks, setKnocks] = useState<Knock[]>([]);
 	const [chat, setChat] = useState<ChatMsg[]>([]);
 	const [unreadChat, setUnreadChat] = useState(0);
@@ -162,7 +165,7 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 			stopPreview();
 			try {
 				const stream = await navigator.mediaDevices.getUserMedia({
-					audio: micId ? { deviceId: { exact: micId } } : true,
+					audio: micId ? { deviceId: { exact: micId }, noiseSuppression: true, echoCancellation: true, autoGainControl: true } : { noiseSuppression: true, echoCancellation: true, autoGainControl: true },
 					video: mode === "video" ? (camId ? { deviceId: { exact: camId } } : true) : false,
 				});
 				if (cancelled) { stream.getTracks().forEach((t) => t.stop()); return; }
@@ -277,7 +280,7 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 		stopPreview();
 		try {
 			const stream = await navigator.mediaDevices.getUserMedia({
-				audio: micId ? { deviceId: { exact: micId } } : true,
+				audio: micId ? { deviceId: { exact: micId }, noiseSuppression: true, echoCancellation: true, autoGainControl: true } : { noiseSuppression: true, echoCancellation: true, autoGainControl: true },
 				video: mode === "video" ? (camId ? { deviceId: { exact: camId }, width: 1280, height: 720 } : { width: 1280, height: 720 }) : false,
 			});
 			local.current = stream;
@@ -300,6 +303,16 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 				setChat((cur) => (cur.some((x) => x.id === l.id) ? cur : [...cur, { ...l, mine: false }]));
 				setUnreadChat((n) => n + 1);
 			})
+			.on("broadcast", { event: "poll" }, ({ payload }) => {
+				const pl = payload as { id: string; question: string; options: string[]; by: string };
+				setPolls((cur) => (cur.some((x) => x.id === pl.id) ? cur : [...cur, { id: pl.id, question: String(pl.question).slice(0, 200), options: (pl.options ?? []).slice(0, 6).map((o) => String(o).slice(0, 80)), by: String(pl.by).slice(0, 60), votes: {}, open: true }]));
+				setPanel("polls");
+			})
+			.on("broadcast", { event: "vote" }, ({ payload }) => {
+				const v = payload as { id: string; voter: string; option: number };
+				setPolls((cur) => cur.map((x) => (x.id === v.id && x.open ? { ...x, votes: { ...x.votes, [v.voter]: v.option } } : x)));
+			})
+			.on("broadcast", { event: "pollend" }, ({ payload }) => setPolls((cur) => cur.map((x) => (x.id === (payload as { id: string }).id ? { ...x, open: false } : x))))
 			.on("broadcast", { event: "react" }, ({ payload }) => showReaction(String(payload.id), String(payload.emoji).slice(0, 8), String(payload.name ?? "Someone")))
 			.on("broadcast", { event: "ctl" }, ({ payload }) => {
 				// Only the host's instructions are followed.
@@ -476,6 +489,45 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 		setChat((cur) => [...cur, line]);
 		send("chat", { ...line, mine: false });
 	};
+	const askPoll = (question: string, options: string[]) => {
+		const id = `${myId.current}-${Date.now()}`;
+		setPolls((cur) => [...cur, { id, question, options, by: "You", votes: {}, open: true }]);
+		send("poll", { id, question, options, by: shownName });
+	};
+	const votePoll = (id: string, option: number) => {
+		setPolls((cur) => cur.map((x) => (x.id === id && x.open ? { ...x, votes: { ...x.votes, [myId.current]: option } } : x)));
+		send("vote", { id, voter: myId.current, option });
+	};
+	const endPoll = (id: string) => {
+		setPolls((cur) => cur.map((x) => (x.id === id ? { ...x, open: false } : x)));
+		send("pollend", { id });
+	};
+
+	/** Change microphone or camera while in the call: the new track replaces the old one on every connection. */
+	const switchDevice = async (kind: "audio" | "video", deviceId: string) => {
+		try {
+			const fresh = await navigator.mediaDevices.getUserMedia(kind === "audio"
+				? { audio: { deviceId: { exact: deviceId }, noiseSuppression: noise, echoCancellation: echo, autoGainControl: true } }
+				: { video: { deviceId: { exact: deviceId }, width: 1280, height: 720 } });
+			const track = (kind === "audio" ? fresh.getAudioTracks() : fresh.getVideoTracks())[0];
+			if (!track || !local.current) return;
+			const old = (kind === "audio" ? local.current.getAudioTracks() : local.current.getVideoTracks())[0];
+			track.enabled = kind === "audio" ? micOnRef.current : camOnRef.current;
+			for (const pc of pcs.current.values()) {
+				const sender = pc.getSenders().find((x) => x.track?.kind === kind);
+				if (sender && !(kind === "video" && sharing)) await sender.replaceTrack(track).catch(() => undefined);
+			}
+			if (old) { local.current.removeTrack(old); old.stop(); }
+			local.current.addTrack(track);
+			if (kind === "audio") setMicId(deviceId); else setCamId(deviceId);
+			if (localVideo.current) localVideo.current.srcObject = local.current;
+		} catch { /* the old device stays in use */ }
+	};
+	const applyAudioProcessing = async (next: { noiseSuppression?: boolean; echoCancellation?: boolean }) => {
+		const t = local.current?.getAudioTracks()[0];
+		await t?.applyConstraints({ noiseSuppression: next.noiseSuppression ?? noise, echoCancellation: next.echoCancellation ?? echo, autoGainControl: true }).catch(() => undefined);
+	};
+
 	const react = (emoji: string) => {
 		showReaction("me", emoji, shownName);
 		send("react", { id: myId.current, emoji, name: shownName });
@@ -849,10 +901,24 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 				{panel !== "none" && !embedded && (
 					<aside className="fixed inset-x-0 bottom-0 z-40 flex h-[70dvh] flex-col overflow-hidden rounded-t-2xl bg-white text-[#202124] shadow-2xl md:static md:m-3 md:ml-0 md:h-auto md:w-80 md:shrink-0 md:rounded-xl md:shadow-none">
 						<div className="flex items-center justify-between border-b border-[#dadce0] px-4 py-3 text-base">
-							{panel === "transcript" ? "Transcript" : panel === "info" ? "Meeting details" : panel === "chat" ? "Messages" : "People"}
+							{panel === "transcript" ? "Transcript" : panel === "info" ? "Meeting details" : panel === "chat" ? "Messages" : panel === "polls" ? "Polls" : panel === "settings" ? "Call settings" : "People"}
 							<button onClick={() => setPanel("none")} aria-label="Close" className="flex h-8 w-8 items-center justify-center rounded-full hover:bg-black/5"><X className="h-4 w-4" /></button>
 						</div>
 													{panel === "chat" && <ChatPanel lines={chat} onSend={sendChat} />}
+							{panel === "polls" && <PollPanel polls={polls} me={myId.current} onCreate={askPoll} onVote={votePoll} onClose={endPoll} />}
+							{panel === "settings" && (
+								<div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4 text-sm">
+									<label className="block"><span className="mb-1 block text-xs text-[#5f6368]">Microphone</span>
+										<select value={micId} onChange={(e) => void switchDevice("audio", e.target.value)} className="h-10 w-full rounded-lg border border-[#dadce0] bg-white px-2"><option value="">Default microphone</option>{mics.map((d) => <option key={d.id} value={d.id}>{d.label}</option>)}</select></label>
+									<label className="block"><span className="mb-1 block text-xs text-[#5f6368]">Camera</span>
+										<select value={camId} onChange={(e) => void switchDevice("video", e.target.value)} className="h-10 w-full rounded-lg border border-[#dadce0] bg-white px-2"><option value="">Default camera</option>{cams.map((d) => <option key={d.id} value={d.id}>{d.label}</option>)}</select></label>
+									<label className="block"><span className="mb-1 block text-xs text-[#5f6368]">Speaker</span>
+										<select value={speakerId} onChange={(e) => setSpeakerId(e.target.value)} className="h-10 w-full rounded-lg border border-[#dadce0] bg-white px-2"><option value="">Default speaker</option>{speakers.map((d) => <option key={d.id} value={d.id}>{d.label}</option>)}</select></label>
+									<label className="flex items-center justify-between gap-3"><span>Reduce background noise</span><input type="checkbox" checked={noise} onChange={(e) => { setNoise(e.target.checked); void applyAudioProcessing({ noiseSuppression: e.target.checked }); }} className="h-4 w-4 accent-[#068297]" /></label>
+									<label className="flex items-center justify-between gap-3"><span>Echo cancellation</span><input type="checkbox" checked={echo} onChange={(e) => { setEcho(e.target.checked); void applyAudioProcessing({ echoCancellation: e.target.checked }); }} className="h-4 w-4 accent-[#068297]" /></label>
+									<label className="flex items-center justify-between gap-3"><span>Play call sound</span><input type="checkbox" checked={speakerOn} onChange={(e) => setSpeakerOn(e.target.checked)} className="h-4 w-4 accent-[#068297]" /></label>
+								</div>
+							)}
 							{panel === "transcript" && (
 								<div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4 text-sm">
 								{!speechOk && <p className="text-amber-700">Live captions need Chrome, Edge or Safari. Others in the call may still see your words.</p>}
@@ -966,6 +1032,8 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 					</div>
 					<Ctl onClick={() => setPanel((p) => (p === "info" ? "none" : "info"))} label="Meeting details" icon={<Info className="h-5 w-5" />} active={panel === "info"} flat />
 					<Ctl onClick={() => setPanel((p) => (p === "people" ? "none" : "people"))} label="People" icon={<Users className="h-5 w-5" />} active={panel === "people"} flat />
+					<Ctl onClick={() => setPanel((p) => (p === "polls" ? "none" : "polls"))} label="Polls" icon={<BarChart3 className="h-5 w-5" />} active={panel === "polls"} flat />
+					<Ctl onClick={() => setPanel((p) => (p === "settings" ? "none" : "settings"))} label="Call settings" icon={<Settings2 className="h-5 w-5" />} active={panel === "settings"} flat />
 					<Ctl onClick={() => setPanel((p) => (p === "transcript" ? "none" : "transcript"))} label="Transcript" icon={<MessageSquareText className="h-5 w-5" />} active={panel === "transcript"} flat />
 					{embedded && <Ctl onClick={() => window.parent.postMessage({ type: "meet:minimize" }, window.location.origin)} label="Minimise" icon={<Minimize2 className="h-5 w-5" />} flat />}
 				</div>
@@ -997,6 +1065,8 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 							["Picture in picture", <PictureInPicture2 key="pp" className="h-5 w-5" />, () => { setMoreOpen(false); void dockCall(); }, false],
 							["People", <Users key="u" className="h-5 w-5" />, () => { setPanel("people"); setMoreOpen(false); }, false],
 							["Meeting details", <Info key="i" className="h-5 w-5" />, () => { setPanel("info"); setMoreOpen(false); }, false],
+							["Polls", <BarChart3 key="po" className="h-5 w-5" />, () => { setPanel("polls"); setMoreOpen(false); }, panel === "polls"],
+							["Call settings", <Settings2 key="se" className="h-5 w-5" />, () => { setPanel("settings"); setMoreOpen(false); }, panel === "settings"],
 							["Transcript", <MessageSquareText key="t" className="h-5 w-5" />, () => { setPanel("transcript"); setMoreOpen(false); }, false],
 						] as [string, React.ReactNode, () => void, boolean][]).map(([label, icon, run, on]) => (
 							<button key={label} onClick={run} className={cn("flex w-full items-center gap-4 rounded-xl px-4 py-3 text-left text-[15px]", on ? "bg-[#e0f2f5] text-[#068297]" : "active:bg-black/5")}>{icon}{label}</button>
