@@ -1,5 +1,5 @@
 import { publicDoc } from "@/lib/mjengo/public-doc";
-import { loadIndex, saveIndex, storage, type VersionMeta } from "@/lib/mjengo/doc-versions";
+import { loadIndex, parseVersionMeta, saveIndex, storage } from "@/lib/mjengo/doc-versions";
 
 export const runtime = "nodejs";
 
@@ -27,8 +27,8 @@ export async function PUT(req: Request, ctx: { params: Promise<{ id: string; vid
 	const { id, vid } = await ctx.params;
 	const bad = await check(id, vid, true);
 	if (bad) return bad;
-	let meta: VersionMeta;
-	try { meta = JSON.parse(req.headers.get("x-version-meta") ?? "{}") as VersionMeta; } catch { return new Response("Bad request.", { status: 400 }); }
+	const meta = parseVersionMeta(req.headers.get("x-version-meta"));
+	if (!meta) return new Response("Bad request.", { status: 400 });
 	const bytes = new Uint8Array(await req.arrayBuffer());
 	if (bytes.length > 25 * 1024 * 1024) return new Response("Too large.", { status: 413 });
 	const up = await storage().upload(`versions/${id}/${vid}.bin`, bytes, { contentType: "application/octet-stream", upsert: true });

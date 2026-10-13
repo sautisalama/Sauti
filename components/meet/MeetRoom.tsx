@@ -797,6 +797,7 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 				<span className="font-medium">{clock}</span>
 				<span className="text-white/40">|</span>
 				<span className="font-medium">{code}</span>
+					{companion && <span className="flex items-center gap-1.5 rounded-full bg-white/10 px-2.5 py-1 text-xs"><SmartphoneNfc className="h-3.5 w-3.5" /> Companion mode: sound is off so there is no echo</span>}
 				<button onClick={() => setPanel((p) => (p === "info" ? "none" : "info"))} aria-label="Meeting details" className="text-white/70 hover:text-white"><Info className="h-4 w-4" /></button>
 				<span className="flex-1" />
 				<button onClick={() => setPanel((p) => (p === "people" ? "none" : "people"))} aria-label="People" className="flex h-10 items-center gap-2 rounded-full bg-white/10 px-3 text-sm hover:bg-white/20"><Users className="h-4 w-4" />{remotes.length + 1}</button>

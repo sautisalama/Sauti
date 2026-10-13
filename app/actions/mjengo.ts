@@ -72,7 +72,7 @@ const FIELDS: Record<Kind, Field[]> = {
 };
 
 /** Details the person who added something may keep from everyone else, per item. */
-export const HIDEABLE: Record<Kind, string[]> = {
+const HIDEABLE: Record<Kind, string[]> = {
   grant: ['amount', 'funder', 'deadline', 'decision_date', 'owner_id', 'link', 'description', 'notes'],
   opportunity: ['value', 'organisation', 'deadline', 'owner_id', 'source_url', 'description', 'notes'],
   project: ['budget', 'spent', 'lead_id', 'grant_id', 'description', 'notes'],
