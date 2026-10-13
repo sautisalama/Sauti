@@ -1,5 +1,6 @@
 "use client";
 
+import { ManageAccess } from "./ManageAccess";
 import { SHARE_EMAIL_UI } from "@/lib/client/flags";
 import { useCallback, useEffect, useState } from "react";
 import { format, parseISO } from "date-fns";
@@ -89,9 +90,7 @@ export function EntityAccessPanel({ kind, id }: { kind: Kind; id: string }) {
 						{view.people.map((p) => (
 							<li key={p.id} className="flex items-center gap-3 py-1.5 text-sm">
 								<span className="min-w-0 flex-1 truncate">{p.name}</span>
-								<select value={p.level} disabled={busy} onChange={(e) => run(() => e.target.value === "none" ? setEntityAccess(kind, id, p.id, null, false) : setEntityAccess(kind, id, p.id, e.target.value as "view" | "edit", false))} aria-label={`Access for ${p.name}`} className="h-8 rounded-md border border-serene-neutral-200 bg-white px-1.5 text-xs">
-									<option value="view">Can view</option><option value="edit">Can edit</option><option value="none">Remove</option>
-								</select>
+								<ManageAccess name={p.name} level={p.level} disabled={busy} levels={[["view", "Can view"], ["edit", "Can edit"]]} onChange={(v) => run(() => setEntityAccess(kind, id, p.id, v as "view" | "edit" | null, false))} />
 							</li>
 						))}
 					</ul>

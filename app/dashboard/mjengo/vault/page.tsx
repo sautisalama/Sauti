@@ -51,6 +51,8 @@ export default function VaultPage() {
 	const [sortKey, setSortKey] = useState<"name" | "type" | "date" | "size">("date");
 	const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
 	const [typeFilter, setTypeFilter] = useState<string>("all");
+	// Only the things I have shared, so an old share can be found and taken back.
+	const [sharedOnly, setSharedOnly] = useState(false);
 	const [driveRename, setDriveRename] = useState<{ id: string; name: string } | null>(null);
 	const [addLink, setAddLink] = useState(false);
 	const [pickDoc, setPickDoc] = useState(false);
@@ -164,8 +166,10 @@ export default function VaultPage() {
 		setFolderId(null);
 	};
 
-	const folders = (data?.items ?? []).filter((i) => i.type === "folder");
-	const allFiles = (data?.items ?? []).filter((i) => i.type === "file");
+	const isShared = (i: VaultItem) => !!i.shared || i.people.length > 1;
+	const only = (i: VaultItem) => !sharedOnly || isShared(i);
+	const folders = (data?.items ?? []).filter((i) => i.type === "folder" && only(i));
+	const allFiles = (data?.items ?? []).filter((i) => i.type === "file" && only(i));
 	const extOf = (n: string) => (n.includes(".") ? n.split(".").pop()!.toLowerCase() : "file");
 	const types = ["all", ...Array.from(new Set(allFiles.map((f) => extOf(f.name)))).sort()];
 	const shownFiles = allFiles
@@ -222,6 +226,11 @@ export default function VaultPage() {
 						</button>
 					))}
 				</div>
+				{tab === "mine" && (
+					<button onClick={() => setSharedOnly((v) => !v)} aria-pressed={sharedOnly} title="Only what you have shared with others. Open one and press Manage beside a person to change or remove their access." className={cn("flex touch-manipulation items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold", sharedOnly ? "border-sauti-teal bg-sauti-teal-light text-sauti-teal" : "border-serene-neutral-200 bg-white text-serene-neutral-600 hover:bg-serene-neutral-50")}>
+						<Users className="h-3.5 w-3.5" /> Shared by me
+					</button>
+				)}
 				<nav aria-label="Folder path" className="flex min-w-0 flex-wrap items-center gap-1 text-sm">
 					<button onClick={() => setFolderId(null)} className="rounded px-1.5 py-0.5 text-serene-neutral-600 hover:bg-serene-neutral-100">{tab === "mine" ? "Mine" : "Shared with me"}</button>
 					{data?.path.map((p) => (

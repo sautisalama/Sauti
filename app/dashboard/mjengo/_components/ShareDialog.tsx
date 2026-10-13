@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { MjengoLoader } from "./MjengoLoader";
+import { ManageAccess } from "./ManageAccess";
 import { RecipientField } from "../mail/_components/RecipientField";
 import { getAccess, inviteByLink, listPeople, fileMeta, setFileMeta, setGeneralAccess, setPermission, type AccessView, type PersonRow, type VaultItem } from "../vault/api";
 
@@ -122,13 +123,7 @@ export function ShareDialog({ item, onClose }: { item: VaultItem | null; onClose
 										<span className="flex h-8 w-8 items-center justify-center rounded-full bg-serene-neutral-100 text-xs font-bold text-serene-neutral-600">{initials(p.name)}</span>
 										<span className="min-w-0 flex-1"><span className="block truncate font-medium">{p.name}</span><span className="block truncate text-xs text-serene-neutral-500">{p.email}{p.inherited ? " · from a parent folder" : ""}</span></span>
 										{p.inherited ? <span className="text-xs capitalize text-serene-neutral-500">{p.level}</span> : (
-											<Select value={p.level} disabled={busy || (p.level === "edit" && !canGiveEdit)} onValueChange={(v) => run(() => v === "none" ? setPermission(item!.type, item!.id, p.userId, null, notify) : setPermission(item!.type, item!.id, p.userId, v as "view" | "share" | "edit", notify))}>
-												<SelectTrigger className="h-8 w-44 text-xs"><SelectValue /></SelectTrigger>
-												<SelectContent>
-													{LEVELS.filter(([v]) => v !== "edit" || canGiveEdit).map(([v, l]) => <SelectItem key={v} value={v}>{l}</SelectItem>)}
-													<SelectItem value="none">Remove access</SelectItem>
-												</SelectContent>
-											</Select>
+											<ManageAccess name={p.name} level={p.level} disabled={busy || (p.level === "edit" && !canGiveEdit)} levels={LEVELS.filter(([v]) => v !== "edit" || canGiveEdit)} onChange={(v) => run(() => setPermission(item!.type, item!.id, p.userId, v as "view" | "share" | "edit" | null, notify), v ? undefined : `${p.name} no longer has access`)} />
 										)}
 									</li>
 								))}
