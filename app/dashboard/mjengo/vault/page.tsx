@@ -1,11 +1,12 @@
 "use client";
 
+import { tagBrandGuidelines } from "@/app/actions/mjengo-brand";
 import { MjengoLoader } from "../_components/MjengoLoader";
 import { ShareDialog } from "../_components/ShareDialog";
 import { DriveResult, saveToDrive } from "../_components/drive";
 import { AvatarStack, DriveBadge, useTeam } from "../_components/People";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ArrowDownAZ, ArrowUpAZ, ChevronDown, ChevronRight, LayoutGrid, List as ListIcon, CloudUpload, Download, FileEdit, FileText as FileTextIcon, Folder, FolderPlus, HardDrive, Loader2, MoreVertical, Pencil, Share2, Trash2, Unplug, Upload, Users } from "lucide-react";
+import { BookMarked, ArrowDownAZ, ArrowUpAZ, ChevronDown, ChevronRight, LayoutGrid, List as ListIcon, CloudUpload, Download, FileEdit, FileText as FileTextIcon, Folder, FolderPlus, HardDrive, Loader2, MoreVertical, Pencil, Share2, Trash2, Unplug, Upload, Users } from "lucide-react";
 import { format, formatDistanceToNow } from "date-fns";
 import { filesHub, renameDriveFolder, disconnectDrive, shareFolderToDrive, type FilesHub } from "@/app/actions/mjengo-files";
 import { unwrap } from "@/lib/action-result";
@@ -188,6 +189,7 @@ export default function VaultPage() {
 				<DropdownMenuItem onClick={() => open(i)}>{i.type === "folder" ? <Folder className="mr-2 h-4 w-4" /> : <Download className="mr-2 h-4 w-4" />}{i.type === "folder" ? "Open" : "Download"}</DropdownMenuItem>
 				{i.type === "file" && <DropdownMenuItem onClick={() => saveToDrive("vault", i.id)}><CloudUpload className="mr-2 h-4 w-4" />{i.driveLink ? "Update in Google Drive" : "Save to Google Drive"}</DropdownMenuItem>}
 				{i.type === "folder" && hub?.drive.connected && <DropdownMenuItem onClick={async () => { try { const r = await unwrap(shareFolderToDrive(i.id)); toast({ title: "Copied to Google Drive", description: `${r.copied} file${r.copied === 1 ? "" : "s"} added${r.skipped > 0 ? `, ${r.skipped} more to go: run it again` : ""}.` }); await loadHub(); load(); } catch (e) { fail("Could not copy to Google Drive", e); } }}><CloudUpload className="mr-2 h-4 w-4" />Share folder to Google Drive</DropdownMenuItem>}
+				{i.type === "file" && /\.(docx|pdf|txt|md)$/i.test(i.name) && <DropdownMenuItem onClick={async () => { try { await unwrap(tagBrandGuidelines(i.id)); toast({ title: "Tagged as the brand guidelines", description: "The brand was read from it. See it under Brand." }); } catch (e) { fail("Could not use it as the guidelines", e); } }}><BookMarked className="mr-2 h-4 w-4" />Use as brand guidelines</DropdownMenuItem>}
 				{(i.level === "share" || i.level === "edit") && <DropdownMenuItem onClick={() => setShare(i)}><Share2 className="mr-2 h-4 w-4" />Share</DropdownMenuItem>}
 				{i.level === "edit" && <DropdownMenuItem onClick={() => setRename(i)}><Pencil className="mr-2 h-4 w-4" />Rename</DropdownMenuItem>}
 				{i.level === "edit" && <DropdownMenuItem className="text-red-600" onClick={() => setRemoving(i)}><Trash2 className="mr-2 h-4 w-4" />Delete</DropdownMenuItem>}
