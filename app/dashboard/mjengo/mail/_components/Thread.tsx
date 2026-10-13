@@ -143,7 +143,10 @@ export function AiSummary({ accountId, mailbox, uid, subject, from, text, earlie
 	accountId: string; mailbox: string; uid: number; subject: string; from: string; text: string; earlier: { from: string; text: string }[];
 }) {
 	const key = `${accountId}:${mailbox}:${uid}`;
-	const long = text.length > 700 || earlier.length >= 2;
+	// Automated mail (no-reply senders, newsletters, receipts) is never summarised by itself: nobody needs a model
+	// to say that a receipt arrived. The manual Summarise button is still there.
+	const automated = /no[-_.]?reply|do[-_.]?not[-_.]?reply|notifications?@|newsletter|mailer|bounce|updates@|digest|billing@|receipts?@/i.test(from) || /unsubscribe|manage (your )?(email )?preferences|view in browser|view this email in/i.test(text.slice(-1500));
+	const long = !automated && (text.length > 700 || earlier.length >= 2);
 	const [out, setOut] = useState<string>(mailStore.summaries.get(key) ?? "");
 	const [busy, setBusy] = useState(false);
 	const [hidden, setHidden] = useState(false);

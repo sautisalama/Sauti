@@ -207,9 +207,31 @@ const ICON_KEYS = ['meeting', 'call', 'travel', 'deadline', 'writing', 'review',
 /** An icon key per event title, chosen by the AI from what the activity is. Unknown or failed titles are left out. */
 async function icons_(titles: string[]): Promise<Record<string, string>> {
   await requireModule('calendar');
-  const list = [...new Set(titles.map((t) => t.trim().slice(0, 100)).filter(Boolean))].slice(0, 40);
+  const all = [...new Set(titles.map((t) => t.trim().slice(0, 100)).filter(Boolean))].slice(0, 40);
+  // Words settle most titles without a model; only the rest are sent.
+  const WORDS: [RegExp, string][] = [
+    [/\b(meet|call|zoom|teams|standup|stand-up|sync|catch.?up|1:1|one.on.one)\b/i, 'meeting'],
+    [/\b(flight|travel|trip|train|airport|drive|visit|field)\b/i, 'travel'],
+    [/\b(deadline|due|submit|submission|closing)\b/i, 'deadline'],
+    [/\b(write|writing|draft|proposal|concept note)\b/i, 'writing'],
+    [/\b(review|audit|check|evaluation|feedback)\b/i, 'review'],
+    [/\b(workshop|retreat|forum|conference|summit)\b/i, 'workshop'],
+    [/\b(lunch|breakfast|dinner|coffee|tea)\b/i, 'lunch'],
+    [/\b(training|course|class|webinar|learning)\b/i, 'training'],
+    [/\b(interview|hiring|recruit)\b/i, 'interview'],
+    [/\b(report|reporting|brief)\b/i, 'report'],
+    [/\b(party|celebrat|birthday|social|team building)\b/i, 'social'],
+    [/\b(budget|finance|payroll|invoice|payment|accounts?)\b/i, 'finance'],
+    [/\b(focus|deep work|blocked|no meetings)\b/i, 'focus'],
+  ];
+  const known: Record<string, string> = {};
+  const list: string[] = [];
+  for (const t of all) {
+    const hit = WORDS.find(([re]) => re.test(t));
+    if (hit) known[t] = hit[1]; else list.push(t);
+  }
   const key = process.env.OPENROUTER_API_KEY;
-  if (!list.length || !key) return {};
+  if (!list.length || !key) return known;
   const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
     method: 'POST',
     signal: AbortSignal.timeout(20_000),
@@ -226,13 +248,13 @@ async function icons_(titles: string[]): Promise<Record<string, string>> {
       ],
     }),
   }).catch(() => null);
-  if (!res?.ok) return {};
+  if (!res?.ok) return known;
   try {
     const j = (await res.json()) as { choices?: { message?: { content?: string } }[] };
     const parsed = JSON.parse(j.choices?.[0]?.message?.content ?? '{}') as Record<string, string>;
-    return Object.fromEntries(Object.entries(parsed).filter(([t, k]) => list.includes(t) && ICON_KEYS.includes(k)));
+    return { ...known, ...Object.fromEntries(Object.entries(parsed).filter(([t, k]) => list.includes(t) && ICON_KEYS.includes(k))) };
   } catch {
-    return {};
+    return known;
   }
 }
 
