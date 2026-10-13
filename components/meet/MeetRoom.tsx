@@ -7,7 +7,7 @@ import { putToSignedUrl } from "@/lib/client/upload";
 import { prepareUpload, registerUpload } from "@/app/dashboard/mjengo/vault/api";
 import { attachRecording } from "@/app/actions/mjengo-meet";
 import { Accessibility, Captions, Circle, ExternalLink, MoreVertical, ShieldCheck, UserPlus, Check, Copy, Hand, Info, Loader2, Mail, MessageCircle, MessageSquareText, Mic, MicOff, Minimize2, MonitorUp, Pin, PinOff, PictureInPicture2, PhoneOff, Smile, SmartphoneNfc, UserMinus, Users, Video, VideoOff, Volume2, X } from "lucide-react";
-import { enterMeeting, checkMeetingEntry, listKnocks, decideKnock, decideAllKnocks, saveMeetingChat, type Knock } from "@/app/actions/meet-room";
+import { lockMeeting, enterMeeting, checkMeetingEntry, listKnocks, decideKnock, decideAllKnocks, saveMeetingChat, type Knock } from "@/app/actions/meet-room";
 import { ChatPanel, ReactionLayer, ReactionPicker, type ChatMsg, type FloatingReaction } from "./meet-parts";
 import { callStore } from "@/lib/client/call-store";
 import { createClient } from "@/utils/supabase/client";
@@ -63,6 +63,7 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 	const [entry, setEntry] = useState<"idle" | "checking" | "waiting" | "denied">("idle");
 	const [entryError, setEntryError] = useState("");
 	const [isHost, setIsHost] = useState(false);
+	const [locked, setLocked] = useState(false);
 	const [knocks, setKnocks] = useState<Knock[]>([]);
 	const [chat, setChat] = useState<ChatMsg[]>([]);
 	const [unreadChat, setUnreadChat] = useState(0);
@@ -306,7 +307,7 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 				const mine = payload.to === myId.current || payload.to === "all";
 				if (!mine) return;
 				if (payload.action === "mute") { micOnRef.current = false; setMicOn(false); local.current?.getAudioTracks().forEach((t) => (t.enabled = false)); pushState({ muted: true }); }
-				if (payload.action === "remove") void leaveRef.current();
+				if (payload.action === "remove" || payload.action === "end") void leaveRef.current();
 			})
 			.on("presence", { event: "join" }, ({ key, newPresences }) => {
 				if (key === myId.current) return;
@@ -490,7 +491,7 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 		const t = setInterval(poll, 3500);
 		return () => { on = false; clearInterval(t); };
 	}, [joined, code]);
-	const hostCtl = (to: string, action: "mute" | "remove") => send("ctl", { from: myId.current, to, action });
+	const hostCtl = (to: string, action: "mute" | "remove" | "end") => send("ctl", { from: myId.current, to, action });
 	const decide = (k: Knock, admit: boolean) => {
 		setKnocks((cur) => cur.filter((x) => x.guestKey !== k.guestKey));
 		void unwrap(decideKnock(code, k.guestKey, admit)).catch(() => undefined);
@@ -861,10 +862,12 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 						)}
 						{panel === "people" && (
 								<div className="min-h-0 flex-1 overflow-y-auto">
-									{isHost && remotes.length > 0 && (
-										<div className="flex items-center justify-between border-b border-[#e8eaed] px-4 py-2 text-xs">
-											<span className="text-[#5f6368]">You are the host</span>
-											<button onClick={() => hostCtl("all", "mute")} className="rounded-full border border-[#dadce0] px-3 py-1 font-medium text-[#068297] hover:bg-[#f1fafb]">Mute everyone</button>
+									{isHost && (
+										<div className="flex flex-wrap items-center gap-2 border-b border-[#e8eaed] px-4 py-2 text-xs">
+											<span className="mr-auto text-[#5f6368]">You are the host</span>
+											<button onClick={() => { const next = !locked; setLocked(next); void unwrap(lockMeeting(code, next)).catch(() => setLocked(!next)); }} aria-pressed={locked} className={cn("rounded-full border px-3 py-1 font-medium", locked ? "border-[#068297] bg-[#e0f2f5] text-[#068297]" : "border-[#dadce0] text-[#5f6368] hover:bg-[#f1fafb]")}>{locked ? "Call is locked" : "Lock the call"}</button>
+											{remotes.length > 0 && <button onClick={() => hostCtl("all", "mute")} className="rounded-full border border-[#dadce0] px-3 py-1 font-medium text-[#068297] hover:bg-[#f1fafb]">Mute everyone</button>}
+											{remotes.length > 0 && <button onClick={() => { hostCtl("all", "end"); setTimeout(() => void leaveRef.current(), 400); }} className="rounded-full bg-[#fce8e6] px-3 py-1 font-medium text-[#d93025] hover:bg-[#f9d6d2]">End for everyone</button>}
 										</div>
 									)}
 									{handOrder.length > 0 && (

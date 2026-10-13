@@ -50,6 +50,7 @@ async function enter_(code: string, guestKey: string, name: string): Promise<Ent
   const m = await meeting(code);
   const me = await participantOf(m);
   if (me) return { status: 'in', key: roomKey(code), host: me.host, name: me.name };
+  if (m.settings?.locked) throw new Error('The host has locked this call, so no one new can ask to join.');
   const key = String(guestKey).slice(0, 80);
   if (!key) throw new Error('Missing guest key.');
   const db = looseAdmin();
@@ -109,6 +110,15 @@ async function saveChat_(code: string, lines: ChatLine[]): Promise<void> {
   await db.from('mjengo_meetings').update({ chat: [...have.values()].sort((a, b) => a.at.localeCompare(b.at)) }).eq('code', code);
 }
 
+/** The host locks or unlocks the call: while it is locked nobody new can knock. */
+async function lock_(code: string, locked: boolean): Promise<void> {
+  const m = await meeting(code);
+  const me = await participantOf(m);
+  if (!me?.host) throw new Error('Only the host can lock the call.');
+  await looseAdmin().from('mjengo_meetings').update({ settings: { ...(m.settings ?? {}), locked } }).eq('code', code);
+}
+
+export const lockMeeting = guard(lock_);
 export const enterMeeting = guard(enter_);
 export const checkMeetingEntry = guard(check_);
 export const listKnocks = guard(knocks_);
