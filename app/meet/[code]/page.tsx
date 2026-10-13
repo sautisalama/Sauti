@@ -31,6 +31,7 @@ export default async function MeetPage({ params, searchParams }: { params: Promi
 			autoJoin={autojoin === "1"}
 			startMic={mic !== "0"}
 			startCam={cam !== "0"}
+			userId={actor?.id ?? null}
 		/>
 	);
 }

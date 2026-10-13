@@ -19,7 +19,7 @@ import { saveTranscript, type TranscriptLine } from "@/app/actions/mjengo-meet";
 import { cn } from "@/lib/utils";
 
 type SignalKind = "offer" | "answer" | "ice";
-interface Peer { id: string; name: string; companion?: boolean }
+interface Peer { id: string; name: string; companion?: boolean; uid?: string | null }
 interface Remote extends Peer { stream: MediaStream | null; muted: boolean; sharing?: boolean; hand?: boolean; cam?: boolean; host?: boolean; handAt?: number }
 interface Device { id: string; label: string }
 
@@ -33,7 +33,7 @@ const ICE: RTCIceServer[] = [
 const LANGS = [["en-KE", "English (Kenya)"], ["en-US", "English (US)"], ["en-GB", "English (UK)"], ["sw-KE", "Kiswahili"]] as const;
 
 /** A small peer-to-peer call room: preview and device choice, video or voice, companion mode, sharing, captions. */
-export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, description = "", resources = [], autoJoin = false, startMic = true, startCam = true }: { code: string; mode: "video" | "voice"; title: string | null; defaultName: string; canSave: boolean; embedded?: boolean; description?: string; resources?: { label: string; url: string }[]; autoJoin?: boolean; startMic?: boolean; startCam?: boolean }) {
+export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, description = "", resources = [], autoJoin = false, startMic = true, startCam = true, userId = null }: { code: string; mode: "video" | "voice"; title: string | null; defaultName: string; canSave: boolean; embedded?: boolean; description?: string; resources?: { label: string; url: string }[]; autoJoin?: boolean; startMic?: boolean; startCam?: boolean; /** The signed-in account, which is what lets a second device join as a companion. */ userId?: string | null }) {
 	const [name, setName] = useState(defaultName);
 	const [joined, setJoined] = useState(false);
 	const [micOn, setMicOn] = useState(startMic);
@@ -132,7 +132,7 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 	const setRemote = useCallback((id: string, patch: Partial<Remote>) => {
 		setRemotes((cur) => {
 			if (cur.some((r) => r.id === id)) return cur.map((r) => (r.id === id ? { ...r, ...patch } : r));
-			return [...cur, { id, name: patch.name ?? "Guest", stream: patch.stream ?? null, muted: false, cam: true, companion: patch.companion, host: patch.host }];
+			return [...cur, { id, name: patch.name ?? "Guest", stream: patch.stream ?? null, muted: false, cam: true, companion: patch.companion, uid: patch.uid, host: patch.host }];
 		});
 	}, []);
 
@@ -226,7 +226,7 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 		if (pcs.current.has(peer.id)) return;
 		const pc = new RTCPeerConnection({ iceServers: ICE });
 		pcs.current.set(peer.id, pc);
-		setRemote(peer.id, { name: peer.name, companion: peer.companion });
+		setRemote(peer.id, { name: peer.name, companion: peer.companion, uid: peer.uid });
 		local.current?.getTracks().forEach((t) => pc.addTrack(t, local.current!));
 		if (!local.current?.getVideoTracks().length) pc.addTransceiver("video", { direction: "recvonly" });
 		pc.ontrack = (e) => setRemote(peer.id, { stream: e.streams[0] });
@@ -240,14 +240,14 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 		if (initiator) {
 			const offer = await pc.createOffer();
 			await pc.setLocalDescription(offer);
-			send("signal", { from: myId.current, to: peer.id, kind: "offer" as SignalKind, data: offer, name: shownName, companion });
+			send("signal", { from: myId.current, to: peer.id, kind: "offer" as SignalKind, data: offer, name: shownName, companion, uid: userId });
 		}
-	}, [shownName, companion, send, setRemote]);
+	}, [shownName, companion, userId, send, setRemote]);
 
-	const onSignal = useCallback(async (m: { from: string; to: string; kind: SignalKind; data: unknown; name?: string; companion?: boolean }) => {
+	const onSignal = useCallback(async (m: { from: string; to: string; kind: SignalKind; data: unknown; name?: string; companion?: boolean; uid?: string | null }) => {
 		if (m.to !== myId.current) return;
 		if (m.kind === "offer") {
-			await connect({ id: m.from, name: m.name ?? "Guest", companion: m.companion }, false);
+			await connect({ id: m.from, name: m.name ?? "Guest", companion: m.companion, uid: m.uid }, false);
 			const pc = pcs.current.get(m.from)!;
 			await pc.setRemoteDescription(m.data as RTCSessionDescriptionInit);
 			for (const c of pendingIce.current.get(m.from) ?? []) await pc.addIceCandidate(c).catch(() => undefined);
@@ -336,10 +336,10 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 			})
 			.on("presence", { event: "join" }, ({ key, newPresences }) => {
 				if (key === myId.current) return;
-				const p = newPresences[0] as unknown as { name?: string; companion?: boolean; host?: boolean; ht?: string };
+				const p = newPresences[0] as unknown as { name?: string; companion?: boolean; uid?: string | null; host?: boolean; ht?: string };
 				// Someone who says they are the host is believed only after the server confirms it.
 				if (p?.ht) void unwrap(verifyHostToken(code, p.ht)).then((ok) => { if (ok) { hostIds.current.add(key); setRemote(key, { host: true }); } }).catch(() => undefined);
-				connect({ id: key, name: p?.name ?? "Guest", companion: p?.companion }, true);
+				connect({ id: key, name: p?.name ?? "Guest", companion: p?.companion, uid: p?.uid }, true);
 				
 				// The newcomer is told how this device is now once it is listening.
 				setTimeout(() => pushState({}), 900);
@@ -350,7 +350,7 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 				pcs.current.delete(key);
 				setRemotes((cur) => cur.filter((r) => r.id !== key));
 			})
-			.subscribe(async (status) => { if (status === "SUBSCRIBED") { await ch.track({ name: shownName, companion, host, ht: hostToken }); pushState({ muted: !micOnRef.current, cam: camOnRef.current && !!local.current?.getVideoTracks().length }); } });
+			.subscribe(async (status) => { if (status === "SUBSCRIBED") { await ch.track({ name: shownName, companion, uid: userId, host, ht: hostToken }); pushState({ muted: !micOnRef.current, cam: camOnRef.current && !!local.current?.getVideoTracks().length }); } });
 		setJoined(true);
 		setReadyOpen(true);
 		if (present) setTimeout(() => { void toggleShareRef.current(); }, 600);
@@ -741,11 +741,15 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 		channel.current?.unsubscribe();
 	}, []);
 
+	// A companion is the same person on a second device: it is only drawn while it presents or shows a camera.
+	const showsVideo = (r: Remote) => r.cam !== false && !!r.stream?.getVideoTracks().some((t) => t.readyState === "live" && !t.muted);
+	const visible = remotes.filter((r) => !r.companion || r.sharing || showsVideo(r));
+	const myCompanion = remotes.find((r) => r.companion && !!userId && r.uid === userId) ?? null;
 	const handOrder = remotes.filter((r) => r.hand).sort((a, b) => (a.handAt ?? 0) - (b.handAt ?? 0));
 	const tile = (r: Remote) => (
 		<RemoteTile key={r.id} r={r} sinkId={speakerId} audioOn={speakerOn} reaction={tileReact[r.id]} pinned={pinned === r.id} onPin={() => setPinned((p) => (p === r.id ? null : r.id))} />
 	);
-	const tiles = remotes.length + 1;
+	const tiles = visible.length + 1;
 	const cols = tiles <= 1 ? "grid-cols-1" : tiles <= 4 ? "grid-cols-1 sm:grid-cols-2" : "grid-cols-2 lg:grid-cols-3";
 	const mailto = `mailto:?subject=${encodeURIComponent(title || "Join the call")}&body=${encodeURIComponent(`Join the call: ${link}`)}`;
 
@@ -848,13 +852,17 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 					</label>
 					<div className="flex flex-wrap justify-center gap-3 lg:justify-start">
 						<button onClick={() => join(false)} disabled={!name.trim() || entry === "checking"} className="h-12 rounded-full bg-[#068297] px-7 text-sm font-medium text-white shadow-sm hover:bg-[#056d7e] disabled:opacity-40">{entry === "checking" ? "Joining…" : companion ? "Join as companion" : "Join now"}</button>
-						<button onClick={() => join(true)} disabled={!name.trim() || companion || entry === "checking"} className="flex h-12 items-center gap-2 rounded-full border border-[#dadce0] px-6 text-sm font-medium text-[#068297] hover:bg-[#f1fafb] disabled:opacity-40"><MonitorUp className="h-4 w-4" /> Present</button>
+						<button onClick={() => join(true)} disabled={!name.trim() || entry === "checking"} className="flex h-12 items-center gap-2 rounded-full border border-[#dadce0] px-6 text-sm font-medium text-[#068297] hover:bg-[#f1fafb] disabled:opacity-40"><MonitorUp className="h-4 w-4" /> Present</button>
 					</div>
 					{entryError && <p role="alert" className="max-w-sm text-sm text-[#d93025]">{entryError}</p>}
-						<label className="flex max-w-sm cursor-pointer items-start gap-3 text-left">
-							<input type="checkbox" checked={companion} onChange={(e) => { setCompanion(e.target.checked); if (e.target.checked) { setSpeakerOn(false); setMicOn(false); } else setMicOn(true); }} className="mt-1 h-4 w-4 accent-[#068297]" />
-							<span className="text-sm"><span className="flex items-center gap-1.5 font-medium"><SmartphoneNfc className="h-4 w-4" /> Companion mode</span><span className="block text-xs text-[#5f6368]">Already in this call on a computer? Join from this device to share its camera, present, chat and react. The microphone and speaker start off so there is no echo.</span></span>
-						</label>
+						{userId ? (
+							<label className="flex max-w-sm cursor-pointer items-start gap-3 text-left">
+								<input type="checkbox" checked={companion} onChange={(e) => { setCompanion(e.target.checked); if (e.target.checked) { setSpeakerOn(false); setMicOn(false); } else setMicOn(true); }} className="mt-1 h-4 w-4 accent-[#068297]" />
+								<span className="text-sm"><span className="flex items-center gap-1.5 font-medium"><SmartphoneNfc className="h-4 w-4" /> Use this device as a companion</span><span className="block text-xs text-[#5f6368]">Your microphone and speaker stay on the device you joined with. Use this one to see what is presented, present your screen, show a camera, chat and react. It shows to others as you, not as a second person.</span></span>
+							</label>
+						) : (
+							<p className="flex max-w-sm items-start gap-3 text-left text-xs text-[#5f6368]"><SmartphoneNfc className="mt-0.5 h-4 w-4 shrink-0" /> Sign in on this device and on your main device with the same account to use one of them as a companion.</p>
+						)}
 					<p className="max-w-sm text-xs text-[#5f6368]">Captions and accessibility tools are off until you turn them on inside the call. Calls go directly between people in the call.</p>
 				</div>
 			</div></main>
@@ -908,7 +916,8 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 				<span className="font-medium">{clock}</span>
 				<span className="text-white/40">|</span>
 				<span className="font-medium">{code}</span>
-					{companion && <span className="flex items-center gap-1.5 rounded-full bg-white/10 px-2.5 py-1 text-xs"><SmartphoneNfc className="h-3.5 w-3.5" /> Companion mode: sound is off so there is no echo</span>}
+					{companion && <span className="flex items-center gap-1.5 rounded-full bg-white/10 px-2.5 py-1 text-xs"><SmartphoneNfc className="h-3.5 w-3.5" /> Companion: sound stays on your main device</span>}
+					{!companion && myCompanion && <span className="flex items-center gap-1.5 rounded-full bg-[#068297]/30 px-2.5 py-1 text-xs"><SmartphoneNfc className="h-3.5 w-3.5" /> Your companion device is connected</span>}
 				<button onClick={() => setPanel((p) => (p === "info" ? "none" : "info"))} aria-label="Meeting details" className="text-white/70 hover:text-white"><Info className="h-4 w-4" /></button>
 				<span className="flex-1" />
 				<button onClick={() => setPanel((p) => (p === "people" ? "none" : "people"))} aria-label="People" className="flex h-10 items-center gap-2 rounded-full bg-white/10 px-3 text-sm hover:bg-white/20"><Users className="h-4 w-4" />{remotes.length + 1}</button>
@@ -943,21 +952,21 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 							</div>
 							<div className="flex shrink-0 gap-2 overflow-x-auto lg:w-56 lg:flex-col lg:overflow-y-auto">
 								<div className="h-28 w-44 shrink-0 lg:h-32 lg:w-full">{selfTile}</div>
-								{remotes.filter((r) => r.id !== presenter.id).map((r) => <div key={r.id} className="h-28 w-44 shrink-0 lg:h-32 lg:w-full">{tile(r)}</div>)}
+								{visible.filter((r) => r.id !== presenter.id).map((r) => <div key={r.id} className="h-28 w-44 shrink-0 lg:h-32 lg:w-full">{tile(r)}</div>)}
 							</div>
 						</div>
-											) : pinned && (pinned === "me" || remotes.some((r) => r.id === pinned)) ? (
+											) : pinned && (pinned === "me" || visible.some((r) => r.id === pinned)) ? (
 							<div className="flex h-full min-h-0 flex-col gap-3 lg:flex-row">
-								<div className="relative min-h-0 flex-1 overflow-hidden rounded-2xl">{pinned === "me" ? selfTile : tile(remotes.find((r) => r.id === pinned)!)}</div>
+								<div className="relative min-h-0 flex-1 overflow-hidden rounded-2xl">{pinned === "me" ? selfTile : tile(visible.find((r) => r.id === pinned)!)}</div>
 								<div className="flex shrink-0 gap-2 overflow-x-auto lg:w-56 lg:flex-col lg:overflow-y-auto">
 									{pinned !== "me" && <div className="h-28 w-44 shrink-0 lg:h-32 lg:w-full">{selfTile}</div>}
-									{remotes.filter((r) => r.id !== pinned).map((r) => <div key={r.id} className="h-28 w-44 shrink-0 lg:h-32 lg:w-full">{tile(r)}</div>)}
+									{visible.filter((r) => r.id !== pinned).map((r) => <div key={r.id} className="h-28 w-44 shrink-0 lg:h-32 lg:w-full">{tile(r)}</div>)}
 								</div>
 							</div>
 						) : (
-							<div className={cn("grid h-full min-h-0 auto-rows-fr gap-3", cols, remotes.length > 0 && "max-md:grid-cols-1 max-md:gap-1.5")}>
-							<div className={cn("min-h-0", remotes.length > 0 && "max-md:fixed max-md:bottom-24 max-md:right-3 max-md:z-20 max-md:h-36 max-md:w-24 max-md:overflow-hidden max-md:rounded-xl max-md:shadow-xl max-md:ring-1 max-md:ring-white/20")}>{selfTile}</div>
-							{remotes.map((r) => tile(r))}
+							<div className={cn("grid h-full min-h-0 auto-rows-fr gap-3", cols, visible.length > 0 && "max-md:grid-cols-1 max-md:gap-1.5")}>
+							<div className={cn("min-h-0", visible.length > 0 && "max-md:fixed max-md:bottom-24 max-md:right-3 max-md:z-20 max-md:h-36 max-md:w-24 max-md:overflow-hidden max-md:rounded-xl max-md:shadow-xl max-md:ring-1 max-md:ring-white/20")}>{selfTile}</div>
+							{visible.map((r) => tile(r))}
 						</div>
 					)}
 				</div>
@@ -1106,7 +1115,7 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 
 			{pipWin && createPortal(
 				<div className="flex h-screen w-screen flex-col bg-[#191919] text-white">
-					<div className={cn("grid min-h-0 flex-1 auto-rows-fr gap-1.5 overflow-auto p-1.5", remotes.length > 0 ? "grid-cols-2" : "grid-cols-1")}>
+					<div className={cn("grid min-h-0 flex-1 auto-rows-fr gap-1.5 overflow-auto p-1.5", visible.length > 0 ? "grid-cols-2" : "grid-cols-1")}>
 						<div className="min-h-[90px]">{selfTile}</div>
 						{remotes.map((r) => <div key={r.id} className="min-h-[90px]">{tile(r)}</div>)}
 					</div>
