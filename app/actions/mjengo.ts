@@ -239,7 +239,9 @@ export async function saveEntity(kind: Kind, id: string | null, values: Record<s
     revalidate();
     return row;
   }
-  const { data: row, error } = await db.from(TABLE[kind]).insert({ ...data, created_by: actor.id }).select('*').single();
+  // Private from the start: only the person who adds it (and anyone they add later) sees a restricted record.
+  const visibility = values.visibility === 'restricted' ? 'restricted' : 'team';
+  const { data: row, error } = await db.from(TABLE[kind]).insert({ ...data, visibility, created_by: actor.id }).select('*').single();
   if (error || !row) throw new Error('Could not create it.');
   await audit(actor, `${kind}.created`, kind, row.id, String(row[labelKey]));
   revalidate();

@@ -4,7 +4,7 @@ import { EntityReminders } from "@/components/mjengo/EntityReminders";
 import { MjengoLoader } from "./MjengoLoader";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { AlertCircle, BadgeCheck, CheckSquare, EyeOff, ExternalLink, FileWarning, Kanban, List, Loader2, Plus, Search, Trash2 } from "lucide-react";
+import { AlertCircle, BadgeCheck, CheckSquare, EyeOff, Lock, Users, ExternalLink, FileWarning, Kanban, List, Loader2, Plus, Search, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -186,6 +186,7 @@ export function EntityWorkspace({ kind }: { kind: Kind }) {
 		try {
 			const payload: Record<string, unknown> = {};
 			for (const f of cfg.fields) payload[f.key] = editing.values[f.key] === "" ? null : editing.values[f.key];
+			if (!editing.id) payload.visibility = editing.values.visibility === "restricted" ? "restricted" : "team";
 			const row = await saveEntity(kind, editing.id, payload);
 			await load();
 			setEditing({ id: row.id, values: { ...row } }); // stay open so documents can be added
@@ -289,7 +290,7 @@ export function EntityWorkspace({ kind }: { kind: Kind }) {
 							<li key={r.id}>
 								<button onClick={() => openRow(r)} className="flex w-full touch-manipulation flex-wrap items-center gap-x-4 gap-y-1 p-3 text-left hover:bg-serene-neutral-50 sm:flex-nowrap">
 									<div className="min-w-0 flex-1">
-										<p className="flex items-center gap-1.5 truncate text-sm font-semibold text-serene-neutral-900"><span className="truncate">{r[cfg.titleKey]}</span>{kind === "opportunity" && r.verification?.trust === "verified" && <BadgeCheck className="h-3.5 w-3.5 shrink-0 text-emerald-600" aria-label="Verified source" />}{kind === "opportunity" && r.verification && ["suspicious", "repost"].includes(r.verification.trust) && <AlertCircle className="h-3.5 w-3.5 shrink-0 text-amber-600" aria-label="Check the source" />}</p>
+										<p className="flex items-center gap-1.5 truncate text-sm font-semibold text-serene-neutral-900"><span className="truncate">{r[cfg.titleKey]}</span>{r.visibility === "restricted" && <Lock className="h-3 w-3 shrink-0 text-serene-neutral-400" aria-label="Private" />}{kind === "opportunity" && r.verification?.trust === "verified" && <BadgeCheck className="h-3.5 w-3.5 shrink-0 text-emerald-600" aria-label="Verified source" />}{kind === "opportunity" && r.verification && ["suspicious", "repost"].includes(r.verification.trust) && <AlertCircle className="h-3.5 w-3.5 shrink-0 text-amber-600" aria-label="Check the source" />}</p>
 										<p className="truncate text-xs text-serene-neutral-500">{r[cfg.subKey] || cfg.subLabel}</p>
 									</div>
 									<StatusPill kind={kind} value={r.status} />
@@ -356,7 +357,23 @@ export function EntityWorkspace({ kind }: { kind: Kind }) {
 									</Link>
 								</>
 							) : (
-								<p className="flex items-start gap-2 rounded-xl bg-sauti-teal-light/40 p-3 text-sm text-sauti-dark"><AlertCircle className="mt-0.5 h-4 w-4 shrink-0" /> Save first, then add the documents this {cfg.noun} needs.</p>
+								<>
+									<div className="rounded-xl border border-serene-neutral-100 p-3">
+										<p className="mb-2 text-sm font-semibold text-serene-neutral-900">Who sees this {cfg.noun}</p>
+										<div className="grid grid-cols-2 gap-2">
+											{([["team", "Whole team", "Everyone on the team can open it.", Users], ["restricted", "Only me", "Private until you add people.", Lock]] as const).map(([v, label, hint, Icon]) => {
+												const on = (editing.values.visibility === "restricted" ? "restricted" : "team") === v;
+												return (
+													<button key={v} type="button" aria-pressed={on} onClick={() => set("visibility", v)} className={cn("flex items-start gap-2 rounded-xl border p-3 text-left", on ? "border-sauti-teal bg-sauti-teal-light/50" : "border-serene-neutral-200 hover:bg-serene-neutral-50")}>
+														<Icon className="mt-0.5 h-4 w-4 shrink-0 text-sauti-teal" />
+														<span><span className="block text-sm font-medium text-serene-neutral-900">{label}</span><span className="block text-xs text-serene-neutral-500">{hint}</span></span>
+													</button>
+												);
+											})}
+										</div>
+									</div>
+									<p className="flex items-start gap-2 rounded-xl bg-sauti-teal-light/40 p-3 text-sm text-sauti-dark"><AlertCircle className="mt-0.5 h-4 w-4 shrink-0" /> Save first, then add the documents this {cfg.noun} needs.</p>
+								</>
 							)}
 						</div>
 					)}
