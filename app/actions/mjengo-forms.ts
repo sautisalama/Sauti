@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { looseAdmin } from '@/lib/loose-db';
 import { logAudit } from '@/lib/access/audit';
-import { requireAdminActor } from '@/lib/access/super-admin';
+import { isSuperAdminEmail, requireAdminActor } from '@/lib/access/super-admin';
 import { requireModule } from '@/lib/access/permissions';
 import { guard } from '@/lib/action-result';
 import { askAi } from '@/lib/mjengo/ai';
@@ -48,6 +48,13 @@ async function formActor(formId: string, key: string | null | undefined, need: '
     throw new Error('This edit link is no longer valid.');
   }
   const a = await requireModule('forms', need);
+  // A form limited to the people added to it: the creator, those added (as editors or viewers) and oversight.
+  const { data: f } = await looseAdmin().from('mjengo_forms').select('restricted, created_by').eq('id', formId).maybeSingle();
+  if (f?.restricted && f.created_by !== a.id && !(await isSuperAdminEmail(a.email))) {
+    const { data: e } = await looseAdmin().from('mjengo_form_editors').select('level').eq('form_id', formId).eq('email', a.email.toLowerCase()).maybeSingle();
+    if (!e) throw new Error('This form is limited to the people it was shared with.');
+    if (need !== 'view' && e.level !== 'edit') throw new Error('You can view this form and its responses but not change it.');
+  }
   return { id: a.id, email: a.email, viaLink: false };
 }
 
@@ -66,9 +73,17 @@ async function withCounts(rows: Omit<FormRow, 'response_count' | 'last_response_
 }
 
 export async function listForms(): Promise<FormRow[]> {
-  await requireModule('forms');
-  const { data } = await looseAdmin().from('mjengo_forms').select('*').order('updated_at', { ascending: false });
-  return withCounts((data ?? []) as Omit<FormRow, 'response_count' | 'last_response_at'>[]);
+  const a = await requireModule('forms');
+  const db = looseAdmin();
+  const { data } = await db.from('mjengo_forms').select('*').order('updated_at', { ascending: false });
+  let rows = (data ?? []) as (Omit<FormRow, 'response_count' | 'last_response_at'> & { restricted?: boolean; created_by?: string | null })[];
+  // Forms limited to certain people are only listed for those people.
+  if (rows.some((r) => r.restricted) && !(await isSuperAdminEmail(a.email))) {
+    const { data: mine } = await db.from('mjengo_form_editors').select('form_id').eq('email', a.email.toLowerCase());
+    const allowed = new Set(((mine ?? []) as { form_id: string }[]).map((m) => m.form_id));
+    rows = rows.filter((r) => !r.restricted || r.created_by === a.id || allowed.has(r.id));
+  }
+  return withCounts(rows as Omit<FormRow, 'response_count' | 'last_response_at'>[]);
 }
 
 export async function getForm(id: string, key?: string | null): Promise<FormRow | null> {
