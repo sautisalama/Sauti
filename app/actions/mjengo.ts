@@ -578,17 +578,32 @@ export interface Overview {
 export async function getOverview(): Promise<Overview> {
   const actor = await requireAdminActor();
   const db = looseAdmin();
-  const [{ data: grants }, { data: opps }, { data: projects }, { data: docs }, { data: todos }] = await Promise.all([
-    db.from('mjengo_grants').select('id, title, status, amount, currency, deadline'),
-    db.from('mjengo_opportunities').select('id, title, status, deadline'),
-    db.from('mjengo_projects').select('id, name, status, budget, spent, end_date'),
+  const [{ data: grants }, { data: opps }, { data: projects }, { data: docs }, { data: todos }, oversight, { data: acc }] = await Promise.all([
+    db.from('mjengo_grants').select('id, title, status, amount, currency, deadline, created_by, visibility, hidden_fields'),
+    db.from('mjengo_opportunities').select('id, title, status, deadline, created_by, visibility, hidden_fields'),
+    db.from('mjengo_projects').select('id, name, status, budget, spent, end_date, created_by, visibility, hidden_fields'),
     db.from('mjengo_documents').select('id, name, entity_type, entity_id, required, file_path, due_date'),
     db.from('mjengo_todos').select('id, title, status, due_date, assignee_ids'),
+    isSuperAdminEmail(actor.email),
+    db.from('mjengo_entity_access').select('entity_type, entity_id').eq('user_id', actor.id),
   ]);
+  // Records another person keeps to a few people are left out, and details their owner hid are not counted.
+  const shared = new Set(((acc ?? []) as { entity_type: string; entity_id: string }[]).map((a) => `${a.entity_type}:${a.entity_id}`));
+  const visibleTo = <X extends { id: string; created_by: string | null; visibility?: string; hidden_fields?: string[] }>(rows: X[] | null, kind: string, hide: string[]) =>
+    (rows ?? [])
+      .filter((r) => oversight || r.created_by === actor.id || r.visibility !== 'restricted' || shared.has(`${kind}:${r.id}`))
+      .map((r) => {
+        const out = { ...r } as Record<string, unknown>;
+        if (!oversight && r.created_by !== actor.id) for (const k of hide) if ((r.hidden_fields ?? []).includes(k)) out[k] = null;
+        return out as unknown as X;
+      });
+  const grantsV = visibleTo(grants as never[] | null, 'grant', ['amount', 'deadline']);
+  const oppsV = visibleTo(opps as never[] | null, 'opportunity', ['deadline']);
+  const projectsV = visibleTo(projects as never[] | null, 'project', ['budget', 'spent']);
 
-  const G = (grants ?? []) as { id: string; title: string; status: string; amount: number | null; currency: string; deadline: string | null }[];
-  const O = (opps ?? []) as { id: string; title: string; status: string; deadline: string | null }[];
-  const P = (projects ?? []) as { id: string; name: string; status: string; budget: number | null; spent: number | null; end_date: string | null }[];
+  const G = (grantsV ?? []) as { id: string; title: string; status: string; amount: number | null; currency: string; deadline: string | null }[];
+  const O = (oppsV ?? []) as { id: string; title: string; status: string; deadline: string | null }[];
+  const P = (projectsV ?? []) as { id: string; name: string; status: string; budget: number | null; spent: number | null; end_date: string | null }[];
   const D = (docs ?? []) as { id: string; name: string; entity_type: Kind; entity_id: string; required: boolean; file_path: string | null; due_date: string | null }[];
   const T = (todos ?? []) as { id: string; title: string; status: string; due_date: string | null; assignee_ids: string[] }[];
 

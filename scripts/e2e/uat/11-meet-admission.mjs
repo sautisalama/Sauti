@@ -65,6 +65,9 @@ try {
 	// Host controls: mute everyone is offered.
 	await host.getByRole("button", { name: "People" }).first().click();
 	check("Host controls are shown", (await host.getByText("Mute everyone").count()) > 0);
+	await host.getByRole("button", { name: "Mute everyone" }).click();
+	await guest.getByRole("button", { name: "Turn on microphone" }).first().waitFor({ timeout: 20000 });
+	check("The host's mute reaches the guest (the host is verified by the server)", true);
 } catch (e) {
 	check("Admission flow", false, String(e).slice(0, 200));
 } finally {

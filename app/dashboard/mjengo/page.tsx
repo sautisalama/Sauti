@@ -59,7 +59,7 @@ export default function MjengoOverview() {
 						{st.setup.length === 0 ? <p className="text-sm text-serene-neutral-500">Everything is connected.</p> : (
 							<ul className="space-y-1">
 								{st.setup.map((i) => (
-									<li key={i.id}><Link href={i.href} className="block rounded-lg px-2 py-1.5 hover:bg-serene-neutral-50"><span className="block text-sm font-medium text-serene-neutral-900">{i.label}</span><span className="block text-xs text-serene-neutral-500">{i.hint}</span></Link></li>
+									<li key={i.id}>{i.href.startsWith("/api/") ? <a href={i.href} className="block rounded-lg px-2 py-1.5 hover:bg-serene-neutral-50"><span className="block text-sm font-medium text-serene-neutral-900">{i.label}</span><span className="block text-xs text-serene-neutral-500">{i.hint}</span></a> : <Link href={i.href} className="block rounded-lg px-2 py-1.5 hover:bg-serene-neutral-50"><span className="block text-sm font-medium text-serene-neutral-900">{i.label}</span><span className="block text-xs text-serene-neutral-500">{i.hint}</span></Link>}</li>
 								))}
 							</ul>
 						)}

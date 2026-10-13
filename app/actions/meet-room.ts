@@ -21,6 +21,12 @@ function roomKey(code: string): string {
 
 const CODE = /^[a-z0-9]{3}-[a-z0-9]{4}-[a-z0-9]{3}$/;
 
+/** A proof that this person is the host, which other people in the call can check with the server. */
+function hostMac(code: string, userId: string): string {
+  const secret = process.env.DATA_ENCRYPTION_KEY || process.env.SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SERVICE_ROLE_KEY || '';
+  return createHmac('sha256', secret).update(`${VERSION}:host:${code}:${userId}`).digest('hex').slice(0, 32);
+}
+
 async function meeting(code: string) {
   if (!CODE.test(code)) throw new Error('That is not a valid call link.');
   const { data } = await looseAdmin().from('mjengo_meetings').select('id, code, created_by, invitees, participants, settings, title').eq('code', code).maybeSingle();
@@ -41,7 +47,7 @@ async function participantOf(m: Awaited<ReturnType<typeof meeting>>): Promise<{ 
 }
 
 export type Entry =
-  | { status: 'in'; key: string; host: boolean; name: string | null }
+  | { status: 'in'; key: string; host: boolean; name: string | null; hostToken?: string }
   | { status: 'waiting' }
   | { status: 'denied' };
 
@@ -49,7 +55,7 @@ export type Entry =
 async function enter_(code: string, guestKey: string, name: string): Promise<Entry> {
   const m = await meeting(code);
   const me = await participantOf(m);
-  if (me) return { status: 'in', key: roomKey(code), host: me.host, name: me.name };
+  if (me) return { status: 'in', key: roomKey(code), host: me.host, name: me.name, ...(me.host ? { hostToken: `${me.id}.${hostMac(code, me.id)}` } : {}) };
   if (m.settings?.locked) throw new Error('The host has locked this call, so no one new can ask to join.');
   const key = String(guestKey).slice(0, 80);
   if (!key) throw new Error('Missing guest key.');
@@ -118,6 +124,16 @@ async function lock_(code: string, locked: boolean): Promise<void> {
   await looseAdmin().from('mjengo_meetings').update({ settings: { ...(m.settings ?? {}), locked } }).eq('code', code);
 }
 
+/** Is this token really the host's? Other participants ask before they obey host controls. */
+async function verifyHost_(code: string, token: string): Promise<boolean> {
+  if (!CODE.test(code)) return false;
+  const [id, mac] = String(token).split('.');
+  if (!id || !mac) return false;
+  const { data } = await looseAdmin().from('mjengo_meetings').select('created_by').eq('code', code).maybeSingle();
+  return !!data && data.created_by === id && mac === hostMac(code, id);
+}
+
+export const verifyHostToken = guard(verifyHost_);
 export const lockMeeting = guard(lock_);
 export const enterMeeting = guard(enter_);
 export const checkMeetingEntry = guard(check_);

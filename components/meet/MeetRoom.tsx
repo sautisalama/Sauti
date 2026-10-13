@@ -7,7 +7,7 @@ import { putToSignedUrl } from "@/lib/client/upload";
 import { prepareUpload, registerUpload } from "@/app/dashboard/mjengo/vault/api";
 import { attachRecording } from "@/app/actions/mjengo-meet";
 import { Accessibility, Captions, Circle, ExternalLink, MoreVertical, ShieldCheck, UserPlus, Check, Copy, Hand, Info, Loader2, Mail, BarChart3, MessageCircle, MessageSquareText, Settings2, Mic, MicOff, Minimize2, MonitorUp, Pin, PinOff, PictureInPicture2, PhoneOff, Smile, SmartphoneNfc, UserMinus, Users, Video, VideoOff, Volume2, X } from "lucide-react";
-import { lockMeeting, enterMeeting, checkMeetingEntry, listKnocks, decideKnock, decideAllKnocks, saveMeetingChat, type Knock } from "@/app/actions/meet-room";
+import { verifyHostToken, lockMeeting, enterMeeting, checkMeetingEntry, listKnocks, decideKnock, decideAllKnocks, saveMeetingChat, type Knock } from "@/app/actions/meet-room";
 import { ChatPanel, PollPanel, ReactionLayer, ReactionPicker, type ChatMsg, type FloatingReaction, type Poll } from "./meet-parts";
 import { callStore } from "@/lib/client/call-store";
 import { createClient } from "@/utils/supabase/client";
@@ -85,7 +85,7 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 	const toggleMicRef = useRef<() => void>(() => undefined);
 	const toggleCamRef = useRef<() => void>(() => undefined);
 	const toggleHandRef = useRef<() => void>(() => undefined);
-	const beginRef = useRef<(k: string, h: boolean, p?: boolean) => Promise<void>>(async () => undefined);
+	const beginRef = useRef<(k: string, h: boolean, p?: boolean, t?: string) => Promise<void>>(async () => undefined);
 
 	// Lobby
 	const [cams, setCams] = useState<Device[]>([]);
@@ -265,7 +265,7 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 		setEntryError("");
 		try {
 			const r = await unwrap(enterMeeting(code, myId.current, name));
-			if (r.status === "in") { setEntry("idle"); await begin(r.key, r.host, present); }
+			if (r.status === "in") { setEntry("idle"); await begin(r.key, r.host, present, r.hostToken); }
 			else if (r.status === "denied") setEntry("denied");
 			else setEntry("waiting");
 		} catch (e) {
@@ -274,7 +274,7 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 		}
 	};
 
-	const begin = async (roomKeyValue: string, host: boolean, present = false) => {
+	const begin = async (roomKeyValue: string, host: boolean, present = false, hostToken?: string) => {
 		setIsHost(host);
 		if (host) hostIds.current.add(myId.current);
 		stopPreview();
@@ -324,10 +324,11 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 			})
 			.on("presence", { event: "join" }, ({ key, newPresences }) => {
 				if (key === myId.current) return;
-				const p = newPresences[0] as unknown as { name?: string; companion?: boolean; host?: boolean };
-				if (p?.host) hostIds.current.add(key);
+				const p = newPresences[0] as unknown as { name?: string; companion?: boolean; host?: boolean; ht?: string };
+				// Someone who says they are the host is believed only after the server confirms it.
+				if (p?.ht) void unwrap(verifyHostToken(code, p.ht)).then((ok) => { if (ok) { hostIds.current.add(key); setRemote(key, { host: true }); } }).catch(() => undefined);
 				connect({ id: key, name: p?.name ?? "Guest", companion: p?.companion }, true);
-				setRemote(key, { host: !!p?.host });
+				
 				// The newcomer is told how this device is now once it is listening.
 				setTimeout(() => pushState({}), 900);
 			})
@@ -337,7 +338,7 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 				pcs.current.delete(key);
 				setRemotes((cur) => cur.filter((r) => r.id !== key));
 			})
-			.subscribe(async (status) => { if (status === "SUBSCRIBED") { await ch.track({ name: shownName, companion, host }); pushState({ muted: !micOnRef.current, cam: camOnRef.current && !!local.current?.getVideoTracks().length }); } });
+			.subscribe(async (status) => { if (status === "SUBSCRIBED") { await ch.track({ name: shownName, companion, host, ht: hostToken }); pushState({ muted: !micOnRef.current, cam: camOnRef.current && !!local.current?.getVideoTracks().length }); } });
 		setJoined(true);
 		setReadyOpen(true);
 		if (present) setTimeout(() => { void toggleShareRef.current(); }, 600);
