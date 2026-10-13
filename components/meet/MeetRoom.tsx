@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { format } from "date-fns";
 import { MeetRecorder } from "@/lib/client/meet-recorder";
 import { sendRecording } from "@/lib/client/remote-recording";
@@ -8,7 +9,7 @@ import { beginRemoteRecording, finishRemoteRecording } from "@/app/actions/meet-
 import { putToSignedUrl } from "@/lib/client/upload";
 import { prepareUpload, registerUpload } from "@/app/dashboard/mjengo/vault/api";
 import { attachRecording } from "@/app/actions/mjengo-meet";
-import { Accessibility, Captions, Circle, ExternalLink, MoreVertical, ShieldCheck, UserPlus, Check, Copy, Hand, Info, Loader2, Mail, BarChart3, MessageCircle, MessageSquareText, Settings2, Mic, MicOff, Minimize2, MonitorUp, Pin, PinOff, PictureInPicture2, PhoneOff, Smile, SmartphoneNfc, UserMinus, Users, Video, VideoOff, Volume2, X } from "lucide-react";
+import { Accessibility, Captions, Circle, ExternalLink, MoreVertical, Maximize2, ShieldCheck, UserPlus, Check, Copy, Hand, Info, Loader2, Mail, BarChart3, MessageCircle, MessageSquareText, Settings2, Mic, MicOff, Minimize2, MonitorUp, Pin, PinOff, PictureInPicture2, PhoneOff, Smile, SmartphoneNfc, UserMinus, Users, Video, VideoOff, Volume2, X } from "lucide-react";
 import { makeCohost, verifyHostToken, lockMeeting, enterMeeting, checkMeetingEntry, listKnocks, decideKnock, decideAllKnocks, saveMeetingChat, type Knock } from "@/app/actions/meet-room";
 import { ChatPanel, PollPanel, ReactionLayer, ReactionPicker, type ChatMsg, type FloatingReaction, type Poll } from "./meet-parts";
 import { callStore } from "@/lib/client/call-store";
@@ -356,7 +357,8 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 	};
 
 	beginRef.current = begin;
-	useEffect(() => { if (joined && localVideo.current && local.current) localVideo.current.srcObject = local.current; }, [joined, camOn, sharing]);
+	// Your own picture is never played back to you: the muted flag is set on the element itself, since React only sets it when the element is first made.
+	useEffect(() => { if (joined && localVideo.current && local.current) { localVideo.current.muted = true; localVideo.current.srcObject = local.current; } }, [joined, camOn, sharing]);
 
 	/* ------------------------------------------------------------ captions */
 
@@ -436,6 +438,37 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 		} catch { /* cancelled */ }
 	};
 
+	/**
+	 * The call in the browser's floating window: a real window that can be dragged anywhere, even to another
+	 * screen, and stays on top while people work elsewhere. The tiles move into it (they are only ever drawn in one
+	 * place, so no one is heard twice) with the mic, camera and leave controls under them.
+	 */
+	const [pipWin, setPipWin] = useState<Window | null>(null);
+	const openFloating = async (): Promise<boolean> => {
+		const dpip = (window as unknown as { documentPictureInPicture?: { requestWindow: (o: { width: number; height: number }) => Promise<Window> } }).documentPictureInPicture;
+		if (!dpip) return false;
+		try {
+			const w = await dpip.requestWindow({ width: 420, height: 330 });
+			for (const sheet of Array.from(document.styleSheets)) {
+				try {
+					const st = w.document.createElement("style");
+					st.textContent = Array.from(sheet.cssRules).map((r) => r.cssText).join(String.fromCharCode(10));
+					w.document.head.appendChild(st);
+				} catch {
+					if (sheet.href) { const l = w.document.createElement("link"); l.rel = "stylesheet"; l.href = sheet.href; w.document.head.appendChild(l); }
+				}
+			}
+			w.document.body.style.margin = "0";
+			w.document.body.className = document.body.className;
+			w.addEventListener("pagehide", () => setPipWin(null));
+			setPipWin(w);
+			return true;
+		} catch {
+			return false;
+		}
+	};
+	useEffect(() => () => { try { pipWin?.close(); } catch { /* already closed */ } }, [pipWin]);
+
 	/** The browser's own floating video of whoever is on screen (a small extra, from the more menu). */
 	const popOutVideo = async () => {
 		const el = (document.querySelector("video[data-remote='1']") as HTMLVideoElement | null) ?? localVideo.current;
@@ -450,6 +483,8 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 	 * people keep working in the other suites. Guests (no suite) get the browser's own floating video.
 	 */
 	const dockCall = async () => {
+		if (pipWin) { pipWin.close(); return; }
+		if (await openFloating()) return;
 		if (embedded) { window.parent.postMessage({ type: "meet:minimize" }, window.location.origin); return; }
 		if (!canSave) { void popOutVideo(); return; }
 		callStore.open(code, mode, { minimized: true, mic: micOnRef.current, cam: camOnRef.current });
@@ -884,7 +919,13 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 			</div>
 			<div className="flex min-h-0 flex-1">
 				<div className="min-h-0 min-w-0 flex-1 p-3 max-md:p-1.5">
-					{presenter ? (
+					{pipWin ? (
+						<div className="flex h-full flex-col items-center justify-center gap-3 rounded-2xl bg-[#2a2a2a] text-center">
+							<PictureInPicture2 className="h-8 w-8 text-white/70" />
+							<p className="text-sm text-white/80">The call is in a floating window.<br />Drag it anywhere, even to another screen.</p>
+							<button onClick={() => pipWin.close()} className="rounded-full bg-white px-5 py-2 text-sm font-medium text-[#202124] hover:bg-white/90">Bring the call back here</button>
+						</div>
+					) : presenter ? (
 						<div className="flex h-full min-h-0 flex-col gap-3 lg:flex-row">
 							<div className="relative min-h-0 flex-1 overflow-hidden rounded-xl bg-black">
 								{presenter.id === "me" ? (
@@ -1063,6 +1104,22 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 				</div>
 			</div>
 
+			{pipWin && createPortal(
+				<div className="flex h-screen w-screen flex-col bg-[#191919] text-white">
+					<div className={cn("grid min-h-0 flex-1 auto-rows-fr gap-1.5 overflow-auto p-1.5", remotes.length > 0 ? "grid-cols-2" : "grid-cols-1")}>
+						<div className="min-h-[90px]">{selfTile}</div>
+						{remotes.map((r) => <div key={r.id} className="min-h-[90px]">{tile(r)}</div>)}
+					</div>
+					<div className="flex shrink-0 items-center justify-center gap-2 bg-[#191919] pb-2 pt-1">
+						<Ctl onClick={toggleMic} label={micOn ? "Turn off the microphone" : "Turn on the microphone"} icon={micOn ? <Mic className="h-5 w-5" /> : <MicOff className="h-5 w-5" />} danger={!micOn} />
+						<Ctl onClick={toggleCam} label={camOn ? "Turn off the camera" : "Turn on the camera"} icon={camOn ? <Video className="h-5 w-5" /> : <VideoOff className="h-5 w-5" />} danger={!camOn} />
+						<Ctl onClick={() => pipWin.close()} label="Bring the call back to the page" icon={<Maximize2 className="h-5 w-5" />} />
+						<button onClick={() => { pipWin.close(); leave(); }} aria-label="Leave call" title="Leave call" className="flex h-12 w-16 items-center justify-center rounded-full bg-[#ea4335] hover:bg-[#d93025]"><PhoneOff className="h-5 w-5" /></button>
+					</div>
+				</div>,
+				pipWin.document.body,
+			)}
+
 			{readyOpen && remotes.length === 0 && (
 				<div className="absolute bottom-24 left-3 right-3 z-30 rounded-lg bg-white p-5 text-[#202124] shadow-2xl md:right-auto md:w-[26rem]">
 					<div className="mb-4 flex items-center justify-between"><h2 className="text-lg">Your meeting&apos;s ready</h2><button onClick={() => setReadyOpen(false)} aria-label="Close" className="flex h-9 w-9 items-center justify-center rounded-full hover:bg-black/5"><X className="h-5 w-5" /></button></div>
@@ -1119,7 +1176,7 @@ function Ctl({ icon, label, onClick, active, danger, className, flat }: { icon: 
 /** Plays a stream; the presenter's own screen and a remote screen both use it. */
 function StreamVideo({ stream, className, muted }: { stream: MediaStream | null; className?: string; muted?: boolean }) {
 	const ref = useRef<HTMLVideoElement>(null);
-	useEffect(() => { if (ref.current && ref.current.srcObject !== stream) ref.current.srcObject = stream; }, [stream]);
+	useEffect(() => { if (ref.current && ref.current.srcObject !== stream) ref.current.srcObject = stream; if (ref.current && muted) ref.current.muted = true; }, [stream, muted]);
 	return <video ref={ref} data-rec-video="1" data-rec-stage="1" autoPlay playsInline muted={muted} className={className} />;
 }
 function ScreenPreview({ stream }: { stream: MediaStream | null }) {
