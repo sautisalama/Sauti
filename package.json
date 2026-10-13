@@ -87,6 +87,7 @@
 		"imapflow": "^2.3.0",
 		"jspdf": "^4.1.0",
 		"jspdf-autotable": "^5.0.7",
+		"jsqr": "^1.4.0",
 		"jszip": "^3.10.2",
 		"leaflet": "^1.9.4",
 		"leaflet-defaulticon-compatibility": "^0.1.2",

@@ -1,9 +1,11 @@
 "use client";
 
+import jsQR from "jsqr";
+import { readReceiptQr, type ScannedReceipt } from "@/lib/finance/receipt-qr";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { format, parseISO } from "date-fns";
-import { Camera, CheckCircle2, FileSpreadsheet, FileText, Loader2, Plus, Printer, Receipt, Trash2, Upload, Wallet, X } from "lucide-react";
+import { Camera, QrCode, CheckCircle2, FileSpreadsheet, FileText, Loader2, Plus, Printer, Receipt, Trash2, Upload, Wallet, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -277,8 +279,77 @@ function ReceiptSheet({ open, onClose, onSaved, fail }: { open: boolean; onClose
 	const [busy, setBusy] = useState(false);
 	const cam = useRef<HTMLInputElement>(null);
 	const pick = useRef<HTMLInputElement>(null);
+	const [scanning, setScanning] = useState(false);
+	const [scanned, setScanned] = useState<ScannedReceipt | null>(null);
+	const scanVideo = useRef<HTMLVideoElement>(null);
 
-	useEffect(() => { if (!open) { setVendor(""); setAmount(""); setNote(""); setCategory(""); setPhoto(null); setPreview(null); } }, [open]);
+	/** A QR code was read: fill in what it says and file it as tax when it is from KRA. */
+	const applyScan = useCallback((raw: string) => {
+		const r = readReceiptQr(raw);
+		setScanned(r);
+		setVendor((v) => v || r.vendor);
+		if (r.category) setCategory(r.category);
+		setNote((n) => (n ? (n.includes(r.note) ? n : `${n}
+${r.note}`) : r.note));
+		toast({ title: r.tax ? "KRA receipt found: filed as tax" : "QR code read", description: r.link ?? undefined });
+	}, [toast]);
+
+	// Live camera scan: look for a code a few times a second until one is read.
+	useEffect(() => {
+		if (!scanning) return;
+		let stop = false;
+		let stream: MediaStream | null = null;
+		let timer: ReturnType<typeof setInterval> | undefined;
+		(async () => {
+			try {
+				stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: "environment" } }, audio: false });
+				if (stop) { stream.getTracks().forEach((t) => t.stop()); return; }
+				const v = scanVideo.current;
+				if (!v) return;
+				v.srcObject = stream;
+				await v.play().catch(() => undefined);
+				const c = document.createElement("canvas");
+				timer = setInterval(() => {
+					if (!v.videoWidth) return;
+					const k = Math.min(1, 720 / v.videoWidth);
+					c.width = Math.round(v.videoWidth * k); c.height = Math.round(v.videoHeight * k);
+					const x = c.getContext("2d", { willReadFrequently: true })!;
+					x.drawImage(v, 0, 0, c.width, c.height);
+					const hit = jsQR(x.getImageData(0, 0, c.width, c.height).data, c.width, c.height);
+					if (hit?.data) { setScanning(false); applyScan(hit.data); }
+				}, 250);
+			} catch {
+				setScanning(false);
+				toast({ title: "The camera could not be opened", description: "Allow the camera, or choose a photo of the code instead.", variant: "destructive" });
+			}
+		})();
+		return () => { stop = true; if (timer) clearInterval(timer); stream?.getTracks().forEach((t) => t.stop()); };
+	}, [scanning, applyScan, toast]);
+
+	// A photo or picture of the receipt is also checked for a code, so a KRA receipt is filed without scanning.
+	useEffect(() => {
+		if (!photo || !photo.type.startsWith("image/")) return;
+		let dead = false;
+		const url = URL.createObjectURL(photo);
+		const img = new Image();
+		img.onload = () => {
+			if (dead) return;
+			for (const k of [1, 0.5]) {
+				const w = Math.round(Math.min(img.naturalWidth, 1600) * k), h = Math.round((img.naturalHeight * w) / img.naturalWidth);
+				const c = document.createElement("canvas");
+				c.width = w; c.height = h;
+				const x = c.getContext("2d", { willReadFrequently: true })!;
+				x.drawImage(img, 0, 0, w, h);
+				const hit = jsQR(x.getImageData(0, 0, w, h).data, w, h);
+				if (hit?.data) { applyScan(hit.data); break; }
+			}
+			URL.revokeObjectURL(url);
+		};
+		img.src = url;
+		return () => { dead = true; };
+	}, [photo, applyScan]);
+
+	useEffect(() => { if (!open) { setVendor(""); setAmount(""); setNote(""); setCategory(""); setPhoto(null); setPreview(null); setScanning(false); setScanned(null); } }, [open]);
 	useEffect(() => {
 		if (!photo || !photo.type.startsWith("image/")) { setPreview(null); return; }
 		const u = URL.createObjectURL(photo);
@@ -319,7 +390,19 @@ function ReceiptSheet({ open, onClose, onSaved, fail }: { open: boolean; onClose
 						<div className="mt-3 flex justify-center gap-2">
 							<Button type="button" variant="outline" size="sm" className="gap-1.5" onClick={() => cam.current?.click()}><Camera className="h-4 w-4" /> Take a photo</Button>
 							<Button type="button" variant="outline" size="sm" className="gap-1.5" onClick={() => pick.current?.click()}><Upload className="h-4 w-4" /> Choose a file</Button>
+							<Button type="button" variant="outline" size="sm" className="gap-1.5" onClick={() => setScanning((v) => !v)}><QrCode className="h-4 w-4" /> {scanning ? "Stop" : "Scan QR"}</Button>
 						</div>
+						{scanning && (
+							<div className="mt-3 overflow-hidden rounded-xl bg-black">
+								<video ref={scanVideo} playsInline muted className="mx-auto max-h-56 w-full object-cover" />
+								<p className="bg-black/70 py-1.5 text-xs text-white">Hold the receipt&apos;s QR code in view</p>
+							</div>
+						)}
+						{scanned && (
+							<p className={"mt-3 rounded-lg px-3 py-2 text-left text-xs " + (scanned.tax ? "bg-emerald-50 text-emerald-800" : "bg-serene-neutral-50 text-serene-neutral-700")}>
+								{scanned.tax ? "KRA receipt: filed as tax." : "Code read."}{scanned.pin ? ` Seller PIN ${scanned.pin}.` : ""} Check the amount and date, then save.
+							</p>
+						)}
 						<input ref={cam} type="file" accept="image/*" capture="environment" className="sr-only" onChange={(e) => setPhoto(e.target.files?.[0] ?? null)} />
 						<input ref={pick} type="file" accept="image/*,application/pdf" className="sr-only" onChange={(e) => setPhoto(e.target.files?.[0] ?? null)} />
 					</div>
