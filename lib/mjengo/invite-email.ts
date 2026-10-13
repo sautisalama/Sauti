@@ -78,7 +78,8 @@ export async function sendAccessEmail(o: InviteOptions): Promise<void> {
 }
 
 /** A plain notice in the same look: a heading, a few lines and one button. Used for permission changes. */
-export async function sendNoticeEmail(o: { to: string[]; by: string; subject: string; heading: string; lines: string[]; button?: { label: string; url: string } }): Promise<void> {
+export async function sendNoticeEmail(o: { to: string[]; by: string; subject: string; heading: string; lines: string[]; button?: { label: string; url: string }; always?: boolean }): Promise<void> {
+  if (!o.always && !shareEmailsOn()) return;
   const to = [...new Set(o.to.map((e) => e.trim().toLowerCase()).filter((e) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)))];
   if (!to.length) return;
   const href = o.button ? (o.button.url.startsWith('http') ? o.button.url : `${appOrigin()}${o.button.url}`) : '';
