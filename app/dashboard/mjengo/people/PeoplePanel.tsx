@@ -11,6 +11,8 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "
 import Link from "next/link";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import { RolesCard } from "./RolesCard";
+import { notifyAccessChange } from "@/app/actions/roles";
 import {
 	addSuperAdmin, getAccessOverview, removeSuperAdmin, searchPeople, setAccountType, setAdminStatus,
 	type AccessOverview, type PersonView,
@@ -57,6 +59,12 @@ export function PeoplePanel() {
 		}, 300);
 		return () => clearTimeout(t);
 	}, [query]);
+
+	/** After an access change: ask whether to tell the person by email (nothing is sent unless they say yes). */
+	const askEmail = async (userId: string, summary: string) => {
+		if (!window.confirm("Email them about this change?")) return;
+		try { const r = await notifyAccessChange(userId, summary); if (!r.ok) throw new Error(r.error); toast({ title: "They were emailed" }); } catch (e) { toast({ title: "Could not send the email", description: e instanceof Error ? e.message : undefined, variant: "destructive" }); }
+	};
 
 	const run = async (key: string, fn: () => Promise<unknown>, ok: string) => {
 		setBusyId(key);
@@ -176,7 +184,7 @@ export function PeoplePanel() {
 					{searching && <p className="text-xs text-serene-neutral-400">Searching...</p>}
 					<ul className="space-y-2">
 						{results.map((p) => (
-							<PersonRow key={p.id} p={p} busy={busyId === p.id} onAdmin={(v) => run(p.id, () => setAdminStatus(p.id, v), v ? "Made an admin" : "Admin access removed")} onType={(t) => run(p.id, () => setAccountType(p.id, t), "Account type changed")} />
+							<PersonRow key={p.id} p={p} busy={busyId === p.id} onAdmin={(v) => run(p.id, async () => { await setAdminStatus(p.id, v); await askEmail(p.id, v ? "You were made an administrator, so you can now use the Mjengo suite." : "Your administrator access was removed."); }, v ? "Made an admin" : "Admin access removed")} onType={(t) => run(p.id, async () => { await setAccountType(p.id, t); await askEmail(p.id, `Your account type was changed to ${t}.`); }, "Account type changed")} />
 						))}
 					</ul>
 					{query.trim().length >= 2 && !searching && results.length === 0 && <p className="text-sm text-serene-neutral-500">No one found.</p>}
@@ -205,6 +213,8 @@ export function PeoplePanel() {
 					</ul>
 				</CardContent>
 			</Card>
+
+			<RolesCard admins={data.admins.map((a) => ({ id: a.id, name: a.name, email: a.email }))} />
 
 			<Sheet open={!!selected} onOpenChange={(o) => !o && setSelected(null)}>
 				<SheetContent className="flex w-full flex-col gap-0 p-0 sm:max-w-md">
@@ -244,7 +254,7 @@ export function PeoplePanel() {
 													<Button variant="outline" className="gap-1.5" disabled={!data.me.canAdd || adding} onClick={() => window.confirm(`Make ${live.name} a super admin?`) && run(live.id, () => addSuperAdmin(live.email ?? ""), "Made a super admin")}>
 														<Crown className="h-4 w-4" /> Make super admin
 													</Button>
-													<Button variant="outline" className="gap-1.5" disabled={busyId === live.id} onClick={() => window.confirm(`Remove admin access for ${live.name}?`) && run(live.id, async () => { await setAdminStatus(live.id, false); setSelected(null); }, "Admin access removed")}>
+													<Button variant="outline" className="gap-1.5" disabled={busyId === live.id} onClick={() => window.confirm(`Remove admin access for ${live.name}?`) && run(live.id, async () => { await setAdminStatus(live.id, false); setSelected(null); await askEmail(live.id, "Your administrator access was removed."); }, "Admin access removed")}>
 														<ShieldOff className="h-4 w-4" /> Make regular member
 													</Button>
 												</div>
@@ -254,7 +264,7 @@ export function PeoplePanel() {
 									</section>
 									<section className="space-y-2">
 										<h4 className="text-sm font-semibold">Account type</h4>
-										<Select onValueChange={(v) => window.confirm(`Change ${live.name}'s account type to ${v}?`) && run(live.id, () => setAccountType(live.id, v as "survivor" | "professional" | "ngo"), "Account type changed")} disabled={live.isSuperAdmin || busyId === live.id}>
+										<Select onValueChange={(v) => window.confirm(`Change ${live.name}'s account type to ${v}?`) && run(live.id, async () => { await setAccountType(live.id, v as "survivor" | "professional" | "ngo"); await askEmail(live.id, `Your account type was changed to ${v}.`); }, "Account type changed")} disabled={live.isSuperAdmin || busyId === live.id}>
 											<SelectTrigger><SelectValue placeholder="Keep as it is" /></SelectTrigger>
 											<SelectContent>
 												<SelectItem value="survivor">Survivor</SelectItem>

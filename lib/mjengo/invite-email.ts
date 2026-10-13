@@ -69,3 +69,23 @@ export async function sendAccessEmail(o: InviteOptions): Promise<void> {
     console.error('[invite-email]', e instanceof Error ? e.message : e);
   }
 }
+
+/** A plain notice in the same look: a heading, a few lines and one button. Used for permission changes. */
+export async function sendNoticeEmail(o: { to: string[]; by: string; subject: string; heading: string; lines: string[]; button?: { label: string; url: string } }): Promise<void> {
+  const to = [...new Set(o.to.map((e) => e.trim().toLowerCase()).filter((e) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)))];
+  if (!to.length) return;
+  const href = o.button ? (o.button.url.startsWith('http') ? o.button.url : `${appOrigin()}${o.button.url}`) : '';
+  const html = `<!DOCTYPE html><html><body style="margin:0;background:#f6f8f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#0b2228">
+<div style="max-width:560px;margin:28px auto;background:#fff;border:1px solid #e4e7ea;border-radius:16px;overflow:hidden">
+  <div style="padding:22px 28px 0;font-size:13px;color:#068297;font-weight:600">Sauti Salama</div>
+  <div style="padding:10px 28px 4px;font-size:18px;font-weight:600">${esc(o.heading)}</div>
+  <div style="padding:6px 28px 0;font-size:14px;line-height:1.6;color:#202124">${o.lines.map((l) => `<p style="margin:0 0 10px">${esc(l)}</p>`).join('')}</div>
+  ${o.button ? `<div style="padding:12px 28px 28px"><a href="${esc(href)}" style="display:inline-block;background:#068297;color:#fff;text-decoration:none;font-weight:600;font-size:14px;padding:11px 22px;border-radius:999px">${esc(o.button.label)}</a></div>` : '<div style="height:20px"></div>'}
+  <div style="padding:14px 28px;border-top:1px solid #eef0f1;font-size:12px;color:#80868b">Sent by ${esc(o.by)} from the Sauti Salama suite.</div>
+</div></body></html>`;
+  try {
+    await sendEmail(to, o.subject, html, { email: 'notifications@sautisalama.org', name: `${o.by} via Sauti Salama` }, { category: 'Access' });
+  } catch (e) {
+    console.error('[notice-email]', e instanceof Error ? e.message : e);
+  }
+}
