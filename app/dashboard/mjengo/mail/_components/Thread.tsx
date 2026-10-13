@@ -106,9 +106,9 @@ export function ThreadMessage({
 						<button onClick={() => !isCurrent && onOpenChange(false)} className="truncate text-left text-[15px] font-semibold text-[#37352f]" title={!isCurrent ? "Close this message" : undefined}>{who}</button>
 						<span className="shrink-0 text-xs text-[#9b9a97]">{m.date ? format(new Date(m.date), "d MMM yyyy, HH:mm") : ""}</span>
 						<span className="ml-auto flex items-center gap-0.5 opacity-100 transition sm:opacity-0 sm:group-hover/h:opacity-100">
-							{onReply && <button onClick={onReply} aria-label="Reply" title="Reply" className="flex h-7 w-7 items-center justify-center rounded-md text-[#787774] hover:bg-black/5 hover:text-[#37352f]"><Reply className="h-4 w-4" /></button>}
-							{onReplyAll && <button onClick={onReplyAll} aria-label="Reply all" title="Reply all" className="flex h-7 w-7 items-center justify-center rounded-md text-[#787774] hover:bg-black/5 hover:text-[#37352f]"><ReplyAll className="h-4 w-4" /></button>}
-							{onForward && <button onClick={onForward} aria-label="Forward" title="Forward" className="flex h-7 w-7 items-center justify-center rounded-md text-[#787774] hover:bg-black/5 hover:text-[#37352f]"><Forward className="h-4 w-4" /></button>}
+							{onReply && <button onClick={onReply} aria-label="Reply" title="Reply" className="max-sm:hidden flex h-7 w-7 items-center justify-center rounded-md text-[#787774] hover:bg-black/5 hover:text-[#37352f]"><Reply className="h-4 w-4" /></button>}
+							{onReplyAll && <button onClick={onReplyAll} aria-label="Reply all" title="Reply all" className="max-sm:hidden flex h-7 w-7 items-center justify-center rounded-md text-[#787774] hover:bg-black/5 hover:text-[#37352f]"><ReplyAll className="h-4 w-4" /></button>}
+							{onForward && <button onClick={onForward} aria-label="Forward" title="Forward" className="max-sm:hidden flex h-7 w-7 items-center justify-center rounded-md text-[#787774] hover:bg-black/5 hover:text-[#37352f]"><Forward className="h-4 w-4" /></button>}
 						</span>
 					</div>
 					<p className="mt-0.5 text-[13px] text-[#787774]">

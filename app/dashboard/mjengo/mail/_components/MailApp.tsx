@@ -832,17 +832,17 @@ function ReadingPane({ teamIds, team, onWrite, onAddContact, onPrev, onNext, has
 				{detail && <>
 					<span className="mx-1 hidden h-5 w-px bg-black/10 sm:block" />
 					<button onClick={() => onAct("archive")} aria-label="Archive (E)" title="Archive (E)" className="flex h-8 w-8 items-center justify-center rounded-md text-[#787774] hover:bg-black/5 hover:text-[#37352f]"><Archive className="h-[18px] w-[18px]" /></button>
-					<button onClick={() => onAct("spam")} aria-label="Report spam" title="Report spam" className="flex h-8 w-8 items-center justify-center rounded-md text-[#787774] hover:bg-black/5 hover:text-[#37352f]"><ShieldAlert className="h-[18px] w-[18px]" /></button>
+					<button onClick={() => onAct("spam")} aria-label="Report spam" title="Report spam" className="max-sm:hidden flex h-8 w-8 items-center justify-center rounded-md text-[#787774] hover:bg-black/5 hover:text-[#37352f]"><ShieldAlert className="h-[18px] w-[18px]" /></button>
 					<button onClick={() => onAct("trash")} aria-label="Delete (#)" title="Delete (#)" className="flex h-8 w-8 items-center justify-center rounded-md text-[#787774] hover:bg-black/5 hover:text-[#37352f]"><Trash2 className="h-[18px] w-[18px]" /></button>
-					<span className="mx-1 h-5 w-px bg-black/10" />
-					<button onClick={() => onReply(false)} aria-label="Reply (R)" title="Reply (R)" className="flex h-8 w-8 items-center justify-center rounded-md text-[#787774] hover:bg-black/5 hover:text-[#37352f]"><Reply className="h-[18px] w-[18px]" /></button>
-					<button onClick={() => onReply(true)} aria-label="Reply all" title="Reply all" className="flex h-8 w-8 items-center justify-center rounded-md text-[#787774] hover:bg-black/5 hover:text-[#37352f]"><ReplyAll className="h-[18px] w-[18px]" /></button>
-					<button onClick={onForward} aria-label="Forward" title="Forward" className="flex h-8 w-8 items-center justify-center rounded-md text-[#787774] hover:bg-black/5 hover:text-[#37352f]"><Forward className="h-[18px] w-[18px]" /></button>
-					<span className="mx-1 h-5 w-px bg-black/10" />
-					<button onClick={() => onAct(selected?.seen ? "unread" : "read")} aria-label={selected?.seen ? "Mark unread (U)" : "Mark read"} title={selected?.seen ? "Mark unread (U)" : "Mark read"} className="flex h-8 w-8 items-center justify-center rounded-md text-[#787774] hover:bg-black/5 hover:text-[#37352f]">{selected?.seen ? <Mail className="h-[18px] w-[18px]" /> : <MailOpen className="h-[18px] w-[18px]" />}</button>
-					<button onClick={() => onAct(selected?.flagged ? "unstar" : "star")} aria-label={selected?.flagged ? "Remove star" : "Star (S)"} title={selected?.flagged ? "Remove star" : "Star (S)"} className="flex h-8 w-8 items-center justify-center rounded-md text-[#787774] hover:bg-black/5 hover:text-[#37352f]"><Star className={cn("h-[18px] w-[18px]", selected?.flagged && "fill-amber-400 text-amber-400")} /></button>
+					<span className="mx-1 h-5 w-px bg-black/10 max-sm:hidden" />
+					<button onClick={() => onReply(false)} aria-label="Reply (R)" title="Reply (R)" className="max-sm:hidden flex h-8 w-8 items-center justify-center rounded-md text-[#787774] hover:bg-black/5 hover:text-[#37352f]"><Reply className="h-[18px] w-[18px]" /></button>
+					<button onClick={() => onReply(true)} aria-label="Reply all" title="Reply all" className="max-sm:hidden flex h-8 w-8 items-center justify-center rounded-md text-[#787774] hover:bg-black/5 hover:text-[#37352f]"><ReplyAll className="h-[18px] w-[18px]" /></button>
+					<button onClick={onForward} aria-label="Forward" title="Forward" className="max-sm:hidden flex h-8 w-8 items-center justify-center rounded-md text-[#787774] hover:bg-black/5 hover:text-[#37352f]"><Forward className="h-[18px] w-[18px]" /></button>
+					<span className="mx-1 h-5 w-px bg-black/10 max-sm:hidden" />
+					<button onClick={() => onAct(selected?.seen ? "unread" : "read")} aria-label={selected?.seen ? "Mark unread (U)" : "Mark read"} title={selected?.seen ? "Mark unread (U)" : "Mark read"} className="max-sm:hidden flex h-8 w-8 items-center justify-center rounded-md text-[#787774] hover:bg-black/5 hover:text-[#37352f]">{selected?.seen ? <Mail className="h-[18px] w-[18px]" /> : <MailOpen className="h-[18px] w-[18px]" />}</button>
+					<button onClick={() => onAct(selected?.flagged ? "unstar" : "star")} aria-label={selected?.flagged ? "Remove star" : "Star (S)"} title={selected?.flagged ? "Remove star" : "Star (S)"} className="max-sm:hidden flex h-8 w-8 items-center justify-center rounded-md text-[#787774] hover:bg-black/5 hover:text-[#37352f]"><Star className={cn("h-[18px] w-[18px]", selected?.flagged && "fill-amber-400 text-amber-400")} /></button>
 					<Popover>
-						<PopoverTrigger asChild><button aria-label="Labels" title="Label" className="flex h-8 w-8 items-center justify-center rounded-md text-[#787774] hover:bg-black/5 hover:text-[#37352f]"><Tag className="h-[18px] w-[18px]" /></button></PopoverTrigger>
+						<PopoverTrigger asChild><button aria-label="Labels" title="Label" className="max-sm:hidden flex h-8 w-8 items-center justify-center rounded-md text-[#787774] hover:bg-black/5 hover:text-[#37352f]"><Tag className="h-[18px] w-[18px]" /></button></PopoverTrigger>
 						<PopoverContent align="end" className="w-60 p-1.5">
 							{labels.filter((l) => !l.project_id).map((l) => { const on = selectedLabels.includes(l.id); return (
 								<button key={l.id} onClick={() => onToggleLabel(l.id, !on)} className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-black/5">
@@ -870,8 +870,37 @@ function ReadingPane({ teamIds, team, onWrite, onAddContact, onPrev, onNext, has
 					</Popover>
 					<span className="flex-1" />
 					<button onClick={onAutoLabelSimilar} className="mr-1 hidden h-8 items-center gap-2 rounded-lg border border-black/10 bg-white px-3 text-sm text-[#37352f] shadow-sm hover:bg-black/[0.03] lg:flex"><Sparkles className="h-4 w-4 text-[#787774]" /> Auto label similar</button>
-					<button onClick={onSummarise} aria-label="Summarise" title="Summarise" className="flex h-8 w-8 items-center justify-center rounded-md text-[#787774] hover:bg-black/5 hover:text-[#37352f]"><Sparkles className="h-[18px] w-[18px]" /></button>
-				</>}
+					<button onClick={onSummarise} aria-label="Summarise" title="Summarise" className="max-sm:hidden flex h-8 w-8 items-center justify-center rounded-md text-[#787774] hover:bg-black/5 hover:text-[#37352f]"><Sparkles className="h-[18px] w-[18px]" /></button>
+				
+					<span className="flex-1 sm:hidden" />
+					<Popover>
+						<PopoverTrigger asChild><button aria-label="More actions" title="More" className="flex h-9 w-9 items-center justify-center rounded-md text-[#37352f] hover:bg-black/5 sm:hidden"><MoreHorizontal className="h-5 w-5" /></button></PopoverTrigger>
+						<PopoverContent align="end" className="w-64 p-1.5 sm:hidden">
+							{([
+								[selected?.flagged ? "Remove star" : "Star", <Star key="s" className="h-4 w-4" />, () => onAct(selected?.flagged ? "unstar" : "star")],
+								[selected?.seen ? "Mark unread" : "Mark read", selected?.seen ? <Mail key="u" className="h-4 w-4" /> : <MailOpen key="u" className="h-4 w-4" />, () => onAct(selected?.seen ? "unread" : "read")],
+								["Report spam", <ShieldAlert key="sp" className="h-4 w-4" />, () => onAct("spam")],
+								["Summarise", <Sparkles key="sm" className="h-4 w-4" />, onSummarise],
+								["Auto label similar", <Tag key="al" className="h-4 w-4" />, onAutoLabelSimilar],
+							] as [string, React.ReactNode, () => void][]).map(([label, icon, run]) => (
+								<button key={label} onClick={run} className="flex w-full items-center gap-3 rounded-md px-2.5 py-2.5 text-left text-[15px] hover:bg-black/5"><span className="text-[#787774]">{icon}</span>{label}</button>
+							))}
+							<p className="mt-1 border-t border-black/[0.06] px-2.5 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wide text-[#9b9a97]">Labels</p>
+							<div className="max-h-40 overflow-y-auto">
+								{labels.filter((l) => !l.project_id).map((l) => { const on = selectedLabels.includes(l.id); return (
+									<button key={l.id} onClick={() => onToggleLabel(l.id, !on)} className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-sm hover:bg-black/5">
+										<span className={cn("h-2.5 w-2.5 rounded-full", LABEL_COLORS[l.color]?.dot ?? "bg-sauti-teal")} /><span className="flex-1 truncate">{l.name}</span>{on && <Check className="h-4 w-4 text-sauti-teal" />}
+									</button>
+								); })}
+								{projects.map((pr) => { const lab = labels.find((l) => l.project_id === pr.id); const on = !!lab && selectedLabels.includes(lab.id); return (
+									<button key={pr.id} onClick={() => onToggleProject(pr.id, !on)} className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-sm hover:bg-black/5">
+										<FolderKanban className="h-3.5 w-3.5 shrink-0 text-[#787774]" /><span className="flex-1 truncate">{pr.name}</span>{on && <Check className="h-4 w-4 text-sauti-teal" />}
+									</button>
+								); })}
+							</div>
+						</PopoverContent>
+					</Popover>
+</>}
 			</header>
 
 			<div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
