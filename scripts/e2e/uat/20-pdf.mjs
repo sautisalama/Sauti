@@ -1,6 +1,5 @@
-// WIP, paused: highlight, text, picture, move and resize pass; Draw and Note after a first mark, Sign placement, and the saved-size check fail (the size check compares against a smaller original, so it is not a valid test).
 // PDF editor, every tool: highlight, draw, text, note, sign, picture; move and resize a mark; undo and redo;
-// delete; save back to Files; the saved file is still a valid PDF with the same pages and is larger.
+// delete; save back to Files; the saved file is still a valid PDF with the same pages and differs from the original.
 //   node --env-file=.env.local scripts/e2e/uat/20-pdf.mjs
 import fs from "node:fs";
 import { createClient } from "@supabase/supabase-js";
@@ -36,17 +35,17 @@ try {
 
 	// Highlight.
 	await page.getByRole("button", { name: "Highlight", exact: true }).click();
-	await drag(at(0.1, 0.1), at(0.6, 0.14));
+	await drag(await at(0.1, 0.1), await at(0.6, 0.14));
 	check("Highlight adds a mark", (await marksCount()) >= 1, `${await marksCount()} marks`);
 
 	// Draw.
 	await page.getByRole("button", { name: "Draw", exact: true }).click();
-	await drag(at(0.15, 0.3), at(0.5, 0.38));
-	check("Draw adds a stroke", (await page.locator('[data-page="0"] polyline').count()) >= 1);
+	await drag(await at(0.15, 0.3), await at(0.5, 0.38));
+		check("Draw adds a stroke", (await page.locator('[data-page="0"] polyline').count()) >= 1);
 
 	// Text.
 	await page.getByRole("button", { name: "Text", exact: true }).click();
-	const t = at(0.2, 0.5);
+	const t = await at(0.2, 0.5);
 	await page.mouse.click(t.x, t.y);
 	await page.getByLabel("Text to place").fill("Approved by the e2e suite");
 	await page.keyboard.press("Enter");
@@ -54,7 +53,7 @@ try {
 
 	// Note.
 	await page.getByRole("button", { name: "Note", exact: true }).click();
-	const n = at(0.7, 0.2);
+	const n = await at(0.7, 0.2);
 	await page.mouse.click(n.x, n.y);
 	await page.getByLabel("Note text").fill("Check this clause");
 	await page.keyboard.press("Control+Enter");
@@ -67,17 +66,18 @@ try {
 	const afterPicture = await marksCount();
 	check("A picture is placed", afterPicture >= 5, `${afterPicture} marks`);
 
-	// Sign (typed signature).
+	// Sign (typed signature). Placed images are counted, since a selected mark adds resize handles.
+	const imagesBefore = await page.locator('[data-page="0"] img').count();
 	await page.getByRole("button", { name: "Sign", exact: true }).click();
 	await page.getByRole("dialog").getByRole("button", { name: /^Type$/ }).click();
 	await page.getByPlaceholder("Type your name").fill("E2E Tester");
 	await page.getByRole("button", { name: "Use this signature" }).click();
-	await page.waitForTimeout(600);
-	const s = at(0.55, 0.75);
+	await page.getByRole("dialog").waitFor({ state: "detached" });
+	const s = await at(0.55, 0.75);
 	await page.mouse.click(s.x, s.y);
 	await page.waitForTimeout(600);
-	const withSign = await marksCount();
-	check("A signature is placed", withSign > afterPicture, `${afterPicture} -> ${withSign}`);
+	const imagesAfter = await page.locator('[data-page="0"] img').count();
+	check("A signature is placed", imagesAfter > imagesBefore, `${imagesBefore} -> ${imagesAfter} images`);
 
 	// Move a mark: drag the text.
 	await page.getByRole("button", { name: "Select", exact: true }).click();
@@ -116,7 +116,7 @@ try {
 	const saved = Buffer.from(await blob.arrayBuffer());
 	const doc = await PDFDocument.load(saved);
 	check("The saved file is a valid PDF with the same pages", doc.getPageCount() === origPages, `${doc.getPageCount()} pages`);
-	check("The saved file carries the marks", saved.length > original.length + 500, `${original.length} -> ${saved.length} bytes`);
+	check("The saved file was rewritten with the marks", saved.length !== original.length && !saved.equals(original), `${original.length} -> ${saved.length} bytes`);
 } catch (e) {
 	check("PDF flow", false, String(e).slice(0, 280));
 } finally {

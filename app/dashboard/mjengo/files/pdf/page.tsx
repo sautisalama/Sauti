@@ -445,6 +445,9 @@ function PageView({ index, size, zoom, canvasRef, marks, tool, color, thickness,
 	/** Typing a new text or note (no id), or changing one that is already there (id). */
 	const [typing, setTyping] = useState<{ id?: string; kind: "text" | "pin"; x: number; y: number; text: string } | null>(null);
 	const start = useRef<{ x: number; y: number } | null>(null);
+	// The newest highlight box and pen stroke, so a quick release never commits a stale render's value.
+	const liveDraft = useRef<{ x: number; y: number; w: number; h: number } | null>(null);
+	const liveStroke = useRef<[number, number][] | null>(null);
 	const drag = useRef<Drag | null>(null);
 	const typingInput = useRef<HTMLTextAreaElement>(null);
 	// Focus after the click has finished, otherwise the browser takes the focus back and the box closes at once.
@@ -464,8 +467,8 @@ function PageView({ index, size, zoom, canvasRef, marks, tool, color, thickness,
 		if ((e.target as HTMLElement).closest("[data-mark], [data-typing]")) return;
 		const [x, y] = pos(e);
 		onSelect(null);
-		if (tool === "highlight") { start.current = { x, y }; setDraft({ x, y, w: 0, h: 0 }); (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); }
-		else if (tool === "pen") { setStroke([[x, y]]); (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); }
+		if (tool === "highlight") { start.current = { x, y }; liveDraft.current = { x, y, w: 0, h: 0 }; setDraft(liveDraft.current); (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); }
+		else if (tool === "pen") { liveStroke.current = [[x, y]]; setStroke(liveStroke.current); (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); }
 		else if (tool === "text") { e.preventDefault(); setTyping({ kind: "text", x, y, text: "" }); }
 		else if (tool === "pin") { e.preventDefault(); setTyping({ kind: "pin", x, y, text: "" }); }
 		else if (tool === "sign") {
@@ -519,8 +522,8 @@ function PageView({ index, size, zoom, canvasRef, marks, tool, color, thickness,
 			}
 			return;
 		}
-		if (draft && start.current) setDraft({ x: Math.min(x, start.current.x), y: Math.min(y, start.current.y), w: Math.abs(x - start.current.x), h: Math.abs(y - start.current.y) });
-		else if (stroke) setStroke((s) => (s ? [...s, [x, y]] : s));
+		if (liveDraft.current && start.current) { liveDraft.current = { x: Math.min(x, start.current.x), y: Math.min(y, start.current.y), w: Math.abs(x - start.current.x), h: Math.abs(y - start.current.y) }; setDraft(liveDraft.current); }
+		else if (liveStroke.current) { liveStroke.current = [...liveStroke.current, [x, y]]; setStroke(liveStroke.current); }
 	};
 
 	const up = () => {
@@ -533,8 +536,10 @@ function PageView({ index, size, zoom, canvasRef, marks, tool, color, thickness,
 			}
 			return;
 		}
-		if (draft && draft.w > 0.004 && draft.h > 0.003) onAdd({ id: uid(), page: index, kind: "highlight", color, ...draft });
-		if (stroke && stroke.length > 1) onAdd({ id: uid(), page: index, kind: "pen", points: stroke, color, width: thickness });
+		const d2 = liveDraft.current, st = liveStroke.current;
+		if (d2 && d2.w > 0.004 && d2.h > 0.003) onAdd({ id: uid(), page: index, kind: "highlight", color, ...d2 });
+		if (st && st.length > 1) onAdd({ id: uid(), page: index, kind: "pen", points: st, color, width: thickness });
+		liveDraft.current = null; liveStroke.current = null;
 		setDraft(null); setStroke(null); start.current = null;
 	};
 
