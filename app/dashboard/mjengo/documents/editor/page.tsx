@@ -53,10 +53,14 @@ const colorFor = (s: string) => COLORS[[...s].reduce((a, c) => a + c.charCodeAt(
 const extOf = (n: string) => n.split(".").pop()?.toLowerCase() ?? "";
 
 /** The organisation's letterhead and the colours of every saved design system, handed to AI Studio. */
-async function loadBrand(): Promise<Pick<AiOptions, "letterhead" | "palettes">> {
+async function loadBrand(onMore?: (more: NonNullable<AiOptions["palettes"]>) => void): Promise<Pick<AiOptions, "letterhead" | "palettes">> {
 	const out: Pick<AiOptions, "letterhead" | "palettes"> = {};
 	try {
-		const b = await unwrap(getBrand());
+		// A server action can fail once while the page is still settling; the brand is asked for up to three times.
+		let b: Awaited<ReturnType<typeof getBrand>> extends infer R ? (R extends { ok: true; data: infer D } ? D : never) : never;
+		for (let attempt = 0; ; attempt++) {
+			try { b = await unwrap(getBrand()); break; } catch (e) { if (attempt >= 2) throw e; await new Promise((r) => setTimeout(r, 600 * (attempt + 1))); }
+		}
 		let logo: string | undefined;
 		try {
 			if (b.logo?.startsWith("data:")) logo = b.logo;
@@ -72,14 +76,17 @@ async function loadBrand(): Promise<Pick<AiOptions, "letterhead" | "palettes">> 
 		out.letterhead = { name: b.name, tagline: b.tagline || undefined, address: b.address || undefined, contact: b.contact || undefined, logo, logoWidth: b.letterhead.logoWidth, align: b.letterhead.align, rule: b.letterhead.rule, font: b.fonts.heading };
 		out.palettes = [{ id: "brand", name: `${b.name} brand`, primary: hex(b.palette.primary), secondary: hex(b.palette.secondary), accent: hex(b.palette.accent), muted: hex(b.palette.muted) }];
 	} catch { /* defaults */ }
-	try {
-		const r = await designSystemsForForms();
-		const hex = (c: string) => c.replace(/^#/, "").toUpperCase();
-		const palettes = r
-			.filter((d) => (d.colors ?? []).length)
-			.map((d) => ({ id: `ds-${d.id}`, name: d.name, primary: hex(d.colors[0]), secondary: hex(d.colors[1] ?? d.colors[0]), accent: hex(d.colors[2] ?? d.colors[0]), muted: "6B7280" }));
-		if (palettes.length) out.palettes = [...(out.palettes ?? []), ...palettes];
-	} catch { /* built-in palettes */ }
+	// The saved design systems follow, without holding the editor back: the palettes are read as they are shown.
+	void (async () => {
+		try {
+			const r = await designSystemsForForms();
+			const hex = (c: string) => c.replace(/^#/, "").toUpperCase();
+			const palettes = r
+				.filter((d) => (d.colors ?? []).length)
+				.map((d) => ({ id: `ds-${d.id}`, name: d.name, primary: hex(d.colors[0]), secondary: hex(d.colors[1] ?? d.colors[0]), accent: hex(d.colors[2] ?? d.colors[0]), muted: "6B7280" }));
+			if (palettes.length) onMore?.(palettes);
+		} catch { /* built-in palettes */ }
+	})();
 	return out;
 }
 
@@ -96,12 +103,19 @@ function EditorScreen() {
 	const [shareOpen, setShareOpen] = useState(false);
 	const [versionsOpen, setVersionsOpen] = useState(false);
 	const [brand, setBrand] = useState<Pick<AiOptions, "letterhead" | "palettes"> | null>(null);
+	// Saved design systems arrive after the brand and never hold the editor back or replace its letterhead.
+	const [designPalettes, setDesignPalettes] = useState<NonNullable<AiOptions["palettes"]>>([]);
 	useEffect(() => {
-		let on = true;
-		Promise.race([loadBrand(), new Promise<Pick<AiOptions, "letterhead" | "palettes">>((res) => setTimeout(() => res({}), 2500))]).then((b) => on && setBrand(b));
-		return () => { on = false; };
+		// The studio remembers a letterhead per browser. One saved with no organisation name (the page was only
+		// looked at) would hide the organisation's own, so it is dropped before the editor starts.
+		try {
+			const raw = localStorage.getItem("wordcraft.ai.studio");
+			const v = raw ? JSON.parse(raw) : null;
+			if (v && v.letterhead && !String(v.letterhead.name ?? "").trim()) { v.letterhead = null; localStorage.setItem("wordcraft.ai.studio", JSON.stringify(v)); }
+		} catch { /* no saved studio */ }
+		Promise.race([loadBrand(setDesignPalettes), new Promise<Pick<AiOptions, "letterhead" | "palettes">>((res) => setTimeout(() => res({}), 20000))]).then((b) => setBrand(b));
 	}, []);
-	const aiOptions = useMemo<AiOptions>(() => ({ ...ai, ...(brand ?? {}) }), [brand]);
+	const aiOptions = useMemo<AiOptions>(() => ({ ...ai, ...(brand ?? {}), palettes: [...(brand?.palettes ?? []), ...designPalettes] }), [brand, designPalettes]);
 	const [metaKey, setMetaKey] = useState(0);
 	const [fileId, setFileId] = useState<string | null>(initialFile);
 	const [name, setName] = useState("Untitled document.docx");

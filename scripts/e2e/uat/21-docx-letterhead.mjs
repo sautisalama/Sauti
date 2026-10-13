@@ -1,6 +1,5 @@
-// WIP, paused: the editor was still on "Starting the editor" after 150 s in the last run (see the upload-tray snapshot fix just before it), so the letterhead steps were never reached.
 // A Word document gets the organisation letterhead from the brand: open the editor on a .docx, open AI Studio,
-// apply the letterhead, save, and check that the saved file's header carries the organisation name.
+// the Letterhead page already carries the organisation, apply it, save, and check the saved file's header.
 //   node --env-file=.env.local scripts/e2e/uat/21-docx-letterhead.mjs
 import fs from "node:fs";
 import JSZip from "jszip";
@@ -8,8 +7,6 @@ import { createClient } from "@supabase/supabase-js";
 import { BASE, accounts, check, launch, newPage, signIn, summary } from "../lib.mjs";
 
 const db = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SERVICE_ROLE_KEY, { auth: { persistSession: false } });
-const SHOTS = process.env.SHOTS || "";
-const shot = async (page, n) => { if (SHOTS) await page.screenshot({ path: `${SHOTS}/${n}.png` }); };
 const bytes = fs.readFileSync(new URL("../samples/e2e-sample.docx", import.meta.url));
 const browser = await launch();
 const page = await newPage(browser);
@@ -22,24 +19,29 @@ try {
 	const { data: row } = await db.from("vault_files").insert({ name: "Letterhead test.docx", storage_path: path, mime: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", size: bytes.length, owner_id: accounts.accounts.admin.id }).select("id").single();
 	file = { id: row.id, path };
 
-	page.on("console", (m) => { if (["error", "warning"].includes(m.type())) console.log("  [console]", m.text().slice(0, 200)); });
-	page.on("pageerror", (e) => console.log("  [pageerror]", String(e).slice(0, 200)));
-	page.on("requestfailed", (r) => console.log("  [reqfailed]", r.url().slice(0, 120)));
 	await signIn(page, "admin");
 	await page.goto(`${BASE}/dashboard/mjengo/documents/editor?file=${file.id}`, { waitUntil: "domcontentloaded", timeout: 180000 });
 	await page.getByRole("button", { name: /^File/ }).first().waitFor({ timeout: 90000 });
-	await page.getByText("Clipboard", { exact: true }).waitFor({ timeout: 150000 });
-	await page.waitForTimeout(1500);
-	await shot(page, "1-open");
-	await page.mouse.click(878, 936);
-	await page.waitForTimeout(700);
-	await shot(page, "1b-bar");
-	await page.mouse.click(563, 916);
-	await page.waitForTimeout(800);
-	await shot(page, "2-studio");
+	// The AI launcher (the sparkle at the bottom of the page).
+	const launcher = page.locator(".wcai button").first();
+	await launcher.waitFor({ timeout: 120000 });
+	await launcher.click();
+	await page.getByRole("button", { name: "More options" }).waitFor({ timeout: 30000 }).catch(() => undefined);
+	// Studio: the tab strip carries Letterhead.
+	const studioToggle = page.locator(".wcai-round").nth(1);
+	await studioToggle.click().catch(() => undefined);
 	await page.getByText("Letterhead", { exact: true }).first().click();
-	await page.waitForTimeout(800);
-	await shot(page, "3-letterhead");
+	const name = await page.locator(".wcai-form input").first().inputValue();
+	check("The letterhead starts from the organisation brand", name.trim().length > 0, JSON.stringify(name));
+	await page.getByRole("button", { name: "Apply to document" }).click();
+	await page.getByText(/Letterhead added to the header/).waitFor({ timeout: 20000 });
+	check("The letterhead is applied", true);
+	await page.getByRole("button", { name: /^Save/ }).first().click().catch(async () => { await page.keyboard.press("Control+s"); });
+	await page.waitForTimeout(8000);
+	const { data: blob } = await db.storage.from("mjengo-docs").download(path);
+	const zip = await JSZip.loadAsync(Buffer.from(await blob.arrayBuffer()));
+	const headers = await Promise.all(Object.keys(zip.files).filter((f) => /^word\/header\d*\.xml$/.test(f)).map((f) => zip.file(f).async("string")));
+	check("The saved file's header carries the organisation name", headers.some((h) => h.includes(name.trim())), `${headers.length} headers`);
 } catch (e) {
 	check("Docx letterhead flow", false, String(e).slice(0, 300));
 } finally {
