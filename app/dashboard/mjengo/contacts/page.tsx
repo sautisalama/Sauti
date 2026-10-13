@@ -1,5 +1,6 @@
 "use client";
 
+import { SHARE_EMAIL_UI } from "@/lib/client/flags";
 import { MjengoLoader } from "../_components/MjengoLoader";
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
@@ -290,7 +291,7 @@ function ContactShareDialog({ contact, onClose }: { contact: ContactRow | null; 
 	const [team, setTeam] = useState<AdminLite[]>([]);
 	const [adding, setAdding] = useState("");
 	const [level, setLevel] = useState<"view" | "edit">("view");
-	const [notify, setNotify] = useState(true);
+	const [notify, setNotify] = useState(SHARE_EMAIL_UI);
 	const [busy, setBusy] = useState(false);
 
 	const refresh = useCallback(async () => {
@@ -335,7 +336,7 @@ function ContactShareDialog({ contact, onClose }: { contact: ContactRow | null; 
 									{emails.length > 0 && (
 										<div className="flex flex-wrap items-center gap-3">
 											<select value={level} onChange={(e) => setLevel(e.target.value as "view" | "edit")} aria-label="Access" className="h-9 rounded-md border border-serene-neutral-200 bg-white px-2 text-sm"><option value="view">Can view</option><option value="edit">Can edit</option></select>
-											<label className="flex items-center gap-2 text-sm"><Switch checked={notify} onCheckedChange={setNotify} aria-label="Email them" /> Email them</label>
+											{SHARE_EMAIL_UI && <label className="flex items-center gap-2 text-sm"><Switch checked={notify} onCheckedChange={setNotify} aria-label="Email them" /> Email them</label>}
 											<Button size="sm" disabled={busy} onClick={add} className="ml-auto bg-sauti-teal hover:bg-sauti-dark">Share</Button>
 										</div>
 									)}

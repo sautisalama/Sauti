@@ -774,7 +774,7 @@ const AUTO_WORDS = /unsubscribe|manage (your )?(email )?preferences|view (this e
 
 /**
  * What kind of mail this is, so the suite knows whether it needs reading, can be left alone, or should be
- * offered to Opportunities. Jev (a typed decision model) answers when TYPESAFE_API_KEY is set; otherwise word
+ * offered to Opportunities. Jev (a typed decision model, through OpenRouter) answers; if it cannot, word
  * rules do. No language model is called either way.
  */
 async function triage_(subject: string, from: string, text: string): Promise<MailTriage> {

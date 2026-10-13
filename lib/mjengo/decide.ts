@@ -1,27 +1,25 @@
 /**
- * Typed decisions from TypeSafe's Jev (System One): you give it text and a question with a fixed set of
- * answers, it returns one of them with probabilities, in one fast pass and without writing prose. It is the
- * right tool for "which of these is it", "yes or no", and "should I call the language model at all", and the
- * wrong one for writing, arithmetic or counting.
+ * Typed decisions from TypeSafe's Jev (System One) through OpenRouter, with the same OPENROUTER_API_KEY as every
+ * other AI call: no extra key. You give it text and a question with a fixed set of answers, it returns one of
+ * them with probabilities, in one fast pass and without writing prose. The right tool for "which of these is
+ * it" and "yes or no"; the wrong one for writing, arithmetic or counting.
  *
- * Switched on by TYPESAFE_API_KEY. Without it every function returns null and the caller uses its own rule or
- * the language model, so nothing depends on it. Base URL can be changed with TYPESAFE_API_BASE (a gateway).
+ * Every function returns null when it cannot answer, and the caller then uses its own rule or the language model.
  */
 
 export interface Choice<K extends string> { choice: K; probability: number; confidence: number; probabilities: Record<string, number> }
 
-export const decideConfigured = () => !!process.env.TYPESAFE_API_KEY;
+export const decideConfigured = () => !!process.env.OPENROUTER_API_KEY;
 
 async function evaluate(state: string, instructions: string, criteria: Record<string, string>): Promise<{ choice: string; probabilities: Record<string, number>; confidence: number } | null> {
-  const key = process.env.TYPESAFE_API_KEY;
+  const key = process.env.OPENROUTER_API_KEY;
   if (!key) return null;
-  const base = (process.env.TYPESAFE_API_BASE || 'https://api.typesafe.ai').replace(/\/$/, '');
   try {
-    const res = await fetch(`${base}/v1/systemone`, {
+    const res = await fetch('https://openrouter.ai/api/alpha/decisions', {
       method: 'POST',
       signal: AbortSignal.timeout(6_000),
       headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ state: state.slice(0, 24_000), model: process.env.TYPESAFE_MODEL || 'jev-latest', questions: { q: { type: 'choice', instructions, criteria } } }),
+      body: JSON.stringify({ model: process.env.JEV_MODEL || 'typesafe/jev-1.13', state: { text: state.slice(0, 24_000) }, questions: { q: { type: 'choice', instructions, criteria } } }),
     });
     if (!res.ok) return null;
     const j = (await res.json()) as { answers?: { q?: { choice?: string; probabilities?: Record<string, number>; confidence?: number } } };

@@ -1,5 +1,6 @@
 "use client";
 
+import { SHARE_EMAIL_UI } from "@/lib/client/flags";
 import { useCallback, useEffect, useState } from "react";
 import { format, parseISO } from "date-fns";
 import { Bell, EyeOff, Loader2, Lock, Plus, Trash2, Users } from "lucide-react";
@@ -34,7 +35,7 @@ export function EntityAccessPanel({ kind, id }: { kind: Kind; id: string }) {
 	const [team, setTeam] = useState<AdminLite[]>([]);
 	const [adding, setAdding] = useState("");
 	const [level, setLevel] = useState<"view" | "edit">("view");
-	const [notify, setNotify] = useState(true);
+	const [notify, setNotify] = useState(SHARE_EMAIL_UI);
 	const [busy, setBusy] = useState(false);
 
 	const refresh = useCallback(async () => {
@@ -74,7 +75,7 @@ export function EntityAccessPanel({ kind, id }: { kind: Kind; id: string }) {
 					{emails.length > 0 && (
 						<div className="flex flex-wrap items-center gap-3">
 							<select value={level} onChange={(e) => setLevel(e.target.value as "view" | "edit")} aria-label="Access" className="h-9 rounded-md border border-serene-neutral-200 bg-white px-2 text-sm"><option value="view">Can view</option><option value="edit">Can edit</option></select>
-							<label className="flex items-center gap-2 text-sm"><Switch checked={notify} onCheckedChange={setNotify} aria-label="Email them" /> Email them</label>
+							{SHARE_EMAIL_UI && <label className="flex items-center gap-2 text-sm"><Switch checked={notify} onCheckedChange={setNotify} aria-label="Email them" /> Email them</label>}
 							<Button size="sm" disabled={busy} className="ml-auto bg-sauti-teal hover:bg-sauti-dark" onClick={() => run(async () => {
 								const out = emails.filter((e) => !byEmail.has(e));
 								if (out.length) throw new Error(`${out.join(", ")} ${out.length === 1 ? "is" : "are"} not on the team.`);

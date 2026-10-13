@@ -1,5 +1,6 @@
 "use client";
 
+import { SHARE_EMAIL_UI } from "@/lib/client/flags";
 import { MjengoLoader } from "../_components/MjengoLoader";
 import { useCallback, useEffect, useState } from "react";
 import { Crown, Loader2, Lock, Search, ShieldCheck, ShieldOff, UserPlus, X } from "lucide-react";
@@ -62,7 +63,7 @@ export function PeoplePanel() {
 
 	/** After an access change: ask whether to tell the person by email (nothing is sent unless they say yes). */
 	const askEmail = async (userId: string, summary: string) => {
-		if (!window.confirm("Email them about this change?")) return;
+		if (!SHARE_EMAIL_UI || !window.confirm("Email them about this change?")) return;
 		try { const r = await notifyAccessChange(userId, summary); if (!r.ok) throw new Error(r.error); toast({ title: "They were emailed" }); } catch (e) { toast({ title: "Could not send the email", description: e instanceof Error ? e.message : undefined, variant: "destructive" }); }
 	};
 

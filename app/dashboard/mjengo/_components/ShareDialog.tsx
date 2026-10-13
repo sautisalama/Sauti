@@ -1,5 +1,6 @@
 "use client";
 
+import { SHARE_EMAIL_UI } from "@/lib/client/flags";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Check, Copy, Globe, Link2, Loader2, Lock, UserPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -30,7 +31,7 @@ export function ShareDialog({ item, onClose }: { item: VaultItem | null; onClose
 	const [adding, setAdding] = useState("");
 	const [addLevel, setAddLevel] = useState<"view" | "share" | "edit">("view");
 	const [note, setNote] = useState("");
-	const [notify, setNotify] = useState(true);
+	const [notify, setNotify] = useState(SHARE_EMAIL_UI);
 	const [busy, setBusy] = useState(false);
 	const [copied, setCopied] = useState(false);
 
@@ -84,7 +85,7 @@ export function ShareDialog({ item, onClose }: { item: VaultItem | null; onClose
 			<DialogContent className="max-h-[90vh] max-w-xl overflow-y-auto">
 				<DialogHeader>
 					<DialogTitle className="truncate pr-6">Share “{item?.name}”</DialogTitle>
-					<DialogDescription>Add people by name or email. Teammates are emailed a link to open it{isFile ? "; people outside the team get the link" : ""}.</DialogDescription>
+					<DialogDescription>Add people by name or email. Teammates can open it from Files{isFile ? "; people outside the team get the link to open it" : ""}.</DialogDescription>
 				</DialogHeader>
 				{!view ? (
 					<MjengoLoader label="Loading" compact />
@@ -101,12 +102,12 @@ export function ShareDialog({ item, onClose }: { item: VaultItem | null; onClose
 											<SelectTrigger className="h-9 w-48 text-sm"><SelectValue /></SelectTrigger>
 											<SelectContent>{LEVELS.filter(([v]) => v !== "edit" || canGiveEdit).map(([v, l]) => <SelectItem key={v} value={v}>{l}</SelectItem>)}</SelectContent>
 										</Select>
-										<label className="flex items-center gap-2 text-sm"><Switch checked={notify} onCheckedChange={setNotify} aria-label="Notify people" /> Email them</label>
+										{SHARE_EMAIL_UI && <label className="flex items-center gap-2 text-sm"><Switch checked={notify} onCheckedChange={setNotify} aria-label="Notify people" /> Email them</label>}
 									</div>
 									{emails.some((e) => !byEmail.has(e)) && isFile && (
 										<p className="text-xs text-serene-neutral-600">{emails.filter((e) => !byEmail.has(e)).join(", ")} {emails.filter((e) => !byEmail.has(e)).length === 1 ? "is" : "are"} not on the team, so they will get the link (anyone with it can {addLevel === "edit" ? "edit" : "view"}).</p>
 									)}
-									{notify && <Textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2} placeholder="Add a message (optional)" className="text-sm" />}
+									{SHARE_EMAIL_UI && notify && <Textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2} placeholder="Add a message (optional)" className="text-sm" />}
 									<div className="flex justify-end"><Button size="sm" disabled={busy} onClick={submit} className="gap-1.5 bg-sauti-teal hover:bg-sauti-dark">{busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserPlus className="h-4 w-4" />} Share</Button></div>
 								</div>
 							)}
@@ -132,7 +133,7 @@ export function ShareDialog({ item, onClose }: { item: VaultItem | null; onClose
 									</li>
 								))}
 							</ul>
-							{view.people.length > 0 && <label className="mt-2 flex items-center gap-2 text-xs text-serene-neutral-600"><Switch checked={notify} onCheckedChange={setNotify} aria-label="Email people about changes" /> Email people when their access changes</label>}
+							{SHARE_EMAIL_UI && view.people.length > 0 && <label className="mt-2 flex items-center gap-2 text-xs text-serene-neutral-600"><Switch checked={notify} onCheckedChange={setNotify} aria-label="Email people about changes" /> Email people when their access changes</label>}
 						</div>
 
 						<div className="space-y-3 rounded-xl bg-serene-neutral-50 p-3">

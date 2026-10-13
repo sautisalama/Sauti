@@ -59,7 +59,7 @@ export function RecipientField({ value, onChange, placeholder, autoFocus }: { va
 					const label = names.current.get(p.toLowerCase());
 					return (
 						<span key={p} title={p} className={cn("flex max-w-[260px] items-center gap-1 rounded-full border py-0.5 pl-2.5 pr-1 text-sm", ok ? "border-serene-neutral-200 bg-serene-neutral-50 text-serene-neutral-900" : "border-red-200 bg-red-50 text-red-700")}>
-							<span className="truncate">{label ?? p}</span>
+							<span className="truncate">{label ?? (emailOk(p) ? p.split("@")[0] : p)}</span>
 							<button type="button" aria-label={`Remove ${p}`} onClick={(e) => { e.stopPropagation(); onChange(pills.filter((x) => x !== p).join(", ")); }} className="rounded-full p-0.5 text-serene-neutral-400 hover:bg-black/5 hover:text-serene-neutral-700">
 								<X className="h-3 w-3" />
 							</button>

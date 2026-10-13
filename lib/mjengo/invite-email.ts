@@ -18,6 +18,12 @@ const WORDS: Record<InviteKind, { noun: string; verb: string }> = {
 
 const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c] as string));
 
+/**
+ * "Added to" and "access changed" emails are switched off while the suite is still being built. Set
+ * SHARE_EMAILS=on to send them again. Explicit emails (call summaries, mail itself) are not affected.
+ */
+export const shareEmailsOn = () => process.env.SHARE_EMAILS === 'on';
+
 export function appOrigin(): string {
   const o = (process.env.NEXT_PUBLIC_APP_URL || 'https://app.sautisalama.org').replace(/\/$/, '');
   return o.startsWith('http') ? o : `https://${o}`;
@@ -45,6 +51,7 @@ export interface InviteOptions {
  * never blocks the action that caused it.
  */
 export async function sendAccessEmail(o: InviteOptions): Promise<void> {
+  if (!shareEmailsOn()) return;
   const to = [...new Set(o.to.map((e) => e.trim().toLowerCase()).filter((e) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)))];
   if (!to.length) return;
   const w = WORDS[o.kind];

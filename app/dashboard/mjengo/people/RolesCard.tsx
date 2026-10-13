@@ -1,5 +1,6 @@
 "use client";
 
+import { SHARE_EMAIL_UI } from "@/lib/client/flags";
 import { useCallback, useEffect, useState } from "react";
 import { KeyRound, Loader2, Plus, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -145,10 +146,10 @@ export function RolesCard({ admins }: { admins: Admin[] }) {
 
 			<Dialog open={!!pending} onOpenChange={(o) => !o && !busy && setPending(null)}>
 				<DialogContent className="max-w-sm">
-					<DialogHeader><DialogTitle>Email {pending?.label} about this?</DialogTitle><DialogDescription>{pending?.on ? "They will be told which parts of the suite they can use." : "They will be told the role was taken away."}</DialogDescription></DialogHeader>
+					<DialogHeader><DialogTitle>{pending?.on ? `Give this role to ${pending?.label}?` : `Take this role from ${pending?.label}?`}</DialogTitle><DialogDescription>{pending?.on ? "They will be able to use the parts of the suite this role allows." : "They lose what this role allowed. Other roles they have still apply."}</DialogDescription></DialogHeader>
 					<DialogFooter className={cn("gap-2")}>
-						<Button variant="outline" disabled={busy} onClick={() => void confirmAssign(false)}>No, just do it</Button>
-						<Button disabled={busy} className="gap-2 bg-sauti-teal hover:bg-sauti-dark" onClick={() => void confirmAssign(true)}>{busy && <Loader2 className="h-4 w-4 animate-spin" />} Yes, email them</Button>
+						<Button variant="outline" disabled={busy} onClick={() => setPending(null)}>Cancel</Button>
+						<Button disabled={busy} className="gap-2 bg-sauti-teal hover:bg-sauti-dark" onClick={() => void confirmAssign(SHARE_EMAIL_UI)}>{busy && <Loader2 className="h-4 w-4 animate-spin" />} {pending?.on ? "Give the role" : "Take it away"}</Button>
 					</DialogFooter>
 				</DialogContent>
 			</Dialog>
