@@ -235,7 +235,7 @@ function SheetScreen() {
 				<Input value={name} onChange={(e) => setName(e.target.value)} aria-label="File name" className="h-9 min-w-0 flex-1 border-transparent sm:max-w-xs sm:flex-none bg-transparent px-2 text-[15px] font-medium shadow-none hover:border-black/10 focus-visible:ring-1" />
 				{level !== "edit" && <span className="hidden text-xs text-[#787774] sm:inline">View only: saving makes your own copy</span>}
 				<span className="hidden flex-1 sm:block" />
-				{fileId && level !== "view" && <Button variant="outline" size="sm" className="h-9 shrink-0 gap-1.5" onClick={() => setShareOpen(true)} aria-label="Share"><Share2 className="h-4 w-4" /><span className="hidden sm:inline">Share</span></Button>}
+				{fileId && level !== "view" && <Button variant="outline" size="sm" className="h-9 min-w-0 shrink-0 gap-1.5" onClick={() => setShareOpen(true)} aria-label="Share"><Share2 className="h-4 w-4" /><span className="hidden sm:inline">Share</span></Button>}
 				<Button variant="outline" size="sm" className="h-9 shrink-0 gap-1.5" onClick={() => setFormulas((v) => !v)} aria-pressed={formulas} aria-label="Formulas"><span className="font-serif text-base italic leading-none">fx</span><span className="hidden sm:inline">Formulas</span></Button>
 				<Button variant="ghost" size="sm" className="gap-1.5" onClick={download} disabled={loading}><Download className="h-4 w-4" /> <span className="hidden sm:inline">Download</span></Button>
 				<Button size="sm" className="gap-1.5 bg-sauti-teal hover:bg-sauti-dark" onClick={save} disabled={loading || saving}>{saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Save</Button>

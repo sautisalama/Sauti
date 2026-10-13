@@ -384,7 +384,7 @@ function PdfScreen() {
 						{[0.5, 0.75, 1, 1.25, 1.5, 2].map((z) => <option key={z} value={z}>{Math.round(z * 100)}%</option>)}
 					</select>
 					{fileId && <Button variant={commentsOpen ? "secondary" : "ghost"} size="sm" className="h-9 shrink-0 gap-1.5" aria-pressed={commentsOpen} aria-label="Comments" title="Comments: click on the page to leave one" onClick={() => { setCommentsOpen((v) => !v); setPendingSpot(null); }}><MessageSquarePlus className="h-4 w-4" /><span className="hidden sm:inline">Comments{cm.comments.filter((c) => !c.parentId && !c.resolved).length > 0 ? ` (${cm.comments.filter((c) => !c.parentId && !c.resolved).length})` : ""}</span></Button>}
-					{fileId && level !== "view" && <Button variant="outline" size="sm" className="h-9 shrink-0 gap-1.5" onClick={() => setShareOpen(true)} aria-label="Share"><Share2 className="h-4 w-4" /><span className="hidden sm:inline">Share</span></Button>}
+					{fileId && level !== "view" && <Button variant="outline" size="sm" className="h-9 min-w-0 shrink-0 gap-1.5" onClick={() => setShareOpen(true)} aria-label="Share"><Share2 className="h-4 w-4" /><span className="hidden sm:inline">Share</span></Button>}
 					<Button variant="ghost" size="sm" className="h-9 shrink-0 gap-1.5" aria-label="Download" onClick={download} disabled={loading}><Download className="h-4 w-4" /><span className="hidden sm:inline">Download</span></Button>
 					<Button size="sm" className="h-9 shrink-0 gap-1.5 bg-sauti-teal hover:bg-sauti-dark" onClick={save} disabled={loading || saving || (!marks.length && level === "edit")}>{saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Save</Button>
 				</div>
