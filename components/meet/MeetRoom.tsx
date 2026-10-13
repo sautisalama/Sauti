@@ -727,6 +727,7 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 					<h1 className="text-3xl font-normal sm:text-4xl">You left the meeting</h1>
 					<div className="mt-8 flex flex-wrap justify-center gap-3">
 						<button onClick={() => setLeft(false)} className="h-11 rounded-full border border-[#dadce0] px-6 text-sm font-medium text-[#068297] hover:bg-[#f1fafb]">Rejoin</button>
+						<a href={`/meet/${code}/notes`} className="flex h-11 items-center rounded-full border border-[#dadce0] px-6 text-sm font-medium text-[#068297] hover:bg-[#f1fafb]">Call notes</a>
 						<button onClick={() => window.location.assign(home)} className="h-11 rounded-full bg-[#068297] px-6 text-sm font-medium text-white hover:bg-[#056d7e]">Return to home screen</button>
 					</div>
 					<div className="mt-12 flex w-full items-start gap-4 rounded-lg border border-[#dadce0] bg-[#f8f9fc] p-5 text-left">
