@@ -8,7 +8,7 @@ import { MjengoLoader } from "../../_components/MjengoLoader";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { ActiveSelection, cache, Canvas, Circle, FabricImage, Gradient, Group, Line, Path, PencilBrush, Rect, Shadow, Textbox, Triangle, filters, type FabricObject } from "fabric";
-import { AlignCenter, AlignHorizontalJustifyCenter, AlignLeft, AlignRight, ArrowLeft, ArrowUpDown, Bold, ChevronDown, ChevronUp, Eraser, Eye, EyeOff, GripVertical, Group as GroupIcon, MoveVertical, Scissors, SlidersHorizontal, Ungroup, Wand2, Copy, Download, Image as ImageIcon, Italic, Gift, Layers, LayoutTemplate, Loader2, Redo2, Save, Shapes, Sparkles, Trash2, Type, Undo2, Upload } from "lucide-react";
+import { AlignCenter, AlignJustify, AlignHorizontalJustifyCenter, AlignLeft, AlignRight, ArrowLeft, ArrowUpDown, Bold, ChevronDown, ChevronUp, Eraser, Eye, EyeOff, GripVertical, Group as GroupIcon, MoveVertical, Scissors, SlidersHorizontal, Ungroup, Wand2, Copy, Download, Image as ImageIcon, Italic, Gift, Layers, LayoutTemplate, Loader2, Redo2, Save, Shapes, Sparkles, Trash2, Type, Undo2, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Input } from "@/components/ui/input";
@@ -44,6 +44,33 @@ const SIZES = [
 	{ id: "x", label: "X post", w: 1600, h: 900 },
 	{ id: "poster", label: "A4 poster", w: 1240, h: 1754 },
 ] as const;
+
+const PURPLE = "#8B3DFF";
+const styled = new WeakSet<object>();
+
+/** Canva's selection look for every object: purple frame, round corners, pill sides, rotate handle underneath. */
+function styleSelection(o: FabricObject) {
+	o.set({ borderColor: PURPLE, cornerColor: "#FFFFFF", cornerStrokeColor: PURPLE, cornerStyle: "circle", cornerSize: 12, transparentCorners: false, borderScaleFactor: 1.6, padding: 0, borderOpacityWhenMoving: 0.6 });
+	const ctl = (o as unknown as { controls?: Record<string, { render?: unknown; y?: number; offsetY?: number; withConnection?: boolean }> }).controls;
+	if (!ctl || styled.has(ctl)) return;
+	const pill = (w: number, h: number) => (ctx: CanvasRenderingContext2D, left: number, top: number, _s: unknown, obj: FabricObject) => {
+		ctx.save();
+		ctx.translate(left, top);
+		ctx.rotate(((obj.angle ?? 0) * Math.PI) / 180);
+		ctx.fillStyle = "#FFFFFF";
+		ctx.strokeStyle = PURPLE;
+		ctx.lineWidth = 1.5;
+		ctx.beginPath();
+		ctx.roundRect(-w / 2, -h / 2, w, h, Math.min(w, h) / 2);
+		ctx.fill();
+		ctx.stroke();
+		ctx.restore();
+	};
+	for (const k of ["ml", "mr"]) if (ctl[k]) ctl[k].render = pill(8, 20);
+	for (const k of ["mt", "mb"]) if (ctl[k]) ctl[k].render = pill(20, 8);
+	if (ctl.mtr) { ctl.mtr.y = 0.5; ctl.mtr.offsetY = 30; ctl.mtr.withConnection = false; }
+	styled.add(ctl);
+}
 
 type Panel = "templates" | "text" | "shapes" | "uploads" | "inspire" | "brand";
 type Builder = (c: Canvas, w: number, h: number) => void;
@@ -203,6 +230,7 @@ function DesignEditor() {
 		if (!el.current) return;
 		const c = new Canvas(el.current, { width: size.w * 0.5, height: size.h * 0.5, backgroundColor: "#FFFFFF", preserveObjectStacking: true });
 		canvas.current = c;
+		(window as unknown as { __designCanvas?: Canvas }).__designCanvas = c;
 		const onSel = () => setSelected(c.getActiveObject() ?? null);
 		c.on("selection:created", onSel);
 		c.on("selection:updated", onSel);
@@ -214,7 +242,47 @@ function DesignEditor() {
 			const t = (e as { target?: FabricObject }).target as (Textbox & { isEditing?: boolean }) | undefined;
 			if (t && t.type === "textbox" && lastSel.current === t && !t.isEditing) { t.enterEditing(); t.hiddenTextarea?.focus(); c.requestRenderAll(); }
 		});
-		c.on("object:added", () => snapshot());
+		c.on("object:added", (e) => { const t = (e as { target?: FabricObject }).target; if (t) styleSelection(t); snapshot(); });
+		// Hover outline and the size label under the selection, as Canva draws them.
+		let hover: FabricObject | null = null;
+		c.on("mouse:over", (e) => { hover = (e as { target?: FabricObject }).target ?? null; c.requestRenderAll(); });
+		c.on("mouse:out", () => { hover = null; c.requestRenderAll(); });
+		c.on("after:render", (e) => {
+			const ctx = (e as unknown as { ctx: CanvasRenderingContext2D }).ctx;
+			const act = c.getActiveObject();
+			if (hover && hover !== act && hover.visible !== false && !(act && act.type === "activeselection" && (act as ActiveSelection).getObjects().includes(hover))) {
+				const co = hover.getCoords();
+				const vt = c.viewportTransform;
+				ctx.save();
+				ctx.strokeStyle = PURPLE;
+				ctx.lineWidth = 1.5;
+				ctx.beginPath();
+				co.forEach((pt, i) => { const x = pt.x * vt[0] + vt[4], y = pt.y * vt[3] + vt[5]; if (i) ctx.lineTo(x, y); else ctx.moveTo(x, y); });
+				ctx.closePath();
+				ctx.stroke();
+				ctx.restore();
+			}
+			if (act && (act as { isEditing?: boolean }).isEditing !== true) {
+				const r = act.getBoundingRect();
+				const vt = c.viewportTransform;
+				const cx = (r.left + r.width / 2) * vt[0] + vt[4];
+				const by = (r.top + r.height) * vt[3] + vt[5];
+				const label = `${Math.round(act.getScaledWidth())} × ${Math.round(act.getScaledHeight())}`;
+				ctx.save();
+				ctx.font = "600 11px Inter, system-ui, sans-serif";
+				const w = ctx.measureText(label).width + 16;
+				const y = by + (act.type === "activeselection" ? 14 : 50);
+				ctx.fillStyle = PURPLE;
+				ctx.beginPath();
+				ctx.roundRect(cx - w / 2, y, w, 20, 10);
+				ctx.fill();
+				ctx.fillStyle = "#FFFFFF";
+				ctx.textAlign = "center";
+				ctx.textBaseline = "middle";
+				ctx.fillText(label, cx, y + 10.5);
+				ctx.restore();
+			}
+		});
 		c.on("object:removed", () => snapshot());
 		if (!initialId) {
 			const sp = new URLSearchParams(window.location.search);
@@ -645,6 +713,49 @@ function DesignEditor() {
 		snapshot();
 	};
 
+	/** Figma-style: line up the things in a selection with each other, or space them evenly. */
+	const arrange = (kind: "left" | "center" | "right" | "top" | "middle" | "bottom" | "h-space" | "v-space" | "same-w" | "same-h") => {
+		const c = canvas.current;
+		const sel = c?.getActiveObject();
+		if (!c || !sel || sel.type !== "activeselection") return;
+		const objs = (sel as ActiveSelection).getObjects().slice();
+		c.discardActiveObject();
+		const box = (x: FabricObject) => { const r = x.getBoundingRect(); return { l: r.left, t: r.top, r: r.left + r.width, b: r.top + r.height, w: r.width, h: r.height }; };
+		const bs = objs.map(box);
+		const L = Math.min(...bs.map((b) => b.l)), R = Math.max(...bs.map((b) => b.r));
+		const T = Math.min(...bs.map((b) => b.t)), B = Math.max(...bs.map((b) => b.b));
+		const move = (x: FabricObject, dx: number, dy: number) => { x.set({ left: (x.left ?? 0) + dx, top: (x.top ?? 0) + dy }); x.setCoords(); };
+		if (kind === "h-space" || kind === "v-space") {
+			const horiz = kind === "h-space";
+			const order = objs.map((x, i) => ({ x, b: bs[i] })).sort((a, b) => (horiz ? a.b.l - b.b.l : a.b.t - b.b.t));
+			const total = order.reduce((n, { b }) => n + (horiz ? b.w : b.h), 0);
+			const gap = ((horiz ? R - L : B - T) - total) / Math.max(1, order.length - 1);
+			let cursor = horiz ? L : T;
+			for (const { x, b } of order) {
+				if (horiz) move(x, cursor - b.l, 0); else move(x, 0, cursor - b.t);
+				cursor += (horiz ? b.w : b.h) + gap;
+			}
+		} else if (kind === "same-w" || kind === "same-h") {
+			const first = objs[0];
+			objs.slice(1).forEach((x) => {
+				if (kind === "same-w") x.scaleX = (x.scaleX ?? 1) * (first.getScaledWidth() / Math.max(1, x.getScaledWidth()));
+				else x.scaleY = (x.scaleY ?? 1) * (first.getScaledHeight() / Math.max(1, x.getScaledHeight()));
+				x.setCoords();
+			});
+		} else {
+			objs.forEach((x, i) => {
+				const b = bs[i];
+				const dx = kind === "left" ? L - b.l : kind === "right" ? R - b.r : kind === "center" ? (L + R) / 2 - (b.l + b.r) / 2 : 0;
+				const dy = kind === "top" ? T - b.t : kind === "bottom" ? B - b.b : kind === "middle" ? (T + B) / 2 - (b.t + b.b) / 2 : 0;
+				move(x, dx, dy);
+			});
+		}
+		c.setActiveObject(new ActiveSelection(objs, { canvas: c }));
+		c.requestRenderAll();
+		snapshot();
+		bump((n) => n + 1);
+	};
+
 	/** Remove the background from the selected picture. Runs on this device. */
 	const removeBg = async () => {
 		const c = canvas.current;
@@ -908,7 +1019,7 @@ function DesignEditor() {
 								<button onClick={() => set({ linethrough: !t?.linethrough })} aria-pressed={!!t?.linethrough} aria-label="Strikethrough" className={tgl(!!t?.linethrough)}><span className="text-sm font-semibold line-through">S</span></button>
 								<button onClick={() => { const cur = String(t?.text ?? ""); const up = cur === cur.toUpperCase(); set({ text: up ? cur.toLowerCase() : cur.toUpperCase() }); }} aria-label="Change case" className={tgl(false)}><span className="text-xs font-semibold">aA</span></button>
 								{sep}
-								{([["left", AlignLeft], ["center", AlignCenter], ["right", AlignRight]] as const).map(([a, Icon]) => <button key={a} onClick={() => set({ textAlign: a })} aria-label={`Align ${a}`} aria-pressed={o.textAlign === a} className={tgl(o.textAlign === a)}><Icon className="h-4 w-4" /></button>)}
+								{([["left", AlignLeft], ["center", AlignCenter], ["right", AlignRight], ["justify", AlignJustify]] as const).map(([a, Icon]) => <button key={a} onClick={() => set({ textAlign: a })} aria-label={a === "justify" ? "Justify" : `Align ${a}`} aria-pressed={o.textAlign === a} className={tgl(o.textAlign === a)}><Icon className="h-4 w-4" /></button>)}
 								<Popover>
 									<PopoverTrigger asChild><button aria-label="Spacing" title="Spacing" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg hover:bg-serene-neutral-100"><MoveVertical className="h-[18px] w-[18px]" /></button></PopoverTrigger>
 									<PopoverContent align="start" className="w-56 space-y-3 p-3">
@@ -989,7 +1100,22 @@ function DesignEditor() {
 						</Popover>
 						<Popover>
 							<PopoverTrigger asChild><button aria-label="Align" title="Align" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg hover:bg-serene-neutral-100"><AlignHorizontalJustifyCenter className="h-[18px] w-[18px]" /></button></PopoverTrigger>
-							<PopoverContent align="start" className="w-52 p-2">
+							<PopoverContent align="start" className="w-64 p-2">
+								{o.type === "activeselection" && (
+									<>
+										<p className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-serene-neutral-500">With each other</p>
+										<div className="grid grid-cols-3 gap-1.5">
+											{([["left", "Left"], ["center", "Centre"], ["right", "Right"], ["top", "Top"], ["middle", "Middle"], ["bottom", "Bottom"]] as const).map(([k, l]) => <button key={k} onClick={() => arrange(k)} className="h-8 rounded-lg border border-serene-neutral-200 text-xs hover:bg-serene-neutral-50">{l}</button>)}
+										</div>
+										<div className="mt-1.5 grid grid-cols-2 gap-1.5">
+											<button onClick={() => arrange("h-space")} className="h-8 rounded-lg border border-serene-neutral-200 text-xs hover:bg-serene-neutral-50">Space across</button>
+											<button onClick={() => arrange("v-space")} className="h-8 rounded-lg border border-serene-neutral-200 text-xs hover:bg-serene-neutral-50">Space down</button>
+											<button onClick={() => arrange("same-w")} className="h-8 rounded-lg border border-serene-neutral-200 text-xs hover:bg-serene-neutral-50">Same width</button>
+											<button onClick={() => arrange("same-h")} className="h-8 rounded-lg border border-serene-neutral-200 text-xs hover:bg-serene-neutral-50">Same height</button>
+										</div>
+										<p className="mb-1 mt-3 text-[11px] font-semibold uppercase tracking-wider text-serene-neutral-500">On the page</p>
+									</>
+								)}
 								<div className="grid grid-cols-3 gap-1.5">
 									{([["left", "Left"], ["center", "Centre"], ["right", "Right"], ["top", "Top"], ["middle", "Middle"], ["bottom", "Bottom"]] as const).map(([k, l]) => <button key={k} onClick={() => alignPage(k)} className="h-8 rounded-lg border border-serene-neutral-200 text-xs hover:bg-serene-neutral-50">{l}</button>)}
 								</div>
