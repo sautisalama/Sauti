@@ -988,6 +988,33 @@ async function bodyText(accountId: string, mailbox: string, uid: number, ownerId
   return { text: (p.text || htmlToText(p.html ?? '')).slice(0, 8000), subject: p.subject, from: p.from[0] };
 }
 
+/**
+ * The conversation so far as the AI should see it: who wrote each message and in what order, plus how this
+ * person themselves has been writing in the thread (greeting, sign-off, paragraph breaks) so a drafted reply
+ * is in their voice and shape. Never fails: a thread that cannot be read gives an empty context.
+ */
+async function threadContext(accountId: string, mailbox: string, uid: number, subject: string, ownerId: string): Promise<{ history: string; voice: string; me: string }> {
+  try {
+    const acct = await loadAccount(accountId, ownerId);
+    const me = acct.email.toLowerCase();
+    const t = await getThread_(accountId, mailbox, subject, 8);
+    const msgs = t.details
+      .filter((d) => d.uid !== uid || d.mailbox !== mailbox)
+      .sort((a, b) => (a.date ?? '').localeCompare(b.date ?? ''))
+      .slice(-6);
+    const clip = (x: string) => x.replace(/\n>.*$/gm, '').replace(/\n{3,}/g, '\n\n').trim().slice(0, 700);
+    const history = msgs.map((m) => {
+      const a = m.from[0];
+      const mine = a?.address?.toLowerCase() === me;
+      return `--- ${mine ? 'ME' : a?.name || a?.address || 'Them'}${m.date ? ` (${m.date.slice(0, 10)})` : ''}\n${clip(m.text || htmlToText(m.html ?? ''))}`;
+    }).join('\n\n');
+    const mineOnly = msgs.filter((m) => m.from[0]?.address?.toLowerCase() === me).slice(-2).map((m) => clip(m.text || htmlToText(m.html ?? ''))).join('\n\n=====\n\n');
+    return { history, voice: mineOnly, me: acct.email };
+  } catch {
+    return { history: '', voice: '', me: '' };
+  }
+}
+
 /** Two or three sentences at the top of a long thread. Sent to the AI service only when asked. */
 async function summariseMessage_(accountId: string, mailbox: string, uid: number): Promise<string> {
   const actor = await requireModule('mail');
@@ -998,10 +1025,11 @@ async function summariseMessage_(accountId: string, mailbox: string, uid: number
 async function draftReply_(accountId: string, mailbox: string, uid: number, instruction: string): Promise<string> {
   const actor = await requireModule('mail');
   const { text, subject, from } = await bodyText(accountId, mailbox, uid, actor.id);
+  const ctx = await threadContext(accountId, mailbox, uid, subject, actor.id);
   const out = await ai(
-    'You write email replies for the team at Sauti Salama, a survivor-led GBV support organisation in Kenya. Write only the body of the reply: warm, clear and brief, in the language of the email. No subject line, no placeholders, no sign-off name. Do not invent facts.',
-    `Reply to ${from?.name || from?.address || 'the sender'} about "${subject}".\nInstruction: ${instruction || 'Reply helpfully and briefly.'}\n\nTheir email:\n${text}`,
-    500
+    'You write email replies for the team at Sauti Salama, a survivor-led GBV support organisation in Kenya. You write as ME, the person replying, to the person who sent the latest email. Use the earlier messages to know who is who, what has already been said and what is still open: do not repeat answered points and do not greet someone who is only copied. If ME wrote earlier in the thread, copy ME\'s way of writing: the same kind of greeting, the same level of formality, the same paragraph length and blank lines between paragraphs, the same closing line. Write only the body of the reply in the language of the latest email. No subject line, no placeholders, no sign-off name. Do not invent facts.',
+    `Reply to ${from?.name || from?.address || 'the sender'} about "${subject}".\nInstruction: ${instruction || 'Reply helpfully and briefly.'}\n${ctx.voice ? `\nHow ME has written in this thread (copy the shape, not the content):\n${ctx.voice}\n` : ''}${ctx.history ? `\nEarlier in the conversation:\n${ctx.history}\n` : ''}\nLatest email to answer:\n${text}`,
+    600
   );
   return out
     .split(/\n{2,}/)
@@ -1015,9 +1043,10 @@ export interface ReplySuggestion { label: string; body: string }
 async function suggestReplies_(accountId: string, mailbox: string, uid: number): Promise<ReplySuggestion[]> {
   const actor = await requireModule('mail');
   const { text, subject, from } = await bodyText(accountId, mailbox, uid, actor.id);
+  const ctx = await threadContext(accountId, mailbox, uid, subject, actor.id);
   const raw = await ai(
-    'You suggest replies for the team at Sauti Salama, a survivor-led GBV support organisation in Kenya. Reply with one JSON object {"replies":[{"label": string, "body": string}]} with exactly three different replies. "label" is two to four words naming the intent (for example Confirm, Ask for details, Decline politely). "body" is the reply: one to three sentences, matching the sender\'s tone and language, no subject, no sign-off name, no placeholders, no invented facts.',
-    `From ${from?.name || from?.address || 'the sender'}, subject "${subject}":\n${text.slice(0, 5000)}`,
+    'You suggest replies for the team at Sauti Salama, a survivor-led GBV support organisation in Kenya. The replies are written as ME to the person who sent the latest email; the earlier messages (when given) show what has been settled, so suggest only what moves things on, in the way ME has been writing. Reply with one JSON object {"replies":[{"label": string, "body": string}]} with exactly three different replies. "label" is two to four words naming the intent (for example Confirm, Ask for details, Decline politely). "body" is the reply: one to three sentences, matching the sender\'s tone and language, no subject, no sign-off name, no placeholders, no invented facts.',
+    `${ctx.history ? `Earlier in the conversation:\n${ctx.history}\n\n` : ''}From ${from?.name || from?.address || 'the sender'}, subject "${subject}":\n${text.slice(0, 5000)}`,
     700
   );
   try {

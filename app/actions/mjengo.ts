@@ -5,7 +5,7 @@ import { looseAdmin } from '@/lib/loose-db';
 import { logAudit } from '@/lib/access/audit';
 import { isSuperAdminEmail, requireAdminActor, type Actor } from '@/lib/access/super-admin';
 import { requireModule, type ModuleKey } from '@/lib/access/permissions';
-import { sendAccessEmail } from '@/lib/mjengo/invite-email';
+import { sendAccessEmail, sendNoticeEmail } from '@/lib/mjengo/invite-email';
 
 export type Kind = 'grant' | 'opportunity' | 'project' | 'fellowship';
 
@@ -483,6 +483,10 @@ async function notifyAssigned(actor: Actor, userIds: string[], title: string, to
   if (!others.length) return;
   const { sendNotification } = await import('@/lib/notifications');
   await Promise.all(others.map((userId) => sendNotification({ userId, type: 'todo_assigned', title: 'A task was given to you', message: `${actor.name || 'A teammate'}: ${title}`, link: `/dashboard/mjengo/todos?task=${todoId}`, sendEmail: false }).catch(() => undefined)));
+  // Like Google: whoever is given a task is emailed as well as notified.
+  const { data: people } = await looseAdmin().from('profiles').select('email').in('id', others);
+  const to = ((people ?? []) as { email: string | null }[]).map((p) => p.email).filter(Boolean) as string[];
+  if (to.length) void sendNoticeEmail({ to, by: actor.name || 'A teammate', subject: `Task for you: ${title}`.slice(0, 120), heading: 'A task was given to you', lines: [title], button: { label: 'Open the task', url: `/dashboard/mjengo/todos?task=${todoId}` } });
 }
 
 export async function saveTodo(id: string | null, v: { trackId?: string; title?: string; notes?: string | null; dueDate?: string | null; assigneeIds?: string[]; status?: 'todo' | 'doing' | 'done'; entityType?: Kind | null; entityId?: string | null; important?: boolean; remindOn?: string | null; steps?: { id: string; title: string; done: boolean }[] }) {

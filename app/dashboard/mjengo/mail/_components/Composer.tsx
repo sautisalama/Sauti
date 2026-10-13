@@ -470,7 +470,7 @@ export function Composer({ accounts, accountId, seed, snippets, signature = "", 
 	};
 
 	const sourceText = () => plain(seed.quoteHtml ?? "").replace(/\s+/g, " ").trim();
-	const earlierText = () => thread.slice(1).reverse().map((t) => ({ from: t.name || t.address, text: plain(t.html ?? "").replace(/\s+/g, " ").trim().slice(0, 600) })).filter((e) => e.text);
+	const earlierText = () => thread.slice(1).reverse().map((t) => ({ from: t.mine ? "ME" : t.name || t.address, text: plain(t.html ?? "").replace(/\s+/g, " ").trim().slice(0, 600) })).filter((e) => e.text);
 
 	/** One tap and the reply starts appearing: no prompt to fill in first. */
 	const writeWithAi = (instruction?: string) => {

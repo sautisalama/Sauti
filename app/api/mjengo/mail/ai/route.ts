@@ -36,7 +36,7 @@ export async function POST(request: Request) {
 	const text = clip(b.text, 7000);
 	const subject = clip(b.subject, 200);
 	const from = clip(b.from, 120);
-	const earlier = (b.earlier ?? []).slice(-4).map((e) => `${clip(e.from, 60)}: ${clip(e.text, 600)}`).join("\n---\n");
+	const earlier = (b.earlier ?? []).slice(-6).map((e) => `${clip(e.from, 60)}: ${clip(e.text, 600)}`).join("\n---\n");
 
 	if (b.task === "summary") {
 		return streamChat({
@@ -69,7 +69,7 @@ export async function POST(request: Request) {
 
 	// reply
 	return streamChat({
-		system: "You write email replies for the team at Sauti Salama, a survivor-led GBV support organisation in Kenya. Write only the body of the reply: clear, warm and brief, in the language and tone of the email being answered (formal if they are formal, relaxed if they are relaxed). Answer what was asked. No subject line, no sign-off name, no placeholders in brackets, no invented facts or dates. Use blank lines between paragraphs.",
+		system: "You write email replies for the team at Sauti Salama, a survivor-led GBV support organisation in Kenya. You write as ME, the person replying, to the sender of the email being answered. Lines in the earlier thread marked ME are what ME wrote before: copy ME's way of writing there (the kind of greeting, formality, paragraph length, blank lines between paragraphs and the closing line) so the reply looks like the same person wrote it. Use the earlier messages to know who is who and what has already been said; do not repeat settled points. Otherwise match the language and tone of the email being answered. Answer what was asked. Write only the body: no subject line, no sign-off name, no placeholders in brackets, no invented facts or dates. Use blank lines between paragraphs.",
 		user: `Reply to ${from || "the sender"} about \"${subject}\".\n${b.instruction ? `What to say: ${clip(b.instruction, 500)}\n` : ""}${earlier ? `\nEarlier in the thread:\n${earlier}\n` : ""}\nTheir email:\n${text}`,
 		maxTokens: 450,
 		temperature: 0.5,
