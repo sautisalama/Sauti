@@ -5,6 +5,8 @@ import { useSearchParams } from "next/navigation";
 import { WordcraftEditor, httpVersionStore, type SavedFile, type WordcraftEditorRef } from "@gamine/wordcraft-react";
 import * as Y from "yjs";
 import type { AiOptions } from "@gamine/wordcraft-react";
+import { getBrand } from "@/app/actions/mjengo-brand";
+import { unwrap } from "@/lib/action-result";
 import { designSystemsForForms } from "@/app/actions/mjengo-forms";
 import { yjsCollaboration } from "@gamine/wordcraft-react/collab";
 import { MjengoLoader } from "../../_components/MjengoLoader";
@@ -54,15 +56,21 @@ const extOf = (n: string) => n.split(".").pop()?.toLowerCase() ?? "";
 async function loadBrand(): Promise<Pick<AiOptions, "letterhead" | "palettes">> {
 	const out: Pick<AiOptions, "letterhead" | "palettes"> = {};
 	try {
+		const b = await unwrap(getBrand());
 		let logo: string | undefined;
 		try {
-			const r = await fetch("/Logo.png");
-			if (r.ok) {
-				const blob = await r.blob();
-				logo = await new Promise<string>((resolve, reject) => { const fr = new FileReader(); fr.onload = () => resolve(String(fr.result)); fr.onerror = reject; fr.readAsDataURL(blob); });
+			if (b.logo?.startsWith("data:")) logo = b.logo;
+			else if (b.logo) {
+				const r = await fetch(b.logo);
+				if (r.ok) {
+					const blob = await r.blob();
+					logo = await new Promise<string>((resolve, reject) => { const fr = new FileReader(); fr.onload = () => resolve(String(fr.result)); fr.onerror = reject; fr.readAsDataURL(blob); });
+				}
 			}
 		} catch { /* a letterhead without the logo is still a letterhead */ }
-		out.letterhead = { name: "Sauti Salama", tagline: "Breaking the Silence, Building a Brighter Future", contact: "sautisalama.org", logo, logoWidth: 56, align: "left", rule: true };
+		const hex = (c: string) => c.replace(/^#/, "").toUpperCase();
+		out.letterhead = { name: b.name, tagline: b.tagline || undefined, address: b.address || undefined, contact: b.contact || undefined, logo, logoWidth: b.letterhead.logoWidth, align: b.letterhead.align, rule: b.letterhead.rule, font: b.fonts.heading };
+		out.palettes = [{ id: "brand", name: `${b.name} brand`, primary: hex(b.palette.primary), secondary: hex(b.palette.secondary), accent: hex(b.palette.accent), muted: hex(b.palette.muted) }];
 	} catch { /* defaults */ }
 	try {
 		const r = await designSystemsForForms();
@@ -70,7 +78,7 @@ async function loadBrand(): Promise<Pick<AiOptions, "letterhead" | "palettes">> 
 		const palettes = r
 			.filter((d) => (d.colors ?? []).length)
 			.map((d) => ({ id: `ds-${d.id}`, name: d.name, primary: hex(d.colors[0]), secondary: hex(d.colors[1] ?? d.colors[0]), accent: hex(d.colors[2] ?? d.colors[0]), muted: "6B7280" }));
-		if (palettes.length) out.palettes = [{ id: "sauti", name: "Sauti Salama", primary: "0F3B44", secondary: "068297", accent: "068297", muted: "6B7280" }, ...palettes];
+		if (palettes.length) out.palettes = [...(out.palettes ?? []), ...palettes];
 	} catch { /* built-in palettes */ }
 	return out;
 }

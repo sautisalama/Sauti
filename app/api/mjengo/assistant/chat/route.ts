@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { brandAsPrompt, loadBrandRow } from "@/lib/mjengo/brand";
 import { getActor } from "@/lib/access/super-admin";
 import { looseAdmin } from "@/lib/loose-db";
 import { decryptField, encryptField } from "@/lib/security/crypto";
@@ -84,6 +85,8 @@ export async function POST(request: Request) {
 	const history = ((hist ?? []) as { role: "user" | "assistant"; content: string }[]).reverse().filter((m) => m.content);
 
 	let design = "";
+	let brandText = "";
+	try { brandText = brandAsPrompt(await loadBrandRow()); } catch { /* no brand yet */ }
 	if (designId) {
 		const { data: d } = await db.from("mjengo_design_systems").select("name, description, colors, fonts, voice, notes").eq("id", designId).maybeSingle();
 		if (d) {
@@ -147,6 +150,7 @@ export async function POST(request: Request) {
 				const system = [
 					"You are the team assistant inside the Mjengo suite of Sauti Salama, a survivor-led Kenyan organisation working on gender-based violence. Help with grant writing, partnerships, communications, planning and everyday work. Be clear, practical and concise. Use light Markdown.",
 					NO_DASH_RULE,
+					brandText ? `The organisation's brand. Follow it for anything written, laid out or designed, including letterheads:\n${brandText}` : "",
 					design,
 				].filter(Boolean).join("\n\n");
 				const remaining = Math.max(0, FREE_TOKENS - used);

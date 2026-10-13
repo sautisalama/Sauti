@@ -1,5 +1,6 @@
 "use client";
 
+import { getBrand } from "@/app/actions/mjengo-brand";
 import { ColourInput } from "@/components/mjengo/ColourInput";
 import { PaletteSources } from "@/components/mjengo/PaletteSources";
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
@@ -132,7 +133,14 @@ function DesignEditor() {
 	const [magic, setMagic] = useState<string | null>(null);
 	const [checks, setChecks] = useState<{ ok: boolean; items: string[] } | null>(null);
 	const [brand, setBrand] = useState<{ colours: string[]; fonts: string[]; logo: string | null }>({ colours: ["#068297", "#7D2AE8", "#FFDE59", "#0E1318", "#FFFFFF"], fonts: ["Poppins", "Inter"], logo: "/Logo.png" });
-	useEffect(() => { try { const b = localStorage.getItem("ss_design_brand"); if (b) setBrand(JSON.parse(b)); } catch { /* defaults */ } }, []);
+	// The organisation's brand is the starting point for everyone; this device may add to it.
+	useEffect(() => {
+		let on = true;
+		let mine: typeof brand | null = null;
+		try { const b = localStorage.getItem("ss_design_brand"); if (b) { mine = JSON.parse(b); setBrand(mine!); } } catch { /* defaults */ }
+		unwrap(getBrand()).then((o) => { if (on) setBrand({ colours: [...new Set([...o.colours, ...(mine?.colours ?? [])])].slice(0, 24), fonts: [...new Set([o.fonts.heading, o.fonts.body, ...(mine?.fonts ?? [])])], logo: mine?.logo ?? o.logo }); }).catch(() => undefined);
+		return () => { on = false; };
+	}, []);
 	const saveBrand = (b: typeof brand) => { setBrand(b); try { localStorage.setItem("ss_design_brand", JSON.stringify(b)); } catch { /* ignore */ } };
 	const [zoomMul, setZoomMul] = useState(1);
 	const zoomRef = useRef(1);

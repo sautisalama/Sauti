@@ -9,6 +9,7 @@ import { guard } from '@/lib/action-result';
 import { askAi } from '@/lib/mjengo/ai';
 import { sanitiseQuestions, sanitiseTheme, sanitiseWelcome, type FormSettings, type Question } from '@/lib/forms/schema';
 import { questionsFrom, templateById } from '@/lib/forms/templates';
+import { loadBrandRow } from '@/lib/mjengo/brand';
 
 export interface FormRow {
   id: string;
@@ -216,6 +217,13 @@ async function designFor(opts: FormStartOptions): Promise<Partial<FormSettings>>
     try {
       const raw = await askAi('Pick the main brand colours named or implied by the text. Answer with JSON {"colours": ["#RRGGBB", ...]} with 1 to 4 colours, the primary first.', opts.guidelines.slice(0, 4000), 200, { json: true, temperature: 0.2 });
       colours = ((JSON.parse(raw) as { colours?: string[] }).colours ?? []).filter((c) => /^#[0-9a-fA-F]{6}$/.test(c));
+    } catch { /* default look */ }
+  }
+  if (!colours.length) {
+    // Nothing was chosen: the organisation's brand is the look.
+    try {
+      const b = await loadBrandRow();
+      if (b.guidelines || b.updatedAt) colours = [b.palette.primary, b.palette.secondary];
     } catch { /* default look */ }
   }
   if (!colours.length) return {};
