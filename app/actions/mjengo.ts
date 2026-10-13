@@ -13,7 +13,9 @@ const TABLE: Record<Kind, string> = { grant: 'mjengo_grants', opportunity: 'mjen
 const LABEL_FIELD: Record<Kind, string> = { grant: 'title', opportunity: 'title', project: 'name', fellowship: 'title' };
 const MODULE_OF: Record<Kind, ModuleKey> = { grant: 'grants', opportunity: 'opportunities', project: 'projects', fellowship: 'fellowships' };
 
-type Field = { key: string; type: 'text' | 'number' | 'date' | 'enum' | 'uuid' | 'int'; options?: string[] };
+type Field = { key: string; type: 'text' | 'number' | 'date' | 'enum' | 'uuid' | 'int' | 'tags' | 'sdgs'; options?: string[] };
+/** What a fund covers; read from its link and kept on grants, opportunities and fellowships. */
+const COVERS: Field[] = [{ key: 'sectors', type: 'tags' }, { key: 'themes', type: 'tags' }, { key: 'sdgs', type: 'sdgs' }, { key: 'regions', type: 'tags' }, { key: 'eligibility', type: 'text' }];
 const CURRENCIES = ['USD', 'KES', 'EUR', 'GBP'];
 const FIELDS: Record<Kind, Field[]> = {
   grant: [
@@ -28,11 +30,12 @@ const FIELDS: Record<Kind, Field[]> = {
     { key: 'link', type: 'text' },
     { key: 'description', type: 'text' },
     { key: 'notes', type: 'text' },
+    ...COVERS,
   ],
   opportunity: [
     { key: 'title', type: 'text' },
     { key: 'organisation', type: 'text' },
-    { key: 'kind', type: 'enum', options: ['grant', 'partnership', 'tender', 'fellowship', 'event', 'other'] },
+    { key: 'kind', type: 'enum', options: ['grant', 'partnership', 'tender', 'fellowship', 'consultancy', 'event', 'other'] },
     { key: 'status', type: 'enum', options: ['new', 'evaluating', 'pursuing', 'applied', 'won', 'lost', 'passed'] },
     { key: 'value', type: 'number' },
     { key: 'currency', type: 'enum', options: CURRENCIES },
@@ -41,6 +44,7 @@ const FIELDS: Record<Kind, Field[]> = {
     { key: 'source_url', type: 'text' },
     { key: 'description', type: 'text' },
     { key: 'notes', type: 'text' },
+    ...COVERS,
   ],
   project: [
     { key: 'name', type: 'text' },
@@ -68,6 +72,7 @@ const FIELDS: Record<Kind, Field[]> = {
     { key: 'link', type: 'text' },
     { key: 'description', type: 'text' },
     { key: 'notes', type: 'text' },
+    ...COVERS,
   ],
 };
 
@@ -127,6 +132,12 @@ function clean(kind: Kind, input: Record<string, unknown>) {
       case 'uuid':
         if (!/^[0-9a-f-]{36}$/i.test(String(v))) throw new Error(`Invalid ${f.key}.`);
         out[f.key] = String(v);
+        break;
+      case 'tags':
+        out[f.key] = [...new Set((Array.isArray(v) ? v : String(v).split(',')).map((t) => String(t).trim().slice(0, 60)).filter(Boolean))].slice(0, 30);
+        break;
+      case 'sdgs':
+        out[f.key] = [...new Set((Array.isArray(v) ? v : []).map((n) => Math.round(Number(n))).filter((n) => n >= 1 && n <= 17))].sort((a, b) => a - b);
         break;
     }
   }

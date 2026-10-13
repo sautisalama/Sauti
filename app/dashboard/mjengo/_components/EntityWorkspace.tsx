@@ -3,7 +3,7 @@
 import { EntityReminders } from "@/components/mjengo/EntityReminders";
 import { MjengoLoader } from "./MjengoLoader";
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AlertCircle, BadgeCheck, CheckSquare, EyeOff, Lock, Users, ExternalLink, FileWarning, Kanban, List, Loader2, Plus, Search, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,13 +18,14 @@ import { deleteEntity, listAdmins, listEntities, saveEntity, type AdminLite, typ
 import { cn } from "@/lib/utils";
 import { unwrap } from "@/lib/action-result";
 import { linkPreview, type LinkPreview } from "@/app/actions/mjengo-link-preview";
+import { extractFundDetails } from "@/app/actions/mjengo-fund-extract";
 import { DocumentsPanel } from "./DocumentsPanel";
 import { OpportunityVerifyCard } from "./OpportunityVerify";
 import { GrantCharts, type GrantLite } from "./GrantCharts";
 import { Avatars, DeadlineChip, STATUSES, StatusPill, money, type Kind } from "./shared";
 import { EntityAccessPanel, FellowshipAssignments } from "./EntityExtras";
 
-type FieldDef = { key: string; label: string; type: "text" | "textarea" | "number" | "date" | "select" | "owner" | "grant" | "url"; options?: { value: string; label: string }[]; wide?: boolean };
+type FieldDef = { key: string; label: string; type: "text" | "textarea" | "number" | "date" | "select" | "owner" | "grant" | "url" | "tags" | "sdgs"; options?: { value: string; label: string }[]; wide?: boolean };
 
 const CURRENCY: FieldDef = { key: "currency", label: "Currency", type: "select", options: ["USD", "KES", "EUR", "GBP"].map((c) => ({ value: c, label: c })) };
 
@@ -47,6 +48,11 @@ const CONFIG = {
 			{ key: "owner_id", label: "Owner", type: "owner" },
 			{ key: "link", label: "Call / portal link", type: "url", wide: true },
 			{ key: "description", label: "What it funds", type: "textarea", wide: true },
+			{ key: "sectors", label: "Sectors", type: "tags", wide: true },
+			{ key: "themes", label: "Themes", type: "tags", wide: true },
+			{ key: "sdgs", label: "Sustainable Development Goals", type: "sdgs", wide: true },
+			{ key: "regions", label: "Open to", type: "tags", wide: true },
+			{ key: "eligibility", label: "Who can apply", type: "textarea", wide: true },
 			{ key: "notes", label: "Notes", type: "textarea", wide: true },
 		],
 	},
@@ -60,7 +66,7 @@ const CONFIG = {
 		fields: [
 			{ key: "title", label: "Opportunity", type: "text", wide: true },
 			{ key: "organisation", label: "Organisation", type: "text" },
-			{ key: "kind", label: "Type", type: "select", options: ["grant", "partnership", "tender", "fellowship", "event", "other"].map((v) => ({ value: v, label: v[0].toUpperCase() + v.slice(1) })) },
+			{ key: "kind", label: "Type", type: "select", options: ["grant", "partnership", "tender", "fellowship", "consultancy", "event", "other"].map((v) => ({ value: v, label: v[0].toUpperCase() + v.slice(1) })) },
 			{ key: "status", label: "Status", type: "select", options: STATUSES.opportunity.map((s) => ({ value: s.value, label: s.label })) },
 			{ key: "value", label: "Estimated value", type: "number" },
 			CURRENCY,
@@ -68,6 +74,11 @@ const CONFIG = {
 			{ key: "owner_id", label: "Owner", type: "owner" },
 			{ key: "source_url", label: "Source link", type: "url", wide: true },
 			{ key: "description", label: "Details", type: "textarea", wide: true },
+			{ key: "sectors", label: "Sectors", type: "tags", wide: true },
+			{ key: "themes", label: "Themes", type: "tags", wide: true },
+			{ key: "sdgs", label: "Sustainable Development Goals", type: "sdgs", wide: true },
+			{ key: "regions", label: "Open to", type: "tags", wide: true },
+			{ key: "eligibility", label: "Who can apply", type: "textarea", wide: true },
 			{ key: "notes", label: "Notes", type: "textarea", wide: true },
 		],
 	},
@@ -112,6 +123,11 @@ CONFIG.fellowship = {
 		{ key: "owner_id", label: "Who is responsible", type: "owner" },
 		{ key: "link", label: "Programme link", type: "url", wide: true },
 		{ key: "description", label: "About it", type: "textarea", wide: true },
+		{ key: "sectors", label: "Sectors", type: "tags", wide: true },
+		{ key: "themes", label: "Themes", type: "tags", wide: true },
+		{ key: "sdgs", label: "Sustainable Development Goals", type: "sdgs", wide: true },
+		{ key: "regions", label: "Open to", type: "tags", wide: true },
+		{ key: "eligibility", label: "Who can apply", type: "textarea", wide: true },
 		{ key: "notes", label: "Notes", type: "textarea", wide: true },
 	],
 };
@@ -179,6 +195,14 @@ export function EntityWorkspace({ kind }: { kind: Kind }) {
 	const openRow = (r: Row) => setEditing({ id: r.id, values: { ...r } });
 
 	const set = (key: string, value: unknown) => setEditing((e) => (e ? { ...e, values: { ...e.values, [key]: value } } : e));
+	// Details that have no value are left out to keep the form short; the "Add" chips bring one back.
+	const [revealed, setRevealed] = useState<Set<string>>(new Set());
+	useEffect(() => { setRevealed(new Set()); }, [editing?.id]);
+	const urlKey = kind === "opportunity" ? "source_url" : "link";
+	const coreKeys = new Set([cfg.titleKey, cfg.subKey, "status", "kind", urlKey, dueKey(kind), ownerKey(kind), "currency"]);
+	const hasValue = (v: unknown) => !(v == null || v === "" || (Array.isArray(v) && v.length === 0));
+	const shownField = (key: string) => coreKeys.has(key) || revealed.has(key) || hasValue(editing?.values[key]);
+	const hiddenFields = cfg.fields.filter((f) => !shownField(f.key));
 
 	const save = async () => {
 		if (!editing) return;
@@ -314,7 +338,7 @@ export function EntityWorkspace({ kind }: { kind: Kind }) {
 					{editing && (
 						<div className="flex-1 space-y-6 p-4">
 							<div className="grid gap-4 sm:grid-cols-2">
-								{cfg.fields.map((f) => (
+								{cfg.fields.filter((f) => shownField(f.key)).map((f) => (
 									<div key={f.key} className={cn("space-y-1.5", f.wide && "sm:col-span-2")}>
 										<Label htmlFor={`f-${f.key}`} className="text-xs font-semibold text-serene-neutral-600">{f.label}</Label>
 										{((editing.values._hidden as string[] | undefined) ?? []).includes(f.key)
@@ -324,6 +348,22 @@ export function EntityWorkspace({ kind }: { kind: Kind }) {
 								))}
 							</div>
 
+							{hiddenFields.length > 0 && (
+								<div className="flex flex-wrap items-center gap-1.5">
+									<span className="text-xs text-serene-neutral-500">Add:</span>
+									{hiddenFields.map((f) => (
+										<button key={f.key} type="button" onClick={() => setRevealed((r) => new Set(r).add(f.key))} className="flex h-7 items-center gap-1 rounded-full border border-serene-neutral-200 px-2.5 text-xs font-medium text-serene-neutral-700 hover:bg-serene-neutral-50"><Plus className="h-3 w-3" />{f.label}</button>
+									))}
+								</div>
+							)}
+
+							{(kind === "grant" || kind === "opportunity" || kind === "fellowship") && (
+								<FundFromLink
+									url={String(editing.values[urlKey] ?? "")}
+									values={editing.values}
+									onFill={(patch) => Object.entries(patch).forEach(([k, v]) => set(k, v))}
+								/>
+							)}
 							{kind === "grant" && (
 								<LinkPreviewCard
 									url={String(editing.values.link ?? "")}
@@ -484,6 +524,10 @@ function ProjectMoney({ v }: { v: Record<string, any> }) {
 function FieldInput({ f, value, onChange, admins, grants }: { f: FieldDef; value: any; onChange: (v: unknown) => void; admins: AdminLite[]; grants: { id: string; title: string }[] }) {
 	const id = `f-${f.key}`;
 	switch (f.type) {
+		case "tags":
+			return <TagsInput id={id} value={Array.isArray(value) ? value : []} onChange={onChange} />;
+		case "sdgs":
+			return <SdgPicker value={Array.isArray(value) ? value : []} onChange={onChange} />;
 		case "textarea":
 			return <Textarea id={id} value={value ?? ""} onChange={(e) => onChange(e.target.value)} rows={3} />;
 		case "number":
@@ -522,4 +566,98 @@ function FieldInput({ f, value, onChange, admins, grants }: { f: FieldDef; value
 		default:
 			return <Input id={id} value={value ?? ""} onChange={(e) => onChange(e.target.value)} />;
 	}
+}
+
+function TagsInput({ id, value, onChange }: { id: string; value: string[]; onChange: (v: unknown) => void }) {
+	const [draft, setDraft] = useState("");
+	const add = () => { const t = draft.trim(); if (t && !value.includes(t)) onChange([...value, t]); setDraft(""); };
+	return (
+		<div className="flex flex-wrap items-center gap-1.5 rounded-md border border-input px-2 py-1.5">
+			{value.map((t) => (
+				<span key={t} className="flex items-center gap-1 rounded-full bg-sauti-teal-light py-0.5 pl-2.5 pr-1 text-xs font-medium text-sauti-dark">{t}<button type="button" aria-label={`Remove ${t}`} onClick={() => onChange(value.filter((x) => x !== t))} className="rounded-full px-1 hover:bg-black/10">×</button></span>
+			))}
+			<input id={id} value={draft} onChange={(e) => setDraft(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" || e.key === ",") { e.preventDefault(); add(); } else if (e.key === "Backspace" && !draft && value.length) onChange(value.slice(0, -1)); }} onBlur={add} placeholder={value.length ? "" : "Type and press Enter"} className="min-w-[8rem] flex-1 bg-transparent py-0.5 text-sm outline-none" />
+		</div>
+	);
+}
+
+const SDG_NAMES = ["No poverty", "Zero hunger", "Good health and well-being", "Quality education", "Gender equality", "Clean water and sanitation", "Affordable and clean energy", "Decent work and economic growth", "Industry, innovation and infrastructure", "Reduced inequalities", "Sustainable cities and communities", "Responsible consumption and production", "Climate action", "Life below water", "Life on land", "Peace, justice and strong institutions", "Partnerships for the goals"];
+const SDG_COLOURS = ["#E5243B", "#DDA63A", "#4C9F38", "#C5192D", "#FF3A21", "#26BDE2", "#FCC30B", "#A21942", "#FD6925", "#DD1367", "#FD9D24", "#BF8B2E", "#3F7E44", "#0A97D9", "#56C02B", "#00689D", "#19486A"];
+
+function SdgPicker({ value, onChange }: { value: number[]; onChange: (v: unknown) => void }) {
+	const toggle = (n: number) => onChange(value.includes(n) ? value.filter((x) => x !== n) : [...value, n].sort((a, b) => a - b));
+	return (
+		<div>
+			<div className="flex flex-wrap gap-1.5">
+				{SDG_NAMES.map((name, i) => {
+					const n = i + 1, on = value.includes(n);
+					return <button key={n} type="button" aria-pressed={on} aria-label={`Goal ${n}: ${name}`} title={`${n}. ${name}`} onClick={() => toggle(n)} className={cn("flex h-8 w-8 items-center justify-center rounded-md text-xs font-bold transition", on ? "text-white shadow-sm" : "bg-serene-neutral-100 text-serene-neutral-500 hover:bg-serene-neutral-200")} style={on ? { background: SDG_COLOURS[i] } : undefined}>{n}</button>;
+				})}
+			</div>
+			{value.length > 0 && <p className="mt-1.5 text-xs text-serene-neutral-600">{value.map((n) => `${n}. ${SDG_NAMES[n - 1]}`).join(" · ")}</p>}
+		</div>
+	);
+}
+
+/** Reads the call's page and fills the details that are still empty: what it funds, sectors, themes, SDGs, who can apply. */
+function FundFromLink({ url, values, onFill }: { url: string; values: Record<string, any>; onFill: (patch: Record<string, unknown>) => void }) {
+	const [busy, setBusy] = useState(false);
+	const [err, setErr] = useState<string | null>(null);
+	const [done, setDone] = useState<{ site: string; filled: string[] } | null>(null);
+	const lastUrl = useRef("");
+	const valuesRef = useRef(values);
+	valuesRef.current = values;
+	const onFillRef = useRef(onFill);
+	onFillRef.current = onFill;
+	const LABELS: Record<string, string> = { title: "name", organisation: "funder", description: "details", amount: "amount", deadline: "deadline", sectors: "sectors", themes: "themes", sdgs: "SDGs", regions: "regions", eligibility: "eligibility" };
+
+	const read = useCallback(async () => {
+		setErr(null);
+		setBusy(true);
+		try {
+			const r = await unwrap(extractFundDetails(url.trim()));
+			const cur = valuesRef.current;
+			const empty = (v: unknown) => v == null || v === "" || (Array.isArray(v) && v.length === 0);
+			// The funder or host goes to whichever field this kind uses; a grant's amount is "amount", an opportunity's "value".
+			const orgKey = "funder" in cur ? "funder" : "host" in cur ? "host" : "organisation";
+			const amountKey = "amount" in cur ? "amount" : "stipend" in cur ? "stipend" : "value";
+			const targets: Record<string, string> = { title: "title", organisation: orgKey, description: "description", amount: amountKey, deadline: "deadline", sectors: "sectors", themes: "themes", sdgs: "sdgs", regions: "regions", eligibility: "eligibility" };
+			const patch: Record<string, unknown> = {};
+			const filled: string[] = [];
+			let gotAmount = false;
+			for (const [k, v] of Object.entries(r)) {
+				const key = targets[k];
+				if (!key || v == null || (Array.isArray(v) && !v.length)) continue;
+				if (!empty(cur[key])) continue;
+				patch[key] = v;
+				filled.push(LABELS[k] ?? k);
+				if (k === "amount") gotAmount = true;
+			}
+			if (gotAmount && r.currency) patch.currency = r.currency;
+			if (Object.keys(patch).length) onFillRef.current(patch);
+			setDone({ site: r.sourceSite ?? "", filled });
+		} catch (e) {
+			setErr(e instanceof Error ? e.message : "Could not read that link.");
+		} finally {
+			setBusy(false);
+		}
+	}, [url]);
+
+	// A new link is read once, a moment after it stops changing.
+	useEffect(() => {
+		const u = url.trim();
+		if (!/^https?:\/\/[^\s.]+\.[^\s]+/i.test(u) || u === lastUrl.current) return;
+		const t = setTimeout(() => { lastUrl.current = u; void read(); }, 1200);
+		return () => clearTimeout(t);
+	}, [url, read]);
+
+	if (!url.trim() || (!busy && !done && !err)) return null;
+	return (
+		<div className="flex flex-wrap items-center gap-2 rounded-xl border border-dashed border-serene-neutral-200 px-3 py-2 text-xs text-serene-neutral-600">
+			{busy ? <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Reading the page and filling in the details…</> : err ? <span>{err}</span> : done && (
+				<span>{done.filled.length ? <>Filled from {done.site || "the link"}: {done.filled.join(", ")}.</> : <>Read {done.site || "the link"}. Nothing new to fill in.</>}</span>
+			)}
+			{!busy && <button type="button" onClick={() => void read()} className="font-medium text-sauti-teal hover:underline">Read again</button>}
+		</div>
+	);
 }

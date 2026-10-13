@@ -1,9 +1,8 @@
 'use server';
 
-import { lookup } from 'node:dns/promises';
-import { isIP } from 'node:net';
 import { guard } from '@/lib/action-result';
 import { requireAdminActor } from '@/lib/access/super-admin';
+import { fetchHtml } from '@/lib/mjengo/safe-fetch';
 
 export interface LinkPreview {
   url: string;
@@ -14,30 +13,6 @@ export interface LinkPreview {
   siteName: string | null;
   favicon: string | null;
   deadline: string | null;
-}
-
-const MAX_BYTES = 1_500_000;
-
-function privateIp(ip: string): boolean {
-  if (isIP(ip) === 6) {
-    const v = ip.toLowerCase();
-    if (v === '::1' || v === '::' || v.startsWith('fc') || v.startsWith('fd') || v.startsWith('fe80')) return true;
-    const m = v.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/);
-    return m ? privateIp(m[1]) : false;
-  }
-  const [a = 0, b = 0] = ip.split('.').map(Number);
-  return a === 10 || a === 127 || a === 0 || a >= 224 || (a === 169 && b === 254) || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168) || (a === 100 && b >= 64 && b <= 127);
-}
-
-async function assertPublic(raw: string): Promise<URL> {
-  const u = new URL(raw);
-  if (u.protocol !== 'https:' && u.protocol !== 'http:') throw new Error('Only web links can be previewed.');
-  if (u.username || u.password) throw new Error('Links with a password are not fetched.');
-  const host = u.hostname.replace(/^\[|\]$/g, '');
-  if (host === 'localhost' || host.endsWith('.localhost') || host.endsWith('.internal') || host.endsWith('.local')) throw new Error('That address is private.');
-  const addrs = isIP(host) ? [{ address: host }] : await lookup(host, { all: true });
-  if (!addrs.length || addrs.some((a) => privateIp(a.address))) throw new Error('That address is private.');
-  return u;
 }
 
 const decode = (s: string) =>
@@ -83,48 +58,23 @@ function orgFromJsonLd(html: string): { organisation: string | null; deadline: s
 }
 
 async function load(raw: string): Promise<LinkPreview> {
-  let url = (await assertPublic(raw)).toString();
-  for (let hop = 0; hop < 5; hop++) {
-    const res = await fetch(url, {
-      redirect: 'manual',
-      headers: { 'user-agent': 'Mozilla/5.0 (compatible; SautiSalamaPreview/1.0; +https://sautisalama.org)', accept: 'text/html,application/xhtml+xml;q=0.9,*/*;q=0.5', 'accept-language': 'en' },
-      signal: AbortSignal.timeout(10_000),
-    });
-    if (res.status >= 300 && res.status < 400 && res.headers.get('location')) {
-      url = (await assertPublic(new URL(res.headers.get('location')!, url).toString())).toString();
-      continue;
-    }
-    if (!res.ok) throw new Error('That page did not open (' + res.status + ').');
-    if (!/html|xml/i.test(res.headers.get('content-type') ?? '')) throw new Error('That link is not a web page.');
-    const reader = res.body?.getReader();
-    const chunks: Uint8Array[] = [];
-    let total = 0;
-    while (reader) {
-      const { done, value } = await reader.read();
-      if (done || !value) break;
-      total += value.byteLength;
-      chunks.push(value);
-      if (total > MAX_BYTES) { await reader.cancel(); break; }
-    }
-    const html = new TextDecoder('utf-8', { fatal: false }).decode(Buffer.concat(chunks));
-    const abs = (v: string | null) => { if (!v) return null; try { return new URL(v, url).toString(); } catch { return null; } };
-    const titleTag = /<title[^>]*>([\s\S]*?)<\/title>/i.exec(html)?.[1];
-    const icon = /<link[^>]+rel=["'][^"']*icon[^"']*["'][^>]*href=["']([^"']+)["']/i.exec(html)?.[1] ?? null;
-    const ld = orgFromJsonLd(html);
-    const host = new URL(url).hostname.replace(/^www\./, '');
-    const siteName = metaContent(html, ['og:site_name', 'application-name']);
-    return {
-      url,
-      title: metaContent(html, ['og:title', 'twitter:title']) ?? (titleTag ? decode(titleTag) : null),
-      description: metaContent(html, ['og:description', 'twitter:description', 'description']),
-      image: abs(metaContent(html, ['og:image', 'twitter:image', 'twitter:image:src'])),
-      organisation: ld.organisation ?? metaContent(html, ['article:publisher', 'author']) ?? siteName ?? host,
-      siteName: siteName ?? host,
-      favicon: abs(icon) ?? `${new URL(url).origin}/favicon.ico`,
-      deadline: ld.deadline,
-    };
-  }
-  throw new Error('That link redirects too many times.');
+  const { url, html } = await fetchHtml(raw);
+  const abs = (v: string | null) => { if (!v) return null; try { return new URL(v, url).toString(); } catch { return null; } };
+  const titleTag = /<title[^>]*>([\s\S]*?)<\/title>/i.exec(html)?.[1];
+  const icon = /<link[^>]+rel=["'][^"']*icon[^"']*["'][^>]*href=["']([^"']+)["']/i.exec(html)?.[1] ?? null;
+  const ld = orgFromJsonLd(html);
+  const host = new URL(url).hostname.replace(/^www\./, '');
+  const siteName = metaContent(html, ['og:site_name', 'application-name']);
+  return {
+    url,
+    title: metaContent(html, ['og:title', 'twitter:title']) ?? (titleTag ? decode(titleTag) : null),
+    description: metaContent(html, ['og:description', 'twitter:description', 'description']),
+    image: abs(metaContent(html, ['og:image', 'twitter:image', 'twitter:image:src'])),
+    organisation: ld.organisation ?? metaContent(html, ['article:publisher', 'author']) ?? siteName ?? host,
+    siteName: siteName ?? host,
+    favicon: abs(icon) ?? `${new URL(url).origin}/favicon.ico`,
+    deadline: ld.deadline,
+  };
 }
 
 export const linkPreview = guard(async (raw: string): Promise<LinkPreview> => {
