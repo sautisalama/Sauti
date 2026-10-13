@@ -269,15 +269,6 @@ html[data-a11y-high-contrast="1"] {
 	}
 }
 
-/* Mobile landscape guard overlay for portrait-only experience */
-.orientation-lock-portrait {
-	display: none;
-}
-@media screen and (max-width: 900px) and (orientation: landscape) {
-	.orientation-lock-portrait {
-		display: flex;
-	}
-}
 .recording-pulse {
 	position: relative;
 }

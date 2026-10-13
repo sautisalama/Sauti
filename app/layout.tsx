@@ -10,7 +10,6 @@ import { AccessibilityProvider } from "@/components/a11y/AccessibilityProvider";
 import { KeyboardFocusScript } from "@/components/a11y/KeyboardFocusScript";
 import AccessibilityFAB from "@/components/a11y/AccessibilityFAB";
 
-import { OrientationGuard } from "@/components/OrientationGuard";
 import { Suspense } from "react";
 import { DeviceInitializer } from "@/components/auth/DeviceInitializer";
 import { ORGANIZATION } from "@/lib/organization";
@@ -186,7 +185,6 @@ export default function RootLayout({
 						<AccessibilityFAB />
 
 				</AccessibilityProvider>
-				<OrientationGuard />
 				<PWAInstallPrompt />
 				<ServiceWorkerRegister />
 				<Toaster />
