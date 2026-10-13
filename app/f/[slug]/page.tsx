@@ -1,7 +1,11 @@
 import { getPublicForm } from "@/app/actions/public-forms";
 import { PublicFormClient } from "./PublicForm";
+import { previewMetadata } from "@/lib/seo/previews";
 
-export const metadata = { title: "Form", robots: { index: false, follow: false } };
+export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }) {
+	const { slug } = await params;
+	return previewMetadata("form", slug, "Form");
+}
 
 export default async function PublicFormPage({ params }: { params: Promise<{ slug: string }> }) {
 	const { slug } = await params;

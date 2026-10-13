@@ -81,6 +81,7 @@ export async function updateSession(request: NextRequest) {
 		"/d", // documents shared with anyone who has the link
 		"/meet", // call links work for guests
 		"/join", // group invite pages show a preview before asking you to sign in
+		"/connect", // a shared Sauti ID shows who it is (and its link preview) before asking you to sign in
 	];
 	const path = request.nextUrl.pathname;
 	// An OAuth redirect that fell back to the site root (for example on Android, when the app link was not on

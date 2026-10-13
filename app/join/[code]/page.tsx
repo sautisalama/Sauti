@@ -7,8 +7,12 @@ import { getInvitePreview } from "@/app/actions/community-invite";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { JoinGroupButton } from "./JoinGroupButton";
+import { previewMetadata } from "@/lib/seo/previews";
 
-export const metadata = { title: "Join group", robots: { index: false } };
+export async function generateMetadata({ params }: { params: Promise<{ code: string }> }) {
+	const { code } = await params;
+	return previewMetadata("group", code, "Join group");
+}
 
 export default async function JoinPage({ params }: { params: Promise<{ code: string }> }) {
 	const { code } = await params;

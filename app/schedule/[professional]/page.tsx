@@ -1,12 +1,18 @@
 import { getBookableProfessional } from '@/lib/scheduling/public-professional';
 import { EnhancedPublicScheduler } from '../../_components/EnhancedPublicScheduler';
 import { notFound } from 'next/navigation';
+import { previewMetadata } from '@/lib/seo/previews';
 import { BadgeCheck, LifeBuoy, Lock, MessageCircle } from 'lucide-react';
 
 interface SchedulePageProps {
   params: Promise<{
     professional: string;
   }>;
+}
+
+export async function generateMetadata({ params }: SchedulePageProps) {
+  const { professional } = await params;
+  return previewMetadata('schedule', professional, 'Book an appointment');
 }
 
 const card = 'rounded-2xl border border-serene-neutral-100 bg-white p-5 shadow-sm sm:p-6';

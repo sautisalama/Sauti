@@ -3,9 +3,13 @@ import { notFound } from "next/navigation";
 import { looseAdmin } from "@/lib/loose-db";
 import { getActor } from "@/lib/access/super-admin";
 import { MeetRoom } from "@/components/meet/MeetRoom";
+import { previewMetadata } from "@/lib/seo/previews";
 
 export const dynamic = "force-dynamic";
-export const metadata: Metadata = { title: "Call | Sauti Salama", robots: { index: false, follow: false } };
+export async function generateMetadata({ params }: { params: Promise<{ code: string }> }): Promise<Metadata> {
+	const { code } = await params;
+	return previewMetadata("meet", code, "Call | Sauti Salama");
+}
 
 export default async function MeetPage({ params, searchParams }: { params: Promise<{ code: string }>; searchParams: Promise<{ embed?: string; autojoin?: string; mic?: string; cam?: string }> }) {
 	const { code } = await params;

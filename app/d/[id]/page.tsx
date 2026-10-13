@@ -3,9 +3,13 @@ import { notFound } from "next/navigation";
 import { publicDoc } from "@/lib/mjengo/public-doc";
 import { getActor } from "@/lib/access/super-admin";
 import { PublicDoc } from "./PublicDoc";
+import { previewMetadata } from "@/lib/seo/previews";
 
 export const dynamic = "force-dynamic";
-export const metadata: Metadata = { title: "Shared document | Sauti Salama", robots: { index: false, follow: false } };
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
+	const { id } = await params;
+	return previewMetadata("doc", id, "Shared document | Sauti Salama");
+}
 
 /** A document its owner opened to anyone with the link: no account needed. */
 export default async function SharedDocPage({ params }: { params: Promise<{ id: string }> }) {

@@ -1,18 +1,45 @@
 import Link from "next/link";
-import { redirect } from "next/navigation";
 import { createClient } from "@/utils/supabase/server";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { ConnectButton } from "./ConnectButton";
+import { getPreview, previewMetadata } from "@/lib/seo/previews";
 
-export const metadata = { title: "Connect", robots: { index: false } };
+export async function generateMetadata({ params }: { params: Promise<{ code: string }> }) {
+	const { code } = await params;
+	return previewMetadata("user", code, "Connect");
+}
 
 /** Landing page for a scanned/shared Sauti ID: sign in, then message the person. */
 export default async function ConnectPage({ params }: { params: Promise<{ code: string }> }) {
 	const { code } = await params;
 	const supabase = await createClient();
 	const { data: { user } } = await supabase.auth.getUser();
-	if (!user) redirect(`/signin?next=${encodeURIComponent(`/connect/${code}`)}`);
+	if (!user) {
+		// Link previews and visitors see who this is; signing in comes after.
+		const who = await getPreview("user", code);
+		return (
+			<main className="flex min-h-[100dvh] items-center justify-center bg-serene-neutral-50 px-4 py-10">
+				<div className="w-full max-w-sm rounded-3xl border border-serene-neutral-100 bg-white p-8 text-center shadow-sm">
+					{who ? (
+						<>
+							<Avatar className="mx-auto h-24 w-24 ring-4 ring-white shadow-md">
+								<AvatarImage src={who.image ?? undefined} />
+								<AvatarFallback className="bg-gradient-to-br from-serene-blue-100 to-serene-blue-50 text-3xl font-bold text-serene-blue-600">{who.title[0]?.toUpperCase()}</AvatarFallback>
+							</Avatar>
+							<h1 className="mt-4 text-2xl font-bold text-serene-neutral-900">{who.title}</h1>
+							<p className="mt-1 text-sm text-serene-neutral-500">Sign in to connect and send a message.</p>
+						</>
+					) : (
+						<h1 className="text-xl font-bold text-serene-neutral-900">We couldn&apos;t find that Sauti ID</h1>
+					)}
+					<Button asChild className="mt-6 w-full">
+						<Link href={`/signin?next=${encodeURIComponent(`/connect/${code}`)}`}>Sign in</Link>
+					</Button>
+				</div>
+			</main>
+		);
+	}
 
 	const { data } = await supabase.rpc("find_user_by_sauti_id", { p_code: code });
 	const person = data?.[0];
