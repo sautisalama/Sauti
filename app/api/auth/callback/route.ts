@@ -6,6 +6,7 @@ import { registerDevice, parseSettings, TrackedDevice } from "@/lib/user-setting
 import { revalidatePath } from "next/cache";
 import { Json } from "@/types/db-schema";
 import { landingFor } from "@/lib/auth/landing";
+import { createAdminClient } from "@/utils/supabase/admin-client";
 
 export async function GET(request: Request) {
 	const { searchParams, origin } = new URL(request.url);
@@ -71,6 +72,17 @@ export async function GET(request: Request) {
 			revalidatePath("/dashboard", "layout");
 			// No page asked for: resume the suite they were last in.
 			next = await landingFor(supabase, user.id, next.startsWith("/") && !next.startsWith("//") ? next : null);
+			// Signed in with Google as an administrator and nothing of theirs is connected yet: one more tap on
+			// Google's own consent screen (their account is already chosen) connects mail, calendar and files.
+			try {
+				if (user.app_metadata.provider === "google" && user.email && !(await cookies()).get("ss_google_offered")) {
+					const { data: prof } = await supabase.from("profiles").select("is_admin").eq("id", user.id).maybeSingle();
+					if (prof?.is_admin) {
+						const { data: have } = await createAdminClient().from("mail_accounts" as never).select("id").eq("owner_id", user.id).eq("auth_type", "google").limit(1);
+						if (!have?.length) next = `/api/mjengo/mail/oauth/google/start?email=${encodeURIComponent(user.email)}`;
+					}
+				}
+			} catch { /* the suite offers the connection later */ }
 		}
 
 		if (!error) {
@@ -82,7 +94,10 @@ export async function GET(request: Request) {
 			const redirectOrigin = resolvedHost ? `${protocol}://${resolvedHost}` : origin;
 			const redirectUrl = `${redirectOrigin}${next}`;
 			
-			return NextResponse.redirect(redirectUrl);
+			const res = NextResponse.redirect(redirectUrl);
+			// Offered once a month at most, so a person who declines is not sent round again at every sign-in.
+			if (next.startsWith("/api/mjengo/mail/oauth/google/start")) res.cookies.set("ss_google_offered", "1", { httpOnly: true, sameSite: "lax", path: "/", maxAge: 30 * 86400 });
+			return res;
 		} else {
 			console.error("Auth exchange error:", error);
 			const forwardedHost = request.headers.get("x-forwarded-host");

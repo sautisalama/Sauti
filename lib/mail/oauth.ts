@@ -51,13 +51,16 @@ export function oauthConfigured(p: OAuthProvider): boolean {
 
 export const redirectUri = (origin: string, p: OAuthProvider) => `${origin}/api/mjengo/mail/oauth/${p}/callback`;
 
-export function authorizeUrl(p: OAuthProvider, origin: string, state: string, loginHint?: string): string {
+/** Everything the suite uses from a Google account, asked for in one consent screen. */
+export const GOOGLE_ALL_SCOPES = 'https://mail.google.com/ openid email https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/contacts.readonly';
+
+export function authorizeUrl(p: OAuthProvider, origin: string, state: string, loginHint?: string, all = false): string {
   const c = cfg(p);
   const q = new URLSearchParams({
     client_id: process.env[c.idEnv]!,
     redirect_uri: redirectUri(origin, p),
     response_type: 'code',
-    scope: c.scope,
+    scope: all && p === 'google' ? GOOGLE_ALL_SCOPES : c.scope,
     state,
     ...(c.extra ?? {}),
     ...(loginHint ? { login_hint: loginHint } : {}),

@@ -6,6 +6,8 @@ import { getActor } from "@/lib/access/super-admin";
 import { emailFromIdToken, exchangeCode, oauthServers, type OAuthProvider } from "@/lib/mail/oauth";
 import { testImap, verifySmtp } from "@/lib/mail/client";
 import { originOf } from "@/lib/mail/origin";
+import { saveCalendarTokens } from "@/lib/calendar/tokens";
+import { saveDriveConnection } from "@/lib/google-drive";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -17,6 +19,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ prov
 	const back = (q: string) => {
 		const r = NextResponse.redirect(`${origin}/dashboard/mjengo/mail?${q}`);
 		r.cookies.delete({ name: "ss_mail_oauth", path: "/api/mjengo/mail/oauth" });
+		r.cookies.delete({ name: "ss_mail_oauth_all", path: "/api/mjengo/mail/oauth" });
 		return r;
 	};
 	const fail = (m: string) => back("mail_error=" + encodeURIComponent(m));
@@ -66,8 +69,15 @@ export async function GET(request: Request, { params }: { params: Promise<{ prov
 			.select("id")
 			.single();
 		if (error || !data) return fail("Could not save the mailbox.");
+		// The same grant also covers the calendar and Drive when everything was asked for: connect them too.
+		const wantsAll = request.headers.get("cookie")?.includes("ss_mail_oauth_all=1") && p === "google";
+		if (wantsAll) {
+			const expires = (tokens as { expires_in?: number }).expires_in;
+			await saveCalendarTokens(actor.id, { access_token: tokens.access_token ?? null, refresh_token: tokens.refresh_token, expiry_date: expires ? Date.now() + expires * 1000 : null }).catch(() => undefined);
+			await saveDriveConnection(actor.id, tokens.refresh_token, email).catch(() => undefined);
+		}
 		await logAudit({ actorId: actor.id, actorEmail: actor.email, action: "mail.account_connected", targetType: "mailbox", targetId: data.id, targetLabel: email, details: { via: p } });
-		return back("mail_connected=" + encodeURIComponent(email));
+		return back("mail_connected=" + encodeURIComponent(email) + (wantsAll ? "&google_all=1" : ""));
 	} catch (e) {
 		return fail(e instanceof Error ? e.message : "Could not complete the sign-in.");
 	}

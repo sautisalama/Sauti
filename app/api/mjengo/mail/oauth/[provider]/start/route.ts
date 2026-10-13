@@ -20,7 +20,11 @@ export async function GET(request: Request, { params }: { params: Promise<{ prov
 	if (!oauthConfigured(p)) return back("mail_error=" + encodeURIComponent(`${p === "google" ? "Google" : "Microsoft"} sign-in is not set up on this site yet.`));
 
 	const state = randomBytes(24).toString("base64url");
-	const res = NextResponse.redirect(authorizeUrl(p, origin, state, new URL(request.url).searchParams.get("email") || undefined));
+	const sp = new URL(request.url).searchParams;
+	// Google: mail, calendar, files and contacts in one consent, so nothing else has to be connected afterwards.
+	const all = p === "google" && sp.get("all") !== "0";
+	const res = NextResponse.redirect(authorizeUrl(p, origin, state, sp.get("email") || actor.email || undefined, all));
+	if (all) res.cookies.set("ss_mail_oauth_all", "1", { httpOnly: true, secure: origin.startsWith("https"), sameSite: "lax", path: "/api/mjengo/mail/oauth", maxAge: 600 });
 	res.cookies.set("ss_mail_oauth", `${p}:${state}`, { httpOnly: true, secure: origin.startsWith("https"), sameSite: "lax", path: "/api/mjengo/mail/oauth", maxAge: 600 });
 	return res;
 }

@@ -230,6 +230,16 @@ async function icons_(titles: string[]): Promise<Record<string, string>> {
     const hit = WORDS.find(([re]) => re.test(t));
     if (hit) known[t] = hit[1]; else list.push(t);
   }
+  // Jev (a typed decision model) is faster and cheaper than writing prose for a fixed set of answers.
+  const { decideChoice, decideConfigured } = await import('@/lib/mjengo/decide');
+  if (decideConfigured() && list.length) {
+    const options = Object.fromEntries(ICON_KEYS.map((k) => [k, `An event about ${k}.`])) as Record<string, string>;
+    const answers = await Promise.all(list.map((t) => decideChoice(`Calendar event title: ${t}`, 'What kind of activity is this event?', options)));
+    for (let i = list.length - 1; i >= 0; i--) {
+      const a = answers[i];
+      if (a && a.probability >= 0.45) { known[list[i]] = a.choice; list.splice(i, 1); }
+    }
+  }
   const key = process.env.OPENROUTER_API_KEY;
   if (!list.length || !key) return known;
   const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {

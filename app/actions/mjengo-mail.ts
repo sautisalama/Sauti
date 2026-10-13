@@ -767,6 +767,32 @@ async function setMessageLabel_(accountId: string, messageId: string, labelId: s
   else await db.from('mail_message_labels').delete().eq('account_id', accountId).eq('message_id', messageId).eq('label_id', labelId).eq('owner_id', actor.id);
 }
 
+export interface MailTriage { kind: 'personal' | 'automated' | 'opportunity'; confidence: number; by: 'jev' | 'rules' }
+
+const OPP_WORDS = /\b(call for (proposals|applications|expressions)|request for proposals?|rfp|funding opportunit|grant (opportunity|call|application)|fellowship|tender|expression of interest|eoi|application deadline|apply by|closing date)\b/i;
+const AUTO_WORDS = /unsubscribe|manage (your )?(email )?preferences|view (this email )?in (your )?browser|no[-_.]?reply|do[-_.]?not[-_.]?reply|receipt|invoice #|your order/i;
+
+/**
+ * What kind of mail this is, so the suite knows whether it needs reading, can be left alone, or should be
+ * offered to Opportunities. Jev (a typed decision model) answers when TYPESAFE_API_KEY is set; otherwise word
+ * rules do. No language model is called either way.
+ */
+async function triage_(subject: string, from: string, text: string): Promise<MailTriage> {
+  await requireModule('mail');
+  const body = `From: ${from.slice(0, 120)}\nSubject: ${subject.slice(0, 200)}\n\n${text.slice(0, 3500)}`;
+  const { decideChoice } = await import('@/lib/mjengo/decide');
+  const r = await decideChoice(body, 'What kind of email is this?', {
+    personal: 'A person wrote this to the reader and expects a reply or attention.',
+    automated: 'A newsletter, receipt, notification, system message or marketing mail.',
+    opportunity: 'It announces a funding call, grant, fellowship, tender or partnership opportunity with a deadline.',
+  });
+  if (r) return { kind: r.choice, confidence: r.probability, by: 'jev' };
+  const hay = `${subject}\n${text.slice(0, 3000)}`;
+  if (OPP_WORDS.test(hay)) return { kind: 'opportunity', confidence: 0.6, by: 'rules' };
+  if (AUTO_WORDS.test(`${from}\n${text.slice(-1500)}`)) return { kind: 'automated', confidence: 0.7, by: 'rules' };
+  return { kind: 'personal', confidence: 0.5, by: 'rules' };
+}
+
 export interface ProjectLite { id: string; name: string; status: string }
 
 async function listProjects_(): Promise<ProjectLite[]> {
@@ -1107,6 +1133,7 @@ export const summariseMessage = guard(summariseMessage_);
 export const draftReply = guard(draftReply_);
 export const suggestReplies = guard(suggestReplies_);
 export const listLabels = guard(listLabels_);
+export const mailTriage = guard(triage_);
 export const listMailProjects = guard(listProjects_);
 export const projectLabel = guard(projectLabel_);
 export const listGrantsLite = guard(listGrantsLite_);

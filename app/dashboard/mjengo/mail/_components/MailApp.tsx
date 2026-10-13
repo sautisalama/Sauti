@@ -26,7 +26,7 @@ import { PersonChip } from "./PersonChip";
 import { AiSummary, ThreadMessage } from "./Thread";
 import { unwrap } from "@/lib/action-result";
 import { addContactFromMail } from "@/app/actions/mjengo-contacts";
-import { listLabels, saveLabel, deleteLabel, setMessageLabel, projectLabel, listGrantsLite, linkToWork, type LabelRow, type ProjectLite, type GrantLite } from "./api";
+import { listLabels, saveLabel, deleteLabel, setMessageLabel, projectLabel, listGrantsLite, linkToWork, mailTriage, type LabelRow, type ProjectLite, type GrantLite } from "./api";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { AccountSwitcher } from "./AccountSwitcher";
 import { detailKey, listKey, mailStore, mergeFresh, prefetchDetails, setMailUnread } from "./mail-store";
@@ -596,7 +596,7 @@ const Pane = (
 			hasPrev={rows.findIndex((r) => r.uid === selected?.uid) > 0}
 			hasNext={rows.findIndex((r) => r.uid === selected?.uid) >= 0 && rows.findIndex((r) => r.uid === selected?.uid) < rows.length - 1}
 			onAutoLabelSimilar={() => { const f = detail?.from[0]; setLabelEdit({ name: f ? displayName(f) : "", instruction: f ? `Emails from ${displayName(f)} <${f.address}>` : "" }); }}
-			labels={labels} selectedLabels={rows.find((r) => r.uid === selected?.uid)?.labels ?? selected?.labels ?? []} onToggleLabel={(id, on) => selected?.messageId && toggleLabel(selected.messageId, id, on, selected.uid)} projects={projects} onToggleProject={(id, on) => selected?.messageId && toggleProject(selected.messageId, id, on, selected.uid)} onNewLabel={() => setLabelEdit({})} selected={selected} detail={detail} busy={detailBusy} accountId={accountId!} conversation={conversation} summary={summary} summaryBusy={summaryBusy} allowImages={allowImages}
+			labels={labels} selectedLabels={rows.find((r) => r.uid === selected?.uid)?.labels ?? selected?.labels ?? []} onToggleLabel={(id, on) => selected?.messageId && toggleLabel(selected.messageId, id, on, selected.uid)} projects={projects} onOpportunity={(links, subject) => setWorkPrompt({ url: links[0], subject, links })} onToggleProject={(id, on) => selected?.messageId && toggleProject(selected.messageId, id, on, selected.uid)} onNewLabel={() => setLabelEdit({})} selected={selected} detail={detail} busy={detailBusy} accountId={accountId!} conversation={conversation} summary={summary} summaryBusy={summaryBusy} allowImages={allowImages}
 			onClose={close} onSummarise={summarise} onOpen={(m) => open(m)} onAct={(a) => selected && act(selected, a)}
 			onReply={(all) => detail && startReply(detail, all)} onForward={() => detail && startReply(detail, false, true)}
 			onLoadImages={() => { setAllowImages(true); if (selected) open(selected, true); }} full={effectiveLayout === "full"}
@@ -800,11 +800,11 @@ function HoverBtn({ label, onClick, children }: { label: string; onClick: () => 
 	return <button onClick={(e) => { e.stopPropagation(); onClick(); }} title={label} aria-label={label} className="rounded-md p-1.5 text-serene-neutral-600 hover:bg-serene-neutral-100">{children}</button>;
 }
 
-function ReadingPane({ teamIds, team, onWrite, onAddContact, onPrev, onNext, hasPrev, hasNext, onAutoLabelSimilar, labels, selectedLabels, onToggleLabel, projects, onToggleProject, onNewLabel, selected, detail, busy, accountId, conversation, summary, summaryBusy, allowImages, onClose, onSummarise, onOpen, onAct, onReply, onForward, onLoadImages, full, meAddress, inlineReply }: {
+function ReadingPane({ teamIds, team, onWrite, onAddContact, onPrev, onNext, hasPrev, hasNext, onAutoLabelSimilar, labels, selectedLabels, onToggleLabel, projects, onToggleProject, onOpportunity, onNewLabel, selected, detail, busy, accountId, conversation, summary, summaryBusy, allowImages, onClose, onSummarise, onOpen, onAct, onReply, onForward, onLoadImages, full, meAddress, inlineReply }: {
 	teamIds: (a: string[]) => (string | undefined)[]; team: ReturnType<typeof useTeam>;
 	onWrite: (address: string) => void; onAddContact: (name: string, address: string) => void;
 	onPrev: () => void; onNext: () => void; hasPrev: boolean; hasNext: boolean; onAutoLabelSimilar: () => void;
-	labels: LabelRow[]; selectedLabels: string[]; onToggleLabel: (id: string, on: boolean) => void; projects: ProjectLite[]; onToggleProject: (id: string, on: boolean) => void; onNewLabel: () => void;
+	labels: LabelRow[]; selectedLabels: string[]; onToggleLabel: (id: string, on: boolean) => void; projects: ProjectLite[]; onToggleProject: (id: string, on: boolean) => void; onOpportunity: (links: string[], subject: string) => void; onNewLabel: () => void;
 	selected: MessageRow | null; detail: Detail | null; busy: boolean; accountId: string; conversation: MessageRow[]; summary: string | null; summaryBusy: boolean; allowImages: boolean;
 	onClose: () => void; onSummarise: () => void; onOpen: (m: MessageRow) => void; onAct: (a: MailAction) => void; onReply: (all: boolean) => void; onForward: () => void; onLoadImages: () => void; full: boolean;
 	meAddress: string; inlineReply: React.ReactNode | null;
@@ -913,6 +913,14 @@ function ReadingPane({ teamIds, team, onWrite, onAddContact, onPrev, onNext, has
 							{selectedLabels.map((id) => { const l = labels.find((x) => x.id === id); return l ? <span key={id} className={cn("rounded px-2 py-0.5", LABEL_COLORS[l.color]?.chip ?? "bg-black/5")}>{l.name}</span> : null; })}
 						</div>
 						<hr className="-mx-6 mt-4 border-black/[0.07]" />
+
+						<OpportunityChip
+							key={`${accountId}:${selected?.mailbox}:${detail.uid}`}
+							subject={detail.subject}
+							from={detail.from[0] ? `${detail.from[0].name || ""} <${detail.from[0].address}>` : ""}
+							text={detail.text || (detail.html ?? "").replace(/<[^>]+>/g, " ")}
+							onOffer={() => { const links = linksIn(detail.html ?? "", detail.text ?? ""); if (links.length) onOpportunity(links, detail.subject); }}
+						/>
 
 						<AiSummary
 							accountId={accountId}
@@ -1123,5 +1131,24 @@ function WorkPrompt({ prompt, onClose }: { prompt: { url: string; subject: strin
 				</div>
 			</DialogContent>
 		</Dialog>
+	);
+}
+
+/** A quiet line under the subject when the message looks like a funding call: one tap offers it to Opportunities. */
+function OpportunityChip({ subject, from, text, onOffer }: { subject: string; from: string; text: string; onOffer: () => void }) {
+	const [looks, setLooks] = useState(false);
+	useEffect(() => {
+		let on = true;
+		if (text.length < 200) return;
+		mailTriage(subject, from, text).then((t) => { if (on && t.kind === "opportunity" && t.confidence >= 0.55) setLooks(true); }).catch(() => undefined);
+		return () => { on = false; };
+	}, [subject, from, text]);
+	if (!looks) return null;
+	return (
+		<button onClick={onOffer} className="mt-3 flex w-full items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-left text-sm text-amber-900 hover:bg-amber-100">
+			<Sparkles className="h-4 w-4 shrink-0" />
+			<span className="min-w-0 flex-1">This looks like a funding or partnership opportunity.</span>
+			<span className="shrink-0 font-semibold">Add to Opportunities</span>
+		</button>
 	);
 }
