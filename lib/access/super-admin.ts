@@ -1,3 +1,4 @@
+import { cache } from 'react';
 import { createClient } from '@/utils/supabase/server';
 import { looseAdmin } from '@/lib/loose-db';
 
@@ -23,7 +24,7 @@ export interface SuperAdminRow {
 }
 
 /** The signed-in person, or null. Email comes from the auth account (verified), never from a form. */
-export async function getActor(): Promise<Actor | null> {
+export const getActor = cache(async function getActor(): Promise<Actor | null> {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user?.email) return null;
@@ -35,7 +36,7 @@ export async function getActor(): Promise<Actor | null> {
     name: [p?.first_name, p?.last_name].filter(Boolean).join(' ') || user.email,
     isAdmin: !!p?.is_admin,
   };
-}
+});
 
 /** Super-admin row for an email, if any. */
 export async function findSuperAdmin(email: string): Promise<SuperAdminRow | null> {
@@ -43,9 +44,11 @@ export async function findSuperAdmin(email: string): Promise<SuperAdminRow | nul
   return (data as SuperAdminRow | null) ?? null;
 }
 
+const superAdminByEmail = cache(async (email: string) => !!(await findSuperAdmin(email)));
+
 export async function isSuperAdminEmail(email: string | undefined | null): Promise<boolean> {
   if (!email) return false;
-  return !!(await findSuperAdmin(email.toLowerCase()));
+  return superAdminByEmail(email.toLowerCase());
 }
 
 /** Any administrator (the Mjengo suite). */

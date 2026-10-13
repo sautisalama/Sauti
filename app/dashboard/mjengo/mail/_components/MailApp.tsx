@@ -83,6 +83,7 @@ export function MailApp() {
 		const [labels, setLabels] = useState<LabelRow[]>([]);
 	const [labelEdit, setLabelEdit] = useState<Partial<LabelRow> | null>(null);
 	const [projects, setProjects] = useState<ProjectLite[]>([]);
+	useEffect(() => { try { localStorage.setItem("ss_mail_used", "1"); } catch { /* no storage */ } }, []);
 	// A link in an email that was tagged as a grant or an opportunity: offered a place in the suite.
 	const [workPrompt, setWorkPrompt] = useState<{ url: string; subject: string; links: string[] } | null>(null);
 	const [dropOn, setDropOn] = useState<string | null>(null);

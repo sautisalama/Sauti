@@ -133,7 +133,9 @@ export function EnhancedSidebar({
 	useEffect(() => {
 		if (!onMjengo) return;
 		let on = true;
-		const tick = () => suiteCounts().then((c) => on && setSuite(c)).catch(() => undefined);
+		// Not on every page change: at most every 20 seconds.
+		let last = 0;
+		const tick = () => { if (Date.now() - last < 20_000) return; last = Date.now(); suiteCounts().then((c) => on && setSuite(c)).catch(() => undefined); };
 		tick();
 		const t = setInterval(tick, 60_000);
 		window.addEventListener("focus", tick);

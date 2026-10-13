@@ -1,3 +1,4 @@
+import { cache } from 'react';
 import { looseAdmin } from '@/lib/loose-db';
 import { getActor, isSuperAdminEmail, type Actor } from '@/lib/access/super-admin';
 
@@ -27,7 +28,7 @@ export const MODULE_KEYS = MODULES.map((m) => m.key) as ModuleKey[];
 export const moduleLabel = (k: string) => MODULES.find((m) => m.key === k)?.label ?? k;
 
 /** Everything this person may use. 'all' for super admins and for administrators without a role. */
-export async function permissionsFor(userId: string, email: string): Promise<'all' | Set<ModuleKey>> {
+export const permissionsFor = cache(async function permissionsFor(userId: string, email: string): Promise<'all' | Set<ModuleKey>> {
   if (await isSuperAdminEmail(email)) return 'all';
   const db = looseAdmin();
   const { data: mem } = await db.from('mjengo_role_members').select('role_id').eq('user_id', userId);
@@ -37,7 +38,7 @@ export async function permissionsFor(userId: string, email: string): Promise<'al
   const out = new Set<ModuleKey>();
   for (const r of (roles ?? []) as { permissions: string[] }[]) for (const p of r.permissions ?? []) if (MODULE_KEYS.includes(p as ModuleKey)) out.add(p as ModuleKey);
   return out;
-}
+});
 
 export const may = (perms: 'all' | Set<ModuleKey>, key: ModuleKey) => perms === 'all' || perms.has(key);
 

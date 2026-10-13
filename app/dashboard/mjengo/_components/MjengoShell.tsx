@@ -47,7 +47,14 @@ export function MjengoShell({ isSuper, children }: { isSuper: boolean; children:
 	useEffect(() => { startSuiteNotifications(); }, []);
 	// Warm the mail screen shortly after the suite opens, so Mail is already there when it is clicked.
 	useEffect(() => {
-		const t = setTimeout(() => { import("../mail/_components/mail-store").then((m) => m.prefetchMail()).catch(() => undefined); }, 1200);
+		// Only for people who use mail, and only when the browser is idle: it must never slow the first screen.
+		let used = false;
+		try { used = localStorage.getItem("ss_mail_used") === "1"; } catch { /* no storage */ }
+		if (!used) return;
+		const run = () => { import("../mail/_components/mail-store").then((m) => m.prefetchMail()).catch(() => undefined); };
+		const w = window as unknown as { requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => number; cancelIdleCallback?: (n: number) => void };
+		if (w.requestIdleCallback) { const id = w.requestIdleCallback(run, { timeout: 6000 }); return () => w.cancelIdleCallback?.(id); }
+		const t = setTimeout(run, 4000);
 		return () => clearTimeout(t);
 	}, []);
 	// Mail and the document editor take the whole window, like native apps.
