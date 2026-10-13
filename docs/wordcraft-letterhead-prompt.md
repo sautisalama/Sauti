@@ -280,3 +280,106 @@ convert SVG to PNG, optional "remove white background", and a size cap with a cl
    header left, centre, right; footer; first page only; watermark behind text at the chosen opacity.
 4. Replace the logo: the old one is removed, not stacked. Remove: header and watermark are cleared.
 5. Low-contrast palette: a warning appears and the fix button makes headings pass 4.5:1.
+
+---
+
+# Part 4: AI that builds structure: tables, diagrams, charts, lists and other blocks
+
+## Today (what exists in the package)
+
+AI results are inserted by `insertText(editor, text)`, which splits the answer on newlines and types plain
+paragraphs. So "make a table of our grants with amounts and deadlines" returns text, not a table; there are no
+headings, lists, links, diagrams, charts or images from the AI. The quick actions are text actions only (rewrite,
+shorten, elaborate, formal, casual, fix grammar, summarise, outline, continue, meeting notes, email, brainstorm).
+
+## 1. Rich output instead of plain text (P0)
+
+- The AI returns **Markdown or a block list**, and the package inserts it as real document structure: headings,
+  bulleted and numbered lists (nested), bold and italic, links, block quotes, code blocks, horizontal rules, and
+  **tables** (header row, column alignment, optional header shading from the palette).
+- Preferred contract so it is robust: a small JSON block schema the model is instructed to follow
+  (`{ type: "heading" | "paragraph" | "list" | "table" | "diagram" | "chart" | "image" | "callout" | "code", ... }`),
+  with a Markdown fallback. Validate and repair before inserting; never insert raw model HTML.
+- Insert modes: at the cursor, replace the selection, insert below, or **insert as a suggestion** (tracked change)
+  when the person is in Suggesting mode.
+- Preview before insert: the result card renders the structure (a real table, a rendered diagram), with Insert,
+  Replace, Regenerate and "Edit as text".
+- The inserted structure uses the document's styles and theme (Part 3), so tables and headings match the palette.
+
+## 2. Tables from data (P0)
+
+- "Turn this list into a table", "Make a table comparing X and Y", "Summarise the grants as a table with
+  funder, amount, deadline".
+- Data sources: the prompt itself, the selection, the document, **a pasted CSV or spreadsheet range**, or a file
+  through the host picker (`ai.pickData(): Promise<{ columns, rows } | null>`; the host maps its Sheets or Excel
+  files). With data given, the AI formats and summarises; it must not invent values (missing becomes an empty cell
+  or "[to confirm]").
+- Table tools next to the result: add or remove rows and columns, sort, number format (currency, percent, date),
+  totals row, and "Update from source" when the table was made from a host data source.
+- Round trip: tables are native Word tables (`w:tbl`), not images.
+
+## 3. Diagrams (P0)
+
+- Natural language to **diagrams**: flowchart, sequence, org chart, timeline, Gantt, mind map, entity relationship,
+  state, and simple concept maps.
+- Engine: **Mermaid** (text syntax the model writes reliably). Render in the browser to SVG, then insert as an
+  image (PNG with an SVG source where the format allows) with **alt text** generated from the diagram.
+- Keep the source: store the Mermaid text with the image (a custom XML part or the image's description field) so
+  "Edit diagram" reopens a code and live preview panel, and the AI can change it ("add a step after approval").
+- Safety: render with Mermaid's `securityLevel: "strict"`, no script, no external fetches; limit size and
+  complexity; fall back to showing the code if rendering fails, with a one-click "Ask AI to fix the diagram".
+- Theme: diagrams take the document palette (primary, secondary, accent) and fonts.
+
+## 4. Charts (P1)
+
+- "Chart the grant amounts by funder": the AI produces data plus a chart spec (bar, column, line, area, pie,
+  donut, scatter, stacked) from the table, selection or a data source.
+- Render in the browser (a small chart renderer such as Chart.js or Vega-Lite) with the palette colours, value
+  labels, axis titles and a legend; insert as an image with alt text and keep the spec and data for "Edit chart".
+- Stretch goal: write a **native Word chart** (DrawingML chart part with embedded workbook) so it is editable in
+  Word. Until then, the image plus the stored spec is acceptable.
+
+## 5. More blocks the AI can create (P1 and P2)
+
+- **Callouts** (note, tip, warning) and **pull quotes**, styled from the palette.
+- **Table of contents**, footnotes and endnotes, page breaks, and a cover page.
+- **Equations** from natural language or LaTeX (render with KaTeX or MathML, insert as an OMML equation where
+  possible).
+- **QR codes and barcodes** from a link or text (useful for forms, event sign-up, and donation links).
+- **Images**: host adapter `ai.generateImage(prompt) → Blob`, or search through `ai.imageSearch(query)`; always
+  with alt text and a stored prompt; never inserted without preview.
+- **Forms elements**: signature line, date field, checkbox list, fillable text (content controls).
+- **Smart templates**: "Project proposal", "Meeting agenda", "Report with executive summary" that create the
+  headings, tables and placeholders at once (the generator list already has some of these labels).
+- **Document-level actions**: "Add an executive summary at the top", "Add a risk table to section 3", "Turn this
+  section into an FAQ".
+
+## 6. Quick actions and the slash menu
+
+- Add structured actions to the quick chips and to a `/` slash menu: Table, Diagram, Chart, Timeline, Checklist,
+  Callout, Equation, QR code, Image, Table of contents.
+- Each opens the same panel: a prompt box, a data source picker, a result preview and the insert modes.
+- The host can add its own actions: `ai.actions = [{ id, label, icon, run(ctx) → Block[] }]`, for example "Insert
+  our standard donor paragraph" or "Insert the grant budget table from Finance".
+
+## 7. Safety, quality and limits
+
+- All AI output is untrusted: sanitise, cap sizes (rows, columns, nodes, characters), strip scripts and remote
+  resources, and never execute model output.
+- Show a short "AI-generated, check before use" marker in the result card, not in the document.
+- Facts and numbers: when the source data is given, values must come from it; otherwise the model is instructed
+  to use placeholders (`[number]`) instead of inventing figures.
+- Works with the permission levels (Part 2): in Viewing and Commenting the structured actions are hidden; in
+  Suggesting they insert as tracked changes.
+- Every renderer (Mermaid, charts, KaTeX) is loaded lazily, only when first used.
+
+## 8. Acceptance
+
+1. "Make a table of three funders with amount and deadline" inserts a native Word table with a shaded header in
+   the palette colour; opened in Word it is a real table.
+2. Paste a CSV, ask for "a table sorted by amount with a total": the values match the CSV exactly.
+3. "Draw a flowchart of our case referral process" shows a rendered diagram in the preview; Insert places it with
+   alt text; "Edit diagram" reopens the Mermaid source; a syntax error offers the AI fix.
+4. "Bar chart of these amounts by funder" inserts a chart in the palette colours with a legend and axis titles.
+5. A viewer sees none of these actions; a suggester's insertion is a tracked change.
+6. A model reply with a script tag or a remote image URL is sanitised: nothing runs, nothing is fetched.
