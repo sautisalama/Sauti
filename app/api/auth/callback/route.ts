@@ -79,7 +79,7 @@ export async function GET(request: Request) {
 					const { data: prof } = await supabase.from("profiles").select("is_admin").eq("id", user.id).maybeSingle();
 					if (prof?.is_admin) {
 						const { data: have } = await createAdminClient().from("mail_accounts" as never).select("id").eq("owner_id", user.id).eq("auth_type", "google").limit(1);
-						if (!have?.length) next = `/api/mjengo/mail/oauth/google/start?email=${encodeURIComponent(user.email)}`;
+						if (!have?.length) next = `/api/mjengo/mail/oauth/google/start?choice=done&email=${encodeURIComponent(user.email)}`;
 					}
 				}
 			} catch { /* the suite offers the connection later */ }

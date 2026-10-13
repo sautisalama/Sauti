@@ -93,7 +93,7 @@ export async function suiteStatus(): Promise<SuiteStatus> {
   const aiRow = ai.data as { provider: string | null; api_key_enc: string | null } | null;
 
   const setup: SuiteStatus['setup'] = [];
-  if (!mail.count && !drive.count) setup.push({ id: 'google', label: 'Connect your Google account', hint: 'Mail, calendar and files in one step.', href: `/api/mjengo/mail/oauth/google/start?email=${encodeURIComponent(actor.email)}` });
+  if (!mail.count && !drive.count) setup.push({ id: 'google', label: 'Connect your Google account', hint: 'Mail, calendar and files in one step.', href: `/api/mjengo/mail/oauth/google/start?choice=done&email=${encodeURIComponent(actor.email)}` });
   else {
     if (!mail.count) setup.push({ id: 'mail', label: 'Connect your mailbox', hint: 'Send and read email inside the suite.', href: '/dashboard/mjengo/mail' });
     else if (!(sig.data as { html?: string } | null)?.html) setup.push({ id: 'signature', label: 'Add an email signature', hint: 'It is added to every email you send.', href: '/dashboard/mjengo/mail' });

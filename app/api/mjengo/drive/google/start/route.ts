@@ -4,6 +4,7 @@ import { getActor } from "@/lib/access/super-admin";
 import { originOf } from "@/lib/mail/origin";
 import { resolveDriveSource, safeReturn } from "@/lib/mjengo-drive";
 import { driveConnection } from "@/lib/google-drive";
+import { googleChoiceUrl, mustAskGoogleChoice } from "@/lib/mail/google-choice";
 
 export const runtime = "nodejs";
 
@@ -33,6 +34,7 @@ export async function GET(request: Request) {
 	}
 
 	const connected = await driveConnection(actor.id);
+	if (!connected && (await mustAskGoogleChoice(request))) return NextResponse.redirect(googleChoiceUrl(origin, "drive", request));
 	const state = randomBytes(24).toString("base64url");
 	const q = new URLSearchParams({
 		client_id: process.env.GOOGLE_CLIENT_ID,

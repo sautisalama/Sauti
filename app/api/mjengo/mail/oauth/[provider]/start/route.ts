@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { getActor } from "@/lib/access/super-admin";
 import { originOf } from "@/lib/mail/origin";
 import { authorizeUrl, oauthConfigured, type OAuthProvider } from "@/lib/mail/oauth";
+import { googleChoiceUrl, mustAskGoogleChoice } from "@/lib/mail/google-choice";
 
 export const runtime = "nodejs";
 
@@ -18,6 +19,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ prov
 	const actor = await getActor();
 	if (!actor?.isAdmin) return back("mail_error=" + encodeURIComponent("Only administrators can connect a mailbox."));
 	if (!oauthConfigured(p)) return back("mail_error=" + encodeURIComponent(`${p === "google" ? "Google" : "Microsoft"} sign-in is not set up on this site yet.`));
+
+	if (p === "google" && new URL(request.url).searchParams.get("all") === null && (await mustAskGoogleChoice(request))) return NextResponse.redirect(googleChoiceUrl(origin, "mail", request));
 
 	const state = randomBytes(24).toString("base64url");
 	const sp = new URL(request.url).searchParams;

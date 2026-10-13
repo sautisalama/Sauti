@@ -2,6 +2,7 @@ import { randomBytes } from "node:crypto";
 import { NextResponse } from "next/server";
 import { getActor } from "@/lib/access/super-admin";
 import { originOf } from "@/lib/mail/origin";
+import { googleChoiceUrl, mustAskGoogleChoice } from "@/lib/mail/google-choice";
 
 export const runtime = "nodejs";
 
@@ -12,6 +13,8 @@ export async function GET(request: Request) {
 	const actor = await getActor();
 	if (!actor?.isAdmin) return back("import_error=" + encodeURIComponent("Only administrators can import contacts."));
 	if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) return back("import_error=" + encodeURIComponent("Google sign-in is not set up on this site yet."));
+
+	if (await mustAskGoogleChoice(request)) return NextResponse.redirect(googleChoiceUrl(origin, "contacts", request));
 
 	const state = randomBytes(24).toString("base64url");
 	const q = new URLSearchParams({
