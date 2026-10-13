@@ -5,6 +5,7 @@ import { useSyncExternalStore } from "react";
 export interface TrayItem { id: number; name: string; size: number; pct: number; state: "uploading" | "done" | "error"; error?: string }
 
 let items: TrayItem[] = [];
+const NONE: TrayItem[] = [];
 let n = 0;
 const listeners = new Set<() => void>();
 const emit = () => { items = [...items]; listeners.forEach((l) => l()); };
@@ -28,5 +29,5 @@ export function trayStart(name: string, size: number) {
 export const trayDismiss = (id: number) => { items = items.filter((x) => x.id !== id); emit(); };
 
 export function useTray(): TrayItem[] {
-	return useSyncExternalStore((l) => { listeners.add(l); return () => listeners.delete(l); }, () => items, () => []);
+	return useSyncExternalStore((l) => { listeners.add(l); return () => listeners.delete(l); }, () => items, () => NONE);
 }
