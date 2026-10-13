@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Send, X } from "lucide-react";
+import { Pin, PinOff, Send, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 /* ---------------------------------------------------------------- reactions */
@@ -60,10 +60,10 @@ export function ReactionLayer({ items }: { items: FloatingReaction[] }) {
 
 /* ---------------------------------------------------------------- chat */
 
-export interface ChatMsg { id: string; name: string; text: string; at: string; mine?: boolean }
+export interface ChatMsg { id: string; name: string; text: string; at: string; mine?: boolean; pinned?: boolean }
 
 /** Messages for everyone in the call. Links are clickable; they are kept with the meeting afterwards. */
-export function ChatPanel({ lines, onSend }: { lines: ChatMsg[]; onSend: (text: string) => void }) {
+export function ChatPanel({ lines, onSend, onPin }: { lines: ChatMsg[]; onSend: (text: string) => void; onPin?: (id: string, pinned: boolean) => void }) {
 	const [draft, setDraft] = useState("");
 	const end = useRef<HTMLDivElement>(null);
 	useEffect(() => { end.current?.scrollIntoView({ block: "end" }); }, [lines.length]);
@@ -71,11 +71,24 @@ export function ChatPanel({ lines, onSend }: { lines: ChatMsg[]; onSend: (text: 
 	const linkify = (t: string) => t.split(/(https?:\/\/[^\s]+)/g).map((p, i) => (/^https?:\/\//.test(p) ? <a key={i} href={p} target="_blank" rel="noopener noreferrer" className="break-all text-[#068297] underline">{p}</a> : <span key={i}>{p}</span>));
 	return (
 		<div className="flex min-h-0 flex-1 flex-col">
+			{lines.some((l) => l.pinned) && (
+				<div className="max-h-40 shrink-0 space-y-1.5 overflow-y-auto border-b border-[#dadce0] bg-[#fffbe6] p-3 text-sm" aria-label="Pinned messages">
+					<p className="flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wider text-[#8a6d00]"><Pin className="h-3 w-3" /> Pinned</p>
+					{lines.filter((l) => l.pinned).map((l) => (
+						<div key={l.id} className="flex items-start gap-2">
+							<p className="min-w-0 flex-1 whitespace-pre-wrap break-words"><span className="font-medium">{l.mine ? "You" : l.name}: </span>{linkify(l.text)}</p>
+							{onPin && <button onClick={() => onPin(l.id, false)} aria-label="Unpin" title="Unpin" className="shrink-0 text-[#8a6d00] hover:text-black"><PinOff className="h-3.5 w-3.5" /></button>}
+						</div>
+					))}
+				</div>
+			)}
 			<div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4 text-sm">
 				{lines.length === 0 && <p className="text-[#5f6368]">Messages are visible to everyone in the call and kept with the meeting.</p>}
 				{lines.map((l) => (
-					<div key={l.id} className={cn("flex flex-col", l.mine && "items-end")}>
-						<span className="text-[11px] text-[#5f6368]">{l.mine ? "You" : l.name} · {new Date(l.at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</span>
+					<div key={l.id} className={cn("group flex flex-col", l.mine && "items-end")}>
+						<span className="flex items-center gap-1.5 text-[11px] text-[#5f6368]">{l.mine ? "You" : l.name} · {new Date(l.at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}
+							{onPin && <button onClick={() => onPin(l.id, !l.pinned)} aria-label={l.pinned ? "Unpin message" : "Pin message"} title={l.pinned ? "Unpin" : "Pin to the top"} className={cn("rounded p-0.5 hover:bg-black/5", l.pinned ? "text-[#8a6d00]" : "opacity-0 focus:opacity-100 group-hover:opacity-100 max-md:opacity-100")}>{l.pinned ? <PinOff className="h-3 w-3" /> : <Pin className="h-3 w-3" />}</button>}
+						</span>
 						<span className={cn("mt-0.5 max-w-[90%] whitespace-pre-wrap break-words rounded-2xl px-3 py-2", l.mine ? "bg-[#e0f2f5]" : "bg-[#f1f3f4]")}>{linkify(l.text)}</span>
 					</div>
 				))}

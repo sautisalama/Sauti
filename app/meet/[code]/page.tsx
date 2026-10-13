@@ -18,6 +18,13 @@ export default async function MeetPage({ params, searchParams }: { params: Promi
 	const { data } = await looseAdmin().from("mjengo_meetings").select("title, mode, ended_at, description, resources").eq("code", code).maybeSingle();
 	if (!data) notFound();
 	const actor = await getActor();
+	// The scheduled end is only told to people who were invited (and the host), never to guests with just the link.
+	let endsAt: string | null = null;
+	if (actor) {
+		const { data: ev } = await looseAdmin().from("mjengo_events").select("ends_at, attendees, created_by").eq("meeting_code", code).order("starts_at", { ascending: false }).limit(1).maybeSingle();
+		const invited = !!ev && (ev.created_by === actor.id || ((ev.attendees ?? []) as string[]).some((e) => String(e).toLowerCase() === actor.email));
+		if (invited && ev?.ends_at) endsAt = new Date(ev.ends_at as string).toISOString();
+	}
 	return (
 		<MeetRoom
 			code={code}
@@ -32,6 +39,7 @@ export default async function MeetPage({ params, searchParams }: { params: Promi
 			startMic={mic !== "0"}
 			startCam={cam !== "0"}
 			userId={actor?.id ?? null}
+			endsAt={endsAt}
 		/>
 	);
 }

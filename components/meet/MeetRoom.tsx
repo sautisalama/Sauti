@@ -33,7 +33,7 @@ const ICE: RTCIceServer[] = [
 const LANGS = [["en-KE", "English (Kenya)"], ["en-US", "English (US)"], ["en-GB", "English (UK)"], ["sw-KE", "Kiswahili"]] as const;
 
 /** A small peer-to-peer call room: preview and device choice, video or voice, companion mode, sharing, captions. */
-export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, description = "", resources = [], autoJoin = false, startMic = true, startCam = true, userId = null }: { code: string; mode: "video" | "voice"; title: string | null; defaultName: string; canSave: boolean; embedded?: boolean; description?: string; resources?: { label: string; url: string }[]; autoJoin?: boolean; startMic?: boolean; startCam?: boolean; /** The signed-in account, which is what lets a second device join as a companion. */ userId?: string | null }) {
+export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, description = "", resources = [], autoJoin = false, startMic = true, startCam = true, userId = null, endsAt = null }: { code: string; mode: "video" | "voice"; title: string | null; defaultName: string; canSave: boolean; embedded?: boolean; description?: string; resources?: { label: string; url: string }[]; autoJoin?: boolean; startMic?: boolean; startCam?: boolean; /** The signed-in account, which is what lets a second device join as a companion. */ userId?: string | null; /** When the scheduled meeting was due to end; only given to people who were invited. */ endsAt?: string | null }) {
 	const [name, setName] = useState(defaultName);
 	const [joined, setJoined] = useState(false);
 	const [micOn, setMicOn] = useState(startMic);
@@ -67,6 +67,11 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 	const [entry, setEntry] = useState<"idle" | "checking" | "waiting" | "denied">("idle");
 	const [entryError, setEntryError] = useState("");
 	const [isHost, setIsHost] = useState(false);
+	// Ending as the host asks whether the call goes on without you.
+	const [endAsk, setEndAsk] = useState(false);
+	// A quiet note, only for invited people and hosts, once the scheduled time has passed.
+	const [nowTick, setNowTick] = useState(() => Date.now());
+	useEffect(() => { if (!endsAt) return; const t = setInterval(() => setNowTick(Date.now()), 30000); return () => clearInterval(t); }, [endsAt]);
 	const [cohostToken, setCohostToken] = useState<string | null>(null);
 	const canModerate = isHost || !!cohostToken;
 	const [locked, setLocked] = useState(false);
@@ -304,6 +309,7 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 			.on("broadcast", { event: "caption" }, ({ payload }) => addLine(payload as TranscriptLine))
 			.on("broadcast", { event: "rec" }, ({ payload }) => setRecBy(payload.on ? String(payload.by ?? "Someone") : null))
 			.on("broadcast", { event: "state" }, ({ payload }) => setRemote(payload.id, { muted: !!payload.muted, sharing: !!payload.sharing, hand: !!payload.hand, cam: payload.cam !== false, handAt: payload.hand ? Date.now() : undefined }))
+			.on("broadcast", { event: "pin" }, ({ payload }) => setChat((cur) => cur.map((x) => (x.id === payload.id ? { ...x, pinned: !!payload.pinned } : x))))
 			.on("broadcast", { event: "chat" }, ({ payload }) => {
 				const l = payload as ChatMsg;
 				setChat((cur) => (cur.some((x) => x.id === l.id) ? cur : [...cur, { ...l, mine: false }]));
@@ -531,6 +537,13 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 		return () => window.removeEventListener("keydown", onKey);
 	}, [joined]);
 
+	/** Pin a message to the top of the chat for everyone, or take it down again; it is kept with the meeting. */
+	const pinChat = (id: string, pinned: boolean) => {
+		setChat((cur) => cur.map((x) => (x.id === id ? { ...x, pinned } : x)));
+		send("pin", { id, pinned });
+		const l = chatRef.current.find((x) => x.id === id);
+		if (l) void unwrap(saveMeetingChat(code, [{ id: l.id, name: l.name, text: l.text, at: l.at, pinned }])).catch(() => undefined);
+	};
 	const sendChat = (text: string) => {
 		const line: ChatMsg = { id: `${myId.current}-${Date.now()}`, name: shownName, text: text.slice(0, 1000), at: new Date().toISOString(), mine: true };
 		setChat((cur) => [...cur, line]);
@@ -922,6 +935,11 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 				<span className="flex-1" />
 				<button onClick={() => setPanel((p) => (p === "people" ? "none" : "people"))} aria-label="People" className="flex h-10 items-center gap-2 rounded-full bg-white/10 px-3 text-sm hover:bg-white/20"><Users className="h-4 w-4" />{remotes.length + 1}</button>
 			</div>
+			{endsAt && nowTick > new Date(endsAt).getTime() && (
+				<div className="pointer-events-none absolute inset-x-0 top-2 z-30 flex justify-center px-3" role="status">
+					<span className="rounded-full bg-black/55 px-3 py-1 text-xs text-white/90 backdrop-blur">This meeting was scheduled to end at {format(new Date(endsAt), "h:mm a")} ({Math.max(1, Math.round((nowTick - new Date(endsAt).getTime()) / 60000))} min ago)</span>
+				</div>
+			)}
 			<div className="pointer-events-none absolute inset-x-0 top-0 z-10 flex items-center gap-2 bg-gradient-to-b from-black/60 to-transparent px-4 pb-6 pt-[max(0.75rem,env(safe-area-inset-top))] text-sm md:hidden">
 				<span className="min-w-0 flex-1 truncate font-medium">{title || code}</span>
 				<span className="text-white/70">{clock}</span>
@@ -977,7 +995,7 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 							{panel === "transcript" ? "Transcript" : panel === "info" ? "Meeting details" : panel === "chat" ? "Messages" : panel === "polls" ? "Polls" : panel === "settings" ? "Call settings" : "People"}
 							<button onClick={() => setPanel("none")} aria-label="Close" className="flex h-8 w-8 items-center justify-center rounded-full hover:bg-black/5"><X className="h-4 w-4" /></button>
 						</div>
-													{panel === "chat" && <ChatPanel lines={chat} onSend={sendChat} />}
+													{panel === "chat" && <ChatPanel lines={chat} onSend={sendChat} onPin={pinChat} />}
 							{panel === "polls" && <PollPanel polls={polls} me={myId.current} onCreate={askPoll} onVote={votePoll} onClose={endPoll} />}
 							{panel === "settings" && (
 								<div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4 text-sm">
@@ -1097,7 +1115,7 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 							{reactOpen && <ReactionPicker onPick={react} onClose={() => setReactOpen(false)} />}
 						</div>
 						<Ctl onClick={dockCall} label={canSave || embedded ? "Picture in picture: keep the call while you work in other suites" : "Picture in picture"} icon={<PictureInPicture2 className="h-5 w-5" />} className="hidden md:flex" />
-					<button onClick={leave} aria-label="Leave call" title="Leave call" className="flex h-12 w-16 items-center justify-center rounded-full bg-[#ea4335] hover:bg-[#d93025]"><PhoneOff className="h-5 w-5" /></button>
+					<button onClick={() => { if (isHost && visible.length > 0) setEndAsk(true); else void leave(); }} aria-label="Leave call" title="Leave call" className="flex h-12 w-16 items-center justify-center rounded-full bg-[#ea4335] hover:bg-[#d93025]"><PhoneOff className="h-5 w-5" /></button>
 				</div>
 				<div className="hidden items-center gap-1 md:flex">
 					<div className="relative">
@@ -1127,6 +1145,20 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 					</div>
 				</div>,
 				pipWin.document.body,
+			)}
+
+			{endAsk && (
+				<div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 p-4" role="dialog" aria-modal="true" aria-label="Leave the call">
+					<div className="w-full max-w-sm rounded-2xl bg-white p-5 text-[#202124] shadow-2xl">
+						<h2 className="text-lg font-medium">Leave the call?</h2>
+						<p className="mt-1 text-sm text-[#5f6368]">You are the host. The others can carry on without you, or you can end the call for everyone.</p>
+						<div className="mt-4 flex flex-col gap-2">
+							<button onClick={() => { setEndAsk(false); void leave(); }} className="h-11 rounded-full border border-[#dadce0] text-sm font-medium hover:bg-[#f8f9fa]">Leave, the call goes on</button>
+							<button onClick={() => { setEndAsk(false); hostCtl("all", "end"); setTimeout(() => void leaveRef.current(), 400); }} className="h-11 rounded-full bg-[#ea4335] text-sm font-medium text-white hover:bg-[#d93025]">End for everyone</button>
+							<button onClick={() => setEndAsk(false)} className="h-10 rounded-full text-sm font-medium text-[#068297] hover:bg-[#f1fafb]">Stay in the call</button>
+						</div>
+					</div>
+				</div>
 			)}
 
 			{readyOpen && remotes.length === 0 && (

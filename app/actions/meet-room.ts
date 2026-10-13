@@ -115,7 +115,7 @@ async function decideAll_(code: string, admit: boolean, cohostToken?: string | n
   await looseAdmin().from('mjengo_meeting_knocks').update({ status: admit ? 'admitted' : 'denied', decided_by: me?.id ?? null, decided_at: new Date().toISOString() }).eq('code', code).eq('status', 'pending');
 }
 
-export interface ChatLine { id: string; name: string; text: string; at: string }
+export interface ChatLine { id: string; name: string; text: string; at: string; pinned?: boolean }
 
 /** Keep the messages written in the call with the meeting. Only participants can save. */
 async function saveChat_(code: string, lines: ChatLine[]): Promise<void> {
@@ -124,7 +124,7 @@ async function saveChat_(code: string, lines: ChatLine[]): Promise<void> {
   const db = looseAdmin();
   const { data } = await db.from('mjengo_meetings').select('chat').eq('code', code).maybeSingle();
   const have = new Map<string, ChatLine>(((data?.chat ?? []) as ChatLine[]).map((l) => [l.id, l]));
-  for (const l of lines.slice(0, 2000)) have.set(String(l.id).slice(0, 60), { id: String(l.id).slice(0, 60), name: String(l.name).slice(0, 80), text: String(l.text).slice(0, 2000), at: String(l.at).slice(0, 40) });
+  for (const l of lines.slice(0, 2000)) have.set(String(l.id).slice(0, 60), { id: String(l.id).slice(0, 60), name: String(l.name).slice(0, 80), text: String(l.text).slice(0, 2000), at: String(l.at).slice(0, 40), ...(l.pinned ? { pinned: true } : {}) });
   await db.from('mjengo_meetings').update({ chat: [...have.values()].sort((a, b) => a.at.localeCompare(b.at)) }).eq('code', code);
 }
 
