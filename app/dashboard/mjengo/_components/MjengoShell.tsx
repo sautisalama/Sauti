@@ -4,7 +4,7 @@ import { OpenRouterBalance } from "./OpenRouterBalance";
 import Link from "next/link";
 import { useEffect } from "react";
 import { usePathname } from "next/navigation";
-import { ArrowLeft, GraduationCap, ClipboardList, Briefcase, CheckSquare, FileText, HardDrive, FolderKanban, LayoutDashboard, Lightbulb, Mail, ScrollText, ShieldCheck, Sparkles, CalendarClock, Users, MessageCircle, Bell, Megaphone, Palette, Video, BookMarked } from "lucide-react";
+import { ArrowLeft, GraduationCap, ClipboardList, Briefcase, CheckSquare, FileText, HardDrive, FolderKanban, LayoutDashboard, Lightbulb, Mail, ScrollText, ShieldCheck, Sparkles, CalendarClock, Users, MessageCircle, Bell, Megaphone, Palette, Video, BookMarked, Receipt } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { MjengoDock } from "./MjengoDock";
 import { UploadTray } from "@/components/mjengo/UploadTray";
@@ -28,6 +28,7 @@ const TABS = [
 	{ href: `${BASE}/todos`, label: "To-dos", icon: CheckSquare },
 	{ href: `${BASE}/assistant`, label: "Assistant", icon: Sparkles },
 	{ href: `${BASE}/design`, label: "Design", icon: Palette },
+	{ href: `${BASE}/finance`, label: "Finance", icon: Receipt },
 	{ href: `${BASE}/brand`, label: "Brand", icon: BookMarked },
 	{ href: `${BASE}/people`, label: "People & access", icon: ShieldCheck, superOnly: true },
 	{ href: `${BASE}/logs`, label: "Logs", icon: ScrollText, superOnly: true },

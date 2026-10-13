@@ -736,7 +736,16 @@ export interface LabelRow {
 
 async function listLabels_(): Promise<LabelRow[]> {
   const actor = await requireModule('mail');
-  const { data } = await looseAdmin().from('mail_labels').select('id, name, color, instruction, project_id').eq('owner_id', actor.id).order('created_at');
+  const db = looseAdmin();
+  const read = () => db.from('mail_labels').select('id, name, color, instruction, project_id').eq('owner_id', actor.id).order('created_at');
+  let { data } = await read();
+  // Financial and Budgeting are there for everyone: tagging an email with them is how money mail is found.
+  const have = new Set(((data ?? []) as { name: string }[]).map((l) => l.name.toLowerCase()));
+  const missing = [['Financial', 'green', 'Invoices, receipts, payments, statements and anything about money.'], ['Budgeting', 'amber', 'Budgets, forecasts, cost plans and budget approvals.']].filter(([n]) => !have.has(n.toLowerCase()));
+  if (missing.length) {
+    await db.from('mail_labels').insert(missing.map(([name, color, instruction]) => ({ owner_id: actor.id, name, color, instruction })));
+    ({ data } = await read());
+  }
   return (data ?? []) as LabelRow[];
 }
 

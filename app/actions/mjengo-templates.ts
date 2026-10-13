@@ -6,7 +6,7 @@ import { guard } from '@/lib/action-result';
 import { requireAdminActor } from '@/lib/access/super-admin';
 import { BUILTIN_DOCUMENTS, BUILTIN_POSTS, type TemplateLite } from '@/lib/mjengo/templates';
 
-export type TemplateKind = 'document' | 'post' | 'design';
+export type TemplateKind = 'document' | 'post' | 'design' | 'invoice' | 'budget';
 export interface TemplateRow extends TemplateLite { kind: TemplateKind; data: Record<string, unknown>; created_by: string | null }
 
 /** Built-in templates first, then the team's own. Design templates are all the team's own (the built-ins live in the editor). */
