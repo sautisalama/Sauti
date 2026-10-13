@@ -36,6 +36,20 @@ const SLUG_CHARS = 'abcdefghjkmnpqrstuvwxyz23456789';
 const makeSlug = () => Array.from({ length: 8 }, () => SLUG_CHARS[Math.floor(Math.random() * SLUG_CHARS.length)]).join('');
 const refresh = () => revalidatePath('/dashboard/mjengo/forms', 'layout');
 
+/**
+ * Who is acting on a form: an administrator with the forms module, or someone holding the form's edit link
+ * (which may be outside the organisation). Edit-link holders can edit and read responses, nothing else.
+ */
+async function formActor(formId: string, key: string | null | undefined, need: 'view' | 'write' = 'view'): Promise<{ id: string | null; email: string; viaLink: boolean }> {
+  if (key) {
+    const { data } = await looseAdmin().from('mjengo_forms').select('edit_token').eq('id', formId).maybeSingle();
+    if (data?.edit_token && data.edit_token === key) return { id: null, email: 'edit link', viaLink: true };
+    throw new Error('This edit link is no longer valid.');
+  }
+  const a = await requireModule('forms', need);
+  return { id: a.id, email: a.email, viaLink: false };
+}
+
 async function withCounts(rows: Omit<FormRow, 'response_count' | 'last_response_at'>[]): Promise<FormRow[]> {
   if (!rows.length) return [];
   const db = looseAdmin();
@@ -56,8 +70,8 @@ export async function listForms(): Promise<FormRow[]> {
   return withCounts((data ?? []) as Omit<FormRow, 'response_count' | 'last_response_at'>[]);
 }
 
-export async function getForm(id: string): Promise<FormRow | null> {
-  await requireModule('forms');
+export async function getForm(id: string, key?: string | null): Promise<FormRow | null> {
+  await formActor(id, key);
   const { data } = await looseAdmin().from('mjengo_forms').select('*').eq('id', id).maybeSingle();
   if (!data) return null;
   return (await withCounts([data as Omit<FormRow, 'response_count' | 'last_response_at'>]))[0];
@@ -81,8 +95,8 @@ export async function createForm(title?: string): Promise<string> {
   throw new Error('Could not create the form.');
 }
 
-export async function saveForm(id: string, patch: { title?: string; description?: string | null; questions?: Question[]; settings?: FormSettings }) {
-  const actor = await requireModule('forms', 'write');
+export async function saveForm(id: string, patch: { title?: string; description?: string | null; questions?: Question[]; settings?: FormSettings }, key?: string | null) {
+  const actor = await formActor(id, key, 'write');
   const update: Record<string, unknown> = {};
   if (patch.title !== undefined) update.title = patch.title.trim().slice(0, 120) || 'Untitled form';
   if (patch.description !== undefined) update.description = patch.description ? patch.description.slice(0, 2000) : null;
@@ -114,8 +128,8 @@ export async function saveForm(id: string, patch: { title?: string; description?
   return { questions: data.questions as Question[] };
 }
 
-export async function setFormStatus(id: string, status: 'draft' | 'open' | 'closed') {
-  const actor = await requireModule('forms', 'write');
+export async function setFormStatus(id: string, status: 'draft' | 'open' | 'closed', key?: string | null) {
+  const actor = await formActor(id, key, 'write');
   const db = looseAdmin();
   if (status === 'open') {
     const { data } = await db.from('mjengo_forms').select('questions').eq('id', id).maybeSingle();
@@ -139,8 +153,8 @@ export async function deleteForm(id: string) {
 }
 
 /** Up to 5,000 newest responses: enough for the table, export and analytics. */
-export async function getResponses(formId: string): Promise<ResponseRow[]> {
-  await requireModule('forms');
+export async function getResponses(formId: string, key?: string | null): Promise<ResponseRow[]> {
+  await formActor(formId, key);
   const { data } = await looseAdmin()
     .from('mjengo_form_responses')
     .select('id, answers, respondent_email, created_at')
@@ -162,8 +176,8 @@ export async function exportedCsv(formId: string): Promise<void> {
 }
 
 /** A one-time upload link for an image shown with a form. The image is public, like the form itself. */
-export async function formImageUpload(formId: string, fileName: string): Promise<{ signedUrl: string; publicUrl: string }> {
-  await requireModule('forms');
+export async function formImageUpload(formId: string, fileName: string, key?: string | null): Promise<{ signedUrl: string; publicUrl: string }> {
+  await formActor(formId, key, 'write');
   const safe = fileName.replace(/[^\w.\-]+/g, '_').slice(-80) || 'image';
   const path = `forms/${formId}/${Date.now()}-${safe}`;
   const db = looseAdmin();
@@ -328,8 +342,9 @@ export const generateForm = guard(generate_);
 export const createFromTemplate = guard(fromTemplate_);
 export const linkPoster = guard(poster_);
 
-async function seen_(formId: string) {
-  await requireModule('forms');
+async function seen_(formId: string, key?: string | null) {
+  const a = await formActor(formId, key);
+  if (a.viaLink) return;
   await looseAdmin().from('mjengo_forms').update({ responses_seen_at: new Date().toISOString() }).eq('id', formId);
 }
 

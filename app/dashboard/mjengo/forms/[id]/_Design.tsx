@@ -1,5 +1,6 @@
 "use client";
 
+import { editKey } from "./_key";
 import { ColourInput } from "@/components/mjengo/ColourInput";
 import { PaletteSources } from "@/components/mjengo/PaletteSources";
 import { useEffect, useRef, useState } from "react";
@@ -38,7 +39,7 @@ export function MediaPicker({ formId, value, onChange, accept = "both", compact 
 		if (f.size > (isVideo ? MAX_VIDEO : MAX_IMAGE)) { toast({ title: "That file is too big", description: isVideo ? "Videos up to 50 MB can be uploaded. For longer ones, paste a YouTube or Vimeo link." : "Pictures up to 8 MB.", variant: "destructive" }); return; }
 		setBusy(true);
 		try {
-			const { signedUrl, publicUrl } = await formImageUpload(formId, f.name);
+			const { signedUrl, publicUrl } = await formImageUpload(formId, f.name, editKey());
 			await putToSignedUrl(signedUrl, f);
 			onChange({ kind: isVideo ? "video" : "image", url: publicUrl, alt: value?.alt });
 		} catch (e) {
