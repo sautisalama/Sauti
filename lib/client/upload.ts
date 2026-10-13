@@ -1,10 +1,15 @@
 import { createClient } from '@/utils/supabase/client';
+import { trayStart } from './upload-tray';
 
 /**
  * Upload to a private bucket with real progress (the storage client has no progress callback), by
  * PUTting to a one-time signed upload URL. Throws on failure.
  */
 export async function uploadWithProgress(bucket: string, path: string, file: File, onProgress?: (pct: number) => void): Promise<void> {
+  const tray = trayStart(file.name, file.size);
+  const report = onProgress;
+  onProgress = (p) => { tray.progress(p); report?.(p); };
+  try {
   const supabase = createClient();
   const { data: target, error } = await supabase.storage.from(bucket).createSignedUploadUrl(path);
   if (error || !target) throw error || new Error('Could not start the upload');
@@ -24,20 +29,26 @@ export async function uploadWithProgress(bucket: string, path: string, file: Fil
     xhr.send(body);
   });
   onProgress?.(100);
+  tray.done();
+  } catch (e) { tray.fail(e instanceof Error ? e.message : 'Upload failed'); throw e; }
 }
 
 export const safeFileName = (name: string) => name.replace(/[^a-zA-Z0-9._-]+/g, '_').slice(-120);
 
 /** PUT a file to a signed upload URL that the server created (for paths the browser may not write to directly). */
 export function putToSignedUrl(signedUrl: string, file: File, onProgress?: (pct: number) => void): Promise<void> {
+	const tray = trayStart(file.name, file.size);
 	return new Promise<void>((resolve, reject) => {
+		const fail = reject;
+		reject = (e) => { tray.fail(e instanceof Error ? e.message : 'Upload failed'); fail(e); };
 		const xhr = new XMLHttpRequest();
 		xhr.open('PUT', signedUrl);
 		xhr.upload.onprogress = (e) => {
-			if (e.lengthComputable) onProgress?.(Math.min(99, Math.round((e.loaded / e.total) * 100)));
+			if (e.lengthComputable) { const p = Math.min(99, Math.round((e.loaded / e.total) * 100)); tray.progress(p); onProgress?.(p); }
 		};
 		xhr.onload = () => {
 			if (xhr.status >= 200 && xhr.status < 300) {
+				tray.done();
 				onProgress?.(100);
 				resolve();
 			} else reject(new Error(`Upload failed (${xhr.status})`));

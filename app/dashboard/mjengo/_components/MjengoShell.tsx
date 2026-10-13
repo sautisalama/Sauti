@@ -7,6 +7,7 @@ import { usePathname } from "next/navigation";
 import { ArrowLeft, GraduationCap, ClipboardList, Briefcase, CheckSquare, FileText, HardDrive, FolderKanban, LayoutDashboard, Lightbulb, Mail, ScrollText, ShieldCheck, Sparkles, CalendarClock, Users, MessageCircle, Bell, Megaphone, Palette, Video } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { MjengoDock } from "./MjengoDock";
+import { UploadTray } from "@/components/mjengo/UploadTray";
 import { startSuiteNotifications } from "@/lib/client/suite-notifications";
 
 const BASE = "/dashboard/mjengo";
@@ -89,6 +90,7 @@ export function MjengoShell({ isSuper, children }: { isSuper: boolean; children:
 				})}
 			</nav>
 			<MjengoDock />
+			<UploadTray />
 			<div className={cn("w-full flex-1", fullBleed ? "min-h-0" : "px-4 py-5 md:px-8")}>{children}</div>
 		</div>
 	);

@@ -7,6 +7,7 @@ import * as Y from "yjs";
 import { Loader2, ShieldCheck } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import { SupabaseYProvider } from "@/lib/client/supabase-yjs";
+import { watchedVersionStore } from "@/lib/client/watched-version-store";
 
 const COLORS = ["#0f766e", "#c2410c", "#7c3aed", "#0369a1", "#be123c", "#4d7c0f", "#a16207", "#0e7490"];
 const colorFor = (s: string) => COLORS[[...s].reduce((a, c) => a + c.charCodeAt(0), 0) % COLORS.length];
@@ -19,6 +20,7 @@ export function PublicDoc({ id, name, access, signedInName, signedInId }: { id: 
 	const [doc, setDoc] = useState<{ name: string; data: ArrayBuffer } | null>(null);
 	const [error, setError] = useState("");
 	const [status, setStatus] = useState<"" | "saving" | "saved">("");
+	const [historyProblem, setHistoryProblem] = useState(false);
 	const queue = useRef<Promise<unknown>>(Promise.resolve());
 	const guestId = useRef(`guest-${Math.random().toString(36).slice(2, 8)}`);
 
@@ -90,6 +92,7 @@ export function PublicDoc({ id, name, access, signedInName, signedInId }: { id: 
 				<span className="font-semibold text-sauti-teal">Sauti Salama</span>
 				<span className="min-w-0 truncate text-serene-neutral-700">{name}</span>
 				<span className="flex-1" />
+				{historyProblem && <span className="rounded-full bg-amber-50 px-2 py-0.5 text-xs text-amber-800">History is not being kept right now</span>}
 				<span className="text-xs text-serene-neutral-500">{access === "edit" ? (status === "saving" ? "Saving…" : status === "saved" ? "All changes saved" : "Editing") : "View only"} · {person.name}</span>
 			</div>
 			<div className="relative min-h-0 flex-1">
@@ -106,7 +109,7 @@ export function PublicDoc({ id, name, access, signedInName, signedInId }: { id: 
 						autoSave={access === "edit"}
 						mode={access === "edit" ? undefined : "viewing"}
 						user={person}
-						versionHistory={{ store: httpVersionStore(`/api/public-docs/${id}/versions`), documentId: id, interval: 120_000 }}
+						versionHistory={{ store: watchedVersionStore(httpVersionStore(`/api/public-docs/${id}/versions`), () => setHistoryProblem(true)), documentId: id, interval: 120_000 }}
 						collaboration={collab?.collaboration ?? null}
 						onSave={onSave}
 						onError={(e) => setError(e.message)}

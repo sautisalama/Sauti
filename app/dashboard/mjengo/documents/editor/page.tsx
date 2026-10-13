@@ -17,6 +17,7 @@ import { putToSignedUrl } from "@/lib/client/upload";
 import { ArrowLeft } from "lucide-react";
 import { DocAssist } from "./_DocAssist";
 import { DocBar } from "./_DocBar";
+import { watchedVersionStore } from "@/lib/client/watched-version-store";
 import { ShareDialog } from "../../_components/ShareDialog";
 import { finishReplace, getFileUrl, prepareReplace, prepareUpload, registerUpload } from "../../vault/api";
 
@@ -247,7 +248,7 @@ function EditorScreen() {
 						autoSave={level === "edit"}
 						user={person}
 						// Version history is kept on the server per document, so everyone sees the same list.
-													versionHistory={fileId ? { store: httpVersionStore(`/api/mjengo/docs/versions/${fileId}`), documentId: fileId, interval: 120_000 } : true}
+													versionHistory={fileId ? { store: watchedVersionStore(httpVersionStore(`/api/mjengo/docs/versions/${fileId}`), (what, m) => toast({ title: what === "save" ? "Version history could not be saved" : "Version history could not be loaded", description: `${m}. Your document is still saved.`, variant: "destructive" })), documentId: fileId, interval: 120_000 } : true}
 							versionsOpen={versionsOpen}
 							onVersionsOpenChange={setVersionsOpen}
 						ai={aiOptions}

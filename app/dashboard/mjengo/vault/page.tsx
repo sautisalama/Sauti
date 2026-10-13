@@ -231,7 +231,7 @@ export default function VaultPage() {
 				</nav>
 			</div>
 
-			{uploads.length > 0 && (
+			{false && uploads.length > 0 && (
 				<ul className="space-y-1 rounded-xl border border-serene-neutral-100 bg-white p-3 text-sm">
 					{uploads.map((u) => (
 						<li key={u.name} className="flex items-center gap-3">

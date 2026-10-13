@@ -134,8 +134,8 @@ export function EnhancedSidebar({
 		if (!onMjengo) return;
 		let on = true;
 		// Not on every page change: at most every 20 seconds.
-		let last = 0;
-		const tick = () => { if (Date.now() - last < 20_000) return; last = Date.now(); suiteCounts().then((c) => on && setSuite(c)).catch(() => undefined); };
+		const w = window as unknown as { __ssCountsAt?: number };
+		const tick = () => { if (Date.now() - (w.__ssCountsAt ?? 0) < 20_000) return; w.__ssCountsAt = Date.now(); suiteCounts().then((c) => on && setSuite(c)).catch(() => undefined); };
 		tick();
 		const t = setInterval(tick, 60_000);
 		window.addEventListener("focus", tick);
