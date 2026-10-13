@@ -203,3 +203,80 @@ who are not native English speakers.
   above (two-browser presence, comment round trip through .docx, permission enforcement, checker underline and
   apply, document chat citation click).
 - Mobile: the comment margin collapses into a bottom sheet; presence avatars collapse to a count.
+
+---
+
+# Part 3: Theme from a logo or photo, and logo placement
+
+## Today (what exists in the package)
+
+- Letterhead page: "Add logo" (under 1.5 MB), alignment left / centre / right, an accent rule on or off.
+- Palette page: built-in palettes plus one custom palette of four colours (primary, secondary, accent, muted),
+  applied to the title and headings only.
+- Missing: picking colours from a picture, applying a palette across the document, writing the palette into the
+  .docx theme, and logo positions other than the header alignment.
+
+## 1. Theme from a logo or photo (P0)
+
+- A "From a logo or photo" action on the Palette page and on the Letterhead page. Sources: upload, drag and drop,
+  paste, and a host picker `ai.pickImage(): Promise<Blob | string | null>` (so the host can offer its files).
+  More than one picture can be chosen.
+- Extraction runs in the browser: shrink to about 96 px on the long side, convert to Lab, skip transparent,
+  near-white and near-black pixels, cluster (k-means or median cut), merge near duplicates, and rank by area and
+  saturation. For a logo, flat colours win; for a photo, the most saturated large areas win. With several pictures,
+  take colours round-robin so a small logo is not drowned by a busy photo.
+- Show 5 to 8 swatches with their share. Roles are assigned automatically and can be changed by clicking a swatch
+  for a role: primary (dark enough for text on white, contrast at least 4.5:1), secondary, accent (most
+  saturated), muted (neutral). Warn when headings would not be readable on the page or on the band colour, and
+  offer a one-click fix that darkens the colour until it passes.
+- Light and Dark variants of the same palette.
+- Save as a custom palette with its source ("from logo.png"), so it can be reused and shared. Host callbacks:
+  `onPaletteCreated(palette)` so the host can store it for the whole organisation; `ai.palettes` already feeds
+  saved ones back in.
+- Apply to the whole document, not only headings: title, headings, table header fills and borders, hyperlinks,
+  bullet colours, quote and callout bars, the letterhead rule, and shapes. Write it as the **document theme**
+  (the colour scheme in `word/theme/theme1.xml` plus linked styles), not as inline overrides, so Word's
+  Design > Colors shows it and changing the palette later recolours everything consistently.
+- "Apply to headings only" stays as the light option.
+- Optional fonts: `ai.fonts = { heading, body }` or a fonts step in the same panel, written to the theme font
+  scheme.
+
+## 2. Logo placement (P0)
+
+Model: `logo = { src, placement, size, offset, opacity, wrap, pages }`.
+
+Placements (presets with a live mini-page preview in the panel):
+
+- **Header**: left, centre, right; logo with the organisation text beside it (logo left + text right, text left +
+  logo right) or stacked (logo above text).
+- **Footer**: left, centre, right.
+- **Top of the first page only**, or on every page (`pages: "first" | "all" | "odd" | "even"`, using the
+  different-first-page and odd/even header settings in Word).
+- **Watermark**: centred behind the text; size, opacity (5 to 40 percent), rotation (0 or minus 45), optional
+  repeat. Use a Word-compatible watermark (a VML `PowerPlusWaterMarkObject` in the header, or `wp:anchor` with
+  `behindDoc="1"`) so Word, Google Docs and LibreOffice all show it.
+- **Cover page**: large and centred, then a page break.
+- **Side edge**: a vertical strip at the left or right margin.
+- **Inline at the cursor** (as a normal image) and **signature block** (end of the document).
+- **Partner logos row**: several logos side by side in the header or footer with even spacing.
+
+Options: width in cm or px, keep aspect ratio, offset x and y, opacity, wrap (inline, behind text, in front of
+text), and alignment of the letterhead text relative to the logo. Image handling: trim transparent margins,
+convert SVG to PNG, optional "remove white background", and a size cap with a clear message.
+
+## 3. API additions
+
+- `ai.letterhead = { name, tagline, address, contact, logo: { src, placement, size, offset, opacity, wrap, pages }, align, rule, font }`
+  (existing fields keep working; a plain `logo` string means `placement: "header-left"`).
+- `ai.brand = { logo, palette }` as shorthand: one object, and both the letterhead and the palette are ready.
+- Callbacks: `onLogoChanged`, `onPaletteCreated`, `onLetterheadApplied`.
+
+## 4. Acceptance
+
+1. Choose a logo: swatches appear, a palette is created, "Apply to document" recolours the title, headings,
+   tables and links, and the .docx theme part carries the colours (Word's Design > Colors shows them).
+2. Choose a photo and a logo together: both contribute colours; the logo's colours are present.
+3. Placement presets render correctly in the preview and in the saved .docx opened in Word and Google Docs:
+   header left, centre, right; footer; first page only; watermark behind text at the chosen opacity.
+4. Replace the logo: the old one is removed, not stacked. Remove: header and watermark are cleared.
+5. Low-contrast palette: a warning appears and the fix button makes headings pass 4.5:1.
