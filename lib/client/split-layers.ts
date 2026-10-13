@@ -18,6 +18,69 @@ export interface LayerSplit {
 
 const MAX = 1400;
 
+/**
+ * The subject's mask, as a W x H canvas whose alpha is the mask. A general-purpose model (BiRefNet, which handles
+ * products, animals, objects and people, with fine edges like hair) runs first when the device has WebGPU; a
+ * portrait-only model is the fallback, so a picture is never left without a try.
+ */
+let birefnet: Promise<{ model: any; processor: any; RawImage: any }> | null = null; // eslint-disable-line @typescript-eslint/no-explicit-any
+async function subjectMask(base: HTMLCanvasElement, W: number, H: number): Promise<HTMLCanvasElement> {
+  const tf = await import('@huggingface/transformers');
+  // BiRefNet needs more storage buffers per shader than many integrated GPUs allow (a failed run there also leaves
+  // the runtime unusable for the CPU model), so the GPU is only used when the adapter clearly has room.
+  let gpu = false;
+  try {
+    const nav = navigator as unknown as { gpu?: { requestAdapter: () => Promise<{ limits: { maxStorageBuffersPerShaderStage: number } } | null> } };
+    const adapter = await nav.gpu?.requestAdapter();
+    gpu = !!adapter && adapter.limits.maxStorageBuffersPerShaderStage >= 24;
+  } catch { /* no WebGPU */ }
+  if (gpu) {
+    try {
+      birefnet ??= (async () => {
+        const id = 'onnx-community/BiRefNet_lite-ONNX';
+        const model = await tf.AutoModel.from_pretrained(id, { dtype: 'fp16', device: 'webgpu' });
+        const processor = await tf.AutoProcessor.from_pretrained(id);
+        return { model, processor, RawImage: tf.RawImage };
+      })();
+      const { model, processor, RawImage } = await birefnet;
+      const image = await RawImage.fromURL(base.toDataURL('image/png'));
+      const { pixel_values } = await processor(image);
+      const inputName = (model.sessions?.model?.inputNames?.[0] as string | undefined) ?? 'input_image';
+      const res = await model({ [inputName]: pixel_values });
+      const tensor = (res.output_image ?? res.output ?? Object.values(res)[0]) as { [k: string]: any }; // eslint-disable-line @typescript-eslint/no-explicit-any
+      const m = await RawImage.fromTensor(tensor[0].sigmoid().mul(255).to('uint8')).resize(W, H);
+      const out = document.createElement('canvas');
+      out.width = W; out.height = H;
+      const octx = out.getContext('2d')!;
+      const rgba = new Uint8ClampedArray(W * H * 4);
+      for (let p = 0; p < W * H; p++) { rgba[p * 4] = rgba[p * 4 + 1] = rgba[p * 4 + 2] = 255; rgba[p * 4 + 3] = m.data[p * m.channels]; }
+      octx.putImageData(new ImageData(rgba, W, H), 0, 0);
+      return out;
+    } catch {
+      birefnet = null; // fall back to the portrait model below
+    }
+  }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  // The CPU build: many integrated GPUs stop WebGPU models with "too many storage buffers", so this never depends on WebGPU.
+    const remover: any = await tf.pipeline('background-removal', 'Xenova/modnet', { device: 'wasm', dtype: 'q8', session_options: { executionProviders: ['wasm'] } });
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const out: any = await remover(base.toDataURL('image/png'));
+  const cut = Array.isArray(out) ? out[0] : out;
+  const oc = document.createElement('canvas');
+  oc.width = cut.width; oc.height = cut.height;
+  const octx = oc.getContext('2d')!;
+  if (cut.channels === 4) octx.putImageData(new ImageData(new Uint8ClampedArray(cut.data), cut.width, cut.height), 0, 0);
+  else {
+    const rgba = new Uint8ClampedArray(cut.width * cut.height * 4);
+    for (let p = 0; p < cut.width * cut.height; p++) { rgba[p * 4] = rgba[p * 4 + 1] = rgba[p * 4 + 2] = 255; rgba[p * 4 + 3] = cut.data[p * cut.channels]; }
+    octx.putImageData(new ImageData(rgba, cut.width, cut.height), 0, 0);
+  }
+  const sub = document.createElement('canvas');
+  sub.width = W; sub.height = H;
+  sub.getContext('2d')!.drawImage(oc, 0, 0, W, H);
+  return sub;
+}
+
 function load(src: string): Promise<HTMLImageElement> {
   return new Promise((res, rej) => {
     const img = new Image();
@@ -169,27 +232,8 @@ export async function splitIntoLayers(src: string, onStep?: (message: string) =>
   let backdropCanvas: HTMLCanvasElement = clean;
   onStep?.('Separating the subject (the first time downloads a small model)');
   try {
-    const { pipeline } = await import('@huggingface/transformers');
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const remover: any = await pipeline('background-removal', 'Xenova/modnet');
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const out: any = await remover(base.toDataURL('image/png'));
-    const cut = Array.isArray(out) ? out[0] : out;
-    const oc = document.createElement('canvas');
-    oc.width = cut.width; oc.height = cut.height;
-    const octx = oc.getContext('2d')!;
-    const id = new ImageData(new Uint8ClampedArray(cut.data), cut.width, cut.height);
-    if (cut.channels === 4) octx.putImageData(id, 0, 0);
-    else {
-      const rgba = new Uint8ClampedArray(cut.width * cut.height * 4);
-      for (let p = 0; p < cut.width * cut.height; p++) { rgba[p * 4] = rgba[p * 4 + 1] = rgba[p * 4 + 2] = 255; rgba[p * 4 + 3] = cut.data[p * cut.channels]; }
-      octx.putImageData(new ImageData(rgba, cut.width, cut.height), 0, 0);
-    }
-    // Same size as the working picture.
-    const sub = document.createElement('canvas');
-    sub.width = W; sub.height = H;
+    const sub = await subjectMask(base, W, H);
     const sctx = sub.getContext('2d', { willReadFrequently: true })!;
-    sctx.drawImage(oc, 0, 0, W, H);
     const px = sctx.getImageData(0, 0, W, H);
     let covered = 0;
     for (let p = 0; p < W * H; p++) if (px.data[p * 4 + 3] > 128) covered++;
@@ -250,25 +294,7 @@ export async function removeBackground(src: string): Promise<string | null> {
   const base = document.createElement('canvas');
   base.width = W; base.height = H;
   base.getContext('2d')!.drawImage(img, 0, 0, W, H);
-  const { pipeline } = await import('@huggingface/transformers');
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const remover: any = await pipeline('background-removal', 'Xenova/modnet');
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const out: any = await remover(base.toDataURL('image/png'));
-  const cut = Array.isArray(out) ? out[0] : out;
-  const oc = document.createElement('canvas');
-  oc.width = cut.width; oc.height = cut.height;
-  const octx = oc.getContext('2d')!;
-  if (cut.channels === 4) octx.putImageData(new ImageData(new Uint8ClampedArray(cut.data), cut.width, cut.height), 0, 0);
-  else {
-    const rgba = new Uint8ClampedArray(cut.width * cut.height * 4);
-    for (let p = 0; p < cut.width * cut.height; p++) { rgba[p * 4] = rgba[p * 4 + 1] = rgba[p * 4 + 2] = 255; rgba[p * 4 + 3] = cut.data[p * cut.channels]; }
-    octx.putImageData(new ImageData(rgba, cut.width, cut.height), 0, 0);
-  }
-  const sub = document.createElement('canvas');
-  sub.width = W; sub.height = H;
-  const sctx = sub.getContext('2d')!;
-  sctx.drawImage(oc, 0, 0, W, H);
+  const sub = await subjectMask(base, W, H);
   const keep = document.createElement('canvas');
   keep.width = W; keep.height = H;
   const kx = keep.getContext('2d')!;
