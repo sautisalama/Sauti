@@ -60,6 +60,8 @@ const colorFor = (s: string) => COLORS[[...s].reduce((a, c) => a + c.charCodeAt(
 
 const extOf = (n: string) => n.split(".").pop()?.toLowerCase() ?? "";
 
+let brandOnce: Promise<Pick<AiOptions, "letterhead" | "palettes" | "fonts">> | null = null;
+
 /** The organisation's letterhead and the colours of every saved design system, handed to AI Studio. */
 async function loadBrand(onMore?: (more: NonNullable<AiOptions["palettes"]>) => void): Promise<Pick<AiOptions, "letterhead" | "palettes" | "fonts">> {
 	const out: Pick<AiOptions, "letterhead" | "palettes" | "fonts"> = {};
@@ -122,7 +124,11 @@ function EditorScreen() {
 			const v = raw ? JSON.parse(raw) : null;
 			if (v && v.letterhead && !String(v.letterhead.name ?? "").trim()) { v.letterhead = null; localStorage.setItem("wordcraft.ai.studio", JSON.stringify(v)); }
 		} catch { /* no saved studio */ }
-		Promise.race([loadBrand(setDesignPalettes), new Promise<Pick<AiOptions, "letterhead" | "palettes" | "fonts">>((res) => setTimeout(() => res({}), 20000))]).then((b) => setBrand(b));
+		// One read for the page (the effect runs twice in development), and a result without a letterhead never
+		// replaces one that was found: a failed second read must not blank the first.
+		brandOnce ??= loadBrand(setDesignPalettes).then((b) => { if (!b.letterhead) brandOnce = null; return b; });
+		Promise.race([brandOnce, new Promise<Pick<AiOptions, "letterhead" | "palettes" | "fonts">>((res) => setTimeout(() => res({}), 20000))])
+			.then((b) => setBrand((cur) => (cur?.letterhead && !b.letterhead ? cur : b)));
 	}, []);
 	// A palette made from a logo or photo is kept for the whole organisation, as a design system, so forms,
 	// designs and the assistant can use it too; it is also offered here straight away.
@@ -211,6 +217,9 @@ function EditorScreen() {
 		return { name, id: me?.id ?? undefined, color: colorFor(me?.id ?? name) };
 	}, [me?.id, me?.email, me?.profile]);
 
+	// Everyone in the document right now, for the header (named people and anonymous guests alike).
+	const [live, setLive] = useState<PresenceUser[]>([]);
+
 	// Co-editing: everyone who opens this file with edit rights joins the same live document.
 	const collab = useMemo(() => {
 		if (!initialFile || loading || !me?.id) return null;
@@ -220,8 +229,6 @@ function EditorScreen() {
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [initialFile, loading, me?.id]);
 	useEffect(() => () => collab?.provider.destroy(), [collab]);
-	// Everyone in the document right now, for the header (named people and anonymous guests alike).
-	const [live, setLive] = useState<PresenceUser[]>([]);
 
 	// Where the open document lives, kept in a ref so a save that fires right after another (AutoSave)
 	// always sees the file the previous one created.

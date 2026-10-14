@@ -22,19 +22,16 @@ try {
 	await signIn(page, "admin");
 	await page.goto(`${BASE}/dashboard/mjengo/documents/editor?file=${file.id}`, { waitUntil: "domcontentloaded", timeout: 180000 });
 	await page.getByRole("button", { name: /^File/ }).first().waitFor({ timeout: 90000 });
-	// The AI launcher (the sparkle at the bottom of the page).
-	const launcher = page.locator(".wcai button").first();
-	await launcher.waitFor({ timeout: 120000 });
-	await launcher.click();
-	await page.getByRole("button", { name: "More options" }).waitFor({ timeout: 30000 }).catch(() => undefined);
-	// Studio: the tab strip carries Letterhead.
-	const studioToggle = page.locator(".wcai-round").nth(1);
-	await studioToggle.click().catch(() => undefined);
+	// AI Studio: the launcher opens the bar, "AI Studio" the studio, and its Letterhead page starts filled in.
+	await page.locator(".wcai-launch").first().waitFor({ timeout: 120000 });
+	await page.waitForTimeout(3000);
+	await page.locator(".wcai-launch").first().click();
+	await page.getByRole("button", { name: "AI Studio" }).first().click();
 	await page.getByText("Letterhead", { exact: true }).first().click();
 	const name = await page.locator(".wcai-form input").first().inputValue();
 	check("The letterhead starts from the organisation brand", name.trim().length > 0, JSON.stringify(name));
 	await page.getByRole("button", { name: "Apply to document" }).click();
-	await page.getByText(/Letterhead added to the header/).waitFor({ timeout: 20000 });
+	await page.getByText(/Letterhead added to the document/).waitFor({ timeout: 20000 });
 	check("The letterhead is applied", true);
 	await page.getByRole("button", { name: /^Save/ }).first().click().catch(async () => { await page.keyboard.press("Control+s"); });
 	await page.waitForTimeout(8000);
