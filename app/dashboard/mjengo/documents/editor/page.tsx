@@ -236,9 +236,12 @@ function EditorScreen() {
 		setCommentsOpen(true);
 		let tries = 0;
 		const press = () => {
-			const btn = Array.from(document.querySelectorAll<HTMLButtonElement>("[data-wordcraft-root] .wccm button")).find((b) => /^\+?\s*Comment$/.test((b.textContent ?? "").trim()) && !b.closest("form"));
+			const root = document.querySelector("[data-wordcraft-root] .wccm");
+			// The "+ Comment" button toggles the composer, so it is only pressed when the composer is not open yet.
+			if (root?.querySelector("textarea")) return;
+			const btn = root?.querySelector<HTMLButtonElement>(".wccm-top .wccm-primary");
 			if (btn) btn.click();
-			else if (tries++ < 10) setTimeout(press, 120);
+			else if (tries++ < 25) setTimeout(press, 120);
 		};
 		setTimeout(press, 150);
 	}, []);
