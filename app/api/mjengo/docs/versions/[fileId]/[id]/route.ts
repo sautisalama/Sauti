@@ -1,4 +1,4 @@
-import { loadIndex, parseVersionMeta, saveIndex, storage, versionAccess } from "@/lib/mjengo/doc-versions";
+import { parseVersionMeta, removeVersion, renameVersion, storage, upsertVersion, versionAccess } from "@/lib/mjengo/doc-versions";
 
 export const runtime = "nodejs";
 
@@ -34,9 +34,7 @@ export async function PUT(req: Request, ctx: Ctx) {
 	if (bytes.length > 25 * 1024 * 1024) return new Response("Too large.", { status: 413 });
 	const up = await storage().upload(`versions/${fileId}/${id}.bin`, bytes, { contentType: "application/octet-stream", upsert: true });
 	if (up.error) return new Response("Could not save.", { status: 500 });
-	const list = (await loadIndex(fileId)).filter((m) => m.id !== id);
-	list.unshift({ ...meta, id, size: bytes.length });
-	await saveIndex(fileId, list.slice(0, 300));
+	await upsertVersion(fileId, { ...meta, id, size: bytes.length });
 	return new Response(null, { status: 204 });
 }
 
@@ -45,8 +43,7 @@ export async function PATCH(req: Request, ctx: Ctx) {
 	const refused = await versionAccess(fileId, "edit", id);
 	if (refused) return refused;
 	const body = (await req.json().catch(() => ({}))) as { name?: string | null };
-	const list = await loadIndex(fileId);
-	await saveIndex(fileId, list.map((m) => (m.id === id ? { ...m, name: body.name ? String(body.name).slice(0, 80) : undefined } : m)));
+	await renameVersion(fileId, id, body.name ? String(body.name) : null);
 	return new Response(null, { status: 204 });
 }
 
@@ -54,7 +51,6 @@ export async function DELETE(_req: Request, ctx: Ctx) {
 	const { fileId, id } = await ctx.params;
 	const refused = await versionAccess(fileId, "edit", id);
 	if (refused) return refused;
-	await storage().remove([`versions/${fileId}/${id}.bin`]);
-	await saveIndex(fileId, (await loadIndex(fileId)).filter((m) => m.id !== id));
+	await removeVersion(fileId, id);
 	return new Response(null, { status: 204 });
 }

@@ -1,5 +1,5 @@
 import { publicDoc } from "@/lib/mjengo/public-doc";
-import { loadIndex, parseVersionMeta, saveIndex, storage } from "@/lib/mjengo/doc-versions";
+import { parseVersionMeta, renameVersion, storage, upsertVersion } from "@/lib/mjengo/doc-versions";
 
 export const runtime = "nodejs";
 
@@ -39,9 +39,7 @@ export async function PUT(req: Request, ctx: { params: Promise<{ id: string; vid
 	if (bytes.length > 25 * 1024 * 1024) return new Response("Too large.", { status: 413 });
 	const up = await storage().upload(`versions/${id}/${vid}.bin`, bytes, { contentType: "application/octet-stream", upsert: true });
 	if (up.error) return new Response("Could not save.", { status: 500 });
-	const list = (await loadIndex(id)).filter((m) => m.id !== vid);
-	list.unshift({ ...meta, id: vid, size: bytes.length });
-	await saveIndex(id, list.slice(0, 300));
+	await upsertVersion(id, { ...meta, id: vid, size: bytes.length });
 	return new Response(null, { status: 204 });
 }
 
@@ -50,7 +48,6 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string; v
 	const bad = await check(id, vid, true);
 	if (bad) return bad;
 	const body = (await req.json().catch(() => ({}))) as { name?: string | null };
-	const list = await loadIndex(id);
-	await saveIndex(id, list.map((m) => (m.id === vid ? { ...m, name: body.name ? String(body.name).slice(0, 80) : undefined } : m)));
+	await renameVersion(id, vid, body.name ? String(body.name) : null);
 	return new Response(null, { status: 204 });
 }

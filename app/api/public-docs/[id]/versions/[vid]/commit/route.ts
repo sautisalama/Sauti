@@ -1,5 +1,5 @@
 import { publicDoc } from "@/lib/mjengo/public-doc";
-import { loadIndex, saveIndex, storage, type VersionMeta } from "@/lib/mjengo/doc-versions";
+import { upsertVersion, versionSize, type VersionMeta } from "@/lib/mjengo/doc-versions";
 
 export const runtime = "nodejs";
 
@@ -14,13 +14,10 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string; vi
 	if (!ID.test(vid)) return new Response("Bad request.", { status: 400 });
 	const meta = (await req.json().catch(() => null)) as VersionMeta | null;
 	if (!meta || typeof meta !== "object" || typeof meta.createdAt !== "string") return new Response("Bad request.", { status: 400 });
-	const found = await storage().list(`versions/${id}`, { search: `${vid}.bin`, limit: 5 });
-	const file = (found.data ?? []).find((f) => f.name === `${vid}.bin`);
-	if (!file) return new Response("The version was not uploaded.", { status: 409 });
-	const size = Number((file.metadata as { size?: number } | null)?.size ?? 0);
+	const size = await versionSize(`versions/${id}`, `${vid}.bin`);
+	if (size === null) return new Response("The version was not uploaded.", { status: 409 });
 	if (size > 100 * 1024 * 1024) return new Response("Too large.", { status: 413 });
-	const list = (await loadIndex(id)).filter((m) => m.id !== vid);
-	list.unshift({
+	await upsertVersion(id, {
 		id: vid,
 		createdAt: meta.createdAt,
 		reason: meta.reason,
@@ -30,6 +27,5 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string; vi
 		...(meta.title ? { title: String(meta.title).slice(0, 200) } : {}),
 		...(typeof meta.words === "number" ? { words: meta.words } : {}),
 	});
-	await saveIndex(id, list.slice(0, 300));
-	return new Response(null, { status: 204 });
+	return Response.json({ size });
 }
