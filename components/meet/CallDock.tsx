@@ -49,11 +49,15 @@ export function CallDock() {
 		<div
 			className={cn(
 				"overflow-hidden bg-[#0E1318] shadow-2xl transition-[width,height,border-radius] duration-200",
-				floating
-					? "fixed bottom-20 right-4 z-[60] h-[190px] w-[min(70vw,300px)] rounded-2xl border border-black/10 lg:bottom-4"
-					: "fixed inset-0 z-[100]",
+				floating && call.pip
+					? "fixed bottom-20 right-4 z-[60] h-12 w-[min(80vw,260px)] rounded-full border border-black/10 lg:bottom-4"
+					: floating
+						? "fixed bottom-20 right-4 z-[60] h-[190px] w-[min(70vw,300px)] rounded-2xl border border-black/10 lg:bottom-4"
+						: "fixed inset-0 z-[100]",
 			)}
 		>
+			{/* Kept mounted while the call is in its own window, so nothing is dropped; only hidden. */}
+			<div className={cn("h-full w-full", floating && call.pip && "hidden")}>
 			<MeetRoom
 				key={call.code}
 				code={call.code}
@@ -71,6 +75,10 @@ export function CallDock() {
 				startMic={call.mic !== false}
 				startCam={call.cam !== false}
 			/>
+			</div>
+			{floating && call.pip && (
+				<span className="pointer-events-none absolute inset-y-0 left-4 flex items-center text-sm font-medium text-white">Call is in its own window</span>
+			)}
 			{floating && (
 				<div className="absolute right-1.5 top-1.5 z-[70] flex gap-1">
 					<button

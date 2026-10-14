@@ -2,7 +2,8 @@
 
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { WordcraftEditor, httpVersionStore, type SavedFile, type WordcraftEditorRef } from "@gamine/wordcraft-react";
+import { WordcraftEditor, type PresenceUser, type SavedFile, type WordcraftEditorRef } from "@gamine/wordcraft-react";
+import { directVersionStore } from "@/lib/client/direct-version-store";
 import * as Y from "yjs";
 import type { AiOptions } from "@gamine/wordcraft-react";
 import { getBrand } from "@/app/actions/mjengo-brand";
@@ -21,6 +22,7 @@ import { DocAssist } from "./_DocAssist";
 import { DocBar } from "./_DocBar";
 import { watchedVersionStore } from "@/lib/client/watched-version-store";
 import { ShareDialog } from "../../_components/ShareDialog";
+import { useTeam } from "../../_components/People";
 import { finishReplace, getFileUrl, prepareReplace, prepareUpload, registerUpload } from "../../vault/api";
 
 /** Writing help runs on our server so the organisation key never reaches the browser. */
@@ -28,13 +30,16 @@ const ai: AiOptions = {
 	name: "Salama AI",
 	allowUserKey: true,
 	studio: true,
+	// Answers become real headings, lists and tables; "Ask this document" answers from the document with citations.
+	structure: true,
+	chat: true,
 	complete: (req) =>
 		(async function* () {
 			const res = await fetch("/api/mjengo/ai/complete", {
 				method: "POST",
 				signal: req.signal,
 				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({ prompt: req.prompt, action: req.action, selection: req.selection, document: req.document, instructions: req.instructions }),
+				body: JSON.stringify({ prompt: req.prompt, action: req.action, selection: req.selection, document: req.document, instructions: req.instructions, history: req.history, goals: req.goals, language: req.language, data: req.data }),
 			});
 			if (!res.ok || !res.body) throw new Error((await res.text().catch(() => "")) || "The AI service is unavailable.");
 			const reader = res.body.getReader();
@@ -185,6 +190,9 @@ function EditorScreen() {
 	}, [initialFile]);
 
 	const me = useUser();
+	const team = useTeam();
+	// The people who can be @mentioned or given a comment to follow up.
+	const mentionable = useMemo(() => team.map((t) => ({ id: t.id, name: t.name, email: t.email ?? undefined, avatarUrl: t.avatar ?? undefined })), [team]);
 	const person = useMemo(() => {
 		const p = me?.profile as { first_name?: string | null; last_name?: string | null } | null | undefined;
 		const name = [p?.first_name, p?.last_name].filter(Boolean).join(" ") || me?.email || "Someone";
@@ -193,13 +201,15 @@ function EditorScreen() {
 
 	// Co-editing: everyone who opens this file with edit rights joins the same live document.
 	const collab = useMemo(() => {
-		if (!initialFile || loading || level !== "edit" || !me?.id) return null;
+		if (!initialFile || loading || !me?.id) return null;
 		const ydoc = new Y.Doc();
 		const provider = new SupabaseYProvider(ydoc, createClient(), `mjengo-doc:${initialFile}`, `${me.id}:${Math.random().toString(36).slice(2, 8)}`);
-		return { provider, collaboration: yjsCollaboration({ doc: ydoc, provider, user: person }) };
+		return { provider, collaboration: yjsCollaboration({ doc: ydoc, provider, user: person, onPresenceChange: setLive }) };
 		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [initialFile, loading, level, me?.id]);
+	}, [initialFile, loading, me?.id]);
 	useEffect(() => () => collab?.provider.destroy(), [collab]);
+	// Everyone in the document right now, for the header (named people and anonymous guests alike).
+	const [live, setLive] = useState<PresenceUser[]>([]);
 
 	// Where the open document lives, kept in a ref so a save that fires right after another (AutoSave)
 	// always sees the file the previous one created.
@@ -260,7 +270,7 @@ function EditorScreen() {
 					</button>
 					{fileId && level !== "view" && <button onClick={() => setShareOpen(true)} className="flex h-9 items-center gap-1.5 rounded-full bg-sauti-teal px-3.5 text-sm font-semibold text-white">Share</button>}
 				</div>
-									{fileId && <DocBar fileId={fileId} name={name} canShare={level !== "view"} refreshKey={metaKey} onShare={() => setShareOpen(true)} onHistory={() => setVersionsOpen(true)} />}
+									{fileId && <DocBar live={live} fileId={fileId} name={name} canShare={level !== "view"} refreshKey={metaKey} onShare={() => setShareOpen(true)} onHistory={() => setVersionsOpen(true)} />}
 					<div className="relative min-h-0 flex-1 overflow-hidden">
 						<WordcraftEditor
 						ref={ref}
@@ -270,11 +280,16 @@ function EditorScreen() {
 						autoSave={level === "edit"}
 						user={person}
 						// Version history is kept on the server per document, so everyone sees the same list.
-													versionHistory={fileId ? { store: watchedVersionStore(httpVersionStore(`/api/mjengo/docs/versions/${fileId}`), (what, m) => toast({ title: what === "save" ? "Version history could not be saved" : "Version history could not be loaded", description: `${m}. Your document is still saved.`, variant: "destructive" })), documentId: fileId, interval: 120_000 } : true}
+													versionHistory={fileId ? { store: watchedVersionStore(directVersionStore(`/api/mjengo/docs/versions/${fileId}`), (what, m) => toast({ title: what === "save" ? "Version history could not be saved" : "Version history could not be loaded", description: `${m}. Your document is still saved.`, variant: "destructive" })), documentId: fileId, interval: 120_000 } : true}
 							versionsOpen={versionsOpen}
 							onVersionsOpenChange={setVersionsOpen}
 						ai={aiOptions}
 						collaboration={collab?.collaboration ?? null}
+						permission={level === "edit" ? "edit" : "view"}
+						comments={{ people: mentionable }}
+						presence
+						checks
+						tools={{ outline: true, accessibility: true, sources: true, wordCount: true, voice: true, translate: true }}
 						onSave={onSave}
 						onError={(e) => toast({ title: "The editor reported a problem", description: e.message, variant: "destructive" })}
 						loading={<MjengoLoader label="Starting the editor" hint="The first time takes a moment while it downloads." className="h-full min-h-0" />}

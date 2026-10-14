@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { WordcraftEditor, httpVersionStore, type SavedFile, type WordcraftEditorRef } from "@gamine/wordcraft-react";
+import { WordcraftEditor, PresenceAvatars, httpVersionStore, type PresenceUser, type SavedFile, type WordcraftEditorRef } from "@gamine/wordcraft-react";
 import { yjsCollaboration } from "@gamine/wordcraft-react/collab";
 import * as Y from "yjs";
 import { Loader2, ShieldCheck } from "lucide-react";
@@ -22,6 +22,7 @@ export function PublicDoc({ id, name, access, signedInName, signedInId }: { id: 
 	const [status, setStatus] = useState<"" | "saving" | "saved">("");
 	const [historyProblem, setHistoryProblem] = useState(false);
 	const queue = useRef<Promise<unknown>>(Promise.resolve());
+	const [live, setLive] = useState<PresenceUser[]>([]);
 	const guestId = useRef(`guest-${Math.random().toString(36).slice(2, 8)}`);
 
 	useEffect(() => {
@@ -48,15 +49,16 @@ export function PublicDoc({ id, name, access, signedInName, signedInId }: { id: 
 		return () => { cancelled = true; };
 	}, [id, name, ready]);
 
-	const person = useMemo(() => ({ name: who || "Guest", id: signedInId ?? guestId.current, color: colorFor(signedInId ?? who) }), [who, signedInId]);
+	// A guest who gave no name is still shown: the editor names them ("Anonymous ...").
+	const person = useMemo(() => ({ name: who.trim(), id: signedInId ?? guestId.current, color: colorFor(signedInId ?? who) }), [who, signedInId]);
 
 	const collab = useMemo(() => {
-		if (!doc || access !== "edit") return null;
+		if (!doc) return null;
 		const ydoc = new Y.Doc();
 		const provider = new SupabaseYProvider(ydoc, createClient(), `mjengo-doc:${id}`, `${person.id}:${Math.random().toString(36).slice(2, 8)}`);
-		return { provider, collaboration: yjsCollaboration({ doc: ydoc, provider, user: person }) };
+		return { provider, collaboration: yjsCollaboration({ doc: ydoc, provider, user: person, onPresenceChange: setLive }) };
 		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [doc, access, id]);
+	}, [doc, id]);
 	useEffect(() => () => collab?.provider.destroy(), [collab]);
 
 	const onSave = (file: SavedFile) => {
@@ -81,6 +83,7 @@ export function PublicDoc({ id, name, access, signedInName, signedInId }: { id: 
 					</div>
 					<input value={who} onChange={(e) => setWho(e.target.value)} autoFocus placeholder="Your name" aria-label="Your name" className="h-11 w-full rounded-lg border border-serene-neutral-200 px-3 text-base outline-none focus:border-sauti-teal" />
 					<button type="submit" disabled={!who.trim()} className="h-11 w-full rounded-full bg-sauti-teal text-sm font-semibold text-white disabled:opacity-40">Open the document</button>
+					<button type="button" onClick={() => setReady(true)} className="h-9 w-full rounded-full text-sm font-medium text-serene-neutral-600 hover:bg-serene-neutral-50">Continue without a name</button>
 				</form>
 			</main>
 		);
@@ -92,8 +95,9 @@ export function PublicDoc({ id, name, access, signedInName, signedInId }: { id: 
 				<span className="font-semibold text-sauti-teal">Sauti Salama</span>
 				<span className="min-w-0 truncate text-serene-neutral-700">{name}</span>
 				<span className="flex-1" />
+				{live.length > 0 && <PresenceAvatars users={live} max={5} size={26} />}
 				{historyProblem && <span className="rounded-full bg-amber-50 px-2 py-0.5 text-xs text-amber-800">History is not being kept right now</span>}
-				<span className="text-xs text-serene-neutral-500">{access === "edit" ? (status === "saving" ? "Saving…" : status === "saved" ? "All changes saved" : "Editing") : "View only"} · {person.name}</span>
+				<span className="text-xs text-serene-neutral-500">{access === "edit" ? (status === "saving" ? "Saving…" : status === "saved" ? "All changes saved" : "Editing") : "View only"} · {person.name || "Anonymous"}</span>
 			</div>
 			<div className="relative min-h-0 flex-1">
 				{error ? (
@@ -107,7 +111,9 @@ export function PublicDoc({ id, name, access, signedInName, signedInId }: { id: 
 						document={doc}
 						guardUnload={access === "edit"}
 						autoSave={access === "edit"}
-						mode={access === "edit" ? undefined : "viewing"}
+						permission={access === "edit" ? "edit" : "view"}
+						comments
+						presence
 						user={person}
 						versionHistory={{ store: watchedVersionStore(httpVersionStore(`/api/public-docs/${id}/versions`), () => setHistoryProblem(true)), documentId: id, interval: 120_000 }}
 						collaboration={collab?.collaboration ?? null}

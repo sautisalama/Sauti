@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import { PresenceAvatars, type PresenceUser } from "@gamine/wordcraft-react";
 import { fileMeta, setFileMeta, type FileMeta } from "../../vault/api";
 
 const initials = (n: string) => n.trim().split(/\s+/).map((p) => p[0]).slice(0, 2).join("").toUpperCase() || "?";
@@ -16,7 +17,7 @@ const initials = (n: string) => n.trim().split(/\s+/).map((p) => p[0]).slice(0, 
  * The top of a document: name, labels, the people who have it as overlapping photos, and Share. The File menu
  * holds access, labels, the meeting it belongs to and version history, so nothing floats over the page.
  */
-export function DocBar({ fileId, name, canShare, refreshKey, onShare, onHistory }: { fileId: string; name: string; canShare: boolean; refreshKey: number; onShare: () => void; onHistory: () => void }) {
+export function DocBar({ fileId, name, canShare, refreshKey, onShare, onHistory, live = [] }: { fileId: string; name: string; canShare: boolean; refreshKey: number; onShare: () => void; onHistory: () => void; /** Everyone in the document right now, signed in or not. */ live?: PresenceUser[] }) {
 	const { toast } = useToast();
 	const [meta, setMeta] = useState<FileMeta | null>(null);
 	const [details, setDetails] = useState(false);
@@ -87,6 +88,12 @@ export function DocBar({ fileId, name, canShare, refreshKey, onShare, onHistory 
 
 				<span className="flex-1" />
 
+				{live.length > 0 && (
+					<span className="flex shrink-0 items-center gap-1.5" title={`${live.length} here now: ${live.map((u) => u.name).join(", ")}`}>
+						<span className="hidden text-[11px] font-medium text-[#787774] sm:inline">Here now</span>
+						<PresenceAvatars users={live} max={4} size={28} />
+					</span>
+				)}
 				{shown.length > 0 && (
 					<button onClick={canShare ? onShare : undefined} aria-label={`${everyone.length} ${everyone.length === 1 ? "person has" : "people have"} access`} title={everyone.map((p) => p.name).join(", ")} className="flex items-center rounded-full p-1 hover:bg-black/5">
 						<span className="flex -space-x-2">

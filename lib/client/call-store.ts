@@ -8,6 +8,8 @@ export interface ActiveCall {
 	minimized: boolean;
 	/** True once the person has joined; keeps the dock alive across suite pages. */
 	live: boolean;
+	/** The call is showing in its own floating window, so the corner only holds a small bar. */
+	pip?: boolean;
 	mic?: boolean;
 	cam?: boolean;
 	title: string | null;
@@ -92,6 +94,10 @@ export const callStore = {
 	setLive(v: boolean) {
 		const c = read();
 		if (c && c.live !== v) write({ ...c, live: v });
+	},
+	setPip(v: boolean) {
+		const c = read();
+		if (c && !!c.pip !== v) write({ ...c, pip: v });
 	},
 	setMedia(mic: boolean, cam: boolean) {
 		const c = read();

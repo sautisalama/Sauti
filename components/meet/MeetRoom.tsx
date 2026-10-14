@@ -476,6 +476,8 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 		}
 	};
 	useEffect(() => () => { try { pipWin?.close(); } catch { /* already closed */ } }, [pipWin]);
+	// The corner window shrinks to a small bar while the call is in its own window.
+	useEffect(() => { if (inSuite) callStore.setPip(!!pipWin); }, [inSuite, pipWin]);
 
 	/** The browser's own floating video of whoever is on screen (a small extra, from the more menu). */
 	const popOutVideo = async () => {
@@ -492,10 +494,14 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 	 */
 	const dockCall = async () => {
 		if (pipWin) { pipWin.close(); return; }
-		if (!inSuite) { void popOutVideo(); return; }
-		// The same live call keeps running in the corner of the suite: nothing is dropped and no one is rejoined.
+		if (!inSuite) { void floatWindow(); return; }
+		// The browser needs the click to open the window, so it is asked for first. The call then shrinks out of
+		// the way and the page moves on: the person keeps working in the suite (and can share it) while the call
+		// sits in its own window that can be dragged anywhere, even off the browser.
+		const opening = openFloating();
 		callStore.minimize(true);
-		router.push(callStore.consumeReturn(canSave ? "/dashboard/mjengo" : "/dashboard"));
+		if (window.location.pathname.startsWith("/meet")) router.push(callStore.consumeReturn(canSave ? "/dashboard/mjengo" : "/dashboard"));
+		await opening;
 	};
 	/** The call in its own window that can be dragged to any screen, even outside the browser. */
 	const floatWindow = async () => {
@@ -1125,8 +1131,7 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 							<Ctl onClick={() => setReactOpen((v) => !v)} label="Send a reaction (R)" icon={<Smile className="h-5 w-5" />} active={reactOpen} />
 							{reactOpen && <ReactionPicker onPick={react} onClose={() => setReactOpen(false)} />}
 						</div>
-						<Ctl onClick={dockCall} label={inSuite ? "Picture in picture: minimise the call and keep working in the suite" : "Picture in picture"} icon={<PictureInPicture2 className="h-5 w-5" />} className="hidden md:flex" />
-						<Ctl onClick={() => void floatWindow()} label="Float the call in its own window (drag it to any screen)" icon={<ExternalLink className="h-5 w-5" />} active={!!pipWin} className="hidden md:flex" />
+						<Ctl onClick={dockCall} label={inSuite ? "Picture in picture: the call in its own window, so you can keep working in the suite" : "Picture in picture"} icon={<PictureInPicture2 className="h-5 w-5" />} active={!!pipWin} className="hidden md:flex" />
 					<button onClick={() => { if (isHost && visible.length > 0) setEndAsk(true); else void leave(); }} aria-label="Leave call" title="Leave call" className="flex h-12 w-16 items-center justify-center rounded-full bg-[#ea4335] hover:bg-[#d93025]"><PhoneOff className="h-5 w-5" /></button>
 				</div>
 				<div className="hidden items-center gap-1 md:flex">
