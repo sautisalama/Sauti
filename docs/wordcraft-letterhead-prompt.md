@@ -393,3 +393,18 @@ The workspace row at the editor's bottom right draws the AI star on **Ask** and 
 with CSS masks, which is brittle). Add `icons?: { ask?: ReactNode; comments?: ReactNode; checks?: ReactNode;
 tools?: ReactNode; voice?: ReactNode }` on `WordcraftEditorProps`, used by `ToolsBar` and `CommentsButton`, and
 export the default icons so a host can reuse them. Keep the `wcwb-ask` and `wccm-launch` class names stable.
+
+# Part 6: One comments surface (no native pane)
+
+With `comments` on, the selection toolbar's comment button and the ribbon's Comments / Show Comments buttons still
+use the engine's own flow: `review.newComment` creates an empty comment and opens the engine's side pane, which
+then competes with the drawer. A host can only switch the commands off (`disabledCommands`), which also blocks
+the drawer, because the drawer itself creates comments through `review.newComment`.
+
+Add `comments: { exclusive: true }` (or `nativePane: false`). When set:
+
+- The engine's pane never opens: its open state is not set by `review.newComment`, `review.comments` or
+  `view.commentsPane`.
+- The selection toolbar's comment button, the ribbon buttons, the context menu and `Ctrl+Alt+M` all open the
+  drawer with its composer on the current selection, and no comment exists until it is submitted with text.
+- Commands issued by the drawer itself are not affected by `disabledCommands` for the comment ids.
