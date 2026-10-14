@@ -59,9 +59,17 @@ const ASK_ICON = svg("<path d='M4 5h16v11H11l-5 4v-4H4Z'/>");
 const COMMENTS_ICON = svg("<path d='M7.9 20A9 9 0 1 0 4 16.1L2 22Z'/><path d='M8 12h.01M12 12h.01M16 12h.01' stroke-width='2.6'/>");
 /** The package draws a sparkle on Ask and a square bubble on Comments; both are redrawn here. */
 const ICON_CSS = `
-[data-wordcraft-root] .wcwb-ask > svg { display: none; }
+/* Hidden without display:none: that svg holds the sparkle gradient the Help me write launcher also uses. */
+[data-wordcraft-root] .wcwb-ask > svg { position: absolute; width: 0; height: 0; opacity: 0; pointer-events: none; }
 [data-wordcraft-root] .wcwb-ask::before { content: ""; display: inline-block; width: 16px; height: 16px; flex: none; background: currentColor; -webkit-mask: ${ASK_ICON} center / contain no-repeat; mask: ${ASK_ICON} center / contain no-repeat; }
-[data-wordcraft-root] .wccm-launch[aria-label^="Comments"] > svg { display: none; }
+[data-wordcraft-root] .wccm-launch[aria-label^="Comments"] > svg { position: absolute; width: 0; height: 0; opacity: 0; pointer-events: none; }
+/* The comments drawer: everything wraps inside its width, so no sideways scrolling and every action is visible. */
+[data-wordcraft-root] .wccm { overflow-x: hidden; }
+[data-wordcraft-root] .wccm-list { overflow-x: hidden; min-width: 0; }
+[data-wordcraft-root] .wccm-list *, [data-wordcraft-root] .wccm-top * { min-width: 0; max-width: 100%; overflow-wrap: anywhere; word-break: break-word; }
+[data-wordcraft-root] .wccm-list p, [data-wordcraft-root] .wccm-list span, [data-wordcraft-root] .wccm-list blockquote, [data-wordcraft-root] .wccm-list div { white-space: normal; text-overflow: clip; }
+[data-wordcraft-root] .wccm-list textarea, [data-wordcraft-root] .wccm-list input { width: 100%; box-sizing: border-box; }
+[data-wordcraft-root] .wccm-list [class*="actions"], [data-wordcraft-root] .wccm-list [class*="row"], [data-wordcraft-root] .wccm-list [class*="foot"] { flex-wrap: wrap; }
 [data-wordcraft-root] .wccm-launch[aria-label^="Comments"]::before { content: ""; display: inline-block; width: 18px; height: 18px; flex: none; background: currentColor; -webkit-mask: ${COMMENTS_ICON} center / contain no-repeat; mask: ${COMMENTS_ICON} center / contain no-repeat; }
 `;
 
@@ -218,6 +226,22 @@ function EditorScreen() {
 	}, [initialFile]);
 
 	const me = useUser();
+	// The comments drawer. The buttons that come with the editor (the selection toolbar, the ribbon) create an
+	// empty comment first and ask for its text later, which ended up as an empty comment. Such a comment is
+	// taken back at once and the drawer opens with its composer on the same selection instead.
+	const [commentsOpen, setCommentsOpen] = useState(false);
+	const startComposer = useCallback((c: { id: number; text: string; parent: number | null }) => {
+		if (c.text.trim() || c.parent !== null) return;
+		ref.current?.execute("review.deleteComment", { id: c.id });
+		setCommentsOpen(true);
+		let tries = 0;
+		const press = () => {
+			const btn = Array.from(document.querySelectorAll<HTMLButtonElement>("[data-wordcraft-root] .wccm button")).find((b) => /^\+?\s*Comment$/.test((b.textContent ?? "").trim()) && !b.closest("form"));
+			if (btn) btn.click();
+			else if (tries++ < 10) setTimeout(press, 120);
+		};
+		setTimeout(press, 150);
+	}, []);
 	const team = useTeam();
 	// The people who can be @mentioned or given a comment to follow up.
 	const mentionable = useMemo(() => team.map((t) => ({ id: t.id, name: t.name, email: t.email ?? undefined, avatarUrl: t.avatar ?? undefined })), [team]);
@@ -315,7 +339,11 @@ function EditorScreen() {
 						ai={aiOptions}
 						collaboration={collab?.collaboration ?? null}
 						permission={level === "edit" ? "edit" : "view"}
-						comments={{ people: mentionable }}
+						// One comments system: the drawer. The editor's older comment pane is not opened.
+						disabledCommands={["view.commentsPane"]}
+						commentsOpen={commentsOpen}
+						onCommentsOpenChange={setCommentsOpen}
+						comments={{ people: mentionable, onCreate: startComposer }}
 						presence
 						checks
 						tools={{ outline: true, accessibility: true, sources: true, wordCount: true, voice: true, translate: true }}
