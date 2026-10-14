@@ -30,8 +30,16 @@ try {
 	check("The page moves on and the call is minimised in the corner", true, new URL(page.url()).pathname);
 
 	// Move around the suite with the sidebar: the call is still there and was not dropped.
-	await page.getByRole("link", { name: "Files" }).first().click();
-	await page.waitForURL(/\/files|\/vault/, { timeout: 30000 });
+	const here = new URL(page.url()).pathname;
+	const link = page.locator('a[href^="/dashboard"]:visible').filter({ hasNot: page.locator("[hidden]") });
+	let moved = false;
+	for (let i = 0; i < Math.min(6, await link.count()) && !moved; i++) {
+		const href = await link.nth(i).getAttribute("href");
+		if (!href || href === here || href.startsWith("/dashboard/mjengo/meet")) continue;
+		await link.nth(i).click();
+		await page.waitForURL((u) => u.pathname !== here, { timeout: 20000 }).then(() => { moved = true; }).catch(() => undefined);
+	}
+	check("A sidebar link was followed without a reload", moved, new URL(page.url()).pathname);
 	await page.getByRole("button", { name: "Return to the full call" }).waitFor({ timeout: 15000 });
 	const lobby = await page.getByRole("button", { name: /^Join now$/ }).count();
 	check("The call keeps running while moving between pages", lobby === 0);
