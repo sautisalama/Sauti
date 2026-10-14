@@ -56,6 +56,8 @@ const ai: AiOptions = {
 
 const svg = (paths: string, w = 1.8) => `url("data:image/svg+xml,${encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='${w}' stroke-linecap='round' stroke-linejoin='round'>${paths}</svg>`)}")`;
 const ASK_ICON = svg("<path d='M4 5h16v11H11l-5 4v-4H4Z'/>");
+const EDIT_ICON = svg("<path d='M12 20h9'/><path d='M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z'/>");
+const DELETE_ICON = svg("<path d='M3 6h18'/><path d='M8 6V4h8v2'/><path d='M19 6l-1 14H6L5 6'/><path d='M10 11v6M14 11v6'/>");
 const COMMENTS_ICON = svg("<path d='M7.9 20A9 9 0 1 0 4 16.1L2 22Z'/><path d='M8 12h.01M12 12h.01M16 12h.01' stroke-width='2.6'/>");
 /** The package draws a sparkle on Ask and a square bubble on Comments; both are redrawn here. */
 const ICON_CSS = `
@@ -63,6 +65,23 @@ const ICON_CSS = `
 [data-wordcraft-root] .wcwb-ask > svg { position: absolute; width: 0; height: 0; opacity: 0; pointer-events: none; }
 [data-wordcraft-root] .wcwb-ask::before { content: ""; display: inline-block; width: 16px; height: 16px; flex: none; background: currentColor; -webkit-mask: ${ASK_ICON} center / contain no-repeat; mask: ${ASK_ICON} center / contain no-repeat; }
 [data-wordcraft-root] .wccm-launch[aria-label^="Comments"] > svg { position: absolute; width: 0; height: 0; opacity: 0; pointer-events: none; }
+/* A comment card: who and when on top, the text, and the Edit and Delete icons underneath the text. */
+[data-wordcraft-root] .wccm-head, [data-wordcraft-root] .wccm-reply { display: flex; flex-wrap: wrap; align-items: center; }
+[data-wordcraft-root] .wccm-who { display: contents; }
+[data-wordcraft-root] .wccm-who > :not(.wccm-more) { order: 1; }
+[data-wordcraft-root] .wccm-meta { flex: 1 1 0; }
+[data-wordcraft-root] .wccm-text, [data-wordcraft-root] .wccm-edit { order: 2; flex: 1 1 100%; }
+[data-wordcraft-root] .wccm-more { order: 3; flex: 1 1 100%; margin-top: 4px; }
+@supports selector(::details-content) {
+  [data-wordcraft-root] .wccm-more > summary { display: none; }
+  [data-wordcraft-root] .wccm-more::details-content { content-visibility: visible; display: block; }
+}
+[data-wordcraft-root] .wccm-more > div { position: static; display: flex; gap: 2px; min-width: 0; padding: 0; background: none; border: 0; box-shadow: none; }
+[data-wordcraft-root] .wccm-more > div button { width: 30px; height: 30px; min-width: 30px; padding: 0; border-radius: 50%; font-size: 0; line-height: 0; display: grid; place-items: center; text-align: center; color: var(--dim); }
+[data-wordcraft-root] .wccm-more > div button::before { content: ""; width: 16px; height: 16px; background: currentColor; }
+[data-wordcraft-root] .wccm-more > div button:first-child::before { -webkit-mask: ${EDIT_ICON} center / contain no-repeat; mask: ${EDIT_ICON} center / contain no-repeat; }
+[data-wordcraft-root] .wccm-more > div button:last-child::before { -webkit-mask: ${DELETE_ICON} center / contain no-repeat; mask: ${DELETE_ICON} center / contain no-repeat; }
+[data-wordcraft-root] .wccm-more > div button:last-child:hover { color: #d93025; }
 /* The comments drawer: everything wraps inside its width, so no sideways scrolling and every action is visible. */
 [data-wordcraft-root] .wccm { overflow-x: hidden; }
 [data-wordcraft-root] .wccm-list { overflow-x: hidden; min-width: 0; }
@@ -343,7 +362,7 @@ function EditorScreen() {
 						collaboration={collab?.collaboration ?? null}
 						permission={level === "edit" ? "edit" : "view"}
 						// One comments system: the drawer. The editor's older comment pane is not opened.
-						disabledCommands={["view.commentsPane"]}
+						disabledCommands={["view.commentsPane", "review.comments"]}
 						commentsOpen={commentsOpen}
 						onCommentsOpenChange={setCommentsOpen}
 						comments={{ people: mentionable, onCreate: startComposer }}
