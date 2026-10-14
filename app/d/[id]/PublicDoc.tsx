@@ -1,13 +1,14 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { WordcraftEditor, PresenceAvatars, httpVersionStore, type PresenceUser, type SavedFile, type WordcraftEditorRef } from "@gamine/wordcraft-react";
+import { WordcraftEditor, PresenceAvatars, type PresenceUser, type SavedFile, type WordcraftEditorRef } from "@gamine/wordcraft-react";
 import { yjsCollaboration } from "@gamine/wordcraft-react/collab";
 import * as Y from "yjs";
 import { Loader2, ShieldCheck } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import { SupabaseYProvider } from "@/lib/client/supabase-yjs";
 import { watchedVersionStore } from "@/lib/client/watched-version-store";
+import { directVersionStore } from "@/lib/client/direct-version-store";
 
 const COLORS = ["#0f766e", "#c2410c", "#7c3aed", "#0369a1", "#be123c", "#4d7c0f", "#a16207", "#0e7490"];
 const colorFor = (s: string) => COLORS[[...s].reduce((a, c) => a + c.charCodeAt(0), 0) % COLORS.length];
@@ -115,7 +116,7 @@ export function PublicDoc({ id, name, access, signedInName, signedInId }: { id: 
 						comments
 						presence
 						user={person}
-						versionHistory={{ store: watchedVersionStore(httpVersionStore(`/api/public-docs/${id}/versions`), () => setHistoryProblem(true)), documentId: id, interval: 120_000 }}
+						versionHistory={{ store: watchedVersionStore(directVersionStore(`/api/public-docs/${id}/versions`), () => setHistoryProblem(true)), documentId: id, interval: 120_000 }}
 						collaboration={collab?.collaboration ?? null}
 						onSave={onSave}
 						onError={(e) => setError(e.message)}

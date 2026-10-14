@@ -1,9 +1,10 @@
 "use client";
 
-import { Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
 import { WordcraftEditor, type PresenceUser, type SavedFile, type WordcraftEditorRef } from "@gamine/wordcraft-react";
 import { directVersionStore } from "@/lib/client/direct-version-store";
+import { saveDesignSystem } from "@/app/actions/mjengo-ai";
 import * as Y from "yjs";
 import type { AiOptions } from "@gamine/wordcraft-react";
 import { getBrand } from "@/app/actions/mjengo-brand";
@@ -33,6 +34,8 @@ const ai: AiOptions = {
 	// Answers become real headings, lists and tables; "Ask this document" answers from the document with citations.
 	structure: true,
 	chat: true,
+	// Diagrams: Mermaid loads only when a diagram is first made.
+	mermaid: () => import("mermaid"),
 	complete: (req) =>
 		(async function* () {
 			const res = await fetch("/api/mjengo/ai/complete", {
@@ -58,8 +61,8 @@ const colorFor = (s: string) => COLORS[[...s].reduce((a, c) => a + c.charCodeAt(
 const extOf = (n: string) => n.split(".").pop()?.toLowerCase() ?? "";
 
 /** The organisation's letterhead and the colours of every saved design system, handed to AI Studio. */
-async function loadBrand(onMore?: (more: NonNullable<AiOptions["palettes"]>) => void): Promise<Pick<AiOptions, "letterhead" | "palettes">> {
-	const out: Pick<AiOptions, "letterhead" | "palettes"> = {};
+async function loadBrand(onMore?: (more: NonNullable<AiOptions["palettes"]>) => void): Promise<Pick<AiOptions, "letterhead" | "palettes" | "fonts">> {
+	const out: Pick<AiOptions, "letterhead" | "palettes" | "fonts"> = {};
 	try {
 		// A server action can fail once while the page is still settling; the brand is asked for up to three times.
 		let b: Awaited<ReturnType<typeof getBrand>> extends infer R ? (R extends { ok: true; data: infer D } ? D : never) : never;
@@ -79,6 +82,7 @@ async function loadBrand(onMore?: (more: NonNullable<AiOptions["palettes"]>) => 
 		} catch { /* a letterhead without the logo is still a letterhead */ }
 		const hex = (c: string) => c.replace(/^#/, "").toUpperCase();
 		out.letterhead = { name: b.name, tagline: b.tagline || undefined, address: b.address || undefined, contact: b.contact || undefined, logo, logoWidth: b.letterhead.logoWidth, align: b.letterhead.align, rule: b.letterhead.rule, font: b.fonts.heading };
+		out.fonts = { heading: b.fonts.heading, body: b.fonts.body };
 		out.palettes = [{ id: "brand", name: `${b.name} brand`, primary: hex(b.palette.primary), secondary: hex(b.palette.secondary), accent: hex(b.palette.accent), muted: hex(b.palette.muted) }];
 	} catch { /* defaults */ }
 	// The saved design systems follow, without holding the editor back: the palettes are read as they are shown.
@@ -107,7 +111,7 @@ function EditorScreen() {
 	const ref = useRef<WordcraftEditorRef>(null);
 	const [shareOpen, setShareOpen] = useState(false);
 	const [versionsOpen, setVersionsOpen] = useState(false);
-	const [brand, setBrand] = useState<Pick<AiOptions, "letterhead" | "palettes"> | null>(null);
+	const [brand, setBrand] = useState<Pick<AiOptions, "letterhead" | "palettes" | "fonts"> | null>(null);
 	// Saved design systems arrive after the brand and never hold the editor back or replace its letterhead.
 	const [designPalettes, setDesignPalettes] = useState<NonNullable<AiOptions["palettes"]>>([]);
 	useEffect(() => {
@@ -118,9 +122,17 @@ function EditorScreen() {
 			const v = raw ? JSON.parse(raw) : null;
 			if (v && v.letterhead && !String(v.letterhead.name ?? "").trim()) { v.letterhead = null; localStorage.setItem("wordcraft.ai.studio", JSON.stringify(v)); }
 		} catch { /* no saved studio */ }
-		Promise.race([loadBrand(setDesignPalettes), new Promise<Pick<AiOptions, "letterhead" | "palettes">>((res) => setTimeout(() => res({}), 20000))]).then((b) => setBrand(b));
+		Promise.race([loadBrand(setDesignPalettes), new Promise<Pick<AiOptions, "letterhead" | "palettes" | "fonts">>((res) => setTimeout(() => res({}), 20000))]).then((b) => setBrand(b));
 	}, []);
-	const aiOptions = useMemo<AiOptions>(() => ({ ...ai, ...(brand ?? {}), palettes: [...(brand?.palettes ?? []), ...designPalettes] }), [brand, designPalettes]);
+	// A palette made from a logo or photo is kept for the whole organisation, as a design system, so forms,
+	// designs and the assistant can use it too; it is also offered here straight away.
+	const keepPalette = useCallback((pal: { id: string; name: string; primary: string; secondary: string; accent: string; muted: string }) => {
+		setDesignPalettes((cur) => (cur.some((p) => p.id === pal.id) ? cur : [...cur, pal]));
+		void unwrap(saveDesignSystem(null, { name: pal.name, description: "Made from a picture in AI Studio", colors: [pal.primary, pal.secondary, pal.accent, pal.muted].map((c) => `#${c.replace(/^#/, "")}`) }))
+			.then(() => toast({ title: "Palette saved", description: `“${pal.name}” is available to the whole team.` }))
+			.catch(() => toast({ title: "The palette could not be saved for the team", variant: "destructive" }));
+	}, [toast]);
+	const aiOptions = useMemo<AiOptions>(() => ({ ...ai, ...(brand ?? {}), palettes: [...(brand?.palettes ?? []), ...designPalettes], onPaletteCreated: keepPalette }), [brand, designPalettes, keepPalette]);
 	const [metaKey, setMetaKey] = useState(0);
 	const [fileId, setFileId] = useState<string | null>(initialFile);
 	const [name, setName] = useState("Untitled document.docx");

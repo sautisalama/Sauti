@@ -14,10 +14,16 @@ async function check(id: string, vid: string, write: boolean) {
 	return null;
 }
 
-export async function GET(_req: Request, ctx: { params: Promise<{ id: string; vid: string }> }) {
+export async function GET(req: Request, ctx: { params: Promise<{ id: string; vid: string }> }) {
 	const { id, vid } = await ctx.params;
 	const bad = await check(id, vid, false);
 	if (bad) return bad;
+	// A document with pictures is larger than a function may send back: the browser reads it from storage itself.
+	if (new URL(req.url).searchParams.get("url")) {
+		const { data: signed } = await storage().createSignedUrl(`versions/${id}/${vid}.bin`, 120);
+		if (!signed?.signedUrl) return new Response("Not found.", { status: 404 });
+		return Response.json({ url: signed.signedUrl });
+	}
 	const { data } = await storage().download(`versions/${id}/${vid}.bin`);
 	if (!data) return new Response("Not found.", { status: 404 });
 	return new Response(await data.arrayBuffer(), { headers: { "Content-Type": "application/octet-stream" } });

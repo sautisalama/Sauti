@@ -97,6 +97,7 @@
 		"mailparser": "^3.9.37",
 		"mailtrap": "^3.4.0",
 		"mammoth": "^1.13.0",
+		"mermaid": "^12.2.0",
 		"next": "^16.0.8",
 		"nodemailer": "^6.10.1",
 		"pdf-lib": "^1.17.1",
