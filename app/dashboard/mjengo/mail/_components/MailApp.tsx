@@ -22,11 +22,10 @@ import {
 import { Composer, type ComposeSeed, type ThreadMsg } from "./Composer";
 import { ConnectDialog, LabelDialog, LABEL_COLORS, SettingsDialog, ViewDialog } from "./Dialogs";
 import { getMailPrefs, getSignature, mailBootstrap, type MailPrefs, type SignatureState } from "./api";
-import { PersonChip } from "./PersonChip";
+import { ContactDialog, type ContactDraft } from "./ContactDialog";
 import { AiSummary, ThreadMessage } from "./Thread";
 import { MeetingChips } from "./MeetingChips";
 import { unwrap } from "@/lib/action-result";
-import { addContactFromMail } from "@/app/actions/mjengo-contacts";
 import { listLabels, saveLabel, deleteLabel, setMessageLabel, projectLabel, listGrantsLite, linkToWork, mailTriage, type LabelRow, type ProjectLite, type GrantLite } from "./api";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { AccountSwitcher } from "./AccountSwitcher";
@@ -113,6 +112,8 @@ export function MailApp() {
 
 	const [layout, setLayout] = useState<Layout>("side");
 	const [compose, setCompose] = useState<ComposeSeed | null>(null);
+	// Someone in an email being added to the contacts (opened by double-clicking them).
+	const [contactDraft, setContactDraft] = useState<ContactDraft | null>(null);
 	// A reply is written in the conversation itself, under the messages it answers.
 	const [reply, setReply] = useState<ComposeSeed | null>(null);
 	const [connectOpen, setConnectOpen] = useState(false);
@@ -585,13 +586,10 @@ const Pane = (
 		<ReadingPane
 			teamIds={teamIds} team={team}
 			onWrite={(address) => setCompose({ to: [address] })}
-			onAddContact={async (name, address) => {
-				try {
-					const c = await unwrap(addContactFromMail(name, address));
-					toast({ title: c.source === "mail" ? "Added to contacts" : "Already in your contacts", description: `${c.name} <${address}>` });
-				} catch (e) {
-					toast({ title: "Could not add the contact", description: e instanceof Error ? e.message : undefined, variant: "destructive" });
-				}
+			onAddContact={(name, address) => {
+				// The card reads their organisation from what they wrote, when this email is from them.
+				const mine = detail?.from[0]?.address?.toLowerCase() === address.toLowerCase();
+				setContactDraft({ name, email: address, context: mine ? (detail?.text ?? "") : "" });
 			}}
 			onPrev={() => { const i = rows.findIndex((r) => r.uid === selected?.uid); if (i > 0) open(rows[i - 1]); }}
 			onNext={() => { const i = rows.findIndex((r) => r.uid === selected?.uid); if (rows[i + 1]) open(rows[i + 1]); }}
@@ -688,6 +686,7 @@ const Pane = (
 				<Dialog open onOpenChange={(o) => !o && close()}><DialogContent className="h-[88vh] max-w-3xl gap-0 overflow-hidden p-0 [&>button]:hidden"><DialogTitle className="sr-only">Message</DialogTitle>{Pane}</DialogContent></Dialog>
 			)}
 
+			<ContactDialog draft={contactDraft} onClose={() => setContactDraft(null)} onWrite={(address) => setCompose({ to: [address] })} />
 			{compose && accountId && <Composer accounts={accounts} accountId={accountId} seed={compose} snippets={snippets} signature={signature?.html ?? ""} undoSeconds={prefs.undoSeconds} onReopen={(seed) => setCompose(seed)} onClose={() => setCompose(null)} onSent={() => { setCompose(null); if (active.config.mailbox === "sent") loadList(false); }} />}
 			<ConnectDialog open={connectOpen} onClose={() => setConnectOpen(false)} onConnected={(a) => { setAccounts((p) => [...(p ?? []), a]); setAccountId(a.id); }} />
 			<SettingsDialog open={settingsOpen} onClose={() => setSettingsOpen(false)} accounts={accounts} onAccountsChanged={() => loadAccounts().catch(() => undefined)} onConnect={() => setConnectOpen(true)} snippets={snippets} onSnippetsChanged={() => loadMeta().catch(() => undefined)} layout={layout} onLayout={changeLayout} signature={signature?.html ?? ""} onSignatureSaved={(html) => setSignature({ html, configured: !!html, dismissed: true })} prefs={prefs} onPrefs={setPrefs} labels={labels} onEditLabel={(l) => { setSettingsOpen(false); setLabelEdit(l); }} />
@@ -947,6 +946,8 @@ function ReadingPane({ teamIds, team, onWrite, onAddContact, onPrev, onNext, has
 						{/* The conversation, the way Apple Mail lays it out: one message after another, each message once,
 						    older ones folded to a line, the quoted history folded under "See more". */}
 						<ThreadStack
+							onWrite={onWrite}
+							onAddContact={onAddContact}
 							selected={selected}
 							detail={detail}
 							conversation={conversation}
@@ -980,7 +981,8 @@ function ReadingPane({ teamIds, team, onWrite, onAddContact, onPrev, onNext, has
  * context; everything else is a single line. More than two older messages fold under "N earlier messages".
  * A bar at the bottom starts a reply right there.
  */
-function ThreadStack({ selected, detail, conversation, accountId, meAddress, onReply, onForward, inlineReply, attachments }: {
+function ThreadStack({ selected, detail, conversation, accountId, meAddress, onReply, onForward, inlineReply, attachments, onWrite, onAddContact }: {
+	onWrite: (address: string) => void; onAddContact: (name: string, address: string) => void;
 	selected: MessageRow | null; detail: Detail; conversation: MessageRow[]; accountId: string; meAddress: string;
 	onReply: (all: boolean) => void; onForward: () => void; inlineReply: React.ReactNode | null; attachments: React.ReactNode;
 }) {
@@ -1011,7 +1013,7 @@ function ThreadStack({ selected, detail, conversation, accountId, meAddress, onR
 	useEffect(() => { current.current?.scrollIntoView({ block: "start" }); }, [curKey]);
 
 	const row = (c: MessageRow) => (
-		<ThreadMessage key={key(c)} m={c} accountId={accountId} mine={me(c)} open={isOpen(c)} onOpenChange={(o) => setOpened((cur) => ({ ...cur, [key(c)]: o }))} />
+		<ThreadMessage key={key(c)} m={c} accountId={accountId} mine={me(c)} open={isOpen(c)} onOpenChange={(o) => setOpened((cur) => ({ ...cur, [key(c)]: o }))} onWrite={onWrite} onAddContact={onAddContact} />
 	);
 	const currentRow = selected ? (
 		<div key="current" ref={current}>
@@ -1027,6 +1029,8 @@ function ThreadStack({ selected, detail, conversation, accountId, meAddress, onR
 					onReply={() => onReply(false)}
 					onReplyAll={() => onReply(true)}
 					onForward={onForward}
+					onWrite={onWrite}
+					onAddContact={onAddContact}
 				>{attachments}</ThreadMessage>
 			</ul>
 		</div>

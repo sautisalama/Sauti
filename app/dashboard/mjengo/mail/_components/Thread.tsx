@@ -8,8 +8,23 @@ import { messageDoc, softFor } from "@/lib/mail/thread";
 import { fitFrame } from "@/lib/mail/frame";
 import { getMessageDetail, type MessageRow } from "./api";
 import { detailKey, mailStore, type Detail } from "./mail-store";
+import { PersonChip } from "./PersonChip";
 
 const name = (a: { name: string; address: string }) => a.name || a.address || "Unknown";
+
+/** Recipients as small chips: click for the card, double-click to add to the contacts. */
+function People({ list, onWrite, onAddContact, showAddress }: { list: { name: string; address: string }[]; onWrite?: (a: string) => void; onAddContact?: (n: string, a: string) => void; showAddress?: boolean }) {
+	return (
+		<>
+			{list.map((t, i) => (
+				<span key={`${t.address}-${i}`}>
+					{onWrite && onAddContact ? <PersonChip name={showAddress ? t.address : name(t)} address={t.address} onWrite={onWrite} onAddContact={(n) => onAddContact(t.name || n, t.address)} /> : showAddress ? t.address : name(t)}
+					{i < list.length - 1 ? ", " : ""}
+				</span>
+			))}
+		</>
+	);
+}
 const initials = (s: string) => s.split(/[\s@.]+/).filter(Boolean).slice(0, 2).map((x) => x[0]?.toUpperCase()).join("") || "?";
 const stamp = (d: string | null) => (!d ? "" : isToday(new Date(d)) ? format(new Date(d), "HH:mm") : isThisYear(new Date(d)) ? format(new Date(d), "d MMM, HH:mm") : format(new Date(d), "d MMM yyyy"));
 const plainOf = (d: Detail | null) => (d ? (d.text || d.html?.replace(/<[^>]+>/g, " ") || "").replace(/\s+/g, " ").trim() : "");
@@ -49,12 +64,14 @@ function Body({ html, text }: { html: string | null; text: string }) {
  * the header. Closed messages are a single line with the start of what was said.
  */
 export function ThreadMessage({
-	m, accountId, open, onOpenChange, detail, mine, isCurrent, onReply, onReplyAll, onForward, children,
+	m, accountId, open, onOpenChange, detail, mine, isCurrent, onReply, onReplyAll, onForward, onWrite, onAddContact, children,
 }: {
 	m: MessageRow; accountId: string; open: boolean; onOpenChange: (o: boolean) => void;
 	/** Already loaded (the message being read). Otherwise it is fetched when the message is opened. */
 	detail?: Detail | null; mine: boolean; isCurrent?: boolean;
 	onReply?: () => void; onReplyAll?: () => void; onForward?: () => void;
+	/** Click someone for the card, double-click to add them to the contacts. */
+	onWrite?: (address: string) => void; onAddContact?: (name: string, address: string) => void;
 	children?: React.ReactNode;
 }) {
 	const key = detailKey(accountId, m.mailbox, m.uid);
@@ -112,15 +129,15 @@ export function ThreadMessage({
 						</span>
 					</div>
 					<p className="mt-0.5 text-[13px] text-[#787774]">
-						To: {d ? (d.to.length ? d.to.map((t) => name(t)).slice(0, details ? 99 : 2).join(", ") : "me") : "..."}
+						To: {d ? (d.to.length ? <People list={d.to.slice(0, details ? 99 : 2)} onWrite={onWrite} onAddContact={onAddContact} /> : "me") : "..."}
 						{d && !details && (d.to.length > 2 || d.cc.length > 0) && <span> +{Math.max(0, d.to.length - 2) + d.cc.length}</span>}
 						{d && <button onClick={() => setDetails((v) => !v)} className="ml-2 text-[#068297] hover:underline">{details ? "Hide" : "Details"}</button>}
 					</p>
 					{details && d && (
 						<dl className="mt-1.5 space-y-0.5 text-[13px] text-[#787774]">
-							<div><dt className="inline text-[#9b9a97]">From </dt><dd className="inline">{m.from.name ? `${m.from.name} ` : ""}&lt;{m.from.address}&gt;</dd></div>
-							{d.to.length > 0 && <div><dt className="inline text-[#9b9a97]">To </dt><dd className="inline">{d.to.map((t) => t.address).join(", ")}</dd></div>}
-							{d.cc.length > 0 && <div><dt className="inline text-[#9b9a97]">Cc </dt><dd className="inline">{d.cc.map((t) => t.address).join(", ")}</dd></div>}
+							<div><dt className="inline text-[#9b9a97]">From </dt><dd className="inline">{onWrite && onAddContact ? <PersonChip name={m.from.name} address={m.from.address} onWrite={onWrite} onAddContact={onAddContact} /> : m.from.name} &lt;{m.from.address}&gt;</dd></div>
+							{d.to.length > 0 && <div><dt className="inline text-[#9b9a97]">To </dt><dd className="inline"><People list={d.to} onWrite={onWrite} onAddContact={onAddContact} showAddress /></dd></div>}
+							{d.cc.length > 0 && <div><dt className="inline text-[#9b9a97]">Cc </dt><dd className="inline"><People list={d.cc} onWrite={onWrite} onAddContact={onAddContact} showAddress /></dd></div>}
 							<div><dt className="inline text-[#9b9a97]">Subject </dt><dd className="inline">{d.subject}</dd></div>
 						</dl>
 					)}

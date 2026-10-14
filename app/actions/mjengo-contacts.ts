@@ -6,6 +6,7 @@ import { logAudit } from '@/lib/access/audit';
 import { requireAdminActor, isSuperAdminEmail } from '@/lib/access/super-admin';
 import { requireModule } from '@/lib/access/permissions';
 import { sendAccessEmail } from '@/lib/mjengo/invite-email';
+import { askAi } from '@/lib/mjengo/ai';
 
 export interface ContactRow {
   id: string;
@@ -173,6 +174,64 @@ async function addContactFromMail_(name: string, email: string): Promise<Contact
   return data as ContactRow;
 }
 
+const FREE_MAIL = /^(gmail|googlemail|yahoo|ymail|outlook|hotmail|live|msn|icloud|me|aol|proton|protonmail|zoho|gmx|mail|yandex|rocketmail|inbox)\./i;
+
+/** "info@sautisalama.org" gives "Sautisalama": a guess from the domain, empty for personal mail providers. */
+function organisationFromDomain(email: string): string {
+  const host = email.split('@')[1]?.toLowerCase() ?? '';
+  if (!host || FREE_MAIL.test(host)) return '';
+  const parts = host.split('.').filter(Boolean);
+  const second = ['co', 'com', 'org', 'ac', 'go', 'or', 'ne', 'sc', 'net', 'gov', 'edu'];
+  const core = parts.length > 2 && second.includes(parts[parts.length - 2]) ? parts[parts.length - 3] : parts[parts.length - 2] ?? parts[0];
+  return core ? core.replace(/[-_]+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()) : '';
+}
+
+/**
+ * The organisation a person writes from, for the "add to contacts" card. The signature or text of the email they
+ * sent (when given) is read first; the domain is the fallback. It is only a suggestion: the person edits it.
+ */
+async function suggestOrganisation_(name: string, email: string, context?: string): Promise<{ organisation: string; title: string | null; source: 'text' | 'domain' | 'none' }> {
+  await requireModule('contacts', 'write');
+  const addr = email.trim().toLowerCase();
+  if (!emailOk(addr)) throw new Error('That is not a valid email address.');
+  const fallback = organisationFromDomain(addr);
+  const text = (context ?? '').replace(/\s+/g, ' ').trim().slice(-1800);
+  if (text.length < 20) return { organisation: fallback, title: null, source: fallback ? 'domain' : 'none' };
+  try {
+    const raw = await askAi(
+      'You read the end of an email and say which organisation its sender works for, and their job title if it is written. Reply with one JSON object {"organisation": string | null, "title": string | null}. Use only what the text says (a signature, a letterhead line, a footer); if it is not clear, use null. Never invent. Keep the organisation name as written, without legal suffixes such as "Ltd".',
+      `Sender: ${name || '(no name)'} <${addr}>\nEmail domain: ${addr.split('@')[1]}\n\nText:\n${text}`,
+      200,
+      { json: true, temperature: 0 },
+    );
+    const j = JSON.parse(/\{[\s\S]*\}/.exec(raw)?.[0] ?? '{}') as { organisation?: string | null; title?: string | null };
+    const org = (j.organisation ?? '').toString().trim().slice(0, 120);
+    const title = (j.title ?? '').toString().trim().slice(0, 100) || null;
+    if (org) return { organisation: org, title, source: 'text' };
+    return { organisation: fallback, title, source: fallback ? 'domain' : 'none' };
+  } catch {
+    return { organisation: fallback, title: null, source: fallback ? 'domain' : 'none' };
+  }
+}
+
+/** Add someone from an email with the details confirmed by the person: name, organisation, title. */
+async function addContactDetailed_(v: { name: string; email: string; organisation?: string | null; title?: string | null }): Promise<ContactRow> {
+  const actor = await requireModule('contacts', 'write');
+  const addr = v.email.trim().toLowerCase();
+  if (!emailOk(addr)) throw new Error('That is not a valid email address.');
+  const db = looseAdmin();
+  const { data: have } = await db.from('mjengo_contacts').select(COLS).ilike('email', addr).maybeSingle();
+  if (have) return have as ContactRow;
+  const { data, error } = await db
+    .from('mjengo_contacts')
+    .insert({ name: clean(v.name) ?? addr, email: addr, organisation: clean(v.organisation), title: clean(v.title), source: 'mail', created_by: actor.id })
+    .select(COLS)
+    .single();
+  if (error || !data) throw new Error('Could not add the contact.');
+  await logAudit({ actorId: actor.id, actorEmail: actor.email, action: 'contact.created', targetType: 'contact', targetId: data.id, targetLabel: data.name, details: { via: 'mail' } });
+  return data as ContactRow;
+}
+
 /** For recipient pickers: teammates and contacts matching what has been typed, teammates first. */
 async function suggestContacts_(q: string): Promise<{ name: string; email: string; avatar?: string | null; kind?: 'team' | 'contact' }[]> {
   const me = await requireModule('contacts', 'write');
@@ -268,4 +327,6 @@ export const saveContact = guard(saveContact_);
 export const deleteContact = guard(deleteContact_);
 export const importContacts = guard(importContacts_);
 export const addContactFromMail = guard(addContactFromMail_);
+export const suggestOrganisation = guard(suggestOrganisation_);
+export const addContactDetailed = guard(addContactDetailed_);
 export const suggestContacts = guard(suggestContacts_);

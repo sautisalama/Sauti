@@ -10,7 +10,7 @@ export function PersonChip({ name, address, onWrite, onAddContact, className }: 
 	return (
 		<Popover>
 			<PopoverTrigger asChild>
-				<button type="button" className={cn("rounded px-0.5 text-left hover:bg-black/5 hover:underline", className)} title={address}>
+				<button type="button" onDoubleClick={() => onAddContact(name, address)} className={cn("rounded px-0.5 text-left hover:bg-black/5 hover:underline", className)} title={`${address}. Double-click to add to contacts.`}>
 					{label}
 				</button>
 			</PopoverTrigger>

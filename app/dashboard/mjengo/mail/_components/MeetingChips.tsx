@@ -26,7 +26,11 @@ export function MeetingChips({ subject, text, html, sent, from }: { subject: str
 	const [done, setDone] = useState<string | null>(null);
 	const [busy, setBusy] = useState(false);
 	const [err, setErr] = useState("");
-	const meeting: DetectedMeeting | undefined = found.meetings[0];
+	// A meeting that has already happened is not offered for the calendar (its time is read, and it is behind us).
+	const meeting: DetectedMeeting | undefined = found.meetings.find((m) => {
+		const at = m.end ? new Date(m.end).getTime() : m.start ? new Date(m.start).getTime() + HOUR : m.dateOnly ? new Date(`${m.dateOnly}T23:59:59+03:00`).getTime() : null;
+		return at === null || at >= Date.now();
+	});
 	const deadline = found.deadlines[0];
 	const [title, setTitle] = useState(meeting?.title || subject || "Meeting");
 	const [startStr, setStartStr] = useState(() => (meeting?.start ? toLocal(new Date(meeting.start).getTime()) : meeting?.dateOnly ? `${meeting.dateOnly}T09:00` : ""));
