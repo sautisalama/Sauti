@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { looseAdmin } from "@/lib/loose-db";
 import { getActor } from "@/lib/access/super-admin";
 import { MeetRoom } from "@/components/meet/MeetRoom";
+import { MeetCallBridge } from "@/components/meet/MeetCallBridge";
 import { previewMetadata } from "@/lib/seo/previews";
 
 export const dynamic = "force-dynamic";
@@ -25,21 +26,21 @@ export default async function MeetPage({ params, searchParams }: { params: Promi
 		const invited = !!ev && (ev.created_by === actor.id || ((ev.attendees ?? []) as string[]).some((e) => String(e).toLowerCase() === actor.email));
 		if (invited && ev?.ends_at) endsAt = new Date(ev.ends_at as string).toISOString();
 	}
-	return (
-		<MeetRoom
-			code={code}
-			mode={data.mode === "voice" ? "voice" : "video"}
-			title={data.title}
-			description={(data.description as string | null) ?? ""}
-			resources={(actor?.isAdmin ? (data.resources as { label: string; url: string }[] | null) : null) ?? []}
-			defaultName={actor?.name ?? ""}
-			canSave={!!actor?.isAdmin}
-			embedded={embed === "1"}
-			autoJoin={autojoin === "1"}
-			startMic={mic !== "0"}
-			startCam={cam !== "0"}
-			userId={actor?.id ?? null}
-			endsAt={endsAt}
-		/>
-	);
+	const props = {
+		code,
+		mode: (data.mode === "voice" ? "voice" : "video") as "voice" | "video",
+		title: data.title as string | null,
+		description: (data.description as string | null) ?? "",
+		resources: (actor?.isAdmin ? (data.resources as { label: string; url: string }[] | null) : null) ?? [],
+		defaultName: actor?.name ?? "",
+		canSave: !!actor?.isAdmin,
+		userId: actor?.id ?? null,
+		endsAt,
+		startMic: mic !== "0",
+		startCam: cam !== "0",
+	};
+	// Signed-in people: the call is hosted by the app shell, so it can be minimised and carried through the suite.
+	// Guests with only the link have no suite, so the call is the page.
+	if (actor) return <MeetCallBridge {...props} />;
+	return <MeetRoom {...props} embedded={embed === "1"} autoJoin={autojoin === "1"} />;
 }

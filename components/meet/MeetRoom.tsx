@@ -1,7 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
+import { useRouter } from "next/navigation";
 import { format } from "date-fns";
 import { MeetRecorder } from "@/lib/client/meet-recorder";
 import { sendRecording } from "@/lib/client/remote-recording";
@@ -33,7 +34,8 @@ const ICE: RTCIceServer[] = [
 const LANGS = [["en-KE", "English (Kenya)"], ["en-US", "English (US)"], ["en-GB", "English (UK)"], ["sw-KE", "Kiswahili"]] as const;
 
 /** A small peer-to-peer call room: preview and device choice, video or voice, companion mode, sharing, captions. */
-export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, description = "", resources = [], autoJoin = false, startMic = true, startCam = true, userId = null, endsAt = null }: { code: string; mode: "video" | "voice"; title: string | null; defaultName: string; canSave: boolean; embedded?: boolean; description?: string; resources?: { label: string; url: string }[]; autoJoin?: boolean; startMic?: boolean; startCam?: boolean; /** The signed-in account, which is what lets a second device join as a companion. */ userId?: string | null; /** When the scheduled meeting was due to end; only given to people who were invited. */ endsAt?: string | null }) {
+export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, description = "", resources = [], autoJoin = false, startMic = true, startCam = true, userId = null, endsAt = null, inSuite = false }: { code: string; mode: "video" | "voice"; title: string | null; defaultName: string; canSave: boolean; embedded?: boolean; description?: string; resources?: { label: string; url: string }[]; autoJoin?: boolean; startMic?: boolean; startCam?: boolean; /** The signed-in account, which is what lets a second device join as a companion. */ userId?: string | null; /** When the scheduled meeting was due to end; only given to people who were invited. */ endsAt?: string | null; /** Hosted by the app shell: minimising keeps the call running while people use the rest of the suite. */ inSuite?: boolean }) {
+	const router = useRouter();
 	const [name, setName] = useState(defaultName);
 	const [joined, setJoined] = useState(false);
 	const [micOn, setMicOn] = useState(startMic);
@@ -490,23 +492,27 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 	 */
 	const dockCall = async () => {
 		if (pipWin) { pipWin.close(); return; }
-		if (await openFloating()) return;
-		if (embedded) { window.parent.postMessage({ type: "meet:minimize" }, window.location.origin); return; }
-		if (!canSave) { void popOutVideo(); return; }
-		callStore.open(code, mode, { minimized: true, mic: micOnRef.current, cam: camOnRef.current });
-		await persist(false);
-		if (recorder.current) await stopRecording();
-		stopPreview();
-		screenStream.current?.getTracks().forEach((t) => t.stop());
-		pcs.current.forEach((pc) => pc.close());
-		pcs.current.clear();
-		local.current?.getTracks().forEach((t) => t.stop());
-		local.current = null;
-		channel.current?.unsubscribe();
-		let back = "/dashboard/mjengo";
-		try { const r = new URL(document.referrer); if (r.origin === window.location.origin && !r.pathname.startsWith("/meet")) back = r.pathname + r.search; } catch { /* no referrer */ }
-		window.location.assign(back);
+		if (!inSuite) { void popOutVideo(); return; }
+		// The same live call keeps running in the corner of the suite: nothing is dropped and no one is rejoined.
+		callStore.minimize(true);
+		router.push(callStore.consumeReturn(canSave ? "/dashboard/mjengo" : "/dashboard"));
 	};
+	/** The call in its own window that can be dragged to any screen, even outside the browser. */
+	const floatWindow = async () => {
+		if (pipWin) { pipWin.close(); return; }
+		if (!(await openFloating())) void popOutVideo();
+	};
+
+	// The shell knows the call is live (so it keeps it alive across pages) and can ask it to leave from the corner.
+	useEffect(() => { if (inSuite && joined) callStore.setLive(true); }, [inSuite, joined]);
+	const leaveGen = useSyncExternalStore(callStore.subscribe, callStore.leaveGeneration, () => 0);
+	const firstGen = useRef(leaveGen);
+	useEffect(() => {
+		if (!inSuite || leaveGen === firstGen.current) return;
+		firstGen.current = leaveGen;
+		void leaveRef.current();
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [leaveGen]);
 
 	// Join straight away when the call was handed over from the full page or opened from the small window.
 	const autoRan = useRef(false);
@@ -741,10 +747,15 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 		setJoined(false);
 		setRemotes([]);
 		setReadyOpen(false);
-		if (embedded) { window.parent.postMessage({ type: "meet:left" }, window.location.origin); return; }
+		if (inSuite) {
+			callStore.close();
+			// From the corner of another page the person stays where they are; from the call page they go back.
+			if (window.location.pathname.startsWith("/meet")) router.push(home);
+			return;
+		}
 		// Straight back to Meet: no second screen to dismiss, and no camera left on.
 		window.location.assign(home);
-	}, [persist, embedded, home, stopRecording]);
+	}, [persist, inSuite, router, home, stopRecording]);
 
 	leaveRef.current = leave;
 	useEffect(() => () => {
@@ -1114,7 +1125,8 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 							<Ctl onClick={() => setReactOpen((v) => !v)} label="Send a reaction (R)" icon={<Smile className="h-5 w-5" />} active={reactOpen} />
 							{reactOpen && <ReactionPicker onPick={react} onClose={() => setReactOpen(false)} />}
 						</div>
-						<Ctl onClick={dockCall} label={canSave || embedded ? "Picture in picture: keep the call while you work in other suites" : "Picture in picture"} icon={<PictureInPicture2 className="h-5 w-5" />} className="hidden md:flex" />
+						<Ctl onClick={dockCall} label={inSuite ? "Picture in picture: minimise the call and keep working in the suite" : "Picture in picture"} icon={<PictureInPicture2 className="h-5 w-5" />} className="hidden md:flex" />
+						<Ctl onClick={() => void floatWindow()} label="Float the call in its own window (drag it to any screen)" icon={<ExternalLink className="h-5 w-5" />} active={!!pipWin} className="hidden md:flex" />
 					<button onClick={() => { if (isHost && visible.length > 0) setEndAsk(true); else void leave(); }} aria-label="Leave call" title="Leave call" className="flex h-12 w-16 items-center justify-center rounded-full bg-[#ea4335] hover:bg-[#d93025]"><PhoneOff className="h-5 w-5" /></button>
 				</div>
 				<div className="hidden items-center gap-1 md:flex">
@@ -1127,7 +1139,6 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 					<Ctl onClick={() => setPanel((p) => (p === "polls" ? "none" : "polls"))} label="Polls" icon={<BarChart3 className="h-5 w-5" />} active={panel === "polls"} flat />
 					<Ctl onClick={() => setPanel((p) => (p === "settings" ? "none" : "settings"))} label="Call settings" icon={<Settings2 className="h-5 w-5" />} active={panel === "settings"} flat />
 					<Ctl onClick={() => setPanel((p) => (p === "transcript" ? "none" : "transcript"))} label="Transcript" icon={<MessageSquareText className="h-5 w-5" />} active={panel === "transcript"} flat />
-					{embedded && <Ctl onClick={() => window.parent.postMessage({ type: "meet:minimize" }, window.location.origin)} label="Minimise" icon={<Minimize2 className="h-5 w-5" />} flat />}
 				</div>
 			</div>
 

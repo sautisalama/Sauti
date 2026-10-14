@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Inter, Atkinson_Hyperlegible } from "next/font/google";
 import "./globals.css";
+import { CallDock } from "@/components/meet/CallDock";
 import { Toaster } from "@/components/ui/toaster";
 
 import { PWAInstallPrompt } from "@/components/PWAInstallPrompt";
@@ -183,6 +184,8 @@ export default function RootLayout({
 							{children}
 						</Suspense>
 						<AccessibilityFAB />
+						{/* The live call lives here, above every page, so it survives going between Meet and the dashboard. */}
+						<Suspense fallback={null}><CallDock /></Suspense>
 
 				</AccessibilityProvider>
 				<PWAInstallPrompt />
