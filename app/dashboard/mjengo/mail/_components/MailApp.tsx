@@ -24,6 +24,7 @@ import { ConnectDialog, LabelDialog, LABEL_COLORS, SettingsDialog, ViewDialog } 
 import { getMailPrefs, getSignature, mailBootstrap, type MailPrefs, type SignatureState } from "./api";
 import { PersonChip } from "./PersonChip";
 import { AiSummary, ThreadMessage } from "./Thread";
+import { MeetingChips } from "./MeetingChips";
 import { unwrap } from "@/lib/action-result";
 import { addContactFromMail } from "@/app/actions/mjengo-contacts";
 import { listLabels, saveLabel, deleteLabel, setMessageLabel, projectLabel, listGrantsLite, linkToWork, mailTriage, type LabelRow, type ProjectLite, type GrantLite } from "./api";
@@ -923,6 +924,7 @@ function ReadingPane({ teamIds, team, onWrite, onAddContact, onPrev, onNext, has
 							onOffer={() => { const links = linksIn(detail.html ?? "", detail.text ?? ""); if (links.length) onOpportunity(links, detail.subject); }}
 						/>
 
+						<div className="flex flex-wrap items-start gap-2">
 						<AiSummary
 							accountId={accountId}
 							mailbox={selected?.mailbox ?? ""}
@@ -932,6 +934,15 @@ function ReadingPane({ teamIds, team, onWrite, onAddContact, onPrev, onNext, has
 							text={detail.text || (detail.html ?? "").replace(/<[^>]+>/g, " ")}
 							earlier={[...conversation].sort((x, y) => (x.date ?? "").localeCompare(y.date ?? "")).slice(-3).map((c) => ({ from: c.from.name || c.from.address, text: (mailStore.details.get(detailKey(accountId, c.mailbox, c.uid))?.text ?? "").slice(0, 600) })).filter((e) => e.text)}
 						/>
+						<MeetingChips
+							key={`mc:${accountId}:${selected?.mailbox}:${detail.uid}`}
+							subject={detail.subject}
+							text={detail.text || ""}
+							html={detail.html}
+							sent={detail.date ?? null}
+							from={detail.from[0] ? (detail.from[0].name || detail.from[0].address) : ""}
+						/>
+						</div>
 
 						{/* The conversation, the way Apple Mail lays it out: one message after another, each message once,
 						    older ones folded to a line, the quoted history folded under "See more". */}

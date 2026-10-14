@@ -208,7 +208,7 @@ export function AiSummary({ accountId, mailbox, uid, subject, from, text, earlie
 	const bullets = lines.filter((l) => /^[-*]\s+/.test(l)).map((l) => l.replace(/^[-*]\s+/, ""));
 	const needs = lines.find((l) => /^needs:/i.test(l))?.replace(/^needs:\s*/i, "");
 	return (
-		<section aria-label="Summary" className="mt-4 rounded-2xl border border-[#068297]/15 bg-[#F4FAFB] p-4">
+		<section aria-label="Summary" className="mt-4 w-full basis-full rounded-2xl border border-[#068297]/15 bg-[#F4FAFB] p-4">
 			<div className="mb-1.5 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-[#068297]">
 				<Sparkles className="h-3.5 w-3.5" /> Summary
 				{busy && <Loader2 className="h-3 w-3 animate-spin" />}
