@@ -383,3 +383,13 @@ shorten, elaborate, formal, casual, fix grammar, summarise, outline, continue, m
 4. "Bar chart of these amounts by funder" inserts a chart in the palette colours with a legend and axis titles.
 5. A viewer sees none of these actions; a suggester's insertion is a tracked change.
 6. A model reply with a script tag or a remote image URL is sanitised: nothing runs, nothing is fetched.
+
+---
+
+# Part 5: Icons the host can choose
+
+The workspace row at the editor's bottom right draws the AI star on **Ask** and a square speech bubble on
+**Comments**. A host may want Ask to look like chat and Comments to look different (the app here redraws both
+with CSS masks, which is brittle). Add `icons?: { ask?: ReactNode; comments?: ReactNode; checks?: ReactNode;
+tools?: ReactNode; voice?: ReactNode }` on `WordcraftEditorProps`, used by `ToolsBar` and `CommentsButton`, and
+export the default icons so a host can reuse them. Keep the `wcwb-ask` and `wccm-launch` class names stable.

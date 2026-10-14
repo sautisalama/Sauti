@@ -19,7 +19,6 @@ import { listTemplates } from "@/app/actions/mjengo-templates";
 import { useToast } from "@/hooks/use-toast";
 import { putToSignedUrl } from "@/lib/client/upload";
 import { ArrowLeft } from "lucide-react";
-import { DocAssist } from "./_DocAssist";
 import { DocBar } from "./_DocBar";
 import { watchedVersionStore } from "@/lib/client/watched-version-store";
 import { ShareDialog } from "../../_components/ShareDialog";
@@ -54,6 +53,17 @@ const ai: AiOptions = {
 			}
 		})(),
 };
+
+const svg = (paths: string, w = 1.8) => `url("data:image/svg+xml,${encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='${w}' stroke-linecap='round' stroke-linejoin='round'>${paths}</svg>`)}")`;
+const ASK_ICON = svg("<path d='M4 5h16v11H11l-5 4v-4H4Z'/>");
+const COMMENTS_ICON = svg("<path d='M7.9 20A9 9 0 1 0 4 16.1L2 22Z'/><path d='M8 12h.01M12 12h.01M16 12h.01' stroke-width='2.6'/>");
+/** The package draws a sparkle on Ask and a square bubble on Comments; both are redrawn here. */
+const ICON_CSS = `
+[data-wordcraft-root] .wcwb-ask > svg { display: none; }
+[data-wordcraft-root] .wcwb-ask::before { content: ""; display: inline-block; width: 16px; height: 16px; flex: none; background: currentColor; -webkit-mask: ${ASK_ICON} center / contain no-repeat; mask: ${ASK_ICON} center / contain no-repeat; }
+[data-wordcraft-root] .wccm-launch[aria-label^="Comments"] > svg { display: none; }
+[data-wordcraft-root] .wccm-launch[aria-label^="Comments"]::before { content: ""; display: inline-block; width: 18px; height: 18px; flex: none; background: currentColor; -webkit-mask: ${COMMENTS_ICON} center / contain no-repeat; mask: ${COMMENTS_ICON} center / contain no-repeat; }
+`;
 
 const COLORS = ["#0f766e", "#c2410c", "#7c3aed", "#0369a1", "#be123c", "#4d7c0f", "#a16207", "#0e7490"];
 const colorFor = (s: string) => COLORS[[...s].reduce((a, c) => a + c.charCodeAt(0), 0) % COLORS.length];
@@ -314,7 +324,9 @@ function EditorScreen() {
 						loading={<MjengoLoader label="Starting the editor" hint="The first time takes a moment while it downloads." className="h-full min-h-0" />}
 						fallback={(e) => <div className="p-6 text-sm text-red-700">The editor could not start: {e.message}. It needs a current browser with WebGL2 or WebGPU.</div>}
 					/>
-					<DocAssist editor={ref} />
+					{/* One chat entry: "Ask" (with the chat bubble) answers from the document. The older floating Chat is gone,
+					    and Comments takes a round bubble with dots so the two are not mistaken for each other. */}
+					<style>{ICON_CSS}</style>
 					<ShareDialog item={shareOpen && fileId ? ({ type: "file", id: fileId, name } as never) : null} onClose={() => { setShareOpen(false); setMetaKey((k) => k + 1); }} />
 				</div>
 				</>
