@@ -24,6 +24,7 @@ import { OpportunityVerifyCard } from "./OpportunityVerify";
 import { GrantCharts, type GrantLite } from "./GrantCharts";
 import { Avatars, DeadlineChip, STATUSES, StatusPill, money, type Kind } from "./shared";
 import { EntityAccessPanel, FellowshipAssignments } from "./EntityExtras";
+import { EntityTimeline } from "./EntityTimeline";
 
 type FieldDef = { key: string; label: string; type: "text" | "textarea" | "number" | "date" | "select" | "owner" | "grant" | "url" | "tags" | "sdgs"; options?: { value: string; label: string }[]; wide?: boolean };
 
@@ -384,6 +385,7 @@ export function EntityWorkspace({ kind }: { kind: Kind }) {
 								<>
 									{kind === "project" && <ProjectMoney v={editing.values} />}
 									{kind === "fellowship" && <FellowshipAssignments fellowshipId={editing.id} />}
+									<EntityTimeline kind={kind} id={editing.id} />
 									<EntityAccessPanel kind={kind} id={editing.id} />
 									<DocumentsPanel kind={kind} entityId={editing.id} onChange={load} />
 									<div className="rounded-xl border border-serene-neutral-100 p-3">

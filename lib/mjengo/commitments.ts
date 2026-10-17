@@ -1,6 +1,7 @@
 import { looseAdmin } from '@/lib/loose-db';
 import { sendNotification } from '@/lib/notifications';
 import { askAi } from '@/lib/mjengo/ai';
+import { autoLinkMeeting } from '@/lib/mjengo/auto-link';
 
 interface Line { id: string; name: string; text: string; at: string }
 export interface Commitment { title: string; owner: string | null; due: string | null }
@@ -38,6 +39,10 @@ export async function extractCommitments(title: string | null, lines: Line[], to
 export async function commitmentsToTodos(meeting: { code: string; title: string | null; participants: string[]; created_by: string | null }, lines: Line[]): Promise<number> {
   if (lines.length < 3) return 0;
   const db = looseAdmin();
+  // The call joins the timeline of every grant, project and so on it speaks about; when it speaks about exactly one,
+  // its promises belong to that record too.
+  const linked = await autoLinkMeeting(meeting, lines).catch(() => []);
+  const only = linked.length === 1 ? linked[0] : null;
   const found = await extractCommitments(meeting.title, lines);
   if (!found.length) return 0;
 
@@ -64,7 +69,7 @@ export async function commitmentsToTodos(meeting: { code: string; title: string 
     if (have.has(c.title.toLowerCase())) continue;
     const owner = ownerId(c.owner);
     const { error } = await db.from('mjengo_todos').insert({
-      track_id: track.id, title: c.title, status: 'todo', due_date: c.due, assignee_ids: owner ? [owner] : [],
+      track_id: track.id, title: c.title, status: 'todo', due_date: c.due, assignee_ids: owner ? [owner] : [], entity_type: only?.kind ?? null, entity_id: only?.id ?? null,
       notes: `${marker}${meeting.title ? `: ${meeting.title}` : ''}. Open it at /dashboard/mjengo/meetings?code=${meeting.code}`, created_by: meeting.created_by,
     });
     if (error) continue;
