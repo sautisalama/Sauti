@@ -2,11 +2,12 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { Bell, Calendar, GripVertical, Loader2, MessageCircle, Pin, PinOff, Video } from "lucide-react";
+import { Bell, Calendar, GripVertical, Loader2, MessageCircle, Pin, PinOff, Sparkles, Video } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useDashboardData } from "@/components/providers/DashboardDataProvider";
 import { cn } from "@/lib/utils";
 import { MeetChooser } from "./MeetChooser";
+import { SalamaPanel } from "./SalamaPanel";
 import { useSuiteNotifications } from "@/lib/client/suite-notifications";
 
 type Edge = "left" | "right" | "bottom";
@@ -30,6 +31,7 @@ export function MjengoDock() {
 	const open = pinned || hover;
 	const [drag, setDrag] = useState<{ x: number; y: number } | null>(null);
 	const [chooser, setChooser] = useState(false);
+	const [salama, setSalama] = useState(false);
 	const { unread } = useSuiteNotifications();
 	const moved = useRef(false);
 	const origin = useRef({ x: 0, y: 0 });
@@ -97,10 +99,11 @@ export function MjengoDock() {
 	const collapse = () => { if (hoverTimer.current) clearTimeout(hoverTimer.current); hoverTimer.current = setTimeout(() => setOpen(false), 220); };
 
 	if (!mounted) return null;
-	if (small) return <><EdgeSheet unread={unread} onMeeting={() => setChooser(true)} starting={false} /><MeetChooser open={chooser} onClose={() => setChooser(false)} /></>;
+	if (small) return <><EdgeSheet unread={unread} onMeeting={() => setChooser(true)} onSalama={() => setSalama(true)} starting={false} /><MeetChooser open={chooser} onClose={() => setChooser(false)} /><SalamaPanel open={salama} onClose={() => setSalama(false)} /></>;
 	return (
 		<TooltipProvider delayDuration={150}>
 			<MeetChooser open={chooser} onClose={() => setChooser(false)} />
+			<SalamaPanel open={salama} onClose={() => setSalama(false)} />
 			{/* Hover (or tap the handle) to expand; move away to collapse. Drag the handle to put it on another edge. */}
 			<div
 				style={style}
@@ -124,8 +127,9 @@ export function MjengoDock() {
 					{!open && unread > 0 && <span className="absolute -right-1 -top-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-sauti-teal px-1 text-[10px] font-bold text-white">{unread > 9 ? "9+" : unread}</span>}
 				</button>
 
-				<div role="toolbar" aria-label="Quick actions" className={cn("flex gap-0.5 overflow-hidden transition-all duration-200", horizontal ? "flex-row items-center" : "flex-col items-center", open ? (horizontal ? "max-w-[320px] px-1 opacity-100" : "max-h-[280px] pb-1 opacity-100") : (horizontal ? "max-w-0 opacity-0" : "max-h-0 opacity-0"))}>
+				<div role="toolbar" aria-label="Quick actions" className={cn("flex gap-0.5 overflow-hidden transition-all duration-200", horizontal ? "flex-row items-center" : "flex-col items-center", open ? (horizontal ? "max-w-[380px] px-1 opacity-100" : "max-h-[330px] pb-1 opacity-100") : (horizontal ? "max-w-0 opacity-0" : "max-h-0 opacity-0"))}>
 					<Item label={pinned ? "Unpin" : "Pin open"} hint={pinned ? "Let it collapse when you move away" : "Keep it open while you work"} onClick={togglePin} side={side}>{pinned ? <PinOff className="h-[18px] w-[18px] text-sauti-teal" /> : <Pin className="h-[18px] w-[18px]" />}</Item>
+					<Item label="Salama" hint="Your team's AI member: ask about your own work" onClick={() => setSalama(true)} side={side}><Sparkles className="h-[18px] w-[18px] text-sauti-teal" /></Item>
 					<Item label="Chats" hint="Conversations in the suite" href="/dashboard/mjengo/chat" side={side}><MessageCircle className="h-[18px] w-[18px]" /></Item>
 					<Item label="Notifications" hint="What needs your attention" href="/dashboard/mjengo/notifications" side={side}>
 						<Bell className="h-[18px] w-[18px]" />
@@ -155,7 +159,7 @@ function Item({ label, hint, href, onClick, busy, side, children }: { label: str
  * On phones the quick actions live off the right edge: swipe in from the right to pull them out, swipe
  * back (or tap outside) to put them away. The thin tab on the edge shows where to swipe and works as a tap.
  */
-function EdgeSheet({ unread, onMeeting, starting }: { unread: number; onMeeting: () => void; starting: boolean }) {
+function EdgeSheet({ unread, onMeeting, onSalama, starting }: { unread: number; onMeeting: () => void; onSalama: () => void; starting: boolean }) {
 	const [open, setOpen] = useState(false);
 	const [dx, setDx] = useState(0);
 	const from = useRef<{ x: number; y: number; open: boolean } | null>(null);
@@ -186,6 +190,7 @@ function EdgeSheet({ unread, onMeeting, starting }: { unread: number; onMeeting:
 	const dragging = from.current !== null && dx !== 0;
 	const offset = open ? dx : W + dx;
 	const items: { label: string; href?: string; run?: () => void; icon: React.ReactNode; badge?: number }[] = [
+		{ label: "Salama", run: onSalama, icon: <Sparkles className="h-5 w-5" /> },
 		{ label: "Chats", href: "/dashboard/mjengo/chat", icon: <MessageCircle className="h-5 w-5" /> },
 		{ label: "Notifications", href: "/dashboard/mjengo/notifications", icon: <Bell className="h-5 w-5" />, badge: unread },
 		{ label: "Meeting", run: onMeeting, icon: starting ? <Loader2 className="h-5 w-5 animate-spin" /> : <Video className="h-5 w-5" /> },

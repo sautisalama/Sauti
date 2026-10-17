@@ -5,6 +5,8 @@ import { useSearchParams } from "next/navigation";
 import { WordcraftEditor, type FileMenuOptions, type IconsOptions, type SavedFile, type TopBarOptions, type WordcraftEditorRef } from "@gamine/wordcraft-react";
 import { directVersionStore } from "@/lib/client/direct-version-store";
 import { saveDesignSystem } from "@/app/actions/mjengo-ai";
+import { askSalamaInDoc } from "@/app/actions/mjengo-salama";
+import { SALAMA } from "@/lib/mjengo/salama-shared";
 import * as Y from "yjs";
 import type { AiOptions } from "@gamine/wordcraft-react";
 import { getBrand } from "@/app/actions/mjengo-brand";
@@ -218,7 +220,7 @@ function EditorScreen() {
 	const me = useUser();
 	const team = useTeam();
 	// The people who can be @mentioned or given a comment to follow up.
-	const mentionable = useMemo(() => team.map((t) => ({ id: t.id, name: t.name, email: t.email ?? undefined, avatarUrl: t.avatar ?? undefined })), [team]);
+	const mentionable = useMemo(() => [{ id: SALAMA.id, name: SALAMA.name, email: SALAMA.email, avatarUrl: undefined as string | undefined }, ...team.map((t) => ({ id: t.id, name: t.name, email: t.email ?? undefined, avatarUrl: t.avatar ?? undefined }))], [team]);
 	const person = useMemo(() => {
 		const p = me?.profile as { first_name?: string | null; last_name?: string | null } | null | undefined;
 		const name = [p?.first_name, p?.last_name].filter(Boolean).join(" ") || me?.email || "Someone";
@@ -347,8 +349,16 @@ function EditorScreen() {
 								// A mention or an assignment is a task for that person: they are told, and it opens this document.
 								onMention: ({ comment, people, assignee }) => {
 									if (!fileId) return;
-									const assigned = assignee?.id;
-									const mentioned = people.map((x) => x.id).filter((x) => x !== assigned);
+									// Salama is a member of the team: mention her (or give her the comment) and she answers in the thread.
+									if (people.some((x) => x.id === SALAMA.id) || assignee?.id === SALAMA.id) {
+										const thread = comment.parent ?? comment.id;
+										const question = comment.text.replace(/@salama/gi, "").trim() || "Please look at this passage and tell me what stands out.";
+										void unwrap(askSalamaInDoc(fileId, question, comment.quote))
+											.then((a) => ref.current?.comments.reply(thread, `Salama: ${a.text}${a.sources.length ? `\n\nFrom: ${a.sources.map((x) => x.title).join("; ")}` : ""}`))
+											.catch((e) => toast({ title: "Salama could not answer", description: e instanceof Error ? e.message : undefined, variant: "destructive" }));
+									}
+									const assigned = assignee?.id && assignee.id !== SALAMA.id ? assignee.id : undefined;
+									const mentioned = people.map((x) => x.id).filter((x) => x !== assigned && x !== SALAMA.id);
 									if (assigned) void notifyDocComment(fileId, [assigned], comment.text, "assigned").catch(() => undefined);
 									if (mentioned.length) void notifyDocComment(fileId, mentioned, comment.text, "mention").catch(() => undefined);
 								},

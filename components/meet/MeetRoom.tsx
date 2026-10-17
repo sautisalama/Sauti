@@ -10,9 +10,11 @@ import { beginRemoteRecording, finishRemoteRecording } from "@/app/actions/meet-
 import { putToSignedUrl } from "@/lib/client/upload";
 import { prepareUpload, registerUpload } from "@/app/dashboard/mjengo/vault/api";
 import { attachRecording } from "@/app/actions/mjengo-meet";
-import { Accessibility, Captions, Circle, ExternalLink, MoreVertical, Maximize2, ShieldCheck, UserPlus, Check, Copy, Hand, Info, Loader2, Mail, BarChart3, MessageCircle, MessageSquareText, Settings2, Mic, MicOff, Minimize2, MonitorUp, Pin, PinOff, PictureInPicture2, PhoneOff, Smile, SmartphoneNfc, UserMinus, Users, Video, VideoOff, Volume2, X } from "lucide-react";
+import { Sparkles, Accessibility, Captions, Circle, ExternalLink, MoreVertical, Maximize2, ShieldCheck, UserPlus, Check, Copy, Hand, Info, Loader2, Mail, BarChart3, MessageCircle, MessageSquareText, Settings2, Mic, MicOff, Minimize2, MonitorUp, Pin, PinOff, PictureInPicture2, PhoneOff, Smile, SmartphoneNfc, UserMinus, Users, Video, VideoOff, Volume2, X } from "lucide-react";
 import { makeCohost, verifyHostToken, lockMeeting, enterMeeting, checkMeetingEntry, listKnocks, decideKnock, decideAllKnocks, saveMeetingChat, type Knock } from "@/app/actions/meet-room";
 import { ChatPanel, PollPanel, ReactionLayer, ReactionPicker, type ChatMsg, type FloatingReaction, type Poll } from "./meet-parts";
+import { askSalamaInCall } from "@/app/actions/mjengo-salama";
+import { addressedToSalama, SALAMA } from "@/lib/mjengo/salama-shared";
 import { callStore } from "@/lib/client/call-store";
 import { createClient } from "@/utils/supabase/client";
 import { unwrap } from "@/lib/action-result";
@@ -83,6 +85,11 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 	const [knocks, setKnocks] = useState<Knock[]>([]);
 	const [chat, setChat] = useState<ChatMsg[]>([]);
 	const [unreadChat, setUnreadChat] = useState(0);
+	const [salamaBusy, setSalamaBusy] = useState(false);
+	const [hearSalama, setHearSalama] = useState(false);
+	const askSalamaRef = useRef<(q: string) => void>(() => undefined);
+	const hearRef = useRef(false);
+	hearRef.current = hearSalama;
 	const [reactOpen, setReactOpen] = useState(false);
 	const [floating, setFloating] = useState<FloatingReaction[]>([]);
 	const [tileReact, setTileReact] = useState<Record<string, string>>({});
@@ -389,6 +396,9 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 				const line: TranscriptLine = { id: `${myId.current}-${Date.now()}-${i}`, name: name || "Guest", text, at: new Date().toISOString() };
 				addLine(line);
 				send("caption", line as unknown as Record<string, unknown>);
+				// Said aloud, "Salama, ..." is a question to her, asked from the device of the person who spoke.
+				const toSalama = addressedToSalama(text);
+				if (toSalama) askSalamaRef.current(toSalama);
 			}
 		};
 		r.onend = () => { if (!stopped) { try { r.start(); } catch { /* already running */ } } };
@@ -560,7 +570,32 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 		const line: ChatMsg = { id: `${myId.current}-${Date.now()}`, name: shownName, text: text.slice(0, 1000), at: new Date().toISOString(), mine: true };
 		setChat((cur) => [...cur, line]);
 		send("chat", { ...line, mine: false });
+		const toSalama = addressedToSalama(text);
+		if (toSalama) askSalamaRef.current(toSalama);
 	};
+	/** Salama answers in the call's chat, for everyone, and the answer is kept with the meeting like any message. */
+	const postSalama = (text: string, everyone = true) => {
+		const line: ChatMsg = { id: `salama-${myId.current}-${Date.now()}`, name: SALAMA.name, text: text.slice(0, 1000), at: new Date().toISOString(), mine: false };
+		setChat((cur) => [...cur, line]);
+		if (everyone) send("chat", { ...line });
+		setUnreadChat((n) => n + 1);
+	};
+	askSalamaRef.current = (question: string) => {
+		if (salamaBusy) return;
+		setSalamaBusy(true);
+		const here = [shownName, ...remotes.map((r) => r.name)];
+		void unwrap(askSalamaInCall(code, question, linesRef.current.map(({ name: n, text }) => ({ name: n, text })), here))
+			.then((a) => postSalama(`${a.text}${a.sources.length ? `\n\nFrom: ${a.sources.map((s) => s.title).join("; ")}` : ""}`))
+			// A person who may not use Salama (a guest, say) is told privately rather than the whole call.
+			.catch((e) => postSalama(e instanceof Error ? e.message : "I could not answer just now.", false))
+			.finally(() => setSalamaBusy(false));
+	};
+	// Anyone who turned on "Hear Salama" hears her answers read aloud on their own device.
+	useEffect(() => {
+		const last = chat[chat.length - 1];
+		if (!hearRef.current || !last || last.name !== SALAMA.name || last.mine || typeof window === "undefined" || !("speechSynthesis" in window)) return;
+		try { window.speechSynthesis.cancel(); window.speechSynthesis.speak(new SpeechSynthesisUtterance(last.text.split("\n\nFrom:")[0])); } catch { /* no voice available */ }
+	}, [chat]);
 	const askPoll = (question: string, options: string[]) => {
 		const id = `${myId.current}-${Date.now()}`;
 		setPolls((cur) => [...cur, { id, question, options, by: "You", votes: {}, open: true }]);
@@ -1012,7 +1047,7 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 							{panel === "transcript" ? "Transcript" : panel === "info" ? "Meeting details" : panel === "chat" ? "Messages" : panel === "polls" ? "Polls" : panel === "settings" ? "Call settings" : "People"}
 							<button onClick={() => setPanel("none")} aria-label="Close" className="flex h-8 w-8 items-center justify-center rounded-full hover:bg-black/5"><X className="h-4 w-4" /></button>
 						</div>
-													{panel === "chat" && <ChatPanel lines={chat} onSend={sendChat} onPin={pinChat} />}
+													{panel === "chat" && <ChatPanel lines={chat} onSend={sendChat} onPin={pinChat} salama={{ busy: salamaBusy, ask: (q) => askSalamaRef.current(q), speak: hearSalama, onSpeak: setHearSalama }} />}
 							{panel === "polls" && <PollPanel polls={polls} me={myId.current} onCreate={askPoll} onVote={votePoll} onClose={endPoll} />}
 							{panel === "settings" && (
 								<div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4 text-sm">
@@ -1052,6 +1087,7 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 									)}
 									<ul className="space-y-1 p-3 text-sm">
 										<li className="flex items-center gap-3 rounded-lg p-2"><span className="flex h-8 w-8 items-center justify-center rounded-full bg-sauti-teal text-xs text-white">{initials(shownName)}</span><span className="flex-1">{shownName} (you){isHost ? " · Host" : ""}</span>{!micOn && <MicOff className="h-4 w-4 text-[#5f6368]" />}{!camOn && <VideoOff className="h-4 w-4 text-[#5f6368]" />}</li>
+										<li className="flex items-center gap-3 rounded-lg p-2"><span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#068297] text-xs text-white"><Sparkles className="h-4 w-4" /></span><span className="min-w-0 flex-1"><span className="block truncate">Salama</span><span className="block text-xs text-[#5f6368]">AI team member · say “Salama, …” or type it in Messages</span></span></li>
 										{remotes.map((r) => (
 											<li key={r.id} className="group flex items-center gap-3 rounded-lg p-2 hover:bg-[#f8f9fa]">
 												<span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#5f6368] text-xs text-white">{initials(r.name)}</span>
