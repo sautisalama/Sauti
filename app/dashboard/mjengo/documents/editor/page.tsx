@@ -22,7 +22,7 @@ import { DocDetails } from "./_DocDetails";
 import { watchedVersionStore } from "@/lib/client/watched-version-store";
 import { ShareDialog } from "../../_components/ShareDialog";
 import { useTeam } from "../../_components/People";
-import { finishReplace, getFileUrl, prepareReplace, prepareUpload, registerUpload, type FileMeta } from "../../vault/api";
+import { finishReplace, getFileUrl, prepareReplace, prepareUpload, registerUpload, notifyDocComment, type FileMeta } from "../../vault/api";
 
 /** Writing help runs on our server so the organisation key never reaches the browser. */
 const ai: AiOptions = {
@@ -341,9 +341,22 @@ function EditorScreen() {
 						collaboration={collab?.collaboration ?? null}
 						permission={level === "edit" ? "edit" : "view"}
 							// One comments system, owned by us: the editor's own pane never opens and a comment exists only once it has text.
-							comments={{ people: mentionable, exclusive: true }}
+							comments={{
+								people: mentionable,
+								exclusive: true,
+								// A mention or an assignment is a task for that person: they are told, and it opens this document.
+								onMention: ({ comment, people, assignee }) => {
+									if (!fileId) return;
+									const assigned = assignee?.id;
+									const mentioned = people.map((x) => x.id).filter((x) => x !== assigned);
+									if (assigned) void notifyDocComment(fileId, [assigned], comment.text, "assigned").catch(() => undefined);
+									if (mentioned.length) void notifyDocComment(fileId, mentioned, comment.text, "mention").catch(() => undefined);
+								},
+							}}
 							presence
 							topBar={topBar}
+							// Comments already has a button in the top bar and the ribbon, so the bottom-right row does not repeat it.
+							ui={{ workspace: { comments: false } }}
 							fileMenu={fileMenu}
 							icons={ICONS}
 							onShare={() => setShareOpen(true)}

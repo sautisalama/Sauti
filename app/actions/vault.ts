@@ -343,6 +343,24 @@ async function fileMeta_(id: string): Promise<FileMeta> {
   };
 }
 
+/** Someone was @mentioned in, or given, a comment on a document: tell them, but only people who can open it. */
+async function notifyDocComment_(fileId: string, userIds: string[], text: string, kind: 'mention' | 'assigned'): Promise<number> {
+  const c = await ctx();
+  need(c, 'file', fileId, 'view', 'comment on it');
+  const meta = await fileMeta_(fileId);
+  const allowed = new Set([meta.owner.id, ...meta.people.map((p) => p.id)]);
+  const targets = [...new Set(userIds)].filter((u) => u !== c.actor.id && allowed.has(u));
+  if (!targets.length) return 0;
+  const { sendNotification } = await import('@/lib/notifications');
+  const snippet = text.replace(/\s+/g, ' ').trim().slice(0, 140);
+  await Promise.all(targets.map((userId) => sendNotification({
+    userId, type: 'system_alert',
+    title: kind === 'assigned' ? `A comment on “${meta.name}” is yours to follow up` : `You were mentioned in “${meta.name}”`,
+    message: snippet, link: `/dashboard/mjengo/documents/editor?file=${fileId}`, sendEmail: false,
+  }).catch(() => undefined)));
+  return targets.length;
+}
+
 /** Labels and meeting need edit rights; the link setting needs share rights. */
 async function setFileMeta_(id: string, patch: { tags?: string[]; meetingCode?: string | null; linkAccess?: 'off' | 'view' | 'edit' }) {
   const c = await ctx('write');
@@ -484,6 +502,7 @@ export const setPermission = guard(setPermission_);
 export const setGeneralAccess = guard(setGeneralAccess_);
 export const listPeople = guard(listPeople_);
 export const fileMeta = guard(fileMeta_);
+export const notifyDocComment = guard(notifyDocComment_);
 export const setFileMeta = guard(setFileMeta_);
 export const inviteByLink = guard(inviteByLink_);
 export const recentFiles = guard(recentFiles_);

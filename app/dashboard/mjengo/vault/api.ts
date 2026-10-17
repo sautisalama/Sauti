@@ -23,3 +23,4 @@ export const fileMeta = (...a: Parameters<typeof raw.fileMeta>) => unwrap(raw.fi
 export const setFileMeta = (...a: Parameters<typeof raw.setFileMeta>) => unwrap(raw.setFileMeta(...a));
 export const inviteByLink = (...a: Parameters<typeof raw.inviteByLink>) => unwrap(raw.inviteByLink(...a));
 export const recentFiles = (...a: Parameters<typeof raw.recentFiles>) => unwrap(raw.recentFiles(...a));
+export const notifyDocComment = (...a: Parameters<typeof raw.notifyDocComment>) => unwrap(raw.notifyDocComment(...a));
