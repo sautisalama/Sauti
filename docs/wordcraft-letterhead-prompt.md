@@ -408,3 +408,157 @@ Add `comments: { exclusive: true }` (or `nativePane: false`). When set:
 - The selection toolbar's comment button, the ribbon buttons, the context menu and `Ctrl+Alt+M` all open the
   drawer with its composer on the current selection, and no comment exists until it is submitted with text.
 - Commands issued by the drawer itself are not affected by `disabledCommands` for the comment ids.
+
+---
+
+# Part 7 (package level): comments you can fully own, and a switch for every built-in surface
+
+Context: the host app (Sauti) replaces several built-in surfaces with its own (a comments drawer, its own top bar,
+its own sharing and presence). Today it can only do that with CSS hacks and `disabledCommands`, which is blunt. Make
+every built-in surface switchable and make comments fully ownable. Everything below is opt-in; defaults unchanged.
+
+## 1. Comments: one surface, owned by the host (P0)
+
+Found with 0.3.5 (`comments` on, host drawer):
+
+- The selection toolbar's comment button and the ribbon's Comments / Show Comments buttons run `review.newComment`,
+  which creates an EMPTY comment and opens the engine's side pane. That competes with the host's drawer.
+- `disabledCommands: ['view.commentsPane','review.comments']` stops the pane but `review.newComment` can't be
+  disabled, because the drawer itself uses it, so the host's drawer composer and the native flow share one command.
+- Highlight-and-comment left an empty comment behind when the person cancelled.
+
+Add `comments: { exclusive: true }` (alias `nativePane: false`). When set:
+
+1. The engine's pane never opens, whatever command runs (`review.newComment`, `review.comments`,
+   `view.commentsPane`, `Ctrl+Alt+M`, context menu, mobile palette).
+2. Every entry point (selection toolbar, ribbon, context menu, shortcut, mobile) calls
+   `comments.onRequestCompose({ range, quote })` (new callback) or, if absent, opens the package's own drawer with
+   its composer on the selection. **No comment exists until it is submitted with text.** Cancel leaves no trace.
+3. Commands issued by the package's own drawer or by the host through the API are never blocked by
+   `disabledCommands`. Add a host API that does not go through command ids:
+   `editor.comments.create({ range, text, parentId? })`, `.reply`, `.edit`, `.delete`, `.resolve`, `.reopen`,
+   `.list()`, `.focus(id)`, `.onChange(cb)`.
+4. Anchors and highlights stay owned by the package (they follow edits, undo and redo, copy and paste). Hosts only
+   render the list.
+5. Edit and Delete of a comment are icon buttons under the comment text (one pattern), only for the author or a
+   host-granted admin (`permission`).
+6. The drawer fits any width (no sideways scroll), is a standalone export (`<CommentsDrawer/>`) a host can mount
+   anywhere, and accepts `people`, `currentUser`, `canResolve`, `emptyState`.
+7. Keep `wccm-launch` and the other class names stable.
+
+## 2. A switch for every built-in surface (P0)
+
+Add one typed prop, `ui?: WordcraftUi`, where each key is `boolean` (default true). `false` removes the surface from
+the DOM and from keyboard shortcuts, and frees its space (no empty gap):
+
+```ts
+interface WordcraftUi {
+  titleBar?: boolean;        // the top bar: file name, save state, user, undo/redo quick-access (exists today as titleBar: confirm it hides everything, incl. the quick-access toolbar and the window-control area)
+  ribbon?: boolean | RibbonDisplay;  // exists today; accept `false` as "no ribbon and no tab row"
+  statusBar?: boolean;       // page n of m, word count, zoom
+  selectionToolbar?: boolean; // the mini toolbar over a selection (also a way to keep only its comment button off)
+  contextMenu?: boolean | string[]; // or a list of item ids to keep
+  rulers?: boolean;
+  navigationPane?: boolean;
+  workspaceRow?: boolean | { ask?: boolean; comments?: boolean; checks?: boolean; tools?: boolean; voice?: boolean };
+  presence?: boolean;        // avatars
+  shareButton?: boolean;
+  zoomControl?: boolean;
+  pageViewSwitcher?: boolean;
+  fileMenu?: boolean | string[]; // backstage items to keep: 'save','print','export','history'
+  mobilePalette?: boolean;
+}
+```
+
+Requirements:
+- Hiding a surface never breaks the rest (layout reflows, page area uses the freed height, no console errors).
+- Live: toggling props at runtime updates without remounting or losing the document, selection or collaboration.
+- A hidden surface's commands are also refused (same as `disabledCommands`) unless the host calls them through the API.
+- `titleBar: false` + `ribbon: false` + `statusBar: false` gives a clean "paper only" editor that the host wraps
+  with its own header and toolbar. Provide a headless `editor` API (`exec(commandId)`, `canExec`, `getState` for
+  bold/italic/heading/alignment/list, `onSelectionChange`) so the host can build its own toolbar.
+- Also export the default `icons` (see Part 5) and accept `icons` overrides.
+
+## 3. Acceptance
+
+- Host with `comments: { exclusive: true }`, `ui: { titleBar:false, ribbon:false, statusBar:false, selectionToolbar:false }`:
+  no native comments pane opens from any entry point in 10 consecutive runs; the host drawer composer opens on the
+  selection; cancelling leaves no empty comment; submitting creates exactly one; reply, edit, resolve and delete work
+  through the API; no DOM from a hidden surface remains.
+- Default props render exactly as today (snapshot test).
+- Changelog entry per switch; types exported; README section "Owning the UI".
+
+## 4. Part 7 addendum: a customisable top bar (title bar) and granular File options (P0)
+
+The top bar (the title bar that holds the quick-access buttons such as undo and redo) must be a host-configurable
+layout with three zones, not a fixed block. Today the host can only hide it.
+
+```ts
+interface TopBarConfig {
+  left?: TopBarItem[];    // default: ['quickAccess']
+  center?: TopBarItem[];  // default: ['title', 'saveState']
+  right?: TopBarItem[];   // default: ['presence', 'share', 'user']
+}
+type TopBarItem =
+  | 'back' | 'quickAccess' | 'title' | 'saveState' | 'presence' | 'share' | 'user' | 'comments' | 'history'
+  | { id: string; render: () => ReactNode }                               // any host component
+  | { id: string; icon: ReactNode; label: string; onClick: () => void; disabled?: boolean };  // simple button
+```
+Pass as `topBar?: TopBarConfig`. Order in the arrays is the order on screen. Omitted zone = default; `[]` = empty.
+
+### Back button
+- `back` renders an icon button at the far left of the top bar, with the host's `onBack()` (new prop
+  `topBar.back: { onClick, label?: string, href?: string, icon?: ReactNode, confirmIfUnsaved?: boolean }`).
+- Keyboard accessible, with an `aria-label` ("Back to documents" by default, host can change it), and hidden if no
+  handler or href is given.
+
+### Collaborators and the user area, top right
+- `presence`: the avatars of people currently in the document, in the top right beside the share button and the user
+  icon. Each avatar has the person's name, colour (matching their cursor) and a tooltip; click follows that person
+  (scroll to their cursor). Overflow collapses to "+N" with a popover list. The current user is excluded unless
+  `presence.includeSelf`. Props: `presence: { max?: number, size?: 'sm'|'md', follow?: boolean, onAvatarClick?(user) }`.
+  Anonymous guests show as "Guest" with a generated colour.
+- `share`: a button, with host callbacks (`share.onClick`) or a built-in popover (`share.render`). Label, icon and
+  style are customisable; can be hidden (`false`) or disabled with a reason tooltip (`share.disabled: 'Only the owner can share'`).
+- `user`: the signed-in user's avatar and menu (`user: { name, email, avatarUrl, menu?: MenuItem[] }`). `menu` items are
+  host-defined (profile, sign out, switch account). Hidden if absent.
+- On narrow widths the zones collapse in a fixed priority (centre title shortens first, then presence to "+N", then
+  share to an icon only) and never wrap or overflow.
+
+### Quick access (undo / redo and friends)
+- `topBar.quickAccess: ('undo'|'redo'|'save'|'print'|'find'|'spelling'|string)[]` chooses and orders the buttons; host
+  buttons can be mixed in with the item form above. Separators via `'|'`.
+
+### File options, granular
+`ui.fileMenu` (Part 7 section 2) becomes a full descriptor so every item is controllable one by one:
+
+```ts
+fileMenu?: boolean | {
+  items?: Record<FileItemId, boolean | { label?: string; disabled?: boolean | string; hidden?: boolean; onClick?(): void }>;
+  order?: FileItemId[];           // order of items
+  extra?: FileMenuExtraItem[];    // host items (e.g. 'Move to folder', 'Make a copy')
+  sections?: { id: string; title?: string; items: FileItemId[] }[];  // grouping and dividers
+};
+type FileItemId =
+  | 'new' | 'open' | 'save' | 'saveAs' | 'rename' | 'makeCopy' | 'share' | 'print' | 'export'
+  | 'exportDocx' | 'exportPdf' | 'exportOdt' | 'exportTxt' | 'exportHtml' | 'exportMd'
+  | 'versionHistory' | 'info' | 'properties' | 'protect' | 'close' | 'options' | 'language' | 'pageSetup';
+```
+- `share` is a File item too: shown or hidden, renamed, disabled with a reason, or replaced with a host action, same
+  object form. Share can be on in the top bar but off in File, or the reverse.
+- Each export format is its own id, so a host can allow PDF and refuse Word.
+- A hidden or disabled item is also refused by its command and its shortcut (for example, hiding `print` disables
+  `Ctrl+P`), unless the host calls it through the API.
+- `disabled` can be a string, which is shown as the reason in a tooltip.
+- Permissions integration (Part 2): at view and comment levels, `save`, `rename`, `saveAs` etc. are hidden or disabled
+  by default but the host can override each one explicitly.
+- All the above change live and take a plain `permission`-derived function form too:
+  `topBar` and `fileMenu` may be `(ctx: { permission, user, collaborators }) => config`.
+
+### Acceptance (addendum)
+- A host sets `topBar = { left: ['back','quickAccess'], center: ['title','saveState'], right: ['presence','share','user'] }`
+  and sees: back button at far left, undo/redo next to it, avatars of two live collaborators then Share then the
+  user icon at top right; clicking an avatar follows that person; at 360px width nothing overflows.
+- A host hides `exportDocx`, disables `share` with a reason, adds one extra item "Move to folder": the File menu shows
+  exactly that, `Ctrl+P` still works when `print` is on and does nothing when it is off.
+- Defaults (no `topBar`, no `fileMenu`) render as today.

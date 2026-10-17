@@ -1,8 +1,8 @@
 "use client";
 
-import { Suspense, useEffect, useMemo, useRef, useState, useCallback } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState, useCallback, type ReactNode } from "react";
 import { useSearchParams } from "next/navigation";
-import { WordcraftEditor, type PresenceUser, type SavedFile, type WordcraftEditorRef } from "@gamine/wordcraft-react";
+import { WordcraftEditor, type FileMenuOptions, type IconsOptions, type SavedFile, type TopBarOptions, type WordcraftEditorRef } from "@gamine/wordcraft-react";
 import { directVersionStore } from "@/lib/client/direct-version-store";
 import { saveDesignSystem } from "@/app/actions/mjengo-ai";
 import * as Y from "yjs";
@@ -18,12 +18,11 @@ import { SupabaseYProvider } from "@/lib/client/supabase-yjs";
 import { listTemplates } from "@/app/actions/mjengo-templates";
 import { useToast } from "@/hooks/use-toast";
 import { putToSignedUrl } from "@/lib/client/upload";
-import { ArrowLeft } from "lucide-react";
-import { DocBar } from "./_DocBar";
+import { DocDetails } from "./_DocDetails";
 import { watchedVersionStore } from "@/lib/client/watched-version-store";
 import { ShareDialog } from "../../_components/ShareDialog";
 import { useTeam } from "../../_components/People";
-import { finishReplace, getFileUrl, prepareReplace, prepareUpload, registerUpload } from "../../vault/api";
+import { finishReplace, getFileUrl, prepareReplace, prepareUpload, registerUpload, type FileMeta } from "../../vault/api";
 
 /** Writing help runs on our server so the organisation key never reaches the browser. */
 const ai: AiOptions = {
@@ -54,43 +53,13 @@ const ai: AiOptions = {
 		})(),
 };
 
-const svg = (paths: string, w = 1.8) => `url("data:image/svg+xml,${encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='${w}' stroke-linecap='round' stroke-linejoin='round'>${paths}</svg>`)}")`;
-const ASK_ICON = svg("<path d='M4 5h16v11H11l-5 4v-4H4Z'/>");
-const EDIT_ICON = svg("<path d='M12 20h9'/><path d='M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z'/>");
-const DELETE_ICON = svg("<path d='M3 6h18'/><path d='M8 6V4h8v2'/><path d='M19 6l-1 14H6L5 6'/><path d='M10 11v6M14 11v6'/>");
-const COMMENTS_ICON = svg("<path d='M7.9 20A9 9 0 1 0 4 16.1L2 22Z'/><path d='M8 12h.01M12 12h.01M16 12h.01' stroke-width='2.6'/>");
-/** The package draws a sparkle on Ask and a square bubble on Comments; both are redrawn here. */
-const ICON_CSS = `
-/* Hidden without display:none: that svg holds the sparkle gradient the Help me write launcher also uses. */
-[data-wordcraft-root] .wcwb-ask > svg { position: absolute; width: 0; height: 0; opacity: 0; pointer-events: none; }
-[data-wordcraft-root] .wcwb-ask::before { content: ""; display: inline-block; width: 16px; height: 16px; flex: none; background: currentColor; -webkit-mask: ${ASK_ICON} center / contain no-repeat; mask: ${ASK_ICON} center / contain no-repeat; }
-[data-wordcraft-root] .wccm-launch[aria-label^="Comments"] > svg { position: absolute; width: 0; height: 0; opacity: 0; pointer-events: none; }
-/* A comment card: who and when on top, the text, and the Edit and Delete icons underneath the text. */
-[data-wordcraft-root] .wccm-head, [data-wordcraft-root] .wccm-reply { display: flex; flex-wrap: wrap; align-items: center; }
-[data-wordcraft-root] .wccm-who { display: contents; }
-[data-wordcraft-root] .wccm-who > :not(.wccm-more) { order: 1; }
-[data-wordcraft-root] .wccm-meta { flex: 1 1 0; }
-[data-wordcraft-root] .wccm-text, [data-wordcraft-root] .wccm-edit { order: 2; flex: 1 1 100%; }
-[data-wordcraft-root] .wccm-more { order: 3; flex: 1 1 100%; margin-top: 4px; }
-@supports selector(::details-content) {
-  [data-wordcraft-root] .wccm-more > summary { display: none; }
-  [data-wordcraft-root] .wccm-more::details-content { content-visibility: visible; display: block; }
-}
-[data-wordcraft-root] .wccm-more > div { position: static; display: flex; gap: 2px; min-width: 0; padding: 0; background: none; border: 0; box-shadow: none; }
-[data-wordcraft-root] .wccm-more > div button { width: 30px; height: 30px; min-width: 30px; padding: 0; border-radius: 50%; font-size: 0; line-height: 0; display: grid; place-items: center; text-align: center; color: var(--dim); }
-[data-wordcraft-root] .wccm-more > div button::before { content: ""; width: 16px; height: 16px; background: currentColor; }
-[data-wordcraft-root] .wccm-more > div button:first-child::before { -webkit-mask: ${EDIT_ICON} center / contain no-repeat; mask: ${EDIT_ICON} center / contain no-repeat; }
-[data-wordcraft-root] .wccm-more > div button:last-child::before { -webkit-mask: ${DELETE_ICON} center / contain no-repeat; mask: ${DELETE_ICON} center / contain no-repeat; }
-[data-wordcraft-root] .wccm-more > div button:last-child:hover { color: #d93025; }
-/* The comments drawer: everything wraps inside its width, so no sideways scrolling and every action is visible. */
-[data-wordcraft-root] .wccm { overflow-x: hidden; }
-[data-wordcraft-root] .wccm-list { overflow-x: hidden; min-width: 0; }
-[data-wordcraft-root] .wccm-list *, [data-wordcraft-root] .wccm-top * { min-width: 0; max-width: 100%; overflow-wrap: anywhere; word-break: break-word; }
-[data-wordcraft-root] .wccm-list p, [data-wordcraft-root] .wccm-list span, [data-wordcraft-root] .wccm-list blockquote, [data-wordcraft-root] .wccm-list div { white-space: normal; text-overflow: clip; }
-[data-wordcraft-root] .wccm-list textarea, [data-wordcraft-root] .wccm-list input { width: 100%; box-sizing: border-box; }
-[data-wordcraft-root] .wccm-list [class*="actions"], [data-wordcraft-root] .wccm-list [class*="row"], [data-wordcraft-root] .wccm-list [class*="foot"] { flex-wrap: wrap; }
-[data-wordcraft-root] .wccm-launch[aria-label^="Comments"]::before { content: ""; display: inline-block; width: 18px; height: 18px; flex: none; background: currentColor; -webkit-mask: ${COMMENTS_ICON} center / contain no-repeat; mask: ${COMMENTS_ICON} center / contain no-repeat; }
-`;
+
+/** Our own icons for the workspace row: Ask is a chat bubble, Comments a round bubble with dots, so the two are not mistaken for each other. */
+const icon = (paths: ReactNode) => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>{paths}</svg>;
+const ICONS: IconsOptions = {
+	ask: icon(<path d="M4 5h16v11H11l-5 4v-4H4Z" />),
+	comments: icon(<><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z" /><path d="M8 12h.01M12 12h.01M16 12h.01" strokeWidth="2.6" /></>),
+};
 
 const COLORS = ["#0f766e", "#c2410c", "#7c3aed", "#0369a1", "#be123c", "#4d7c0f", "#a16207", "#0e7490"];
 const colorFor = (s: string) => COLORS[[...s].reduce((a, c) => a + c.charCodeAt(0), 0) % COLORS.length];
@@ -177,6 +146,8 @@ function EditorScreen() {
 	}, [toast]);
 	const aiOptions = useMemo<AiOptions>(() => ({ ...ai, ...(brand ?? {}), palettes: [...(brand?.palettes ?? []), ...designPalettes], onPaletteCreated: keepPalette }), [brand, designPalettes, keepPalette]);
 	const [metaKey, setMetaKey] = useState(0);
+	const [detailsOpen, setDetailsOpen] = useState(false);
+	const [meta, setMeta] = useState<FileMeta | null>(null);
 	const [fileId, setFileId] = useState<string | null>(initialFile);
 	const [name, setName] = useState("Untitled document.docx");
 	const [folderId, setFolderId] = useState<string | null>(folderParam);
@@ -245,25 +216,6 @@ function EditorScreen() {
 	}, [initialFile]);
 
 	const me = useUser();
-	// The comments drawer. The buttons that come with the editor (the selection toolbar, the ribbon) create an
-	// empty comment first and ask for its text later, which ended up as an empty comment. Such a comment is
-	// taken back at once and the drawer opens with its composer on the same selection instead.
-	const [commentsOpen, setCommentsOpen] = useState(false);
-	const startComposer = useCallback((c: { id: number; text: string; parent: number | null }) => {
-		if (c.text.trim() || c.parent !== null) return;
-		ref.current?.execute("review.deleteComment", { id: c.id });
-		setCommentsOpen(true);
-		let tries = 0;
-		const press = () => {
-			const root = document.querySelector("[data-wordcraft-root] .wccm");
-			// The "+ Comment" button toggles the composer, so it is only pressed when the composer is not open yet.
-			if (root?.querySelector("textarea")) return;
-			const btn = root?.querySelector<HTMLButtonElement>(".wccm-top .wccm-primary");
-			if (btn) btn.click();
-			else if (tries++ < 25) setTimeout(press, 120);
-		};
-		setTimeout(press, 150);
-	}, []);
 	const team = useTeam();
 	// The people who can be @mentioned or given a comment to follow up.
 	const mentionable = useMemo(() => team.map((t) => ({ id: t.id, name: t.name, email: t.email ?? undefined, avatarUrl: t.avatar ?? undefined })), [team]);
@@ -273,15 +225,12 @@ function EditorScreen() {
 		return { name, id: me?.id ?? undefined, color: colorFor(me?.id ?? name) };
 	}, [me?.id, me?.email, me?.profile]);
 
-	// Everyone in the document right now, for the header (named people and anonymous guests alike).
-	const [live, setLive] = useState<PresenceUser[]>([]);
-
 	// Co-editing: everyone who opens this file with edit rights joins the same live document.
 	const collab = useMemo(() => {
 		if (!initialFile || loading || !me?.id) return null;
 		const ydoc = new Y.Doc();
 		const provider = new SupabaseYProvider(ydoc, createClient(), `mjengo-doc:${initialFile}`, `${me.id}:${Math.random().toString(36).slice(2, 8)}`);
-		return { provider, collaboration: yjsCollaboration({ doc: ydoc, provider, user: person, onPresenceChange: setLive }) };
+		return { provider, collaboration: yjsCollaboration({ doc: ydoc, provider, user: person }) };
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [initialFile, loading, me?.id]);
 	useEffect(() => () => collab?.provider.destroy(), [collab]);
@@ -333,19 +282,49 @@ function EditorScreen() {
 		return run;
 	};
 
+	const canShare = level !== "view";
+	const copyLink = useCallback(() => {
+		if (!fileId) return;
+		const link = `${window.location.origin}/dashboard/mjengo/documents/editor?file=${fileId}`;
+		navigator.clipboard.writeText(link).then(() => toast({ title: "Link copied", description: "People with access who open it edit this same document, live." })).catch(() => undefined);
+	}, [fileId, toast]);
+
+	// The editor's own top bar: back and quick access on the left, the title and save state in the middle, and on the
+	// right everyone who is in the document now (in their cursor colours, click to follow), comments, Share and you.
+	const topBar = useMemo<TopBarOptions>(() => ({
+		left: [{ type: "back", label: "Back", confirmUnsaved: true, onClick: () => window.history.back() }, { type: "quickAccess", items: ["undo", "redo", "save"] }],
+		center: ["title", "saveState"],
+		right: [
+			meta?.meetingCode ? { type: "button", id: "meeting", label: "Meeting", onClick: () => window.open(`/meet/${meta.meetingCode}`, "_blank", "noopener") } : null,
+			"presence",
+			"comments",
+			{ type: "share", hidden: !canShare, disabled: fileId ? false : "Save the document first" },
+			"user",
+		],
+	}), [meta?.meetingCode, canShare, fileId]);
+
+	// The File menu keeps what a document in the vault needs and drops what it does not (New, Open, Recover).
+	const fileMenu = useMemo<FileMenuOptions>(() => [
+		{ id: "info" },
+		{ id: "save", disabled: level === "edit" ? false : "You can only view this document" },
+		{ id: "saveAs" },
+		{ id: "share", hidden: !canShare },
+		{ id: "export" },
+		{ id: "print" },
+		...(fileId ? [
+			{ id: "copyLink", label: "Copy link", section: "This document", onSelect: copyLink },
+			{ id: "labels", label: "Labels and meeting", section: "This document", onSelect: () => setDetailsOpen(true) },
+			{ id: "history", label: "Version history", section: "This document", onSelect: () => setVersionsOpen(true) },
+			...(meta?.meetingCode ? [{ id: "meeting", label: "Open the meeting", section: "This document", onSelect: () => { window.open(`/meet/${meta.meetingCode}`, "_blank", "noopener"); } }] : []),
+		] : []),
+	], [level, canShare, fileId, meta?.meetingCode, copyLink]);
+
 	return (
 		<div className="flex h-full min-h-0 flex-col bg-white">
 			{loading || !brand ? (
 				<MjengoLoader label="Opening your document" className="h-full min-h-0" />
 			) : (
 				<>
-				<div className="flex h-11 shrink-0 items-center justify-between border-b border-black/10 bg-white px-2 sm:hidden">
-					<button onClick={() => window.history.back()} className="flex h-9 items-center gap-1 rounded-full px-2 text-sm font-medium text-[#37352f]" aria-label="Back">
-						<ArrowLeft className="h-4 w-4" /> Back
-					</button>
-					{fileId && level !== "view" && <button onClick={() => setShareOpen(true)} className="flex h-9 items-center gap-1.5 rounded-full bg-sauti-teal px-3.5 text-sm font-semibold text-white">Share</button>}
-				</div>
-									{fileId && <DocBar live={live} fileId={fileId} name={name} canShare={level !== "view"} refreshKey={metaKey} onShare={() => setShareOpen(true)} onHistory={() => setVersionsOpen(true)} />}
 					<div className="relative min-h-0 flex-1 overflow-hidden">
 						<WordcraftEditor
 						ref={ref}
@@ -361,12 +340,14 @@ function EditorScreen() {
 						ai={aiOptions}
 						collaboration={collab?.collaboration ?? null}
 						permission={level === "edit" ? "edit" : "view"}
-						// One comments system: the drawer. The editor's older comment pane is not opened.
-						disabledCommands={["view.commentsPane", "review.comments"]}
-						commentsOpen={commentsOpen}
-						onCommentsOpenChange={setCommentsOpen}
-						comments={{ people: mentionable, onCreate: startComposer }}
-						presence
+							// One comments system, owned by us: the editor's own pane never opens and a comment exists only once it has text.
+							comments={{ people: mentionable, exclusive: true }}
+							presence
+							topBar={topBar}
+							fileMenu={fileMenu}
+							icons={ICONS}
+							onShare={() => setShareOpen(true)}
+							mobileOptions={{ onBack: () => window.history.back(), onShare: () => setShareOpen(true) }}
 						checks
 						tools={{ outline: true, accessibility: true, sources: true, wordCount: true, voice: true, translate: true }}
 						onSave={onSave}
@@ -374,9 +355,7 @@ function EditorScreen() {
 						loading={<MjengoLoader label="Starting the editor" hint="The first time takes a moment while it downloads." className="h-full min-h-0" />}
 						fallback={(e) => <div className="p-6 text-sm text-red-700">The editor could not start: {e.message}. It needs a current browser with WebGL2 or WebGPU.</div>}
 					/>
-					{/* One chat entry: "Ask" (with the chat bubble) answers from the document. The older floating Chat is gone,
-					    and Comments takes a round bubble with dots so the two are not mistaken for each other. */}
-					<style>{ICON_CSS}</style>
+					{fileId && <DocDetails fileId={fileId} refreshKey={metaKey} open={detailsOpen} onOpenChange={setDetailsOpen} onMeta={setMeta} />}
 					<ShareDialog item={shareOpen && fileId ? ({ type: "file", id: fileId, name } as never) : null} onClose={() => { setShareOpen(false); setMetaKey((k) => k + 1); }} />
 				</div>
 				</>

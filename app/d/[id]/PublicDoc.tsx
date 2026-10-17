@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { WordcraftEditor, PresenceAvatars, type PresenceUser, type SavedFile, type WordcraftEditorRef } from "@gamine/wordcraft-react";
+import { WordcraftEditor, type SavedFile, type TopBarOptions, type WordcraftEditorRef } from "@gamine/wordcraft-react";
 import { yjsCollaboration } from "@gamine/wordcraft-react/collab";
 import * as Y from "yjs";
 import { Loader2, ShieldCheck } from "lucide-react";
@@ -20,10 +20,8 @@ export function PublicDoc({ id, name, access, signedInName, signedInId }: { id: 
 	const [ready, setReady] = useState(!!signedInName);
 	const [doc, setDoc] = useState<{ name: string; data: ArrayBuffer } | null>(null);
 	const [error, setError] = useState("");
-	const [status, setStatus] = useState<"" | "saving" | "saved">("");
 	const [historyProblem, setHistoryProblem] = useState(false);
 	const queue = useRef<Promise<unknown>>(Promise.resolve());
-	const [live, setLive] = useState<PresenceUser[]>([]);
 	const guestId = useRef(`guest-${Math.random().toString(36).slice(2, 8)}`);
 
 	useEffect(() => {
@@ -57,21 +55,31 @@ export function PublicDoc({ id, name, access, signedInName, signedInId }: { id: 
 		if (!doc) return null;
 		const ydoc = new Y.Doc();
 		const provider = new SupabaseYProvider(ydoc, createClient(), `mjengo-doc:${id}`, `${person.id}:${Math.random().toString(36).slice(2, 8)}`);
-		return { provider, collaboration: yjsCollaboration({ doc: ydoc, provider, user: person, onPresenceChange: setLive }) };
+		return { provider, collaboration: yjsCollaboration({ doc: ydoc, provider, user: person }) };
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [doc, id]);
 	useEffect(() => () => collab?.provider.destroy(), [collab]);
 
 	const onSave = (file: SavedFile) => {
 		const run = queue.current.catch(() => undefined).then(async () => {
-			setStatus("saving");
 			const r = await fetch(`/api/public-docs/${id}/save`, { method: "PUT", body: file.bytes as BlobPart });
-			if (!r.ok) { setStatus(""); throw new Error(await r.text()); }
-			setStatus("saved");
+			if (!r.ok) throw new Error(await r.text());
 		});
 		queue.current = run;
 		return run;
 	};
+
+	// The editor's own top bar: the brand, the title and save state, everyone in the document now, and you.
+	const topBar = useMemo<TopBarOptions>(() => ({
+		left: [{ type: "custom", id: "brand", render: () => <span className="whitespace-nowrap px-2 text-sm font-semibold text-sauti-teal">Sauti Salama</span> }, access === "edit" ? "quickAccess" : null],
+		center: [{ type: "title", text: name }, "saveState"],
+		right: [
+			historyProblem ? { type: "custom", id: "history-problem", render: () => <span className="rounded-full bg-amber-50 px-2 py-0.5 text-xs text-amber-800">History is not being kept right now</span> } : null,
+			"presence",
+			"comments",
+			{ type: "user", user: { name: person.name || "Anonymous" } },
+		],
+	}), [name, access, historyProblem, person.name]);
 
 	if (!ready) {
 		return (
@@ -92,14 +100,6 @@ export function PublicDoc({ id, name, access, signedInName, signedInId }: { id: 
 
 	return (
 		<div className="flex h-dvh flex-col bg-white">
-			<div className="flex h-11 shrink-0 items-center gap-3 border-b border-black/10 px-3 text-sm">
-				<span className="font-semibold text-sauti-teal">Sauti Salama</span>
-				<span className="min-w-0 truncate text-serene-neutral-700">{name}</span>
-				<span className="flex-1" />
-				{live.length > 0 && <PresenceAvatars users={live} max={5} size={26} />}
-				{historyProblem && <span className="rounded-full bg-amber-50 px-2 py-0.5 text-xs text-amber-800">History is not being kept right now</span>}
-				<span className="text-xs text-serene-neutral-500">{access === "edit" ? (status === "saving" ? "Saving…" : status === "saved" ? "All changes saved" : "Editing") : "View only"} · {person.name || "Anonymous"}</span>
-			</div>
 			<div className="relative min-h-0 flex-1">
 				{error ? (
 					<p className="p-6 text-sm text-red-700">{error}</p>
@@ -113,8 +113,9 @@ export function PublicDoc({ id, name, access, signedInName, signedInId }: { id: 
 						guardUnload={access === "edit"}
 						autoSave={access === "edit"}
 						permission={access === "edit" ? "edit" : "view"}
-						comments
+						comments={{ exclusive: true }}
 						presence
+						topBar={topBar}
 						user={person}
 						versionHistory={{ store: watchedVersionStore(directVersionStore(`/api/public-docs/${id}/versions`), () => setHistoryProblem(true)), documentId: id, interval: 120_000 }}
 						collaboration={collab?.collaboration ?? null}
