@@ -1,6 +1,7 @@
 import { looseAdmin } from '@/lib/loose-db';
 import { sendNotification } from '@/lib/notifications';
 import { askAi } from '@/lib/mjengo/ai';
+import { commitmentsToTodos } from '@/lib/mjengo/commitments';
 
 interface Line { id: string; name: string; text: string; at: string }
 
@@ -36,6 +37,7 @@ export async function shareMeetingNotes(): Promise<{ done: number }> {
     try {
       const notes = await notesFor(m.title, lines);
       await db.from('mjengo_meetings').update({ notes, notes_shared_at: new Date().toISOString(), ended_at: new Date().toISOString() }).eq('id', m.id);
+      await commitmentsToTodos(m, lines).catch(() => undefined);
       const people = [...new Set([...(m.participants ?? []), ...(m.created_by ? [m.created_by] : [])])];
       await Promise.all(people.map((userId) => sendNotification({
         userId, type: 'system_alert', title: 'Call notes are ready', message: `${m.title || 'Your call'}: summary, decisions and actions.`,

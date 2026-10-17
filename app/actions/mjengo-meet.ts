@@ -86,12 +86,14 @@ async function makeNotes_(code: string): Promise<string> {
   const { notesFor } = await import('@/lib/mjengo/meeting-jobs');
   const { sendNotification } = await import('@/lib/notifications');
   const db = looseAdmin();
-  const { data } = await db.from('mjengo_meetings').select('id, title, transcript, participants, created_by').eq('code', code).maybeSingle();
+  const { data } = await db.from('mjengo_meetings').select('id, code, title, transcript, participants, created_by').eq('code', code).maybeSingle();
   if (!data) throw new Error('That call does not exist.');
   const lines = (data.transcript ?? []) as TranscriptLine[];
   if (lines.length < 3) throw new Error('There is not enough in the transcript yet.');
   const notes = await notesFor(data.title, lines);
   await db.from('mjengo_meetings').update({ notes, notes_shared_at: new Date().toISOString() }).eq('id', data.id);
+  const { commitmentsToTodos } = await import('@/lib/mjengo/commitments');
+  await commitmentsToTodos({ code: data.code as string, title: data.title as string | null, participants: (data.participants ?? []) as string[], created_by: (data.created_by as string | null) ?? null }, lines).catch(() => undefined);
   const people = [...new Set([...((data.participants ?? []) as string[]), ...(data.created_by ? [data.created_by as string] : [])])].filter((id) => id !== a.id);
   await Promise.all(people.map((userId) => sendNotification({ userId, type: 'system_alert', title: 'Call notes are ready', message: `${data.title || 'Your call'}: summary, decisions and actions.`, link: `/dashboard/mjengo/meetings?code=${code}`, sendEmail: false }).catch(() => undefined)));
   return notes;
