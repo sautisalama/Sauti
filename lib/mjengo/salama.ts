@@ -3,6 +3,7 @@ import { askAi } from '@/lib/mjengo/ai';
 import { extractText } from '@/lib/mjengo/files-text';
 import { atLeast, levelFor, loadIndex, oversightFor } from '@/lib/vault/access';
 import { may, permissionsFor, type ModuleKey } from '@/lib/access/permissions';
+import { ENTITY_HREF, ENTITY_KINDS, entitiesFor, entityText, type EntityKind, type EntityLite } from '@/lib/mjengo/entity-view';
 
 /**
  * Salama, the team's AI member. This is her one brain: she finds what the asker may see across calls, documents,
@@ -11,7 +12,7 @@ import { may, permissionsFor, type ModuleKey } from '@/lib/access/permissions';
  */
 export { SALAMA, addressedToSalama } from '@/lib/mjengo/salama-shared';
 
-export type SourceKind = 'call' | 'document' | 'todo' | 'event' | 'grant' | 'opportunity' | 'project' | 'now' | 'comment';
+export type SourceKind = 'call' | 'document' | 'todo' | 'event' | 'grant' | 'opportunity' | 'project' | 'fellowship' | 'now' | 'comment';
 export interface Source { n: number; kind: SourceKind; title: string; snippet: string; link: string | null }
 export interface Asker { id: string; email: string }
 
@@ -75,22 +76,37 @@ export async function gatherSources(asker: Asker, question: string, max = 8): Pr
     }));
   })());
 
-  const table = (key: ModuleKey, name: string, cols: string, searchCols: string[], kind: SourceKind, title: (r: Record<string, unknown>) => string, text: (r: Record<string, unknown>) => string, link: string) => {
-    if (!can(key)) return;
-    tasks.push((async () => {
-      const { data } = await db.from(name).select(cols).or(ilike(searchCols, terms)).limit(6);
-      for (const r of (data ?? []) as unknown as Record<string, unknown>[]) {
-        const t = text(r);
-        found.push({ kind, title: title(r), text: passage(t, terms), link, score: hits(`${title(r)} ${t}`, terms) });
-      }
-    })());
-  };
   const s = (v: unknown) => (v == null ? '' : String(v));
-  table('todos', 'mjengo_todos', 'title, notes, status, due_date', ['title', 'notes'], 'todo', (r) => s(r.title), (r) => `${s(r.title)}. Status ${s(r.status)}${r.due_date ? `, due ${s(r.due_date)}` : ''}. ${s(r.notes)}`, '/dashboard/mjengo/todos');
-  table('calendar', 'mjengo_events', 'title, description, location, starts_at', ['title', 'description', 'location'], 'event', (r) => `${s(r.title)} (${s(r.starts_at).slice(0, 10)})`, (r) => `${s(r.title)} on ${s(r.starts_at).slice(0, 16).replace('T', ' ')}${r.location ? ` at ${s(r.location)}` : ''}. ${s(r.description)}`, '/dashboard/mjengo/calendar');
-  table('grants', 'mjengo_grants', 'title, funder, status, amount, currency, deadline, description, notes', ['title', 'funder', 'description', 'notes'], 'grant', (r) => s(r.title), (r) => `${s(r.title)} from ${s(r.funder) || 'a funder'}. Status ${s(r.status)}${r.amount ? `, ${s(r.currency)} ${s(r.amount)}` : ''}${r.deadline ? `, deadline ${s(r.deadline)}` : ''}. ${s(r.description)} ${s(r.notes)}`, '/dashboard/mjengo/grants');
-  table('opportunities', 'mjengo_opportunities', 'title, organisation, kind, status, value, currency, deadline, description, notes', ['title', 'organisation', 'description', 'notes'], 'opportunity', (r) => s(r.title), (r) => `${s(r.title)} (${s(r.kind)}) with ${s(r.organisation) || 'an organisation'}. Status ${s(r.status)}${r.deadline ? `, deadline ${s(r.deadline)}` : ''}. ${s(r.description)} ${s(r.notes)}`, '/dashboard/mjengo/opportunities');
-  table('projects', 'mjengo_projects', 'name, status, progress, start_date, end_date, description, notes', ['name', 'description', 'notes'], 'project', (r) => s(r.name), (r) => `${s(r.name)}. Status ${s(r.status)}, ${s(r.progress)}% done${r.end_date ? `, ends ${s(r.end_date)}` : ''}. ${s(r.description)} ${s(r.notes)}`, '/dashboard/mjengo/projects');
+  const KIND_MODULE: Record<EntityKind, ModuleKey> = { grant: 'grants', opportunity: 'opportunities', project: 'projects', fellowship: 'fellowships' };
+  const kinds = ENTITY_KINDS.filter((k) => can(KIND_MODULE[k]));
+  // Grants, opportunities, projects and fellowships follow their own visibility: "only me" records and hidden details stay hidden.
+  const entities = kinds.length ? entitiesFor(asker, kinds).catch(() => [] as EntityLite[]) : Promise.resolve([] as EntityLite[]);
+  tasks.push((async () => {
+    for (const e of await entities) {
+      const text = entityText(e);
+      const sc = hits(`${e.title} ${text}`, terms);
+      if (sc) found.push({ kind: e.kind, title: e.title, text: passage(text, terms), link: ENTITY_HREF[e.kind], score: sc });
+    }
+  })());
+
+  if (can('todos')) tasks.push((async () => {
+    const { data } = await db.from('mjengo_todos').select('title, notes, status, due_date, entity_type, entity_id').or(ilike(['title', 'notes'], terms)).limit(12);
+    const seen = new Set((await entities).map((e) => `${e.kind}:${e.id}`));
+    for (const r of (data ?? []) as Record<string, unknown>[]) {
+      // A to-do on a record the asker cannot see is not shown either.
+      if (r.entity_type && !seen.has(`${s(r.entity_type)}:${s(r.entity_id)}`)) continue;
+      const t = `${s(r.title)}. Status ${s(r.status)}${r.due_date ? `, due ${s(r.due_date)}` : ''}. ${s(r.notes)}`;
+      found.push({ kind: 'todo', title: s(r.title), text: passage(t, terms), link: '/dashboard/mjengo/todos', score: hits(t, terms) });
+    }
+  })());
+
+  if (can('calendar')) tasks.push((async () => {
+    const { data } = await db.from('mjengo_events').select('title, description, location, starts_at').or(ilike(['title', 'description', 'location'], terms)).limit(6);
+    for (const r of (data ?? []) as Record<string, unknown>[]) {
+      const t = `${s(r.title)} on ${s(r.starts_at).slice(0, 16).replace('T', ' ')}${r.location ? ` at ${s(r.location)}` : ''}. ${s(r.description)}`;
+      found.push({ kind: 'event', title: `${s(r.title)} (${s(r.starts_at).slice(0, 10)})`, text: passage(t, terms), link: '/dashboard/mjengo/calendar', score: hits(t, terms) });
+    }
+  })());
 
   await Promise.all(tasks.map((t) => t.catch(() => undefined)));
   return found

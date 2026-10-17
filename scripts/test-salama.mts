@@ -32,6 +32,24 @@ if (process.argv.includes('--live')) {
 		const r3 = await answerAsSalama(a, `What is our policy on staff holidays in ${tag}x?`);
 		console.log(r3.text);
 		ok('says so when it has nothing', r3.sources.length === 0);
+
+	// Privacy: "only me" records and hidden details never reach someone who may not see them.
+	{
+		const { entitiesFor } = await import('../lib/mjengo/entity-view');
+		const { data: priv } = await db.from('mjengo_grants').insert({ title: `Private ${tag}`, status: 'idea', visibility: 'restricted', created_by: a.id }).select('id').single();
+		const { data: hid } = await db.from('mjengo_grants').insert({ title: `Open ${tag}`, status: 'idea', amount: 99000, visibility: 'team', hidden_fields: ['amount'], created_by: a.id }).select('id').single();
+		try {
+			const other = { id: '00000000-0000-0000-0000-000000000001', email: 'nobody@example.org' };
+			const seen = (await entitiesFor(other, ['grant'])).filter((e) => e.title.endsWith(tag));
+			ok('a private record is not seen by someone it was not given to', !seen.some((e) => e.title === `Private ${tag}`));
+			ok('hidden details are left out for others', seen.find((e) => e.title === `Open ${tag}`)?.row.amount === null);
+			const mine = (await entitiesFor(a, ['grant'])).filter((e) => e.title.endsWith(tag));
+			ok('the owner sees both, with the amount', mine.length === 2 && mine.find((e) => e.title === `Open ${tag}`)?.row.amount === 99000);
+		} finally {
+			if (priv) await db.from('mjengo_grants').delete().eq('id', priv.id);
+			if (hid) await db.from('mjengo_grants').delete().eq('id', hid.id);
+		}
+	}
 	} finally {
 		if (g) await db.from('mjengo_grants').delete().eq('id', g.id);
 		if (m) await db.from('mjengo_meetings').delete().eq('id', m.id);
