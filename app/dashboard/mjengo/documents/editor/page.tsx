@@ -24,6 +24,7 @@ import { DocDetails } from "./_DocDetails";
 import { watchedVersionStore } from "@/lib/client/watched-version-store";
 import { ShareDialog } from "../../_components/ShareDialog";
 import { useTeam } from "../../_components/People";
+import { nameNewDocument } from "@/app/actions/mjengo-flows";
 import { finishReplace, getFileUrl, prepareReplace, prepareUpload, registerUpload, notifyDocComment, type FileMeta } from "../../vault/api";
 
 /** Writing help runs on our server so the organisation key never reaches the browser. */
@@ -243,6 +244,21 @@ function EditorScreen() {
 	target.current = { fileId, level, name, folderId };
 	const queue = useRef<Promise<unknown>>(Promise.resolve());
 
+	// A new document with a placeholder name is named and labelled from what it says, a few tries at most while it fills up.
+	const naming = useRef({ tries: 0, busy: false });
+	const nameFromContent = async (id: string, current: string) => {
+		const n = naming.current;
+		if (n.busy || n.tries >= 4 || !/^untitled|^new document|^document\d*\./i.test(current)) return null;
+		const text = ref.current?.getText?.() ?? "";
+		if (text.trim().split(/\s+/).length < 8) return null;
+		n.busy = true;
+		n.tries += 1;
+		try {
+			const out = await unwrap(nameNewDocument(id, text));
+			return out.renamed ? out.name : null;
+		} catch { return null; } finally { n.busy = false; }
+	};
+
 	/** Write what the editor produced into the vault: over the open file, or as a new one. */
 	const persist = async (file: SavedFile) => {
 		const t = target.current;
@@ -252,6 +268,8 @@ function EditorScreen() {
 			const { signedUrl } = await prepareReplace(t.fileId!);
 			await putToSignedUrl(signedUrl, blob);
 			await finishReplace(t.fileId!, blob.size);
+			const renamed = await nameFromContent(t.fileId!, t.name);
+			if (renamed) { target.current = { ...target.current, name: renamed }; setName(renamed); }
 			return;
 		}
 		// New file, or "Save As" to another format: a fresh vault file you own.
@@ -260,9 +278,10 @@ function EditorScreen() {
 		await putToSignedUrl(signedUrl, blob);
 		const created = await registerUpload(folder, path, file.name, blob.size, file.mimeType || null);
 		if (extOf(file.name) === "docx" || !t.fileId) {
-			target.current = { fileId: created.id, level: "edit", name: file.name, folderId: folder };
+			const finalName = (await nameFromContent(created.id, file.name)) ?? file.name;
+			target.current = { fileId: created.id, level: "edit", name: finalName, folderId: folder };
 			setFileId(created.id);
-			setName(file.name);
+			setName(finalName);
 			setLevel("edit");
 			setFolderId(folder);
 			window.history.replaceState(null, "", `/dashboard/mjengo/documents/editor?file=${created.id}`);
