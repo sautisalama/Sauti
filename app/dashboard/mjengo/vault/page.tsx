@@ -6,7 +6,7 @@ import { ShareDialog } from "../_components/ShareDialog";
 import { DriveResult, saveToDrive } from "../_components/drive";
 import { AvatarStack, DriveBadge, useTeam } from "../_components/People";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { BookMarked, ArrowDownAZ, ArrowUpAZ, ChevronDown, ChevronRight, LayoutGrid, List as ListIcon, CloudUpload, Download, FileEdit, FileText as FileTextIcon, Folder, FolderPlus, HardDrive, Loader2, MoreVertical, Pencil, Share2, Trash2, Unplug, Upload, Users } from "lucide-react";
+import { BookMarked, ArrowDownAZ, ArrowUpAZ, ChevronDown, ChevronRight, LayoutGrid, List as ListIcon, CloudUpload, Download, FileEdit, FileText as FileTextIcon, Folder, FolderPlus, HardDrive, Loader2, MoreVertical, Pencil, Share2, Trash2, Unplug, Upload, Users , Tag as TagIcon } from "lucide-react";
 import { format, formatDistanceToNow } from "date-fns";
 import { filesHub, renameDriveFolder, disconnectDrive, shareFolderToDrive, type FilesHub } from "@/app/actions/mjengo-files";
 import { unwrap } from "@/lib/action-result";
@@ -25,6 +25,9 @@ import { useToast } from "@/hooks/use-toast";
 import { putToSignedUrl } from "@/lib/client/upload";
 import { cn } from "@/lib/utils";
 import { fmtBytes } from "../_components/shared";
+import { MemberFilter, SimilarItems, TagEditor, TagFilter } from "../_components/Facets";
+import { ApprovalSection } from "../_components/ApprovalSection";
+import { AccessExplainer } from "../_components/AccessExplainer";
 import {
 	createFolder, deleteItem, getAccess, getFileUrl, listPeople, listVault, prepareUpload, registerUpload, renameItem, setGeneralAccess, setPermission,
 	type AccessView, type PersonRow, type VaultItem, type VaultListing,
@@ -53,6 +56,9 @@ export default function VaultPage() {
 	const [typeFilter, setTypeFilter] = useState<string>("all");
 	// Only the things I have shared, so an old share can be found and taken back.
 	const [sharedOnly, setSharedOnly] = useState(false);
+	const [tagFilter, setTagFilter] = useState<string[]>([]);
+	const [memberFilter, setMemberFilter] = useState<string | null>(null);
+	const [tagging, setTagging] = useState<VaultItem | null>(null);
 	const [driveRename, setDriveRename] = useState<{ id: string; name: string } | null>(null);
 	const [addLink, setAddLink] = useState(false);
 	const [pickDoc, setPickDoc] = useState(false);
@@ -174,6 +180,7 @@ export default function VaultPage() {
 	const types = ["all", ...Array.from(new Set(allFiles.map((f) => extOf(f.name)))).sort()];
 	const shownFiles = allFiles
 		.filter((f) => typeFilter === "all" || extOf(f.name) === typeFilter)
+		.filter((f) => (!tagFilter.length || tagFilter.some((t) => (f.tags ?? []).includes(t))) && (!memberFilter || f.people.includes(memberFilter) || f.ownerId === memberFilter))
 		.sort((x, y) => {
 			const d = sortDir === "asc" ? 1 : -1;
 			if (sortKey === "name") return d * x.name.localeCompare(y.name);
@@ -191,6 +198,7 @@ export default function VaultPage() {
 				{i.type === "file" && /\.(xlsx|xls|csv)$/i.test(i.name) && <DropdownMenuItem onClick={() => { window.location.href = `/dashboard/mjengo/files/sheet?file=${i.id}`; }}><FileEdit className="mr-2 h-4 w-4" />Open as a sheet</DropdownMenuItem>}
 				{i.type === "file" && /\.(docx|doc|odt|rtf|md|txt)$/i.test(i.name) && <DropdownMenuItem onClick={() => { window.location.href = `/dashboard/mjengo/documents/editor?file=${i.id}`; }}><FileEdit className="mr-2 h-4 w-4" />{i.level === "edit" ? "Edit" : "Open in editor"}</DropdownMenuItem>}
 				<DropdownMenuItem onClick={() => open(i)}>{i.type === "folder" ? <Folder className="mr-2 h-4 w-4" /> : <Download className="mr-2 h-4 w-4" />}{i.type === "folder" ? "Open" : "Download"}</DropdownMenuItem>
+				{i.type === "file" && <DropdownMenuItem onClick={() => setTagging(i)}><TagIcon className="mr-2 h-4 w-4" />Tags, approval, access and similar files</DropdownMenuItem>}
 				{i.type === "file" && <DropdownMenuItem onClick={() => saveToDrive("vault", i.id)}><CloudUpload className="mr-2 h-4 w-4" />{i.driveLink ? "Update in Google Drive" : "Save to Google Drive"}</DropdownMenuItem>}
 				{i.type === "folder" && hub?.drive.connected && <DropdownMenuItem onClick={async () => { try { const r = await unwrap(shareFolderToDrive(i.id)); toast({ title: "Copied to Google Drive", description: `${r.copied} file${r.copied === 1 ? "" : "s"} added${r.skipped > 0 ? `, ${r.skipped} more to go: run it again` : ""}.` }); await loadHub(); load(); } catch (e) { fail("Could not copy to Google Drive", e); } }}><CloudUpload className="mr-2 h-4 w-4" />Share folder to Google Drive</DropdownMenuItem>}
 				{i.type === "file" && /\.(docx|pdf|txt|md)$/i.test(i.name) && <DropdownMenuItem onClick={async () => { try { await unwrap(tagBrandGuidelines(i.id)); toast({ title: "Tagged as the brand guidelines", description: "The brand was read from it. See it under Brand." }); } catch (e) { fail("Could not use it as the guidelines", e); } }}><BookMarked className="mr-2 h-4 w-4" />Use as brand guidelines</DropdownMenuItem>}
@@ -240,6 +248,11 @@ export default function VaultPage() {
 						</span>
 					))}
 				</nav>
+			</div>
+
+			<div className="flex flex-wrap items-center gap-2">
+				<MemberFilter value={memberFilter} onChange={setMemberFilter} label="Anyone's files" />
+				<TagFilter selected={tagFilter} onChange={setTagFilter} extra={allFiles.flatMap((f) => f.tags ?? [])} className="min-w-0 flex-1" />
 			</div>
 
 			{false && uploads.length > 0 && (
@@ -469,6 +482,22 @@ export default function VaultPage() {
 					try { await createFolder(folderId, name); setNewFolder(false); load(); } catch (e) { fail("Could not create the folder", e); } finally { setBusy(false); }
 				}}
 			/>
+			<Dialog open={!!tagging} onOpenChange={(o) => { if (!o) { setTagging(null); load(); } }}>
+				<DialogContent className="max-w-lg">
+					<DialogHeader>
+						<DialogTitle className="truncate">{tagging?.name}</DialogTitle>
+						<DialogDescription>Tags are how files are grouped and found; the autotagger suggests them from what the file says. You can also ask teammates to approve the file.</DialogDescription>
+					</DialogHeader>
+					{tagging && (
+						<div className="space-y-4">
+							<TagEditor type="file" id={tagging.id} tags={tagging.tags ?? []} canEdit={tagging.level === "edit"} onChange={(t) => setTagging((x) => (x ? { ...x, tags: t } : x))} />
+							<ApprovalSection fileId={tagging.id} canAsk={tagging.level === "share" || tagging.level === "edit"} />
+							<AccessExplainer fileId={tagging.id} />
+							<SimilarItems type="file" id={tagging.id} />
+						</div>
+					)}
+				</DialogContent>
+			</Dialog>
 			<NameDialog
 				open={!!rename}
 				title="Rename"

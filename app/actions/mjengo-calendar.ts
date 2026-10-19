@@ -25,6 +25,8 @@ export interface CalItem {
   location?: string | null;
   description?: string | null;
   attendees?: string[];
+  /** Tags on a calendar event (the autotagger and people set them). */
+  tags?: string[];
   removable?: boolean;
 }
 
@@ -81,7 +83,7 @@ async function month_(fromIso: string, toIso: string): Promise<CalMonth> {
   const items: CalItem[] = [];
 
   const [{ data: events }, { data: grants }, { data: opps }, { data: projects }, { data: todos }, { data: posts }] = await Promise.all([
-    db.from('mjengo_events').select('id, title, description, location, starts_at, ends_at, all_day, kind, meeting_code, attendees').gte('ends_at', fromIso).lte('starts_at', toIso),
+    db.from('mjengo_events').select('id, title, description, location, starts_at, ends_at, all_day, kind, meeting_code, attendees, tags').gte('ends_at', fromIso).lte('starts_at', toIso),
     db.from('mjengo_grants').select('id, title, deadline').gte('deadline', from).lte('deadline', to),
     db.from('mjengo_opportunities').select('id, title, deadline').gte('deadline', from).lte('deadline', to),
     db.from('mjengo_projects').select('id, name, end_date').gte('end_date', from).lte('end_date', to),
@@ -89,8 +91,8 @@ async function month_(fromIso: string, toIso: string): Promise<CalMonth> {
     db.from('mjengo_posts').select('id, title, body, scheduled_for, status').gte('scheduled_for', fromIso).lte('scheduled_for', toIso).neq('status', 'cancelled'),
   ]);
 
-  for (const e of (events ?? []) as { id: string; title: string; description: string | null; location: string | null; starts_at: string; ends_at: string; all_day: boolean; kind: 'event' | 'meeting' | 'block'; meeting_code: string | null; attendees: string[] }[]) {
-    items.push({ id: `ev:${e.id}`, title: e.title, start: e.starts_at, end: e.ends_at, allDay: e.all_day, kind: e.kind, meetingCode: e.meeting_code, location: e.location, description: e.description, attendees: e.attendees, removable: true });
+  for (const e of (events ?? []) as { id: string; title: string; description: string | null; location: string | null; starts_at: string; ends_at: string; all_day: boolean; kind: 'event' | 'meeting' | 'block'; meeting_code: string | null; attendees: string[]; tags: string[] | null }[]) {
+    items.push({ id: `ev:${e.id}`, title: e.title, start: e.starts_at, end: e.ends_at, allDay: e.all_day, kind: e.kind, meetingCode: e.meeting_code, location: e.location, description: e.description, attendees: e.attendees, tags: e.tags ?? [], removable: true });
   }
   const day = (d: string) => ({ start: `${d}T00:00:00.000Z`, end: `${d}T23:59:59.000Z`, allDay: true });
   for (const g of (grants ?? []) as { id: string; title: string; deadline: string }[]) items.push({ id: `gr:${g.id}`, title: `Deadline: ${g.title}`, kind: 'grant', href: '/dashboard/mjengo/grants', ...day(g.deadline) });

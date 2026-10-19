@@ -1,11 +1,13 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
+import { after } from 'next/server';
 import { looseAdmin } from '@/lib/loose-db';
 import { logAudit } from '@/lib/access/audit';
 import { isSuperAdminEmail, requireAdminActor, type Actor } from '@/lib/access/super-admin';
 import { requireModule, type ModuleKey } from '@/lib/access/permissions';
 import { sendAccessEmail, sendNoticeEmail } from '@/lib/mjengo/invite-email';
+import { runPlaybooks } from '@/lib/mjengo/playbooks';
 
 export type Kind = 'grant' | 'opportunity' | 'project' | 'fellowship';
 
@@ -247,6 +249,8 @@ export async function saveEntity(kind: Kind, id: string | null, values: Record<s
     if (error || !row) throw new Error('Could not save the changes.');
     const statusChanged = before && 'status' in data && before.status !== data.status;
     await audit(actor, statusChanged ? `${kind}.status_changed` : `${kind}.updated`, kind, id, String(row[labelKey]), statusChanged ? { from: before!.status, to: data.status } : undefined);
+    // A new status can start a playbook (its steps are set up once, for whoever is responsible).
+    if (statusChanged) after(() => runPlaybooks(kind, id, String(data.status), actor.id).then(() => undefined).catch(() => undefined));
     revalidate();
     return row;
   }
@@ -255,6 +259,7 @@ export async function saveEntity(kind: Kind, id: string | null, values: Record<s
   const { data: row, error } = await db.from(TABLE[kind]).insert({ ...data, visibility, created_by: actor.id }).select('*').single();
   if (error || !row) throw new Error('Could not create it.');
   await audit(actor, `${kind}.created`, kind, row.id, String(row[labelKey]));
+  if (row.status) after(() => runPlaybooks(kind, row.id, String(row.status), actor.id).then(() => undefined).catch(() => undefined));
   revalidate();
   return row;
 }
@@ -410,6 +415,7 @@ export interface TodoRow {
   important: boolean;
   remind_on: string | null;
   steps: { id: string; title: string; done: boolean }[];
+  tags?: string[];
 }
 
 export interface TrackRow {

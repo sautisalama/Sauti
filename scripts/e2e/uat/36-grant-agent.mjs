@@ -29,8 +29,9 @@ try {
 	await signIn(page, "admin");
 	await page.goto(`${BASE}/dashboard/mjengo/grants`, { waitUntil: "domcontentloaded", timeout: 180000 });
 	await page.locator('[tabindex="0"]').filter({ hasText: title }).first().click();
-	await page.getByText("Application agent").waitFor({ timeout: 60000 });
-	check("The agent is in the grant", true);
+	await page.getByRole("button", { name: /Application agent/ }).click({ timeout: 60000 });
+	await page.getByText("Application agent").first().waitFor({ timeout: 60000 });
+	check("The agent is in the grant, and opens when asked", true);
 
 	await page.getByRole("button", { name: "Read the funder's call" }).click();
 	await page.getByText("The need", { exact: true }).waitFor({ timeout: 90000 });

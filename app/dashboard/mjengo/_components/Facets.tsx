@@ -1,11 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Loader2, Sparkles, Tag as TagIcon, X } from "lucide-react";
+import { Loader2, Shapes, Sparkles, Tag as TagIcon, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { unwrap } from "@/lib/action-result";
-import { autoTagItem, facets, setTags, type Facets } from "@/app/actions/mjengo-search";
-import type { SearchType } from "@/lib/mjengo/search-shared";
+import { autoTagItem, facets, setTags, similarTo, type Facets } from "@/app/actions/mjengo-search";
+import { SEARCH_TYPE_LABEL, type SearchHit, type SearchType } from "@/lib/mjengo/search-shared";
 
 let cache: Promise<Facets> | null = null;
 /** The tags in use and the team, loaded once and shared by every filter bar on the page. */
@@ -68,9 +68,11 @@ export function TagEditor({ type, id, tags, onChange, canEdit = true }: { type: 
 	const [error, setError] = useState("");
 	useEffect(() => setList(tags), [tags]);
 
+	// A change shows at once and is put back if it could not be saved (saving waits behind other calls the page is making).
 	const save = async (next: string[]) => {
-		setBusy("save"); setError("");
-		try { const saved = await unwrap(setTags(type, id, next)); setList(saved); onChange?.(saved); forgetFacets(); } catch (e) { setError(e instanceof Error ? e.message : "Could not save the tags."); } finally { setBusy(null); }
+		const before = list;
+		setBusy("save"); setError(""); setList([...new Set(next)]);
+		try { const saved = await unwrap(setTags(type, id, next)); setList(saved); onChange?.(saved); forgetFacets(); } catch (e) { setList(before); setError(e instanceof Error ? e.message : "Could not save the tags."); } finally { setBusy(null); }
 	};
 	const suggest = async () => {
 		setBusy("auto"); setError("");
@@ -93,6 +95,30 @@ export function TagEditor({ type, id, tags, onChange, canEdit = true }: { type: 
 				)}
 			</div>
 			{error && <p className="mt-1 text-xs text-red-700">{error}</p>}
+		</div>
+	);
+}
+
+/** Things that read like this one, on demand: other grants like this grant, documents like this document. */
+export function SimilarItems({ type, id }: { type: SearchType; id: string }) {
+	const [hits, setHits] = useState<SearchHit[] | null>(null);
+	const [busy, setBusy] = useState(false);
+	const [error, setError] = useState("");
+	useEffect(() => { setHits(null); setError(""); }, [type, id]);
+	const run = async () => {
+		setBusy(true); setError("");
+		try { setHits(await unwrap(similarTo(type, id))); } catch (e) { setError(e instanceof Error ? e.message : "Could not look for similar things."); } finally { setBusy(false); }
+	};
+	return (
+		<div className="rounded-xl border border-serene-neutral-100 p-3">
+			<div className="flex items-center gap-2">
+				<p className="mr-auto flex items-center gap-1.5 text-sm font-semibold text-serene-neutral-900"><Shapes className="h-4 w-4 text-sauti-teal" /> Similar</p>
+				<button type="button" onClick={() => void run()} disabled={busy} className="flex h-8 items-center gap-1.5 rounded-full border border-serene-neutral-200 px-3 text-xs text-sauti-teal hover:bg-serene-neutral-50 disabled:opacity-50">{busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />} {hits ? "Look again" : "Find similar"}</button>
+			</div>
+			{error && <p className="mt-2 text-xs text-red-700">{error}</p>}
+			{hits && (hits.length === 0 ? <p className="mt-2 text-xs text-serene-neutral-500">Nothing else reads like this yet.</p> : (
+				<ul className="mt-2 space-y-1.5">{hits.map((h) => <li key={`${h.type}:${h.id}`} className="text-sm"><a href={h.link ?? "#"} className="font-medium text-sauti-teal hover:underline">{h.title}</a> <span className="text-xs text-serene-neutral-500">{SEARCH_TYPE_LABEL[h.type]}</span><span className="block truncate text-xs text-serene-neutral-600">{h.snippet}</span></li>)}</ul>
+			))}
 		</div>
 	);
 }

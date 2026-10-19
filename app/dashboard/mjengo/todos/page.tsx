@@ -17,6 +17,7 @@ import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { createTrack, deleteTodo, deleteTrack, getTodoBoard, renameTrack, saveTodo, type TodoRow, type TrackRow } from "@/app/actions/mjengo";
 import { Avatars, DeadlineChip, KIND_LABEL } from "../_components/shared";
+import { MemberFilter, SimilarItems, TagEditor, TagFilter, tagLabel } from "../_components/Facets";
 
 type Board = Awaited<ReturnType<typeof getTodoBoard>>;
 type Task = TodoRow & { trackName: string; trackColor: string };
@@ -41,6 +42,8 @@ export default function TodosPage() {
 	const [showDone, setShowDone] = useState(false);
 	const [quick, setQuick] = useState("");
 	const [newList, setNewList] = useState<string | null>(null);
+	const [tagFilter, setTagFilter] = useState<string[]>([]);
+	const [memberFilter, setMemberFilter] = useState<string | null>(null);
 
 	const load = useCallback(async () => setBoard(await getTodoBoard()), []);
 	useEffect(() => {
@@ -71,7 +74,7 @@ export default function TodosPage() {
 	const all = useMemo(() => (board ? tasksOf(board) : []), [board]);
 	const today = iso(new Date());
 
-	const inView = useMemo(() => {
+	const inViewAll = useMemo(() => {
 		if (!board) return [];
 		const mine = (t: Task) => t.assignee_ids.includes(board.me) || (t.assignee_ids.length === 0 && t.created_by === board.me);
 		switch (view) {
@@ -83,6 +86,8 @@ export default function TodosPage() {
 			default: return all.filter((t) => t.track_id === view);
 		}
 	}, [all, board, view, today]);
+	// Tags and team member narrow whichever list or smart view is open.
+	const inView = useMemo(() => inViewAll.filter((t) => (!tagFilter.length || tagFilter.some((x) => (t.tags ?? []).includes(x))) && (!memberFilter || t.assignee_ids.includes(memberFilter) || t.created_by === memberFilter)), [inViewAll, tagFilter, memberFilter]);
 
 	const count = (id: string) => {
 		if (!board) return 0;
@@ -185,6 +190,11 @@ export default function TodosPage() {
 					)}
 				</header>
 
+				<div className="mb-3 flex flex-wrap items-center gap-2">
+					<MemberFilter value={memberFilter} onChange={setMemberFilter} label="Anyone" />
+					<TagFilter selected={tagFilter} onChange={setTagFilter} extra={all.flatMap((t) => t.tags ?? [])} className="min-w-0 flex-1" />
+				</div>
+
 				<form
 					onSubmit={(e) => { e.preventDefault(); addTask(); }}
 					className="mb-3 flex items-center gap-2 rounded-xl border border-serene-neutral-200 bg-white px-3 shadow-[0_1px_2px_rgba(16,24,40,0.04)] focus-within:border-sauti-teal/50"
@@ -260,6 +270,7 @@ function TaskRow({ t, board, showList, onOpen, run }: { t: Task; board: Board; s
 					{t.remind_on && <span className="flex items-center gap-1"><Bell className="h-3 w-3" />{format(parseISO(t.remind_on), "d MMM")}</span>}
 					{steps.length > 0 && <span>{stepsDone} of {steps.length}</span>}
 					{t.entity_label && t.entity_type && <Badge variant="secondary" className="max-w-[160px] truncate">{KIND_LABEL[t.entity_type]}: {t.entity_label}</Badge>}
+					{(t.tags ?? []).slice(0, 3).map((x) => <span key={x} className="rounded-full bg-serene-neutral-100 px-2 py-0.5 text-[10px] text-serene-neutral-600">{tagLabel(x)}</span>)}
 				</div>
 			</button>
 			<Avatars ids={t.assignee_ids} admins={board.admins} />
@@ -379,6 +390,10 @@ function TodoSheet({ todo, board, onClose, onSaved, fail }: { todo: Task | null;
 						</div>
 
 						<div className="space-y-1.5"><Label className="text-xs font-semibold">Notes</Label><Textarea rows={4} value={v.notes ?? ""} onChange={(e) => setV({ ...v, notes: e.target.value })} /></div>
+						{v.id && (
+							<div className="space-y-1.5"><Label className="text-xs font-semibold">Tags</Label><TagEditor type="todo" id={v.id} tags={v.tags ?? []} onChange={(t) => setV((x) => (x ? { ...x, tags: t } : x))} /></div>
+						)}
+						{v.id && <SimilarItems type="todo" id={v.id} />}
 					</div>
 				)}
 				<div className="sticky bottom-0 flex items-center gap-2 border-t bg-white p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { CheckCircle2, FileText, FolderArchive, Loader2, Save, Sparkles, XCircle } from "lucide-react";
+import { CheckCircle2, ChevronDown, FileText, FolderArchive, Loader2, Save, Sparkles, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
@@ -18,6 +18,22 @@ import { wordCount, type Review, type Section } from "@/lib/mjengo/grant-agent-s
  * before, and reviews the whole against the scoring before it goes. People edit every word.
  */
 export function GrantAgent({ kind, id }: { kind: "grant" | "opportunity"; id: string }) {
+	// It does nothing until it is opened: opening a record should not start a dozen server calls at once.
+	const [open, setOpen] = useState(false);
+	if (!open) {
+		return (
+			<button type="button" onClick={() => setOpen(true)} aria-expanded={false} className="flex w-full items-center gap-2 rounded-xl border border-serene-neutral-100 p-3 text-left hover:bg-serene-neutral-50">
+				<Sparkles className="h-4 w-4 text-sauti-teal" />
+				<span className="mr-auto text-sm font-semibold text-serene-neutral-900">Application agent</span>
+				<span className="hidden text-xs text-serene-neutral-500 sm:inline">Reads the funder&apos;s call and drafts the application</span>
+				<ChevronDown className="h-4 w-4 text-serene-neutral-400" />
+			</button>
+		);
+	}
+	return <GrantAgentBody kind={kind} id={id} />;
+}
+
+function GrantAgentBody({ kind, id }: { kind: "grant" | "opportunity"; id: string }) {
 	const { toast } = useToast();
 	const [brief, setBrief] = useState<Brief | null>(null);
 	const [error, setError] = useState("");

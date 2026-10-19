@@ -26,6 +26,8 @@ import { Avatars, DeadlineChip, STATUSES, StatusPill, money, type Kind } from ".
 import { EntityAccessPanel, FellowshipAssignments } from "./EntityExtras";
 import { EntityTimeline } from "./EntityTimeline";
 import { GrantAgent } from "./GrantAgent";
+import { ProgressReport } from "./ProgressReport";
+import { MemberFilter, SimilarItems, TagEditor, TagFilter, tagLabel } from "./Facets";
 
 type FieldDef = { key: string; label: string; type: "text" | "textarea" | "number" | "date" | "select" | "owner" | "grant" | "url" | "tags" | "sdgs"; options?: { value: string; label: string }[]; wide?: boolean };
 
@@ -163,6 +165,8 @@ export function EntityWorkspace({ kind }: { kind: Kind }) {
 	const [view, setView] = useState<"board" | "list">("board");
 	const [q, setQ] = useState("");
 	const [statusFilter, setStatusFilter] = useState<string | null>(null);
+	const [tagFilter, setTagFilter] = useState<string[]>([]);
+	const [memberFilter, setMemberFilter] = useState<string | null>(null);
 	const [editing, setEditing] = useState<{ id: string | null; values: Record<string, any> } | null>(null);
 	const [saving, setSaving] = useState(false);
 	const [dragId, setDragId] = useState<string | null>(null);
@@ -190,8 +194,11 @@ export function EntityWorkspace({ kind }: { kind: Kind }) {
 
 	const filtered = useMemo(() => {
 		const term = q.trim().toLowerCase();
-		return (rows ?? []).filter((r) => (!statusFilter || r.status === statusFilter) && (!term || [r[cfg.titleKey], r[cfg.subKey]].some((v) => String(v ?? "").toLowerCase().includes(term))));
-	}, [rows, q, statusFilter, cfg]);
+		return (rows ?? []).filter((r) => (!statusFilter || r.status === statusFilter)
+			&& (!term || [r[cfg.titleKey], r[cfg.subKey], ...((r.tags as string[] | undefined) ?? [])].some((v) => String(v ?? "").toLowerCase().includes(term)))
+			&& (!tagFilter.length || tagFilter.some((t) => ((r.tags as string[] | undefined) ?? []).includes(t)))
+			&& (!memberFilter || [r[ownerKey(kind)], r.created_by].includes(memberFilter)));
+	}, [rows, q, statusFilter, tagFilter, memberFilter, cfg, kind]);
 
 	const openNew = () => setEditing({ id: null, values: { status: statuses[0].value, currency: "USD", ...(kind === "opportunity" ? { kind: "grant" } : {}), ...(kind === "project" ? { progress: 0 } : {}) } });
 	const openRow = (r: Row) => setEditing({ id: r.id, values: { ...r } });
@@ -277,6 +284,13 @@ export function EntityWorkspace({ kind }: { kind: Kind }) {
 					</FilterChip>
 				))}
 			</div>
+
+			{rows.length > 0 && (
+				<div className="flex flex-wrap items-center gap-2">
+					<MemberFilter value={memberFilter} onChange={setMemberFilter} label={kind === "project" ? "Any lead" : "Anyone responsible"} />
+					<TagFilter selected={tagFilter} onChange={setTagFilter} extra={rows.flatMap((r) => (r.tags as string[] | undefined) ?? [])} className="min-w-0 flex-1" />
+				</div>
+			)}
 
 			{rows.length === 0 ? (
 				<div className="rounded-2xl border border-dashed border-serene-neutral-200 bg-white p-12 text-center">
@@ -386,8 +400,14 @@ export function EntityWorkspace({ kind }: { kind: Kind }) {
 								<>
 									{kind === "project" && <ProjectMoney v={editing.values} />}
 									{kind === "fellowship" && <FellowshipAssignments fellowshipId={editing.id} />}
+									<div className="rounded-xl border border-serene-neutral-100 p-3">
+										<p className="mb-2 text-sm font-semibold text-serene-neutral-900">Tags</p>
+										<TagEditor type={kind} id={editing.id} tags={(editing.values.tags as string[] | undefined) ?? []} onChange={(t) => { set("tags", t); void load(); }} />
+									</div>
 									<EntityTimeline kind={kind} id={editing.id} />
+									<ProgressReport kind={kind} id={editing.id} />
 									{(kind === "grant" || kind === "opportunity") && <GrantAgent kind={kind} id={editing.id} />}
+									<SimilarItems type={kind} id={editing.id} />
 									<EntityAccessPanel kind={kind} id={editing.id} />
 									<DocumentsPanel kind={kind} entityId={editing.id} onChange={load} />
 									<div className="rounded-xl border border-serene-neutral-100 p-3">
@@ -464,6 +484,7 @@ function Card({ kind, r, admins, onOpen, onDragStart, onDragEnd, dragging }: { k
 				{r.docs.missing > 0 && <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800"><FileWarning className="h-3 w-3" />{r.docs.missing} doc{r.docs.missing === 1 ? "" : "s"} needed</span>}
 				{r.openTodos > 0 && <span className="inline-flex items-center gap-1 rounded-full bg-sauti-teal-light px-2 py-0.5 text-xs font-medium text-sauti-dark"><CheckSquare className="h-3 w-3" />{r.openTodos}</span>}
 			</div>
+			{((r.tags as string[] | undefined) ?? []).length > 0 && <div className="mt-2 flex flex-wrap gap-1">{((r.tags as string[]) ?? []).slice(0, 3).map((t) => <span key={t} className="rounded-full bg-serene-neutral-100 px-2 py-0.5 text-[10px] text-serene-neutral-600">{tagLabel(t)}</span>)}</div>}
 			<div className="mt-2"><Avatars ids={[...new Set([r[ownerKey(kind)], r.created_by].filter(Boolean))] as string[]} admins={admins} /></div>
 		</div>
 	);
