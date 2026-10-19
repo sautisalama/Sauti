@@ -7,6 +7,7 @@ import { requireSuperAdmin } from '@/lib/access/super-admin';
 import { MODULES, moduleLabel, parsePermission } from '@/lib/access/permissions';
 import { sendNoticeEmail } from '@/lib/mjengo/invite-email';
 import { addDefaultRoles, seedDefaultRolesOnce } from '@/lib/mjengo/default-roles';
+import { reconcile, toList, toMap, type Lvl, type PermMap } from '@/lib/access/reconcile';
 
 export interface RoleView {
   id: string;
@@ -85,6 +86,55 @@ async function assign_(roleId: string, userId: string, on: boolean, notify: bool
   return list_();
 }
 
+/** What was clicked on for single people, on top of their roles: person id to permissions like "grants:write". */
+async function listExtras_(): Promise<Record<string, string[]>> {
+  await requireSuperAdmin();
+  const { data } = await looseAdmin().from('mjengo_user_permissions').select('user_id, permissions');
+  return Object.fromEntries(((data ?? []) as { user_id: string; permissions: string[] }[]).filter((r) => r.permissions?.length).map((r) => [r.user_id, r.permissions]));
+}
+
+/**
+ * Change one area for one person (a level, or none). Roles stay the way permissions are held: a role they have that no longer
+ * fits is taken away, a role this change completes is added, and what no role covers is kept for them alone.
+ */
+async function setPersonLevel_(userId: string, moduleKey: string, level: Lvl | null): Promise<{ roles: RoleView[]; extras: Record<string, string[]>; added: string[]; removed: string[] }> {
+  const a = await requireSuperAdmin();
+  if (!MODULES.some((m) => m.key === moduleKey)) throw new Error('That is not a part of the suite.');
+  if (level !== null && level !== 'view' && level !== 'write' && level !== 'owner') throw new Error('Choose view, write or owner.');
+  const db = looseAdmin();
+  const { data: person } = await db.from('profiles').select('email, is_admin').eq('id', userId).maybeSingle();
+  if (!person?.is_admin) throw new Error('Permissions can only be set for administrators.');
+  const { findSuperAdmin } = await import('@/lib/access/super-admin');
+  if (person.email && (await findSuperAdmin(person.email))) throw new Error('Super admins always have everything.');
+
+  const [{ data: roles }, { data: mem }, { data: own }] = await Promise.all([
+    db.from('mjengo_roles').select('id, name, permissions'),
+    db.from('mjengo_role_members').select('role_id').eq('user_id', userId),
+    db.from('mjengo_user_permissions').select('permissions').eq('user_id', userId).maybeSingle(),
+  ]);
+  const all = (roles ?? []) as { id: string; name: string; permissions: string[] }[];
+  const current = ((mem ?? []) as { role_id: string }[]).map((m) => m.role_id);
+  const extras = ((own as { permissions?: string[] } | null)?.permissions ?? []);
+
+  // What they hold now. Someone with no role and nothing of their own keeps everything, as before roles existed.
+  const previous: PermMap = new Map();
+  if (!current.length && !extras.length) for (const m of MODULES) previous.set(m.key, 'owner');
+  else for (const [k, l] of toMap([...all.filter((r) => current.includes(r.id)).flatMap((r) => r.permissions), ...extras])) previous.set(k, l);
+  const desired: PermMap = new Map(previous);
+  if (level === null) desired.delete(moduleKey); else desired.set(moduleKey, level);
+
+  const out = reconcile({ desired, previous, roles: all, current, changed: { module: moduleKey, level } });
+  for (const r of out.removed) await db.from('mjengo_role_members').delete().eq('role_id', r.id).eq('user_id', userId);
+  for (const r of out.added) await db.from('mjengo_role_members').upsert({ role_id: r.id, user_id: userId, assigned_by: a.id }, { onConflict: 'role_id,user_id' });
+  // Everything held and no role needed for it is the old "no role" state; keep it as nothing stored.
+  const everything = MODULES.every((m) => desired.get(m.key) === 'owner') && out.roleIds.length === 0;
+  const keep = everything ? [] : out.extras;
+  if (keep.length) await db.from('mjengo_user_permissions').upsert({ user_id: userId, permissions: keep, updated_by: a.id, updated_at: new Date().toISOString() }, { onConflict: 'user_id' });
+  else await db.from('mjengo_user_permissions').delete().eq('user_id', userId);
+  await logAudit({ actorId: a.id, actorEmail: a.email, action: 'access.person_changed', targetType: 'user', targetId: userId, targetLabel: person.email ?? undefined, details: { area: moduleKey, level, rolesAdded: out.added.map((r) => r.name), rolesRemoved: out.removed.map((r) => r.name), held: toList(desired) } });
+  return { roles: await list_(), extras: await listExtras_(), added: out.added.map((r) => r.name), removed: out.removed.map((r) => r.name) };
+}
+
 /** Tell someone that their account was changed (admin on or off, account type). Sent only when asked for. */
 async function notifyChange_(userId: string, summary: string): Promise<void> {
   const a = await requireSuperAdmin();
@@ -109,5 +159,7 @@ export const restoreDefaultRoles = guard(restoreDefaults_);
 export const saveRole = guard(save_);
 export const deleteRole = guard(remove_);
 export const assignRole = guard(assign_);
+export const listPersonalPermissions = guard(listExtras_);
+export const setPersonLevel = guard(setPersonLevel_);
 export const notifyAccessChange = guard(notifyChange_);
 export const roleModules = guard(async () => MODULES.map((m) => ({ key: m.key as string, label: m.label as string, hint: m.hint as string })));

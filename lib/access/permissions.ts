@@ -50,12 +50,17 @@ export type Perms = 'all' | Map<ModuleKey, Level>;
 export const permissionsFor = cache(async function permissionsFor(userId: string, email: string): Promise<Perms> {
   if (await isSuperAdminEmail(email)) return 'all';
   const db = looseAdmin();
-  const { data: mem } = await db.from('mjengo_role_members').select('role_id').eq('user_id', userId);
+  const [{ data: mem }, { data: own }] = await Promise.all([
+    db.from('mjengo_role_members').select('role_id').eq('user_id', userId),
+    // What was clicked on for this person alone (nothing, if that table is not there yet).
+    db.from('mjengo_user_permissions').select('permissions').eq('user_id', userId).maybeSingle(),
+  ]);
   const roleIds = ((mem ?? []) as { role_id: string }[]).map((m) => m.role_id);
-  if (!roleIds.length) return 'all';
-  const { data: roles } = await db.from('mjengo_roles').select('permissions').in('id', roleIds);
+  const extras = ((own as { permissions?: string[] } | null)?.permissions ?? []);
+  if (!roleIds.length && !extras.length) return 'all';
+  const { data: roles } = roleIds.length ? await db.from('mjengo_roles').select('permissions').in('id', roleIds) : { data: [] };
   const out = new Map<ModuleKey, Level>();
-  for (const r of (roles ?? []) as { permissions: string[] }[]) {
+  for (const r of [...((roles ?? []) as { permissions: string[] }[]), { permissions: extras }]) {
     for (const raw of r.permissions ?? []) {
       const p = parsePermission(raw);
       const cur = p ? out.get(p.key) : undefined;

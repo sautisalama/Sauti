@@ -17,7 +17,8 @@ import {
 	addSuperAdmin, getAccessOverview, removeSuperAdmin, searchPeople, setAccountType, setAdminStatus,
 	type AccessOverview, type PersonView,
 } from "@/app/actions/access";
-import { assignRole, deleteRole, listRoles, notifyAccessChange, restoreDefaultRoles, roleModules, saveRole, type RoleView } from "@/app/actions/roles";
+import { assignRole, deleteRole, listPersonalPermissions, listRoles, notifyAccessChange, restoreDefaultRoles, roleModules, saveRole, setPersonLevel, type RoleView } from "@/app/actions/roles";
+import { AreaMatrix } from "./AreaMatrix";
 
 type Lvl = "view" | "write" | "owner";
 const LVLS: { v: Lvl | "none"; label: string }[] = [{ v: "none", label: "None" }, { v: "view", label: "View" }, { v: "write", label: "Write" }, { v: "owner", label: "Owner" }];
@@ -29,11 +30,12 @@ interface Module { key: string; label: string; hint: string }
 const parse = (p: string): { key: string; level: Lvl } => { const [key, l] = p.split(":"); return { key, level: l === "view" || l === "owner" ? l : "write" }; };
 
 /** The highest level of each module across a person's roles; null means no role at all (full access). */
-function effective(userId: string, roles: RoleView[]): Map<string, Lvl> | null {
+function effective(userId: string, roles: RoleView[], extras: Record<string, string[]> = {}): Map<string, Lvl> | null {
 	const mine = roles.filter((r) => r.members.some((m) => m.id === userId));
-	if (!mine.length) return null;
+	const own = extras[userId] ?? [];
+	if (!mine.length && !own.length) return null;
 	const out = new Map<string, Lvl>();
-	for (const r of mine) for (const raw of r.permissions) { const p = parse(raw); const cur = out.get(p.key); if (!cur || RANK[p.level] > RANK[cur]) out.set(p.key, p.level); }
+	for (const raw of [...mine.flatMap((r) => r.permissions), ...own]) { const p = parse(raw); const cur = out.get(p.key); if (!cur || RANK[p.level] > RANK[cur]) out.set(p.key, p.level); }
 	return out;
 }
 
@@ -42,7 +44,11 @@ export function PeoplePanel() {
 	const { toast } = useToast();
 	const [tab, setTab] = useState<"people" | "roles" | "super">("people");
 	const [data, setData] = useState<AccessOverview | null>(null);
-	const [roles, setRoles] = useState<RoleView[]>([]);
+		const [roles, setRoles] = useState<RoleView[]>([]);
+	const [extras, setExtras] = useState<Record<string, string[]>>({});
+	const [roleOpen, setRoleOpen] = useState<string | null>(null);
+	const [areaBusy, setAreaBusy] = useState<string | null>(null);
+
 	const [modules, setModules] = useState<Module[]>([]);
 	const [q, setQ] = useState("");
 	const [found, setFound] = useState<PersonView[]>([]);
@@ -54,8 +60,8 @@ export function PeoplePanel() {
 	const fail = useCallback((e: unknown) => toast({ title: "That did not work", description: e instanceof Error ? e.message : undefined, variant: "destructive" }), [toast]);
 	const load = useCallback(async () => {
 		try {
-			const [o, r, m] = await Promise.all([getAccessOverview(), unwrap(listRoles()), unwrap(roleModules())]);
-			setData(o); setRoles(r); setModules(m);
+			const [o, r, m, x] = await Promise.all([getAccessOverview(), unwrap(listRoles()), unwrap(roleModules()), unwrap(listPersonalPermissions())]);
+				setData(o); setRoles(r); setModules(m); setExtras(x);
 		} catch (e) { fail(e); }
 	}, [fail]);
 	useEffect(() => { void load(); }, [load]);
@@ -85,13 +91,23 @@ export function PeoplePanel() {
 
 	const summary = (id: string, isSuper: boolean) => {
 		if (isSuper) return { text: "Everything", chip: "Owner of everything" };
-		const e = effective(id, roles);
-		if (!e) return { text: "Everything (no role set)", chip: null };
+		const e = effective(id, roles, extras);
+			if (!e) return { text: "Everything (no role set)", chip: null };
 		const owner = [...e.values()].filter((l) => l === "owner").length;
 		return { text: `${e.size} of ${modules.length} areas`, chip: owner ? `Owner of ${owner}` : null };
 	};
 
-	const openPerson = (p: { id: string; name: string; email: string | null; isSuperAdmin: boolean; isAdmin?: boolean; userType?: string | null }) => setOpen({ ...p, isAdmin: p.isAdmin ?? true });
+			/** One click on an area: allow it, or take it away. Roles that fit are added or taken away by themselves. */
+		const setArea = async (userId: string, key: string, level: Lvl | null) => {
+			setAreaBusy(key);
+			try {
+				const out = await unwrap(setPersonLevel(userId, key, level));
+				setRoles(out.roles); setExtras(out.extras);
+				const note = [out.added.length ? `Now matches ${out.added.map((n) => `"${n}"`).join(" and ")}, so ${out.added.length === 1 ? "that role was" : "those roles were"} added.` : "", out.removed.length ? `${out.removed.map((n) => `"${n}"`).join(" and ")} no longer fit${out.removed.length === 1 ? "s" : ""}, so ${out.removed.length === 1 ? "it was" : "they were"} taken away.` : ""].filter(Boolean).join(" ");
+				toast({ title: level ? "Access updated" : "Access taken away", description: note || undefined });
+			} catch (e) { fail(e); } finally { setAreaBusy(null); }
+		};
+		const openPerson = (p: { id: string; name: string; email: string | null; isSuperAdmin: boolean; isAdmin?: boolean; userType?: string | null }) => setOpen({ ...p, isAdmin: p.isAdmin ?? true });
 	const live = open ? (data.admins.find((a) => a.id === open.id) ?? open) : null;
 
 	return (
@@ -166,10 +182,10 @@ export function PeoplePanel() {
 					{roles.length === 0 ? <p className="rounded-2xl border border-dashed border-serene-neutral-200 bg-white p-10 text-center text-sm text-serene-neutral-500">No roles yet.</p> : (
 						<ul className="grid gap-3 md:grid-cols-2">
 							{roles.map((r) => (
-								<li key={r.id} className="rounded-2xl border border-serene-neutral-200/70 bg-white p-4">
-									<div className="flex items-start gap-2">
-										<div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold text-serene-neutral-900">{r.name}</p>{r.description && <p className="text-xs text-serene-neutral-500">{r.description}</p>}</div>
-										<Button size="sm" variant="ghost" onClick={() => setEdit({ id: r.id, name: r.name, description: r.description ?? "", levels: Object.fromEntries(r.permissions.map((p) => { const x = parse(p); return [x.key, x.level]; })) })}>Edit</Button>
+								<li key={r.id} className="rounded-2xl border border-serene-neutral-200/70 bg-white p-4 transition hover:border-sauti-teal/40 hover:shadow-sm">
+										<div className="flex items-start gap-2">
+											<button type="button" onClick={() => setRoleOpen(r.id)} className="min-w-0 flex-1 text-left" aria-label={`Open ${r.name}`}><p className="truncate text-sm font-semibold text-serene-neutral-900">{r.name}</p>{r.description && <p className="text-xs text-serene-neutral-500">{r.description}</p>}</button>
+											<Button size="sm" variant="ghost" onClick={() => setEdit({ id: r.id, name: r.name, description: r.description ?? "", levels: Object.fromEntries(r.permissions.map((p) => { const x = parse(p); return [x.key, x.level]; })) })}>Edit</Button>
 										<button aria-label={`Delete ${r.name}`} onClick={async () => { if (!window.confirm(`Delete "${r.name}"?`)) return; try { setRoles(await unwrap(deleteRole(r.id))); } catch (e) { fail(e); } }} className="flex h-8 w-8 items-center justify-center rounded-full text-serene-neutral-400 hover:bg-red-50 hover:text-red-600"><Trash2 className="h-4 w-4" /></button>
 									</div>
 									<div className="mt-3 flex flex-wrap gap-1">
@@ -213,7 +229,7 @@ export function PeoplePanel() {
 				<SheetContent className="flex w-full flex-col gap-0 p-0 sm:max-w-lg">
 					{open && live && (() => {
 						const sa = data.superAdmins.find((x) => x.email.toLowerCase() === (open.email ?? "").toLowerCase());
-						const eff = effective(open.id, roles);
+						const eff = effective(open.id, roles, extras);
 						return (
 							<>
 								<SheetHeader className="border-b p-5">
@@ -242,21 +258,12 @@ export function PeoplePanel() {
 										)}
 									</section>
 									<section>
-										<h4 className="mb-2 text-sm font-semibold">What they can do</h4>
-										<ul className="divide-y divide-serene-neutral-100 overflow-hidden rounded-xl border border-serene-neutral-100">
-											{modules.map((m) => {
-												const l: Lvl | null = open.isSuperAdmin || !eff ? "owner" : eff.get(m.key) ?? null;
-												return (
-													<li key={m.key} className="flex items-center justify-between gap-3 px-3 py-2">
-														<span className="text-sm">{m.label}</span>
-														{l ? <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-medium capitalize", TONE[l])}>{l}</span> : <span className="text-xs text-serene-neutral-400">No access</span>}
-													</li>
-												);
-											})}
-										</ul>
-										{!open.isSuperAdmin && !eff && <p className="mt-1.5 text-xs text-serene-neutral-500">No role is set, so they can use everything. Give a role to limit this.</p>}
+										<h4 className="mb-1 text-sm font-semibold">What they can do</h4>
+										<p className="mb-2 text-xs text-serene-neutral-500">{open.isSuperAdmin ? "Super admins can do everything." : "Click what they cannot do to allow it, or the highest thing they can do to take it away. If the result matches a role, that role is added."}</p>
+										<AreaMatrix modules={modules} readOnly={open.isSuperAdmin} busyKey={areaBusy} levelOf={(k) => (open.isSuperAdmin || !eff ? "owner" : eff.get(k) ?? null)} onSet={(k, l) => void setArea(open.id, k, l)} />
+										{!open.isSuperAdmin && !eff && <p className="mt-1.5 text-xs text-serene-neutral-500">No role is set, so they can use everything. Take something away, or give a role, to limit this.</p>}
 									</section>
-									<section className="space-y-2">
+<section className="space-y-2">
 										<h4 className="text-sm font-semibold">Account</h4>
 										{open.isSuperAdmin ? (
 											sa?.is_protected ? <p className="flex items-center gap-1.5 text-sm text-serene-neutral-500"><Lock className="h-4 w-4" /> Protected: this account cannot be changed.</p>
@@ -274,6 +281,41 @@ export function PeoplePanel() {
 												<SelectContent><SelectItem value="survivor">Survivor</SelectItem><SelectItem value="professional">Professional</SelectItem><SelectItem value="ngo">NGO</SelectItem></SelectContent>
 											</Select>
 										)}
+									</section>
+								</div>
+							</>
+						);
+					})()}
+				</SheetContent>
+			</Sheet>
+
+						{/* What a role can and cannot do */}
+			<Sheet open={!!roleOpen} onOpenChange={(o) => !o && setRoleOpen(null)}>
+				<SheetContent className="flex w-full flex-col gap-0 p-0 sm:max-w-lg">
+					{(() => {
+						const r = roles.find((x) => x.id === roleOpen);
+						if (!r) return null;
+						const lv = new Map(r.permissions.map((p) => { const x = parse(p); return [x.key, x.level] as const; }));
+						const setRoleArea = async (key: string, level: Lvl | null) => {
+							setAreaBusy(key);
+							try {
+								const next = new Map(lv);
+								if (level) next.set(key, level); else next.delete(key);
+								setRoles(await unwrap(saveRole(r.id, { name: r.name, description: r.description, permissions: [...next.entries()].map(([k, l]) => `${k}:${l}`) })));
+								toast({ title: "Role updated", description: r.members.length ? `${r.members.length} ${r.members.length === 1 ? "person has" : "people have"} this role, so it applies to them now.` : undefined });
+							} catch (e) { fail(e); } finally { setAreaBusy(null); }
+						};
+						return (
+							<>
+								<SheetHeader className="border-b p-5 text-left"><SheetTitle>{r.name}</SheetTitle><SheetDescription>{r.description || "What this role can and cannot do in each part of the suite."}</SheetDescription></SheetHeader>
+								<div className="flex-1 space-y-5 overflow-y-auto p-5">
+									<section>
+										<p className="mb-2 text-xs text-serene-neutral-500">Click what the role cannot do to allow it, or the highest thing it can do to take it away. Changes apply to everyone who has the role.</p>
+										<AreaMatrix modules={modules} busyKey={areaBusy} levelOf={(k) => lv.get(k) ?? null} onSet={(k, l) => void setRoleArea(k, l)} />
+									</section>
+									<section>
+										<h4 className="mb-1.5 text-sm font-semibold">Who has it</h4>
+										<p className="text-sm text-serene-neutral-600">{r.members.length ? r.members.map((m) => m.name).join(", ") : "Nobody yet. Open a person under People to give it."}</p>
 									</section>
 								</div>
 							</>
