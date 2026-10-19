@@ -1,6 +1,6 @@
 /* Sauti Salama service worker: installability, offline fallback, and web push.
  * Hand-written (not generated): next-pwa is webpack-only and Next 16 builds with Turbopack. */
-const VERSION = "v1";
+const VERSION = "v2";
 const OFFLINE_URL = "/~offline";
 const CACHE = `sauti-${VERSION}`;
 
