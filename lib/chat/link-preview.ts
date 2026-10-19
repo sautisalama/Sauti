@@ -1,7 +1,7 @@
 import { lookup } from 'node:dns/promises';
 import { isIP } from 'node:net';
 import { isPrivateAddress } from '@/lib/net/ssrf';
-import { instagramPost, isInstagramHost, previewOf } from '@/lib/mjengo/social-fetch';
+import { instagramPost, isInstagramHost, isXHost, previewOf, xPost } from '@/lib/mjengo/social-fetch';
 
 export interface LinkPreview {
   title: string;
@@ -45,6 +45,11 @@ export async function loadLinkPreview(rawUrl: string): Promise<LinkPreview | nul
     if (isInstagramHost(rawUrl)) {
       const r = await instagramPost(rawUrl);
       return r.post ? previewOf(r.post) : null;
+    }
+    // A post on X is read through X's own embed endpoint (its words and its author); anything it cannot read is previewed as usual.
+    if (isXHost(rawUrl)) {
+      const x = await xPost(rawUrl);
+      if (x) return { title: `${x.author ?? x.handle ?? 'A post'} on X`, description: x.text.slice(0, 300), url: x.url };
     }
     let url = await assertPublicHttpUrl(rawUrl);
     let response: Response | null = null;

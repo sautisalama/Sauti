@@ -2,7 +2,7 @@ import { askAi } from '@/lib/mjengo/ai';
 import { AGGREGATOR_HOSTS, HUB_HOSTS, SOCIAL_HOSTS, fetchPage, hostOf, type PageMeta } from '@/lib/mjengo/page-fetch';
 import { DEADLINE_NOTE, checkDeadline, checkUrl, hostMatchesName, sameIssuer } from '@/lib/mjengo/evidence';
 import type { Verification, VerificationCheck, VerificationWebsite } from '@/lib/mjengo/opportunity-types';
-import { instagramPost, instagramProfile, isInstagramHost, type SocialPost } from '@/lib/mjengo/social-fetch';
+import { instagramPost, instagramProfile, isInstagramHost, isXHost, xPost, type SocialPost } from '@/lib/mjengo/social-fetch';
 
 /**
  * The PataNext verification workflow, for the opportunities the team collects.
@@ -143,6 +143,8 @@ export async function runVerification(input: { url: string | null; text: string 
     const r = await instagramPost(shared);
     ig = r.post;
     if (!ig) fetchError = r.message;
+  } else if (shared && isXHost(shared) && (await xPost(shared).then((x) => { if (x) ig = { url: x.url, author: x.handle, caption: x.text, image: null, takenAt: null, kind: 'post', source: 'oembed', mentions: [], tagged: [] }; return !!x; }))) {
+    // An X post is read through X's own embed endpoint: its words and where its links really go.
   } else if (shared) {
     try { page = await fetchPage(shared); } catch (e) { fetchError = e instanceof Error ? e.message : 'Could not open that link.'; }
   }
@@ -151,7 +153,7 @@ export async function runVerification(input: { url: string | null; text: string 
   const isAggregator = !!sharedHost && AGGREGATOR_HOSTS.test(sharedHost);
   const account = ig ? (ig.author ? `@${ig.author}` : null) : accountFrom(page, sharedHost);
 
-  const source = [text, ig?.caption, ig?.author ? `Posted by @${ig.author} on Instagram` : '', ig?.tagged.length ? `Accounts tagged in the post: ${ig.tagged.map((h) => `@${h}`).join(', ')}` : '', page?.title, page?.description, !isSocial ? page?.text : '']
+  const source = [text, ig?.caption, ig?.author ? `Posted by @${ig.author} on ${shared && isXHost(shared) ? 'X' : 'Instagram'}` : '', ig?.tagged.length ? `Accounts tagged in the post: ${ig.tagged.map((h) => `@${h}`).join(', ')}` : '', page?.title, page?.description, !isSocial ? page?.text : '']
     .map((s) => (s ?? '').trim()).filter(Boolean).join('\n\n').slice(0, 14_000);
 
   // 2. Extract the facts.
@@ -214,7 +216,7 @@ export async function runVerification(input: { url: string | null; text: string 
 
   // The link in the Instagram bio: the poster's own profile first, then the accounts the post tags or mentions (when an
   // aggregator reposts, the organisation behind it is usually named there). Only when the caption's links did not settle it.
-  if (ig && (!found || !matches(found.page))) {
+  if (ig && shared && isInstagramHost(shared) && (!found || !matches(found.page))) {
     const accounts = [...new Set([ig.author, ...ig.tagged, ...ig.mentions].filter((h): h is string => !!h))].slice(0, 3);
     for (const handle of accounts) {
       const prof = await instagramProfile(handle);

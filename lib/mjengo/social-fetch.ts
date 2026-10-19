@@ -176,3 +176,67 @@ export async function instagramProfile(handle: string): Promise<SocialProfile | 
   await db.from('mjengo_social_cache').upsert({ url_hash: hash, url, provider: 'apify', data: profile ? { profile } : { blocked: true }, fetched_at: new Date().toISOString() }, { onConflict: 'url_hash' });
   return profile;
 }
+
+/* ------------------------------------------------------------------ X (Twitter) */
+
+const X_STATUS = /^\/(?:[A-Za-z0-9_]{1,15}|i|web)\/status(?:es)?\/(\d{5,25})/;
+export const isXHost = (raw: string): boolean => { try { return /(^|\.)(x\.com|twitter\.com)$/i.test(new URL(raw).hostname); } catch { return false; } };
+
+/** The one post a link to X points at, in its plain form. Profiles, searches and lists are not posts. */
+export function xStatusUrl(raw: string): string | null {
+  try {
+    const u = new URL(raw);
+    if (!isXHost(raw)) return null;
+    const m = X_STATUS.exec(u.pathname);
+    if (!m) return null;
+    const handle = u.pathname.split('/')[1];
+    return `https://x.com/${handle}/status/${m[1]}`;
+  } catch { return null; }
+}
+
+const unentity = (s: string) => s.replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/&#0?39;|&apos;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&nbsp;/g, ' ');
+
+/** Where a t.co short link really goes, without opening the page (only X's own shortener is followed). */
+async function expandTco(href: string): Promise<string | null> {
+  try {
+    const u = await assertPublic(href);
+    if (!/(^|\.)t\.co$/i.test(u.hostname)) return href;
+    const res = await fetch(u, { redirect: 'manual', headers: { 'user-agent': 'curl/8.5.0' }, signal: AbortSignal.timeout(6000) });
+    const loc = res.headers.get('location');
+    if (loc) return new URL(loc, u).toString();
+    const meta = /<meta[^>]+http-equiv=["']refresh["'][^>]+URL=['"]?([^'">\s]+)/i.exec(await res.text());
+    return meta ? unentity(meta[1]) : null;
+  } catch { return null; }
+}
+
+export interface XPost { url: string; author: string | null; handle: string | null; text: string; links: string[] }
+
+/**
+ * One public post on X through X's own embed endpoint (no key, no login): who wrote it, what it says, and where its links
+ * really go (X shortens them, so each is followed once and written into the text, which lets the evidence check see them).
+ */
+export async function xPost(raw: string): Promise<XPost | null> {
+  const url = xStatusUrl(raw);
+  if (!url || !enabled()) return null;
+  try {
+    const res = await fetch(`https://publish.twitter.com/oembed?${new URLSearchParams({ url, omit_script: 'true', dnt: 'true' })}`, { signal: AbortSignal.timeout(10_000) });
+    if (!res.ok) return null;
+    const j = (await res.json()) as { html?: string; author_name?: string; author_url?: string };
+    const html = j.html ?? '';
+    const p = /<p[^>]*>([\s\S]*?)<\/p>/i.exec(html)?.[1];
+    if (!p) return null;
+    const links: string[] = [];
+    let body = p.replace(/<br\s*\/?>/gi, '\n');
+    const anchors = [...body.matchAll(/<a\b[^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi)];
+    for (const a of anchors.slice(0, 6)) {
+      const href = unentity(a[1]);
+      const shown = unentity(a[2].replace(/<[^>]+>/g, '')).trim();
+      if (/^pic\.(twitter|x)\.com/i.test(shown) || /^#|^@/.test(shown)) continue;
+      const real = (await expandTco(href)) ?? href;
+      if (/^https?:\/\//i.test(real) && !isXHost(real)) { links.push(real); body = body.replace(a[0], ` ${real} `); }
+    }
+    const text = unentity(body.replace(/<[^>]+>/g, '')).replace(/[ \t]+/g, ' ').replace(/\n{3,}/g, '\n\n').trim().slice(0, 1500);
+    const handle = /^\/?([A-Za-z0-9_]{1,15})/.exec(new URL(j.author_url ?? url).pathname)?.[1] ?? null;
+    return { url, author: trim(j.author_name, 80), handle, text, links: [...new Set(links)].slice(0, 5) };
+  } catch { return null; }
+}
