@@ -2,14 +2,15 @@ import { askAi } from '@/lib/mjengo/ai';
 import { AGGREGATOR_HOSTS, HUB_HOSTS, SOCIAL_HOSTS, fetchPage, hostOf, type PageMeta } from '@/lib/mjengo/page-fetch';
 import { DEADLINE_NOTE, checkDeadline, checkUrl, hostMatchesName, sameIssuer } from '@/lib/mjengo/evidence';
 import type { Verification, VerificationCheck, VerificationWebsite } from '@/lib/mjengo/opportunity-types';
+import { instagramPost, instagramProfile, isInstagramHost, type SocialPost } from '@/lib/mjengo/social-fetch';
 
 /**
  * The PataNext verification workflow, for the opportunities the team collects.
  *
- *   1. read the shared link (social posts are read the way link previews read them: the caption and account)
+ *   1. read the shared link (an Instagram post through the shared lookup: its caption, account and tags; other pages as pages)
  *   2. extract the facts with AI, with the exact words behind the deadline
  *   3. check the evidence in code: a deadline only counts if the post states it, a link only if it is there
- *   4. find the organisation's own website (from the post, the page, or a web search) and read ITS details
+ *   4. find the organisation's own website (from the post, the page, the link in the Instagram bio, or a web search) and read ITS details
  *   5. decide how far to trust it, and say why
  *
  * The details shown for an opportunity come from the organisation's website, not from the social post.
@@ -74,7 +75,7 @@ async function extract(today: string, url: string | null, source: string, jsonLd
 }
 
 /** The organisation's own website, found with a web search when the post does not link to it. */
-async function searchWebsite(issuer: string, title: string | null): Promise<string | null> {
+async function searchWebsite(issuer: string, title: string | null): Promise<{ url: string; cited: boolean } | null> {
   const key = process.env.OPENROUTER_API_KEY;
   if (!key || !issuer) return null;
   try {
@@ -101,9 +102,10 @@ async function searchWebsite(issuer: string, title: string | null): Promise<stri
     if (!answer) return null;
     const h = hostOf(answer);
     if (!h || SOCIAL_HOSTS.test(h) || AGGREGATOR_HOSTS.test(h) || HUB_HOSTS.test(h)) return null;
-    // Only trust a site the search itself cited.
+    // A site the search itself cited is trusted as found. An answer with no citation is only a lead: the caller opens it and
+    // keeps it only if the page's own name matches the organisation.
     const cited = (msg?.annotations ?? []).some((a) => a.url_citation?.url && hostOf(a.url_citation.url) === h);
-    return cited ? new URL(answer).origin : null;
+    return { url: new URL(answer).origin, cited };
   } catch {
     return null;
   }
@@ -134,16 +136,22 @@ export async function runVerification(input: { url: string | null; text: string 
 
   // 1. Read the shared link.
   let page: PageMeta | null = null;
+  let ig: SocialPost | null = null;
   let fetchError: string | null = null;
-  if (shared) {
+  if (shared && isInstagramHost(shared)) {
+    // Instagram asks for a sign-in, so it is never read as a page: the caption, author and tags come from the shared lookup.
+    const r = await instagramPost(shared);
+    ig = r.post;
+    if (!ig) fetchError = r.message;
+  } else if (shared) {
     try { page = await fetchPage(shared); } catch (e) { fetchError = e instanceof Error ? e.message : 'Could not open that link.'; }
   }
   const sharedHost = hostOf(page?.finalUrl ?? shared);
   const isSocial = !!sharedHost && SOCIAL_HOSTS.test(sharedHost);
   const isAggregator = !!sharedHost && AGGREGATOR_HOSTS.test(sharedHost);
-  const account = accountFrom(page, sharedHost);
+  const account = ig ? (ig.author ? `@${ig.author}` : null) : accountFrom(page, sharedHost);
 
-  const source = [text, page?.title, page?.description, !isSocial ? page?.text : '']
+  const source = [text, ig?.caption, ig?.author ? `Posted by @${ig.author} on Instagram` : '', ig?.tagged.length ? `Accounts tagged in the post: ${ig.tagged.map((h) => `@${h}`).join(', ')}` : '', page?.title, page?.description, !isSocial ? page?.text : '']
     .map((s) => (s ?? '').trim()).filter(Boolean).join('\n\n').slice(0, 14_000);
 
   // 2. Extract the facts.
@@ -177,23 +185,61 @@ export async function runVerification(input: { url: string | null; text: string 
     if (candidates.length >= 5) break;
   }
 
-  let website: PageMeta | null = null;
-  let foundBy: Verification['foundBy'] = null;
-  for (const c of candidates) {
-    try {
-      const p = await fetchPage(c.url);
-      const h = hostOf(p.finalUrl);
-      if (!h || SOCIAL_HOSTS.test(h) || AGGREGATOR_HOSTS.test(h) || p.status >= 400) continue;
-      website = p; foundBy = c.via;
-      break;
-    } catch { /* try the next one */ }
-  }
-  if (!website && organisationHint) {
-    const found = await searchWebsite(organisationHint, ex?.title ?? null);
-    if (found) {
+  const matches = (p: PageMeta) => sameIssuer(organisationHint, p.organisation ?? p.siteName) || hostMatchesName(hostOf(p.finalUrl), organisationHint);
+  const tried = new Set<string>();
+  // Open candidates in turn. A link hub (Linktree and the like) is never the website itself: its own links are tried instead.
+  const attempt = async (list: typeof candidates): Promise<{ page: PageMeta; via: NonNullable<Verification['foundBy']> } | null> => {
+    for (let i = 0; i < list.length && i < 8; i++) {
+      const c = list[i];
+      const key = hostOf(c.url) ?? c.url;
+      if (tried.has(key)) continue;
+      tried.add(key);
       try {
-        const p = await fetchPage(found);
-        if (p.status < 400) { website = p; foundBy = 'search'; }
+        const p = await fetchPage(c.url);
+        const h = hostOf(p.finalUrl);
+        if (!h || p.status >= 400 || SOCIAL_HOSTS.test(h) || AGGREGATOR_HOSTS.test(h)) continue;
+        if (HUB_HOSTS.test(h)) {
+          for (const l of p.links) {
+            const lh = hostOf(l);
+            if (lh && !SOCIAL_HOSTS.test(lh) && !AGGREGATOR_HOSTS.test(lh) && !HUB_HOSTS.test(lh) && !list.some((x) => hostOf(x.url) === lh) && list.length < 8) list.push({ url: l, via: c.via });
+          }
+          continue;
+        }
+        return { page: p, via: c.via };
+      } catch { /* try the next one */ }
+    }
+    return null;
+  };
+  let found = await attempt(candidates);
+
+  // The link in the Instagram bio: the poster's own profile first, then the accounts the post tags or mentions (when an
+  // aggregator reposts, the organisation behind it is usually named there). Only when the caption's links did not settle it.
+  if (ig && (!found || !matches(found.page))) {
+    const accounts = [...new Set([ig.author, ...ig.tagged, ...ig.mentions].filter((h): h is string => !!h))].slice(0, 3);
+    for (const handle of accounts) {
+      const prof = await instagramProfile(handle);
+      const fromBio: typeof candidates = [];
+      for (const w of prof?.websites ?? []) {
+        const wh = hostOf(w);
+        if (wh && !SOCIAL_HOSTS.test(wh) && !AGGREGATOR_HOSTS.test(wh)) fromBio.push({ url: w, via: 'bio' });
+      }
+      for (const w of prof?.websites ?? []) { const wh = hostOf(w); if (wh && HUB_HOSTS.test(wh) && !fromBio.some((c) => c.url === w)) fromBio.push({ url: w, via: 'bio' }); }
+      if (!fromBio.length) continue;
+      const f = await attempt(fromBio);
+      // The poster's own site is only taken when it belongs to the organisation the post is about (an aggregator's bio link
+      // is not the funder's website). With no organisation named there is nothing to check it against.
+      if (f && (matches(f.page) || !organisationHint) && !found) { found = f; if (matches(f.page)) break; }
+      else if (f && matches(f.page)) { found = f; break; }
+    }
+  }
+  let website: PageMeta | null = found?.page ?? null;
+  let foundBy: Verification['foundBy'] = found?.via ?? null;
+  if (!website && organisationHint) {
+    const lead = await searchWebsite(organisationHint, ex?.title ?? null);
+    if (lead) {
+      try {
+        const p = await fetchPage(lead.url);
+        if (p.status < 400 && (lead.cited || matches(p))) { website = p; foundBy = 'search'; }
       } catch { /* not reachable */ }
     }
   }
@@ -221,7 +267,7 @@ export async function runVerification(input: { url: string | null; text: string 
   if (asksForMoney && trust !== 'verified') { trust = 'suspicious'; reason = 'The post talks about fees or money transfers, and no official source was confirmed.'; }
 
   checks.push({ id: 'source', label: sourceKind === 'social_post' ? `Posted on ${sharedHost}` : sourceKind === 'official' ? 'Shared from the organisation itself' : sharedHost ? `Shared from ${sharedHost}` : 'No link was shared', ok: sourceKind === 'official' || sourceKind === 'social_post', note: account ?? undefined });
-  checks.push({ id: 'website', label: website ? `Original website found: ${siteHost}` : 'Original website not found', ok: !!website, note: foundBy === 'search' ? 'Found with a web search.' : undefined });
+  checks.push({ id: 'website', label: website ? `Original website found: ${siteHost}` : 'Original website not found', ok: !!website, note: foundBy === 'search' ? 'Found with a web search.' : foundBy === 'bio' ? 'Found from the link in the Instagram profile.' : undefined });
   checks.push({ id: 'org', label: organisation ? `From ${organisation}` : 'Organisation not named', ok: !!website && orgMatch });
   checks.push({ id: 'deadline', label: deadline ? `Deadline ${deadline}` : 'No deadline found', ok: deadlineEvidence === 'stated', note: DEADLINE_NOTE[deadlineEvidence] });
   checks.push({ id: 'apply', label: applyUrl ? 'Apply link is in the post' : 'No apply link in the post', ok: !!applyUrl });

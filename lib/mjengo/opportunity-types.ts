@@ -38,7 +38,7 @@ export interface Verification {
 	email: string | null;
 	checks: VerificationCheck[];
 	/** How the website was found. */
-	foundBy: "post" | "page" | "link" | "search" | null;
+	foundBy: "post" | "page" | "link" | "bio" | "search" | null;
 	error?: string;
 }
 

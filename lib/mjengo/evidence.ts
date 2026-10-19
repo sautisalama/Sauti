@@ -102,8 +102,14 @@ export function sameIssuer(a: string | null | undefined, b: string | null | unde
 }
 
 /** Does the organisation's name show up in the website's host (unhcr -> unhcr.org)? */
+const GENERIC_LABEL = new Set(['www', 'careers', 'jobs', 'apply', 'recruit', 'recruitment', 'hr', 'news', 'en', 'org', 'com', 'net', 'edu', 'gov', 'int', 'co', 'ke', 'uk', 'ac', 'io', 'info']);
 export function hostMatchesName(host: string | null, name: string | null): boolean {
   if (!host || !name) return false;
+  // A short name or its initials can be the whole domain: "UN Secretariat" on careers.un.org, "UNDP" on undp.org.
+  const labels = host.toLowerCase().split('.').filter((l) => l && !GENERIC_LABEL.has(l));
+  const toks = [...tokens(name)];
+  const initials = toks.map((t) => t[0]).join('');
+  if (labels.some((l) => l.length >= 2 && (toks.includes(l) || (initials.length >= 3 && l === initials)))) return true;
   const h = host.replace(/\.[a-z]{2,}(\.[a-z]{2})?$/, '').replace(/[^a-z0-9]/g, '');
   const parts = [...tokens(name)].filter((t) => t.length >= 3);
   if (!parts.length) return false;
