@@ -3,7 +3,7 @@
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { ArrowLeft, ChevronLeft, ChevronRight, Download, Maximize2, Minimize2, Play, Share2, X } from "lucide-react";
+import { ArrowLeft, Pencil, ChevronLeft, ChevronRight, Download, Maximize2, Minimize2, Play, Share2, X } from "lucide-react";
 import { ShareDialog } from "../../_components/ShareDialog";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -223,6 +223,7 @@ function Viewer() {
 							<Button variant="ghost" size="icon" aria-label="Next slide" disabled={index >= count - 1} onClick={() => go("next")}><ChevronRight className="h-[18px] w-[18px]" /></Button>
 						</>
 					)}
+					{fileId && <Button asChild variant="outline" size="sm" className="h-9 gap-1.5"><Link href={`/dashboard/mjengo/files/deck?from=${fileId}`}><Pencil className="h-4 w-4" /><span className="hidden sm:inline">Edit as slides</span></Link></Button>}
 					<Button size="sm" className="h-9 gap-1.5 bg-sauti-teal hover:bg-sauti-dark" onClick={() => void present()} disabled={loading || !!error || count === 0}><Play className="h-4 w-4" /> Present</Button>
 					{fileId && <Button variant="outline" size="sm" className="h-9 min-w-0 shrink-0 gap-1.5" onClick={() => setShareOpen(true)} aria-label="Share"><Share2 className="h-4 w-4" /><span className="hidden sm:inline">Share</span></Button>}
 					{url && <Button asChild variant="outline" size="sm" className="h-9 min-w-0 gap-1.5"><a href={url} download={name}><Download className="h-4 w-4" /> <span className="hidden sm:inline">Download</span></a></Button>}

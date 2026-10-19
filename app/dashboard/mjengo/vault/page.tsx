@@ -147,6 +147,7 @@ export default function VaultPage() {
 			return;
 		}
 		const ext = i.name.includes(".") ? i.name.split(".").pop()!.toLowerCase() : "";
+		if (ext === "deck") { window.location.href = `/dashboard/mjengo/files/deck?file=${i.id}`; return; }
 		if (ext === "excalidraw") { window.location.href = `/dashboard/mjengo/files/draw?file=${i.id}`; return; }
 		if (ext === "pdf") { window.location.href = `/dashboard/mjengo/files/pdf?file=${i.id}`; return; }
 		if (["xlsx", "xls", "csv"].includes(ext)) { window.location.href = `/dashboard/mjengo/files/sheet?file=${i.id}`; return; }
@@ -194,6 +195,7 @@ export default function VaultPage() {
 			<DropdownMenuContent align="end">
 				{i.type === "file" && /\.pdf$/i.test(i.name) && <DropdownMenuItem onClick={() => { window.location.href = `/dashboard/mjengo/files/pdf?file=${i.id}`; }}><FileEdit className="mr-2 h-4 w-4" />Sign or mark up</DropdownMenuItem>}
 				{i.type === "file" && /\.pptx?$/i.test(i.name) && <DropdownMenuItem onClick={() => { window.location.href = `/dashboard/mjengo/files/slides?file=${i.id}`; }}><FileEdit className="mr-2 h-4 w-4" />View slides</DropdownMenuItem>}
+				{i.type === "file" && /pptx?$/i.test(i.name) && <DropdownMenuItem onClick={() => { window.location.href = `/dashboard/mjengo/files/deck?from=${i.id}`; }}><FileEdit className="mr-2 h-4 w-4" />Edit as slides</DropdownMenuItem>}
 				{i.type === "file" && /\.(xlsx|xls|csv)$/i.test(i.name) && <DropdownMenuItem onClick={() => { window.location.href = `/dashboard/mjengo/files/sheet?file=${i.id}`; }}><FileEdit className="mr-2 h-4 w-4" />Open as a sheet</DropdownMenuItem>}
 				{i.type === "file" && /\.(docx|doc|odt|rtf|md|txt)$/i.test(i.name) && <DropdownMenuItem onClick={() => { window.location.href = `/dashboard/mjengo/documents/editor?file=${i.id}`; }}><FileEdit className="mr-2 h-4 w-4" />{i.level === "edit" ? "Edit" : "Open in editor"}</DropdownMenuItem>}
 				<DropdownMenuItem onClick={() => open(i)}>{i.type === "folder" ? <Folder className="mr-2 h-4 w-4" /> : <Download className="mr-2 h-4 w-4" />}{i.type === "folder" ? "Open" : "Download"}</DropdownMenuItem>
@@ -268,10 +270,11 @@ export default function VaultPage() {
 
 			{!folderId && tab === "mine" && (
 				<Fold id="new" title="Start something new" openMap={fold} onToggle={toggleFold}>
-					<section aria-label="Start something new" className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+					<section aria-label="Start something new" className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-7">
 						<NewCard badge="DOCX" tone="bg-[#3b8bc2]" label="Document" onClick={() => setPickDoc(true)} hint="Blank or from a template" />
 						<NewCard badge="XLSX" tone="bg-[#43a047]" label="Spreadsheet" onClick={() => { window.location.href = "/dashboard/mjengo/files/sheet"; }} />
-						<NewCard badge="PPTX" tone="bg-[#ef7d3c]" label="Presentation" onClick={() => setDeck(true)} hint="Made with AI from a topic" />
+						<NewCard badge="SLIDES" tone="bg-[#ef7d3c]" label="Presentation" onClick={() => { window.location.href = `/dashboard/mjengo/files/deck${folderId ? `?folder=${folderId}` : ""}`; }} hint="Templates, AI, edit together" />
+						<NewCard badge="PPTX" tone="bg-[#d9622b]" label="PowerPoint from AI" onClick={() => setDeck(true)} hint="A .pptx file from a topic" />
 						<NewCard badge="PDF" tone="bg-[#e0483d]" label="PDF" onClick={() => pdfInput.current?.click()} hint="Add a PDF to sign or mark up" />
 						<NewCard badge="FLOW" tone="bg-[#7c3aed]" label="Flow or diagram" onClick={() => { window.location.href = "/dashboard/mjengo/files/draw"; }} hint="Draw with Excalidraw" />
 						<NewCard badge="URL" tone="bg-[#6b7280]" label="Link" onClick={() => setAddLink(true)} hint="Save a web address" />
@@ -552,7 +555,7 @@ function NameDialog({ open, title, action, initial, busy, onClose, onSubmit }: {
 }
 
 
-const TYPE_STYLE: Record<string, string> = { pdf: "bg-[#e0483d]", doc: "bg-[#3b8bc2]", docx: "bg-[#3b8bc2]", xls: "bg-[#43a047]", xlsx: "bg-[#43a047]", csv: "bg-[#43a047]", ppt: "bg-[#ef7d3c]", pptx: "bg-[#ef7d3c]", png: "bg-[#8e5bd6]", jpg: "bg-[#8e5bd6]", jpeg: "bg-[#8e5bd6]", txt: "bg-[#6b7280]", md: "bg-[#6b7280]", url: "bg-[#0f766e]" };
+const TYPE_STYLE: Record<string, string> = { pdf: "bg-[#e0483d]", doc: "bg-[#3b8bc2]", docx: "bg-[#3b8bc2]", xls: "bg-[#43a047]", xlsx: "bg-[#43a047]", csv: "bg-[#43a047]", ppt: "bg-[#ef7d3c]", pptx: "bg-[#ef7d3c]", deck: "bg-[#ef7d3c]", png: "bg-[#8e5bd6]", jpg: "bg-[#8e5bd6]", jpeg: "bg-[#8e5bd6]", txt: "bg-[#6b7280]", md: "bg-[#6b7280]", url: "bg-[#0f766e]" };
 
 function TypeIcon({ name, big }: { name: string; big?: boolean }) {
 	const ext = name.includes(".") ? name.split(".").pop()!.toLowerCase() : "";

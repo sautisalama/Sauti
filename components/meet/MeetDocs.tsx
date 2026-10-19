@@ -10,7 +10,7 @@ import { VaultPicker } from "@/app/dashboard/mjengo/_components/VaultPicker";
 
 const DOC = ["docx", "doc", "odt", "rtf", "md"];
 const SHEET = ["xlsx", "xls", "csv"];
-const SLIDES = ["pptx", "ppt"];
+const SLIDES = ["pptx", "ppt", "deck"];
 const IMG = ["png", "jpg", "jpeg", "gif", "webp", "svg"];
 
 export function iconFor(ext: string) {

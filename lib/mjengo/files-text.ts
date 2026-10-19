@@ -34,6 +34,12 @@ export async function textFromBytes(bytes: Uint8Array, name: string, mime: strin
       const r = await mammoth.extractRawText({ buffer: Buffer.from(bytes) });
       return r.value.trim().slice(0, max);
     }
+    if (ext === 'deck') {
+      try {
+        const d = JSON.parse(Buffer.from(bytes).toString('utf8')) as { title?: string; slides?: { notes?: string; els?: { type?: string; text?: string }[] }[] };
+        return [d.title ?? '', ...(d.slides ?? []).map((s, i) => `Slide ${i + 1}: ${(s.els ?? []).filter((e) => e.type === 'text' && e.text).map((e) => e.text).join(' / ')}${s.notes ? ` (notes: ${s.notes})` : ''}`)].join('\n').slice(0, max);
+      } catch { return ''; }
+    }
     if (ext === 'excalidraw') return excalidrawText(Buffer.from(bytes).toString('utf8'), max);
     if (['txt', 'md', 'csv', 'json', 'html'].includes(ext) || (mime ?? '').startsWith('text/')) {
       return Buffer.from(bytes).toString('utf8').slice(0, max);
