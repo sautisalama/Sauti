@@ -1,6 +1,9 @@
 "use client";
 
-import { Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useUser } from "@/hooks/useUser";
+import { useLiveSheet } from "@/lib/client/univer-live";
+import { LivePeople } from "@/components/LivePeople";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { ArrowLeft, Download, Loader2, Save, Share2 } from "lucide-react";
@@ -90,6 +93,15 @@ function SheetScreen() {
 	const [askText, setAskText] = useState("");
 	const [asking, setAsking] = useState(false);
 	const [formulas, setFormulas] = useState(false);
+	const [liveApi, setLiveApi] = useState<unknown>(null);
+	const user = useUser();
+	const me = useMemo(() => {
+		if (!user) return null;
+		const p = user.profile as { first_name?: string | null; last_name?: string | null; avatar_url?: string | null } | null | undefined;
+		return { id: user.id, name: [p?.first_name, p?.last_name].filter(Boolean).join(" ") || user.email || "Someone", avatar: p?.avatar_url ?? null };
+	}, [user]);
+	// Several people in the same saved file edit it together.
+	const live = useLiveSheet({ roomId: fileId && level !== "view" ? fileId : null, api: liveApi as never, me, ready: !loading });
 
 	// Open the file, then start the spreadsheet.
 	useEffect(() => {
@@ -127,6 +139,7 @@ function SheetScreen() {
 					sheets: Object.fromEntries(sheets.map((s) => [s.id, s])),
 				} as never);
 				api.current = univerAPI as never;
+				setLiveApi(univerAPI);
 				disposer.current = () => univer.dispose();
 			} catch (e) {
 				toast({ title: "Could not open the spreadsheet", description: e instanceof Error ? e.message : undefined, variant: "destructive" });
@@ -235,6 +248,7 @@ function SheetScreen() {
 				<Input value={name} onChange={(e) => setName(e.target.value)} aria-label="File name" className="h-9 min-w-0 flex-1 border-transparent sm:max-w-xs sm:flex-none bg-transparent px-2 text-[15px] font-medium shadow-none hover:border-black/10 focus-visible:ring-1" />
 				{level !== "edit" && <span className="hidden text-xs text-[#787774] sm:inline">View only: saving makes your own copy</span>}
 				<span className="hidden flex-1 sm:block" />
+				<LivePeople people={live.people} />
 				{fileId && level !== "view" && <Button variant="outline" size="sm" className="h-9 min-w-0 shrink-0 gap-1.5" onClick={() => setShareOpen(true)} aria-label="Share"><Share2 className="h-4 w-4" /><span className="hidden sm:inline">Share</span></Button>}
 				<Button variant="outline" size="sm" className="h-9 shrink-0 gap-1.5" onClick={() => setFormulas((v) => !v)} aria-pressed={formulas} aria-label="Formulas"><span className="font-serif text-base italic leading-none">fx</span><span className="hidden sm:inline">Formulas</span></Button>
 				<Button variant="ghost" size="sm" className="gap-1.5" onClick={download} disabled={loading}><Download className="h-4 w-4" /> <span className="hidden sm:inline">Download</span></Button>
