@@ -42,16 +42,18 @@ export default async function DashboardLayout({
 
 	return (
 		<div className="flex min-h-screen bg-serene-neutral-50 dark:bg-neutral-950 overflow-x-hidden">
+			{/* A page opened inside a call (?embed=1 in a frame) drops the suite's own chrome. */}
+			<script dangerouslySetInnerHTML={{ __html: "try{if(self!==top&&/[?&]embed=1/.test(location.search))document.documentElement.classList.add('ss-embed')}catch(e){}" }} />
 			<DashboardDataProvider initialData={initialData || fallbackData}>
 				{/* Device session tracking */}
 				<DeviceRegistration />
 				<PushAndBadge />
 				<SuiteTracker />
 				{/* Desktop Sidebar */}
-				<EnhancedSidebar />
+				<div data-chrome className="contents"><EnhancedSidebar /></div>
 
 				{/* Mobile Top Bar */}
-				<MobileTopBar />
+				<div data-chrome className="contents"><MobileTopBar /></div>
 
 				{/* Main Content Area - Handles dynamic margins for sidebar */}
 				<DashboardContent>
@@ -63,7 +65,7 @@ export default async function DashboardLayout({
 				</DashboardContent>
 
 				{/* Mobile Bottom Navigation */}
-				<EnhancedBottomNav />
+				<div data-chrome className="contents"><EnhancedBottomNav /></div>
 			</DashboardDataProvider>
 		</div>
 	);

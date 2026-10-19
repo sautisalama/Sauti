@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { useSearchParams } from "next/navigation";
 import { ArrowLeft, FileSpreadsheet, FileText, Loader2, Save, Sparkles, Upload } from "lucide-react";
@@ -17,12 +17,14 @@ import { MjengoLoader } from "../../_components/MjengoLoader";
 import { TagEditor } from "../../_components/Facets";
 import { VaultPicker } from "../../_components/VaultPicker";
 import { getFileUrl } from "../../vault/api";
+import { useUser } from "@/hooks/useUser";
+import { useLiveBoard } from "@/lib/client/excalidraw-live";
 
 // The drawing board loads only in the browser.
 const Excalidraw = dynamic(async () => (await import("@excalidraw/excalidraw")).Excalidraw, { ssr: false, loading: () => <MjengoLoader label="Opening the drawing board" className="h-full min-h-0" /> });
 
 type Scene = { elements?: unknown[]; appState?: Record<string, unknown>; files?: Record<string, unknown> };
-type Api = { getSceneElements: () => readonly unknown[]; updateScene: (s: Record<string, unknown>) => void; scrollToContent: (t?: unknown, o?: Record<string, unknown>) => void };
+type Api = { getSceneElements: () => readonly unknown[]; getSceneElementsIncludingDeleted: () => readonly unknown[]; getAppState: () => unknown; addFiles: (f: { id: string; dataURL: string; mimeType: string; created: number }[]) => void; updateScene: (s: Record<string, unknown>) => void; scrollToContent: (t?: unknown, o?: Record<string, unknown>) => void };
 
 const DEFAULT_NAME = "Untitled flow";
 const EXAMPLES = [
@@ -64,6 +66,16 @@ function Draw() {
 	const userNamed = useRef(false);
 	const savedSig = useRef<string | null>(null);
 	const fileInput = useRef<HTMLInputElement>(null);
+	// Opened inside a call: the board is shared there, and the page's own back button has nowhere to go.
+	const embed = params.get("embed") === "1";
+	const user = useUser();
+	const me = useMemo(() => {
+		if (!user) return null;
+		const p = user.profile as { first_name?: string | null; last_name?: string | null; avatar_url?: string | null } | null | undefined;
+		return { id: user.id, name: [p?.first_name, p?.last_name].filter(Boolean).join(" ") || user.email || "Someone", avatar: p?.avatar_url ?? null };
+	}, [user]);
+	// Everyone who has this drawing open draws on the same board, with their names, photos and pointers.
+	const live = useLiveBoard({ roomId: fileId, api, me });
 
 	useEffect(() => {
 		const id = params.get("file");
@@ -246,10 +258,19 @@ function Draw() {
 	return (
 		<div className="flex h-full min-h-0 flex-col bg-white">
 			<div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-black/10 px-3 py-2">
-				<button onClick={() => window.history.back()} aria-label="Back" className="flex h-9 w-9 items-center justify-center rounded-full hover:bg-black/5"><ArrowLeft className="h-4 w-4" /></button>
+				{!embed && <button onClick={() => window.history.back()} aria-label="Back" className="flex h-9 w-9 items-center justify-center rounded-full hover:bg-black/5"><ArrowLeft className="h-4 w-4" /></button>}
 				<Input value={name} onChange={(e) => { userNamed.current = true; setName(e.target.value); setDirty(true); }} aria-label="Name of the drawing" className="h-9 max-w-xs font-semibold" />
 				<span className="text-xs text-serene-neutral-500">{saving ? "Saving…" : dirty ? "Saving soon…" : fileId ? "Saved" : "Draw something and it saves itself"}{entity && !linked && !fileId ? " · will be added to the record you came from" : ""}</span>
 				<span className="flex-1" />
+				{live.people.length > 0 && (
+					<span className="flex shrink-0 -space-x-2" aria-label={`Drawing now: ${live.people.map((p) => p.name).join(", ")}`}>
+						{live.people.slice(0, 5).map((p) => (
+							<span key={p.key} title={p.name} style={{ backgroundColor: p.color }} className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-full text-xs font-bold text-white ring-2 ring-white">
+								{p.avatar ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={p.avatar} alt="" className="h-full w-full object-cover" /> : p.name.charAt(0).toUpperCase()}
+							</span>
+						))}
+					</span>
+				)}
 				{fileId && tags && <div className="hidden min-w-0 max-w-sm lg:block"><TagEditor type="file" id={fileId} tags={tags} onChange={setTags} /></div>}
 				<Button variant="outline" onClick={() => setAiOpen(true)} className="gap-1.5 rounded-full"><Sparkles className="h-4 w-4 text-sauti-teal" /> Design with AI</Button>
 				<Button variant="outline" disabled={busy !== null} onClick={() => fileInput.current?.click()} className="gap-1.5 rounded-full">{busy === "import" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />} Import</Button>
@@ -262,9 +283,12 @@ function Draw() {
 			<div className="relative min-h-0 flex-1">
 				<Excalidraw
 					excalidrawAPI={(a) => setApi(a as unknown as Api)}
+					onPointerUpdate={(p) => live.pointer(p as never)}
+					name={name}
 					initialData={initial ? ({ elements: initial.elements, appState: initial.appState, files: initial.files, scrollToContent: true } as never) : undefined}
 					onChange={(elements, appState, files) => {
 						scene.current = { elements, appState: appState as unknown as Record<string, unknown>, files: files as unknown as Record<string, unknown> };
+						live.changed(elements, files as unknown as Record<string, unknown>);
 						const s = signature(elements, files as unknown as Record<string, unknown>);
 						if (sig.current === null) { sig.current = s; savedSig.current = s; return; }
 						if (s !== sig.current) { sig.current = s; if (s !== savedSig.current) setDirty(true); }

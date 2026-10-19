@@ -20,6 +20,9 @@ import { createClient } from "@/utils/supabase/client";
 import { unwrap } from "@/lib/action-result";
 import { saveTranscript, type TranscriptLine } from "@/app/actions/mjengo-meet";
 import { cn } from "@/lib/utils";
+import { FolderOpen } from "lucide-react";
+import { DocsPanel, DocWorkspace, useMeetingDocs } from "./MeetDocs";
+import type { MeetingDoc } from "@/app/actions/meet-docs";
 
 type SignalKind = "offer" | "answer" | "ice";
 interface Peer { id: string; name: string; companion?: boolean; uid?: string | null }
@@ -45,7 +48,12 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 	const [sharing, setSharing] = useState(false);
 	const [remotes, setRemotes] = useState<Remote[]>([]);
 	const [captionsOn, setCaptionsOn] = useState(false);
-	const [panel, setPanel] = useState<"none" | "transcript" | "people" | "info" | "chat" | "polls" | "settings">("none");
+	const [panel, setPanel] = useState<"none" | "transcript" | "people" | "info" | "chat" | "polls" | "settings" | "docs">("none");
+	// Documents attached to the call, from before it started or added during it, opened beside the call for everyone.
+	const meetDocs = useMeetingDocs(code, !!userId);
+	const [openDoc, setOpenDoc] = useState<MeetingDoc | null>(null);
+	const refreshDocsRef = useRef(meetDocs.refresh);
+	refreshDocsRef.current = meetDocs.refresh;
 	const [handUp, setHandUp] = useState(false);
 	const [a11yOpen, setA11yOpen] = useState(false);
 	const [moreOpen, setMoreOpen] = useState(false);
@@ -340,6 +348,7 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 					void unwrap(verifyHostToken(code, c.ht)).then((ok) => { if (ok) { hostIds.current.add(String(c.id)); setRemote(String(c.id), { host: true }); } }).catch(() => undefined);
 				})
 				.on("broadcast", { event: "react" }, ({ payload }) => showReaction(String(payload.id), String(payload.emoji).slice(0, 8), String(payload.name ?? "Someone")))
+			.on("broadcast", { event: "docs" }, () => { void refreshDocsRef.current(); })
 			.on("broadcast", { event: "ctl" }, ({ payload }) => {
 				// Only the host's instructions are followed.
 				if (!hostIds.current.has(String(payload.from))) return;
@@ -996,7 +1005,12 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 				<span className="min-w-0 flex-1 truncate font-medium">{title || code}</span>
 				<span className="text-white/70">{clock}</span>
 			</div>
-			<div className="flex min-h-0 flex-1">
+			<div className="relative flex min-h-0 flex-1">
+				{openDoc && !embedded && userId && (
+					<div className={cn("contents", panel !== "none" && "md:[&>section]:right-[20.75rem]")}>
+						<DocWorkspace doc={openDoc} docs={meetDocs.docs} onSelect={setOpenDoc} onClose={() => setOpenDoc(null)} />
+					</div>
+				)}
 				<div className="min-h-0 min-w-0 flex-1 p-3 max-md:p-1.5">
 					{pipWin ? (
 						<div className="flex h-full flex-col items-center justify-center gap-3 rounded-2xl bg-[#2a2a2a] text-center">
@@ -1044,10 +1058,15 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 				{panel !== "none" && !embedded && (
 					<aside className="fixed inset-x-0 bottom-0 z-40 flex h-[70dvh] flex-col overflow-hidden rounded-t-2xl bg-white text-[#202124] shadow-2xl md:static md:m-3 md:ml-0 md:h-auto md:w-80 md:shrink-0 md:rounded-xl md:shadow-none">
 						<div className="flex items-center justify-between border-b border-[#dadce0] px-4 py-3 text-base">
-							{panel === "transcript" ? "Transcript" : panel === "info" ? "Meeting details" : panel === "chat" ? "Messages" : panel === "polls" ? "Polls" : panel === "settings" ? "Call settings" : "People"}
+							{panel === "transcript" ? "Transcript" : panel === "info" ? "Meeting details" : panel === "chat" ? "Messages" : panel === "polls" ? "Polls" : panel === "settings" ? "Call settings" : panel === "docs" ? "Documents" : "People"}
 							<button onClick={() => setPanel("none")} aria-label="Close" className="flex h-8 w-8 items-center justify-center rounded-full hover:bg-black/5"><X className="h-4 w-4" /></button>
 						</div>
 													{panel === "chat" && <ChatPanel lines={chat} onSend={sendChat} onPin={pinChat} salama={{ busy: salamaBusy, ask: (q) => askSalamaRef.current(q), speak: hearSalama, onSpeak: setHearSalama }} />}
+							{panel === "docs" && (
+								<DocsPanel code={code} docs={meetDocs.docs} loading={meetDocs.loading} error={userId ? meetDocs.error : "Sign in to work on documents together."} canAttach={canSave && !!userId} openId={openDoc?.id ?? null}
+									onChanged={(next) => { meetDocs.setDocs(next); setOpenDoc((cur) => (cur && next.some((d) => d.id === cur.id) ? cur : null)); send("docs", { by: myId.current }); }}
+									onOpen={(d) => setOpenDoc(d)} />
+							)}
 							{panel === "polls" && <PollPanel polls={polls} me={myId.current} onCreate={askPoll} onVote={votePoll} onClose={endPoll} />}
 							{panel === "settings" && (
 								<div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4 text-sm">
@@ -1177,6 +1196,10 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 					</div>
 					<Ctl onClick={() => setPanel((p) => (p === "info" ? "none" : "info"))} label="Meeting details" icon={<Info className="h-5 w-5" />} active={panel === "info"} flat />
 					<Ctl onClick={() => setPanel((p) => (p === "people" ? "none" : "people"))} label="People" icon={<Users className="h-5 w-5" />} active={panel === "people"} flat />
+					<div className="relative">
+						<Ctl onClick={() => setPanel((p) => (p === "docs" ? "none" : "docs"))} label="Documents: work on a file together" icon={<FolderOpen className="h-5 w-5" />} active={panel === "docs" || !!openDoc} flat />
+						{meetDocs.docs.length > 0 && panel !== "docs" && <span className="pointer-events-none absolute right-0.5 top-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-[#068297] px-1 text-[10px] font-bold">{meetDocs.docs.length}</span>}
+					</div>
 					<Ctl onClick={() => setPanel((p) => (p === "polls" ? "none" : "polls"))} label="Polls" icon={<BarChart3 className="h-5 w-5" />} active={panel === "polls"} flat />
 					<Ctl onClick={() => setPanel((p) => (p === "settings" ? "none" : "settings"))} label="Call settings" icon={<Settings2 className="h-5 w-5" />} active={panel === "settings"} flat />
 					<Ctl onClick={() => setPanel((p) => (p === "transcript" ? "none" : "transcript"))} label="Transcript" icon={<MessageSquareText className="h-5 w-5" />} active={panel === "transcript"} flat />
@@ -1239,6 +1262,7 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 							["Picture in picture", <PictureInPicture2 key="pp" className="h-5 w-5" />, () => { setMoreOpen(false); void dockCall(); }, false],
 							["People", <Users key="u" className="h-5 w-5" />, () => { setPanel("people"); setMoreOpen(false); }, false],
 							["Meeting details", <Info key="i" className="h-5 w-5" />, () => { setPanel("info"); setMoreOpen(false); }, false],
+							["Documents", <FolderOpen key="fo" className="h-5 w-5" />, () => { setPanel("docs"); setMoreOpen(false); }, panel === "docs"],
 							["Polls", <BarChart3 key="po" className="h-5 w-5" />, () => { setPanel("polls"); setMoreOpen(false); }, panel === "polls"],
 							["Call settings", <Settings2 key="se" className="h-5 w-5" />, () => { setPanel("settings"); setMoreOpen(false); }, panel === "settings"],
 							["Transcript", <MessageSquareText key="t" className="h-5 w-5" />, () => { setPanel("transcript"); setMoreOpen(false); }, false],

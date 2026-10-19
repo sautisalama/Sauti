@@ -70,9 +70,9 @@ export function MjengoShell({ isSuper, children }: { isSuper: boolean; children:
 
 	return (
 		<div className={cn("flex min-h-dvh flex-col bg-serene-neutral-50", fullBleed && "h-dvh min-h-0")}>
-			<OpenRouterBalance />
+			<div data-chrome className="contents"><OpenRouterBalance /></div>
 			{/* Phones have no side panel: the same sections as a scrolling strip. */}
-			<nav aria-label="Mjengo sections" className={cn("flex shrink-0 gap-1 overflow-x-auto snap-x snap-proximity overscroll-x-contain border-b border-serene-neutral-200 bg-white px-2 pb-1.5 pt-[max(0.5rem,env(safe-area-inset-top))] scrollbar-hide lg:hidden", (pathname.startsWith(`${BASE}/files/`) || pathname.startsWith(`${BASE}/documents/editor`) || pathname.startsWith(`${BASE}/design/editor`)) && "max-sm:hidden")}>
+			<nav data-chrome aria-label="Mjengo sections" className={cn("flex shrink-0 gap-1 overflow-x-auto snap-x snap-proximity overscroll-x-contain border-b border-serene-neutral-200 bg-white px-2 pb-1.5 pt-[max(0.5rem,env(safe-area-inset-top))] scrollbar-hide lg:hidden", (pathname.startsWith(`${BASE}/files/`) || pathname.startsWith(`${BASE}/documents/editor`) || pathname.startsWith(`${BASE}/design/editor`)) && "max-sm:hidden")}>
 {pathname !== BASE && (
 					<button onClick={() => { if (window.history.length > 1) window.history.back(); else window.location.assign(BASE); }} className="flex shrink-0 items-center gap-1.5 rounded-full px-3 py-2 text-sm font-medium text-serene-neutral-500">
 						<ArrowLeft className="h-4 w-4" /> Back
@@ -96,7 +96,7 @@ export function MjengoShell({ isSuper, children }: { isSuper: boolean; children:
 					);
 				})}
 			</nav>
-			<MjengoDock />
+			<div data-chrome className="contents"><MjengoDock /></div>
 			<UploadTray />
 			<div className={cn("w-full flex-1", fullBleed ? "min-h-0" : "px-4 py-5 md:px-8")}>{children}</div>
 		</div>

@@ -460,3 +460,8 @@ html.mjengo-theme .text-sauti-blue { color: #068297; }
 .dark *:hover::-webkit-scrollbar-thumb { background-color: rgb(255 255 255 / 0.3); }
 .scrollbar-hide { scrollbar-width: none; }
 .scrollbar-hide::-webkit-scrollbar { display: none; }
+
+/* A suite page shown inside a call: no sidebar, bars or tabs, and the page uses the whole frame. */
+html.ss-embed [data-chrome] { display: none !important; }
+html.ss-embed main { margin-left: 0 !important; }
+html.ss-embed #main-content { padding: 0 !important; }
