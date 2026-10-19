@@ -472,7 +472,7 @@ export function EntityWorkspace({ kind, pageId }: { kind: Kind; pageId?: string 
 								</div>
 								<div className="space-y-2">
 									{col.map((r) => (
-										<Card key={r.id} kind={kind} r={r} admins={admins} onOpen={() => openRow(r)} onDragStart={() => setDragId(r.id)} onDragEnd={() => setDragId(null)} dragging={dragId === r.id} />
+										<Card key={r.id} fullHref={`${listHref}/${r.id}`} kind={kind} r={r} admins={admins} onOpen={() => openRow(r)} onDragStart={() => setDragId(r.id)} onDragEnd={() => setDragId(null)} dragging={dragId === r.id} />
 									))}
 									{col.length === 0 && <p className="px-2 py-6 text-center text-xs text-serene-neutral-400">Nothing here</p>}
 								</div>
@@ -484,7 +484,7 @@ export function EntityWorkspace({ kind, pageId }: { kind: Kind; pageId?: string 
 				<div className="overflow-hidden rounded-2xl border border-serene-neutral-200/70 bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04)]">
 					<ul className="divide-y divide-serene-neutral-50">
 						{filtered.map((r) => (
-							<li key={r.id}>
+							<li key={r.id} className="group relative"><Link href={`${listHref}/${r.id}`} aria-label={`Open ${cfg.noun} as a full page`} title="Open the full page" className="absolute right-2 top-2 z-10 hidden rounded-md bg-white p-1.5 text-serene-neutral-500 shadow-sm ring-1 ring-serene-neutral-200 hover:text-sauti-teal group-hover:block"><Maximize2 className="h-3.5 w-3.5" /></Link>
 								<button onClick={() => openRow(r)} className="flex w-full touch-manipulation flex-wrap items-center gap-x-4 gap-y-1 p-3 text-left hover:bg-serene-neutral-50 sm:flex-nowrap">
 									<div className="min-w-0 flex-1">
 										<p className="flex items-center gap-1.5 truncate text-sm font-semibold text-serene-neutral-900"><span className="truncate">{r[cfg.titleKey]}</span>{r.visibility === "restricted" && <Lock className="h-3 w-3 shrink-0 text-serene-neutral-400" aria-label="Private" />}{kind === "opportunity" && r.verification?.trust === "verified" && <BadgeCheck className="h-3.5 w-3.5 shrink-0 text-emerald-600" aria-label="Verified source" />}{kind === "opportunity" && r.verification && ["suspicious", "repost"].includes(r.verification.trust) && <AlertCircle className="h-3.5 w-3.5 shrink-0 text-amber-600" aria-label="Check the source" />}</p>
@@ -530,7 +530,7 @@ function FilterChip({ active, onClick, children }: { active: boolean; onClick: (
 	);
 }
 
-function Card({ kind, r, admins, onOpen, onDragStart, onDragEnd, dragging }: { kind: Kind; r: Row; admins: AdminLite[]; onOpen: () => void; onDragStart: () => void; onDragEnd: () => void; dragging: boolean }) {
+function Card({ fullHref, kind, r, admins, onOpen, onDragStart, onDragEnd, dragging }: { fullHref: string; kind: Kind; r: Row; admins: AdminLite[]; onOpen: () => void; onDragStart: () => void; onDragEnd: () => void; dragging: boolean }) {
 	const cfg = CONFIG[kind];
 	const finished = ["awarded", "declined", "closed", "won", "lost", "passed", "completed", "cancelled"].includes(r.status);
 	return (
@@ -544,7 +544,7 @@ function Card({ kind, r, admins, onOpen, onDragStart, onDragEnd, dragging }: { k
 			onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && onOpen()}
 			className={cn("cursor-pointer touch-manipulation rounded-xl border border-serene-neutral-100 bg-white p-3 shadow-sm transition hover:shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-sauti-teal", dragging && "opacity-40")}
 		>
-			<p className="line-clamp-2 text-sm font-semibold text-serene-neutral-900">{r[cfg.titleKey]}</p>
+			<div className="flex items-start gap-1.5"><p className="line-clamp-2 min-w-0 flex-1 text-sm font-semibold text-serene-neutral-900">{r[cfg.titleKey]}</p><Link href={fullHref} onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()} draggable={false} aria-label={`Open ${cfg.noun} as a full page`} title="Open the full page" className="-mr-1 -mt-0.5 shrink-0 rounded-md p-1 text-serene-neutral-400 hover:bg-serene-neutral-100 hover:text-sauti-teal"><Maximize2 className="h-3.5 w-3.5" /></Link></div>
 			{r[cfg.subKey] && kind !== "project" && <p className="mt-0.5 truncate text-xs text-serene-neutral-500">{r[cfg.subKey]}</p>}
 			{kind === "project" && typeof r.progress === "number" && <Progress value={r.progress} className="mt-2 h-1.5" />}
 			{cfg.amountKey && r[cfg.amountKey] != null && <p className="mt-2 text-sm font-bold tabular-nums text-serene-neutral-800">{money(r[cfg.amountKey], r.currency)}</p>}
