@@ -1,13 +1,15 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { CheckCircle2, FileText, Loader2, Save, Sparkles, XCircle } from "lucide-react";
+import Link from "next/link";
+import { CheckCircle2, FileText, FolderArchive, Loader2, Save, Sparkles, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { unwrap } from "@/lib/action-result";
-import { draftForFunder, exportApplication, getBrief, readCall, reviewApplicationAction, saveDraft, saveFeedback, type Brief } from "@/app/actions/mjengo-grant-agent";
+import { draftForFunder, exportApplication, getBrief, readCall, reviewApplicationAction, saveApplication, saveDraft, saveFeedback, type Brief } from "@/app/actions/mjengo-grant-agent";
+import { TagEditor } from "./Facets";
 import { wordCount, type Review, type Section } from "@/lib/mjengo/grant-agent-shared";
 
 /**
@@ -59,6 +61,11 @@ export function GrantAgent({ kind, id }: { kind: "grant" | "opportunity"; id: st
 		const d = await unwrap(saveDraft(kind, id, s.id, text[s.id] ?? ""));
 		setBrief((b) => (b ? { ...b, drafts: { ...b.drafts, [s.id]: d }, review: null } : b));
 		setReview(null);
+	});
+	const saveToVault = () => run("vault", async () => {
+		const out = await unwrap(saveApplication(kind, id));
+		setBrief((b) => (b ? { ...b, files: [...b.files.filter((f) => f.id !== out.id), { id: out.id, name: out.name, link: out.link, tags: out.tags }] } : b));
+		toast({ title: out.replaced ? "Updated in your vault" : "Saved to your vault", description: `${out.name}, ${out.words} words. It is in Grant applications and on this grant's timeline.` });
 	});
 	const openAsDocument = () => run("export", async () => {
 		const out = await unwrap(exportApplication(kind, id));
@@ -118,8 +125,23 @@ export function GrantAgent({ kind, id }: { kind: "grant" | "opportunity"; id: st
 
 					<div className="flex flex-wrap gap-2">
 						<Button type="button" variant="outline" className="h-9 gap-1.5 rounded-full text-sm" disabled={!!busy} onClick={() => void run("review", async () => { const r = await unwrap(reviewApplicationAction(kind, id)); setReview(r); })}>{busy === "review" ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4 text-sauti-teal" />} Review before sending</Button>
+						<Button type="button" variant="outline" className="h-9 gap-1.5 rounded-full text-sm" disabled={!!busy} onClick={() => void saveToVault()}>{busy === "vault" ? <Loader2 className="h-4 w-4 animate-spin" /> : <FolderArchive className="h-4 w-4 text-sauti-teal" />} Save to the vault</Button>
 						<Button type="button" className="h-9 gap-1.5 rounded-full bg-sauti-teal text-sm hover:bg-sauti-dark" disabled={!!busy} onClick={() => void openAsDocument()}>{busy === "export" ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />} Open as a document</Button>
 					</div>
+
+					{brief.files.length > 0 && (
+						<div>
+							<p className="mb-1.5 text-sm font-medium text-serene-neutral-900">In your vault</p>
+							<ul className="space-y-2">
+								{brief.files.map((f) => (
+									<li key={f.id} className="rounded-lg border border-serene-neutral-100 p-2.5">
+										<Link href={f.link} className="flex items-center gap-1.5 text-sm font-medium text-sauti-teal hover:underline"><FileText className="h-3.5 w-3.5" />{f.name}</Link>
+										<div className="mt-1.5"><TagEditor type="file" id={f.id} tags={f.tags} /></div>
+									</li>
+								))}
+							</ul>
+						</div>
+					)}
 
 					{review && (
 						<div className="rounded-lg border border-[#b6e0e6] bg-[#f1fafb] p-3 text-sm">

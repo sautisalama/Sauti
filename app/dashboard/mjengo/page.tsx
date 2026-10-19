@@ -8,6 +8,7 @@ import { Briefcase, CheckSquare, ClipboardList, FileWarning, FolderKanban, Light
 import { getOverview, listEntities, type Overview } from "@/app/actions/mjengo";
 import { suiteStatus, type SuiteStatus } from "@/app/actions/mjengo-nav";
 import { GrantCharts, type GrantLite } from "./_components/GrantCharts";
+import { WorkspaceSearch } from "./_components/WorkspaceSearch";
 import { DeadlineChip, KIND_LABEL, STATUSES, money, type Kind } from "./_components/shared";
 
 const KIND_ICON = { grant: Briefcase, opportunity: Lightbulb, project: FolderKanban, document: FileWarning, todo: CheckSquare } as const;
@@ -33,6 +34,8 @@ export default function MjengoOverview() {
 				<h2 className="text-2xl font-bold tracking-tight text-sauti-dark sm:text-3xl">Mjengo <span className="text-sauti-teal">Suite</span></h2>
 				<p className="mt-1 text-sm text-serene-neutral-600">Grants, opportunities, projects, documents and mail in one calm place.</p>
 			</section>
+
+			<WorkspaceSearch />
 
 			<p className="px-1 text-[11px] font-semibold uppercase tracking-widest text-serene-neutral-400">Overview</p>
 			<div className="grid grid-cols-2 gap-3 lg:grid-cols-5">

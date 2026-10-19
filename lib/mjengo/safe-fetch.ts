@@ -65,3 +65,52 @@ export function pageText(html: string): string {
     .replace(/\s+/g, ' ')
     .trim();
 }
+
+const MAX_PDF = 20_000_000;
+
+/** A page or a PDF at a public address: HTML comes back as text, a PDF as bytes (up to 20 MB). Each redirect is checked. */
+export async function fetchPageOrPdf(raw: string): Promise<{ kind: 'html'; url: string; html: string } | { kind: 'pdf'; url: string; bytes: Uint8Array }> {
+  let url = (await assertPublic(raw)).toString();
+  for (let hop = 0; hop < 5; hop++) {
+    const res = await fetch(url, {
+      redirect: 'manual',
+      headers: { 'user-agent': 'Mozilla/5.0 (compatible; SautiSalamaPreview/1.0; +https://sautisalama.org)', accept: 'text/html,application/pdf;q=0.9,*/*;q=0.5', 'accept-language': 'en' },
+      signal: AbortSignal.timeout(30_000),
+    });
+    if (res.status >= 300 && res.status < 400 && res.headers.get('location')) {
+      url = (await assertPublic(new URL(res.headers.get('location')!, url).toString())).toString();
+      continue;
+    }
+    if (!res.ok) throw new Error('That link did not open (' + res.status + ').');
+    const type = res.headers.get('content-type') ?? '';
+    const isPdf = /pdf/i.test(type) || (/octet-stream/i.test(type) && /\.pdf(\?|#|$)/i.test(url));
+    if (!isPdf && !/html|xml/i.test(type)) throw new Error('That link is neither a web page nor a PDF.');
+    const reader = res.body?.getReader();
+    const chunks: Uint8Array[] = [];
+    let total = 0;
+    const cap = isPdf ? MAX_PDF : MAX_BYTES;
+    while (reader) {
+      const { done, value } = await reader.read();
+      if (done || !value) break;
+      total += value.byteLength;
+      chunks.push(value);
+      if (total > cap) { await reader.cancel(); if (isPdf) throw new Error('That PDF is larger than 20 MB.'); break; }
+    }
+    const all = Buffer.concat(chunks);
+    return isPdf ? { kind: 'pdf', url, bytes: new Uint8Array(all) } : { kind: 'html', url, html: new TextDecoder('utf-8', { fatal: false }).decode(all) };
+  }
+  throw new Error('That link redirects too many times.');
+}
+
+/** Links to PDFs on a page that look like the funder's guidelines, call text or application form (at most three). */
+export function guidelinePdfLinks(html: string, baseUrl: string): { url: string; label: string }[] {
+  const out: { url: string; label: string }[] = [];
+  for (const m of html.matchAll(/<a\b[^>]*href\s*=\s*["']([^"'#]+\.pdf(?:\?[^"']*)?)["'][^>]*>([\s\S]*?)<\/a>/gi)) {
+    let url: string;
+    try { url = new URL(m[1].replace(/&amp;/g, '&'), baseUrl).toString(); } catch { continue; }
+    const label = m[2].replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 100);
+    if (/guideline|call for|call-for|application|apply|rfp|rfa|terms of reference|instruction|criteria|eligib|requirement|template|handbook|prospectus/i.test(`${label} ${url}`) && !out.some((o) => o.url === url)) out.push({ url, label });
+    if (out.length >= 3) break;
+  }
+  return out;
+}

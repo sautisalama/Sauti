@@ -1,3 +1,4 @@
+import { Document, HeadingLevel, Packer, Paragraph, TextRun } from 'docx';
 import { askAi } from '@/lib/mjengo/ai';
 import { brandAsPrompt, loadBrandRow } from '@/lib/mjengo/brand';
 import { gatherSources, type Asker } from '@/lib/mjengo/salama';
@@ -136,4 +137,24 @@ export async function reviewApplication(input: { title: string; funder: string |
   const totalW = weights.reduce((a, b) => a + b, 0);
   const overall = criteria.length && totalW ? Math.round((criteria.reduce((a, c, i) => a + (c.score / c.max) * weights[i], 0) / totalW) * 100) : null;
   return { at: new Date().toISOString(), overall, criteria, checks };
+}
+
+/** The application as a Word file: the title, then each written section under its heading. */
+export async function applicationDocx(title: string, funder: string | null, req: Requirements, drafts: Record<string, Draft>): Promise<Uint8Array> {
+  const children: Paragraph[] = [new Paragraph({ heading: HeadingLevel.HEADING_1, children: [new TextRun(title)] })];
+  if (funder) children.push(new Paragraph({ children: [new TextRun({ text: `Application to ${funder}`, italics: true })] }));
+  for (const s of req.sections) {
+    const t = drafts[s.id]?.text?.trim();
+    if (!t) continue;
+    children.push(new Paragraph({ heading: HeadingLevel.HEADING_2, children: [new TextRun(s.title)] }));
+    for (const block of t.split(/\n{2,}/)) {
+      const lines = block.split('\n').map((l) => l.trim()).filter(Boolean);
+      if (lines.length > 1 && lines.every((l) => /^[-*•]\s+/.test(l))) {
+        for (const l of lines) children.push(new Paragraph({ bullet: { level: 0 }, children: [new TextRun(l.replace(/^[-*•]\s+/, ''))] }));
+      } else {
+        children.push(new Paragraph({ spacing: { after: 160 }, children: lines.flatMap((l, i) => (i ? [new TextRun({ text: l, break: 1 })] : [new TextRun(l)])) }));
+      }
+    }
+  }
+  return new Uint8Array(await Packer.toBuffer(new Document({ sections: [{ children }] })));
 }

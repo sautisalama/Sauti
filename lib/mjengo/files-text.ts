@@ -3,11 +3,8 @@ import { atLeast, descendants, levelFor, loadIndex, oversightFor } from '@/lib/v
 
 const BUCKET = 'mjengo-docs';
 
-/** Plain text from a stored file: PDFs, Word documents and text files. Empty when the type is not readable. */
-export async function extractText(path: string, name: string, mime: string | null, max = 8000): Promise<string> {
-  const { data } = await looseAdmin().storage.from(BUCKET).download(path);
-  if (!data) return '';
-  const bytes = new Uint8Array(await data.arrayBuffer());
+/** Plain text from the bytes of a PDF, Word document or text file. Empty when the type is not readable. */
+export async function textFromBytes(bytes: Uint8Array, name: string, mime: string | null, max = 8000): Promise<string> {
   const ext = name.split('.').pop()?.toLowerCase() ?? '';
   try {
     if (ext === 'pdf' || mime === 'application/pdf') {
@@ -28,6 +25,13 @@ export async function extractText(path: string, name: string, mime: string | nul
     /* unreadable: the file is still kept, just not read */
   }
   return '';
+}
+
+/** Plain text from a stored file: PDFs, Word documents and text files. Empty when the type is not readable. */
+export async function extractText(path: string, name: string, mime: string | null, max = 8000): Promise<string> {
+  const { data } = await looseAdmin().storage.from(BUCKET).download(path);
+  if (!data) return '';
+  return textFromBytes(new Uint8Array(await data.arrayBuffer()), name, mime, max);
 }
 
 /** A vault file the person may open, with its text. Throws when they have no access. */

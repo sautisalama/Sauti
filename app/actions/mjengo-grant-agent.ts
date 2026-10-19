@@ -1,15 +1,20 @@
 'use server';
 
+import { after } from 'next/server';
 import { guard } from '@/lib/action-result';
 import { looseAdmin } from '@/lib/loose-db';
 import { logAudit } from '@/lib/access/audit';
 import { requireModule, type Level, type ModuleKey } from '@/lib/access/permissions';
 import { entitiesFor, entityText, type EntityKind, type EntityLite } from '@/lib/mjengo/entity-view';
-import { fetchHtml, pageText } from '@/lib/mjengo/safe-fetch';
-import { extractText } from '@/lib/mjengo/files-text';
+import { fetchPageOrPdf, guidelinePdfLinks, pageText } from '@/lib/mjengo/safe-fetch';
+import { extractText, textFromBytes } from '@/lib/mjengo/files-text';
+import { saveToVault, linkFileToRecord } from '@/lib/mjengo/vault-save';
+import { indexSource } from '@/lib/mjengo/search-index';
+import { fileLink } from '@/lib/mjengo/links';
+import { atLeast, levelFor, loadIndex, oversightFor } from '@/lib/vault/access';
 import { timelineFor } from '@/lib/mjengo/timeline';
 import {
-  applicationHtml, cleanRequirements, draftSection, extractRequirements, reviewApplication, wordCount,
+  applicationDocx, applicationHtml, cleanRequirements, draftSection, extractRequirements, reviewApplication, wordCount,
   EMPTY_REQUIREMENTS, type Draft, type Requirements, type Review,
 } from '@/lib/mjengo/grant-agent';
 
@@ -29,6 +34,8 @@ export interface Brief {
   earlierFeedback: string[];
   readAt: string | null;
   attached: string[];
+  /** Files in the vault that belong to this application: the funder's guidelines read from a PDF, the saved draft. */
+  files: { id: string; name: string; link: string; tags: string[] }[];
 }
 
 async function open(kind: string, id: string, need: Level = 'view'): Promise<{ actor: { id: string; email: string }; entity: EntityLite; kind: AgentKind }> {
@@ -53,6 +60,21 @@ async function attachedNames(kind: AgentKind, id: string): Promise<string[]> {
   return ((data ?? []) as { name: string; file_name: string | null; file_path: string | null }[]).filter((d) => d.file_path).flatMap((d) => [d.name, d.file_name ?? '']).filter(Boolean);
 }
 
+/** The vault files linked to this record that the person may open. */
+async function vaultFilesOf(kind: AgentKind, id: string, asker: { id: string; email: string }): Promise<Brief['files']> {
+  if (!asker.id) return [];
+  const { data } = await looseAdmin().from('mjengo_links').select('item_id').eq('entity_type', kind).eq('entity_id', id).eq('item_type', 'file');
+  const ids = ((data ?? []) as { item_id: string }[]).map((l) => l.item_id);
+  if (!ids.length) return [];
+  const [ix, oversight] = await Promise.all([loadIndex(), oversightFor(asker.email)]);
+  return ids.flatMap((fid) => {
+    const f = ix.files.get(fid);
+    return f && atLeast(levelFor(ix, asker.id, 'file', fid, oversight), 'view') ? [{ id: f.id, name: f.name, link: fileLink(f.name, f.id), tags: f.tags ?? [] }] : [];
+  });
+}
+
+const baseName = (u: string) => { try { return decodeURIComponent(new URL(u).pathname.split('/').pop() ?? 'guidelines').replace(/\.pdf$/i, '').replace(/[-_+]+/g, ' ').trim() || 'guidelines'; } catch { return 'guidelines'; } };
+
 async function upsert(kind: AgentKind, id: string, entity: EntityLite, actorId: string, patch: Record<string, unknown>) {
   const { error } = await looseAdmin().from('mjengo_grant_briefs').upsert(
     { entity_type: kind, entity_id: id, funder: funderOf(entity), created_by: actorId, updated_at: new Date().toISOString(), ...patch },
@@ -63,7 +85,7 @@ async function upsert(kind: AgentKind, id: string, entity: EntityLite, actorId: 
 
 /** What the agent knows about this application so far. */
 async function getBrief_(kind: AgentKind, id: string): Promise<Brief> {
-  const { entity, kind: k } = await open(kind, id);
+  const { actor, entity, kind: k } = await open(kind, id);
   const row = await briefRow(k, id);
   const funder = funderOf(entity);
   let earlier: string[] = [];
@@ -82,6 +104,7 @@ async function getBrief_(kind: AgentKind, id: string): Promise<Brief> {
     earlierFeedback: earlier,
     readAt: row?.read_at ?? null,
     attached: await attachedNames(k, id),
+    files: await vaultFilesOf(k, id, actor),
   };
 }
 
@@ -94,15 +117,42 @@ async function readCall_(kind: AgentKind, id: string): Promise<Brief> {
   const db = looseAdmin();
   const url = String(entity.row[LINK_FIELD[k]] ?? '').trim();
   let text = '';
-  if (url) { try { const page = await fetchHtml(url); text = pageText(page.html); } catch { /* the documents may still say it */ } }
-  const { data: docs } = await db.from('mjengo_documents').select('name, file_name, file_path, mime_type').eq('entity_type', k).eq('entity_id', id).not('file_path', 'is', null).limit(4);
+  const pdfs: { name: string; bytes: Uint8Array }[] = [];
+  let problem = '';
+  if (url) {
+    try {
+      const got = await fetchPageOrPdf(url);
+      if (got.kind === 'pdf') pdfs.push({ name: baseName(got.url), bytes: got.bytes });
+      else {
+        text = pageText(got.html);
+        // Guidelines are often a PDF the page links to: those are read too.
+        for (const l of guidelinePdfLinks(got.html, got.url)) {
+          try { const p = await fetchPageOrPdf(l.url); if (p.kind === 'pdf') pdfs.push({ name: l.label || baseName(l.url), bytes: p.bytes }); } catch { /* the page itself may still say enough */ }
+        }
+      }
+    } catch (e) { problem = e instanceof Error ? e.message : 'The link could not be read.'; }
+  }
   const read: { name: string; text: string }[] = [];
+  const funder = funderOf(entity);
+  for (const p of pdfs.slice(0, 4)) {
+    const t = await textFromBytes(p.bytes, 'guidelines.pdf', 'application/pdf', 14_000);
+    if (t) read.push({ name: p.name, text: t });
+    // The PDF is kept in the vault, with the funder's name, and joins this record's timeline; the autotagger tags it.
+    try {
+      const saved = await saveToVault(actor, { name: `${funder || entity.title} guidelines, ${p.name}.pdf`, bytes: p.bytes, mime: 'application/pdf', folder: 'Funder guidelines' });
+      await linkFileToRecord(k, id, saved.id, actor.id);
+      after(() => indexSource('file', saved.id).then(() => undefined).catch(() => undefined));
+    } catch { /* reading it still worked */ }
+  }
+  if (pdfs.length && !read.length && !text) throw new Error('The PDF was saved to your vault, but it has no text I can read (it may be a scan). Attach a text version under Documents, or paste its contents into the grant notes.');
+  if (problem && !text && !read.length && !(await db.from('mjengo_documents').select('id').eq('entity_type', k).eq('entity_id', id).not('file_path', 'is', null).limit(1)).data?.length) throw new Error(problem);
+  const { data: docs } = await db.from('mjengo_documents').select('name, file_name, file_path, mime_type').eq('entity_type', k).eq('entity_id', id).not('file_path', 'is', null).limit(4);
   for (const d of (docs ?? []) as { name: string; file_name: string | null; file_path: string; mime_type: string | null }[]) {
     const t = await extractText(d.file_path, d.file_name ?? d.name, d.mime_type, 9000).catch(() => '');
     if (t) read.push({ name: d.name, text: t });
   }
   const before = await briefRow(k, id);
-  const req = await extractRequirements({ title: entity.title, funder: funderOf(entity), pageText: text, docs: read, previous: before?.requirements ?? null });
+  const req = await extractRequirements({ title: entity.title, funder, pageText: text, docs: read, previous: before?.requirements ?? null });
   const kept = draftsOf(before?.drafts);
   const drafts: Record<string, Draft> = {};
   for (const s of req.sections) if (kept[s.id]) drafts[s.id] = kept[s.id];
@@ -174,6 +224,23 @@ async function exportApplication_(kind: AgentKind, id: string): Promise<{ title:
   return { title: `${entity.title} application`, html: applicationHtml(entity.title, brief.funder, brief.requirements, brief.drafts), words };
 }
 
+/**
+ * Save the application as a Word file in the vault (a file of the same name is replaced), put it on this record's
+ * timeline, and let the autotagger tag it so it can be found and filtered with similar applications.
+ */
+async function saveApplication_(kind: AgentKind, id: string): Promise<{ id: string; name: string; link: string; tags: string[]; replaced: boolean; words: number }> {
+  const { actor, entity, kind: k } = await open(kind, id, 'write');
+  const brief = await getBrief_(k, id);
+  const words = brief.requirements.sections.reduce((n, s) => n + wordCount(brief.drafts[s.id]?.text ?? ''), 0);
+  if (!words) throw new Error('Nothing has been written yet.');
+  const bytes = await applicationDocx(entity.title, brief.funder, brief.requirements, brief.drafts);
+  const saved = await saveToVault(actor, { name: `${entity.title} application.docx`, bytes, mime: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', folder: 'Grant applications' });
+  await linkFileToRecord(k, id, saved.id, actor.id, false);
+  const r = await indexSource('file', saved.id).catch(() => ({ indexed: false, tags: [] as string[] }));
+  await logAudit({ actorId: actor.id, actorEmail: actor.email, action: 'mjengo.grant.application_saved', targetType: k, targetId: id, targetLabel: entity.title });
+  return { id: saved.id, name: saved.name, link: fileLink(saved.name, saved.id), tags: r.tags, replaced: saved.replaced, words };
+}
+
 export const getBrief = guard(getBrief_);
 export const readCall = guard(readCall_);
 export const saveRequirements = guard(saveRequirements_);
@@ -182,3 +249,4 @@ export const saveDraft = guard(saveDraft_);
 export const saveFeedback = guard(saveFeedback_);
 export const reviewApplicationAction = guard(review_);
 export const exportApplication = guard(exportApplication_);
+export const saveApplication = guard(saveApplication_);
