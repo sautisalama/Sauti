@@ -123,7 +123,7 @@ export function layoutEls(s: LayoutSpec): El[] {
 				box(60, 124, 80, 5, "@accent"),
 				...st.flatMap((x, i) => [
 					box(60 + i * (cw + gap), 170, cw, 280, "@surface", { shape: "round" }),
-					text(60 + i * (cw + gap) + 12, 210, cw - 24, 110, x.n, { size: 60, bold: true, font: "heading", color: "@accent", align: "center", valign: "middle" }),
+					text(60 + i * (cw + gap) + 12, 210, cw - 24, 110, x.n, { size: x.n.length > 9 ? 30 : x.n.length > 6 ? 40 : x.n.length > 4 ? 52 : 60, bold: true, font: "heading", color: "@accent", align: "center", valign: "middle" }),
 					text(60 + i * (cw + gap) + 16, 330, cw - 32, 100, x.label, { size: 20, align: "center", color: "@muted" }),
 				]),
 			];

@@ -1259,7 +1259,11 @@ async function listSorted_(accountId: string | 'all', bucket: MailBucket, query:
   const all: MessageRow[] = [];
   await Promise.all(accounts.map(async (a) => {
     try {
-      const res = await listMessages_(a.id, 'INBOX', { unread: query.unread, starred: query.starred, hasAttachment: query.hasAttachment }, 0, window);
+      // One slow or broken mailbox must not hold up the others.
+      const res = await Promise.race([
+        listMessages_(a.id, 'INBOX', { unread: query.unread, starred: query.starred, hasAttachment: query.hasAttachment }, 0, window),
+        new Promise<never>((_, rej) => setTimeout(() => rej(new Error('slow')), 10_000)),
+      ]);
       for (const r of res.items) {
         const s = sortMessage(r);
         all.push({ ...r, account: a.id, accountEmail: a.email, accountScope: scopeOf(a.email), kind: s.kind, sure: s.sure });
