@@ -202,6 +202,14 @@ export function EntityWorkspace({ kind }: { kind: Kind }) {
 
 	const openNew = () => setEditing({ id: null, values: { status: statuses[0].value, currency: "USD", ...(kind === "opportunity" ? { kind: "grant" } : {}), ...(kind === "project" ? { progress: 0 } : {}) } });
 	const openRow = (r: Row) => setEditing({ id: r.id, values: { ...r } });
+	// "Start it directly" from Opportunities opens a blank form here.
+	const openedNew = useRef(false);
+	useEffect(() => {
+		if (openedNew.current || !rows) return;
+		const p = new URLSearchParams(window.location.search);
+		if (p.get("new")) { openedNew.current = true; openNew(); window.history.replaceState(null, "", window.location.pathname); }
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [rows]);
 
 	const set = (key: string, value: unknown) => setEditing((e) => (e ? { ...e, values: { ...e.values, [key]: value } } : e));
 	// Details that have no value are left out to keep the form short; the "Add" chips bring one back.
@@ -284,6 +292,13 @@ export function EntityWorkspace({ kind }: { kind: Kind }) {
 					</FilterChip>
 				))}
 			</div>
+
+			{kind === "opportunity" && (
+				<p className="px-1 text-xs text-serene-neutral-500">
+					When an opportunity is won it becomes a grant, project or fellowship, and those sections appear in the menu. Already working on one? Start it directly:{" "}
+					{([["grants", "a grant"], ["projects", "a project"], ["fellowships", "a fellowship"]] as const).map(([path, label], i) => <span key={path}>{i > 0 && " · "}<Link href={`/dashboard/mjengo/${path}?new=1`} className="font-medium text-sauti-teal hover:underline">{label}</Link></span>)}
+				</p>
+			)}
 
 			{rows.length > 0 && (
 				<div className="flex flex-wrap items-center gap-2">
@@ -400,6 +415,9 @@ export function EntityWorkspace({ kind }: { kind: Kind }) {
 								<>
 									{kind === "project" && <ProjectMoney v={editing.values} />}
 									{kind === "fellowship" && <FellowshipAssignments fellowshipId={editing.id} />}
+									{kind === "opportunity" && editing.values.converted_to_type && (
+										<Link href={`/dashboard/mjengo/${editing.values.converted_to_type}s`} className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm font-medium text-emerald-800 hover:bg-emerald-100">Won, and now a {String(editing.values.converted_to_type)}. Open it <ExternalLink className="ml-auto h-3.5 w-3.5" /></Link>
+									)}
 									<div className="rounded-xl border border-serene-neutral-100 p-3">
 										<p className="mb-2 text-sm font-semibold text-serene-neutral-900">Tags</p>
 										<TagEditor type={kind} id={editing.id} tags={(editing.values.tags as string[] | undefined) ?? []} onChange={(t) => { set("tags", t); void load(); }} />

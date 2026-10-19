@@ -3,6 +3,22 @@ import { atLeast, descendants, levelFor, loadIndex, oversightFor } from '@/lib/v
 
 const BUCKET = 'mjengo-docs';
 
+/** The words in a drawing (its text boxes, the labels on its shapes and arrows, its frame names), one per line. */
+export function excalidrawText(json: string, max = 12_000): string {
+  try {
+    const scene = JSON.parse(json) as { elements?: { type?: string; text?: string; name?: string; isDeleted?: boolean }[] };
+    return (scene.elements ?? [])
+      .filter((e) => !e.isDeleted)
+      .map((e) => (e.type === 'text' ? e.text : e.type === 'frame' ? e.name : ''))
+      .filter((t): t is string => !!t && t.trim().length > 0)
+      .map((t) => t.replace(/\s+/g, ' ').trim())
+      .join('\n')
+      .slice(0, max);
+  } catch {
+    return '';
+  }
+}
+
 /** Plain text from the bytes of a PDF, Word document or text file. Empty when the type is not readable. */
 export async function textFromBytes(bytes: Uint8Array, name: string, mime: string | null, max = 8000): Promise<string> {
   const ext = name.split('.').pop()?.toLowerCase() ?? '';
@@ -18,6 +34,7 @@ export async function textFromBytes(bytes: Uint8Array, name: string, mime: strin
       const r = await mammoth.extractRawText({ buffer: Buffer.from(bytes) });
       return r.value.trim().slice(0, max);
     }
+    if (ext === 'excalidraw') return excalidrawText(Buffer.from(bytes).toString('utf8'), max);
     if (['txt', 'md', 'csv', 'json', 'html'].includes(ext) || (mime ?? '').startsWith('text/')) {
       return Buffer.from(bytes).toString('utf8').slice(0, max);
     }

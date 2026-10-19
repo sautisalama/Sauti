@@ -149,6 +149,7 @@ export default function VaultPage() {
 			return;
 		}
 		const ext = i.name.includes(".") ? i.name.split(".").pop()!.toLowerCase() : "";
+		if (ext === "excalidraw") { window.location.href = `/dashboard/mjengo/files/draw?file=${i.id}`; return; }
 		if (ext === "pdf") { window.location.href = `/dashboard/mjengo/files/pdf?file=${i.id}`; return; }
 		if (["xlsx", "xls", "csv"].includes(ext)) { window.location.href = `/dashboard/mjengo/files/sheet?file=${i.id}`; return; }
 		if (["pptx", "ppt"].includes(ext)) { window.location.href = `/dashboard/mjengo/files/slides?file=${i.id}`; return; }
@@ -269,11 +270,12 @@ export default function VaultPage() {
 
 			{!folderId && tab === "mine" && (
 				<Fold id="new" title="Start something new" openMap={fold} onToggle={toggleFold}>
-					<section aria-label="Start something new" className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+					<section aria-label="Start something new" className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
 						<NewCard badge="DOCX" tone="bg-[#3b8bc2]" label="Document" onClick={() => setPickDoc(true)} hint="Blank or from a template" />
 						<NewCard badge="XLSX" tone="bg-[#43a047]" label="Spreadsheet" onClick={() => { window.location.href = "/dashboard/mjengo/files/sheet"; }} />
 						<NewCard badge="PPTX" tone="bg-[#ef7d3c]" label="Presentation" onClick={() => setDeck(true)} hint="Made with AI from a topic" />
 						<NewCard badge="PDF" tone="bg-[#e0483d]" label="PDF" onClick={() => pdfInput.current?.click()} hint="Add a PDF to sign or mark up" />
+						<NewCard badge="FLOW" tone="bg-[#7c3aed]" label="Flow or diagram" onClick={() => { window.location.href = "/dashboard/mjengo/files/draw"; }} hint="Draw with Excalidraw" />
 						<NewCard badge="URL" tone="bg-[#6b7280]" label="Link" onClick={() => setAddLink(true)} hint="Save a web address" />
 						<input ref={pdfInput} type="file" accept="application/pdf,.pdf" multiple className="hidden" onChange={(e) => upload(e.target.files)} />
 					</section>

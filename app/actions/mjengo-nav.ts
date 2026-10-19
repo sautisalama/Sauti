@@ -3,13 +3,26 @@
 import { getActor, isSuperAdminEmail } from '@/lib/access/super-admin';
 import { permissionsFor } from '@/lib/access/permissions';
 import { looseAdmin } from '@/lib/loose-db';
+import { entitiesFor } from '@/lib/mjengo/entity-view';
 
 /** Which Mjengo sections the signed-in person sees in the side navigation. */
-export async function mjengoNav(): Promise<{ isAdmin: boolean; isSuper: boolean; /** Module keys this person may use, or null for everything. */ allowed: string[] | null }> {
+export interface MjengoNav {
+  isAdmin: boolean;
+  isSuper: boolean;
+  /** Module keys this person may use, or null for everything. */
+  allowed: string[] | null;
+  /** Which kinds of work this person has any of. Grants, projects and fellowships show in the menu only once there is one
+   *  (an opportunity that was won, or one made directly), so the menu starts small and grows with the work. */
+  has: { grants: boolean; projects: boolean; fellowships: boolean };
+}
+
+export async function mjengoNav(): Promise<MjengoNav> {
   const actor = await getActor();
-  if (!actor?.isAdmin) return { isAdmin: false, isSuper: false, allowed: null };
+  if (!actor?.isAdmin) return { isAdmin: false, isSuper: false, allowed: null, has: { grants: true, projects: true, fellowships: true } };
   const perms = await permissionsFor(actor.id, actor.email);
-  return { isAdmin: true, isSuper: await isSuperAdminEmail(actor.email), allowed: perms === 'all' ? null : [...perms.keys()] };
+  const mine = await entitiesFor({ id: actor.id, email: actor.email }, ['grant', 'project', 'fellowship']).catch(() => null);
+  const has = mine ? { grants: mine.some((e) => e.kind === 'grant'), projects: mine.some((e) => e.kind === 'project'), fellowships: mine.some((e) => e.kind === 'fellowship') } : { grants: true, projects: true, fellowships: true };
+  return { isAdmin: true, isSuper: await isSuperAdminEmail(actor.email), allowed: perms === 'all' ? null : [...perms.keys()], has };
 }
 
 export interface SuiteCounts {

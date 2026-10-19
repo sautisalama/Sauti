@@ -6,6 +6,7 @@ import { logAudit } from '@/lib/access/audit';
 import { requireSuperAdmin } from '@/lib/access/super-admin';
 import { MODULES, moduleLabel, parsePermission } from '@/lib/access/permissions';
 import { sendNoticeEmail } from '@/lib/mjengo/invite-email';
+import { addDefaultRoles, seedDefaultRolesOnce } from '@/lib/mjengo/default-roles';
 
 export interface RoleView {
   id: string;
@@ -18,6 +19,8 @@ export interface RoleView {
 /** Roles with their members. Super admins only. */
 async function list_(): Promise<RoleView[]> {
   await requireSuperAdmin();
+  // The first time, the default roles (Fundraising Lead, Programme Manager, ...) are added for super admins to give out.
+  await seedDefaultRolesOnce().catch(() => undefined);
   const db = looseAdmin();
   const [{ data: roles }, { data: mem }] = await Promise.all([
     db.from('mjengo_roles').select('id, name, description, permissions').order('created_at'),
@@ -94,7 +97,15 @@ async function notifyChange_(userId: string, summary: string): Promise<void> {
   });
 }
 
+/** Add back any default role that was deleted. */
+async function restoreDefaults_(): Promise<RoleView[]> {
+  const a = await requireSuperAdmin();
+  await addDefaultRoles({ id: a.id, email: a.email });
+  return list_();
+}
+
 export const listRoles = guard(list_);
+export const restoreDefaultRoles = guard(restoreDefaults_);
 export const saveRole = guard(save_);
 export const deleteRole = guard(remove_);
 export const assignRole = guard(assign_);

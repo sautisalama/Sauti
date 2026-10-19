@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { format, parseISO } from "date-fns";
-import { CalendarClock, CheckCircle2, CircleDot, FileText, Link2, Loader2, Paperclip, PencilLine, Phone, Plus, Search, Sparkles, Unlink, X } from "lucide-react";
+import { CalendarClock, CheckCircle2, CircleDot, FileText, Link2, Loader2, Paperclip, PencilLine, Phone, Plus, Search, Shapes, Sparkles, Unlink, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
@@ -77,6 +77,7 @@ export function EntityTimeline({ kind, id }: { kind: Kind; id: string }) {
 		<div className="rounded-xl border border-serene-neutral-100 p-3">
 			<div className="mb-2 flex flex-wrap items-center gap-2">
 				<p className="mr-auto text-sm font-semibold text-serene-neutral-900">Timeline</p>
+				<Button type="button" size="sm" variant="outline" className="h-8 gap-1.5 rounded-full text-xs" onClick={() => { window.location.href = `/dashboard/mjengo/files/draw?entity=${kind}:${id}`; }}><Shapes className="h-3.5 w-3.5 text-sauti-teal" /> Draw a flow</Button>
 				<Button type="button" size="sm" variant="outline" className="h-8 gap-1.5 rounded-full text-xs" onClick={() => setPicking((v) => !v)}><Link2 className="h-3.5 w-3.5" /> Link a call or file</Button>
 				<Button type="button" size="sm" variant="outline" className="h-8 gap-1.5 rounded-full text-xs" onClick={() => void runBrief()} disabled={briefing || !tl}>{briefing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5 text-sauti-teal" />} Brief me</Button>
 			</div>

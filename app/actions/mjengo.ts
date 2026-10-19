@@ -8,6 +8,7 @@ import { isSuperAdminEmail, requireAdminActor, type Actor } from '@/lib/access/s
 import { requireModule, type ModuleKey } from '@/lib/access/permissions';
 import { sendAccessEmail, sendNoticeEmail } from '@/lib/mjengo/invite-email';
 import { runPlaybooks } from '@/lib/mjengo/playbooks';
+import { convertWonOpportunity } from '@/lib/mjengo/won';
 
 export type Kind = 'grant' | 'opportunity' | 'project' | 'fellowship';
 
@@ -251,6 +252,8 @@ export async function saveEntity(kind: Kind, id: string | null, values: Record<s
     await audit(actor, statusChanged ? `${kind}.status_changed` : `${kind}.updated`, kind, id, String(row[labelKey]), statusChanged ? { from: before!.status, to: data.status } : undefined);
     // A new status can start a playbook (its steps are set up once, for whoever is responsible).
     if (statusChanged) after(() => runPlaybooks(kind, id, String(data.status), actor.id).then(() => undefined).catch(() => undefined));
+    // A won opportunity becomes the grant, project or fellowship it was for.
+    if (statusChanged && kind === 'opportunity' && data.status === 'won') after(() => convertWonOpportunity(id, actor.id).then(() => undefined).catch(() => undefined));
     revalidate();
     return row;
   }
@@ -260,6 +263,7 @@ export async function saveEntity(kind: Kind, id: string | null, values: Record<s
   if (error || !row) throw new Error('Could not create it.');
   await audit(actor, `${kind}.created`, kind, row.id, String(row[labelKey]));
   if (row.status) after(() => runPlaybooks(kind, row.id, String(row.status), actor.id).then(() => undefined).catch(() => undefined));
+  if (kind === 'opportunity' && row.status === 'won') after(() => convertWonOpportunity(row.id, actor.id).then(() => undefined).catch(() => undefined));
   revalidate();
   return row;
 }

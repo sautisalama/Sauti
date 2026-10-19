@@ -111,6 +111,34 @@ async function searchWebsite(issuer: string, title: string | null): Promise<{ ur
   }
 }
 
+/** Sites and widgets an aggregator links to that are never the organisation behind an opportunity. */
+const UTILITY_HOSTS = /(^|\.)(google\.com|googleapis\.com|gstatic\.com|googletagmanager\.com|doubleclick\.net|w\.org|wordpress\.(org|com)|gravatar\.com|cloudflare\.com|addthis\.com|sharethis\.com|disqus\.com|mailchimp\.com|feedburner\.com|paypal\.com|amazon\.[a-z.]+|amzn\.to|telegram\.org|telegram\.me|bing\.com|yahoo\.com|archive\.org|medium\.com)$/i;
+const FORMS = /docs\.google\.com\/forms|forms\.gle|forms\.office\.com|typeform\.com|airtable\.com\/shr/i;
+
+/**
+ * An aggregator's listing names the real organisation and links to it ("Apply here", "Official website", a short link).
+ * The links on its page worth following to the original, best first: the words they are written on, a host that matches
+ * the organisation's name, a shortened link (an aggregator's own shorteners lead to the real page), an application form.
+ */
+function originalLinks(p: PageMeta, hint: string | null): string[] {
+  const own = hostOf(p.finalUrl);
+  const best = new Map<string, number>();
+  for (const a of p.anchors) {
+    const h = hostOf(a.href);
+    if (!h || h === own || SOCIAL_HOSTS.test(h) || AGGREGATOR_HOSTS.test(h)) continue;
+    const isForm = FORMS.test(a.href);
+    if (UTILITY_HOSTS.test(h) && !isForm) continue;
+    let s = 0;
+    if (/\b(apply|official|website|source|original|visit|register|application|call for|read more|click here|link)\b/i.test(a.text)) s += 5;
+    if (hint && hostMatchesName(h, hint)) s += 4;
+    if (HUB_HOSTS.test(h)) s += 3;
+    if (isForm) s += 3;
+    try { if (new URL(a.href).pathname.length > 1) s += 1; } catch { /* keep the score */ }
+    if (s >= 4) best.set(a.href, Math.max(best.get(a.href) ?? 0, s));
+  }
+  return [...best.entries()].sort((a, b) => b[1] - a[1]).slice(0, 4).map(([u]) => u);
+}
+
 const SCAM_WORDS = /\b(registration fee|processing fee|application fee|pay (?:a )?fee|send (?:money|mpesa|m-pesa)|mpesa|m-pesa|till number|paybill|western union|bitcoin|gift card|guaranteed (?:grant|loan|visa))\b/i;
 
 function accountFrom(page: PageMeta | null, host: string | null): string | null {
@@ -165,7 +193,7 @@ export async function runVerification(input: { url: string | null; text: string 
   const deadline = deadlineEvidence === 'stated' ? ex!.deadline : page?.deadline ?? null;
   const links = [...(page?.links ?? []), ...(source.match(URL_RE) ?? [])];
   const applyEvidence = ex ? checkUrl(ex.official_url, source, links) : 'no_url';
-  const applyUrl = ex?.official_url && applyEvidence === 'stated' ? ex.official_url : null;
+  let applyUrl = ex?.official_url && applyEvidence === 'stated' ? ex.official_url : null;
 
   // 4. The organisation's own website.
   const organisationHint = ex?.issuer ?? null;
@@ -174,7 +202,8 @@ export async function runVerification(input: { url: string | null; text: string 
     if (!u) return;
     const abs = /^https?:\/\//i.test(u) ? u : `https://${u}`;
     const h = hostOf(abs);
-    if (!h || SOCIAL_HOSTS.test(h) || AGGREGATOR_HOSTS.test(h)) return;
+    // Aggregators are kept as candidates too: their pages are opened to find the link to the original.
+    if (!h || SOCIAL_HOSTS.test(h)) return;
     if (!candidates.some((c) => hostOf(c.url) === h)) candidates.push({ url: abs, via });
   };
   if (ex?.issuer_website && checkUrl(ex.issuer_website, source, links) === 'stated') push(ex.issuer_website, 'post');
@@ -187,11 +216,14 @@ export async function runVerification(input: { url: string | null; text: string 
     if (candidates.length >= 5) break;
   }
 
+  // Pages that are not the organisation first, so the aggregator's page is only opened when nothing better is there.
+  candidates.sort((a, b) => Number(AGGREGATOR_HOSTS.test(hostOf(a.url) ?? '')) - Number(AGGREGATOR_HOSTS.test(hostOf(b.url) ?? '')));
+  const agg: { v: { url: string; host: string } | null } = { v: null };
   const matches = (p: PageMeta) => sameIssuer(organisationHint, p.organisation ?? p.siteName) || hostMatchesName(hostOf(p.finalUrl), organisationHint);
   const tried = new Set<string>();
   // Open candidates in turn. A link hub (Linktree and the like) is never the website itself: its own links are tried instead.
   const attempt = async (list: typeof candidates): Promise<{ page: PageMeta; via: NonNullable<Verification['foundBy']> } | null> => {
-    for (let i = 0; i < list.length && i < 8; i++) {
+    for (let i = 0; i < list.length && i < 10; i++) {
       const c = list[i];
       const key = hostOf(c.url) ?? c.url;
       if (tried.has(key)) continue;
@@ -199,11 +231,17 @@ export async function runVerification(input: { url: string | null; text: string 
       try {
         const p = await fetchPage(c.url);
         const h = hostOf(p.finalUrl);
-        if (!h || p.status >= 400 || SOCIAL_HOSTS.test(h) || AGGREGATOR_HOSTS.test(h)) continue;
+        if (!h || p.status >= 400 || SOCIAL_HOSTS.test(h)) continue;
+        if (AGGREGATOR_HOSTS.test(h)) {
+          // A repost site: never the answer, but it links to the original organisation, which is what is wanted.
+          agg.v ??= { url: p.finalUrl, host: h };
+          for (const l of originalLinks(p, organisationHint)) { const lh = hostOf(l); if (lh && !list.some((x) => hostOf(x.url) === lh) && list.length < 10) list.push({ url: l, via: 'aggregator' }); }
+          continue;
+        }
         if (HUB_HOSTS.test(h)) {
           for (const l of p.links) {
             const lh = hostOf(l);
-            if (lh && !SOCIAL_HOSTS.test(lh) && !AGGREGATOR_HOSTS.test(lh) && !HUB_HOSTS.test(lh) && !list.some((x) => hostOf(x.url) === lh) && list.length < 8) list.push({ url: l, via: c.via });
+            if (lh && !SOCIAL_HOSTS.test(lh) && !AGGREGATOR_HOSTS.test(lh) && !HUB_HOSTS.test(lh) && !list.some((x) => hostOf(x.url) === lh) && list.length < 10) list.push({ url: l, via: c.via });
           }
           continue;
         }
@@ -246,7 +284,12 @@ export async function runVerification(input: { url: string | null; text: string 
     }
   }
 
+  const aggregator = agg.v;
   const siteHost = website ? hostOf(website.finalUrl) : null;
+  // The link to use is the organisation's own page that the trail ended on, and the apply link follows it when the post's was an aggregator's or a short link.
+  const sharedUrlRaw = shared;
+  const sharedIsOther = !!sharedHost && (SOCIAL_HOSTS.test(sharedHost) || AGGREGATOR_HOSTS.test(sharedHost) || HUB_HOSTS.test(sharedHost) || (!!siteHost && siteHost !== sharedHost));
+  if (website && applyUrl && (AGGREGATOR_HOSTS.test(hostOf(applyUrl) ?? '') || HUB_HOSTS.test(hostOf(applyUrl) ?? ''))) applyUrl = website.finalUrl;
   const organisation = website?.organisation ?? website?.siteName ?? organisationHint ?? (siteHost ? siteHost : null);
   const orgMatch = !!website && (sameIssuer(organisationHint, website.organisation ?? website.siteName) || hostMatchesName(siteHost, organisationHint));
 
@@ -261,7 +304,8 @@ export async function runVerification(input: { url: string | null; text: string 
   let trust: Verification['trust'] = 'unverified';
   let reason = 'No official website could be found for this yet.';
   if (website) {
-    if (orgMatch && foundBy !== 'search') { trust = 'verified'; reason = `The organisation's own website (${siteHost}) was found and its name matches.`; }
+    if (orgMatch && foundBy === 'aggregator') { trust = 'verified'; reason = `${aggregator?.host ?? 'A repost site'} is a repost site. Its link led to the organisation's own site (${siteHost}), and the name matches.`; }
+    else if (orgMatch && foundBy !== 'search') { trust = 'verified'; reason = `The organisation's own website (${siteHost}) was found and its name matches.`; }
     else if (orgMatch) { trust = 'likely'; reason = `A web search points to ${siteHost} as the organisation's site and the name matches.`; }
     else { trust = 'likely'; reason = `A website (${siteHost}) was found, but the organisation name could not be matched to it.`; }
   }
@@ -269,7 +313,8 @@ export async function runVerification(input: { url: string | null; text: string 
   if (asksForMoney && trust !== 'verified') { trust = 'suspicious'; reason = 'The post talks about fees or money transfers, and no official source was confirmed.'; }
 
   checks.push({ id: 'source', label: sourceKind === 'social_post' ? `Posted on ${sharedHost}` : sourceKind === 'official' ? 'Shared from the organisation itself' : sharedHost ? `Shared from ${sharedHost}` : 'No link was shared', ok: sourceKind === 'official' || sourceKind === 'social_post', note: account ?? undefined });
-  checks.push({ id: 'website', label: website ? `Original website found: ${siteHost}` : 'Original website not found', ok: !!website, note: foundBy === 'search' ? 'Found with a web search.' : foundBy === 'bio' ? 'Found from the link in the Instagram profile.' : undefined });
+  checks.push({ id: 'website', label: website ? `Original website found: ${siteHost}` : 'Original website not found', ok: !!website, note: foundBy === 'search' ? 'Found with a web search.' : foundBy === 'bio' ? 'Found from the link in the Instagram profile.' : foundBy === 'aggregator' ? `Found through the link in ${aggregator?.host ?? 'the aggregator'}'s listing.` : undefined });
+  if (aggregator) checks.push({ id: 'aggregator', label: `Listed on ${aggregator.host}, a repost site`, ok: foundBy === 'aggregator', note: foundBy === 'aggregator' ? 'Its link to the original was followed.' : 'The original could not be found from it.' });
   checks.push({ id: 'org', label: organisation ? `From ${organisation}` : 'Organisation not named', ok: !!website && orgMatch });
   checks.push({ id: 'deadline', label: deadline ? `Deadline ${deadline}` : 'No deadline found', ok: deadlineEvidence === 'stated', note: DEADLINE_NOTE[deadlineEvidence] });
   checks.push({ id: 'apply', label: applyUrl ? 'Apply link is in the post' : 'No apply link in the post', ok: !!applyUrl });
@@ -295,6 +340,10 @@ export async function runVerification(input: { url: string | null; text: string 
     email: ex?.official_email && source.toLowerCase().includes(ex.official_email.toLowerCase()) ? ex.official_email : null,
     checks,
     foundBy,
+    finalUrl: website && trust !== 'suspicious' ? website.finalUrl : null,
+    sharedUrl: sharedUrlRaw,
+    useFinalLink: !!website && trust !== 'suspicious' && sharedIsOther,
+    viaAggregator: aggregator?.url ?? null,
     ...(fetchError && !website ? { error: fetchError } : {}),
   };
 }

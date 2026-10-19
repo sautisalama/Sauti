@@ -11,9 +11,9 @@ const GENERIC_TITLE = /^(shared opportunity|untitled|new opportunity)$/i;
  */
 export async function verifyOpportunityRow(id: string, override?: { url?: string; text?: string }): Promise<{ verification: Verification; filled: string[] }> {
   const db = looseAdmin();
-  const { data: row } = await db.from('mjengo_opportunities').select('id, title, organisation, kind, deadline, source_url, description').eq('id', id).maybeSingle();
+  const { data: row } = await db.from('mjengo_opportunities').select('id, title, organisation, kind, deadline, source_url, shared_url, description').eq('id', id).maybeSingle();
   if (!row) throw new Error('That opportunity no longer exists.');
-  const r = row as { title: string | null; organisation: string | null; kind: string; deadline: string | null; source_url: string | null; description: string | null };
+  const r = row as { title: string | null; organisation: string | null; kind: string; deadline: string | null; source_url: string | null; shared_url: string | null; description: string | null };
 
   const verification = await runVerification({
     url: override?.url?.trim() || r.source_url,
@@ -25,6 +25,12 @@ export async function verifyOpportunityRow(id: string, override?: { url?: string
   const patch: Record<string, unknown> = { verification, verified_at: verification.at };
   const filled: string[] = [];
   const hostTitle = r.source_url ? (() => { try { return new URL(r.source_url!).hostname.replace(/^www\./, ''); } catch { return ''; } })() : '';
+  // The link kept for the opportunity is the organisation's own page. The link it was shared as stays beside it.
+  if (verification.finalUrl && (verification.useFinalLink || !r.source_url) && verification.finalUrl !== r.source_url) {
+    patch.source_url = verification.finalUrl.slice(0, 600);
+    if (r.source_url && !r.shared_url) patch.shared_url = r.source_url.slice(0, 600);
+    filled.push('link');
+  }
   if (verification.title && (!r.title || GENERIC_TITLE.test(r.title) || r.title === hostTitle)) { patch.title = verification.title.slice(0, 200); filled.push('title'); }
   if (!r.organisation && verification.organisation) { patch.organisation = verification.organisation.slice(0, 160); filled.push('organisation'); }
   if (!r.deadline && verification.deadline && verification.checks.find((c) => c.id === 'deadline')?.ok) { patch.deadline = verification.deadline; filled.push('deadline'); }

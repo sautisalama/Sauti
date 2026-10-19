@@ -2,6 +2,7 @@ import { looseAdmin } from '@/lib/loose-db';
 import { may, permissionsFor, type ModuleKey } from '@/lib/access/permissions';
 import { atLeast, levelFor, loadIndex, oversightFor } from '@/lib/vault/access';
 import { ENTITY_HREF, entitiesFor, type EntityKind } from '@/lib/mjengo/entity-view';
+import { fileLink } from '@/lib/mjengo/links';
 
 export type TimelineKind = 'added' | 'status' | 'change' | 'document' | 'requirement' | 'todo' | 'done' | 'call' | 'file' | 'event' | 'date';
 export interface TimelineItem {
@@ -106,7 +107,7 @@ export async function timelineFor(asker: { id: string; email: string }, kind: En
       for (const l of f) {
         const file = ix.files.get(l.item_id);
         if (!file || !atLeast(levelFor(ix, asker.id, 'file', file.id, oversight), 'view')) continue;
-        add({ id: `f-${file.id}`, at: file.updated_at ?? file.created_at ?? l.created_at, kind: 'file', title: file.name, detail: 'File linked here', ref: { type: 'file', id: file.id }, link: /\.docx$/i.test(file.name) ? `/dashboard/mjengo/documents/editor?file=${file.id}` : '/dashboard/mjengo/files', auto: l.auto });
+        add({ id: `f-${file.id}`, at: file.updated_at ?? file.created_at ?? l.created_at, kind: 'file', title: file.name, detail: 'File linked here', ref: { type: 'file', id: file.id }, link: fileLink(file.name, file.id), auto: l.auto });
       }
     }
   }

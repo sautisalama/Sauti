@@ -2,7 +2,8 @@
 
 import { OpenRouterBalance } from "./OpenRouterBalance";
 import Link from "next/link";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
+import { mjengoNav } from "@/app/actions/mjengo-nav";
 import { usePathname } from "next/navigation";
 import { ArrowLeft, GraduationCap, ClipboardList, Briefcase, CheckSquare, FileText, HardDrive, FolderKanban, LayoutDashboard, Lightbulb, Mail, ScrollText, ShieldCheck, Sparkles, CalendarClock, Users, MessageCircle, Bell, Megaphone, Palette, Video, BookMarked, Receipt, Workflow } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -20,11 +21,11 @@ const TABS = [
 	{ href: `${BASE}/calendar`, label: "Calendar", icon: CalendarClock },
 	{ href: "/meet", label: "Meet", icon: Video },
 	{ href: `${BASE}/vault`, label: "Files", icon: HardDrive },
+	{ href: `${BASE}/forms`, label: "Forms", icon: ClipboardList },
 	{ href: `${BASE}/grants`, label: "Grants", icon: Briefcase },
 	{ href: `${BASE}/opportunities`, label: "Opportunities", icon: Lightbulb },
 	{ href: `${BASE}/projects`, label: "Projects", icon: FolderKanban },
 	{ href: `${BASE}/fellowships`, label: "Fellowships", icon: GraduationCap },
-	{ href: `${BASE}/forms`, label: "Forms", icon: ClipboardList },
 	{ href: `${BASE}/todos`, label: "To-dos", icon: CheckSquare },
 	{ href: `${BASE}/playbooks`, label: "Playbooks", icon: Workflow },
 	{ href: `${BASE}/assistant`, label: "Assistant", icon: Sparkles },
@@ -37,6 +38,9 @@ const TABS = [
 
 export function MjengoShell({ isSuper, children }: { isSuper: boolean; children: React.ReactNode }) {
 	const pathname = usePathname() ?? "";
+	// Grants, projects and fellowships show once there is one (an opportunity that was won).
+	const [has, setHas] = useState({ grants: true, projects: true, fellowships: true });
+	useEffect(() => { mjengoNav().then((n) => setHas(n.has)).catch(() => undefined); }, []);
 	// On a phone the strip scrolls freely and the current section rests in the middle.
 	useEffect(() => {
 		const el = document.querySelector<HTMLElement>('nav[aria-label="Mjengo sections"] [aria-current="page"]');
@@ -74,7 +78,7 @@ export function MjengoShell({ isSuper, children }: { isSuper: boolean; children:
 						<ArrowLeft className="h-4 w-4" /> Back
 					</button>
 				)}
-				{TABS.filter((t) => !t.superOnly || isSuper).map((t) => {
+				{TABS.filter((t) => (!t.superOnly || isSuper) && !((t.href.endsWith("/grants") && !has.grants) || (t.href.endsWith("/projects") && !has.projects) || (t.href.endsWith("/fellowships") && !has.fellowships))).map((t) => {
 					const active = t.exact ? pathname === t.href : pathname.startsWith(t.href);
 					return (
 						<Link

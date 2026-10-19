@@ -64,7 +64,7 @@ export async function gatherSources(asker: Asker, question: string, max = 8): Pr
   if (can('files')) tasks.push((async () => {
     const [ix, oversight] = await Promise.all([loadIndex(), oversightFor(asker.email)]);
     const mine = [...ix.files.values()].filter((f) => atLeast(levelFor(ix, asker.id, 'file', f.id, oversight), 'view'));
-    const readable = (f: { name: string; mime: string | null }) => /\.(pdf|docx|txt|md|csv|json|html)$/i.test(f.name) || (f.mime ?? '').startsWith('text/');
+    const readable = (f: { name: string; mime: string | null }) => /\.(pdf|docx|txt|md|csv|json|html|excalidraw)$/i.test(f.name) || (f.mime ?? '').startsWith('text/');
     const byName = mine.map((f) => ({ f, s: hits(`${f.name} ${(f.tags ?? []).join(' ')}`, terms) })).filter((x) => x.s > 0).sort((a, b) => b.s - a.s).slice(0, 3).map((x) => x.f);
     // Names rarely hold the answer, so a few of the most recently changed documents are read as well.
     const recent = mine.filter(readable).sort((a, b) => (b.updated_at ?? '').localeCompare(a.updated_at ?? '')).slice(0, 4);

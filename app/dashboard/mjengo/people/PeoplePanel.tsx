@@ -17,7 +17,7 @@ import {
 	addSuperAdmin, getAccessOverview, removeSuperAdmin, searchPeople, setAccountType, setAdminStatus,
 	type AccessOverview, type PersonView,
 } from "@/app/actions/access";
-import { assignRole, deleteRole, listRoles, notifyAccessChange, roleModules, saveRole, type RoleView } from "@/app/actions/roles";
+import { assignRole, deleteRole, listRoles, notifyAccessChange, restoreDefaultRoles, roleModules, saveRole, type RoleView } from "@/app/actions/roles";
 
 type Lvl = "view" | "write" | "owner";
 const LVLS: { v: Lvl | "none"; label: string }[] = [{ v: "none", label: "None" }, { v: "view", label: "View" }, { v: "write", label: "Write" }, { v: "owner", label: "Owner" }];
@@ -158,7 +158,10 @@ export function PeoplePanel() {
 				<section className="space-y-3">
 					<div className="flex items-center justify-between gap-3">
 						<p className="max-w-xl text-sm text-serene-neutral-500">Each role sets a level for every part of the suite: <b>View</b> reads, <b>Write</b> creates and changes, <b>Owner</b> can also delete and manage other people&apos;s items. People with no role keep everything.</p>
-						<Button className="shrink-0 gap-1.5 bg-sauti-teal hover:bg-sauti-dark" onClick={() => setEdit({ id: null, name: "", description: "", levels: {} })}><Plus className="h-4 w-4" /> New role</Button>
+						<div className="flex shrink-0 flex-wrap gap-2">
+							<Button variant="outline" onClick={async () => { try { setRoles(await unwrap(restoreDefaultRoles())); } catch { /* the list stays as it is */ } }}>Add default roles</Button>
+							<Button className="gap-1.5 bg-sauti-teal hover:bg-sauti-dark" onClick={() => setEdit({ id: null, name: "", description: "", levels: {} })}><Plus className="h-4 w-4" /> New role</Button>
+						</div>
 					</div>
 					{roles.length === 0 ? <p className="rounded-2xl border border-dashed border-serene-neutral-200 bg-white p-10 text-center text-sm text-serene-neutral-500">No roles yet.</p> : (
 						<ul className="grid gap-3 md:grid-cols-2">

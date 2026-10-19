@@ -38,7 +38,15 @@ export interface Verification {
 	email: string | null;
 	checks: VerificationCheck[];
 	/** How the website was found. */
-	foundBy: "post" | "page" | "link" | "bio" | "search" | null;
+	foundBy: "post" | "page" | "link" | "bio" | "aggregator" | "search" | null;
+	/** The link to use for this opportunity: the organisation's own page, which the shared link, a short link or an aggregator's listing led to. */
+	finalUrl?: string | null;
+	/** The link as it was shared (an Instagram post, a short link, an aggregator's page). */
+	sharedUrl?: string | null;
+	/** Set when the shared link was not the organisation's own page, so the final link should replace it. */
+	useFinalLink?: boolean;
+	/** The aggregator's page that was followed to the original, if the trail went through one. */
+	viaAggregator?: string | null;
 	error?: string;
 }
 

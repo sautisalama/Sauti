@@ -20,6 +20,7 @@
 	"dependencies": {
 		"@clerk/nextjs": "^6.0.2",
 		"@ducanh2912/next-pwa": "^10.2.9",
+		"@excalidraw/excalidraw": "^0.18.1",
 		"@gamine/wordcraft-react": "^0.3.6",
 		"@huggingface/transformers": "^4.3.1",
 		"@radix-ui/react-accordion": "^1.2.12",

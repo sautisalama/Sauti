@@ -28,6 +28,8 @@ const ICON: Record<TrustTier, React.ReactNode> = {
 function patchFrom(v: Verification, values: Record<string, unknown>): Record<string, unknown> {
 	const patch: Record<string, unknown> = {};
 	const empty = (k: string) => values[k] == null || values[k] === "";
+	// The link kept is the organisation's own page, not the post, short link or aggregator it was shared from.
+	if (v.finalUrl && (v.useFinalLink || empty("source_url")) && values.source_url !== v.finalUrl) patch.source_url = v.finalUrl;
 	if (v.title && (empty("title") || /^(shared opportunity|untitled)$/i.test(String(values.title)))) patch.title = v.title;
 	if (v.organisation && empty("organisation")) patch.organisation = v.organisation;
 	if (v.deadline && empty("deadline") && v.checks.find((c) => c.id === "deadline")?.ok) patch.deadline = v.deadline;

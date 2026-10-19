@@ -19,6 +19,8 @@ export interface PageMeta {
   deadline: string | null;
   jsonLd: unknown[];
   links: string[];
+  /** The same links with the words they are written on ("Apply here", "Official website"). */
+  anchors: { href: string; text: string }[];
   text: string;
 }
 
@@ -28,9 +30,9 @@ const TIMEOUT_MS = 10_000;
 
 export const SOCIAL_HOSTS = /(^|\.)(instagram\.com|tiktok\.com|x\.com|twitter\.com|facebook\.com|fb\.com|fb\.watch|linkedin\.com|lnkd\.in|youtube\.com|youtu\.be|t\.me|threads\.net|pinterest\.com|reddit\.com|wa\.me|whatsapp\.com)$/i;
 /** Link shorteners and "link in bio" pages: they point somewhere else and are followed or read for links. */
-export const HUB_HOSTS = /(^|\.)(bit\.ly|t\.co|tinyurl\.com|buff\.ly|ow\.ly|goo\.gl|is\.gd|cutt\.ly|rebrand\.ly|shorturl\.at|linktr\.ee|lnk\.bio|beacons\.ai|bio\.link|campsite\.bio|taplink\.cc|linkin\.bio|stan\.store|carrd\.co)$/i;
+export const HUB_HOSTS = /(^|\.)(bit\.ly|t\.co|tinyurl\.com|buff\.ly|ow\.ly|goo\.gl|is\.gd|cutt\.ly|rebrand\.ly|shorturl\.at|linktr\.ee|lnk\.bio|beacons\.ai|bio\.link|campsite\.bio|taplink\.cc|linkin\.bio|stan\.store|carrd\.co|l1nk\.dev|linkpop\.com|hoo\.be|link\.bio|bio\.site|heylink\.me|solo\.to|snipfeed\.co|tap\.bio|lnk\.to|ig\.me)$/i;
 /** Sites that repost other people's opportunities. */
-export const AGGREGATOR_HOSTS = /(opportunitydesk|opportunitiesforafricans|opportunitiesforyouth|afterschoolafrica|scholarshipsads|scholars4dev|fundsforngos|fundsforngo|youthop|devex\.com|scholarshipportal|opportunitiescorners|mastersportal|scholarshiproar|globalgrants|grantforward|grants\.gov\.ke\/aggregat)/i;
+export const AGGREGATOR_HOSTS = /(opportunitydesk|opportunitiesforafricans|opportunitiesforyouth|afterschoolafrica|scholarshipsads|scholars4dev|fundsforngos|fundsforngo|youthop|devex\.com|scholarshipportal|opportunitiescorners|mastersportal|scholarshiproar|globalgrants|grantforward|grants\.gov\.ke\/aggregat|opportunitiespal|fundsforyouth|ngojobsinafrica|scholarshipcorner|youthcorner)/i;
 const BOT_UA = 'facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)';
 const UA = 'Mozilla/5.0 (compatible; SautiSalamaVerify/1.0; +https://sautisalama.org)';
 
@@ -128,6 +130,14 @@ export function readHtml(html: string, baseUrl: string): Omit<PageMeta, 'finalUr
     if (h && /^https?:/i.test(h) && !seen.has(h)) { seen.add(h); links.push(h); }
   }
 
+  const anchors: { href: string; text: string }[] = [];
+  const are = /<a\s[^>]*?href=["']([^"'#][^"']*)["'][^>]*>([\s\S]*?)<\/a>/gi;
+  let am: RegExpExecArray | null;
+  while ((am = are.exec(html)) && anchors.length < 300) {
+    const h = abs(decode(am[1]));
+    if (h && /^https?:/i.test(h)) anchors.push({ href: h, text: decode(am[2].replace(/<[^>]+>/g, ' ')).slice(0, 120) });
+  }
+
   const text = decode(
     html
       .replace(/<script[\s\S]*?<\/script>/gi, ' ').replace(/<style[\s\S]*?<\/style>/gi, ' ').replace(/<noscript[\s\S]*?<\/noscript>/gi, ' ')
@@ -145,6 +155,7 @@ export function readHtml(html: string, baseUrl: string): Omit<PageMeta, 'finalUr
     deadline: ld.deadline,
     jsonLd: ld.jsonLd,
     links,
+    anchors,
     text,
   };
 }
