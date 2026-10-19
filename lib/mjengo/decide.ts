@@ -1,34 +1,50 @@
 /**
- * Typed decisions from TypeSafe's Jev (System One) through OpenRouter, with the same OPENROUTER_API_KEY as every
- * other AI call: no extra key. You give it text and a question with a fixed set of answers, it returns one of
- * them with probabilities, in one fast pass and without writing prose. The right tool for "which of these is
- * it" and "yes or no"; the wrong one for writing, arithmetic or counting.
+ * Typed decisions from TypeSafe's Jev (System One). You give it text and a question with a fixed set of answers, it
+ * returns one of them with probabilities, in one fast pass and without writing prose. The right tool for "which of
+ * these is it" and "yes or no"; the wrong one for writing, arithmetic or counting.
+ *
+ * Jev's own API is tried first (TYPESAFE_API_KEY); OpenRouter (OPENROUTER_API_KEY) is the spare when that key is
+ * missing, the call fails, or the answer is not one of the options.
  *
  * Every function returns null when it cannot answer, and the caller then uses its own rule or the language model.
  */
 
 export interface Choice<K extends string> { choice: K; probability: number; confidence: number; probabilities: Record<string, number> }
 
-export const decideConfigured = () => !!process.env.OPENROUTER_API_KEY;
+const jevKey = () => process.env.TYPESAFE_API_KEY || process.env.JEV_API_KEY || process.env.jev_key || '';
 
-async function evaluate(state: string, instructions: string, criteria: Record<string, string>): Promise<{ choice: string; probabilities: Record<string, number>; confidence: number } | null> {
-  const key = process.env.OPENROUTER_API_KEY;
-  if (!key) return null;
+export const decideConfigured = () => !!(jevKey() || process.env.OPENROUTER_API_KEY);
+
+interface Answer { choice: string; probabilities: Record<string, number>; confidence: number }
+
+/** One call to a System One endpoint; the two providers differ only in the URL, the key and the model name. */
+async function ask(url: string, key: string, model: string, state: string, instructions: string, criteria: Record<string, string>): Promise<Answer | null> {
   try {
-    const res = await fetch('https://openrouter.ai/api/alpha/decisions', {
+    const res = await fetch(url, {
       method: 'POST',
       signal: AbortSignal.timeout(6_000),
       headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model: process.env.JEV_MODEL || 'typesafe/jev-1.13', state: { text: state.slice(0, 24_000) }, questions: { q: { type: 'choice', instructions, criteria } } }),
+      body: JSON.stringify({ model, state: url.includes('openrouter') ? { text: state.slice(0, 24_000) } : state.slice(0, 24_000), questions: { q: { type: 'choice', instructions, criteria } } }),
     });
     if (!res.ok) return null;
     const j = (await res.json()) as { answers?: { q?: { choice?: string; probabilities?: Record<string, number>; confidence?: number } } };
     const a = j.answers?.q;
-    if (!a?.choice) return null;
+    if (!a?.choice || !(a.choice in criteria)) return null;
     return { choice: a.choice, probabilities: a.probabilities ?? {}, confidence: a.confidence ?? a.probabilities?.[a.choice] ?? 0 };
   } catch {
     return null;
   }
+}
+
+async function evaluate(state: string, instructions: string, criteria: Record<string, string>): Promise<Answer | null> {
+  const primary = jevKey();
+  if (primary) {
+    const r = await ask('https://api.typesafe.ai/v1/systemone', primary, process.env.JEV_MODEL_DIRECT || 'jev-latest', state, instructions, criteria);
+    if (r) return r;
+  }
+  const spare = process.env.OPENROUTER_API_KEY;
+  if (spare) return ask('https://openrouter.ai/api/alpha/decisions', spare, process.env.JEV_MODEL || 'typesafe/jev-1.13', state, instructions, criteria);
+  return null;
 }
 
 /** Pick one of the given answers. Null when Jev is not configured or did not answer. */

@@ -4,7 +4,7 @@ import { MjengoLoader } from "../../_components/MjengoLoader";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { format, isThisWeek, isToday, isYesterday, startOfDay } from "date-fns";
 import {
-	Archive, Check, ArrowLeft, ChevronDown, ChevronUp, ChevronsRight, Clock, ListFilter, MoreHorizontal, RotateCw, SlidersHorizontal, Command as CommandIcon, Edit3, FileText, Flag, Forward, Inbox, Loader2, Mail, MailOpen, Menu, Paperclip, Pencil, Plus, Reply, ReplyAll, Search, Send, Settings, ShieldAlert, FolderKanban, Sparkles, Star, Tag, Trash2, User, X,
+	Archive, Bell, Check, ArrowLeft, Newspaper, Receipt, CreditCard, ChevronDown, ChevronUp, ChevronsRight, Clock, ListFilter, MoreHorizontal, RotateCw, SlidersHorizontal, Command as CommandIcon, Edit3, FileText, Flag, Forward, Inbox, Loader2, Mail, MailOpen, Menu, Paperclip, Pencil, Plus, Reply, ReplyAll, Search, Send, Settings, ShieldAlert, FolderKanban, Sparkles, Star, Tag, Trash2, User, X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -31,16 +31,21 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { AccountSwitcher } from "./AccountSwitcher";
 import { detailKey, listKey, mailStore, mergeFresh, prefetchDetails, setMailUnread } from "./mail-store";
 import { AvatarStack, useTeam } from "../../_components/People";
+import { listSorted, dismissPending, type MailBucket, type PendingItem } from "./api";
+import { Avatar, ScopeTag } from "./AccountSwitcher";
 import { cacheDetail, cacheList, readDetail, readList } from "@/lib/mail/offline-cache";
 
 type Detail = Awaited<ReturnType<typeof getMessageDetail>>;
 type Layout = "side" | "center" | "full";
 type HoverAction = NonNullable<ViewConfig["hoverActions"]>[number];
 
-const BUILT_IN: { key: string; label: string; icon: typeof Inbox; config: ViewConfig; section: "views" | "mail" }[] = [
+const BUILT_IN: { key: string; label: string; icon: typeof Inbox; config: ViewConfig; section: "views" | "sorted" | "mail"; bucket?: MailBucket }[] = [
 	{ key: "inbox", label: "Inbox", icon: Inbox, config: { mailbox: "inbox", group: "date" }, section: "views" },
 	{ key: "unread", label: "Unread", icon: Mail, config: { mailbox: "inbox", unread: true, group: "date" }, section: "views" },
 	{ key: "starred", label: "Starred", icon: Star, config: { mailbox: "inbox", starred: true, group: "date" }, section: "views" },
+	{ key: "subscriptions", label: "Subscriptions", icon: Newspaper, config: { mailbox: "inbox", group: "date" }, section: "sorted", bucket: "subscription" },
+	{ key: "receipts", label: "Receipts", icon: Receipt, config: { mailbox: "inbox", group: "date" }, section: "sorted", bucket: "receipt" },
+	{ key: "updates", label: "Updates", icon: Bell, config: { mailbox: "inbox", group: "date" }, section: "sorted", bucket: "update" },
 	{ key: "archive", label: "All Mail", icon: Archive, config: { mailbox: "archive", group: "date" }, section: "mail" },
 	{ key: "sent", label: "Sent", icon: Send, config: { mailbox: "sent", group: "date" }, section: "mail" },
 	{ key: "drafts", label: "Drafts", icon: FileText, config: { mailbox: "drafts", group: "date" }, section: "mail" },
@@ -50,6 +55,9 @@ const BUILT_IN: { key: string; label: string; icon: typeof Inbox; config: ViewCo
 const ICON: Record<string, typeof Inbox> = { inbox: Inbox, star: Star, paperclip: Paperclip, user: User, tag: Tag, flag: Flag };
 const DEFAULT_HOVER: HoverAction[] = ["archive", "trash", "unread", "star"];
 
+const ALL = "all";
+/** One message across mailboxes: the same uid can exist in two of them. */
+const rkey = (m: { account?: string; mailbox: string; uid: number }) => `${m.account ?? ""}:${m.mailbox}:${m.uid}`;
 const displayName = (m: { name: string; address: string }) => m.name || m.address || "Unknown";
 
 function groupLabel(d: string | null, mode: ViewConfig["group"], from: string, seen = true): string {
@@ -88,6 +96,9 @@ export function MailApp() {
 	const [workPrompt, setWorkPrompt] = useState<{ url: string; subject: string; links: string[] } | null>(null);
 	const [dropOn, setDropOn] = useState<string | null>(null);
 	const [onlyUnread, setOnlyUnread] = useState(false);
+	const [pending, setPending] = useState<PendingItem[]>([]);
+	const [counts, setCounts] = useState<Record<"subscription" | "receipt" | "update", number>>({ subscription: 0, receipt: 0, update: 0 });
+	const [failedBoxes, setFailedBoxes] = useState<string[]>([]);
 	const [viewKey, setViewKey] = useState("inbox");
 	const [q, setQ] = useState("");
 	const [debouncedQ, setDebouncedQ] = useState("");
@@ -110,6 +121,8 @@ export function MailApp() {
 	const [summary, setSummary] = useState<string | null>(null);
 	const [summaryBusy, setSummaryBusy] = useState(false);
 
+	/** The mailbox a message belongs to (in the combined inbox every row says so). */
+	const acctOf = (m?: { account?: string } | null) => m?.account ?? (accountId === ALL ? accounts?.[0]?.id ?? null : accountId);
 	const [layout, setLayout] = useState<Layout>("side");
 	const [compose, setCompose] = useState<ComposeSeed | null>(null);
 	// Someone in an email being added to the contacts (opened by double-clicking them).
@@ -139,7 +152,7 @@ export function MailApp() {
 	const loadAccounts = useCallback(async () => {
 		const list = await listAccounts();
 		setAccounts(list);
-		setAccountId((cur) => (cur && list.some((a) => a.id === cur) ? cur : list[0]?.id ?? null));
+		setAccountId((cur) => (cur && (cur === ALL ? list.length > 1 : list.some((a) => a.id === cur)) ? cur : list.length > 1 ? ALL : list[0]?.id ?? null));
 	}, []);
 	const loadMeta = useCallback(async () => {
 		const [v, s, l, sig] = await Promise.all([listViews(), listSnippets(), listLabels(), getSignature().catch(() => null)]);
@@ -185,7 +198,7 @@ export function MailApp() {
 		(mailStore.boot ??= mailBootstrap().catch((e) => { mailStore.boot = null; throw e; }))
 			.then((b) => {
 				setAccounts(b.accounts);
-				setAccountId((cur) => (cur && b.accounts.some((x) => x.id === cur) ? cur : b.accounts[0]?.id ?? null));
+				setAccountId((cur) => (cur && (cur === ALL ? b.accounts.length > 1 : b.accounts.some((x) => x.id === cur)) ? cur : b.accounts.length > 1 ? ALL : b.accounts[0]?.id ?? null));
 				setViews(b.views);
 				setSnippets(b.snippets);
 				setLabels(b.labels);
@@ -199,6 +212,12 @@ export function MailApp() {
 
 	useEffect(() => {
 		if (!accountId) return;
+		if (accountId === ALL) {
+			setBoxes([]);
+			Promise.all((accounts ?? []).map((a) => getMailboxes(a.id).then((r) => { mailStore.boxes.set(a.id, { ...r, at: Date.now() }); return r.unread; }).catch(() => 0)))
+				.then((n) => { const t = n.reduce((x, y) => x + y, 0); setUnread(t); setMailUnread(t); });
+			return;
+		}
 		const have = mailStore.boxes.get(accountId);
 		setBoxes(have?.boxes ?? []);
 		if (have) setUnread(have.unread);
@@ -207,7 +226,7 @@ export function MailApp() {
 		getMailboxes(accountId)
 			.then((r) => { mailStore.boxes.set(accountId, { ...r, at: Date.now() }); setBoxes(r.boxes); setUnread(r.unread); setMailUnread(r.unread); })
 			.catch((e) => { if (!have) setLoadError(e instanceof Error ? e.message : "Could not reach the mailbox."); });
-	}, [accountId]);
+	}, [accountId, accounts?.length]);
 
 	useEffect(() => {
 		const t = setTimeout(() => setDebouncedQ(q), 350);
@@ -224,9 +243,16 @@ export function MailApp() {
 	}, [views, viewKey, labels]);
 
 	const mailboxPath = useMemo(() => {
+		if (accountId === ALL) return active.config.mailbox === "inbox" ? "INBOX" : null;
 		const hit = boxes.find((b) => b.special === active.config.mailbox);
 		return hit?.path ?? (active.config.mailbox === "inbox" ? "INBOX" : null);
-	}, [boxes, active]);
+	}, [boxes, active, accountId]);
+
+	/** The inbox views hold only mail that needs a person; subscriptions, receipts and updates sit under their labels. */
+	const bucket: MailBucket | null = useMemo(() => {
+		if (debouncedQ || active.config.mailbox !== "inbox" || active.config.labelId || active.config.from) return null;
+		return BUILT_IN.find((b) => b.key === viewKey)?.bucket ?? "inbox";
+	}, [debouncedQ, active, viewKey]);
 
 	const loadList = useCallback(async (append = false, silent = false) => {
 		if (!accountId || !mailboxPath) return;
@@ -235,6 +261,19 @@ export function MailApp() {
 		setLoadError(null);
 		try {
 			const c = active.config;
+			if (bucket) {
+				const s = await listSorted(accountId, bucket, { unread: c.unread || onlyUnread, starred: c.starred, hasAttachment: c.hasAttachment }, append ? rows.length : 0, 40);
+				if (token !== listToken.current) return;
+				const items = append ? [...rows, ...s.items.filter((i) => !rows.some((p) => rkey(p) === rkey(i)))] : s.items;
+				setRows(items);
+				setTotal(s.total);
+				setCounts(s.counts);
+				setPending(s.pending);
+				setFailedBoxes(s.failed);
+				setOffline(false);
+				mailStore.lists.set(listKey(accountId, viewKey, onlyUnread), { items, total: s.total, at: Date.now() });
+				return;
+			}
 			const res = await listMessages(accountId, mailboxPath, { unread: c.unread || onlyUnread, starred: c.starred, hasAttachment: c.hasAttachment, from: c.from, labelId: c.labelId, text: debouncedQ }, append ? rows.length : 0, 40);
 			if (token !== listToken.current) return;
 			setRows((prev) => {
@@ -258,7 +297,7 @@ export function MailApp() {
 		} finally {
 			if (token === listToken.current) setLoading(false);
 		}
-	}, [accountId, mailboxPath, active, debouncedQ, rows.length, onlyUnread]);
+	}, [accountId, mailboxPath, active, debouncedQ, rows, onlyUnread, bucket, viewKey]);
 
 	// Reload when the account, view or search changes.
 	useEffect(() => {
@@ -305,21 +344,22 @@ export function MailApp() {
 
 	/* ---- opening a message */
 	const open = useCallback(async (m: MessageRow, images = true) => {
-		if (!accountId) return;
-		const key = detailKey(accountId, m.mailbox, m.uid);
+		const acct = acctOf(m);
+		if (!acct) return;
+		const key = detailKey(acct, m.mailbox, m.uid);
 		const cached = mailStore.details.get(key);
 		setSelected(m);
 		setSummary(null);
 		// What we already have is shown at once; the rest streams in behind it.
-		const convoKey = `${accountId}:${m.mailbox}:${cached?.subject ?? m.subject}`;
+		const convoKey = `${acct}:${m.mailbox}:${cached?.subject ?? m.subject}`;
 		setConversation((mailStore.convos.get(convoKey) ?? []).filter((x) => x.uid !== m.uid));
 		if (cached) {
 			setDetail(cached);
 			setDetailBusy(false);
-			setRows((prev) => prev.map((r) => (r.uid === m.uid ? { ...r, seen: true } : r)));
+			setRows((prev) => prev.map((r) => (rkey(r) === rkey(m) ? { ...r, seen: true } : r)));
 			if (!m.seen) {
 				setUnread((u) => Math.max(0, u - 1));
-				actOnMessages(accountId, m.mailbox, [m.uid], "read").catch(() => undefined);
+				actOnMessages(acct, m.mailbox, [m.uid], "read").catch(() => undefined);
 			}
 		} else {
 			setDetail(null);
@@ -327,25 +367,25 @@ export function MailApp() {
 		}
 		try {
 			if (!cached) {
-				const d = await getMessageDetail(accountId, m.mailbox, m.uid, images);
+				const d = await getMessageDetail(acct, m.mailbox, m.uid, images);
 				mailStore.details.set(key, d);
 				// The person may have moved on while this loaded.
-				if (selectedRef.current?.uid !== m.uid) return;
+				if ((selectedRef.current ? rkey(selectedRef.current) : "") !== rkey(m)) return;
 				setDetail(d);
-				cacheDetail(`${accountId}:${m.mailbox}:${m.uid}`, d);
-				setRows((prev) => prev.map((r) => (r.uid === m.uid ? { ...r, seen: true } : r)));
+				cacheDetail(`${acct}:${m.mailbox}:${m.uid}`, d);
+				setRows((prev) => prev.map((r) => (rkey(r) === rkey(m) ? { ...r, seen: true } : r)));
 				if (!m.seen) setUnread((u) => Math.max(0, u - 1));
 			}
 			const subject = (mailStore.details.get(key) ?? cached)?.subject ?? m.subject;
-			const ck = `${accountId}:${m.mailbox}:${subject}`;
-			getThread(accountId, m.mailbox, subject).then((t) => {
+			const ck = `${acct}:${m.mailbox}:${subject}`;
+			getThread(acct, m.mailbox, subject).then((t) => {
 				// Bodies first, then the list that points at them, so every row can show its text at once.
-				for (const d of t.details) mailStore.details.set(detailKey(accountId, d.mailbox, d.uid), d as never);
+				for (const d of t.details) mailStore.details.set(detailKey(acct, d.mailbox, d.uid), d as never);
 				mailStore.convos.set(ck, t.rows);
-				if (selectedRef.current?.uid === m.uid) setConversation(t.rows.filter((x) => !(x.uid === m.uid && x.mailbox === m.mailbox)));
+				if ((selectedRef.current ? rkey(selectedRef.current) : "") === rkey(m)) setConversation(t.rows.filter((x) => !(x.uid === m.uid && x.mailbox === m.mailbox)));
 			}).catch(() => undefined);
 		} catch (e) {
-			const saved = readDetail<Detail>(`${accountId}:${m.mailbox}:${m.uid}`);
+			const saved = readDetail<Detail>(`${acct}:${m.mailbox}:${m.uid}`);
 			if (saved) {
 				setDetail(saved);
 				setOffline(true);
@@ -356,12 +396,12 @@ export function MailApp() {
 		} finally {
 			setDetailBusy(false);
 		}
-	}, [accountId, toast]);
+	}, [accountId, accounts, toast]);
 
 	// The message list keeps the next messages' bodies ready, so flipping between emails has no wait.
 	useEffect(() => {
-		if (!accountId || rows.length === 0) return;
-		const idx = selected ? rows.findIndex((r) => r.uid === selected.uid) : 0;
+		if (!accountId || accountId === ALL || rows.length === 0) return;
+		const idx = selected ? rows.findIndex((r) => rkey(r) === rkey(selected)) : 0;
 		const from = Math.max(0, idx - 2);
 		const near = rows.slice(from, from + 14);
 		const t = setTimeout(() => { prefetchDetails(accountId, near).catch(() => undefined); }, 350);
@@ -373,24 +413,25 @@ export function MailApp() {
 
 	/* ---- actions */
 	const act = useCallback(async (m: MessageRow, action: MailAction) => {
-		if (!accountId) return;
+		const acct = acctOf(m);
+		if (!acct) return;
 		const removes = action === "archive" || action === "trash" || action === "spam" || action === "delete";
 		const before = rows;
-		const idx = rows.findIndex((r) => r.uid === m.uid);
-		setRows((prev) => (removes ? prev.filter((r) => r.uid !== m.uid) : prev.map((r) => (r.uid === m.uid ? { ...r, seen: action === "read" ? true : action === "unread" ? false : r.seen, flagged: action === "star" ? true : action === "unstar" ? false : r.flagged } : r))));
-		if (removes && selected?.uid === m.uid) {
+		const idx = rows.findIndex((r) => rkey(r) === rkey(m));
+		setRows((prev) => (removes ? prev.filter((r) => rkey(r) !== rkey(m)) : prev.map((r) => (rkey(r) === rkey(m) ? { ...r, seen: action === "read" ? true : action === "unread" ? false : r.seen, flagged: action === "star" ? true : action === "unstar" ? false : r.flagged } : r))));
+		if (removes && (!!selected && rkey(selected) === rkey(m))) {
 			const next = before[idx + 1] ?? before[idx - 1];
 			if (next && layout === "side") open(next); else close();
 		}
 		try {
-			await actOnMessages(accountId, m.mailbox, [m.uid], action);
+			await actOnMessages(acct, m.mailbox, [m.uid], action);
 			if (action === "unread" || action === "read") setUnread((u) => Math.max(0, u + (action === "unread" ? 1 : -1)));
 			if (removes) toast({ title: action === "archive" ? "Archived" : action === "trash" ? "Moved to Trash" : action === "spam" ? "Marked as spam" : "Deleted" });
 		} catch (e) {
 			setRows(before);
 			toast({ title: "That did not work", description: e instanceof Error ? e.message : undefined, variant: "destructive" });
 		}
-	}, [accountId, rows, selected, layout, open, toast]);
+	}, [accountId, accounts, rows, selected, layout, open, toast]);
 
 	/** Tag a message with a project: the project's own label is made the first time. */
 	const toggleProject = async (messageId: string, projectId: string, on: boolean, uid?: number) => {
@@ -405,12 +446,13 @@ export function MailApp() {
 
 	/** Add or remove a label on a message; reflected straight away in the list. */
 	const toggleLabel = async (messageId: string, labelId: string, on: boolean, uid?: number) => {
-		if (!accountId) return;
+		const acct = rows.find((r) => r.messageId === messageId)?.account ?? acctOf(selected);
+		if (!acct) return;
 		const apply = (r: MessageRow) => (r.messageId === messageId ? { ...r, labels: on ? Array.from(new Set([...r.labels, labelId])) : r.labels.filter((x) => x !== labelId) } : r);
 		setRows((prev) => prev.map(apply));
 		if (selected && selected.messageId === messageId) setSelected((s) => (s ? apply(s) : s));
 		try {
-			await setMessageLabel(accountId, messageId, labelId, on);
+			await setMessageLabel(acct, messageId, labelId, on);
 			const lab = labels.find((l) => l.id === labelId);
 			if (on) toast({ title: `Labelled ${lab?.name ?? ""}` });
 			// Tagged as something that comes with a link (a grant, an opportunity): offer to put the link to work.
@@ -426,7 +468,7 @@ export function MailApp() {
 	};
 
 	const startReply = (d: Detail, all: boolean, forward = false) => {
-		const me = accounts?.find((a) => a.id === accountId)?.email.toLowerCase();
+		const me = accounts?.find((a) => a.id === acctOf(selected))?.email.toLowerCase();
 		const sender = d.from[0]?.address;
 		const bodyHtml = d.html ?? `<p>${d.text.replace(/\n/g, "<br>")}</p>`;
 		const quote = `<br><blockquote><p>On ${d.date ? format(new Date(d.date), "d MMM yyyy, HH:mm") : ""}, ${displayName(d.from[0] ?? { name: "", address: "" })} wrote:</p>${bodyHtml}</blockquote>`;
@@ -437,7 +479,7 @@ export function MailApp() {
 			...(here ? [{ key: `cur-${here.uid}`, mailbox: here.mailbox, uid: here.uid, name: displayName(d.from[0] ?? { name: "", address: "" }), address: d.from[0]?.address ?? "", date: d.date, html: bodyHtml, mine: d.from[0]?.address.toLowerCase() === me } as ThreadMsg] : []),
 			...conversation.map((c) => ({
 				key: `${c.mailbox}-${c.uid}`, mailbox: c.mailbox, uid: c.uid, name: displayName(c.from), address: c.from.address, date: c.date,
-				html: mailStore.details.get(detailKey(accountId!, c.mailbox, c.uid))?.html ?? undefined,
+				html: mailStore.details.get(detailKey(acctOf(selected)!, c.mailbox, c.uid))?.html ?? undefined,
 				mine: c.from.address.toLowerCase() === me,
 			})),
 		];
@@ -458,9 +500,10 @@ export function MailApp() {
 	};
 
 	const summarise = async () => {
-		if (!accountId || !selected) return;
+		const acct = acctOf(selected);
+		if (!acct || !selected) return;
 		setSummaryBusy(true);
-		try { setSummary(await summariseMessage(accountId, selected.mailbox, selected.uid)); } catch (e) { toast({ title: "Could not summarise", description: e instanceof Error ? e.message : undefined, variant: "destructive" }); } finally { setSummaryBusy(false); }
+		try { setSummary(await summariseMessage(acct, selected.mailbox, selected.uid)); } catch (e) { toast({ title: "Could not summarise", description: e instanceof Error ? e.message : undefined, variant: "destructive" }); } finally { setSummaryBusy(false); }
 	};
 
 	/* ---- keyboard */
@@ -469,7 +512,7 @@ export function MailApp() {
 			if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") { e.preventDefault(); setCmdOpen((v) => !v); return; }
 			const el = e.target as HTMLElement;
 			if (el.closest("input, textarea, [contenteditable=true], [role=dialog]") || e.metaKey || e.ctrlKey || e.altKey) return;
-			const idx = selected ? rows.findIndex((r) => r.uid === selected.uid) : -1;
+			const idx = selected ? rows.findIndex((r) => rkey(r) === rkey(selected)) : -1;
 			switch (e.key) {
 				case "c": e.preventDefault(); setCompose({}); break;
 				case "/": e.preventDefault(); searchRef.current?.focus(); break;
@@ -524,7 +567,7 @@ export function MailApp() {
 	const sidebar = (
 		<div className={cn("flex h-full flex-col bg-[#f7f7f5]", ink)}>
 			<div className="flex items-center gap-1 px-2 pb-1 pt-[max(0.625rem,env(safe-area-inset-top))]">
-				<div className="min-w-0 flex-1"><AccountSwitcher accounts={accounts} accountId={accountId} onSelect={(id) => { setAccountId(id); setViewKey("inbox"); setNavOpen(false); }} onAdd={() => { setNavOpen(false); setConnectOpen(true); }} onSettings={() => { setNavOpen(false); setSettingsOpen(true); }} /></div>
+				<div className="min-w-0 flex-1"><AccountSwitcher accounts={accounts} accountId={accountId} unread={unread} onSelect={(id) => { setAccountId(id); setViewKey("inbox"); setNavOpen(false); }} onAdd={() => { setNavOpen(false); setConnectOpen(true); }} onSettings={() => { setNavOpen(false); setSettingsOpen(true); }} /></div>
 				<button onClick={() => { setCompose({}); setNavOpen(false); }} aria-label="Compose (C)" title="Compose (C)" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-[#37352f] hover:bg-black/5"><Edit3 className="h-[18px] w-[18px]" /></button>
 			</div>
 			<div className="px-2">
@@ -538,6 +581,9 @@ export function MailApp() {
 				{BUILT_IN.filter((b) => b.section === "views").map((b) => <NavItem key={b.key} active={viewKey === b.key} icon={b.icon} tone={b.key === "inbox" ? "text-red-500" : "text-[#787774]"} label={b.label} badge={b.key === "inbox" ? unread : 0} onClick={() => { setViewKey(b.key); setNavOpen(false); }} />)}
 				{views.map((v) => <NavItem key={v.id} active={viewKey === `custom:${v.id}`} icon={ICON[v.icon] ?? Inbox} tone="text-amber-600" label={v.name} onClick={() => { setViewKey(`custom:${v.id}`); setNavOpen(false); }} onEdit={() => setViewEdit(v)} />)}
 				<button onClick={() => setViewEdit({})} className="flex h-9 w-full items-center gap-3 rounded-md px-3 text-[15px] text-[#787774] hover:bg-black/5"><Plus className="h-[18px] w-[18px]" /> New view</button>
+
+				<Heading>Kept out of your inbox</Heading>
+				{BUILT_IN.filter((b) => b.section === "sorted").map((b) => <NavItem key={b.key} active={viewKey === b.key} icon={b.icon} tone="text-[#787774]" label={b.label} badge={b.bucket && b.bucket !== "inbox" ? counts[b.bucket as "subscription" | "receipt" | "update"] : 0} onClick={() => { setViewKey(b.key); setNavOpen(false); }} />)}
 
 				<Heading>Labels</Heading>
 				{labels.filter((l) => !l.project_id).map((l) => (
@@ -575,7 +621,11 @@ export function MailApp() {
 				)}
 
 				<Heading>Mail</Heading>
-				{BUILT_IN.filter((b) => b.section === "mail").map((b) => <NavItem key={b.key} active={viewKey === b.key} icon={b.icon} tone="text-[#787774]" label={b.label} onClick={() => { setViewKey(b.key); setNavOpen(false); }} />)}
+				{BUILT_IN.filter((b) => b.section === "mail").map((b) => <NavItem key={b.key} active={viewKey === b.key} icon={b.icon} tone="text-[#787774]" label={b.label} onClick={() => {
+						// These folders belong to one mailbox: from the combined inbox, open the first and say which.
+						if (accountId === ALL && accounts[0]) { setAccountId(accounts[0].id); toast({ title: `${b.label} of ${accounts[0].email}`, description: "Folders other than the inbox are per mailbox. Switch mailbox at the top to see another." }); }
+						setViewKey(b.key); setNavOpen(false);
+					}} />)}
 			</nav>
 			<div className="space-y-px px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-1">
 				<button onClick={() => setSettingsOpen(true)} className="flex h-9 w-full items-center gap-3 rounded-md px-3 text-[15px] hover:bg-black/5"><Settings className="h-[18px] w-[18px] text-[#787774]" /> Settings</button>
@@ -584,12 +634,12 @@ export function MailApp() {
 		</div>
 	);
 
-	const inlineReply = reply && accountId ? (
+	const inlineReply = reply && acctOf(selected) ? (
 		<Composer
 			key={`reply-${reply.replyTo?.uid ?? "x"}`}
 			inline
 			accounts={accounts}
-			accountId={accountId}
+			accountId={acctOf(selected)!}
 			seed={reply}
 			snippets={snippets}
 			signature={signature?.html ?? ""}
@@ -610,16 +660,16 @@ const Pane = (
 				const mine = detail?.from[0]?.address?.toLowerCase() === address.toLowerCase();
 				setContactDraft({ name, email: address, context: mine ? (detail?.text ?? "") : "" });
 			}}
-			onPrev={() => { const i = rows.findIndex((r) => r.uid === selected?.uid); if (i > 0) open(rows[i - 1]); }}
-			onNext={() => { const i = rows.findIndex((r) => r.uid === selected?.uid); if (rows[i + 1]) open(rows[i + 1]); }}
-			hasPrev={rows.findIndex((r) => r.uid === selected?.uid) > 0}
-			hasNext={rows.findIndex((r) => r.uid === selected?.uid) >= 0 && rows.findIndex((r) => r.uid === selected?.uid) < rows.length - 1}
+			onPrev={() => { const i = rows.findIndex((r) => !!selected && rkey(r) === rkey(selected)); if (i > 0) open(rows[i - 1]); }}
+			onNext={() => { const i = rows.findIndex((r) => !!selected && rkey(r) === rkey(selected)); if (rows[i + 1]) open(rows[i + 1]); }}
+			hasPrev={rows.findIndex((r) => !!selected && rkey(r) === rkey(selected)) > 0}
+			hasNext={rows.findIndex((r) => !!selected && rkey(r) === rkey(selected)) >= 0 && rows.findIndex((r) => !!selected && rkey(r) === rkey(selected)) < rows.length - 1}
 			onAutoLabelSimilar={() => { const f = detail?.from[0]; setLabelEdit({ name: f ? displayName(f) : "", instruction: f ? `Emails from ${displayName(f)} <${f.address}>` : "" }); }}
-			labels={labels} selectedLabels={rows.find((r) => r.uid === selected?.uid)?.labels ?? selected?.labels ?? []} onToggleLabel={(id, on) => selected?.messageId && toggleLabel(selected.messageId, id, on, selected.uid)} projects={projects} onOpportunity={(links, subject) => setWorkPrompt({ url: links[0], subject, links })} onToggleProject={(id, on) => selected?.messageId && toggleProject(selected.messageId, id, on, selected.uid)} onNewLabel={() => setLabelEdit({})} selected={selected} detail={detail} busy={detailBusy} accountId={accountId!} conversation={conversation} summary={summary} summaryBusy={summaryBusy} allowImages={allowImages}
+			labels={labels} selectedLabels={rows.find((r) => !!selected && rkey(r) === rkey(selected))?.labels ?? selected?.labels ?? []} onToggleLabel={(id, on) => selected?.messageId && toggleLabel(selected.messageId, id, on, selected.uid)} projects={projects} onOpportunity={(links, subject) => setWorkPrompt({ url: links[0], subject, links })} onToggleProject={(id, on) => selected?.messageId && toggleProject(selected.messageId, id, on, selected.uid)} onNewLabel={() => setLabelEdit({})} selected={selected} detail={detail} busy={detailBusy} accountId={acctOf(selected)!} conversation={conversation} summary={summary} summaryBusy={summaryBusy} allowImages={allowImages}
 			onClose={close} onSummarise={summarise} onOpen={(m) => open(m)} onAct={(a) => selected && act(selected, a)}
 			onReply={(all) => detail && startReply(detail, all)} onForward={() => detail && startReply(detail, false, true)}
 			onLoadImages={() => { setAllowImages(true); if (selected) open(selected, true); }} full={effectiveLayout === "full"}
-				meAddress={(accounts.find((a) => a.id === accountId)?.email ?? "").toLowerCase()}
+				meAddress={(accounts.find((a) => a.id === acctOf(selected))?.email ?? "").toLowerCase()}
 				inlineReply={inlineReply}
 		/>
 	);
@@ -658,23 +708,47 @@ const Pane = (
 					{loadError && <div className="m-4 rounded-xl bg-red-50 p-4 text-sm text-red-700">{loadError} <button className="ml-2 underline" onClick={() => loadList(false)}>Try again</button></div>}
 					{!loadError && loading && rows.length === 0 && <MjengoLoader label="Loading your mail" compact />}
 					{!loadError && !loading && rows.length === 0 && (
-						<div className="flex h-full flex-col items-center justify-center gap-2 p-10 text-center text-serene-neutral-500"><MailOpen className="h-10 w-10 text-serene-neutral-300" /><p className="font-medium text-serene-neutral-700">{debouncedQ ? "Nothing matches your search" : "Nothing here"}</p><p className="text-sm">{debouncedQ ? "Try different words." : "New mail will appear as it arrives."}</p></div>
+						<div className="flex h-full flex-col items-center justify-center gap-2 p-10 text-center text-serene-neutral-500"><MailOpen className="h-10 w-10 text-serene-neutral-300" /><p className="font-medium text-serene-neutral-700">{debouncedQ ? "Nothing matches your search" : bucket === "inbox" ? "You are all caught up" : "Nothing here"}</p><p className="text-sm">{debouncedQ ? "Try different words." : "New mail will appear as it arrives."}</p></div>
 					)}
-					{groups.map((g) => (
+					{bucket === "inbox" && accountId === ALL && accounts.length > 1 && (
+							<div className="flex flex-wrap items-center gap-x-4 gap-y-1 px-4 pt-3 text-xs text-[#787774] lg:px-6" aria-label="Which mailbox is which">
+								{accounts.map((a) => <span key={a.id} className="flex items-center gap-1.5"><Avatar email={a.email} className="h-4 w-4 rounded-full text-[9px]" />{a.email}<ScopeTag email={a.email} /></span>)}
+							</div>
+						)}
+						{failedBoxes.length > 0 && <div role="status" className="mx-4 mt-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-900 lg:mx-6">Could not reach {failedBoxes.join(", ")} just now; showing the others.</div>}
+						{bucket === "inbox" && pending.length > 0 && (
+							<section className="mx-4 mt-4 rounded-xl border border-amber-200 bg-amber-50/70 p-3 lg:mx-6" aria-label="Pending">
+								<h3 className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-amber-900"><CreditCard className="h-4 w-4" /> Pending payments</h3>
+								<ul className="space-y-1">
+									{pending.map((p) => (
+										<li key={p.key} className="flex items-center gap-2 rounded-lg bg-white px-3 py-2 text-sm shadow-sm">
+											<button className="min-w-0 flex-1 text-left" onClick={() => open({ uid: p.uid, mailbox: p.mailbox, account: p.account, accountEmail: p.accountEmail, from: { name: p.from, address: "" }, subject: p.subject, date: p.date, seen: true, flagged: false, hasAttachments: false, messageId: null, labels: [], thread: 1 })}>
+												<span className="block truncate font-medium text-[#37352f]">{p.subject}</span>
+												<span className="block truncate text-xs text-[#787774]">{p.from}{accountId === ALL ? ` · ${p.accountEmail}` : ""}{p.date ? ` · ${rowTime(p.date)}` : ""}</span>
+											</button>
+											<button onClick={() => { setPending((cur) => cur.filter((x) => x.key !== p.key)); dismissPending(p.key).catch(() => toast({ title: "Could not dismiss it", variant: "destructive" })); }} className="shrink-0 rounded-md border border-black/10 px-2.5 py-1 text-xs font-medium text-[#37352f] hover:bg-black/[0.04]">Dismiss</button>
+										</li>
+									))}
+								</ul>
+							</section>
+						)}
+						{groups.map((g) => (
 						<section key={g.label} className="px-4 lg:px-6">
 							{g.label && <h3 className="border-b border-black/[0.07] pb-2 pt-6 text-[15px] text-[#787774]">{g.label}</h3>}
 							<ul>
 								{g.items.map((m) => (
-									<SwipeRow key={m.uid} seen={m.seen} onArchive={() => act(m, "archive")} onToggleRead={() => act(m, m.seen ? "unread" : "read")}>
+									<SwipeRow key={rkey(m)} seen={m.seen} onArchive={() => act(m, "archive")} onToggleRead={() => act(m, m.seen ? "unread" : "read")}>
 <li className="group relative" draggable={!!m.messageId} onDragStart={(e) => { if (m.messageId) { e.dataTransfer.setData("text/x-message-id", m.messageId); e.dataTransfer.effectAllowed = "copy"; } }}>
-										<button onClick={() => open(m)} className={cn("-mx-2 flex w-[calc(100%+1rem)] touch-manipulation items-center gap-3 rounded-md px-2 text-left text-[15px]", prefs.density === "compact" ? "py-1.5" : "py-[11px]", " transition-colors hover:bg-black/[0.04]", selected?.uid === m.uid && "bg-black/[0.05]")}>
+										<button onClick={() => open(m)} className={cn("-mx-2 flex w-[calc(100%+1rem)] touch-manipulation items-center gap-3 rounded-md px-2 text-left text-[15px]", prefs.density === "compact" ? "py-1.5" : "py-[11px]", " transition-colors hover:bg-black/[0.04]", selected && rkey(selected) === rkey(m) && "bg-black/[0.05]")}>
 											<span className={cn("h-[7px] w-[7px] shrink-0 rounded-full", m.seen ? "bg-transparent" : "bg-sauti-teal")} aria-label={m.seen ? undefined : "Unread"} />
-											<span className={cn("w-[34%] max-w-[300px] shrink-0 truncate text-[#37352f] sm:w-[28%]", !m.seen && "font-semibold")}>{displayName(m.from)}</span>
+											{accountId === ALL && m.accountEmail && <Avatar email={m.accountEmail} className="h-5 w-5 rounded-full text-[10px]" />}
+												<span className={cn("w-[34%] max-w-[300px] shrink-0 truncate text-[#37352f] sm:w-[28%]", !m.seen && "font-semibold")}>{displayName(m.from)}</span>
 											<span className={cn("min-w-0 flex-1 truncate text-[#37352f]", !m.seen && "font-medium")}>
 												{m.subject}
 												{prefs.conversationView && m.thread > 1 && <span className="ml-2 rounded bg-black/[0.05] px-1.5 py-0.5 text-[11px] text-[#787774]">{m.thread}</span>}
 											</span>
-											{m.labels.slice(0, 2).map((id) => { const l = labels.find((x) => x.id === id); return l ? <span key={id} className="hidden shrink-0 rounded bg-black/[0.05] px-2 py-0.5 text-[13px] text-[#37352f] md:inline">{l.name}</span> : null; })}
+											{accountId === ALL && m.accountEmail && <span title={m.accountEmail} className="hidden shrink-0 items-center gap-1 text-[11px] text-[#787774] md:flex">{m.accountEmail.split("@")[0]}<ScopeTag email={m.accountEmail} /></span>}
+												{m.labels.slice(0, 2).map((id) => { const l = labels.find((x) => x.id === id); return l ? <span key={id} className="hidden shrink-0 rounded bg-black/[0.05] px-2 py-0.5 text-[13px] text-[#37352f] md:inline">{l.name}</span> : null; })}
 											<AvatarStack ids={teamIds([m.from.address])} team={team} className="hidden sm:flex" />
 											{m.hasAttachments && <Paperclip className="h-3.5 w-3.5 shrink-0 text-[#9b9a97]" />}
 											{m.flagged && <Star className="h-3.5 w-3.5 shrink-0 fill-amber-400 text-amber-400" />}
@@ -706,7 +780,7 @@ const Pane = (
 			)}
 
 			<ContactDialog draft={contactDraft} onClose={() => setContactDraft(null)} onWrite={(address) => setCompose({ to: [address] })} />
-			{compose && accountId && <Composer accounts={accounts} accountId={accountId} seed={compose} snippets={snippets} signature={signature?.html ?? ""} undoSeconds={prefs.undoSeconds} onReopen={(seed) => setCompose(seed)} onClose={() => setCompose(null)} onSent={() => { setCompose(null); if (active.config.mailbox === "sent") loadList(false); }} />}
+			{compose && accountId && <Composer accounts={accounts} accountId={acctOf(selected)!} seed={compose} snippets={snippets} signature={signature?.html ?? ""} undoSeconds={prefs.undoSeconds} onReopen={(seed) => setCompose(seed)} onClose={() => setCompose(null)} onSent={() => { setCompose(null); if (active.config.mailbox === "sent") loadList(false); }} />}
 			<ConnectDialog open={connectOpen} onClose={() => setConnectOpen(false)} onConnected={(a) => { setAccounts((p) => [...(p ?? []), a]); setAccountId(a.id); }} />
 			<SettingsDialog open={settingsOpen} onClose={() => setSettingsOpen(false)} accounts={accounts} onAccountsChanged={() => loadAccounts().catch(() => undefined)} onConnect={() => setConnectOpen(true)} snippets={snippets} onSnippetsChanged={() => loadMeta().catch(() => undefined)} layout={layout} onLayout={changeLayout} signature={signature?.html ?? ""} onSignatureSaved={(html) => setSignature({ html, configured: !!html, dismissed: true })} prefs={prefs} onPrefs={setPrefs} labels={labels} onEditLabel={(l) => { setSettingsOpen(false); setLabelEdit(l); }} />
 			{labelEdit && (

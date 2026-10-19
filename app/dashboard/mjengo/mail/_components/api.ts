@@ -46,3 +46,6 @@ export const projectLabel = (...a: Parameters<typeof raw.projectLabel>) => unwra
 export const listGrantsLite = (...a: Parameters<typeof raw.listGrantsLite>) => unwrap(raw.listGrantsLite(...a));
 export const linkToWork = (...a: Parameters<typeof raw.linkToWork>) => unwrap(raw.linkToWork(...a));
 export const mailTriage = (...a: Parameters<typeof raw.mailTriage>) => unwrap(raw.mailTriage(...a));
+export const listSorted = (...a: Parameters<typeof raw.listSorted>) => unwrap(raw.listSorted(...a));
+export const dismissPending = (...a: Parameters<typeof raw.dismissPending>) => unwrap(raw.dismissPending(...a));
+export type { MailBucket, PendingItem, SortedList } from '@/app/actions/mjengo-mail';

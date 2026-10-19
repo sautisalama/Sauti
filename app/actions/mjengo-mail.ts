@@ -20,6 +20,7 @@ import sanitizeHtml from 'sanitize-html';
 import { headers } from 'next/headers';
 import { touchContacts, autoAddTeamContacts } from '@/lib/mjengo-contacts';
 import { atLeast, levelFor, loadIndex, oversightFor, recipientLevels } from '@/lib/vault/access';
+import { sortMessage, scopeOf, type MailKind } from '@/lib/mail/sort';
 
 /** Which one-click sign-ins this deployment has credentials for. */
 async function oauthAvailability_() {
@@ -263,6 +264,16 @@ export interface MessageRow {
   labels: string[];
   /** Messages in this list that share the subject. */
   thread: number;
+  /** Set on the combined inbox, where rows of different mailboxes are mixed. */
+  account?: string;
+  accountEmail?: string;
+  accountScope?: 'work' | 'personal';
+  /** Sent by a list (carries a List-Unsubscribe header). */
+  bulk?: boolean;
+  answered?: boolean;
+  kind?: MailKind;
+  /** False when the kind was only guessed from the address and subject. */
+  sure?: boolean;
 }
 
 export interface ListQuery {
@@ -368,7 +379,7 @@ async function listCore_(accountId: string, mailbox: string, query: ListQuery = 
       }
 
       const items: MessageRow[] = [];
-      for await (const m of c.fetch(range, { uid: true, envelope: true, flags: true, internalDate: true, bodyStructure: true }, { uid: useUid })) {
+      for await (const m of c.fetch(range, { uid: true, envelope: true, flags: true, internalDate: true, bodyStructure: true, headers: ['list-unsubscribe', 'precedence'] }, { uid: useUid })) {
         const f = m.envelope?.from?.[0];
         const date = m.envelope?.date ?? (m.internalDate ? new Date(m.internalDate) : null);
         items.push({
@@ -383,6 +394,8 @@ async function listCore_(accountId: string, mailbox: string, query: ListQuery = 
           messageId: m.envelope?.messageId ?? null,
           labels: [],
           thread: 1,
+          bulk: /list-unsubscribe|precedence:\s*(bulk|list|junk)/i.test(m.headers ? m.headers.toString() : ''),
+          answered: m.flags?.has('\\Answered') ?? false,
         });
       }
       items.sort((a, b) => b.uid - a.uid);
@@ -1189,3 +1202,96 @@ async function mailBootstrap_() {
   return { accounts, views, snippets, labels, signature, projects };
 }
 export const mailBootstrap = guard(mailBootstrap_);
+
+/* ------------------------------------------------------- The sorted inbox */
+
+export type MailBucket = 'inbox' | 'subscription' | 'receipt' | 'update';
+export interface PendingItem { key: string; account: string; accountEmail: string; mailbox: string; uid: number; from: string; subject: string; date: string | null }
+export interface SortedList {
+  items: MessageRow[];
+  total: number;
+  /** Unread messages waiting under each label. */
+  counts: Record<'subscription' | 'receipt' | 'update', number>;
+  /** Payments waiting to be made or fixed, not dismissed. */
+  pending: PendingItem[];
+  /** Mailboxes that could not be reached just now. */
+  failed: string[];
+}
+
+const kindCache = new Map<string, MailKind>();
+
+/** Senders the rules could not place are asked to Jev once each (then remembered); the rules stand if it is unsure. */
+async function refineKinds(items: MessageRow[]): Promise<void> {
+  const unsure = items.filter((i) => i.sure === false && i.kind === 'person');
+  for (const i of unsure) { const k = kindCache.get(i.from.address.toLowerCase()); if (k) { i.kind = k; i.sure = true; } }
+  const todo = [...new Map(unsure.filter((i) => i.sure === false).map((i) => [i.from.address.toLowerCase(), i])).values()].slice(0, 8);
+  if (!todo.length) return;
+  const { decideChoice, decideConfigured } = await import('@/lib/mjengo/decide');
+  if (!decideConfigured()) return;
+  const options = {
+    person: 'A real person wrote this to the reader and expects a reply or action.',
+    subscription: 'A newsletter, promotion, marketing or mailing-list message sent to many people.',
+    receipt: 'A receipt, invoice, order, booking or payment confirmation.',
+    update: 'An automated notification, alert, verification code or system message.',
+  } as const;
+  await Promise.race([
+    Promise.all(todo.map(async (i) => {
+      const r = await decideChoice(`From: ${i.from.name} <${i.from.address}>\nSubject: ${i.subject}`, 'What kind of email is this?', options);
+      if (r && r.probability >= 0.75) kindCache.set(i.from.address.toLowerCase(), r.choice);
+    })),
+    new Promise((res) => setTimeout(res, 2500)),
+  ]);
+  for (const i of unsure) { const k = kindCache.get(i.from.address.toLowerCase()); if (k) { i.kind = k; i.sure = true; } }
+}
+
+/**
+ * The inbox of one mailbox, or of all of them mixed (accountId 'all'), with only the mail that needs a person in it.
+ * Subscriptions, receipts and automated updates are left out and counted instead, and payments that are waiting are
+ * listed as pending items. Anything starred, replied to or labelled stays, since it has been acted on.
+ */
+async function listSorted_(accountId: string | 'all', bucket: MailBucket, query: ListQuery = {}, offset = 0, limit = 40): Promise<SortedList> {
+  const actor = await requireModule('mail');
+  const db = looseAdmin();
+  const { data: accts } = await db.from('mail_accounts').select('id, label, email').eq('owner_id', actor.id).order('created_at');
+  const accounts = ((accts ?? []) as { id: string; label: string; email: string }[]).filter((a) => accountId === 'all' || a.id === accountId);
+  const window = Math.min(400, (offset + limit) * 3);
+  const failed: string[] = [];
+  const all: MessageRow[] = [];
+  await Promise.all(accounts.map(async (a) => {
+    try {
+      const res = await listMessages_(a.id, 'INBOX', { unread: query.unread, starred: query.starred, hasAttachment: query.hasAttachment }, 0, window);
+      for (const r of res.items) {
+        const s = sortMessage(r);
+        all.push({ ...r, account: a.id, accountEmail: a.email, accountScope: scopeOf(a.email), kind: s.kind, sure: s.sure });
+      }
+    } catch { failed.push(a.email); }
+  }));
+  all.sort((x, y) => (y.date ? Date.parse(y.date) : 0) - (x.date ? Date.parse(x.date) : 0));
+  const page = all.filter((r) => (bucket === 'inbox' ? r.kind === 'person' || r.kind === 'payment' && (r.flagged || r.labels.length) : r.kind === bucket));
+  const head = page.slice(offset, offset + limit);
+  await refineKinds(head);
+  const keep = bucket === 'inbox' ? head.filter((r) => r.kind === 'person' || r.kind === 'payment') : head.filter((r) => r.kind === bucket);
+  const counts = { subscription: 0, receipt: 0, update: 0 };
+  for (const r of all) if (!r.seen && (r.kind === 'subscription' || r.kind === 'receipt' || r.kind === 'update')) counts[r.kind]++;
+
+  const { data: gone } = await db.from('mail_dismissed').select('item_key').eq('owner_id', actor.id);
+  const dismissed = new Set((gone ?? []).map((g: { item_key: string }) => g.item_key));
+  const month = Date.now() - 45 * 86400000;
+  const pending: PendingItem[] = [];
+  for (const r of all) {
+    if (r.kind !== 'payment' || r.answered || r.flagged || r.labels.length || !r.date || Date.parse(r.date) < month) continue;
+    const key = `${r.account}:${r.messageId ?? r.uid}`;
+    if (dismissed.has(key)) continue;
+    pending.push({ key, account: r.account!, accountEmail: r.accountEmail!, mailbox: r.mailbox, uid: r.uid, from: r.from.name || r.from.address, subject: r.subject, date: r.date });
+    if (pending.length >= 8) break;
+  }
+  return { items: keep, total: page.length, counts, pending: bucket === 'inbox' ? pending : [], failed };
+}
+
+async function dismissPending_(key: string): Promise<void> {
+  const actor = await requireModule('mail', 'write');
+  await looseAdmin().from('mail_dismissed').upsert({ owner_id: actor.id, item_key: key.slice(0, 300) }, { onConflict: 'owner_id,item_key' });
+}
+
+export const listSorted = guard(listSorted_);
+export const dismissPending = guard(dismissPending_);

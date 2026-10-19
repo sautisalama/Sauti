@@ -1,6 +1,7 @@
 "use client";
 
-import { Check, ChevronsUpDown, Plus, Settings } from "lucide-react";
+import { Check, ChevronsUpDown, Layers, Plus, Settings } from "lucide-react";
+import { scopeOf } from "@/lib/mail/sort";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import type { AccountView } from "./api";
@@ -11,35 +12,52 @@ const providerOf = (a: AccountView) => KIND[a.auth_type] ?? (a.protocol === "pop
 
 /** Avatar chosen from the address so each mailbox is recognisable at a glance. */
 const TONES = ["bg-sauti-teal-light text-sauti-teal", "bg-sky-100 text-sky-700", "bg-emerald-100 text-emerald-700", "bg-amber-100 text-amber-800", "bg-rose-100 text-rose-700", "bg-indigo-100 text-indigo-700"];
-const tone = (s: string) => TONES[[...s].reduce((n, c) => n + c.charCodeAt(0), 0) % TONES.length];
+export const toneOf = (s: string) => TONES[[...s].reduce((n, c) => n + c.charCodeAt(0), 0) % TONES.length];
 
-function Avatar({ email, className }: { email: string; className?: string }) {
-	return <span className={cn("flex shrink-0 items-center justify-center rounded-lg font-bold uppercase", tone(email), className)}>{email.charAt(0)}</span>;
+/** Work for a mailbox on the organisation's own domain, Personal for one on a public provider. */
+export function ScopeTag({ email, className }: { email: string; className?: string }) {
+	const work = scopeOf(email) === "work";
+	return <span className={cn("rounded px-1.5 py-px text-[10px] font-semibold uppercase tracking-wide", work ? "bg-sky-100 text-sky-800" : "bg-amber-100 text-amber-800", className)}>{work ? "Work" : "Personal"}</span>;
+}
+
+export function Avatar({ email, className }: { email: string; className?: string }) {
+	return <span className={cn("flex shrink-0 items-center justify-center rounded-lg font-bold uppercase", toneOf(email), className)}>{email.charAt(0)}</span>;
 }
 
 /**
  * The menu beside your name at the top of the sidebar: pick which mailbox you are in, add another,
  * or open mail settings (the way Notion Mail's account menu works).
  */
-export function AccountSwitcher({ accounts, accountId, onSelect, onAdd, onSettings }: { accounts: AccountView[]; accountId: string | null; onSelect: (id: string) => void; onAdd: () => void; onSettings: () => void }) {
-	const current = accounts.find((a) => a.id === accountId) ?? accounts[0];
+export function AccountSwitcher({ accounts, accountId, unread, onSelect, onAdd, onSettings }: { accounts: AccountView[]; accountId: string | null; unread?: number; onSelect: (id: string) => void; onAdd: () => void; onSettings: () => void }) {
+	const all = accountId === "all" && accounts.length > 1;
+	const current = all ? undefined : accounts.find((a) => a.id === accountId) ?? accounts[0];
 
 	return (
 		<DropdownMenu>
 			<DropdownMenuTrigger asChild>
 				<button className="flex h-9 w-full touch-manipulation items-center gap-2 rounded-md px-1.5 text-left text-[#37352f] transition hover:bg-black/5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-sauti-teal" aria-label="Switch or add mailbox">
-					{current && <Avatar email={current.email} className="h-6 w-6 rounded-full text-xs" />}
-					<span className="min-w-0 flex-1 truncate text-[15px] font-medium">{current?.label || current?.email || "No mailbox"}</span>
+					{all ? <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-sauti-teal text-white"><Layers className="h-3.5 w-3.5" /></span> : current && <Avatar email={current.email} className="h-6 w-6 rounded-full text-xs" />}
+					<span className="min-w-0 flex-1 truncate text-[15px] font-medium">{all ? "All inboxes" : current?.label || current?.email || "No mailbox"}</span>{!all && current && <ScopeTag email={current.email} />}
 					<ChevronsUpDown className="h-4 w-4 shrink-0 text-[#9b9a97]" />
 				</button>
 			</DropdownMenuTrigger>
 			<DropdownMenuContent align="start" className="w-[270px] rounded-xl p-1.5">
 				<DropdownMenuLabel className="px-2 pb-1 pt-1.5 text-[11px] font-semibold uppercase tracking-wider text-serene-neutral-400">Mailboxes</DropdownMenuLabel>
-				{accounts.map((a) => (
+				{accounts.length > 1 && (
+						<DropdownMenuItem onSelect={() => onSelect("all")} className="gap-2.5 rounded-lg px-2 py-2">
+							<span className="flex h-8 w-8 items-center justify-center rounded-lg bg-sauti-teal text-white"><Layers className="h-4 w-4" /></span>
+							<span className="min-w-0 flex-1">
+								<span className="block truncate text-sm font-medium">All inboxes</span>
+								<span className="block text-[11px] text-serene-neutral-500">{accounts.length} mailboxes in one place{unread ? ` · ${unread} unread` : ""}</span>
+							</span>
+							{all && <Check className="h-4 w-4 shrink-0 text-sauti-teal" />}
+						</DropdownMenuItem>
+					)}
+					{accounts.map((a) => (
 					<DropdownMenuItem key={a.id} onSelect={() => onSelect(a.id)} className="gap-2.5 rounded-lg px-2 py-2">
 						<Avatar email={a.email} className="h-8 w-8 text-sm" />
 						<span className="min-w-0 flex-1">
-							<span className="block truncate text-sm font-medium">{a.email}</span>
+							<span className="flex items-center gap-1.5"><span className="truncate text-sm font-medium">{a.email}</span><ScopeTag email={a.email} /></span>
 							<span className="block text-[11px] text-serene-neutral-500">{providerOf(a)}</span>
 						</span>
 						{a.id === current?.id && <Check className="h-4 w-4 shrink-0 text-sauti-teal" />}
