@@ -10,7 +10,6 @@ import { BookMarked, ArrowDownAZ, ArrowUpAZ, ChevronDown, ChevronRight, LayoutGr
 import { format, formatDistanceToNow } from "date-fns";
 import { filesHub, renameDriveFolder, disconnectDrive, shareFolderToDrive, type FilesHub } from "@/app/actions/mjengo-files";
 import { unwrap } from "@/lib/action-result";
-import { clearFilesInbox } from "@/app/actions/mjengo-nav";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import RequirementsPanel from "../documents/page";
 import { TemplatePicker } from "../_components/TemplatePicker";
@@ -99,10 +98,9 @@ export default function VaultPage() {
 	// Files shared from a phone: tell the person, then stop counting them.
 	useEffect(() => {
 		const n = new URLSearchParams(window.location.search).get("shared_files");
-		if (n) toast({ title: `${n} file${n === "1" ? "" : "s"} added from your phone`, description: "They are at the top level of Mine." });
-		const t = setTimeout(() => { clearFilesInbox().catch(() => undefined); }, 2500);
+		if (n) toast({ title: `${n} file${n === "1" ? "" : "s"} added from your phone`, description: "Confirm their labels on the Overview." });
+		// They stay marked until the tags are confirmed on the Overview.
 		if (n) window.history.replaceState(null, "", window.location.pathname);
-		return () => clearTimeout(t);
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, []);
 

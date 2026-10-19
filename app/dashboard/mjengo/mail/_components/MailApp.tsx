@@ -156,6 +156,16 @@ export function MailApp() {
 		setCompose({ to: [to] });
 		window.history.replaceState(null, "", window.location.pathname);
 	}, []);
+	// Opened from the Overview: /mail?account=..&uid=.. goes straight to that message.
+	const deepLink = useRef<{ account: string; uid: number; box: string } | null>(null);
+	useEffect(() => {
+		const q = new URLSearchParams(window.location.search);
+		const account = q.get("account"), uid = Number(q.get("uid"));
+		if (!account || !uid) return;
+		deepLink.current = { account, uid, box: q.get("box") || "INBOX" };
+		setAccountId(account);
+		window.history.replaceState(null, "", window.location.pathname);
+	}, []);
 	// Coming back from "Sign in with Google / Microsoft".
 	useEffect(() => {
 		const q = new URLSearchParams(window.location.search);
@@ -264,6 +274,15 @@ export function MailApp() {
 		} else loadList(false);
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [accountId, mailboxPath, viewKey, debouncedQ, views, onlyUnread]);
+
+	useEffect(() => {
+		const d = deepLink.current;
+		if (!d || loading || accountId !== d.account || rows.length === 0) return;
+		deepLink.current = null;
+		const row = rows.find((r) => r.uid === d.uid) ?? ({ uid: d.uid, mailbox: d.box, from: { name: "", address: "" }, subject: "", date: null, seen: false, flagged: false, hasAttachments: false, messageId: null, labels: [], thread: 1 } as MessageRow);
+		void open(row);
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [rows, loading, accountId]);
 
 	// The browser tab shows how many unread messages there are.
 	useEffect(() => {

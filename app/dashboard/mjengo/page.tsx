@@ -29,29 +29,39 @@ export default function MjengoOverview() {
 
 	const cur = o.currencies[0] ?? "USD";
 
+	// Only opportunities still in play: not won, lost or passed.
+	const liveOpps = o.opportunitiesByStatus.filter((x) => !["won", "lost", "passed"].includes(x.status));
+	const liveCount = liveOpps.reduce((n, x) => n + x.count, 0);
+	const today = new Date().toISOString().slice(0, 10);
+	const nextOppDeadline = o.deadlines.find((d) => d.kind === "opportunity" && d.date >= today);
+	const dueSoon = o.deadlines.filter((d) => d.kind === "opportunity" && d.date >= today && d.date <= new Date(Date.now() + 14 * 86400_000).toISOString().slice(0, 10)).length;
+	const pending = st?.todos.pending ?? o.openTodos;
+	// Cards that mean nothing yet are left out; the colours follow the order of what is shown.
+	const liveProjects = o.projectsByStatus.filter((x) => !["completed", "cancelled"].includes(x.status));
+	const showSide = liveCount > 0 || liveProjects.length > 0;
+	const hasContent = !!st && (st.content.posted + st.content.scheduled + st.content.drafts > 0);
+	const cards: StatProps[] = [
+		liveCount > 0 && { key: "pipeline", icon: TrendingUp, label: "In the pipeline", value: String(liveCount), hint: dueSoon ? `${dueSoon} due in two weeks` : nextOppDeadline ? `next deadline ${format(parseISO(nextOppDeadline.date), "d MMM")}` : `live ${liveCount === 1 ? "opportunity" : "opportunities"}`, href: "/dashboard/mjengo/opportunities", tone: dueSoon ? "warn" as const : undefined },
+		o.pipelineValue > 0 && { key: "grants", icon: Briefcase, label: "Grants in progress", value: money(o.pipelineValue, cur), hint: o.currencies.length > 1 ? `${cur} grants only` : "applying or under review", href: "/dashboard/mjengo/grants" },
+		o.awardedValue > 0 && { key: "awarded", icon: Briefcase, label: "Awarded", value: money(o.awardedValue, cur), hint: "awarded or reporting", href: "/dashboard/mjengo/grants" },
+		o.missingDocs > 0 && { key: "docs", icon: FileWarning, label: "Documents needed", value: String(o.missingDocs), hint: "required, not uploaded", tone: "warn" as const, href: "/dashboard/mjengo/documents" },
+		pending > 0 && { key: "todos", icon: CheckSquare, label: "Pending to-dos", value: String(pending), hint: st?.todos.overdue ? `${st.todos.overdue} overdue, ${st.todos.mine} yours` : `${st?.todos.mine ?? o.myTodos} yours`, tone: st?.todos.overdue ? "warn" as const : undefined, href: "/dashboard/mjengo/todos" },
+		!!st && (st.forms.open > 0 || st.forms.newResponses > 0) && { key: "forms", icon: ClipboardList, label: "Open forms", value: String(st.forms.open), hint: st.forms.newResponses ? `${st.forms.newResponses} new responses` : "no new responses", tone: st.forms.newResponses ? "warn" as const : undefined, href: "/dashboard/mjengo/forms" },
+	].filter(Boolean) as StatProps[];
+
 	return (
 		<div className="mx-auto max-w-6xl space-y-6">
-			<section className="relative overflow-hidden rounded-2xl border border-serene-blue-100 bg-gradient-to-br from-serene-blue-50 via-white to-sauti-teal-light/40 p-6 sm:p-8">
-				<h2 className="text-2xl font-bold tracking-tight text-sauti-dark sm:text-3xl">Mjengo <span className="text-sauti-teal">Suite</span></h2>
-				<p className="mt-1 text-sm text-serene-neutral-600">Grants, opportunities, projects, documents and mail in one calm place.</p>
-			</section>
-
 			<DigestCard />
 
 			<WorkspaceSearch />
 
-			<p className="px-1 text-[11px] font-semibold uppercase tracking-widest text-serene-neutral-400">Overview</p>
-			<div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
-				<Stat tint="bg-sauti-teal-light" icon={TrendingUp} label="In the pipeline" value={money(o.pipelineValue, cur)} hint={o.currencies.length > 1 ? `${cur} grants only` : "open grants"} href="/dashboard/mjengo/grants" />
-				<Stat tint="bg-serene-green-100" icon={Briefcase} label="Awarded" value={money(o.awardedValue, cur)} hint="awarded or reporting" href="/dashboard/mjengo/grants" />
-				<Stat tint="bg-sauti-yellow-light" icon={FileWarning} label="Documents needed" value={String(o.missingDocs)} hint="required, not uploaded" tone={o.missingDocs ? "warn" : undefined} href="/dashboard/mjengo/documents" />
-				<Stat tint="bg-serene-blue-50" icon={CheckSquare} label="Pending to-dos" value={String(st?.todos.pending ?? o.openTodos)} hint={st?.todos.overdue ? `${st.todos.overdue} overdue, ${st.todos.mine} yours` : `${st?.todos.mine ?? o.myTodos} yours`} tone={st?.todos.overdue ? "warn" : undefined} href="/dashboard/mjengo/todos" />
-				<Stat tint="bg-white" icon={ClipboardList} label="Open forms" value={String(st?.forms.open ?? 0)} hint={st?.forms.newResponses ? `${st.forms.newResponses} new responses` : "no new responses"} tone={st?.forms.newResponses ? "warn" : undefined} href="/dashboard/mjengo/forms" />
+			<div className={`grid grid-cols-2 gap-3 ${cards.length >= 5 ? "lg:grid-cols-5" : cards.length === 4 ? "lg:grid-cols-4" : cards.length === 3 ? "lg:grid-cols-3" : "lg:grid-cols-2"}`}>
+				{cards.map(({ key, ...c }, i) => <Stat key={key} tint={TINTS[i % TINTS.length]} {...c} />)}
 			</div>
 
-			{st && (
-				<div className="grid gap-4 lg:grid-cols-2">
-					<section className="rounded-2xl border border-serene-neutral-200/70 bg-white p-4 shadow-[0_1px_2px_rgba(16,24,40,0.04)]">
+			{st && (hasContent || st.setup.length > 0) && (
+				<div className={`grid gap-4 ${hasContent && st.setup.length > 0 ? "lg:grid-cols-2" : ""}`}>
+					{hasContent && <section className="rounded-2xl border border-serene-neutral-200/70 bg-white p-4 shadow-[0_1px_2px_rgba(16,24,40,0.04)]">
 						<div className="mb-3 flex items-center justify-between"><h3 className="flex items-center gap-2 text-sm font-bold text-sauti-dark"><Megaphone className="h-4 w-4 text-sauti-teal" /> Shared online</h3><Link href="/dashboard/mjengo/design#schedule" className="text-xs font-medium text-sauti-teal hover:underline">Schedule content</Link></div>
 						<div className="grid grid-cols-3 gap-2 text-center">
 							<div className="rounded-xl bg-serene-neutral-50 p-3"><p className="text-xl font-bold tabular-nums">{st.content.posted}</p><p className="text-xs text-serene-neutral-500">Posted</p></div>
@@ -59,24 +69,24 @@ export default function MjengoOverview() {
 							<div className="rounded-xl bg-serene-neutral-50 p-3"><p className="text-xl font-bold tabular-nums">{st.content.drafts}</p><p className="text-xs text-serene-neutral-500">Drafts</p></div>
 						</div>
 						{st.content.lastPosted && <p className="mt-2 text-xs text-serene-neutral-500">Last posted {format(parseISO(st.content.lastPosted), "d MMM, HH:mm")}</p>}
-					</section>
-					<section className="rounded-2xl border border-serene-neutral-200/70 bg-white p-4 shadow-[0_1px_2px_rgba(16,24,40,0.04)]">
+					</section>}
+					{st.setup.length > 0 && <section className="rounded-2xl border border-serene-neutral-200/70 bg-white p-4 shadow-[0_1px_2px_rgba(16,24,40,0.04)]">
 						<h3 className="mb-3 flex items-center gap-2 text-sm font-bold text-sauti-dark"><Settings2 className="h-4 w-4 text-sauti-teal" /> Still to set up</h3>
-						{st.setup.length === 0 ? <p className="text-sm text-serene-neutral-500">Everything is connected.</p> : (
+						{(
 							<ul className="space-y-1">
 								{st.setup.map((i) => (
 									<li key={i.id}>{i.href.startsWith("/api/") ? <a href={i.href} className="block rounded-lg px-2 py-1.5 hover:bg-serene-neutral-50"><span className="block text-sm font-medium text-serene-neutral-900">{i.label}</span><span className="block text-xs text-serene-neutral-500">{i.hint}</span></a> : <Link href={i.href} className="block rounded-lg px-2 py-1.5 hover:bg-serene-neutral-50"><span className="block text-sm font-medium text-serene-neutral-900">{i.label}</span><span className="block text-xs text-serene-neutral-500">{i.hint}</span></Link>}</li>
 								))}
 							</ul>
 						)}
-					</section>
+					</section>}
 				</div>
 			)}
 
 			<GrantCharts grants={grants} />
 
-			<div className="grid gap-4 lg:grid-cols-3">
-				<section className="rounded-2xl border border-serene-neutral-200/70 bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04)] p-4 lg:col-span-2">
+			{(o.deadlines.length > 0 || showSide) && <div className="grid gap-4 lg:grid-cols-3">
+				<section className={`rounded-2xl border border-serene-neutral-200/70 bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04)] p-4 ${showSide ? "lg:col-span-2" : "lg:col-span-3"}`}>
 					<h3 className="mb-3 text-sm font-bold text-sauti-dark">Coming up</h3>
 					{o.deadlines.length === 0 ? (
 						<p className="text-sm text-serene-neutral-500">No deadlines tracked yet. Add dates to grants, opportunities, documents and tasks and they appear here.</p>
@@ -101,16 +111,21 @@ export default function MjengoOverview() {
 					)}
 				</section>
 
-				<div className="space-y-4">
-					<Breakdown title="Opportunities" kind="opportunity" data={o.opportunitiesByStatus} href="/dashboard/mjengo/opportunities" />
-					<Breakdown title="Projects" kind="project" data={o.projectsByStatus} href="/dashboard/mjengo/projects" />
-				</div>
-			</div>
+				{showSide && (
+					<div className="space-y-4">
+						{liveCount > 0 && <Breakdown title="Opportunities in play" kind="opportunity" data={liveOpps} href="/dashboard/mjengo/opportunities" />}
+						{liveProjects.length > 0 && <Breakdown title="Projects" kind="project" data={liveProjects} href="/dashboard/mjengo/projects" />}
+					</div>
+				)}
+			</div>}
 		</div>
 	);
 }
 
-function Stat({ icon: Icon, label, value, hint, href, tone, tint }: { tint: string; icon: typeof Mail; label: string; value: string; hint: string; href: string; tone?: "warn" }) {
+interface StatProps { key: string; icon: typeof Mail; label: string; value: string; hint: string; href: string; tone?: "warn" }
+const TINTS = ["bg-sauti-teal-light", "bg-serene-green-100", "bg-sauti-yellow-light", "bg-serene-blue-50", "bg-white"];
+
+function Stat({ icon: Icon, label, value, hint, href, tone, tint }: Omit<StatProps, "key"> & { tint: string }) {
 	return (
 		<Link href={href} className={`rounded-2xl border border-black/5 ${tint} p-4 shadow-[0_1px_2px_rgba(16,24,40,0.04)] transition hover:-translate-y-0.5 hover:shadow-md`}>
 			<div className={`mb-3 flex h-9 w-9 items-center justify-center rounded-xl bg-white/80 ${tone === "warn" ? "text-amber-600" : "text-sauti-teal"}`}><Icon className="h-4 w-4" /></div>

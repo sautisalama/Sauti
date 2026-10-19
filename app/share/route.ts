@@ -37,6 +37,15 @@ async function addOpportunity(actor: { id: string; email: string }, input: { tit
 	return newId;
 }
 
+/** Labels for a file that arrived from a phone, from what it says. They stay unconfirmed until the person agrees. */
+async function tagSharedFile(id: string, path: string, name: string, mime: string | null) {
+	const { extractText } = await import("@/lib/mjengo/files-text");
+	const { autoTag } = await import("@/lib/mjengo/autotag");
+	const text = await extractText(path, name, mime, 6000).catch(() => "");
+	const tags = await autoTag({ title: name, text, kind: "file" });
+	if (tags.length) await looseAdmin().from("vault_files").update({ tags }).eq("id", id);
+}
+
 /** Shared files are saved to the person's vault (top level, flagged) so they appear in Files. */
 async function addFiles(actor: { id: string; email: string }, files: File[]) {
 	const db = looseAdmin();
@@ -50,6 +59,8 @@ async function addFiles(actor: { id: string; email: string }, files: File[]) {
 		const { data } = await db.from("vault_files").insert({ folder_id: null, name: f.name.slice(0, 200), storage_path: path, mime: f.type || null, size: f.size, owner_id: actor.id, inbox: true }).select("id").single();
 		if (data) {
 			saved += 1;
+			// Read and tag it at once; the person confirms the tags in "caught up" on the Overview.
+			after(async () => { await tagSharedFile(data.id as string, path, f.name, f.type || null).catch(() => undefined); });
 			await logAudit({ actorId: actor.id, actorEmail: actor.email, action: "vault.file_shared_in", targetType: "vault_file", targetId: data.id, targetLabel: f.name });
 		}
 	}
@@ -68,7 +79,7 @@ async function handle(request: NextRequest, fields: { title: string; text: strin
 
 	if (files.length) {
 		const n = await addFiles(actor, files);
-		return NextResponse.redirect(`${origin}/dashboard/mjengo/vault?shared_files=${n}`, { status: 303 });
+		return NextResponse.redirect(`${origin}/dashboard/mjengo?shared_files=${n}`, { status: 303 });
 	}
 	let url = fields.url.trim();
 	if (!url) url = URL_RE.exec(fields.text)?.[0] ?? URL_RE.exec(fields.title)?.[0] ?? "";
