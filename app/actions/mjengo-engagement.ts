@@ -40,7 +40,7 @@ async function instagram(c: Conn): Promise<ChannelEngagement> {
   // Reach is only given with the insights permission; ask for the latest few and say so when it is not there yet.
   for (const p of out.posts.slice(0, 6)) {
     const ins = await get<{ data?: { name: string; values?: { value: number }[] }[] }>(`${p.id}/insights`, token, { metric: 'reach' });
-    if (failed(ins)) { out.note = 'Reach needs Meta's insights permission, which this connection does not have.'; break; }
+    if (failed(ins)) { out.note = 'Reach needs the Meta insights permission, which this connection does not have.'; break; }
     const v = ins.data?.find((d) => d.name === 'reach')?.values?.[0]?.value;
     if (typeof v === 'number') { p.reach = v; reach += v; reachKnown = true; }
   }
