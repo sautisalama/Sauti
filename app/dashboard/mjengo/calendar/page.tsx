@@ -22,6 +22,7 @@ import { holidayOn } from "@/lib/mjengo/holidays-ke";
 import { Markdown } from "../_components/Markdown";
 import { TagEditor, TagFilter } from "../_components/Facets";
 import { meetingDetail, type MeetingDetail } from "@/app/actions/mjengo-meet";
+import { AddChooser, DeadlineDialog, PostDialog, TodoDialog, type AddKind, type Slot } from "./_AddDialogs";
 
 const KIND: Record<CalKind, { label: string; chip: string; dot: string }> = {
 	event: { label: "Event", chip: "bg-sauti-teal text-white", dot: "bg-sauti-teal" },
@@ -50,7 +51,17 @@ export default function CalendarPage() {
 	const step = (dir: 1 | -1) => setCursor((c) => (mode === "month" ? addMonths(c, dir) : mode === "week" ? addWeeks(c, dir) : addDays(c, dir)));
 	const weekDays = useMemo(() => { const st = startOfWeek(cursor, { weekStartsOn: 1 }); return Array.from({ length: 7 }, (_, i) => addDays(st, i)); }, [cursor]);
 	const [data, setData] = useState<CalMonth | null>(null);
-	const [create, setCreate] = useState<{ date: Date; from?: string; to?: string } | null>(null);
+	const [create, setCreate] = useState<{ date: Date; from?: string; to?: string; preset?: "meeting" | "event" | "reminder" | "block" } | null>(null);
+	// The Create button asks what to add first: anything that depends on a date or a time.
+	const [pick, setPick] = useState<Slot | null>(null);
+	const [other, setOther] = useState<{ kind: "todo" | "content" | "deadline"; slot: Slot } | null>(null);
+	const chosen = (k: AddKind) => {
+		const slot = pick;
+		setPick(null);
+		if (!slot) return;
+		if (k === "todo" || k === "content" || k === "deadline") setOther({ kind: k, slot });
+		else setCreate({ ...slot, preset: k });
+	};
 	const [dayOpen, setDayOpen] = useState<Date | null>(null);
 	const mobile = useIsMobile();
 	const [smart, setSmart] = useState(true);
@@ -129,7 +140,7 @@ export default function CalendarPage() {
 				<Button variant="outline" size="sm" className="h-8 shrink-0 px-3 text-xs" onClick={() => { setCursor(new Date()); if (mobile) setDayOpen(new Date()); }}>Today</Button>
 				<Button asChild variant="ghost" size="icon" className="hidden h-8 w-8 shrink-0 sm:inline-flex" aria-label="Schedule content" title="Schedule content"><Link href="/dashboard/mjengo/design#schedule"><Megaphone className="h-4 w-4" /></Link></Button>
 				<Button asChild variant="ghost" size="icon" className="h-8 w-8 shrink-0" aria-label="Calendar settings" title="Calendar settings"><Link href="/dashboard/profile?section=calendar"><Settings className="h-4 w-4" /></Link></Button>
-				<Button size="sm" className="hidden h-8 shrink-0 gap-1.5 bg-sauti-teal px-3 text-xs hover:bg-sauti-dark sm:inline-flex" onClick={() => setCreate({ date: dayOpen ?? new Date() })}><CalendarPlus className="h-3.5 w-3.5" /> Create</Button>
+				<Button size="sm" className="hidden h-8 shrink-0 gap-1.5 bg-sauti-teal px-3 text-xs hover:bg-sauti-dark sm:inline-flex" onClick={() => setPick({ date: dayOpen ?? new Date() })}><CalendarPlus className="h-3.5 w-3.5" /> Create</Button>
 			</div>
 
 			{data && !data.googleConnected && data.googleConfigured && (
@@ -178,7 +189,7 @@ export default function CalendarPage() {
 							icons={icons}
 							smart={smart}
 							onClose={() => setMode("month")}
-							onSlot={(from, to) => setCreate({ date: cursor, from, to })}
+							onSlot={(from, to) => setPick({ date: cursor, from, to })}
 							onOpen={setView}
 						/>
 					</div>
@@ -233,7 +244,7 @@ export default function CalendarPage() {
 							icons={icons}
 							smart={smart}
 							onClose={() => setDayOpen(null)}
-							onSlot={(from, to) => setCreate({ date: dayOpen, from, to })}
+							onSlot={(from, to) => setPick({ date: dayOpen, from, to })}
 							onOpen={setView}
 						/>
 					)}
@@ -276,18 +287,22 @@ export default function CalendarPage() {
 			{!data && <MjengoLoader compact label="Loading the calendar" />}
 
 			{mobile && (
-				<button onClick={() => setCreate({ date: dayOpen ?? new Date() })} aria-label="Create event" className="fixed bottom-5 right-5 z-40 flex h-14 w-14 items-center justify-center rounded-2xl bg-sauti-teal text-white shadow-lg active:scale-95">
+				<button onClick={() => setPick({ date: dayOpen ?? new Date() })} aria-label="Add to the calendar" className="fixed bottom-5 right-5 z-40 flex h-14 w-14 items-center justify-center rounded-2xl bg-sauti-teal text-white shadow-lg active:scale-95">
 					<Plus className="h-6 w-6" />
 				</button>
 			)}
 
+			<AddChooser slot={pick} onClose={() => setPick(null)} onPick={chosen} />
+			<TodoDialog slot={other?.kind === "todo" ? other.slot : null} onClose={() => setOther(null)} onDone={async () => { setOther(null); await load(); }} />
+			<PostDialog slot={other?.kind === "content" ? other.slot : null} onClose={() => setOther(null)} onDone={async () => { setOther(null); await load(); }} />
+			<DeadlineDialog slot={other?.kind === "deadline" ? other.slot : null} onClose={() => setOther(null)} onDone={async () => { setOther(null); await load(); }} />
 			<CreateDialog slot={create} onClose={() => setCreate(null)} onCreated={async () => { setCreate(null); await load(); }} />
 			<ViewDialog item={view} onClose={() => setView(null)} onRemoved={async () => { setView(null); await load(); }} />
 		</div>
 	);
 }
 
-function CreateDialog({ slot, onClose, onCreated }: { slot: { date: Date; from?: string; to?: string } | null; onClose: () => void; onCreated: () => Promise<void> }) {
+function CreateDialog({ slot, onClose, onCreated }: { slot: { date: Date; from?: string; to?: string; preset?: "meeting" | "event" | "reminder" | "block" } | null; onClose: () => void; onCreated: () => Promise<void> }) {
 	const day = slot?.date ?? null;
 	const { toast } = useToast();
 	const [title, setTitle] = useState("");
@@ -305,7 +320,11 @@ function CreateDialog({ slot, onClose, onCreated }: { slot: { date: Date; from?:
 
 	useEffect(() => {
 		if (!day) return;
-		setTitle(""); setDate(format(day, "yyyy-MM-dd")); setFrom(slot?.from ?? "09:00"); setTo(slot?.to ?? "10:00"); setAllDay(false); setVideo(true); setBlock(false); setGuests(""); setPlace(""); setNotes(""); setReminders([10]);
+		const p = slot?.preset;
+		const start = slot?.from ?? "09:00";
+		// A reminder is a short moment with an alert at the time; a meeting has a video link; an event does not.
+		const end = slot?.to ?? (p === "reminder" ? start : "10:00");
+		setTitle(""); setDate(format(day, "yyyy-MM-dd")); setFrom(start); setTo(end); setAllDay(false); setVideo(p === "meeting" || !p); setBlock(p === "block"); setGuests(""); setPlace(""); setNotes(""); setReminders(p === "reminder" ? [0] : [10]);
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [slot]);
 
@@ -339,11 +358,11 @@ function CreateDialog({ slot, onClose, onCreated }: { slot: { date: Date; from?:
 		<Dialog open={!!day} onOpenChange={(o) => !o && !busy && onClose()}>
 			<DialogContent className="max-h-[92vh] max-w-lg overflow-y-auto">
 				<DialogHeader>
-					<DialogTitle className="sr-only">New event</DialogTitle>
+					<DialogTitle className="sr-only">{slot?.preset === "meeting" ? "New meeting" : slot?.preset === "reminder" ? "New reminder" : slot?.preset === "block" ? "Block time" : "New event"}</DialogTitle>
 					<DialogDescription className="sr-only">Create an event or meeting</DialogDescription>
 				</DialogHeader>
 				<div className="space-y-4">
-					<Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Add title" autoFocus className="h-12 border-0 border-b border-serene-neutral-200 px-0 text-xl shadow-none focus-visible:ring-0" aria-label="Title" />
+					<Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder={slot?.preset === "reminder" ? "Remind me to…" : slot?.preset === "meeting" ? "Meeting title" : "Add title"} autoFocus className="h-12 border-0 border-b border-serene-neutral-200 px-0 text-xl shadow-none focus-visible:ring-0" aria-label="Title" />
 					<div className="flex flex-wrap items-center gap-2">
 						<Clock className="h-4 w-4 text-serene-neutral-500" />
 						<Input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="h-9 w-40" aria-label="Date" />
