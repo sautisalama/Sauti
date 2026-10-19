@@ -9,6 +9,7 @@ import { ENTITY_HREF, entitiesFor } from '@/lib/mjengo/entity-view';
 import { waitingFor } from '@/lib/mjengo/approvals';
 import { cleanTags } from '@/lib/mjengo/autotag';
 import { listAccounts, listMessages } from '@/app/actions/mjengo-mail';
+import { sortMessage } from '@/lib/mail/sort';
 
 export interface UrgentItem { id: string; kind: 'overdue' | 'due_soon' | 'approval'; title: string; detail: string; href: string }
 export interface AddedOpportunity { id: string; title: string; fromPhone: boolean; at: string; status: string; deadline: string | null }
@@ -83,7 +84,8 @@ async function getMailToAnswer_(): Promise<MailToAnswer[]> {
     if (!r || !r.ok) return;
     for (const m of r.data.items) {
       if (m.date && new Date(m.date).getTime() < weekAgo) continue;
-      if (AUTOMATED.test(m.from.address)) continue;
+      // The same sorting as the inbox: only mail that needs a person counts, not lists, receipts, updates or payments.
+      if (AUTOMATED.test(m.from.address) || sortMessage(m).kind !== 'person') continue;
       out.push({ accountId: acc.id, account: acc.label || acc.email, uid: m.uid, mailbox: m.mailbox, from: m.from.name || m.from.address, address: m.from.address, subject: m.subject, date: m.date });
     }
   }));
