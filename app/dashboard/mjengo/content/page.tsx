@@ -1,6 +1,7 @@
 "use client";
 
 import { EngagementCard } from "./_Engagement";
+import { IdeasCard, SharePhotos, type UseIdea } from "./_Ideas";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { addDays, addMonths, eachDayOfInterval, endOfMonth, endOfWeek, format, isSameDay, isSameMonth, startOfMonth, startOfWeek } from "date-fns";
@@ -64,6 +65,9 @@ export default function ContentPage() {
 		if (when) when.setHours(9, 0, 0, 0);
 		setEdit({ body: "", channels: ["linkedin"], media: [], status: "draft", variants: {}, results: {}, link_url: null, whenLocal: when ? format(when, "yyyy-MM-dd'T'HH:mm") : "" });
 	};
+	const useIdea: UseIdea = ({ body, channels, at }) => {
+		setEdit({ body, channels: channels.length ? channels : ["linkedin"], media: [], status: "draft", variants: {}, results: {}, link_url: null, whenLocal: at ? format(new Date(at), "yyyy-MM-dd'T'HH:mm") : "" });
+	};
 
 	if (!posts) return <MjengoLoader label="Loading content" />;
 
@@ -97,6 +101,8 @@ export default function ContentPage() {
 						<Tile tint="bg-serene-blue-50" icon={CalendarDays} title="Month view" hint={showMonth ? "Hide the whole month." : "See the whole month at once."} onClick={() => setShowMonth((v) => !v)} />
 					</div>
 
+					<IdeasCard onUse={useIdea} />
+					<SharePhotos onShared={() => { load().catch(() => undefined); }} />
 					{chan?.connections.some((c) => c.channel === "instagram" || c.channel === "facebook") && <EngagementCard />}
 
 					<section className="rounded-2xl border border-serene-neutral-200/70 bg-white p-4 shadow-[0_1px_2px_rgba(16,24,40,0.04)] sm:p-5">
