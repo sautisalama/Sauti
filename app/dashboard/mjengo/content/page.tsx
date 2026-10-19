@@ -1,5 +1,6 @@
 "use client";
 
+import { EngagementCard } from "./_Engagement";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { addDays, addMonths, eachDayOfInterval, endOfMonth, endOfWeek, format, isSameDay, isSameMonth, startOfMonth, startOfWeek } from "date-fns";
@@ -95,6 +96,8 @@ export default function ContentPage() {
 						<Tile tint="bg-sauti-yellow-light" icon={Palette} title="Start from a design" hint="Make a graphic, then schedule it." href="/dashboard/mjengo/design" />
 						<Tile tint="bg-serene-blue-50" icon={CalendarDays} title="Month view" hint={showMonth ? "Hide the whole month." : "See the whole month at once."} onClick={() => setShowMonth((v) => !v)} />
 					</div>
+
+					{chan?.connections.some((c) => c.channel === "instagram" || c.channel === "facebook") && <EngagementCard />}
 
 					<section className="rounded-2xl border border-serene-neutral-200/70 bg-white p-4 shadow-[0_1px_2px_rgba(16,24,40,0.04)] sm:p-5">
 						<div className="flex flex-wrap items-center gap-3">
