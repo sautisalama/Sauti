@@ -1,6 +1,7 @@
 import { lookup } from 'node:dns/promises';
 import { isIP } from 'node:net';
 import { isPrivateAddress } from '@/lib/net/ssrf';
+import { instagramPost, isInstagramHost, previewOf } from '@/lib/mjengo/social-fetch';
 
 export interface LinkPreview {
   title: string;
@@ -39,6 +40,12 @@ const decode = (s: string) =>
  */
 export async function loadLinkPreview(rawUrl: string): Promise<LinkPreview | null> {
   try {
+    // Instagram needs a sign-in to read, so it is never fetched as a page: a single public post is looked up through the
+    // shared adapter (official oEmbed or the cloud provider, cached), and anything else gets no preview.
+    if (isInstagramHost(rawUrl)) {
+      const r = await instagramPost(rawUrl);
+      return r.post ? previewOf(r.post) : null;
+    }
     let url = await assertPublicHttpUrl(rawUrl);
     let response: Response | null = null;
     for (let i = 0; i <= MAX_REDIRECTS; i++) {

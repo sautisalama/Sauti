@@ -3,6 +3,7 @@
 import { guard } from '@/lib/action-result';
 import { requireAdminActor } from '@/lib/access/super-admin';
 import { fetchHtml } from '@/lib/mjengo/safe-fetch';
+import { instagramPost, isInstagramHost } from '@/lib/mjengo/social-fetch';
 
 export interface LinkPreview {
   url: string;
@@ -81,5 +82,12 @@ export const linkPreview = guard(async (raw: string): Promise<LinkPreview> => {
   await requireAdminActor();
   const text = String(raw ?? '').trim();
   if (!text) throw new Error('Paste a link first.');
-  return load(/^https?:\/\//i.test(text) ? text : `https://${text}`);
+  const url = /^https?:\/\//i.test(text) ? text : `https://${text}`;
+  if (isInstagramHost(url)) {
+    // Instagram is never read as a page (it asks for a sign-in); a public post is looked up through the shared adapter.
+    const r = await instagramPost(url);
+    if (!r.post) throw new Error(r.message);
+    return { url: r.post.url, title: `${r.post.author ? `${r.post.author} on Instagram` : 'Instagram'}`, description: r.post.caption?.slice(0, 300) ?? null, image: r.post.image, organisation: r.post.author, siteName: 'Instagram', favicon: null, deadline: null };
+  }
+  return load(url);
 });
