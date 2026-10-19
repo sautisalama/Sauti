@@ -571,7 +571,13 @@ export function Composer({ accounts, accountId, seed, snippets, signature = "", 
 										<p className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-serene-neutral-600"><Sparkles className="h-3.5 w-3.5 text-sauti-teal" /> Suggested replies</p>
 										<div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
 											{suggestions.map((r, i) => (
-												<button key={i} onClick={() => { editor?.chain().focus().insertContentAt(0, paragraphs(r.body)).run(); setSuggestions(null); }} className="w-56 shrink-0 rounded-xl border border-black/10 bg-white p-3 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-sauti-teal/60">
+												<button key={i} onClick={() => {
+													// The reply arrives complete: its formatting, who it goes to and the account it goes from.
+													editor?.chain().focus().insertContentAt(0, looksLikeMarkdown(r.body) ? markdownToHtml(r.body) : paragraphs(r.body)).run();
+													if (!to.trim() && r.to.length) setTo(r.to.join(", "));
+													if (r.fromAccountId && r.fromAccountId !== from && accounts.some((a) => a.id === r.fromAccountId)) setFrom(r.fromAccountId);
+													setSuggestions(null);
+												}} className="w-56 shrink-0 rounded-xl border border-black/10 bg-white p-3 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-sauti-teal/60">
 													<span className="mb-1 block text-xs font-semibold text-sauti-teal">{r.label}</span>
 													<span className="line-clamp-3 text-xs text-serene-neutral-700">{r.body}</span>
 												</button>

@@ -5,13 +5,13 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { cn } from "@/lib/utils";
 
 /** A sender or recipient in an opened email: click for the address and what you can do with it. */
-export function PersonChip({ name, address, onWrite, onAddContact, className }: { name: string; address: string; onWrite: (address: string) => void; onAddContact: (name: string, address: string) => void; className?: string }) {
+export function PersonChip({ name, address, onWrite, onAddContact, className, children, title }: { name: string; address: string; onWrite: (address: string) => void; onAddContact: (name: string, address: string) => void; className?: string; /** What to click, when it is not the name itself (an avatar, say). */ children?: React.ReactNode; title?: string }) {
 	const label = name || address;
 	return (
 		<Popover>
 			<PopoverTrigger asChild>
-				<button type="button" onDoubleClick={() => onAddContact(name, address)} className={cn("rounded px-0.5 text-left hover:bg-black/5 hover:underline", className)} title={`${address}. Double-click to add to contacts.`}>
-					{label}
+				<button type="button" onDoubleClick={() => onAddContact(name, address)} className={cn("rounded px-0.5 text-left hover:bg-black/5 hover:underline", className)} title={title ?? `${address}. Double-click to add to contacts.`}>
+					{children ?? label}
 				</button>
 			</PopoverTrigger>
 			<PopoverContent align="start" className="w-72 p-0">

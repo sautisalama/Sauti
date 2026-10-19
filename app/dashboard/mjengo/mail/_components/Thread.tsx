@@ -98,6 +98,8 @@ export function ThreadMessage({
 
 	const snippet = plainOf(d).slice(0, 140);
 	const who = mine ? "You" : name(m.from);
+	// Click the avatar or the name for the card (add to contacts, write an email) without opening the full address.
+	const canCard = !mine && !!onWrite && !!onAddContact && !!m.from.address;
 
 	if (!open) {
 		return (
@@ -117,12 +119,23 @@ export function ThreadMessage({
 	return (
 		<li className={cn("border-b border-black/[0.06]", isCurrent && "scroll-mt-4")} data-current={isCurrent ? "1" : undefined}>
 			<div className="group/h flex items-start gap-3 pb-1 pt-4">
-				<span className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-semibold", tint.dot, tint.ink)}>{initials(name(m.from))}</span>
+				{canCard ? (
+					<PersonChip name={m.from.name} address={m.from.address} onWrite={onWrite!} onAddContact={onAddContact!} title={`${m.from.address}. Add to contacts or write an email.`} className="shrink-0 rounded-full p-0 hover:bg-transparent hover:no-underline">
+						<span className={cn("flex h-10 w-10 items-center justify-center rounded-full text-sm font-semibold", tint.dot, tint.ink)}>{initials(name(m.from))}</span>
+					</PersonChip>
+				) : (
+					<span className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-semibold", tint.dot, tint.ink)}>{initials(name(m.from))}</span>
+				)}
 				<div className="min-w-0 flex-1">
 					<div className="flex items-baseline gap-2">
-						<button onClick={() => !isCurrent && onOpenChange(false)} className="truncate text-left text-[15px] font-semibold text-[#37352f]" title={!isCurrent ? "Close this message" : undefined}>{who}</button>
+						{canCard ? (
+							<PersonChip name={who} address={m.from.address} onWrite={onWrite!} onAddContact={(n) => onAddContact!(m.from.name || n, m.from.address)} className="truncate text-[15px] font-semibold text-[#37352f]" />
+						) : (
+							<span className="truncate text-left text-[15px] font-semibold text-[#37352f]">{who}</span>
+						)}
 						<span className="shrink-0 text-xs text-[#9b9a97]">{m.date ? format(new Date(m.date), "d MMM yyyy, HH:mm") : ""}</span>
 						<span className="ml-auto flex items-center gap-0.5 opacity-100 transition sm:opacity-0 sm:group-hover/h:opacity-100">
+							{!isCurrent && <button onClick={() => onOpenChange(false)} aria-label="Close this message" title="Close this message" className="flex h-7 w-7 items-center justify-center rounded-md text-[#787774] hover:bg-black/5 hover:text-[#37352f]"><ChevronDown className="h-4 w-4" /></button>}
 							{onReply && <button onClick={onReply} aria-label="Reply" title="Reply" className="max-sm:hidden flex h-7 w-7 items-center justify-center rounded-md text-[#787774] hover:bg-black/5 hover:text-[#37352f]"><Reply className="h-4 w-4" /></button>}
 							{onReplyAll && <button onClick={onReplyAll} aria-label="Reply all" title="Reply all" className="max-sm:hidden flex h-7 w-7 items-center justify-center rounded-md text-[#787774] hover:bg-black/5 hover:text-[#37352f]"><ReplyAll className="h-4 w-4" /></button>}
 							{onForward && <button onClick={onForward} aria-label="Forward" title="Forward" className="max-sm:hidden flex h-7 w-7 items-center justify-center rounded-md text-[#787774] hover:bg-black/5 hover:text-[#37352f]"><Forward className="h-4 w-4" /></button>}

@@ -1072,21 +1072,40 @@ async function draftReply_(accountId: string, mailbox: string, uid: number, inst
     .join('');
 }
 
-export interface ReplySuggestion { label: string; body: string }
+export interface ReplySuggestion {
+  label: string;
+  /** Markdown-lite (bold, bullets) where the content calls for it; the composer turns it into formatting. */
+  body: string;
+  /** Who the reply goes to and which of the person's accounts it goes from, so nothing is left to fill in. */
+  to: string[];
+  cc: string[];
+  fromAccountId: string;
+}
 
-/** Three short replies that fit the email, in the tone the sender used. */
+/** Three replies that fit the email: the sender's language and tone, the writer's own voice, formatted where it helps. */
 async function suggestReplies_(accountId: string, mailbox: string, uid: number): Promise<ReplySuggestion[]> {
   const actor = await requireModule('mail', 'write');
+  const acct = await loadAccount(accountId, actor.id);
   const { text, subject, from } = await bodyText(accountId, mailbox, uid, actor.id);
   const ctx = await threadContext(accountId, mailbox, uid, subject, actor.id);
+  // Where the reply goes, and from which account: the one the email was sent to, when that is one of theirs.
+  const detail = await getMessageDetail_(accountId, mailbox, uid, false).catch(() => null);
+  const mine = (await looseAdmin().from('mail_accounts').select('id, email').eq('owner_id', actor.id)).data as { id: string; email: string }[] | null;
+  const own = new Set((mine ?? []).map((a) => a.email.toLowerCase()));
+  const sentTo = [...(detail?.to ?? []), ...(detail?.cc ?? [])].map((a) => a.address.toLowerCase());
+  const fromAccountId = (mine ?? []).find((a) => sentTo.includes(a.email.toLowerCase()))?.id ?? accountId;
+  const sender = from?.address && !own.has(from.address.toLowerCase()) ? from.address : detail?.to?.find((a) => !own.has(a.address.toLowerCase()))?.address ?? from?.address ?? '';
+  const to = sender ? [sender] : [];
+  const cc: string[] = [];
   const raw = await ai(
-    'You suggest replies for the team at Sauti Salama, a survivor-led GBV support organisation in Kenya. The replies are written as ME to the person who sent the latest email; the earlier messages (when given) show what has been settled, so suggest only what moves things on, in the way ME has been writing. Reply with one JSON object {"replies":[{"label": string, "body": string}]} with exactly three different replies. "label" is two to four words naming the intent (for example Confirm, Ask for details, Decline politely). "body" is the reply: one to three sentences, matching the sender\'s tone and language, no subject, no sign-off name, no placeholders, no invented facts.',
-    `${ctx.history ? `Earlier in the conversation:\n${ctx.history}\n\n` : ''}From ${from?.name || from?.address || 'the sender'}, subject "${subject}":\n${text.slice(0, 5000)}`,
-    700
+    'You suggest replies for the team at Sauti Salama, a survivor-led GBV support organisation in Kenya. Each reply is written as ME to the person who sent the latest email. The earlier messages (when given) show what has been settled, so suggest only what moves things on. Write it as ME would: copy the greeting of ME, level of formality, paragraph length and closing line when ME wrote earlier in the thread; otherwise greet the sender by first name and match their tone and language. Reply with one JSON object {"replies":[{"label": string, "body": string}]} with exactly three different replies. "label" is two to four words naming the intent (for example Confirm, Ask for details, Decline politely). "body" is the whole email text from greeting to closing line, without a subject, without the name of ME after the closing and without placeholders. Keep it as short as the email deserves: two or three sentences for a simple one, more only when there is more to answer. Where the email asks several things, lists dates, documents or steps, use Markdown: **bold** for the key dates, names or asks and "- " bullets for lists, with a blank line between paragraphs. Plain prose otherwise. Never invent facts, dates or commitments.',
+    [ctx.voice ? `How ME has written in this thread (copy the shape, not the content):\n${ctx.voice}` : '', ctx.history ? `Earlier in the conversation:\n${ctx.history}` : '', `From ${from?.name || from?.address || 'the sender'}, subject "${subject}":\n${text.slice(0, 5000)}`].filter(Boolean).join('\n\n'),
+    1100
   );
+  void acct;
   try {
     const j = JSON.parse(raw.match(/\{[\s\S]*\}/)?.[0] ?? '{}') as { replies?: { label?: string; body?: string }[] };
-    return (j.replies ?? []).filter((r) => r.body).slice(0, 3).map((r) => ({ label: String(r.label ?? 'Reply').slice(0, 40), body: String(r.body).slice(0, 800) }));
+    return (j.replies ?? []).filter((r) => r.body).slice(0, 3).map((r) => ({ label: String(r.label ?? 'Reply').slice(0, 40), body: String(r.body).slice(0, 2000), to, cc, fromAccountId }));
   } catch {
     return [];
   }
