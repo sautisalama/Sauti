@@ -6,6 +6,7 @@ import { requireAdminActor } from '@/lib/access/super-admin';
 import { requireModule, type ModuleKey } from '@/lib/access/permissions';
 import { atLeast, levelFor, loadIndex, oversightFor } from '@/lib/vault/access';
 import { askAi } from '@/lib/mjengo/ai';
+import { dropUnsupportedDateLines } from '@/lib/mjengo/evidence';
 import { ENTITY_KINDS, entitiesFor, type EntityKind } from '@/lib/mjengo/entity-view';
 import { timelineFor, type Timeline } from '@/lib/mjengo/timeline';
 
@@ -84,12 +85,15 @@ async function briefTimeline_(kind: EntityKind, id: string): Promise<string> {
   if (!kindOk(kind)) throw new Error('Unknown kind of record.');
   const t = await timelineFor(await me(), kind, id);
   const line = (i: (typeof t.items)[number]) => `- ${i.at.slice(0, 10)} ${i.upcoming ? '(coming)' : ''} ${i.title}${i.detail ? `: ${i.detail}` : ''}${i.who ? ` [${i.who}]` : ''}`;
-  return askAi(
+  const source = `${new Date().toISOString().slice(0, 10)}\n${t.items.slice(0, 60).map(line).join('\n')}`;
+  const out = await askAi(
     'You are Salama, a member of the team at Sauti Salama. From the timeline given, write a brief for a colleague who is catching up. Use exactly these bold headings in Markdown: **Where it stands** (two or three sentences), **Next** (bullets: dates and things coming), **Watch** (bullets: anything overdue, missing or quiet for a long time; write "Nothing stands out." if none). Use only what is on the timeline. Never invent names, dates or numbers. Under 140 words.',
     `${t.title} (${kind}). Today is ${new Date().toISOString().slice(0, 10)}.\n\nTimeline, newest and upcoming first:\n${t.items.slice(0, 60).map(line).join('\n')}`,
     600,
     { temperature: 0.2 },
   );
+  // A date the timeline does not contain is not allowed to appear in the brief.
+  return dropUnsupportedDateLines(out, source).text;
 }
 
 export const getTimeline = guard(getTimeline_);

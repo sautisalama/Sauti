@@ -1,5 +1,6 @@
 import { looseAdmin } from '@/lib/loose-db';
 import { askAi } from '@/lib/mjengo/ai';
+import { dropUnsupportedDateLines } from '@/lib/mjengo/evidence';
 import { entitiesFor, ENTITY_HREF } from '@/lib/mjengo/entity-view';
 import { waitingFor } from '@/lib/mjengo/approvals';
 
@@ -63,10 +64,11 @@ export async function collectDigest(asker: { id: string; email: string }, since:
 /** Salama's few lines: what to look at first, from the items only. */
 export async function briefOf(items: DigestItem[], since: string): Promise<string> {
   if (!items.length) return '';
-  return askAi(
+  const out = await askAi(
     'You are Salama, a member of the team at Sauti Salama, welcoming a colleague back. From the list of changes, write a short catch-up in plain Markdown: one opening sentence, then at most five bullets, most important first (anything waiting for their answer or given to them comes first). Use only what the list says; never invent names, dates or numbers; do not repeat every item, group the small ones. Under 110 words.',
     `They were last here on ${since.slice(0, 10)}. Changes since:\n${items.slice(0, 40).map((i) => `- ${i.at.slice(0, 10)} [${i.kind}] ${i.title}${i.detail ? `: ${i.detail}` : ''}`).join('\n')}`,
     450,
     { temperature: 0.2 },
   );
+  return dropUnsupportedDateLines(out, `${since}\n${items.map((i) => `${i.at} ${i.title} ${i.detail ?? ''}`).join('\n')}`).text;
 }

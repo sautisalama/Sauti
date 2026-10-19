@@ -2,9 +2,11 @@ import { looseAdmin } from '@/lib/loose-db';
 import { sendNotification } from '@/lib/notifications';
 import { askAi } from '@/lib/mjengo/ai';
 import { autoLinkMeeting } from '@/lib/mjengo/auto-link';
+import { quoteInSource, resolveSaidDate } from '@/lib/mjengo/evidence';
 
 interface Line { id: string; name: string; text: string; at: string }
 export interface Commitment { title: string; owner: string | null; due: string | null }
+interface Said { title: string; owner: string | null; due_words?: string | null }
 
 const TRACK_NAME = 'From calls';
 
@@ -12,20 +14,21 @@ const TRACK_NAME = 'From calls';
 export async function extractCommitments(title: string | null, lines: Line[], today = new Date()): Promise<Commitment[]> {
   const transcript = lines.map((l) => `${l.name}: ${l.text}`).join('\n').slice(0, 24_000);
   const raw = await askAi(
-    `You find commitments in a call transcript for a small team. Return JSON: {"items":[{"title":string,"owner":string|null,"due":string|null}]}. A commitment is something a person agreed to do after the call. "title" is a short imperative sentence. "owner" is the first name of the person who took it on, exactly as it appears in the transcript, or null if unclear. "due" is YYYY-MM-DD only when a date or a weekday was said (today is ${today.toISOString().slice(0, 10)}), otherwise null. Never invent items, names or dates. At most 8 items. If there are none, return {"items":[]}.`,
+    `You find commitments in a call transcript for a small team. Return JSON: {"items":[{"title":string,"owner":string|null,"due_words":string|null}]}. A commitment is something a person agreed to do after the call. "title" is a short imperative sentence. "owner" is the first name of the person who took it on, exactly as it appears in the transcript, or null if unclear. "due_words" is the exact words from the transcript that gave the deadline (for example "by Friday", "on 15 March", "tomorrow"), copied letter for letter, or null when no deadline was said. Do not work out the date yourself. Never invent items, names or dates. At most 8 items. If there are none, return {"items":[]}.`,
     `Call: ${title || 'Untitled call'}\n\nTranscript:\n${transcript}`,
     700,
     { json: true, temperature: 0.1 },
   );
   try {
-    const items = (JSON.parse(raw) as { items?: Commitment[] }).items ?? [];
+    const items = (JSON.parse(raw) as { items?: Said[] }).items ?? [];
     return items
       .filter((i) => i && typeof i.title === 'string' && i.title.trim())
       .slice(0, 8)
       .map((i) => ({
         title: i.title.trim().slice(0, 160),
         owner: typeof i.owner === 'string' && i.owner.trim() ? i.owner.trim() : null,
-        due: typeof i.due === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(i.due) && new Date(i.due) >= new Date(today.toISOString().slice(0, 10)) ? i.due : null,
+        // The date comes from the words that were said, worked out here, and only if those words are really in the call.
+        due: typeof i.due_words === 'string' && quoteInSource(i.due_words, transcript) ? resolveSaidDate(i.due_words, today) : null,
       }));
   } catch {
     return [];

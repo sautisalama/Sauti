@@ -3,8 +3,9 @@
 import { EntityReminders } from "@/components/mjengo/EntityReminders";
 import { MjengoLoader } from "./MjengoLoader";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AlertCircle, BadgeCheck, CheckSquare, EyeOff, Lock, Users, ExternalLink, FileWarning, Kanban, List, Loader2, Plus, Search, Trash2 } from "lucide-react";
+import { AlertCircle, ArrowLeft, BadgeCheck, CheckSquare, Maximize2, EyeOff, Lock, Users, ExternalLink, FileWarning, Kanban, List, Loader2, Plus, Search, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -140,10 +141,12 @@ const dueKey = (kind: Kind) => (kind === "project" ? "end_date" : "deadline");
 const ownerKey = (kind: Kind) => (kind === "project" ? "lead_id" : "owner_id");
 type Row = EntityRow & Record<string, any>;
 
-export function EntityWorkspace({ kind }: { kind: Kind }) {
+export function EntityWorkspace({ kind, pageId }: { kind: Kind; pageId?: string }) {
 	const cfg = CONFIG[kind];
 	const statuses = STATUSES[kind];
 	const { toast } = useToast();
+	const router = useRouter();
+	const listHref = `/dashboard/mjengo/${cfg.plural.toLowerCase()}`;
 	// Opportunities that arrived from a phone stop counting once the list has been looked at.
 	useEffect(() => {
 		if (kind !== "opportunity") return;
@@ -202,6 +205,12 @@ export function EntityWorkspace({ kind }: { kind: Kind }) {
 
 	const openNew = () => setEditing({ id: null, values: { status: statuses[0].value, currency: "USD", ...(kind === "opportunity" ? { kind: "grant" } : {}), ...(kind === "project" ? { progress: 0 } : {}) } });
 	const openRow = (r: Row) => setEditing({ id: r.id, values: { ...r } });
+	// The full page shows one record: open it as soon as the list has loaded.
+	useEffect(() => {
+		if (!pageId || !rows) return;
+		const r = rows.find((x) => x.id === pageId);
+		setEditing((cur) => (cur?.id === pageId ? cur : r ? { id: r.id, values: { ...r } } : null));
+	}, [pageId, rows]);
 	// "Start it directly" from Opportunities opens a blank form here.
 	const openedNew = useRef(false);
 	useEffect(() => {
@@ -244,6 +253,7 @@ export function EntityWorkspace({ kind }: { kind: Kind }) {
 		try {
 			await deleteEntity(kind, editing.id);
 			setEditing(null);
+			if (pageId) { router.push(listHref); return; }
 			await load();
 		} catch (e) {
 			toast({ title: "Could not delete", description: e instanceof Error ? e.message : undefined, variant: "destructive" });
@@ -264,6 +274,138 @@ export function EntityWorkspace({ kind }: { kind: Kind }) {
 
 	if (!rows) {
 		return <MjengoLoader label="Loading" />;
+	}
+
+	const fieldsPart = editing ? (
+		<div className="space-y-6">
+							<div className="grid gap-4 sm:grid-cols-2">
+								{cfg.fields.filter((f) => shownField(f.key)).map((f) => (
+									<div key={f.key} className={cn("space-y-1.5", f.wide && "sm:col-span-2")}>
+										<Label htmlFor={`f-${f.key}`} className="text-xs font-semibold text-serene-neutral-600">{f.label}</Label>
+										{((editing.values._hidden as string[] | undefined) ?? []).includes(f.key)
+											? <p className="flex h-10 items-center gap-2 rounded-md border border-dashed border-amber-200 bg-amber-50/60 px-3 text-sm text-amber-800"><EyeOff className="h-4 w-4" /> Hidden by whoever added it</p>
+											: <FieldInput f={f} value={editing.values[f.key]} onChange={(v) => set(f.key, v)} admins={admins} grants={grants} />}
+									</div>
+								))}
+							</div>
+
+							{hiddenFields.length > 0 && (
+								<div className="flex flex-wrap items-center gap-1.5">
+									<span className="text-xs text-serene-neutral-500">Add:</span>
+									{hiddenFields.map((f) => (
+										<button key={f.key} type="button" onClick={() => setRevealed((r) => new Set(r).add(f.key))} className="flex h-7 items-center gap-1 rounded-full border border-serene-neutral-200 px-2.5 text-xs font-medium text-serene-neutral-700 hover:bg-serene-neutral-50"><Plus className="h-3 w-3" />{f.label}</button>
+									))}
+								</div>
+							)}
+
+							{(kind === "grant" || kind === "opportunity" || kind === "fellowship") && (
+								<FundFromLink
+									url={String(editing.values[urlKey] ?? "")}
+									values={editing.values}
+									onFill={(patch) => Object.entries(patch).forEach(([k, v]) => set(k, v))}
+								/>
+							)}
+							{kind === "grant" && (
+								<LinkPreviewCard
+									url={String(editing.values.link ?? "")}
+									values={editing.values}
+									onFill={(patch) => Object.entries(patch).forEach(([k, v]) => v != null && v !== "" && set(k, v))}
+								/>
+							)}
+							{kind === "opportunity" && (
+								<OpportunityVerifyCard
+									id={editing.id ?? null}
+									values={editing.values}
+									onFill={(patch) => Object.entries(patch).forEach(([k, v]) => v != null && v !== "" && set(k, v))}
+									onChanged={load}
+								/>
+							)}
+		</div>
+	) : null;
+	const panelsPart = editing ? (
+		<div className="space-y-6">
+							{editing.id ? (
+								<>
+									{kind === "project" && <ProjectMoney v={editing.values} />}
+									{kind === "fellowship" && <FellowshipAssignments fellowshipId={editing.id} />}
+									{kind === "opportunity" && editing.values.converted_to_type && (
+										<Link href={`/dashboard/mjengo/${editing.values.converted_to_type}s`} className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm font-medium text-emerald-800 hover:bg-emerald-100">Won, and now a {String(editing.values.converted_to_type)}. Open it <ExternalLink className="ml-auto h-3.5 w-3.5" /></Link>
+									)}
+									<div className="rounded-xl border border-serene-neutral-100 p-3">
+										<p className="mb-2 text-sm font-semibold text-serene-neutral-900">Tags</p>
+										<TagEditor type={kind} id={editing.id} tags={(editing.values.tags as string[] | undefined) ?? []} onChange={(t) => { set("tags", t); void load(); }} />
+									</div>
+									<EntityTimeline kind={kind} id={editing.id} />
+									<ProgressReport kind={kind} id={editing.id} />
+									{(kind === "grant" || kind === "opportunity") && <GrantAgent kind={kind} id={editing.id} />}
+									<SimilarItems type={kind} id={editing.id} />
+									<EntityAccessPanel kind={kind} id={editing.id} />
+									<DocumentsPanel kind={kind} entityId={editing.id} onChange={load} />
+									<div className="rounded-xl border border-serene-neutral-100 p-3">
+										<p className="mb-2 text-sm font-semibold text-serene-neutral-900">Reminders</p>
+										<EntityReminders type={kind} id={editing.id} />
+									</div>
+									<Link href="/dashboard/mjengo/todos" className="flex items-center gap-2 rounded-xl border border-serene-neutral-100 p-3 text-sm text-serene-neutral-700 hover:bg-serene-neutral-50">
+										<CheckSquare className="h-4 w-4 text-sauti-teal" />
+										{(rows.find((r) => r.id === editing.id)?.openTodos ?? 0)} open to-dos linked to this {cfg.noun}
+										<ExternalLink className="ml-auto h-3.5 w-3.5 text-serene-neutral-400" />
+									</Link>
+								</>
+							) : (
+								<>
+									<div className="rounded-xl border border-serene-neutral-100 p-3">
+										<p className="mb-2 text-sm font-semibold text-serene-neutral-900">Who sees this {cfg.noun}</p>
+										<div className="grid grid-cols-2 gap-2">
+											{([["team", "Whole team", "Everyone on the team can open it.", Users], ["restricted", "Only me", "Private until you add people.", Lock]] as const).map(([v, label, hint, Icon]) => {
+												const on = (editing.values.visibility === "restricted" ? "restricted" : "team") === v;
+												return (
+													<button key={v} type="button" aria-pressed={on} onClick={() => set("visibility", v)} className={cn("flex items-start gap-2 rounded-xl border p-3 text-left", on ? "border-sauti-teal bg-sauti-teal-light/50" : "border-serene-neutral-200 hover:bg-serene-neutral-50")}>
+														<Icon className="mt-0.5 h-4 w-4 shrink-0 text-sauti-teal" />
+														<span><span className="block text-sm font-medium text-serene-neutral-900">{label}</span><span className="block text-xs text-serene-neutral-500">{hint}</span></span>
+													</button>
+												);
+											})}
+										</div>
+									</div>
+									<p className="flex items-start gap-2 rounded-xl bg-sauti-teal-light/40 p-3 text-sm text-sauti-dark"><AlertCircle className="mt-0.5 h-4 w-4 shrink-0" /> Save first, then add the documents this {cfg.noun} needs.</p>
+								</>
+							)}
+		</div>
+	) : null;
+	const footerBar = (
+					<div className="sticky bottom-0 flex items-center gap-2 border-t bg-white p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+						{editing?.id && <Button variant="ghost" className="gap-1.5 text-red-600 hover:bg-red-50 hover:text-red-700" onClick={remove}><Trash2 className="h-4 w-4" /> Delete</Button>}
+						<div className="flex-1" />
+						<Button variant="ghost" onClick={() => (pageId ? router.push(listHref) : setEditing(null))}>{pageId ? "Back" : "Close"}</Button>
+						<Button onClick={save} disabled={saving} className="gap-1.5 bg-sauti-teal hover:bg-sauti-dark">{saving && <Loader2 className="h-4 w-4 animate-spin" />} Save</Button>
+					</div>
+	);
+
+	if (pageId) {
+		const title = String(editing?.values[cfg.titleKey] ?? rows.find((r) => r.id === pageId)?.[cfg.titleKey] ?? cfg.noun);
+		return (
+			<div className="mx-auto max-w-6xl space-y-5">
+				<div className="flex flex-wrap items-center gap-3">
+					<Link href={listHref} className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium text-serene-neutral-600 hover:bg-white"><ArrowLeft className="h-4 w-4" /> {cfg.plural}</Link>
+					<h1 className="min-w-0 flex-1 truncate text-xl font-bold text-sauti-dark">{title}</h1>
+					{editing?.values.status && <StatusPill kind={kind} value={String(editing.values.status)} />}
+				</div>
+				{!editing ? (
+					<div className="rounded-2xl border border-dashed border-serene-neutral-200 bg-white p-12 text-center">
+						<p className="font-semibold text-serene-neutral-900">This {cfg.noun} is not here</p>
+						<p className="mt-1 text-sm text-serene-neutral-500">It may have been deleted, or it is kept to a few people.</p>
+					</div>
+				) : (
+					<>
+						<div className="grid items-start gap-5 lg:grid-cols-2">
+							<section className="rounded-2xl border border-serene-neutral-200/70 bg-white p-4 shadow-[0_1px_2px_rgba(16,24,40,0.04)]">{fieldsPart}</section>
+							<section className="rounded-2xl border border-serene-neutral-200/70 bg-white p-4 shadow-[0_1px_2px_rgba(16,24,40,0.04)]">{panelsPart}</section>
+						</div>
+						{footerBar}
+					</>
+				)}
+			</div>
+		);
 	}
 
 	return (
@@ -365,104 +507,13 @@ export function EntityWorkspace({ kind }: { kind: Kind }) {
 				<SheetContent className="flex w-full flex-col gap-0 overflow-y-auto p-0 sm:max-w-xl">
 					<SheetHeader className="border-b p-4 pt-[max(1rem,env(safe-area-inset-top))]">
 						<SheetTitle>{editing?.id ? `Edit ${cfg.noun}` : `New ${cfg.noun}`}</SheetTitle>
+						{editing?.id && <Link href={`${listHref}/${editing.id}`} className="inline-flex w-fit items-center gap-1.5 rounded-full border border-serene-neutral-200 px-3 py-1 text-xs font-medium text-sauti-teal hover:bg-serene-neutral-50"><Maximize2 className="h-3.5 w-3.5" /> Open the full page</Link>}
 					</SheetHeader>
-					{editing && (
-						<div className="flex-1 space-y-6 p-4">
-							<div className="grid gap-4 sm:grid-cols-2">
-								{cfg.fields.filter((f) => shownField(f.key)).map((f) => (
-									<div key={f.key} className={cn("space-y-1.5", f.wide && "sm:col-span-2")}>
-										<Label htmlFor={`f-${f.key}`} className="text-xs font-semibold text-serene-neutral-600">{f.label}</Label>
-										{((editing.values._hidden as string[] | undefined) ?? []).includes(f.key)
-											? <p className="flex h-10 items-center gap-2 rounded-md border border-dashed border-amber-200 bg-amber-50/60 px-3 text-sm text-amber-800"><EyeOff className="h-4 w-4" /> Hidden by whoever added it</p>
-											: <FieldInput f={f} value={editing.values[f.key]} onChange={(v) => set(f.key, v)} admins={admins} grants={grants} />}
-									</div>
-								))}
-							</div>
-
-							{hiddenFields.length > 0 && (
-								<div className="flex flex-wrap items-center gap-1.5">
-									<span className="text-xs text-serene-neutral-500">Add:</span>
-									{hiddenFields.map((f) => (
-										<button key={f.key} type="button" onClick={() => setRevealed((r) => new Set(r).add(f.key))} className="flex h-7 items-center gap-1 rounded-full border border-serene-neutral-200 px-2.5 text-xs font-medium text-serene-neutral-700 hover:bg-serene-neutral-50"><Plus className="h-3 w-3" />{f.label}</button>
-									))}
-								</div>
-							)}
-
-							{(kind === "grant" || kind === "opportunity" || kind === "fellowship") && (
-								<FundFromLink
-									url={String(editing.values[urlKey] ?? "")}
-									values={editing.values}
-									onFill={(patch) => Object.entries(patch).forEach(([k, v]) => set(k, v))}
-								/>
-							)}
-							{kind === "grant" && (
-								<LinkPreviewCard
-									url={String(editing.values.link ?? "")}
-									values={editing.values}
-									onFill={(patch) => Object.entries(patch).forEach(([k, v]) => v != null && v !== "" && set(k, v))}
-								/>
-							)}
-							{kind === "opportunity" && (
-								<OpportunityVerifyCard
-									id={editing.id ?? null}
-									values={editing.values}
-									onFill={(patch) => Object.entries(patch).forEach(([k, v]) => v != null && v !== "" && set(k, v))}
-									onChanged={load}
-								/>
-							)}
-
-							{editing.id ? (
-								<>
-									{kind === "project" && <ProjectMoney v={editing.values} />}
-									{kind === "fellowship" && <FellowshipAssignments fellowshipId={editing.id} />}
-									{kind === "opportunity" && editing.values.converted_to_type && (
-										<Link href={`/dashboard/mjengo/${editing.values.converted_to_type}s`} className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm font-medium text-emerald-800 hover:bg-emerald-100">Won, and now a {String(editing.values.converted_to_type)}. Open it <ExternalLink className="ml-auto h-3.5 w-3.5" /></Link>
-									)}
-									<div className="rounded-xl border border-serene-neutral-100 p-3">
-										<p className="mb-2 text-sm font-semibold text-serene-neutral-900">Tags</p>
-										<TagEditor type={kind} id={editing.id} tags={(editing.values.tags as string[] | undefined) ?? []} onChange={(t) => { set("tags", t); void load(); }} />
-									</div>
-									<EntityTimeline kind={kind} id={editing.id} />
-									<ProgressReport kind={kind} id={editing.id} />
-									{(kind === "grant" || kind === "opportunity") && <GrantAgent kind={kind} id={editing.id} />}
-									<SimilarItems type={kind} id={editing.id} />
-									<EntityAccessPanel kind={kind} id={editing.id} />
-									<DocumentsPanel kind={kind} entityId={editing.id} onChange={load} />
-									<div className="rounded-xl border border-serene-neutral-100 p-3">
-										<p className="mb-2 text-sm font-semibold text-serene-neutral-900">Reminders</p>
-										<EntityReminders type={kind} id={editing.id} />
-									</div>
-									<Link href="/dashboard/mjengo/todos" className="flex items-center gap-2 rounded-xl border border-serene-neutral-100 p-3 text-sm text-serene-neutral-700 hover:bg-serene-neutral-50">
-										<CheckSquare className="h-4 w-4 text-sauti-teal" />
-										{(rows.find((r) => r.id === editing.id)?.openTodos ?? 0)} open to-dos linked to this {cfg.noun}
-										<ExternalLink className="ml-auto h-3.5 w-3.5 text-serene-neutral-400" />
-									</Link>
-								</>
-							) : (
-								<>
-									<div className="rounded-xl border border-serene-neutral-100 p-3">
-										<p className="mb-2 text-sm font-semibold text-serene-neutral-900">Who sees this {cfg.noun}</p>
-										<div className="grid grid-cols-2 gap-2">
-											{([["team", "Whole team", "Everyone on the team can open it.", Users], ["restricted", "Only me", "Private until you add people.", Lock]] as const).map(([v, label, hint, Icon]) => {
-												const on = (editing.values.visibility === "restricted" ? "restricted" : "team") === v;
-												return (
-													<button key={v} type="button" aria-pressed={on} onClick={() => set("visibility", v)} className={cn("flex items-start gap-2 rounded-xl border p-3 text-left", on ? "border-sauti-teal bg-sauti-teal-light/50" : "border-serene-neutral-200 hover:bg-serene-neutral-50")}>
-														<Icon className="mt-0.5 h-4 w-4 shrink-0 text-sauti-teal" />
-														<span><span className="block text-sm font-medium text-serene-neutral-900">{label}</span><span className="block text-xs text-serene-neutral-500">{hint}</span></span>
-													</button>
-												);
-											})}
-										</div>
-									</div>
-									<p className="flex items-start gap-2 rounded-xl bg-sauti-teal-light/40 p-3 text-sm text-sauti-dark"><AlertCircle className="mt-0.5 h-4 w-4 shrink-0" /> Save first, then add the documents this {cfg.noun} needs.</p>
-								</>
-							)}
-						</div>
-					)}
+					{editing && <div className="flex-1 space-y-6 p-4">{fieldsPart}{panelsPart}</div>}
 					<div className="sticky bottom-0 flex items-center gap-2 border-t bg-white p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
 						{editing?.id && <Button variant="ghost" className="gap-1.5 text-red-600 hover:bg-red-50 hover:text-red-700" onClick={remove}><Trash2 className="h-4 w-4" /> Delete</Button>}
 						<div className="flex-1" />
-						<Button variant="ghost" onClick={() => setEditing(null)}>Close</Button>
+						<Button variant="ghost" onClick={() => (pageId ? router.push(listHref) : setEditing(null))}>{pageId ? "Back" : "Close"}</Button>
 						<Button onClick={save} disabled={saving} className="gap-1.5 bg-sauti-teal hover:bg-sauti-dark">{saving && <Loader2 className="h-4 w-4 animate-spin" />} Save</Button>
 					</div>
 				</SheetContent>

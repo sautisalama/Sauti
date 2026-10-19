@@ -116,3 +116,91 @@ export function hostMatchesName(host: string | null, name: string | null): boole
   const joined = [...tokens(name)].join('');
   return parts.some((t) => h.includes(t)) || (joined.length >= 4 && (h.includes(joined) || joined.includes(h)));
 }
+
+/* ------------------------------------------------------------------------------------------------------------------
+ * Dates a model wrote are never trusted by themselves. A date said in a call is worked out here from the words that
+ * were said (the weekday, "tomorrow", "15 March"); a date in a summary must be one the source really contains.
+ * ------------------------------------------------------------------------------------------------------------------ */
+
+const WEEKDAYS = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+const DAY_MS = 86400_000;
+const iso = (d: Date) => d.toISOString().slice(0, 10);
+
+/** Today's date in Nairobi as a UTC midnight, so weekday arithmetic does not slip a day around midnight. */
+export function nairobiToday(now = new Date()): Date {
+  return new Date(`${now.toLocaleDateString('en-CA', { timeZone: 'Africa/Nairobi' })}T00:00:00Z`);
+}
+
+/**
+ * The date that a spoken or written phrase means, or null when it names no single day ("soon", "next week", "after the
+ * funder replies"). Explicit dates, "today", "tomorrow", a weekday ("by Friday", "next Tuesday") and "end of the month"
+ * are understood; a date already in the past is never returned.
+ */
+export function resolveSaidDate(phrase: string | null | undefined, from = new Date()): string | null {
+  if (!phrase) return null;
+  const t = normalise(phrase);
+  const today = nairobiToday(from);
+  const keep = (d: Date | null) => (d && d.getTime() >= today.getTime() ? iso(d) : null);
+
+  const full = /\b(\d{4})-(\d{2})-(\d{2})\b/.exec(t);
+  if (full) return keep(new Date(`${full[1]}-${full[2]}-${full[3]}T00:00:00Z`));
+
+  const monthIdx = (w: string) => MONTHS.findIndex((m) => (m as readonly string[]).includes(w.replace(/\.$/, '')));
+  const mk = (day: number, month: number, year: number | null) => {
+    if (month < 0 || day < 1 || day > 31) return null;
+    let y = year ?? today.getUTCFullYear();
+    let d = new Date(Date.UTC(y, month, day));
+    if (d.getUTCMonth() !== month) return null;
+    if (!year && d.getTime() < today.getTime()) { y += 1; d = new Date(Date.UTC(y, month, day)); }
+    return d;
+  };
+  const dm = /\b(\d{1,2})(?:st|nd|rd|th)?\s+(?:of\s+)?([a-z]{3,9})\.?(?:,?\s*(\d{4}))?\b/.exec(t);
+  if (dm && monthIdx(dm[2]) >= 0) return keep(mk(Number(dm[1]), monthIdx(dm[2]), dm[3] ? Number(dm[3]) : null));
+  const md = /\b([a-z]{3,9})\.?\s+(\d{1,2})(?:st|nd|rd|th)?(?:,?\s*(\d{4}))?\b/.exec(t);
+  if (md && monthIdx(md[1]) >= 0) return keep(mk(Number(md[2]), monthIdx(md[1]), md[3] ? Number(md[3]) : null));
+
+  if (/\bday after tomorrow\b/.test(t)) return iso(new Date(today.getTime() + 2 * DAY_MS));
+  if (/\btomorrow\b/.test(t)) return iso(new Date(today.getTime() + DAY_MS));
+  if (/\b(today|tonight|end of (the )?day|close of business|cob|eod)\b/.test(t)) return iso(today);
+  if (/\bend of (the )?month\b/.test(t)) return iso(new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth() + 1, 0)));
+
+  const wd = WEEKDAYS.findIndex((w) => new RegExp(`\\b${w}\\b|\\b${w.slice(0, 3)}\\b`).test(t));
+  if (wd >= 0) {
+    // "Friday" is the next one (today counts); "next Friday" is the one after that when this week's is still ahead.
+    let ahead = (wd - today.getUTCDay() + 7) % 7;
+    if (/\bnext\b/.test(t)) ahead += 7;
+    return iso(new Date(today.getTime() + ahead * DAY_MS));
+  }
+  if (/\bend of (the )?week\b/.test(t)) {
+    const ahead = (5 - today.getUTCDay() + 7) % 7;
+    return iso(new Date(today.getTime() + ahead * DAY_MS));
+  }
+  return null;
+}
+
+/** Every day-and-month written in a text, as "MM-DD" (the year is often left out, so it is not compared). */
+function monthDays(text: string): Set<string> {
+  const t = normalise(text);
+  const out = new Set<string>();
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const idx = (w: string) => MONTHS.findIndex((m) => (m as readonly string[]).includes(w.replace(/\.$/, '')));
+  for (const m of t.matchAll(/\b\d{4}-(\d{2})-(\d{2})\b/g)) out.add(`${m[1]}-${m[2]}`);
+  for (const m of t.matchAll(/\b(\d{1,2})(?:st|nd|rd|th)?\s+(?:of\s+)?([a-z]{3,9})\b/g)) { const i = idx(m[2]); if (i >= 0) out.add(`${pad(i + 1)}-${pad(Number(m[1]))}`); }
+  for (const m of t.matchAll(/\b([a-z]{3,9})\.?\s+(\d{1,2})(?:st|nd|rd|th)?\b/g)) { const i = idx(m[1]); if (i >= 0) out.add(`${pad(i + 1)}-${pad(Number(m[2]))}`); }
+  return out;
+}
+
+/**
+ * Lines of a model's answer that state a date the source does not contain are removed. A summary may restate and
+ * reorder dates; it may not make one up. Returns the text and how many lines were left out.
+ */
+export function dropUnsupportedDateLines(answer: string, source: string): { text: string; dropped: number } {
+  const known = monthDays(source);
+  let dropped = 0;
+  const kept = answer.split('\n').filter((line) => {
+    const bad = [...monthDays(line)].some((md) => !known.has(md));
+    if (bad) dropped += 1;
+    return !bad;
+  });
+  return { text: kept.join('\n').replace(/\n{3,}/g, '\n\n').trim(), dropped };
+}

@@ -2,6 +2,7 @@
 
 import { guard } from '@/lib/action-result';
 import { requireAdminActor } from '@/lib/access/super-admin';
+import { mentionsDate } from '@/lib/mjengo/evidence';
 import { askAi } from '@/lib/mjengo/ai';
 import { fetchHtml, pageText } from '@/lib/mjengo/safe-fetch';
 
@@ -52,7 +53,8 @@ async function extract_(raw: string): Promise<FundDetails> {
   const amt = Math.round(Number(j.amount));
   if (Number.isFinite(amt) && amt > 0 && body.replace(/[,\s.]/g, '').includes(String(amt))) out.amount = amt;
   if (typeof j.currency === 'string' && ['USD', 'KES', 'EUR', 'GBP'].includes(j.currency)) out.currency = j.currency as FundDetails['currency'];
-  if (typeof j.deadline === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(j.deadline)) out.deadline = j.deadline;
+  // A deadline is only kept when the page itself writes that date.
+  if (typeof j.deadline === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(j.deadline) && mentionsDate(j.deadline, body)) out.deadline = j.deadline;
   const sectors = list(j.sectors, 6); if (sectors.length) out.sectors = sectors;
   const themes = list(j.themes, 8); if (themes.length) out.themes = themes;
   const sdgs = (Array.isArray(j.sdgs) ? j.sdgs : []).map((n) => Math.round(Number(n))).filter((n) => n >= 1 && n <= 17);

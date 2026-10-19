@@ -150,7 +150,7 @@ export function DigestCard() {
 						{c.opportunities.map((o) => (
 							<Row key={o.id}>
 								{o.fromPhone ? <Smartphone className="mt-0.5 h-4 w-4 shrink-0 text-sauti-teal" /> : <Lightbulb className="mt-0.5 h-4 w-4 shrink-0 text-sauti-teal" />}
-								<Link href={`/dashboard/mjengo/opportunities?open=${o.id}`} className="min-w-0 flex-1 hover:underline"><span className="block truncate text-sm font-medium text-serene-neutral-900">{o.title}</span><span className="block truncate text-xs text-serene-neutral-600">{o.fromPhone ? "Shared from the phone" : "Added"} {format(parseISO(o.at), "d MMM")}{o.deadline ? `, deadline ${o.deadline}` : ""}</span></Link>
+								<Link href={`/dashboard/mjengo/opportunities/${o.id}`} className="min-w-0 flex-1 hover:underline"><span className="block truncate text-sm font-medium text-serene-neutral-900">{o.title}</span><span className="block truncate text-xs text-serene-neutral-600">{o.fromPhone ? "Shared from the phone" : "Added"} {format(parseISO(o.at), "d MMM")}{o.deadline ? `, deadline ${o.deadline}` : ""}</span></Link>
 							</Row>
 						))}
 					</Block>
