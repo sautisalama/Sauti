@@ -80,9 +80,10 @@ async function getMailToAnswer_(): Promise<MailToAnswer[]> {
   const weekAgo = Date.now() - 7 * DAY;
   const out: MailToAnswer[] = [];
   await Promise.all(accounts.data.slice(0, 3).map(async (acc) => {
-    const r = await Promise.race([listMessages(acc.id, 'INBOX', { unread: true }, 0, 25), new Promise<null>((res) => setTimeout(() => res(null), 12_000))]).catch(() => null);
+    const r = await Promise.race([listMessages(acc.id, 'INBOX', {}, 0, 120), new Promise<null>((res) => setTimeout(() => res(null), 12_000))]).catch(() => null);
     if (!r || !r.ok) return;
     for (const m of r.data.items) {
+      if (m.seen) continue;
       if (m.date && new Date(m.date).getTime() < weekAgo) continue;
       // The same sorting as the inbox: only mail that needs a person counts, not lists, receipts, updates or payments.
       if (AUTOMATED.test(m.from.address) || sortMessage(m).kind !== 'person') continue;

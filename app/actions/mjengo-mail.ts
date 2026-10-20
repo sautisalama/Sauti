@@ -347,7 +347,37 @@ async function listMessages_(accountId: string, mailbox: string, query: ListQuer
   return res;
 }
 
+/**
+ * The plain inbox of a mailbox is asked for by the Overview, the mail list, the sorted views and the warm-up, often within
+ * seconds of each other. One fetch is shared between them for a minute (a larger one also serves a smaller ask), and any
+ * change made through Sauti clears it.
+ */
+const INBOX_TTL = 60_000;
+const inboxCache = new Map<string, { at: number; limit: number; res: Promise<{ items: MessageRow[]; total: number }> }>();
+function forgetInbox(accountId: string) { for (const k of inboxCache.keys()) if (k.endsWith(":" + accountId)) inboxCache.delete(k); }
+
 async function listCore_(accountId: string, mailbox: string, query: ListQuery = {}, offset = 0, limit = 40): Promise<{ items: MessageRow[]; total: number }> {
+  const plain = mailbox === 'INBOX' && offset === 0 && !query.unread && !query.starred && !query.from?.trim() && !query.text?.trim();
+  if (!plain) return listCoreRaw_(accountId, mailbox, query, offset, limit);
+  const actor = await requireModule('mail');
+  const key = actor.id + ':' + accountId;
+  const hit = inboxCache.get(key);
+  if (hit && Date.now() - hit.at < INBOX_TTL && hit.limit >= limit) {
+    const r = await hit.res;
+    return { items: r.items.slice(0, limit).map((i) => ({ ...i })), total: r.total };
+  }
+  const res = listCoreRaw_(accountId, mailbox, query, 0, limit);
+  inboxCache.set(key, { at: Date.now(), limit, res });
+  try {
+    const r = await res;
+    return { items: r.items.map((i) => ({ ...i })), total: r.total };
+  } catch (e) {
+    if (inboxCache.get(key)?.res === res) inboxCache.delete(key);
+    throw e;
+  }
+}
+
+async function listCoreRaw_(accountId: string, mailbox: string, query: ListQuery = {}, offset = 0, limit = 40): Promise<{ items: MessageRow[]; total: number }> {
   const actor = await requireModule('mail');
   const acct = await loadAccount(accountId, actor.id);
   if (acct.protocol === 'pop3') return listPop3(acct, query, offset, limit);
@@ -415,6 +445,7 @@ async function listCore_(accountId: string, mailbox: string, query: ListQuery = 
 
 async function getMessageDetail_(accountId: string, mailbox: string, uid: number, allowImages = true): Promise<ParsedMessage & { seen: boolean; flagged: boolean }> {
   const actor = await requireModule('mail');
+  forgetInbox(accountId); // opening marks it read
   const acct = await loadAccount(accountId, actor.id);
   if (acct.protocol === 'pop3') {
     const parsed = await parseSource(uid, await fetchSource(acct, mailbox, uid), allowImages);
@@ -517,6 +548,7 @@ async function getThread_(accountId: string, mailbox: string, subject: string, l
 export type MailAction = 'archive' | 'trash' | 'spam' | 'read' | 'unread' | 'star' | 'unstar' | 'delete';
 
 async function actOnMessages_(accountId: string, mailbox: string, uids: number[], action: MailAction) {
+  forgetInbox(accountId);
   const actor = await requireModule('mail', 'write');
   const acct = await loadAccount(accountId, actor.id);
   if (!uids.length) return;
