@@ -49,3 +49,8 @@ export const mailTriage = (...a: Parameters<typeof raw.mailTriage>) => unwrap(ra
 export const listSorted = (...a: Parameters<typeof raw.listSorted>) => unwrap(raw.listSorted(...a));
 export const dismissPending = (...a: Parameters<typeof raw.dismissPending>) => unwrap(raw.dismissPending(...a));
 export type { MailBucket, PendingItem, SortedList } from '@/app/actions/mjengo-mail';
+
+export const getNotify = (...a: Parameters<typeof raw.getNotify>) => unwrap(raw.getNotify(...a));
+export const setNotify = (...a: Parameters<typeof raw.setNotify>) => unwrap(raw.setNotify(...a));
+export const checkNewMail = (...a: Parameters<typeof raw.checkNewMail>) => unwrap(raw.checkNewMail(...a));
+export type { NotifyState } from "@/app/actions/mjengo-mail";

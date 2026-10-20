@@ -1258,17 +1258,26 @@ async function listSorted_(accountId: string | 'all', bucket: MailBucket, query:
   const failed: string[] = [];
   const all: MessageRow[] = [];
   await Promise.all(accounts.map(async (a) => {
-    try {
-      // One slow or broken mailbox must not hold up the others.
-      const res = await Promise.race([
-        listMessages_(a.id, 'INBOX', { unread: query.unread, starred: query.starred, hasAttachment: query.hasAttachment }, 0, window),
-        new Promise<never>((_, rej) => setTimeout(() => rej(new Error('slow')), 10_000)),
-      ]);
-      for (const r of res.items) {
-        const s = sortMessage(r);
-        all.push({ ...r, account: a.id, accountEmail: a.email, accountScope: scopeOf(a.email), kind: s.kind, sure: s.sure });
+    // One slow or broken mailbox must not hold up the others; a dropped connection is tried once more.
+    let why = '';
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const res = await Promise.race([
+          listMessages_(a.id, 'INBOX', { unread: query.unread, starred: query.starred, hasAttachment: query.hasAttachment }, 0, window),
+          new Promise<never>((_, rej) => setTimeout(() => rej(new Error('The mail server took too long to answer.')), 20_000)),
+        ]);
+        for (const r of res.items) {
+          const s = sortMessage(r);
+          all.push({ ...r, account: a.id, accountEmail: a.email, accountScope: scopeOf(a.email), kind: s.kind, sure: s.sure });
+        }
+        why = '';
+        break;
+      } catch (e) {
+        why = e instanceof Error ? e.message : 'unknown error';
+        if (/renewed|rejected the sign-in|Reconnect/i.test(why)) break; // retrying will not help
       }
-    } catch { failed.push(a.email); }
+    }
+    if (why) { console.error('[mail] could not list', a.email, why); failed.push(`${a.email} (${why.replace(/\.$/, '').slice(0, 140)})`); }
   }));
   all.sort((x, y) => (y.date ? Date.parse(y.date) : 0) - (x.date ? Date.parse(x.date) : 0));
   const page = all.filter((r) => (bucket === 'inbox' ? r.kind === 'person' || r.kind === 'payment' && (r.flagged || r.labels.length) : r.kind === bucket));
@@ -1299,3 +1308,38 @@ async function dismissPending_(key: string): Promise<void> {
 
 export const listSorted = guard(listSorted_);
 export const dismissPending = guard(dismissPending_);
+
+/* ------------------------------------------------------------- New-mail alerts */
+
+export interface NotifyState { all: boolean; accounts: { id: string; notify: boolean }[] }
+
+async function getNotify_(): Promise<NotifyState> {
+  const actor = await requireModule('mail');
+  const db = looseAdmin();
+  const [{ data: pref }, { data: accts }] = await Promise.all([
+    db.from('mail_preferences').select('notify_all').eq('owner_id', actor.id).maybeSingle(),
+    db.from('mail_accounts').select('id, notify').eq('owner_id', actor.id).order('created_at'),
+  ]);
+  return { all: pref?.notify_all !== false, accounts: ((accts ?? []) as { id: string; notify: boolean }[]).map((a) => ({ id: a.id, notify: a.notify !== false })) };
+}
+
+/** Turn alerts on or off for every mailbox (accountId omitted) or for one. */
+async function setNotify_(accountId: string | null, on: boolean): Promise<NotifyState> {
+  const actor = await requireModule('mail', 'write');
+  const db = looseAdmin();
+  if (accountId) await db.from('mail_accounts').update({ notify: on, ...(on ? { notify_uid: null } : {}) }).eq('id', accountId).eq('owner_id', actor.id);
+  else await db.from('mail_preferences').upsert({ owner_id: actor.id, notify_all: on }, { onConflict: 'owner_id' });
+  return getNotify_();
+}
+
+/** Called by the open mail page every minute: mail that has arrived since the last look, to show as a toast. */
+async function checkNewMail_(): Promise<import('@/lib/mail/watch').NewMail[]> {
+  const actor = await requireModule('mail');
+  await looseAdmin().from('mail_preferences').upsert({ owner_id: actor.id, app_seen_at: new Date().toISOString() }, { onConflict: 'owner_id' });
+  const { newMailFor } = await import('@/lib/mail/watch');
+  return newMailFor(actor.id);
+}
+
+export const getNotify = guard(getNotify_);
+export const setNotify = guard(setNotify_);
+export const checkNewMail = guard(checkNewMail_);

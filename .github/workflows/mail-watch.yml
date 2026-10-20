@@ -1,0 +1,13 @@
+name: mail-watch
+# Vercel's free plan only runs daily jobs, so this asks the app to look for new mail every 5 minutes.
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+jobs:
+  look:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check for new mail
+        run: curl -fsS --max-time 70 -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" https://sautisalama.com/api/cron/mail-watch

@@ -15,7 +15,7 @@ import { cn } from "@/lib/utils";
 import { confirmAutoLabel, previewAutoLabel, type AutoLabelMatch, type LabelRow } from "./api";
 import { clearMailCache } from "@/lib/mail/offline-cache";
 import { SignatureSettings } from "./SignatureEditor";
-import { addAccount, detectMailbox, oauthAvailability, deleteSnippet, removeAccount, saveSnippet, getAccountServers, updateAccountServers, saveMailPrefs, type AccountView, type AccountServers, type MailPrefs, type SnippetRow, type ViewConfig, type ViewRow } from "./api";
+import { addAccount, detectMailbox, oauthAvailability, deleteSnippet, removeAccount, saveSnippet, getAccountServers, updateAccountServers, saveMailPrefs, getNotify, setNotify, type NotifyState, type AccountView, type AccountServers, type MailPrefs, type SnippetRow, type ViewConfig, type ViewRow } from "./api";
 
 type Found = Awaited<ReturnType<typeof detectMailbox>>;
 
@@ -257,7 +257,7 @@ export function ViewDialog({ view, labels = [], onClose, onSave, onDelete }: { v
 	);
 }
 
-type SettingsTab = "general" | "signature" | "labels" | "accounts" | "filters" | "templates";
+type SettingsTab = "general" | "signature" | "labels" | "accounts" | "notifications" | "filters" | "templates";
 
 /** Mail settings, laid out like Gmail's: General, Signature, Labels, Accounts and import, Filters and blocked, Templates. */
 export function SettingsDialog({ open, onClose, accounts, onAccountsChanged, onConnect, snippets, onSnippetsChanged, layout, onLayout, signature = "", onSignatureSaved, prefs, onPrefs, labels = [], onEditLabel }: {
@@ -272,8 +272,17 @@ export function SettingsDialog({ open, onClose, accounts, onAccountsChanged, onC
 	const [busy, setBusy] = useState(false);
 	const [block, setBlock] = useState("");
 	const [editing, setEditing] = useState<string | null>(null);
+	const [notify, setNotifyState] = useState<NotifyState | null>(null);
+	const [perm, setPerm] = useState<string>(typeof Notification === "undefined" ? "unsupported" : Notification.permission);
+	useEffect(() => { if (open && tab === "notifications") getNotify().then(setNotifyState).catch(() => undefined); }, [open, tab]);
+	const flip = async (id: string | null, on: boolean) => {
+		try {
+			if (on && typeof Notification !== "undefined" && Notification.permission !== "granted") { const { enablePush } = await import("@/components/dashboard/PushAndBadge"); await enablePush(); setPerm(Notification.permission); }
+			setNotifyState(await setNotify(id, on));
+		} catch (e) { toast({ title: "Could not save the setting", description: e instanceof Error ? e.message : undefined, variant: "destructive" }); }
+	};
 
-	const TABS: [SettingsTab, string][] = [["general", "General"], ["signature", "Signature"], ["labels", "Labels"], ["accounts", "Accounts and import"], ["filters", "Filters and blocked"], ["templates", "Templates"]];
+	const TABS: [SettingsTab, string][] = [["general", "General"], ["signature", "Signature"], ["labels", "Labels"], ["accounts", "Accounts and import"], ["notifications", "Notifications"], ["filters", "Filters and blocked"], ["templates", "Templates"]];
 	const row = "flex items-start justify-between gap-4 border-b border-black/[0.06] py-4";
 	const change = async (patch: Partial<MailPrefs>) => {
 		const next = { ...prefs, ...patch };
@@ -312,6 +321,27 @@ export function SettingsDialog({ open, onClose, accounts, onAccountsChanged, onC
 							<div className={row}><div><p className="text-sm font-medium">Density</p><p className="text-xs text-[#787774]">How tightly the message list is spaced.</p></div>
 								<select value={prefs.density} onChange={(e) => change({ density: e.target.value as MailPrefs["density"] })} className={sel}><option value="comfortable">Comfortable</option><option value="compact">Compact</option></select>
 							</div>
+						</div>
+					)}
+
+					{tab === "notifications" && (
+						<div>
+							<h3 className="text-lg font-semibold">Notifications</h3>
+							<p className="mt-1 text-xs text-[#787774]">When new mail that needs you arrives, a message appears here and on this computer, even with Sauti closed. Newsletters, receipts and automated notices stay quiet.</p>
+							{perm === "denied" && <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-900">Notifications are blocked for this site in your browser. Allow them in the address bar&apos;s site settings, then switch a mailbox on again.</p>}
+							{perm === "default" && <p className="mt-3 rounded-lg bg-black/[0.04] px-3 py-2 text-xs text-[#555]">Your browser will ask to allow notifications the first time you switch one on.</p>}
+							{!notify ? <p className="py-6 text-sm text-[#787774]">Loading</p> : (
+								<>
+									<div className={row}><div><p className="text-sm font-medium">All inboxes</p><p className="text-xs text-[#787774]">Master switch. Off means no alerts from any mailbox.</p></div>
+										<Switch checked={notify.all} onCheckedChange={(v) => flip(null, v)} />
+									</div>
+									{accounts.map((a) => (
+										<div key={a.id} className={row}><div><p className="text-sm font-medium">{a.label || a.email}</p><p className="text-xs text-[#787774]">{a.email}</p></div>
+											<Switch checked={notify.all && (notify.accounts.find((x) => x.id === a.id)?.notify ?? true)} disabled={!notify.all} onCheckedChange={(v) => flip(a.id, v)} />
+										</div>
+									))}
+								</>
+							)}
 						</div>
 					)}
 

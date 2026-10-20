@@ -31,7 +31,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { AccountSwitcher } from "./AccountSwitcher";
 import { detailKey, listKey, mailStore, mergeFresh, prefetchDetails, setMailUnread } from "./mail-store";
 import { AvatarStack, useTeam } from "../../_components/People";
-import { listSorted, dismissPending, type MailBucket, type PendingItem } from "./api";
+import { checkNewMail, listSorted, dismissPending, type MailBucket, type PendingItem } from "./api";
 import { Avatar, ScopeTag } from "./AccountSwitcher";
 import { cacheDetail, cacheList, readDetail, readList } from "@/lib/mail/offline-cache";
 
@@ -298,6 +298,30 @@ export function MailApp() {
 			if (token === listToken.current) setLoading(false);
 		}
 	}, [accountId, mailboxPath, active, debouncedQ, rows, onlyUnread, bucket, viewKey]);
+
+	// New mail: look every minute while the page is open, show a toast (and a desktop notice if the tab is hidden).
+	const loadListRef = useRef(loadList);
+	loadListRef.current = loadList;
+	useEffect(() => {
+		let stop = false;
+		const look = async () => {
+			try {
+				const fresh = await checkNewMail();
+				if (stop || !fresh.length) return;
+				const many = fresh.length > 3;
+				const shown = many ? [{ from: fresh.length + " new emails", subject: [...new Set(fresh.map((f) => f.from))].slice(0, 3).join(", "), accountEmail: "" }] : fresh;
+				for (const f of shown) {
+					toast({ title: f.from, description: f.subject + (f.accountEmail && (accounts?.length ?? 0) > 1 ? " · " + f.accountEmail : "") });
+					if (document.hidden && typeof Notification !== "undefined" && Notification.permission === "granted") new Notification(f.from, { body: f.subject, icon: "/icons/icons-192.png", tag: "mail-new" });
+				}
+				loadListRef.current(false, true);
+			} catch { /* the next minute tries again */ }
+		};
+		const id = setInterval(look, 60_000);
+		const first = setTimeout(look, 5_000);
+		return () => { stop = true; clearInterval(id); clearTimeout(first); };
+	// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [accounts?.length]);
 
 	// Reload when the account, view or search changes.
 	useEffect(() => {
@@ -715,7 +739,7 @@ const Pane = (
 								{accounts.map((a) => <span key={a.id} className="flex items-center gap-1.5"><Avatar email={a.email} className="h-4 w-4 rounded-full text-[9px]" />{a.email}<ScopeTag email={a.email} /></span>)}
 							</div>
 						)}
-						{failedBoxes.length > 0 && <div role="status" className="mx-4 mt-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-900 lg:mx-6">Could not reach {failedBoxes.join(", ")} just now; showing the others.</div>}
+						{failedBoxes.length > 0 && <div role="status" className="mx-4 mt-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-900 lg:mx-6">Could not read {failedBoxes.join("; ")}. Showing the others.</div>}
 						{bucket === "inbox" && pending.length > 0 && (
 							<section className="mx-4 mt-4 rounded-xl border border-amber-200 bg-amber-50/70 p-3 lg:mx-6" aria-label="Pending">
 								<h3 className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-amber-900"><CreditCard className="h-4 w-4" /> Pending payments</h3>
