@@ -231,7 +231,7 @@ if (run("mail")) {
 		await a.waitForTimeout(3000);
 		check("mail: each mailbox is tagged Work or Personal", (await a.getByText("Work", { exact: true }).count()) >= 1 && (await a.getByText("Personal", { exact: true }).count()) >= 1);
 		check("mail: Subscriptions, Receipts and Updates sit under their own labels", (await a.getByText("Subscriptions").count()) >= 1 && (await a.getByText("Receipts").count()) >= 1 && (await a.getByText("Updates").count()) >= 1);
-		await a.getByText(/Could not reach/).first().waitFor({ timeout: 30000 }).then(() => check("mail: an unreachable mailbox is named, not silently dropped", true)).catch(() => check("mail: an unreachable mailbox is named, not silently dropped", false));
+		await a.getByText(/Could not read/).first().waitFor({ timeout: 30000 }).then(() => check("mail: an unreachable mailbox is named, not silently dropped", true)).catch(() => check("mail: an unreachable mailbox is named, not silently dropped", false));
 		await shot(a, "mail-all");
 		await a.close();
 	} catch (e) { check("mail: run", false, String(e).slice(0, 300)); }

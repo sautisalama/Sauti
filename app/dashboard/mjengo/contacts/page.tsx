@@ -1,5 +1,6 @@
 "use client";
 
+import { R, fromCache, fresh, held } from "@/lib/client/resources";
 import { SHARE_EMAIL_UI } from "@/lib/client/flags";
 import { MjengoLoader } from "../_components/MjengoLoader";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -86,7 +87,7 @@ export default function ContactsPage() {
 	const [sharing, setSharing] = useState<ContactRow | null>(null);
 
 	const load = useCallback(async (term: string) => {
-		try { setRows(await api.list(term)); } catch (e) { setRows([]); toast({ title: "Could not load contacts", description: e instanceof Error ? e.message : undefined, variant: "destructive" }); }
+		try { const r = R.contacts(term); const h = held(r); if (h) setRows(h); setRows(await fresh(r)); } catch (e) { setRows([]); toast({ title: "Could not load contacts", description: e instanceof Error ? e.message : undefined, variant: "destructive" }); }
 	}, [toast]);
 
 	useEffect(() => {

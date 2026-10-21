@@ -9,6 +9,7 @@ import { DashboardDataProvider } from "@/components/providers/DashboardDataProvi
 import { fetchDashboardData } from "./_data/aggregate";
 import { DeviceRegistration } from "./_components/DeviceRegistration";
 import { PushAndBadge } from "@/components/dashboard/PushAndBadge";
+import { AppWarmup, SwrOwner } from "@/components/dashboard/AppWarmup";
 import { SuiteTracker } from "@/components/dashboard/SuiteTracker";
 
 
@@ -45,6 +46,8 @@ export default async function DashboardLayout({
 			{/* A page opened inside a call (?embed=1 in a frame) drops the suite's own chrome. */}
 			<script dangerouslySetInnerHTML={{ __html: "try{if(self!==top&&/[?&]embed=1/.test(location.search))document.documentElement.classList.add('ss-embed')}catch(e){}" }} />
 			<DashboardDataProvider initialData={initialData || fallbackData}>
+				<SwrOwner id={user.id} />
+				<AppWarmup />
 				{/* Device session tracking */}
 				<DeviceRegistration />
 				<PushAndBadge />

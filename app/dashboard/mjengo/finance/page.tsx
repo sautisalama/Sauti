@@ -1,5 +1,6 @@
 "use client";
 
+import { R, fromCache, fresh, held } from "@/lib/client/resources";
 import jsQR from "jsqr";
 import { readReceiptQr, type ScannedReceipt } from "@/lib/finance/receipt-qr";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -42,12 +43,17 @@ export default function FinancePage() {
 	const fail = useCallback((title: string, e: unknown) => toast({ title, description: e instanceof Error ? e.message : undefined, variant: "destructive" }), [toast]);
 	const load = useCallback(async () => {
 		const [i, r, f, t, b] = await Promise.all([
-			unwrap(financeInvoices()), unwrap(financeReceipts()), unwrap(financeFiles()),
-			unwrap(listTemplates("invoice")).catch(() => [] as TemplateRow[]), unwrap(listTemplates("budget")).catch(() => [] as TemplateRow[]),
+			fresh(R.invoices), fresh(R.receipts), fresh(R.financeFiles),
+			fresh(R.templates("invoice")).catch(() => [] as TemplateRow[]), fresh(R.templates("budget")).catch(() => [] as TemplateRow[]),
 		]);
 		setInvoices(i); setReceipts(r); setFiles(f); setTemplates(t); setBudgetTemplates(b);
 	}, []);
-	useEffect(() => { load().catch((e) => fail("Could not load Finance", e)); }, [load, fail]);
+	useEffect(() => {
+		// What was loaded before paints first; the fresh copy replaces it.
+		const i = held(R.invoices), r = held(R.receipts), f = held(R.financeFiles);
+		if (i && r && f) { setInvoices(i); setReceipts(r); setFiles(f); setTemplates(held(R.templates("invoice")) ?? []); setBudgetTemplates(held(R.templates("budget")) ?? []); }
+		load().catch((e) => fail("Could not load Finance", e));
+	}, [load, fail]);
 
 	const totals = useMemo(() => {
 		const inv = invoices ?? [];

@@ -1,5 +1,6 @@
 "use client";
 
+import { R, fromCache, fresh, held } from "@/lib/client/resources";
 import { MjengoLoader } from "@/app/dashboard/mjengo/_components/MjengoLoader";
 import Link from "next/link";
 import { useEffect, useState } from "react";
@@ -20,9 +21,12 @@ export default function MjengoOverview() {
 	const [st, setSt] = useState<SuiteStatus | null>(null);
 
 	useEffect(() => {
-		getOverview().then(setO).catch(() => undefined);
-		suiteStatus().then(setSt).catch(() => undefined);
-		listEntities("grant").then((g) => setGrants(g as unknown as GrantLite[])).catch(() => undefined);
+		const stops = [
+			fromCache(R.overview, setO),
+			fromCache(R.suite, setSt),
+			fromCache(R.entities("grant"), (g) => setGrants(g as unknown as GrantLite[])),
+		];
+		return () => stops.forEach((s) => s());
 	}, []);
 
 	if (!o) return <MjengoLoader label="Loading your overview" />;

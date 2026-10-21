@@ -1,5 +1,6 @@
 "use client";
 
+import { R, fromCache, fresh, held } from "@/lib/client/resources";
 import { tagBrandGuidelines } from "@/app/actions/mjengo-brand";
 import { MjengoLoader } from "../_components/MjengoLoader";
 import { ShareDialog } from "../_components/ShareDialog";
@@ -83,7 +84,7 @@ export default function VaultPage() {
 
 	const load = useCallback(async () => {
 		try {
-			setData(await listVault(folderId ? "folder" : tab, folderId));
+			setData(await fresh(R.vault(folderId ? "folder" : tab, folderId)));
 		} catch (e) {
 			setData({ path: [], here: null, items: [] });
 			toast({ title: "Could not load the vault", description: e instanceof Error ? e.message : undefined, variant: "destructive" });
@@ -91,9 +92,9 @@ export default function VaultPage() {
 	}, [tab, folderId, toast]);
 
 	useEffect(() => {
-		setData(null);
+		setData(held(R.vault(folderId ? "folder" : tab, folderId)) ?? null);
 		load();
-	}, [load]);
+	}, [load, tab, folderId]);
 
 	// Files shared from a phone: tell the person, then stop counting them.
 	useEffect(() => {
@@ -105,7 +106,7 @@ export default function VaultPage() {
 	}, []);
 
 	const loadHub = useCallback(async () => {
-		try { setHub(await unwrap(filesHub())); } catch { /* the page works without it */ }
+		try { const h = held(R.hub); if (h) setHub(h); setHub(await fresh(R.hub)); } catch { /* the page works without it */ }
 	}, []);
 	useEffect(() => { loadHub(); }, [loadHub]);
 

@@ -1,5 +1,6 @@
 "use client";
 
+import { R, fromCache, fresh, held } from "@/lib/client/resources";
 import { RecipientField } from "../mail/_components/RecipientField";
 import { ReminderList } from "@/components/mjengo/ReminderList";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -87,15 +88,18 @@ export default function CalendarPage() {
 	const gridEnd = useMemo(() => endOfWeek(endOfMonth(month), { weekStartsOn: 1 }), [month]);
 	const days = useMemo(() => eachDayOfInterval({ start: gridStart, end: gridEnd }), [gridStart, gridEnd]);
 
-	const load = useCallback(async () => {
+	const load = useCallback(async (paint = false) => {
 		try {
-			setData(await unwrap(calendarMonth(gridStart.toISOString(), addDays(gridEnd, 1).toISOString())));
+			const r = R.calendar(month);
+			const h = paint === true ? held(r) : undefined;
+			if (h) setData(h);
+			setData(await fresh(r));
 		} catch (e) {
 			setData({ items: [], googleConnected: false, googleConfigured: false, googleError: null });
 			toast({ title: "Could not load the calendar", description: e instanceof Error ? e.message : undefined, variant: "destructive" });
 		}
-	}, [gridStart, gridEnd, toast]);
-	useEffect(() => { setData((d) => d && { ...d }); load(); }, [load]);
+	}, [month, toast]);
+	useEffect(() => { setData((d) => d && { ...d }); load(true); }, [load]);
 
 	// Ask the AI which icon fits each activity, once per title.
 	useEffect(() => {

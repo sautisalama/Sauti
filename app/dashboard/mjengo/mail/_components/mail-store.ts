@@ -1,9 +1,20 @@
 import { useSyncExternalStore } from "react";
-import { getMailboxes, getMessageDetail, getMessageDetails, listMessages, mailBootstrap, type MessageRow } from "./api";
+import { peek, put } from "@/lib/client/swr";
+import { cacheList, readList } from "@/lib/mail/offline-cache";
+import { getMailboxes, getMessageDetail, getMessageDetails, mailBootstrap, type MessageRow, type PendingItem } from "./api";
 
 type Boot = Awaited<ReturnType<typeof mailBootstrap>>;
 type Boxes = Awaited<ReturnType<typeof getMailboxes>>;
-interface Page { items: MessageRow[]; total: number; at: number }
+/** What the sorted inbox shows beside the list: counts under the labels, pending payments, mailboxes that failed. */
+export interface Extra { counts: Record<"subscription" | "receipt" | "update", number>; pending: PendingItem[]; failed: string[] }
+interface Page { items: MessageRow[]; total: number; at: number; extra?: Extra }
+export const ALL = "all";
+
+/** The accounts, labels, views and snippets: one request shared by the warm-up and the screen, and kept on this device. */
+export function bootMail(): Promise<Boot> {
+	return (mailStore.boot ??= mailBootstrap().then((b) => { put("mail:boot", b); return b; }).catch((e) => { mailStore.boot = null; throw e; }));
+}
+export const heldBoot = () => peek<Boot>("mail:boot")?.value;
 export type Detail = Awaited<ReturnType<typeof getMessageDetail>>;
 
 /**
@@ -75,25 +86,37 @@ export function mergeFresh(prev: MessageRow[], fresh: MessageRow[]): MessageRow[
 	return [...fresh, ...older];
 }
 
-/** The same request the list makes for the Inbox view, so a prefetched page is a cache hit. */
-const inboxQuery = { unread: false, text: "" };
+/** A list kept on this device from an earlier visit: shown at once on a cold start, then refreshed. */
+export function coldList(key: string): Page | undefined {
+	const saved = readList<{ items: MessageRow[]; total: number; extra?: Extra }>(key);
+	return saved ? { items: saved.items, total: saved.total, extra: saved.extra, at: 0 } : undefined;
+}
+
+/** Keep a sorted inbox in memory and on this device. */
+export function keepList(accountId: string, viewKey: string, onlyUnread: boolean, page: { items: MessageRow[]; total: number; extra?: Extra }) {
+	mailStore.lists.set(listKey(accountId, viewKey, onlyUnread), { ...page, at: Date.now() });
+	if (!onlyUnread && viewKey === "inbox") cacheList(`${accountId}:${viewKey}`, { items: page.items, total: page.total, extra: page.extra });
+}
 
 let warming: Promise<void> | null = null;
 
-/** Fetch the accounts, the mailbox list and the first page of the Inbox ahead of the first visit. */
+/** Fetch the accounts, every mailbox's folders and the sorted Inbox (the one the screen opens on) ahead of the first visit. */
 export function prefetchMail(): Promise<void> {
 	if (warming) return warming;
 	warming = (async () => {
 		try {
-			const boot = await (mailStore.boot ??= mailBootstrap().catch((e) => { mailStore.boot = null; throw e; }));
-			const account = boot.accounts[0];
-			if (!account) return;
-			const boxes = await getMailboxes(account.id);
-			mailStore.boxes.set(account.id, { ...boxes, at: Date.now() });
-			setMailUnread(boxes.unread);
-			const inbox = boxes.boxes.find((b) => b.special === "inbox")?.path ?? "INBOX";
-			const page = await listMessages(account.id, inbox, inboxQuery, 0, 40);
-			mailStore.lists.set(listKey(account.id, "inbox", false), { items: page.items, total: page.total, at: Date.now() });
+			// One plain request does the lot on the server, side by side (server actions would queue behind each other).
+			const res = await fetch("/api/mail/warm", { credentials: "same-origin" });
+			if (!res.ok) return;
+			const w = (await res.json()) as { ok: boolean; boot: Boot; boxes: Record<string, Boxes | null>; target: string | null; toAnswer?: unknown; list: { items: MessageRow[]; total: number; counts: Extra["counts"]; pending: PendingItem[]; failed: string[] } | null };
+			if (!w.ok) return;
+			mailStore.boot ??= Promise.resolve(w.boot);
+			put("mail:boot", w.boot);
+			let unread = 0;
+			for (const [id, b] of Object.entries(w.boxes)) if (b) { mailStore.boxes.set(id, { ...b, at: Date.now() }); unread += b.unread; }
+			setMailUnread(unread);
+			if (w.toAnswer) put("mail-to-answer", w.toAnswer);
+			if (w.target && w.list) keepList(w.target, "inbox", false, { items: w.list.items, total: w.list.total, extra: { counts: w.list.counts, pending: w.list.pending, failed: w.list.failed } });
 		} catch {
 			// Warming is best effort; the screen loads normally if it failed.
 		} finally {

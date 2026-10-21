@@ -1,5 +1,6 @@
 "use client";
 
+import { R, fromCache, fresh, held } from "@/lib/client/resources";
 import { MjengoLoader } from "../_components/MjengoLoader";
 import { DriveResult, saveToDrive } from "../_components/drive";
 import { AvatarStack, DriveBadge, useTeam } from "../_components/People";
@@ -34,10 +35,11 @@ export default function DocumentsPage() {
 	const [state, setState] = useState<"all" | "needed" | "uploaded">("all");
 
 	useEffect(() => {
-		listDocuments().then(setDocs).catch(() => setDocs([]));
-		searchFiles("")
-			.then((r) => setWritten(r.filter((f) => /\.(docx|doc|odt|rtf|md|txt)$/i.test(f.name)).slice(0, 12)))
-			.catch(() => setWritten([]));
+		const stops = [
+			fromCache(R.documents, setDocs, { onError: () => setDocs([]) }),
+			fromCache(R.written, (r) => setWritten(r.filter((f) => /\.(docx|doc|odt|rtf|md|txt)$/i.test(f.name)).slice(0, 12)), { onError: () => setWritten([]) }),
+		];
+		return () => stops.forEach((s) => s());
 	}, []);
 
 	/** Pick a Word / OpenDocument / text file: it goes into the vault and opens in the editor. */

@@ -1,5 +1,6 @@
 "use client";
 
+import { R, fromCache, fresh, held } from "@/lib/client/resources";
 import { EntityReminders } from "@/components/mjengo/EntityReminders";
 import { MjengoLoader } from "../_components/MjengoLoader";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -45,10 +46,8 @@ export default function TodosPage() {
 	const [tagFilter, setTagFilter] = useState<string[]>([]);
 	const [memberFilter, setMemberFilter] = useState<string | null>(null);
 
-	const load = useCallback(async () => setBoard(await getTodoBoard()), []);
-	useEffect(() => {
-		load().catch(() => toast({ title: "Could not load to-dos", variant: "destructive" }));
-	}, [load, toast]);
+	const load = useCallback(async () => setBoard(await fresh(R.todos)), []);
+	useEffect(() => fromCache(R.todos, setBoard, { onError: () => toast({ title: "Could not load to-dos", variant: "destructive" }) }), [toast]);
 
 	// A reminder links here with ?task=<id>.
 	useEffect(() => {

@@ -1,5 +1,6 @@
 "use client";
 
+import { R, fromCache, fresh, held } from "@/lib/client/resources";
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { format, formatDistanceToNowStrict, parseISO } from "date-fns";
@@ -80,10 +81,13 @@ export function DigestCard() {
 	const [all, setAll] = useState(false);
 
 	const load = useCallback(() => {
-		unwrap(getCaughtUp()).then(setC).catch(() => setC({ since: new Date().toISOString(), urgent: [], opportunities: [], documents: [] }));
-		unwrap(getDigest()).then((d) => setChanges(d.items)).catch(() => setChanges([]));
-		// Mail talks to the mail server, so it fills in when it can.
-		unwrap(getMailToAnswer()).then(setMail).catch(() => setMail([]));
+		const stops = [
+			fromCache(R.caughtUp, setC, { onError: () => setC({ since: new Date().toISOString(), urgent: [], opportunities: [], documents: [] }) }),
+			fromCache(R.digest, (d) => setChanges(d.items), { onError: () => setChanges([]) }),
+			// Mail talks to the mail server, so it fills in when it can.
+			fromCache(R.mailToAnswer, setMail, { onError: () => setMail([]) }),
+		];
+		return () => stops.forEach((s) => s());
 	}, []);
 	useEffect(load, [load]);
 

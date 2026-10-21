@@ -1,5 +1,6 @@
 "use client";
 
+import { R, fromCache, fresh, held } from "@/lib/client/resources";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { format } from "date-fns";
@@ -65,9 +66,9 @@ export default function DesignHome() {
 	});
 
 	useEffect(() => {
-		unwrap(listTemplates("design")).then(setRows).catch(() => setRows([]));
-		unwrap(listAssets()).then(setAssets).catch(() => setAssets([]));
+		const stops = [fromCache(R.templates("design"), setRows, { onError: () => setRows([]) }), fromCache(R.assets, setAssets, { onError: () => setAssets([]) })];
 		try { const v = localStorage.getItem("ss_design_view"); if (v === "grid" || v === "list") setView(v); } catch { /* default */ }
+		return () => stops.forEach((s) => s());
 	}, []);
 
 	// Pinterest suggestions, when the site is connected to Pinterest.

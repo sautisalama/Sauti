@@ -1,5 +1,6 @@
 "use client";
 
+import { R, fromCache, fresh, held } from "@/lib/client/resources";
 import { Suspense, useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { format } from "date-fns";
@@ -23,7 +24,7 @@ function Meetings() {
 	const [tagFilter, setTagFilter] = useState<string[]>([]);
 	const [memberFilter, setMemberFilter] = useState<string | null>(null);
 
-	useEffect(() => { unwrap(listMeetings()).then(setList).catch(() => setList([])); }, []);
+	useEffect(() => fromCache(R.meetings, setList, { onError: () => setList([]) }), []);
 	const open = useCallback(async (c: string) => {
 		setCode(c);
 		setDetail(null);

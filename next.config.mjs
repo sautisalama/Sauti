@@ -43,7 +43,8 @@ const nextConfig = {
 	// Native/Node-only mail libraries are loaded at runtime, not bundled.
 	serverExternalPackages: ["imapflow", "nodemailer", "mailparser"],
 	// Mail attachments travel through server actions.
-	experimental: { serverActions: { bodySizeLimit: "20mb" } },
+	// staleTimes: a page fetched ahead of time (or visited) is reused for a few minutes instead of being asked for again.
+	experimental: { serverActions: { bodySizeLimit: "20mb" }, staleTimes: { dynamic: 180, static: 600 } },
 	async headers() {
 		return [
 			// The worker must always be revalidated so updates reach users promptly.

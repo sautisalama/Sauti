@@ -1,5 +1,6 @@
 "use client";
 
+import { R, fromCache, fresh, held } from "@/lib/client/resources";
 import { OpenRouterBalance } from "./OpenRouterBalance";
 import Link from "next/link";
 import { useEffect, useState } from "react";
@@ -40,7 +41,7 @@ export function MjengoShell({ isSuper, children }: { isSuper: boolean; children:
 	const pathname = usePathname() ?? "";
 	// Grants, projects and fellowships show once there is one (an opportunity that was won).
 	const [has, setHas] = useState({ grants: true, projects: true, fellowships: true });
-	useEffect(() => { mjengoNav().then((n) => setHas(n.has)).catch(() => undefined); }, []);
+	useEffect(() => fromCache(R.nav, (n) => setHas(n.has)), []);
 	// On a phone the strip scrolls freely and the current section rests in the middle.
 	useEffect(() => {
 		const el = document.querySelector<HTMLElement>('nav[aria-label="Mjengo sections"] [aria-current="page"]');

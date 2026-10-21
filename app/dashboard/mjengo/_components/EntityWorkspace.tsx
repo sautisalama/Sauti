@@ -1,5 +1,6 @@
 "use client";
 
+import { R, fromCache, fresh, held } from "@/lib/client/resources";
 import { EntityReminders } from "@/components/mjengo/EntityReminders";
 import { MjengoLoader } from "./MjengoLoader";
 import Link from "next/link";
@@ -185,14 +186,15 @@ export function EntityWorkspace({ kind, pageId }: { kind: Kind; pageId?: string 
 		try { localStorage.setItem("ss_mjengo_view", v); } catch {}
 	};
 
-	const load = useCallback(async () => {
-		const [list, people] = await Promise.all([listEntities(kind), listAdmins()]);
+	const load = useCallback(async (paint = false) => {
+		if (paint === true) { const l = held(R.entities(kind)), a = held(R.admins); if (l && a) { setRows(l as Row[]); setAdmins(a); } }
+		const [list, people] = await Promise.all([fresh(R.entities(kind)), fresh(R.admins)]);
 		setRows(list as Row[]);
 		setAdmins(people);
 		if (kind === "project") setGrants(((await listEntities("grant")) as Row[]).map((g) => ({ id: g.id, title: g.title })));
 	}, [kind]);
 	useEffect(() => {
-		load().catch((e) => toast({ title: "Could not load", description: e instanceof Error ? e.message : undefined, variant: "destructive" }));
+		load(true).catch((e) => toast({ title: "Could not load", description: e instanceof Error ? e.message : undefined, variant: "destructive" }));
 	}, [load, toast]);
 
 	const filtered = useMemo(() => {

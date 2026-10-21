@@ -29,7 +29,7 @@ import { unwrap } from "@/lib/action-result";
 import { listLabels, saveLabel, deleteLabel, setMessageLabel, projectLabel, listGrantsLite, linkToWork, mailTriage, type LabelRow, type ProjectLite, type GrantLite } from "./api";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { AccountSwitcher } from "./AccountSwitcher";
-import { detailKey, listKey, mailStore, mergeFresh, prefetchDetails, setMailUnread } from "./mail-store";
+import { bootMail, heldBoot, coldList, detailKey, keepList, listKey, mailStore, mergeFresh, prefetchDetails, setMailUnread } from "./mail-store";
 import { AvatarStack, useTeam } from "../../_components/People";
 import { checkNewMail, listSorted, dismissPending, type MailBucket, type PendingItem } from "./api";
 import { Avatar, ScopeTag } from "./AccountSwitcher";
@@ -195,8 +195,7 @@ export function MailApp() {
 	}, []);
 
 	useEffect(() => {
-		(mailStore.boot ??= mailBootstrap().catch((e) => { mailStore.boot = null; throw e; }))
-			.then((b) => {
+		const apply = (b: NonNullable<ReturnType<typeof heldBoot>>) => {
 				setAccounts(b.accounts);
 				setAccountId((cur) => (cur && (cur === ALL ? b.accounts.length > 1 : b.accounts.some((x) => x.id === cur)) ? cur : b.accounts.length > 1 ? ALL : b.accounts[0]?.id ?? null));
 				setViews(b.views);
@@ -204,8 +203,11 @@ export function MailApp() {
 				setLabels(b.labels);
 				setProjects((b as { projects?: ProjectLite[] }).projects ?? []);
 				if (b.signature) setSignature(b.signature);
-			})
-			.catch(() => setAccounts([]));
+		};
+		// A copy kept from the last visit paints at once; the fresh one replaces it.
+		const h = heldBoot();
+		if (h) apply(h);
+		bootMail().then(apply).catch(() => { if (!h) setAccounts([]); });
 	}, []);
 
 	useEffect(() => { getMailPrefs().then(setPrefs).catch(() => undefined); }, []);
@@ -271,7 +273,7 @@ export function MailApp() {
 				setPending(s.pending);
 				setFailedBoxes(s.failed);
 				setOffline(false);
-				mailStore.lists.set(listKey(accountId, viewKey, onlyUnread), { items, total: s.total, at: Date.now() });
+				keepList(accountId, viewKey, onlyUnread, { items, total: s.total, extra: { counts: s.counts, pending: s.pending, failed: s.failed } });
 				return;
 			}
 			const res = await listMessages(accountId, mailboxPath, { unread: c.unread || onlyUnread, starred: c.starred, hasAttachment: c.hasAttachment, from: c.from, labelId: c.labelId, text: debouncedQ }, append ? rows.length : 0, 40);
@@ -329,10 +331,11 @@ export function MailApp() {
 		setDetail(null);
 		if (!accountId || !mailboxPath) return;
 		// Paint what we already have straight away; then fetch only if it is old, and fold in what is new.
-		const hit = !debouncedQ ? mailStore.lists.get(listKey(accountId, viewKey, onlyUnread)) : undefined;
+		const hit = !debouncedQ ? mailStore.lists.get(listKey(accountId, viewKey, onlyUnread)) ?? (viewKey === "inbox" && !onlyUnread ? coldList(`${accountId}:${viewKey}`) : undefined) : undefined;
 		if (hit) {
 			setRows(hit.items);
 			setTotal(hit.total);
+			if (hit.extra) { setCounts(hit.extra.counts); setPending(hit.extra.pending); setFailedBoxes(hit.extra.failed); }
 			if (Date.now() - hit.at > 30_000) loadList(false, true);
 		} else loadList(false);
 		// eslint-disable-next-line react-hooks/exhaustive-deps

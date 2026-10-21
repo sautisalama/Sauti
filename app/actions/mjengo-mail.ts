@@ -1306,7 +1306,7 @@ async function listSorted_(accountId: string | 'all', bucket: MailBucket, query:
         break;
       } catch (e) {
         why = e instanceof Error ? e.message : 'unknown error';
-        if (/renewed|rejected the sign-in|Reconnect/i.test(why)) break; // retrying will not help
+        if (/renewed|rejected the sign-in|Reconnect|too long/i.test(why)) break; // retrying will not help
       }
     }
     if (why) { console.error('[mail] could not list', a.email, why); failed.push(`${a.email} (${why.replace(/\.$/, '').slice(0, 140)})`); }

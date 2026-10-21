@@ -1,5 +1,6 @@
 "use client";
 
+import { R, fromCache, fresh, held } from "@/lib/client/resources";
 import { EngagementCard } from "./_Engagement";
 import { IdeasCard, SharePhotos, type UseIdea } from "./_Ideas";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -40,12 +41,16 @@ export default function ContentPage() {
 	const [chan, setChan] = useState<content.ChannelsState | null>(null);
 
 	const load = useCallback(async () => {
-		const [p, a, c] = await Promise.all([unwrap(content.listPosts()), unwrap(ai.listAssets()), unwrap(content.channelsState()).catch(() => null)]);
+		const [p, a, c] = await Promise.all([fresh(R.posts), fresh(R.assets), fresh(R.channels)]);
 		setPosts(p);
 		setAssets(a);
 		setChan(c);
 	}, []);
-	useEffect(() => { load().catch(() => { setPosts([]); toast({ title: "Could not load content", variant: "destructive" }); }); }, [load, toast]);
+	useEffect(() => {
+		const p = held(R.posts), a = held(R.assets);
+		if (p && a) { setPosts(p); setAssets(a); setChan(held(R.channels) ?? null); }
+		load().catch(() => { setPosts((cur) => cur ?? []); toast({ title: "Could not load content", variant: "destructive" }); });
+	}, [load, toast]);
 
 	// Back from connecting an account.
 	useEffect(() => {
