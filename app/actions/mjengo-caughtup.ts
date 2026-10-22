@@ -11,7 +11,7 @@ import { cleanTags } from '@/lib/mjengo/autotag';
 import { listAccounts, listMessages } from '@/app/actions/mjengo-mail';
 import { sortMessage } from '@/lib/mail/sort';
 
-export interface UrgentItem { id: string; kind: 'overdue' | 'due_soon' | 'approval'; title: string; detail: string; href: string }
+export interface UrgentItem { id: string; kind: 'overdue' | 'due_soon' | 'approval'; title: string; detail: string; href: string; /** The record to mark done from the card; absent for approvals. */ done?: { kind: 'todo' | 'grant' | 'opportunity' | 'project' | 'fellowship'; id: string } }
 export interface AddedOpportunity { id: string; title: string; fromPhone: boolean; at: string; status: string; deadline: string | null }
 export interface SharedFile { id: string; name: string; tags: string[]; at: string; size: number | null }
 export interface CaughtUp { since: string; urgent: UrgentItem[]; opportunities: AddedOpportunity[]; documents: SharedFile[] }
@@ -20,6 +20,9 @@ export interface MailToAnswer { accountId: string; account: string; uid: number;
 const DAY = 86400_000;
 const day = (offset: number) => new Date(Date.now() + offset * DAY).toISOString().slice(0, 10);
 const CLOSED = new Set(['won', 'lost', 'passed', 'awarded', 'declined', 'closed', 'completed', 'cancelled', 'withdrawn']);
+
+/** Once submitted or applied there is no deadline left to meet. */
+const SENT = new Set(['submitted', 'applied']);
 
 const me = async () => { const a = await requireAdminActor(); return { id: a.id, email: a.email }; };
 
@@ -44,15 +47,15 @@ async function getCaughtUp_(): Promise<CaughtUp> {
   for (const w of waiting) urgent.push({ id: `ap-${w.approvalId}`, kind: 'approval', title: `${w.from} is waiting for your answer on ${w.name}`, detail: w.note ?? 'Approval asked', href: w.link });
   for (const t of (todos ?? []) as { id: string; title: string; due_date: string; status: string }[]) {
     const late = t.due_date < today;
-    urgent.push({ id: `td-${t.id}`, kind: late ? 'overdue' : 'due_soon', title: t.title, detail: late ? `Task, was due ${t.due_date}` : t.due_date === today ? 'Task, due today' : `Task, due ${t.due_date}`, href: `/dashboard/mjengo/todos?task=${t.id}` });
+    urgent.push({ id: `td-${t.id}`, kind: late ? 'overdue' : 'due_soon', title: t.title, detail: late ? `Task, was due ${t.due_date}` : t.due_date === today ? 'Task, due today' : `Task, due ${t.due_date}`, href: `/dashboard/mjengo/todos?task=${t.id}`, done: { kind: 'todo', id: t.id } });
   }
   for (const e of entities) {
     const r = e.row;
-    if (CLOSED.has(String(r.status))) continue;
+    if (CLOSED.has(String(r.status)) || SENT.has(String(r.status))) continue;
     const date = String((e.kind === 'project' ? r.end_date : r.deadline) ?? '').slice(0, 10);
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || date > day(3) || date < day(-30)) continue;
     const late = date < today;
-    urgent.push({ id: `${e.kind}-${e.id}`, kind: late ? 'overdue' : 'due_soon', title: e.title, detail: `${e.kind === 'project' ? 'Project ends' : 'Deadline'} ${date}`, href: ENTITY_HREF[e.kind] });
+    urgent.push({ id: `${e.kind}-${e.id}`, kind: late ? 'overdue' : 'due_soon', title: e.title, detail: `${e.kind === 'project' ? 'Project ends' : 'Deadline'} ${date}`, href: ENTITY_HREF[e.kind], done: { kind: e.kind, id: e.id } });
   }
   urgent.sort((x, y) => (x.kind === y.kind ? 0 : x.kind === 'approval' ? -1 : y.kind === 'approval' ? 1 : x.kind === 'overdue' ? -1 : 1));
 

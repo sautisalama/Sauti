@@ -578,6 +578,8 @@ export async function deleteTodo(id: string) {
 
 export interface Deadline {
   kind: 'grant' | 'opportunity' | 'project' | 'document' | 'todo';
+  /** The record behind the row, so it can be marked done from the Overview. */
+  id: string;
   label: string;
   date: string;
   href: string;
@@ -594,8 +596,10 @@ export interface Overview {
   budget: { name: string; budget: number; spent: number }[];
   deadlines: Deadline[];
   missingDocs: number;
+  /** Open to-dos that are not yet due or have no date. Ones whose date has passed are counted in `lateTodos`. */
   openTodos: number;
   myTodos: number;
+  lateTodos: number;
 }
 
 export async function getOverview(): Promise<Overview> {
@@ -643,13 +647,16 @@ export async function getOverview(): Promise<Overview> {
 
   const open = ['idea', 'researching', 'drafting', 'submitted', 'under_review'];
   const today = new Date().toISOString().slice(0, 10);
+  // A submitted application no longer has a deadline to meet, and nothing whose date has passed is "coming up".
   const deadlines: Deadline[] = [
-    ...G.filter((g) => g.deadline && !['awarded', 'declined', 'closed'].includes(g.status)).map((g) => ({ kind: 'grant' as const, label: g.title, date: g.deadline!, href: '/dashboard/mjengo/grants' })),
-    ...O.filter((o) => o.deadline && !['won', 'lost', 'passed'].includes(o.status)).map((o) => ({ kind: 'opportunity' as const, label: o.title, date: o.deadline!, href: '/dashboard/mjengo/opportunities' })),
-    ...P.filter((p) => p.end_date && ['planning', 'active'].includes(p.status)).map((p) => ({ kind: 'project' as const, label: `${p.name} ends`, date: p.end_date!, href: '/dashboard/mjengo/projects' })),
-    ...D.filter((d) => d.due_date && d.required && !d.file_path).map((d) => ({ kind: 'document' as const, label: d.name, date: d.due_date!, href: '/dashboard/mjengo/documents', context: d.entity_type })),
-    ...T.filter((t) => t.due_date && t.status !== 'done').map((t) => ({ kind: 'todo' as const, label: t.title, date: t.due_date!, href: '/dashboard/mjengo/todos' })),
-  ].sort((a, b) => a.date.localeCompare(b.date));
+    ...G.filter((g) => g.deadline && !['submitted', 'awarded', 'declined', 'closed'].includes(g.status)).map((g) => ({ kind: 'grant' as const, id: g.id, label: g.title, date: g.deadline!, href: '/dashboard/mjengo/grants' })),
+    ...O.filter((o) => o.deadline && !['applied', 'won', 'lost', 'passed'].includes(o.status)).map((o) => ({ kind: 'opportunity' as const, id: o.id, label: o.title, date: o.deadline!, href: '/dashboard/mjengo/opportunities' })),
+    ...P.filter((p) => p.end_date && ['planning', 'active'].includes(p.status)).map((p) => ({ kind: 'project' as const, id: p.id, label: `${p.name} ends`, date: p.end_date!, href: '/dashboard/mjengo/projects' })),
+    ...D.filter((d) => d.due_date && d.required && !d.file_path).map((d) => ({ kind: 'document' as const, id: d.id, label: d.name, date: d.due_date!, href: '/dashboard/mjengo/documents', context: d.entity_type })),
+    ...T.filter((t) => t.due_date && t.status !== 'done').map((t) => ({ kind: 'todo' as const, id: t.id, label: t.title, date: t.due_date!, href: `/dashboard/mjengo/todos?task=${t.id}` })),
+  ].filter((d) => d.date >= today).sort((a, b) => a.date.localeCompare(b.date));
+  const notDone = T.filter((t) => t.status !== 'done');
+  const live = notDone.filter((t) => !t.due_date || t.due_date >= today);
 
   return {
     grantsByStatus: group(G, (g) => Number(g.amount ?? 0)),
@@ -659,10 +666,11 @@ export async function getOverview(): Promise<Overview> {
     opportunitiesByStatus: group(O).map(({ status, count }) => ({ status, count })),
     projectsByStatus: group(P).map(({ status, count }) => ({ status, count })),
     budget: P.filter((p) => p.budget).map((p) => ({ name: p.name, budget: Number(p.budget ?? 0), spent: Number(p.spent ?? 0) })).slice(0, 8),
-    deadlines: deadlines.filter((d) => d.date >= today.slice(0, 8) + '01').slice(0, 40),
+    deadlines: deadlines.slice(0, 40),
     missingDocs: D.filter((d) => d.required && !d.file_path).length,
-    openTodos: T.filter((t) => t.status !== 'done').length,
-    myTodos: T.filter((t) => t.status !== 'done' && t.assignee_ids?.includes(actor.id)).length,
+    openTodos: live.length,
+    myTodos: live.filter((t) => t.assignee_ids?.includes(actor.id)).length,
+    lateTodos: notDone.length - live.length,
   };
 }
 

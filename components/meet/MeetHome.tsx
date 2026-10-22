@@ -12,6 +12,9 @@ import { MeetChooser } from "@/app/dashboard/mjengo/_components/MeetChooser";
 
 const CODE = /[a-z0-9]{3}-[a-z0-9]{4}-[a-z0-9]{3}/i;
 
+/** A meeting whose end time has passed, or a link made for an earlier day, is over: it is not offered to join. */
+const isOver = (m: MeetHomeItem) => (m.end ? new Date(m.end).getTime() < Date.now() : new Date(m.start) < startOfDay(new Date()));
+
 /** The Meet home: join with a code, start a meeting now, later or on the calendar, and see the day's meetings. */
 export function MeetHome({ isAdmin }: { isAdmin: boolean }) {
 	const [day, setDay] = useState(() => startOfDay(new Date()));
@@ -87,16 +90,19 @@ export function MeetHome({ isAdmin }: { isAdmin: boolean }) {
 							</div>
 						) : (
 							<ul className="space-y-2">
-								{items.map((m) => (
-									<li key={m.key} className="flex items-center gap-3 rounded-xl border border-serene-neutral-200/70 p-3">
+								{items.map((m) => {
+									const over = isOver(m);
+									return (
+									<li key={m.key} className={cn("flex items-center gap-3 rounded-xl border border-serene-neutral-200/70 p-3", over && "bg-serene-neutral-50/60")}>
 										<span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-sauti-teal-light text-sauti-teal">{m.kind === "link" ? <Link2 className="h-4 w-4" /> : <Video className="h-4 w-4" />}</span>
 										<span className="min-w-0 flex-1">
 											<span className="block truncate text-sm font-semibold text-serene-neutral-900">{m.title}</span>
 											<span className="block text-xs text-serene-neutral-500">{m.kind === "link" ? "Link for later" : `${format(new Date(m.start), "h:mm a")}${m.end ? ` to ${format(new Date(m.end), "h:mm a")}` : ""}`}{m.code ? `  ·  ${m.code}` : ""}</span>
 										</span>
-										{m.code && <a href={`/meet/${m.code}`} className="shrink-0 rounded-xl bg-sauti-teal px-4 py-2 text-sm font-semibold text-white transition hover:bg-sauti-dark">Join</a>}
+										{over ? <span className="shrink-0 rounded-full bg-serene-neutral-100 px-2.5 py-1 text-xs font-medium text-serene-neutral-500">Ended</span> : m.code && <a href={`/meet/${m.code}`} className="shrink-0 rounded-xl bg-sauti-teal px-4 py-2 text-sm font-semibold text-white transition hover:bg-sauti-dark">Join</a>}
 									</li>
-								))}
+									);
+								})}
 							</ul>
 						)}
 					</div>

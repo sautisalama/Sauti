@@ -5,12 +5,13 @@ import { MjengoLoader } from "@/app/dashboard/mjengo/_components/MjengoLoader";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { format, parseISO } from "date-fns";
-import { Briefcase, CheckSquare, ClipboardList, FileWarning, FolderKanban, Lightbulb, Mail, Megaphone, Settings2, TrendingUp } from "lucide-react";
-import { getOverview, listEntities, type Overview } from "@/app/actions/mjengo";
+import { Briefcase, Check, CheckSquare, ClipboardList, FileWarning, FolderKanban, Lightbulb, Mail, Megaphone, Settings2, TrendingUp } from "lucide-react";
+import { getOverview, listEntities, type Deadline, type Overview } from "@/app/actions/mjengo";
 import { suiteStatus, type SuiteStatus } from "@/app/actions/mjengo-nav";
 import { GrantCharts, type GrantLite } from "./_components/GrantCharts";
 import { WorkspaceSearch } from "./_components/WorkspaceSearch";
 import { DigestCard } from "./_components/DigestCard";
+import { canMarkDone, markDone } from "@/lib/client/mark-done";
 import { DeadlineChip, KIND_LABEL, STATUSES, money, type Kind } from "./_components/shared";
 
 const KIND_ICON = { grant: Briefcase, opportunity: Lightbulb, project: FolderKanban, document: FileWarning, todo: CheckSquare } as const;
@@ -19,6 +20,7 @@ export default function MjengoOverview() {
 	const [o, setO] = useState<Overview | null>(null);
 	const [grants, setGrants] = useState<GrantLite[]>([]);
 	const [st, setSt] = useState<SuiteStatus | null>(null);
+	const [finishing, setFinishing] = useState<string | null>(null);
 
 	useEffect(() => {
 		const stops = [
@@ -31,6 +33,20 @@ export default function MjengoOverview() {
 
 	if (!o) return <MjengoLoader label="Loading your overview" />;
 
+	/** Ticks a deadline off: it leaves "Coming up" at once and the counts catch up when the refresh lands. */
+	const finish = async (d: Deadline) => {
+		if (!canMarkDone(d.kind)) return;
+		setFinishing(`${d.kind}-${d.id}`);
+		try {
+			await markDone(d.kind, d.id);
+			setO((cur) => (cur ? { ...cur, deadlines: cur.deadlines.filter((x) => !(x.kind === d.kind && x.id === d.id)) } : cur));
+		} catch {
+			// The row stays where it is; the next refresh shows the true state.
+		} finally {
+			setFinishing(null);
+		}
+	};
+
 	const cur = o.currencies[0] ?? "USD";
 
 	// Only opportunities still in play: not won, lost or passed.
@@ -40,6 +56,7 @@ export default function MjengoOverview() {
 	const nextOppDeadline = o.deadlines.find((d) => d.kind === "opportunity" && d.date >= today);
 	const dueSoon = o.deadlines.filter((d) => d.kind === "opportunity" && d.date >= today && d.date <= new Date(Date.now() + 14 * 86400_000).toISOString().slice(0, 10)).length;
 	const pending = st?.todos.pending ?? o.openTodos;
+	const late = st?.todos.overdue ?? o.lateTodos;
 	// Cards that mean nothing yet are left out; the colours follow the order of what is shown.
 	const liveProjects = o.projectsByStatus.filter((x) => !["completed", "cancelled"].includes(x.status));
 	const showSide = liveCount > 0 || liveProjects.length > 0;
@@ -49,7 +66,7 @@ export default function MjengoOverview() {
 		o.pipelineValue > 0 && { key: "grants", icon: Briefcase, label: "Grants in progress", value: money(o.pipelineValue, cur), hint: o.currencies.length > 1 ? `${cur} grants only` : "applying or under review", href: "/dashboard/mjengo/grants" },
 		o.awardedValue > 0 && { key: "awarded", icon: Briefcase, label: "Awarded", value: money(o.awardedValue, cur), hint: "awarded or reporting", href: "/dashboard/mjengo/grants" },
 		o.missingDocs > 0 && { key: "docs", icon: FileWarning, label: "Documents needed", value: String(o.missingDocs), hint: "required, not uploaded", tone: "warn" as const, href: "/dashboard/mjengo/documents" },
-		pending > 0 && { key: "todos", icon: CheckSquare, label: "Pending to-dos", value: String(pending), hint: st?.todos.overdue ? `${st.todos.overdue} overdue, ${st.todos.mine} yours` : `${st?.todos.mine ?? o.myTodos} yours`, tone: st?.todos.overdue ? "warn" as const : undefined, href: "/dashboard/mjengo/todos" },
+		pending + late > 0 && { key: "todos", icon: CheckSquare, label: "Pending to-dos", value: String(pending), hint: late ? `${late} past due, ${st?.todos.mine ?? o.myTodos} yours` : `${st?.todos.mine ?? o.myTodos} yours`, tone: late ? "warn" as const : undefined, href: "/dashboard/mjengo/todos" },
 		!!st && (st.forms.open > 0 || st.forms.newResponses > 0) && { key: "forms", icon: ClipboardList, label: "Open forms", value: String(st.forms.open), hint: st.forms.newResponses ? `${st.forms.newResponses} new responses` : "no new responses", tone: st.forms.newResponses ? "warn" as const : undefined, href: "/dashboard/mjengo/forms" },
 	].filter(Boolean) as StatProps[];
 
@@ -96,11 +113,14 @@ export default function MjengoOverview() {
 						<p className="text-sm text-serene-neutral-500">No deadlines tracked yet. Add dates to grants, opportunities, documents and tasks and they appear here.</p>
 					) : (
 						<ul className="divide-y divide-serene-neutral-50">
-							{o.deadlines.slice(0, 12).map((d, i) => {
+							{o.deadlines.slice(0, 12).map((d) => {
 								const Icon = KIND_ICON[d.kind];
 								return (
-									<li key={i}>
-										<Link href={d.href} className="flex items-center gap-3 py-2.5 hover:bg-serene-neutral-50">
+									<li key={`${d.kind}-${d.id}`} className="flex items-center gap-2">
+											{canMarkDone(d.kind) && (
+												<button type="button" disabled={finishing === `${d.kind}-${d.id}`} onClick={() => void finish(d)} aria-label={`Mark done: ${d.label}`} title="Mark done" className="flex h-6 w-6 shrink-0 touch-manipulation items-center justify-center rounded-full border-2 border-serene-neutral-300 text-white transition-colors hover:border-sauti-teal hover:bg-sauti-teal disabled:opacity-50"><Check className="h-3 w-3" /></button>
+											)}
+										<Link href={d.href} className="flex min-w-0 flex-1 items-center gap-3 py-2.5 hover:bg-serene-neutral-50">
 											<span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-sauti-teal-light/40 text-sauti-teal"><Icon className="h-4 w-4" /></span>
 											<span className="min-w-0 flex-1">
 												<span className="block truncate text-sm font-medium text-serene-neutral-900">{d.label}</span>

@@ -76,6 +76,7 @@ export async function clearFilesInbox(): Promise<void> {
 export interface SuiteStatus {
   forms: { open: number; draft: number; newResponses: number };
   content: { posted: number; scheduled: number; drafts: number; lastPosted: string | null };
+  /** `pending` leaves out to-dos whose date has passed; those are `overdue`. */
   todos: { pending: number; mine: number; overdue: number };
   /** Things that are not switched on yet. Each links to where it is set up. */
   setup: { id: string; label: string; hint: string; href: string }[];
@@ -102,7 +103,8 @@ export async function suiteStatus(): Promise<SuiteStatus> {
   const F = (forms.data ?? []) as { status: string }[];
   const P = (posts.data ?? []) as { status: string; posted_at: string | null }[];
   const T = (todos.data ?? []) as { status: string; due_date: string | null; assignee_ids: string[] | null }[];
-  const pending = T.filter((t) => t.status !== 'done');
+  const notDone = T.filter((t) => t.status !== 'done');
+  const pending = notDone.filter((t) => !t.due_date || t.due_date >= today);
   const aiRow = ai.data as { provider: string | null; api_key_enc: string | null } | null;
 
   const setup: SuiteStatus['setup'] = [];
@@ -123,7 +125,7 @@ export async function suiteStatus(): Promise<SuiteStatus> {
       drafts: P.filter((p) => p.status === 'draft').length,
       lastPosted: P.filter((p) => p.status === 'posted' && p.posted_at).map((p) => p.posted_at as string).sort().pop() ?? null,
     },
-    todos: { pending: pending.length, mine: pending.filter((t) => (t.assignee_ids ?? []).includes(actor.id)).length, overdue: pending.filter((t) => t.due_date && t.due_date < today).length },
+    todos: { pending: pending.length, mine: pending.filter((t) => (t.assignee_ids ?? []).includes(actor.id)).length, overdue: notDone.length - pending.length },
     setup,
   };
 }

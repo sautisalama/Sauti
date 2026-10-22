@@ -7,6 +7,7 @@ import { format, formatDistanceToNowStrict, parseISO } from "date-fns";
 import { AlertTriangle, Bell, CheckCheck, FileSignature, FileText, Inbox, Lightbulb, Loader2, Mail, Phone, Plus, Smartphone, Sparkles, SquareCheck, Activity, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { unwrap } from "@/lib/action-result";
+import { markDone } from "@/lib/client/mark-done";
 import { catchUp, digestBrief, getDigest, type DigestItem } from "@/app/actions/mjengo-workflow";
 import { confirmSharedFile, getCaughtUp, getMailToAnswer, type CaughtUp, type MailToAnswer } from "@/app/actions/mjengo-caughtup";
 import type { DigestKind } from "@/lib/mjengo/digest";
@@ -23,6 +24,16 @@ function Block({ icon: Icon, title, count, tone, children }: { icon: typeof Bell
 			</h4>
 			<ul className="space-y-1.5">{children}</ul>
 		</div>
+	);
+}
+
+/** The tick on a row: marks the task or record done and takes it off the card. */
+function DoneButton({ label, onDone }: { label: string; onDone: () => Promise<void> }) {
+	const [busy, setBusy] = useState(false);
+	return (
+		<button type="button" disabled={busy} aria-label={`Mark done: ${label}`} title="Mark done" onClick={async () => { setBusy(true); try { await onDone(); } catch { setBusy(false); } }} className="mt-0.5 flex h-6 w-6 shrink-0 touch-manipulation items-center justify-center rounded-full border-2 border-serene-neutral-300 text-white transition-colors hover:border-sauti-teal hover:bg-sauti-teal disabled:opacity-50">
+			{busy ? <Loader2 className="h-3 w-3 animate-spin text-sauti-teal" /> : <CheckCheck className="h-3 w-3" />}
+		</button>
 	);
 }
 
@@ -128,7 +139,7 @@ export function DigestCard() {
 				{c.urgent.length > 0 && (
 					<Block icon={AlertTriangle} title="Urgent" count={c.urgent.length} tone="warn">
 						{c.urgent.map((u) => (
-							<Row key={u.id} tone="warn">
+							<Row key={u.id} tone="warn">{u.done && <DoneButton label={u.title} onDone={async () => { await markDone(u.done!.kind, u.done!.id); setC((cur) => (cur ? { ...cur, urgent: cur.urgent.filter((x) => x.id !== u.id) } : cur)); }} />}
 								<AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
 								<Link href={u.href} className="min-w-0 flex-1 hover:underline"><span className="block truncate text-sm font-medium text-serene-neutral-900">{u.title}</span><span className="block truncate text-xs text-serene-neutral-600">{u.detail}</span></Link>
 							</Row>
