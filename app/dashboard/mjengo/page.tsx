@@ -5,8 +5,8 @@ import { MjengoLoader } from "@/app/dashboard/mjengo/_components/MjengoLoader";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { format, parseISO } from "date-fns";
-import { Briefcase, Check, CheckSquare, ClipboardList, FileWarning, FolderKanban, Lightbulb, Mail, Megaphone, Settings2, TrendingUp } from "lucide-react";
-import { getOverview, listEntities, type Deadline, type Overview } from "@/app/actions/mjengo";
+import { Briefcase, Check, EyeOff, CheckSquare, ClipboardList, FileWarning, FolderKanban, Lightbulb, Mail, Megaphone, Settings2, TrendingUp } from "lucide-react";
+import { addressDeadline, getOverview, listEntities, type Deadline, type Overview } from "@/app/actions/mjengo";
 import { suiteStatus, type SuiteStatus } from "@/app/actions/mjengo-nav";
 import { GrantCharts, type GrantLite } from "./_components/GrantCharts";
 import { WorkspaceSearch } from "./_components/WorkspaceSearch";
@@ -34,6 +34,13 @@ export default function MjengoOverview() {
 	if (!o) return <MjengoLoader label="Loading your overview" />;
 
 	/** Ticks a deadline off: it leaves "Coming up" at once and the counts catch up when the refresh lands. */
+	/** Takes a row off this person's card only; the record is not changed. */
+	const address = async (d: Deadline) => {
+		const prev = o;
+		setO((cur) => (cur ? { ...cur, deadlines: cur.deadlines.filter((x) => !(x.kind === d.kind && x.id === d.id)) } : cur));
+		try { await addressDeadline(d); } catch { setO(prev); }
+	};
+
 	const finish = async (d: Deadline) => {
 		if (!canMarkDone(d.kind)) return;
 		setFinishing(`${d.kind}-${d.id}`);
@@ -128,6 +135,7 @@ export default function MjengoOverview() {
 											</span>
 											<DeadlineChip date={d.date} />
 										</Link>
+											<button type="button" onClick={() => void address(d)} aria-label={`Addressed: ${d.label}`} title="Addressed, take off this list" className="flex h-8 shrink-0 touch-manipulation items-center gap-1 rounded-full px-2 text-xs font-medium text-serene-neutral-500 hover:bg-serene-neutral-100 hover:text-sauti-dark"><EyeOff className="h-3.5 w-3.5" /><span className="hidden sm:inline">Addressed</span></button>
 									</li>
 								);
 							})}

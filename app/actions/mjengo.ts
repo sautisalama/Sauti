@@ -576,6 +576,15 @@ export async function deleteTodo(id: string) {
 
 /* --------------------------------------------------------------- Overview */
 
+/** Tied to the date, so a deadline that moves comes back onto the card. */
+const addressedKey = (d: { kind: string; id: string; date: string }) => `${d.kind}:${d.id}:${d.date}`;
+
+/** Takes one "Coming up" row off this person's card. Nothing about the record changes; it is only their view. */
+export async function addressDeadline(d: { kind: Deadline['kind']; id: string; date: string }) {
+  const actor = await requireAdminActor();
+  await looseAdmin().from('mjengo_addressed').upsert({ user_id: actor.id, item_key: addressedKey(d) }, { onConflict: 'user_id,item_key' });
+}
+
 export interface Deadline {
   kind: 'grant' | 'opportunity' | 'project' | 'document' | 'todo';
   /** The record behind the row, so it can be marked done from the Overview. */
@@ -605,7 +614,7 @@ export interface Overview {
 export async function getOverview(): Promise<Overview> {
   const actor = await requireAdminActor();
   const db = looseAdmin();
-  const [{ data: grants }, { data: opps }, { data: projects }, { data: docs }, { data: todos }, oversight, { data: acc }] = await Promise.all([
+  const [{ data: grants }, { data: opps }, { data: projects }, { data: docs }, { data: todos }, oversight, { data: acc }, { data: addressed }] = await Promise.all([
     db.from('mjengo_grants').select('id, title, status, amount, currency, deadline, created_by, visibility, hidden_fields'),
     db.from('mjengo_opportunities').select('id, title, status, deadline, created_by, visibility, hidden_fields'),
     db.from('mjengo_projects').select('id, name, status, budget, spent, end_date, created_by, visibility, hidden_fields'),
@@ -613,6 +622,7 @@ export async function getOverview(): Promise<Overview> {
     db.from('mjengo_todos').select('id, title, status, due_date, assignee_ids'),
     isSuperAdminEmail(actor.email),
     db.from('mjengo_entity_access').select('entity_type, entity_id').eq('user_id', actor.id),
+    db.from('mjengo_addressed').select('item_key').eq('user_id', actor.id),
   ]);
   // Records another person keeps to a few people are left out, and details their owner hid are not counted.
   const shared = new Set(((acc ?? []) as { entity_type: string; entity_id: string }[]).map((a) => `${a.entity_type}:${a.entity_id}`));
@@ -647,6 +657,8 @@ export async function getOverview(): Promise<Overview> {
 
   const open = ['idea', 'researching', 'drafting', 'submitted', 'under_review'];
   const today = new Date().toISOString().slice(0, 10);
+  // Rows this person marked as addressed stay off the card (the record itself is untouched).
+  const gone = new Set(((addressed ?? []) as { item_key: string }[]).map((a) => a.item_key));
   // A submitted application no longer has a deadline to meet, and nothing whose date has passed is "coming up".
   const deadlines: Deadline[] = [
     ...G.filter((g) => g.deadline && !['submitted', 'awarded', 'declined', 'closed'].includes(g.status)).map((g) => ({ kind: 'grant' as const, id: g.id, label: g.title, date: g.deadline!, href: '/dashboard/mjengo/grants' })),
@@ -654,7 +666,7 @@ export async function getOverview(): Promise<Overview> {
     ...P.filter((p) => p.end_date && ['planning', 'active'].includes(p.status)).map((p) => ({ kind: 'project' as const, id: p.id, label: `${p.name} ends`, date: p.end_date!, href: '/dashboard/mjengo/projects' })),
     ...D.filter((d) => d.due_date && d.required && !d.file_path).map((d) => ({ kind: 'document' as const, id: d.id, label: d.name, date: d.due_date!, href: '/dashboard/mjengo/documents', context: d.entity_type })),
     ...T.filter((t) => t.due_date && t.status !== 'done').map((t) => ({ kind: 'todo' as const, id: t.id, label: t.title, date: t.due_date!, href: `/dashboard/mjengo/todos?task=${t.id}` })),
-  ].filter((d) => d.date >= today).sort((a, b) => a.date.localeCompare(b.date));
+  ].filter((d) => d.date >= today && !gone.has(addressedKey(d))).sort((a, b) => a.date.localeCompare(b.date));
   const notDone = T.filter((t) => t.status !== 'done');
   const live = notDone.filter((t) => !t.due_date || t.due_date >= today);
 
