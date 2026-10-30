@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
 	AlertTriangle, Archive, CheckCircle2, Clock, Eye, ExternalLink, FileEdit, FileUp, Loader2, Mail, Pencil,
-	Plus, Save, Send, Trash2, Undo2, X,
+	Plus, Save, Send, Trash2, Undo2, X, FileText, RotateCcw,
 } from "lucide-react";
 import { RichEditor } from "@/components/editor/RichEditor";
 import { ArticleView, KIND_LABEL } from "./ArticleView";
@@ -13,9 +13,9 @@ import { cn } from "@/lib/utils";
 import { uploadToPublications } from "@/lib/content/upload-client";
 import { readingStats } from "@/lib/content/reading";
 import {
-	deletePublication, importFromStorage, resendPublicationEmail, savePublication, setPublicationStatus,
+	attachPdfFromStorage, deletePublication, importFromStorage, resendPublicationEmail, returnPublication, savePublication, setPublicationStatus,
 } from "@/app/actions/publishing";
-import { PUBLICATION_KINDS, type PublicationKind, type PublicationRow, type PublicationStatus } from "@/types/publishing";
+import { PUBLICATION_KINDS, type PublicationDisplayMode, type PublicationKind, type PublicationRow, type PublicationStatus } from "@/types/publishing";
 
 type Draft = {
 	kind: PublicationKind;
@@ -31,6 +31,7 @@ type Draft = {
 	source_file_url: string | null;
 	source_file_name: string | null;
 	source_file_type: string | null;
+	display_mode: PublicationDisplayMode;
 };
 
 const STATUS = {
@@ -54,9 +55,16 @@ const fromRow = (r?: PublicationRow): Draft => ({
 	source_file_url: r?.source_file_url ?? null,
 	source_file_name: r?.source_file_name ?? null,
 	source_file_type: r?.source_file_type ?? null,
+	display_mode: r?.display_mode ?? "content",
 });
 
-export function PublicationEditor({ initial }: { initial?: PublicationRow }) {
+const ADMIN_BASE = "/dashboard/admin/publications";
+
+/**
+ * `isAdmin` admins publish directly. Everyone else (professionals, NGOs) can save drafts and
+ * submit for an administrator to approve; the server enforces this, the UI just reflects it.
+ */
+export function PublicationEditor({ initial, isAdmin = true, basePath = ADMIN_BASE }: { initial?: PublicationRow; isAdmin?: boolean; basePath?: string }) {
 	const router = useRouter();
 	const [id, setId] = useState(initial?.id);
 	const [slug, setSlug] = useState(initial?.slug);
@@ -70,6 +78,9 @@ export function PublicationEditor({ initial }: { initial?: PublicationRow }) {
 	const [notice, setNotice] = useState<string | null>(null);
 	const [warnings, setWarnings] = useState<string[]>([]);
 	const [emailStatus, setEmailStatus] = useState(initial?.email_status ?? null);
+	const [returning, setReturning] = useState(false);
+	const [returnNote, setReturnNote] = useState("");
+	const [rejection, setRejection] = useState(initial?.rejection_reason ?? null);
 	const [, startTransition] = useTransition();
 	const fileRef = useRef<HTMLInputElement>(null);
 	const coverRef = useRef<HTMLInputElement>(null);
@@ -106,6 +117,7 @@ export function PublicationEditor({ initial }: { initial?: PublicationRow }) {
 		source_file_url: d.source_file_url,
 		source_file_name: d.source_file_name,
 		source_file_type: d.source_file_type,
+		display_mode: d.display_mode,
 	});
 
 	const save = async (quiet = false) => {
@@ -118,7 +130,7 @@ export function PublicationEditor({ initial }: { initial?: PublicationRow }) {
 		setSlug(res.slug);
 		setSaved(d);
 		if (!quiet) flash("Saved.");
-		if (!id) router.replace(`/dashboard/admin/publications/${res.id}`);
+		if (!id) router.replace(`${basePath}/${res.id}`);
 		return res;
 	};
 
@@ -131,8 +143,11 @@ export function PublicationEditor({ initial }: { initial?: PublicationRow }) {
 		setBusy(null);
 		if (!res.ok) return setError(res.error);
 		setStatus(next);
+		if (next === "in_review") setRejection(null);
 		flash(
-			next === "published"
+			!isAdmin && next === "in_review"
+				? "Submitted. An administrator will review it and you will be notified."
+				: next === "published"
 				? res.emailed
 					? "Published. A PDF and Word copy is being emailed to publications@sautisalama.org."
 					: "Published."
@@ -144,24 +159,43 @@ export function PublicationEditor({ initial }: { initial?: PublicationRow }) {
 	const importFile = async (file: File) => {
 		setError(null);
 		setWarnings([]);
+		const isPdf = /\.pdf$/i.test(file.name);
 		if (!/\.(docx|pdf)$/i.test(file.name)) return setError("Choose a Word (.docx) or PDF file.");
 		if (file.size > 15 * 1024 * 1024) return setError("The file is larger than 15 MB.");
 		if (d.body && !window.confirm("Replace the current content with the imported document?")) return;
 		setBusy("import");
 		try {
 			const up = await uploadToPublications(file, "imports");
-			const res = await importFromStorage(up.path);
-			if (!res.ok) throw new Error(res.error);
-			setD((p) => ({
-				...p,
-				title: p.title.trim() ? p.title : res.doc.title,
-				body: res.doc.html,
-				source_file_url: res.sourceUrl,
-				source_file_name: res.fileName,
-				source_file_type: res.doc.kind,
-			}));
-			setWarnings(res.doc.warnings);
-			flash(`Imported “${file.name}”. Review it, then save as a draft.`);
+			if (isPdf) {
+				// A PDF is shown as the PDF by default; the text is extracted for search and summary.
+				const res = await attachPdfFromStorage(up.path);
+				if (!res.ok) throw new Error(res.error);
+				setD((p) => ({
+					...p,
+					title: p.title.trim() ? p.title : res.doc?.title ?? file.name.replace(/\.pdf$/i, ""),
+					body: res.doc?.html ?? "",
+					source_file_url: res.sourceUrl,
+					source_file_name: res.fileName,
+					source_file_type: "pdf",
+					display_mode: "pdf",
+				}));
+				setWarnings([...(res.doc?.warnings ?? []), ...(res.warning ? [`${res.warning} The PDF will still be shown as it is.`] : [])]);
+				flash(`Added “${file.name}”. Readers will see the PDF itself.`);
+			} else {
+				const res = await importFromStorage(up.path);
+				if (!res.ok) throw new Error(res.error);
+				setD((p) => ({
+					...p,
+					title: p.title.trim() ? p.title : res.doc.title,
+					body: res.doc.html,
+					source_file_url: res.sourceUrl,
+					source_file_name: res.fileName,
+					source_file_type: res.doc.kind,
+					display_mode: "content",
+				}));
+				setWarnings(res.doc.warnings);
+				flash(`Imported “${file.name}”. Review it, then save as a draft.`);
+			}
 		} catch (e) {
 			setError(e instanceof Error ? e.message : "Import failed.");
 		} finally {
@@ -194,8 +228,23 @@ export function PublicationEditor({ initial }: { initial?: PublicationRow }) {
 			return setError(res.error);
 		}
 		setSaved(d); // avoid the unsaved-changes prompt
-		router.push("/dashboard/admin/publications");
+		router.push(basePath);
 		router.refresh();
+	};
+
+	const sendBack = async () => {
+		if (!id) return;
+		setBusy("return");
+		setError(null);
+		const res = await returnPublication(id, returnNote);
+		setBusy(null);
+		if (!res.ok) return setError(res.error);
+		setStatus("draft");
+		setRejection(returnNote.trim());
+		setReturning(false);
+		setReturnNote("");
+		flash("Returned to the author with your note.");
+		startTransition(() => router.refresh());
 	};
 
 	const resend = async () => {
@@ -208,9 +257,17 @@ export function PublicationEditor({ initial }: { initial?: PublicationRow }) {
 		flash("Copy emailed to publications@sautisalama.org.");
 	};
 
-	const st = STATUS[status];
+	const base = STATUS[status];
+	const st = isAdmin
+		? base
+		: status === "draft"
+			? { ...base, note: "Only you can see this. Submit it when it is ready and an administrator will approve it." }
+			: status === "in_review"
+				? { ...base, note: "Waiting for an administrator to approve it. You can still edit or withdraw it." }
+				: base;
 	const StIcon = st.icon;
-	const publishable = d.title.trim().length >= 3 && stats.words > 5;
+	const lockedForAuthor = !isAdmin && (status === "published" || status === "archived");
+	const publishable = d.title.trim().length >= 3 && (d.display_mode === "pdf" ? !!d.source_file_url : stats.words > 5);
 	const previewUrl = slug && token ? `/publications/${slug}?preview=${token}` : null;
 
 	return (
@@ -231,6 +288,17 @@ export function PublicationEditor({ initial }: { initial?: PublicationRow }) {
 				)}
 			</div>
 
+			{rejection && status === "draft" && (
+				<div role="status" className="rounded-xl border border-orange-200 bg-orange-50 px-4 py-3 text-sm text-orange-900">
+					<p className="font-bold">An administrator asked for changes</p>
+					<p className="mt-0.5 whitespace-pre-wrap">{rejection}</p>
+				</div>
+			)}
+			{lockedForAuthor && (
+				<div role="status" className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-700">
+					This post is published, so only an administrator can change it.
+				</div>
+			)}
 			{error && (
 				<div role="alert" className="flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-800">
 					<AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
@@ -271,7 +339,7 @@ export function PublicationEditor({ initial }: { initial?: PublicationRow }) {
 							<FileUp className="h-5 w-5 text-[#008080]" aria-hidden />
 							<div className="min-w-0 flex-1">
 								<p className="text-sm font-bold text-[#1a365d]">Start from a Word or PDF document</p>
-								<p className="text-xs text-gray-600">We convert it to editable content — you can review and fix it before publishing.</p>
+								<p className="text-xs text-gray-600">Word files become editable content. A PDF can be shown exactly as it is, or you can use its text instead.</p>
 							</div>
 							<input ref={fileRef} type="file" accept=".docx,.pdf,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" className="sr-only" aria-label="Upload Word or PDF document" onChange={(e) => e.target.files?.[0] && importFile(e.target.files[0])} />
 							<button type="button" disabled={busy === "import"} onClick={() => fileRef.current?.click()} className="inline-flex items-center gap-2 rounded-lg bg-[#008080] px-4 py-2 text-sm font-bold text-white hover:bg-[#006666] disabled:opacity-60">
@@ -280,8 +348,18 @@ export function PublicationEditor({ initial }: { initial?: PublicationRow }) {
 						</div>
 						{d.source_file_url && (
 							<p className="mt-2 text-xs text-gray-600">
-								Imported from <a className="font-semibold text-[#008080] underline" href={d.source_file_url} target="_blank" rel="noopener noreferrer">{d.source_file_name}</a>
+								{d.display_mode === "pdf" ? "PDF" : "Imported from"} <a className="font-semibold text-[#008080] underline" href={d.source_file_url} target="_blank" rel="noopener noreferrer">{d.source_file_name}</a>
 							</p>
+						)}
+						{d.source_file_type === "pdf" && d.source_file_url && (
+							<fieldset className="mt-3 flex flex-wrap gap-2" aria-label="How readers see this PDF">
+								{([["pdf", FileText, "Show the PDF itself"], ["content", Pencil, "Show the text instead"]] as const).map(([mode, Icon, label]) => (
+									<label key={mode} className={cn("inline-flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm font-bold", d.display_mode === mode ? "border-[#008080] bg-white text-[#008080]" : "border-gray-200 bg-white/60 text-gray-600")}>
+										<input type="radio" name="display_mode" className="sr-only" checked={d.display_mode === mode} onChange={() => set("display_mode", mode)} />
+										<Icon className="h-4 w-4" aria-hidden /> {label}
+									</label>
+								))}
+							</fieldset>
 						)}
 					</div>
 
@@ -326,7 +404,7 @@ export function PublicationEditor({ initial }: { initial?: PublicationRow }) {
 						</div>
 					</Field>
 
-					<Field label="Content" required>
+					<Field label={d.display_mode === "pdf" ? "Text version" : "Content"} required={d.display_mode !== "pdf"} hint={d.display_mode === "pdf" ? "Readers see the PDF. This text feeds search, the summary and the emailed copy; fix it if the extraction is off." : undefined}>
 						<RichEditor
 							value={d.body}
 							onChange={(html) => set("body", html)}
@@ -338,10 +416,12 @@ export function PublicationEditor({ initial }: { initial?: PublicationRow }) {
 
 					<SourcesEditor links={d.links} onChange={(l) => set("links", l)} />
 
-					<label className="flex items-center gap-2 text-sm font-semibold text-gray-700">
-						<input type="checkbox" checked={d.featured} onChange={(e) => set("featured", e.target.checked)} className="h-4 w-4 rounded border-gray-300" />
-						Feature this on the homepage (still ordered newest first)
-					</label>
+					{isAdmin && (
+						<label className="flex items-center gap-2 text-sm font-semibold text-gray-700">
+							<input type="checkbox" checked={d.featured} onChange={(e) => set("featured", e.target.checked)} className="h-4 w-4 rounded border-gray-300" />
+							Feature this on the homepage (still ordered newest first)
+						</label>
+					)}
 				</div>
 			) : (
 				<div className="rounded-2xl border border-gray-200 bg-white p-5 md:p-10">
@@ -355,48 +435,84 @@ export function PublicationEditor({ initial }: { initial?: PublicationRow }) {
 						publishedAt={initial?.published_at ?? new Date().toISOString()}
 						readMinutes={stats.words ? stats.minutes : null}
 						bodyHtml={d.body}
+						pdfUrl={d.display_mode === "pdf" ? d.source_file_url : null}
 						links={d.links.filter((l) => l.url.trim()).map((l) => ({ label: l.label || l.url, url: /^https?:\/\//i.test(l.url) ? l.url : `https://${l.url}` }))}
 						tags={d.tags.split(",").map((t) => t.trim()).filter(Boolean)}
 					/>
 				</div>
 			)}
 
+			{returning && (
+				<div className="space-y-2 rounded-xl border border-orange-200 bg-orange-50 p-4">
+					<label htmlFor="return-note" className="text-sm font-bold text-orange-900">What should the author change?</label>
+					<textarea id="return-note" value={returnNote} onChange={(e) => setReturnNote(e.target.value)} rows={3} maxLength={1000} className="input" placeholder="Be specific so they can fix it in one go." />
+					<div className="flex gap-2">
+						<button type="button" onClick={sendBack} disabled={busy === "return" || returnNote.trim().length < 3} className="btn-secondary">
+							{busy === "return" ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCcw className="h-4 w-4" />} Return to author
+						</button>
+						<button type="button" onClick={() => setReturning(false)} className="text-sm font-semibold text-gray-500 hover:text-gray-800">Cancel</button>
+					</div>
+				</div>
+			)}
+
 			<div className="sticky bottom-0 -mx-4 flex flex-wrap items-center gap-2 border-t border-gray-200 bg-white/95 px-4 py-3 backdrop-blur md:-mx-6 md:px-6">
-				<button type="button" onClick={() => save()} disabled={!!busy || !d.title.trim()} className="btn-secondary">
-					{busy === "save" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Save {status === "published" ? "changes" : "draft"}
-				</button>
+				{!lockedForAuthor && (
+					<button type="button" onClick={() => save()} disabled={!!busy || !d.title.trim()} className="btn-secondary">
+						{busy === "save" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Save {status === "published" ? "changes" : "draft"}
+					</button>
+				)}
 				{previewUrl && (
 					<a href={previewUrl} target="_blank" rel="noopener noreferrer" className="btn-secondary" title="Shareable link for draft review — works without signing in">
 						<ExternalLink className="h-4 w-4" /> Open preview link
 					</a>
 				)}
 				<span className="flex-1" />
-				{id && (
+				{isAdmin && id && (
 					<button type="button" onClick={resend} disabled={!!busy} className="btn-secondary" title="Email a PDF and Word copy to publications@sautisalama.org">
 						{busy === "email" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />} Email copy
 					</button>
 				)}
-				{status === "draft" && (
-					<button type="button" onClick={() => changeStatus("in_review")} disabled={!!busy || !publishable} className="btn-secondary">
-						<Clock className="h-4 w-4" /> Send to review
-					</button>
-				)}
-				{status === "published" ? (
+				{isAdmin ? (
 					<>
-						<button type="button" onClick={() => changeStatus("draft")} disabled={!!busy} className="btn-secondary"><Undo2 className="h-4 w-4" /> Unpublish</button>
-						<button type="button" onClick={() => changeStatus("archived")} disabled={!!busy} className="btn-secondary"><Archive className="h-4 w-4" /> Archive</button>
+						{status === "draft" && (
+							<button type="button" onClick={() => changeStatus("in_review")} disabled={!!busy || !publishable} className="btn-secondary">
+								<Clock className="h-4 w-4" /> Send to review
+							</button>
+						)}
+						{status === "in_review" && id && (
+							<button type="button" onClick={() => setReturning((v) => !v)} disabled={!!busy} className="btn-secondary">
+								<RotateCcw className="h-4 w-4" /> Return to author
+							</button>
+						)}
+						{status === "published" ? (
+							<>
+								<button type="button" onClick={() => changeStatus("draft")} disabled={!!busy} className="btn-secondary"><Undo2 className="h-4 w-4" /> Unpublish</button>
+								<button type="button" onClick={() => changeStatus("archived")} disabled={!!busy} className="btn-secondary"><Archive className="h-4 w-4" /> Archive</button>
+							</>
+						) : (
+							<button type="button" onClick={() => changeStatus("published")} disabled={!!busy || !publishable} className="inline-flex items-center gap-2 rounded-lg bg-[#1a365d] px-5 py-2 text-sm font-bold text-white hover:bg-[#008080] disabled:opacity-50">
+								{busy === "published" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />} {status === "in_review" ? "Approve & publish" : "Publish"}
+							</button>
+						)}
 					</>
 				) : (
-					<button type="button" onClick={() => changeStatus("published")} disabled={!!busy || !publishable} className="inline-flex items-center gap-2 rounded-lg bg-[#1a365d] px-5 py-2 text-sm font-bold text-white hover:bg-[#008080] disabled:opacity-50">
-						{busy === "published" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />} Publish
-					</button>
+					<>
+						{status === "in_review" && (
+							<button type="button" onClick={() => changeStatus("draft")} disabled={!!busy} className="btn-secondary"><Undo2 className="h-4 w-4" /> Withdraw</button>
+						)}
+						{status === "draft" && (
+							<button type="button" onClick={() => changeStatus("in_review")} disabled={!!busy || !publishable} className="inline-flex items-center gap-2 rounded-lg bg-[#1a365d] px-5 py-2 text-sm font-bold text-white hover:bg-[#008080] disabled:opacity-50">
+								{busy === "in_review" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />} Submit for approval
+							</button>
+						)}
+					</>
 				)}
-				{id && (
+				{id && (isAdmin || status === "draft") && (
 					<button type="button" onClick={remove} disabled={!!busy} className="rounded-lg p-2 text-red-600 hover:bg-red-50" aria-label="Delete permanently" title="Delete permanently">
 						<Trash2 className="h-4 w-4" />
 					</button>
 				)}
-				<Link href="/dashboard/admin/publications" className="text-sm font-semibold text-gray-500 hover:text-gray-800">Close</Link>
+				<Link href={basePath} className="text-sm font-semibold text-gray-500 hover:text-gray-800">Close</Link>
 			</div>
 
 			<style>{`

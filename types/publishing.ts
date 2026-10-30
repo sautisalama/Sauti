@@ -11,6 +11,8 @@ export type PublicationKind = (typeof PUBLICATION_KINDS)[number];
 export const PUBLICATION_STATUSES = ["draft", "in_review", "published", "archived"] as const;
 export type PublicationStatus = (typeof PUBLICATION_STATUSES)[number];
 
+export type PublicationDisplayMode = "content" | "pdf";
+
 export interface ExternalLink {
 	label: string;
 	url: string;
@@ -41,6 +43,12 @@ export interface PublicationRow {
 	emailed_at: string | null;
 	email_status: string | null;
 	view_count: number;
+	/** "pdf" shows the uploaded PDF itself; "content" shows the extracted/written text. */
+	display_mode: PublicationDisplayMode;
+	rejection_reason: string | null;
+	submitted_at: string | null;
+	reviewed_by: string | null;
+	reviewed_at: string | null;
 	created_at: string;
 	updated_at: string;
 }

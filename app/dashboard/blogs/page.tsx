@@ -1,94 +1,75 @@
-'use client';
+import Link from "next/link";
+import { redirect } from "next/navigation";
+import { FileText, Plus } from "lucide-react";
+import { requirePublisher } from "@/lib/auth/require-publisher";
+import { SereneBreadcrumb } from "@/components/ui/SereneBreadcrumb";
+import { KIND_LABEL } from "@/components/publishing/ArticleView";
+import { cn } from "@/lib/utils";
+import type { PublicationRow } from "@/types/publishing";
 
-import { SereneBreadcrumb } from '@/components/ui/SereneBreadcrumb';
-import { Button } from '@/components/ui/button';
-import { FileText, Sparkles, Bell, ArrowLeft } from 'lucide-react';
-import Link from 'next/link';
+export const metadata = { title: "My blogs & publications" };
 
-export default function BlogsComingSoon() {
-  return (
-    <div className="min-h-[80vh] flex flex-col">
-      <div className="max-w-6xl mx-auto px-4 py-6 w-full">
-        <SereneBreadcrumb items={[
-          { label: 'Dashboard', href: '/dashboard' },
-          { label: 'Blogs' }
-        ]} />
-      </div>
+const BADGE: Record<string, string> = {
+	draft: "bg-slate-100 text-slate-700",
+	in_review: "bg-amber-100 text-amber-800",
+	published: "bg-emerald-100 text-emerald-800",
+	archived: "bg-gray-200 text-gray-600",
+};
+const LABEL: Record<string, string> = { draft: "Draft", in_review: "Awaiting approval", published: "Published", archived: "Archived" };
 
-      {/* Coming Soon Content */}
-      <div className="flex-1 flex items-center justify-center px-4">
-        <div className="max-w-lg w-full text-center">
-          {/* Icon */}
-          <div className="relative mx-auto mb-8">
-            <div className="w-24 h-24 mx-auto rounded-2xl bg-gradient-to-br from-sauti-teal/10 to-serene-blue-100 flex items-center justify-center shadow-lg">
-              <FileText className="h-12 w-12 text-sauti-teal" />
-            </div>
-            <div className="absolute -top-2 -right-2 w-10 h-10 rounded-full bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center shadow-md animate-pulse">
-              <Sparkles className="h-5 w-5 text-white" />
-            </div>
-          </div>
+// Admins manage everything (and publish directly) in Publications. Professionals and NGOs
+// write here and submit for approval. Everyone else reads what has been published.
+export default async function MyBlogsPage() {
+	const auth = await requirePublisher();
+	if (!auth.ok) redirect("/publications");
+	if (auth.isAdmin) redirect("/dashboard/admin/publications");
 
-          {/* Title */}
-          <h1 className="text-3xl md:text-4xl font-bold text-sauti-dark mb-4 tracking-tight">
-            Blog Feature Coming Soon
-          </h1>
+	const { data } = await auth.supabase
+		.from("publications")
+		.select("id, title, kind, status, category, updated_at, rejection_reason, slug, view_count")
+		.eq("author_id", auth.user.id)
+		.order("updated_at", { ascending: false })
+		.limit(100);
+	const rows = (data ?? []) as unknown as Pick<PublicationRow, "id" | "title" | "kind" | "status" | "category" | "updated_at" | "rejection_reason" | "slug" | "view_count">[];
 
-          {/* Description */}
-          <p className="text-serene-neutral-500 text-lg mb-8 leading-relaxed">
-            We're working hard to bring you an amazing blogging experience. 
-            Soon you'll be able to share your knowledge, insights, and resources 
-            with the Sauti Salama community.
-          </p>
+	return (
+		<div className="mx-auto max-w-4xl space-y-6 p-4 md:p-6">
+			<SereneBreadcrumb items={[{ label: "Dashboard", href: "/dashboard" }, { label: "Blogs & publications", active: true }]} />
+			<div className="flex flex-wrap items-center justify-between gap-3">
+				<div>
+					<h1 className="text-2xl font-black text-[#1a365d]">Your blogs & publications</h1>
+					<p className="text-sm text-gray-600">Write a post or upload a PDF. An administrator approves it before it goes live.</p>
+				</div>
+				<Link href="/dashboard/blogs/new" className="inline-flex items-center gap-2 rounded-lg bg-[#008080] px-4 py-2.5 text-sm font-bold text-white hover:bg-[#006666]">
+					<Plus className="h-4 w-4" /> New post
+				</Link>
+			</div>
 
-          {/* Features Preview */}
-          <div className="bg-white rounded-2xl border border-serene-neutral-200 p-6 mb-8 text-left shadow-sm">
-            <h3 className="font-semibold text-sauti-dark mb-4 flex items-center gap-2">
-              <Sparkles className="h-4 w-4 text-sauti-teal" />
-              What's Coming
-            </h3>
-            <ul className="space-y-3 text-sm text-serene-neutral-600">
-              <li className="flex items-start gap-3">
-                <div className="w-1.5 h-1.5 rounded-full bg-sauti-teal mt-2 shrink-0" />
-                <span>Rich text editor with image support</span>
-              </li>
-              <li className="flex items-start gap-3">
-                <div className="w-1.5 h-1.5 rounded-full bg-sauti-teal mt-2 shrink-0" />
-                <span>Share educational resources and case studies</span>
-              </li>
-              <li className="flex items-start gap-3">
-                <div className="w-1.5 h-1.5 rounded-full bg-sauti-teal mt-2 shrink-0" />
-                <span>Community engagement and discussion</span>
-              </li>
-              <li className="flex items-start gap-3">
-                <div className="w-1.5 h-1.5 rounded-full bg-sauti-teal mt-2 shrink-0" />
-                <span>NGO review and publishing workflow</span>
-              </li>
-            </ul>
-          </div>
-
-          {/* Actions */}
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
-            <Button asChild variant="outline" className="rounded-xl border-serene-neutral-200 hover:bg-serene-neutral-50">
-              <Link href="/dashboard">
-                <ArrowLeft className="h-4 w-4 mr-2" />
-                Back to Dashboard
-              </Link>
-            </Button>
-            <Button 
-              disabled
-              className="bg-sauti-teal/50 text-white rounded-xl cursor-not-allowed"
-            >
-              <Bell className="h-4 w-4 mr-2" />
-              Get Notified (Soon)
-            </Button>
-          </div>
-
-          {/* Footer Note */}
-          <p className="text-xs text-serene-neutral-400 mt-8">
-            Expected launch: Q2 2026
-          </p>
-        </div>
-      </div>
-    </div>
-  );
+			{rows.length === 0 ? (
+				<div className="rounded-2xl border border-dashed border-gray-300 p-12 text-center">
+					<FileText className="mx-auto mb-3 h-8 w-8 text-gray-400" aria-hidden />
+					<p className="font-bold text-gray-700">You haven’t written anything yet</p>
+					<p className="text-sm text-gray-500">Start a post, or upload a Word or PDF document.</p>
+				</div>
+			) : (
+				<ul className="divide-y divide-gray-100 overflow-hidden rounded-2xl border border-gray-200 bg-white">
+					{rows.map((r) => (
+						<li key={r.id}>
+							<Link href={`/dashboard/blogs/${r.id}`} className="flex flex-wrap items-center gap-3 px-4 py-3 hover:bg-gray-50">
+								<div className="min-w-0 flex-1">
+									<p className="truncate font-bold text-[#1a365d]">{r.title}</p>
+									<p className="text-xs text-gray-500">
+										{KIND_LABEL[r.kind]}{r.category ? ` · ${r.category}` : ""} · edited {new Date(r.updated_at).toLocaleDateString("en-GB")}
+										{r.status === "published" && ` · ${r.view_count} views`}
+									</p>
+									{r.status === "draft" && r.rejection_reason && <p className="mt-0.5 truncate text-xs font-semibold text-orange-700">Changes requested: {r.rejection_reason}</p>}
+								</div>
+								<span className={cn("rounded-full px-2.5 py-1 text-xs font-bold", BADGE[r.status])}>{LABEL[r.status]}</span>
+							</Link>
+						</li>
+					))}
+				</ul>
+			)}
+		</div>
+	);
 }

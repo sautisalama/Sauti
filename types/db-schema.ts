@@ -1471,6 +1471,11 @@ export type Database = {
           title: string
           updated_at: string
           view_count: number
+          display_mode: string
+          rejection_reason: string | null
+          submitted_at: string | null
+          reviewed_by: string | null
+          reviewed_at: string | null
         }
         Insert: {
           author_id?: string | null
@@ -1499,6 +1504,11 @@ export type Database = {
           title: string
           updated_at?: string
           view_count?: number
+          display_mode?: string
+          rejection_reason?: string | null
+          submitted_at?: string | null
+          reviewed_by?: string | null
+          reviewed_at?: string | null
         }
         Update: {
           author_id?: string | null
@@ -1527,6 +1537,11 @@ export type Database = {
           title?: string
           updated_at?: string
           view_count?: number
+          display_mode?: string
+          rejection_reason?: string | null
+          submitted_at?: string | null
+          reviewed_by?: string | null
+          reviewed_at?: string | null
         }
         Relationships: [
           {

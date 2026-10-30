@@ -30,6 +30,7 @@ export default async function AdminPublicationsPage({ searchParams }: { searchPa
 	if ((FILTERS as readonly string[]).includes(status) && status !== "all") query = query.eq("status", status);
 	if (q.trim()) query = query.ilike("title", `%${q.trim().replace(/[%,]/g, " ")}%`);
 	const { data, error } = await query;
+	const { count: awaiting } = await auth.supabase.from("publications").select("id", { count: "exact", head: true }).eq("status", "in_review");
 	const rows = (data ?? []) as unknown as Pick<PublicationRow, "id" | "slug" | "title" | "kind" | "status" | "category" | "featured" | "updated_at" | "published_at" | "email_status" | "view_count">[];
 
 	return (
@@ -44,6 +45,13 @@ export default async function AdminPublicationsPage({ searchParams }: { searchPa
 					<Plus className="h-4 w-4" /> New publication
 				</Link>
 			</div>
+
+			{!!awaiting && status !== "in_review" && (
+				<Link href="/dashboard/admin/publications?status=in_review" className="flex items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-bold text-amber-900 hover:bg-amber-100">
+					<span>{awaiting} {awaiting === 1 ? "post is" : "posts are"} waiting for your approval</span>
+					<span aria-hidden>Review →</span>
+				</Link>
+			)}
 
 			<form className="flex flex-wrap items-center gap-2" role="search">
 				<input name="q" defaultValue={q} placeholder="Search titles" aria-label="Search titles" className="h-10 min-w-[14rem] flex-1 rounded-lg border border-gray-300 px-3 text-sm" />

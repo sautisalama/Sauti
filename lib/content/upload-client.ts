@@ -8,7 +8,7 @@ const safeName = (n: string) => n.replace(/[^\w.-]+/g, "_").replace(/_+/g, "_").
 
 /**
  * Upload straight from the browser to the `publications` bucket (RLS limits
- * writes to admins). This skips the serverless request-body limit, so large
+ * writes to admins and professional/NGO authors). This skips the serverless request-body limit, so large
  * Word/PDF files and images work.
  */
 export async function uploadToPublications(file: File, folder: "covers" | "images" | "imports"): Promise<{ path: string; url: string }> {
@@ -20,6 +20,6 @@ export async function uploadToPublications(file: File, folder: "covers" | "image
 		cacheControl: "31536000",
 		upsert: false,
 	});
-	if (error) throw new Error(error.message.includes("row-level security") ? "Only administrators can upload files." : error.message);
+	if (error) throw new Error(error.message.includes("row-level security") ? "You don't have permission to upload files." : error.message);
 	return { path, url: supabase.storage.from(BUCKET).getPublicUrl(path).data.publicUrl };
 }

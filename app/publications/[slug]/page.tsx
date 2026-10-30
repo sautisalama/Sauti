@@ -118,6 +118,7 @@ export default async function PublicationPage({ params, searchParams }: Props) {
 					readMinutes={pub.read_minutes}
 					// Sanitised on write, and again on read as defence in depth.
 					bodyHtml={sanitizeContent(pub.body)}
+					pdfUrl={pub.display_mode === "pdf" ? pub.source_file_url : null}
 					links={pub.external_links}
 					tags={pub.tags}
 				/>

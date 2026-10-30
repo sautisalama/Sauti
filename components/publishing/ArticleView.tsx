@@ -1,4 +1,4 @@
-import { ExternalLink } from "lucide-react";
+import { Download, ExternalLink } from "lucide-react";
 import type { ExternalLink as Source } from "@/types/publishing";
 
 export interface ArticleViewProps {
@@ -11,6 +11,8 @@ export interface ArticleViewProps {
 	publishedAt?: string | null;
 	readMinutes?: number | null;
 	bodyHtml: string;
+	/** When set, the post is the PDF itself: shown inline with an open/download link. */
+	pdfUrl?: string | null;
 	links?: Source[];
 	tags?: string[];
 }
@@ -23,7 +25,7 @@ export const KIND_LABEL: Record<string, string> = {
 };
 
 /** Shared by the public article page and the editor preview, so what you preview is what ships. */
-export function ArticleView({ title, summary, category, kindLabel, coverUrl, coverAlt, publishedAt, readMinutes, bodyHtml, links = [], tags = [] }: ArticleViewProps) {
+export function ArticleView({ title, summary, category, kindLabel, coverUrl, coverAlt, publishedAt, readMinutes, bodyHtml, pdfUrl, links = [], tags = [] }: ArticleViewProps) {
 	const date = publishedAt ? new Date(publishedAt) : null;
 	return (
 		<article className="mx-auto max-w-3xl">
@@ -60,7 +62,18 @@ export function ArticleView({ title, summary, category, kindLabel, coverUrl, cov
 				<img src={coverUrl} alt={coverAlt ?? ""} className="mb-10 aspect-video w-full rounded-2xl object-cover shadow-xl" />
 			)}
 
-			{bodyHtml ? (
+			{pdfUrl ? (
+				<section aria-label="Document" className="space-y-3">
+					<a href={pdfUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 rounded-lg bg-[#008080] px-4 py-2 text-sm font-bold text-white hover:bg-[#006666]">
+						<Download className="h-4 w-4" aria-hidden /> Open or download the PDF
+					</a>
+					<object data={`${pdfUrl}#view=FitH`} type="application/pdf" className="h-[80vh] w-full rounded-xl border border-gray-200" aria-label={title}>
+						<p className="p-6 text-gray-600">
+							Your browser can’t show PDFs here. <a className="font-semibold text-sauti-teal underline" href={pdfUrl} target="_blank" rel="noopener noreferrer">Open the PDF</a> to read it.
+						</p>
+					</object>
+				</section>
+			) : bodyHtml ? (
 				<div className="rich-content" dangerouslySetInnerHTML={{ __html: bodyHtml }} />
 			) : (
 				<p className="text-gray-400">Nothing to preview yet.</p>

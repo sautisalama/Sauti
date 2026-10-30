@@ -84,8 +84,7 @@ export default function BlogPage() {
 					<Button asChild className="bg-sauti-teal hover:bg-sauti-dark text-white rounded-xl h-11 px-6 relative">
 						<Link href="/dashboard/blogs">
 							<PenLine className="h-4 w-4 mr-2" />
-							Write Blog Post
-							<span className="ml-2 px-2 py-0.5 text-[10px] font-bold bg-amber-400 text-amber-900 rounded-full uppercase">Soon</span>
+							Blogs & Publications
 						</Link>
 					</Button>
 				)}
