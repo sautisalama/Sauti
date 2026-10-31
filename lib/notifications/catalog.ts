@@ -45,6 +45,8 @@ export function categoryOfType(type: string, metadata?: Record<string, unknown> 
     case 'new_message':
       return 'messages';
     case 'match_found':
+    case 'case_waiting':
+    case 'case_followup':
     case 'new_referral':
     case 'case_forwarded':
     case 'review_received':

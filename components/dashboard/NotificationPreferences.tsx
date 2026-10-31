@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Bell, Lock, Mail, Smartphone } from "lucide-react";
+import { Bell, Lock, Mail, Moon, Smartphone } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,7 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import { createClient } from "@/utils/supabase/client";
 import { useDashboardData } from "@/components/providers/DashboardDataProvider";
 import { NOTIFICATION_CATEGORIES, type NotificationCategoryId } from "@/lib/notifications/catalog";
-import { prefsFromSettings, type Channel, type NotificationPrefs } from "@/lib/notifications/prefs";
+import { prefsFromSettings, type Channel, type NotificationPrefs, type QuietHours } from "@/lib/notifications/prefs";
 
 /** What we send you, and a switch for each kind over email and over push. */
 export function NotificationPreferences() {
@@ -32,6 +32,7 @@ export function NotificationPreferences() {
 			email_notifications: next.email,
 			push_notifications: next.push,
 			notification_categories: next.categories,
+			quiet_hours: next.quiet,
 		};
 		try {
 			const { error } = await createClient().from("profiles").update({ settings: settings as never }).eq("id", userId);
@@ -47,6 +48,8 @@ export function NotificationPreferences() {
 	const setMaster = (channel: Channel, on: boolean) => save({ ...prefs, [channel]: on });
 	const setCategory = (id: NotificationCategoryId, channel: Channel, on: boolean) =>
 		save({ ...prefs, categories: { ...prefs.categories, [id]: { ...prefs.categories[id], [channel]: on } } });
+	const browserTz = typeof Intl !== "undefined" ? Intl.DateTimeFormat().resolvedOptions().timeZone : prefs.quiet.tz;
+	const setQuiet = (patch: Partial<QuietHours>) => save({ ...prefs, quiet: { ...prefs.quiet, tz: browserTz || prefs.quiet.tz, ...patch } });
 	const everythingOff = !prefs.email && !prefs.push;
 	const setAll = (on: boolean) => save({ ...prefs, email: on, push: on });
 
@@ -74,6 +77,27 @@ export function NotificationPreferences() {
 					<Button size="sm" variant="outline" disabled={saving} onClick={() => setAll(everythingOff)}>
 						{everythingOff ? "Turn everything on" : "Turn everything off"}
 					</Button>
+				</div>
+
+				{/* Quiet hours: pushes stay silent, nothing is lost from the bell */}
+				<div className="border-b border-neutral-100 px-4 py-3">
+					<div className="flex items-center justify-between gap-3">
+						<div className="flex items-center gap-3">
+							<div className="flex h-9 w-9 items-center justify-center rounded-full bg-indigo-50 text-indigo-600"><Moon className="h-4 w-4" /></div>
+							<div>
+								<p className="text-sm font-semibold text-neutral-900">Quiet hours</p>
+								<p className="text-xs text-neutral-500">No push sounds or buzzes in these hours. Everything waits in the bell. Urgent cases and account notices still come through.</p>
+							</div>
+						</div>
+						<Switch checked={prefs.quiet.enabled} disabled={saving} onCheckedChange={(v) => setQuiet({ enabled: v })} aria-label="Quiet hours" />
+					</div>
+					{prefs.quiet.enabled && (
+						<div className="mt-3 flex flex-wrap items-center gap-2 pl-12 text-sm text-neutral-700">
+							<label className="flex items-center gap-2">From <input type="time" value={prefs.quiet.start} disabled={saving} onChange={(e) => e.target.value && setQuiet({ start: e.target.value })} className="h-9 rounded-md border border-neutral-200 bg-white px-2 text-sm" /></label>
+							<label className="flex items-center gap-2">until <input type="time" value={prefs.quiet.end} disabled={saving} onChange={(e) => e.target.value && setQuiet({ end: e.target.value })} className="h-9 rounded-md border border-neutral-200 bg-white px-2 text-sm" /></label>
+							<span className="text-xs text-neutral-500">{prefs.quiet.tz}</span>
+						</div>
+					)}
 				</div>
 
 				{/* Per kind */}

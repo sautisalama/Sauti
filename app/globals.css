@@ -566,3 +566,225 @@ html.dark.mjengo-theme {
 }
 html.dark .bg-background { background-color: #0e1517; }
 html.dark input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]), html.dark textarea, html.dark select { background-color: #101a1d; color: #e8eef0; }
+
+/* Dark theme, third pass. Tailwind's default palette is a set of CSS variables, so inverting the neutral
+   scales here re-colours every gray/slate utility at once (text, borders, rings, gradients, hovers),
+   including the default hairline colour that was still light grey. White and black are left alone
+   because they are also used for text on coloured buttons. */
+html.dark {
+	--color-gray-50: #101a1d;
+	--color-gray-100: #1a272c;
+	--color-gray-200: #2b3a40;
+	--color-gray-300: #3d4f56;
+	--color-gray-400: #7f9299;
+	--color-gray-500: #9fb0b6;
+	--color-gray-600: #c3ced2;
+	--color-gray-700: #d6dfe2;
+	--color-slate-50: #101a1d;
+	--color-slate-100: #1a272c;
+	--color-slate-200: #2b3a40;
+	--color-slate-300: #3d4f56;
+	--color-slate-400: #7f9299;
+	--color-slate-500: #9fb0b6;
+	--color-slate-600: #c3ced2;
+	--color-slate-700: #d6dfe2;
+	--color-neutral-50: #101a1d;
+	--color-neutral-100: #1a272c;
+	--color-neutral-200: #2b3a40;
+	--color-neutral-300: #3d4f56;
+	--color-neutral-400: #7f9299;
+	--color-neutral-500: #9fb0b6;
+	--color-neutral-600: #c3ced2;
+	--color-neutral-700: #d6dfe2;
+	--color-zinc-50: #101a1d;
+	--color-zinc-100: #1a272c;
+	--color-zinc-200: #2b3a40;
+	--color-zinc-300: #3d4f56;
+	--color-zinc-400: #7f9299;
+	--color-zinc-500: #9fb0b6;
+	--color-zinc-600: #c3ced2;
+	--color-zinc-700: #d6dfe2;
+	--color-stone-50: #101a1d;
+	--color-stone-100: #1a272c;
+	--color-stone-200: #2b3a40;
+	--color-stone-300: #3d4f56;
+	--color-stone-400: #7f9299;
+	--color-stone-500: #9fb0b6;
+	--color-stone-600: #c3ced2;
+	--color-stone-700: #d6dfe2;
+}
+/* Brand-dark fills stay dark enough that white text, and 70%-white text, passes AA. */
+html.dark .bg-sauti-dark, html.dark .bg-sauti-dark\/90 { background-color: #0a4653; }
+html.dark .hover\:bg-sauti-dark:hover { background-color: #0d5767; }
+/* Yellow buttons keep dark text; they were turning light along with the text colours. */
+html.dark [class~="bg-sauti-yellow"], html.dark [class~="bg-sauti-yellow"] * { color: #10181a; }
+html.dark [class~="bg-sauti-yellow/90"], html.dark [class~="bg-sauti-yellow/90"] * { color: #10181a; }
+html.dark .text-black { color: #e8eef0; }
+html.dark .sr-only.bg-white { background-color: #e8eef0; color: #0e1517; }
+html.dark .text-sauti-blue { color: #7cc3e0; }
+html.dark .text-white\/40 { color: rgb(255 255 255 / 0.62); }
+html.dark .text-white\/70 { color: rgb(255 255 255 / 0.82); }
+/* Arbitrary light/dark hex colours used by the public pages. */
+html.dark [class*="bg-[#f"]:not([class*=":bg-[#f"]), html.dark [class*="bg-[#e"]:not([class*=":bg-[#e"]) { background-color: #162024; }
+html.dark [class*="bg-[#fff"]:not([class*=":bg-[#fff"]) { background-color: #162024; }
+html.dark [class*="text-[#1"], html.dark [class*="text-[#0"], html.dark [class*="text-[#2"], html.dark [class*="text-[#3"] { color: #e3eaec; }
+html.dark [class*="text-[#4"], html.dark [class*="text-[#5"], html.dark [class*="text-[#6"] { color: #b6c4c9; }
+html.dark [class*="border-[#e"], html.dark [class*="border-[#d"] { border-color: #2b3a40; }
+html.dark .text-gray-100, html.dark .text-gray-200, html.dark .text-gray-300, html.dark .text-slate-100, html.dark .text-slate-200, html.dark .text-slate-300 { color: #cbd6d9; }
+html.dark .text-gray-100.absolute, html.dark .text-gray-200.absolute { color: #243238; }
+html.dark .text-gray-400, html.dark .text-slate-400 { color: #9fb0b6; }
+html.dark .text-white\/50 { color: rgb(255 255 255 / 0.7); }
+html.dark .text-white\/80, html.dark .text-white\/90 { color: rgb(255 255 255 / 0.92); }
+html.dark .bg-white\/98, html.dark .bg-white\/85, html.dark .bg-white\/75, html.dark .bg-white\/\[0\.98\] { background-color: #162024; }
+html.dark img[src*="logo"] { background: #e8eef0; border-radius: 10px; padding: 3px 6px; }
+/* shadcn tokens: :root wins over the .dark block above on some pages, so state them again with higher specificity. */
+html.dark {
+	--background: 195 24% 7%; --foreground: 195 20% 93%;
+	--card: 195 20% 10%; --card-foreground: 195 20% 93%;
+	--popover: 195 20% 11%; --popover-foreground: 195 20% 93%;
+	--muted: 195 16% 16%; --muted-foreground: 195 12% 68%;
+	--accent: 195 16% 16%; --accent-foreground: 195 20% 93%;
+	--secondary: 195 16% 16%; --secondary-foreground: 195 20% 93%;
+	--border: 195 14% 21%; --input: 195 14% 24%;
+}
+html.dark [class*="bg-[#f" i]:not([class*=":bg-[#f" i]), html.dark [class*="bg-[#e" i]:not([class*=":bg-[#e" i]), html.dark [class*="bg-[#d" i]:not([class*=":bg-[#d" i]) { background-color: #162024; }
+html.dark [class*="border-[#f" i], html.dark [class*="border-[#e" i], html.dark [class*="border-[#d" i] { border-color: #2b3a40; }
+html.dark [class*="text-[#8" i], html.dark [class*="text-[#9" i] { color: #9fb0b6; }
+html.dark .border-zinc-200, html.dark .border-zinc-100 { border-color: #2b3a40; }
+html.dark .bg-white\/60, html.dark .supports-\[backdrop-filter\]\:bg-white\/60 { background-color: rgb(14 21 23 / 0.8); }
+
+/* Accent scales: tinted backgrounds and borders become dark tints of the hue, hue text becomes a lighter tint. Solid 500-700 fills are untouched so white text on them keeps working. */
+html.dark {
+	--color-purple-50: #1d1b2d;
+	--color-purple-100: #271f3b;
+	--color-purple-200: #392756;
+	--color-indigo-50: #161d2d;
+	--color-indigo-100: #1c223a;
+	--color-indigo-200: #262c54;
+	--color-pink-50: #241a24;
+	--color-pink-100: #321d2c;
+	--color-pink-200: #4c233b;
+	--color-orange-50: #261e17;
+	--color-orange-100: #342417;
+	--color-orange-200: #502f17;
+	--color-yellow-50: #242516;
+	--color-yellow-100: #312e15;
+	--color-yellow-200: #4c4113;
+	--color-rose-50: #25191e;
+	--color-rose-100: #331c22;
+	--color-rose-200: #4e212b;
+	--color-cyan-50: #0d252a;
+	--color-cyan-100: #0d2f35;
+	--color-cyan-200: #0c424c;
+	--color-sky-50: #0e232c;
+	--color-sky-100: #0e2c39;
+	--color-sky-200: #0e3d52;
+	--color-violet-50: #1a1c2d;
+	--color-violet-100: #22203b;
+	--color-violet-200: #312955;
+	--color-lime-50: #1a2717;
+	--color-lime-100: #213217;
+	--color-lime-200: #2f4817;
+	--color-emerald-50: #0e2522;
+	--color-emerald-100: #0e2f28;
+	--color-emerald-200: #0f4335;
+	--color-teal-50: #0f2525;
+	--color-teal-100: #0f2f2e;
+	--color-teal-200: #10433f;
+	--color-green-50: #10271e;
+	--color-green-100: #113122;
+	--color-green-200: #14462b;
+	--color-red-50: #241a1c;
+	--color-red-100: #321d1e;
+	--color-red-200: #4d2224;
+	--color-amber-50: #252316;
+	--color-amber-100: #332b15;
+	--color-amber-200: #4f3b14;
+	--color-blue-50: #12202d;
+	--color-blue-100: #15263b;
+	--color-blue-200: #1b3455;
+	--color-fuchsia-50: #221a2d;
+	--color-fuchsia-100: #2e1d3a;
+	--color-fuchsia-200: #472353;
+}
+html.dark .text-purple-600, html.dark .text-purple-700 { color: #c996fa; }
+html.dark .text-purple-800, html.dark .text-purple-900, html.dark .text-purple-950 { color: #bb7af9; }
+html.dark .border-purple-100, html.dark .border-purple-200, html.dark .border-purple-300 { border-color: #3f295f; }
+html.dark .text-indigo-600, html.dark .text-indigo-700 { color: #9ea0f6; }
+html.dark .text-indigo-800, html.dark .text-indigo-900, html.dark .text-indigo-950 { color: #8588f4; }
+html.dark .border-indigo-100, html.dark .border-indigo-200, html.dark .border-indigo-300 { border-color: #292f5d; }
+html.dark .text-pink-600, html.dark .text-pink-700 { color: #f38ec0; }
+html.dark .text-pink-800, html.dark .text-pink-900, html.dark .text-pink-950 { color: #f070af; }
+html.dark .border-pink-100, html.dark .border-pink-200, html.dark .border-pink-300 { border-color: #552541; }
+html.dark .text-orange-600, html.dark .text-orange-700 { color: #fba86f; }
+html.dark .text-orange-800, html.dark .text-orange-900, html.dark .text-orange-950 { color: #fa9249; }
+html.dark .border-orange-100, html.dark .border-orange-200, html.dark .border-orange-300 { border-color: #593317; }
+html.dark .text-yellow-600, html.dark .text-yellow-700 { color: #f2d066; }
+html.dark .text-yellow-800, html.dark .text-yellow-900, html.dark .text-yellow-950 { color: #efc43e; }
+html.dark .border-yellow-100, html.dark .border-yellow-200, html.dark .border-yellow-300 { border-color: #544812; }
+html.dark .text-rose-600, html.dark .text-rose-700 { color: #f8889b; }
+html.dark .text-rose-800, html.dark .text-rose-900, html.dark .text-rose-950 { color: #f66981; }
+html.dark .border-rose-100, html.dark .border-rose-200, html.dark .border-rose-300 { border-color: #58222e; }
+html.dark .text-cyan-600, html.dark .text-cyan-700 { color: #65d2e4; }
+html.dark .text-cyan-800, html.dark .text-cyan-900, html.dark .text-cyan-950 { color: #3dc6dd; }
+html.dark .border-cyan-100, html.dark .border-cyan-200, html.dark .border-cyan-300 { border-color: #0b4953; }
+html.dark .text-sky-600, html.dark .text-sky-700 { color: #6ac7f1; }
+html.dark .text-sky-800, html.dark .text-sky-900, html.dark .text-sky-950 { color: #43b9ee; }
+html.dark .border-sky-100, html.dark .border-sky-200, html.dark .border-sky-300 { border-color: #0e435a; }
+html.dark .text-violet-600, html.dark .text-violet-700 { color: #b79af9; }
+html.dark .text-violet-800, html.dark .text-violet-900, html.dark .text-violet-950 { color: #a580f8; }
+html.dark .border-violet-100, html.dark .border-violet-200, html.dark .border-violet-300 { border-color: #362c5e; }
+html.dark .text-lime-600, html.dark .text-lime-700 { color: #b3df6f; }
+html.dark .text-lime-800, html.dark .text-lime-900, html.dark .text-lime-950 { color: #9fd749; }
+html.dark .border-lime-100, html.dark .border-lime-200, html.dark .border-lime-300 { border-color: #345017; }
+html.dark .text-emerald-600, html.dark .text-emerald-700 { color: #6bd4b1; }
+html.dark .text-emerald-800, html.dark .text-emerald-900, html.dark .text-emerald-950 { color: #45c89d; }
+html.dark .border-emerald-100, html.dark .border-emerald-200, html.dark .border-emerald-300 { border-color: #0f4939; }
+html.dark .text-teal-600, html.dark .text-teal-700 { color: #6dd3c8; }
+html.dark .text-teal-800, html.dark .text-teal-900, html.dark .text-teal-950 { color: #48c8ba; }
+html.dark .border-teal-100, html.dark .border-teal-200, html.dark .border-teal-300 { border-color: #104945; }
+html.dark .text-green-600, html.dark .text-green-700 { color: #76db9b; }
+html.dark .text-green-800, html.dark .text-green-900, html.dark .text-green-950 { color: #53d281; }
+html.dark .border-green-100, html.dark .border-green-200, html.dark .border-green-300 { border-color: #144d2e; }
+html.dark .text-red-600, html.dark .text-red-700 { color: #f58b8b; }
+html.dark .text-red-800, html.dark .text-red-900, html.dark .text-red-950 { color: #f36d6d; }
+html.dark .border-red-100, html.dark .border-red-200, html.dark .border-red-300 { border-color: #562425; }
+html.dark .text-amber-600, html.dark .text-amber-700 { color: #f9c368; }
+html.dark .text-amber-800, html.dark .text-amber-900, html.dark .text-amber-950 { color: #f7b341; }
+html.dark .border-amber-100, html.dark .border-amber-200, html.dark .border-amber-300 { border-color: #584113; }
+html.dark .text-blue-600, html.dark .text-blue-700 { color: #85b2f9; }
+html.dark .text-blue-800, html.dark .text-blue-900, html.dark .text-blue-950 { color: #669ef8; }
+html.dark .border-blue-100, html.dark .border-blue-200, html.dark .border-blue-300 { border-color: #1c385e; }
+html.dark .text-fuchsia-600, html.dark .text-fuchsia-700 { color: #e78cf5; }
+html.dark .text-fuchsia-800, html.dark .text-fuchsia-900, html.dark .text-fuchsia-950 { color: #e16ff3; }
+html.dark .border-fuchsia-100, html.dark .border-fuchsia-200, html.dark .border-fuchsia-300 { border-color: #4f255c; }
+html.dark .bg-serene-green-50, html.dark .bg-serene-green-100 { background-color: rgb(52 168 107 / 0.16); }
+html.dark .border-serene-green-100, html.dark .border-serene-green-200, html.dark .border-serene-blue-100, html.dark .border-serene-blue-200 { border-color: #2b3a40; }
+html.dark .bg-serene-green-600, html.dark .bg-serene-green-700 { background-color: #1f7a52; }
+/* Hue text at 400/500 also needs lifting on dark. */
+html.dark .text-purple-400, html.dark .text-purple-500 { color: #d4aafb; }
+html.dark .text-indigo-400, html.dark .text-indigo-500 { color: #b1b2f8; }
+html.dark .text-pink-400, html.dark .text-pink-500 { color: #f6a4cc; }
+html.dark .text-orange-400, html.dark .text-orange-500 { color: #fcb98a; }
+html.dark .text-yellow-400, html.dark .text-yellow-500 { color: #f4d984; }
+html.dark .text-rose-400, html.dark .text-rose-500 { color: #fa9fae; }
+html.dark .text-cyan-400, html.dark .text-cyan-500 { color: #82daea; }
+html.dark .text-sky-400, html.dark .text-sky-500 { color: #86d2f4; }
+html.dark .text-violet-400, html.dark .text-violet-500 { color: #c5aefa; }
+html.dark .text-lime-400, html.dark .text-lime-500 { color: #c2e68a; }
+html.dark .text-emerald-400, html.dark .text-emerald-500 { color: #88dcc0; }
+html.dark .text-teal-400, html.dark .text-teal-500 { color: #8adcd2; }
+html.dark .text-green-400, html.dark .text-green-500 { color: #90e2ae; }
+html.dark .text-red-400, html.dark .text-red-500 { color: #f7a2a2; }
+html.dark .text-amber-400, html.dark .text-amber-500 { color: #face85; }
+html.dark .text-blue-400, html.dark .text-blue-500 { color: #9dc0fa; }
+html.dark .text-fuchsia-400, html.dark .text-fuchsia-500 { color: #eca2f7; }
+html.dark .react-flow { background-color: #0e1517; }
+html.dark .react-flow__controls-button { background-color: #1e2b30; color: #e8eef0; border-color: #2b3a40; fill: #e8eef0; }
+html.dark .react-flow__controls-button svg { fill: #e8eef0; }
+html.dark .react-flow__minimap { background-color: #162024; }
+html.dark .react-flow__attribution { background: transparent; }
+html.dark .react-flow__attribution a { color: #7f9299; }
+html.dark .from-serene-neutral-100, html.dark .from-serene-neutral-200, html.dark .from-gray-100, html.dark .from-serene-blue-100 { --tw-gradient-from: #24343a var(--tw-gradient-from-position); --tw-gradient-to: rgb(36 52 58 / 0) var(--tw-gradient-to-position); --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to); }
+html.dark .to-serene-neutral-100, html.dark .to-serene-neutral-200, html.dark .to-gray-100, html.dark .to-serene-blue-100, html.dark .to-serene-blue-200 { --tw-gradient-to: #1a272c var(--tw-gradient-to-position); }
+html.dark .via-serene-neutral-50, html.dark .via-gray-50 { --tw-gradient-stops: var(--tw-gradient-from), #101a1d var(--tw-gradient-via-position), var(--tw-gradient-to); }

@@ -27,6 +27,8 @@ import { GrantCharts, type GrantLite } from "./GrantCharts";
 import { Avatars, DeadlineChip, STATUSES, StatusPill, money, type Kind } from "./shared";
 import { EntityAccessPanel, FellowshipAssignments } from "./EntityExtras";
 import { EntityTimeline } from "./EntityTimeline";
+import { EntityTasks } from "./EntityTasks";
+import { autoTagItem } from "@/app/actions/mjengo-search";
 import { GrantAgent } from "./GrantAgent";
 import { ProgressReport } from "./ProgressReport";
 import { MemberFilter, SimilarItems, TagEditor, TagFilter, tagLabel } from "./Facets";
@@ -251,6 +253,9 @@ export function EntityWorkspace({ kind, pageId }: { kind: Kind; pageId?: string 
 	};
 
 	const [confirmingDelete, setConfirmingDelete] = useState(false);
+	// A link that was read again changes the details; the tags and to-dos that depend on it are redone after saving.
+	const [linkVersion, setLinkVersion] = useState(0);
+	const [pendingRefresh, setPendingRefresh] = useState(false);
 	const remove = async () => {
 		if (!editing?.id) return;
 		setConfirmingDelete(false);
@@ -275,6 +280,23 @@ export function EntityWorkspace({ kind, pageId }: { kind: Kind; pageId?: string 
 			load();
 		}
 	};
+
+	useEffect(() => {
+		if (!pendingRefresh || !editing?.id || saving) return;
+		setPendingRefresh(false);
+		const id = editing.id;
+		void (async () => {
+			try {
+				await save();
+				await unwrap(autoTagItem(kind, id));
+				setLinkVersion((v) => v + 1);
+				await load();
+			} catch {
+				toast({ title: "Saved, but the tags could not be refreshed", description: "Use Suggest tags to try again.", variant: "destructive" });
+			}
+		})();
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [pendingRefresh, editing, saving]);
 
 	if (!rows) {
 		return <MjengoLoader label="Loading" />;
@@ -306,6 +328,8 @@ export function EntityWorkspace({ kind, pageId }: { kind: Kind; pageId?: string 
 								<FundFromLink
 									url={String(editing.values[urlKey] ?? "")}
 									values={editing.values}
+									existing={!!editing.id}
+									onRefreshed={() => setPendingRefresh(true)}
 									onFill={(patch) => Object.entries(patch).forEach(([k, v]) => set(k, v))}
 								/>
 							)}
@@ -335,25 +359,21 @@ export function EntityWorkspace({ kind, pageId }: { kind: Kind; pageId?: string 
 									{kind === "opportunity" && editing.values.converted_to_type && (
 										<Link href={`/dashboard/mjengo/${editing.values.converted_to_type}s`} className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm font-medium text-emerald-800 hover:bg-emerald-100">Won, and now a {String(editing.values.converted_to_type)}. Open it <ExternalLink className="ml-auto h-3.5 w-3.5" /></Link>
 									)}
+									<EntityTasks kind={kind} id={editing.id} version={linkVersion} noun={cfg.noun} />
 									<div className="rounded-xl border border-serene-neutral-100 p-3">
 										<p className="mb-2 text-sm font-semibold text-serene-neutral-900">Tags</p>
-										<TagEditor type={kind} id={editing.id} tags={(editing.values.tags as string[] | undefined) ?? []} onChange={(t) => { set("tags", t); void load(); }} />
+										<TagEditor key={`tags-${linkVersion}`} type={kind} id={editing.id} tags={(editing.values.tags as string[] | undefined) ?? []} onChange={(t) => { set("tags", t); void load(); }} />
+									</div>
+									<DocumentsPanel kind={kind} entityId={editing.id} onChange={load} />
+									<div className="rounded-xl border border-serene-neutral-100 p-3">
+										<p className="mb-2 text-sm font-semibold text-serene-neutral-900">Reminders</p>
+										<EntityReminders type={kind} id={editing.id} />
 									</div>
 									<EntityTimeline kind={kind} id={editing.id} />
 									<ProgressReport kind={kind} id={editing.id} />
 									{(kind === "grant" || kind === "opportunity") && <GrantAgent kind={kind} id={editing.id} />}
 									<SimilarItems type={kind} id={editing.id} />
 									<EntityAccessPanel kind={kind} id={editing.id} />
-									<DocumentsPanel kind={kind} entityId={editing.id} onChange={load} />
-									<div className="rounded-xl border border-serene-neutral-100 p-3">
-										<p className="mb-2 text-sm font-semibold text-serene-neutral-900">Reminders</p>
-										<EntityReminders type={kind} id={editing.id} />
-									</div>
-									<Link href="/dashboard/mjengo/todos" className="flex items-center gap-2 rounded-xl border border-serene-neutral-100 p-3 text-sm text-serene-neutral-700 hover:bg-serene-neutral-50">
-										<CheckSquare className="h-4 w-4 text-sauti-teal" />
-										{(rows.find((r) => r.id === editing.id)?.openTodos ?? 0)} open to-dos linked to this {cfg.noun}
-										<ExternalLink className="ml-auto h-3.5 w-3.5 text-serene-neutral-400" />
-									</Link>
 								</>
 							) : (
 								<>
@@ -712,18 +732,23 @@ function SdgPicker({ value, onChange }: { value: number[]; onChange: (v: unknown
 }
 
 /** Reads the call's page and fills the details that are still empty: what it funds, sectors, themes, SDGs, who can apply. */
-function FundFromLink({ url, values, onFill }: { url: string; values: Record<string, any>; onFill: (patch: Record<string, unknown>) => void }) {
+function FundFromLink({ url, values, onFill, existing = false, onRefreshed }: { url: string; values: Record<string, any>; onFill: (patch: Record<string, unknown>) => void; existing?: boolean; onRefreshed?: () => void }) {
 	const [busy, setBusy] = useState(false);
 	const [err, setErr] = useState<string | null>(null);
 	const [done, setDone] = useState<{ site: string; filled: string[] } | null>(null);
-	const lastUrl = useRef("");
+	// What a refresh replaced, so it can be put back.
+	const [undo, setUndo] = useState<Record<string, unknown> | null>(null);
+	const onRefreshedRef = useRef(onRefreshed);
+	onRefreshedRef.current = onRefreshed;
+	// An item that is already saved is not read again just by opening it; only a changed link, or the button, does that.
+	const lastUrl = useRef(existing ? url.trim() : "");
 	const valuesRef = useRef(values);
 	valuesRef.current = values;
 	const onFillRef = useRef(onFill);
 	onFillRef.current = onFill;
 	const LABELS: Record<string, string> = { title: "name", organisation: "funder", description: "details", amount: "amount", deadline: "deadline", sectors: "sectors", themes: "themes", sdgs: "SDGs", regions: "regions", eligibility: "eligibility" };
 
-	const read = useCallback(async () => {
+	const read = useCallback(async (overwrite = false) => {
 		setErr(null);
 		setBusy(true);
 		try {
@@ -735,12 +760,14 @@ function FundFromLink({ url, values, onFill }: { url: string; values: Record<str
 			const amountKey = "amount" in cur ? "amount" : "stipend" in cur ? "stipend" : "value";
 			const targets: Record<string, string> = { title: "title", organisation: orgKey, description: "description", amount: amountKey, deadline: "deadline", sectors: "sectors", themes: "themes", sdgs: "sdgs", regions: "regions", eligibility: "eligibility" };
 			const patch: Record<string, unknown> = {};
+			const prev: Record<string, unknown> = {};
 			const filled: string[] = [];
 			let gotAmount = false;
 			for (const [k, v] of Object.entries(r)) {
 				const key = targets[k];
 				if (!key || v == null || (Array.isArray(v) && !v.length)) continue;
-				if (!empty(cur[key])) continue;
+				if (!empty(cur[key]) && !(overwrite && JSON.stringify(cur[key]) !== JSON.stringify(v))) continue;
+				if (overwrite && !empty(cur[key])) prev[key] = cur[key];
 				patch[key] = v;
 				filled.push(LABELS[k] ?? k);
 				if (k === "amount") gotAmount = true;
@@ -748,12 +775,15 @@ function FundFromLink({ url, values, onFill }: { url: string; values: Record<str
 			if (gotAmount && r.currency) patch.currency = r.currency;
 			if (Object.keys(patch).length) onFillRef.current(patch);
 			setDone({ site: r.sourceSite ?? "", filled });
+			setUndo(overwrite && Object.keys(prev).length ? prev : null);
+			// On a saved record, new details mean its tags and to-dos should be redone too.
+			if (existing && filled.length) onRefreshedRef.current?.();
 		} catch (e) {
 			setErr(e instanceof Error ? e.message : "Could not read that link.");
 		} finally {
 			setBusy(false);
 		}
-	}, [url]);
+	}, [url, existing]);
 
 	// A new link is read once, a moment after it stops changing.
 	useEffect(() => {
@@ -763,13 +793,14 @@ function FundFromLink({ url, values, onFill }: { url: string; values: Record<str
 		return () => clearTimeout(t);
 	}, [url, read]);
 
-	if (!url.trim() || (!busy && !done && !err)) return null;
+	if (!/^https?:\/\//i.test(url.trim()) || (!busy && !done && !err && !existing)) return null;
 	return (
 		<div className="flex flex-wrap items-center gap-2 rounded-xl border border-dashed border-serene-neutral-200 px-3 py-2 text-xs text-serene-neutral-600">
 			{busy ? <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Reading the page and filling in the details…</> : err ? <span>{err}</span> : done && (
-				<span>{done.filled.length ? <>Filled from {done.site || "the link"}: {done.filled.join(", ")}.</> : <>Read {done.site || "the link"}. Nothing new to fill in.</>}</span>
+				<span>{done.filled.length ? <>{undo ? "Updated" : "Filled"} from {done.site || "the link"}: {done.filled.join(", ")}.{existing ? " Tags and to-dos were refreshed." : ""}</> : <>Read {done.site || "the link"}. Nothing new to fill in.</>}</span>
 			)}
-			{!busy && <button type="button" onClick={() => void read()} className="font-medium text-sauti-teal hover:underline">Read again</button>}
+			{!busy && undo && <button type="button" onClick={() => { onFillRef.current(undo); setUndo(null); onRefreshedRef.current?.(); }} className="font-medium text-serene-neutral-700 hover:underline">Undo</button>}
+			{!busy && <button type="button" onClick={() => void read(existing)} className="font-medium text-sauti-teal hover:underline">{existing ? "Refresh from link" : "Read again"}</button>}
 		</div>
 	);
 }

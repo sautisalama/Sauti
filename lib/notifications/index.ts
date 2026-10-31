@@ -56,6 +56,7 @@ export async function sendNotification(payload: NotificationPayload) {
       url: payload.link,
       tag: payload.type,
       category: categoryOfType(payload.type, payload.metadata),
+      urgency: (payload.metadata as { urgency?: string } | undefined)?.urgency ?? null,
     });
   }
 

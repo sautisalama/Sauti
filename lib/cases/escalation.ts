@@ -1,5 +1,6 @@
 import { createAdminClient } from "@/utils/supabase/admin-client";
 import { sendEmail } from "@/lib/notifications/email";
+import { reassureSurvivors } from "@/lib/cases/nudges";
 import { ESCALATION_AFTER_HOURS, ESCALATION_EMAIL_RECIPIENTS } from "@/lib/constants";
 
 /** Matches still waiting on someone to respond. */
@@ -201,5 +202,7 @@ export async function escalateStaleCases(appUrl: string) {
 		for (const c of claimed) await admin.from("case_escalation_alerts").delete().eq("kind", c.kind).eq("ref_id", c.refId);
 		throw new Error(`escalation email failed: ${String(res.error)}`);
 	}
-	return { found: stale.length, sent: claimed.length };
+	// Tell the people waiting that someone is on it. Best-effort: never undoes the escalation.
+	const survivors = await reassureSurvivors(claimed).catch((e) => ({ sent: 0, error: String(e) }));
+	return { found: stale.length, sent: claimed.length, survivorsTold: survivors.sent };
 }

@@ -16,6 +16,8 @@ export type NotificationType =
   | 'new_content'
   | 'todo_due'
   | 'todo_assigned'
+  | 'case_waiting'
+  | 'case_followup'
   | 'welcome';
 
 export interface RecipientProfile {

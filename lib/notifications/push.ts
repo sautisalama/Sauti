@@ -1,7 +1,7 @@
 import webpush from 'web-push';
 import { createAdminClient } from '@/utils/supabase/admin-client';
 import { categoryOfType, type NotificationCategoryId } from './catalog';
-import { allows, getPrefsByUserId } from './prefs';
+import { allows, breaksQuiet, getPrefsByUserId, inQuietHours } from './prefs';
 
 let configured = false;
 function configure(): boolean {
@@ -25,6 +25,8 @@ export interface PushPayload {
   chatId?: string;
   /** Which Notifications-settings kind this is; the person's push switches are checked against it. */
   category?: NotificationCategoryId;
+  /** Report urgency, so a high-urgency case can break through quiet hours. */
+  urgency?: string | null;
   /** Skip the preference check (the settings page's own test push). */
   force?: boolean;
 }
@@ -37,7 +39,13 @@ export interface PushPayload {
 export async function sendPushToUser(userId: string, payload: PushPayload): Promise<{ sent: number }> {
   if (!configured && !configure()) return { sent: 0 };
   try {
-    if (!payload.force && !allows(await getPrefsByUserId(userId), payload.category ?? 'reminders', 'push')) return { sent: 0 };
+    if (!payload.force) {
+      const prefs = await getPrefsByUserId(userId);
+      const category = payload.category ?? 'reminders';
+      if (!allows(prefs, category, 'push')) return { sent: 0 };
+      // Quiet hours: stay silent, the notification is still waiting in the bell.
+      if (inQuietHours(prefs.quiet) && !breaksQuiet(category, payload.urgency)) return { sent: 0 };
+    }
     const db = createAdminClient();
     const { data: subs } = await db
       .from('push_subscriptions')

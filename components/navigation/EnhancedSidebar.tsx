@@ -1,5 +1,7 @@
 "use client";
 
+import { WorkspaceMenu } from "@/components/navigation/WorkspaceMenu";
+import { useWorkspaceSync } from "@/hooks/useWorkspace";
 import { ThemeMenuItem } from "@/components/theme/ThemeControls";
 import { useState, useEffect, useMemo, useCallback } from "react";
 import Link from "next/link";
@@ -215,14 +217,7 @@ export function EnhancedSidebar({
 		return () => window.removeEventListener("keydown", onKey);
 	}, [toggleCollapsed]);
 
-	useEffect(() => {
-		const checkAdminMode = () => {
-            if (isAdminMode && pathname === "/dashboard") {
-                 router.push("/dashboard/admin");
-            }
-		};
-		checkAdminMode();
-	}, [pathname, router, isAdminMode]);
+	useWorkspaceSync(dash?.data?.userId, !!roleContext?.can_switch_to_admin);
 	useEffect(() => {
 		// Prefer provider data when available to avoid extra fetches
 		if (typeof dash?.data?.casesCount === "number") {
@@ -866,49 +861,7 @@ export function EnhancedSidebar({
 											</Link>
 										</DropdownMenuItem>
 									)}
-									{roleContext?.can_switch_to_admin && (
-										<>
-											<DropdownMenuSeparator className="bg-serene-neutral-100 my-1" />
-											<DropdownMenuItem asChild>
-												<Link href="/dashboard/mjengo" className="flex items-center gap-3 cursor-pointer rounded-xl focus:bg-purple-50 focus:text-purple-700 m-1 p-2">
-													<div className="h-8 w-8 rounded-lg bg-purple-50 flex items-center justify-center text-purple-600">
-														<Briefcase className="h-4 w-4" />
-													</div>
-													<div className="flex flex-col">
-														<span className="font-semibold text-xs text-neutral-800">Mjengo Suite</span>
-														<span className="text-[9px] text-gray-500">Mail, grants, projects</span>
-													</div>
-												</Link>
-											</DropdownMenuItem>
-											{!isAdminMode ? (
-												<DropdownMenuItem 
-													onClick={switchToAdmin} 
-													className="flex items-center gap-3 cursor-pointer rounded-xl focus:bg-blue-50 focus:text-blue-700 m-1 p-2"
-												>
-													<div className="h-8 w-8 rounded-lg bg-blue-50 flex items-center justify-center text-blue-600">
-														<Shield className="h-4 w-4" />
-													</div>
-													<div className="flex flex-col">
-														<span className="font-semibold text-xs text-neutral-800">Switch to Admin Mode</span>
-														<span className="text-[9px] text-gray-500">Platform management</span>
-													</div>
-												</DropdownMenuItem>
-											) : (
-												<DropdownMenuItem 
-													onClick={switchToUser} 
-													className="flex items-center gap-3 cursor-pointer rounded-xl focus:bg-serene-neutral-50 focus:text-serene-neutral-900 m-1 p-2"
-												>
-													<div className="h-8 w-8 rounded-lg bg-serene-neutral-50 flex items-center justify-center text-serene-neutral-600">
-														{roleContext.primary_role === 'ngo' ? <Building2 className="h-4 w-4" /> : <GraduationCap className="h-6 w-6" />}
-													</div>
-													<div className="flex flex-col">
-														<span className="font-semibold text-xs text-neutral-800">Switch to {getRoleLabel(roleContext.primary_role)} Mode</span>
-														<span className="text-[9px] text-gray-500">Regular dashboard</span>
-													</div>
-												</DropdownMenuItem>
-											)}
-										</>
-									)}
+									<WorkspaceMenu canSwitch={!!roleContext?.can_switch_to_admin} primaryRole={roleContext?.primary_role} />
 								</>
 							)}
 

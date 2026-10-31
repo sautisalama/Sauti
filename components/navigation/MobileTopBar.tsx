@@ -1,5 +1,6 @@
 "use client";
 
+import { WorkspaceMenu } from "@/components/navigation/WorkspaceMenu";
 import { ThemeMenuItem } from "@/components/theme/ThemeControls";
 import { useUser } from "@/hooks/useUser";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -160,41 +161,7 @@ export function MobileTopBar() {
                         )}
                         <ThemeMenuItem />
 
-                        {/* Role Switcher Options */}
-                        {roleContext?.can_switch_to_admin && (
-                                <>
-                                    <DropdownMenuSeparator className="bg-serene-neutral-100 my-1" />
-                                    <DropdownMenuItem asChild>
-                                        <Link href="/dashboard/mjengo" className="flex items-center gap-3 cursor-pointer rounded-xl focus:bg-purple-50 focus:text-purple-700 p-3">
-                                            <div className="h-6 w-6 rounded-md bg-purple-100 flex items-center justify-center text-purple-600">
-                                                <Briefcase className="h-3.5 w-3.5" />
-                                            </div>
-                                            <span className="font-semibold text-sm">Mjengo Suite</span>
-                                        </Link>
-                                    </DropdownMenuItem>
-                                    {!isAdminMode ? (
-                                        <DropdownMenuItem 
-                                            onClick={switchToAdmin} 
-                                            className="flex items-center gap-3 cursor-pointer rounded-xl focus:bg-blue-50 focus:text-blue-700 p-3"
-                                        >
-                                            <div className="h-6 w-6 rounded-md bg-blue-100 flex items-center justify-center text-blue-600">
-                                                <Shield className="h-3.5 w-3.5" />
-                                            </div>
-                                            <span className="font-semibold text-sm">Switch to Admin</span>
-                                        </DropdownMenuItem>
-                                    ) : (
-                                        <DropdownMenuItem 
-                                            onClick={switchToUser} 
-                                            className="flex items-center gap-3 cursor-pointer rounded-xl focus:bg-serene-neutral-50 focus:text-serene-neutral-900 p-3"
-                                        >
-                                            <div className="h-6 w-6 rounded-md bg-serene-neutral-100 flex items-center justify-center text-serene-neutral-600">
-                                                {roleContext.primary_role === 'ngo' ? <Building2 className="h-3.5 w-3.5" /> : <User className="h-3.5 w-3.5" />}
-                                            </div>
-                                            <span className="font-semibold text-sm">Switch to {getRoleLabel(roleContext.primary_role)}</span>
-                                        </DropdownMenuItem>
-                                    )}
-                                </>
-                        )}
+                        <WorkspaceMenu canSwitch={!!roleContext?.can_switch_to_admin} primaryRole={roleContext?.primary_role} />
                         </>
                     )}
     
