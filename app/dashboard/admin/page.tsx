@@ -17,6 +17,7 @@ import {
 	SereneBreadcrumb,
 } from "../_components/SereneDashboardUI";
 import { AdminActivitySection } from "./_components/AdminActivitySection";
+import { EscalatedCases } from "./_components/EscalatedCases";
 import { useDashboardData } from "@/components/providers/DashboardDataProvider";
 
 import { Database, Tables } from "@/types/db-schema";
@@ -206,6 +207,9 @@ export default function AdminDashboard() {
                 timeOfDay={getTimeOfDay()}
                 welcomeMessage="Here's what needs your attention today."
             />
+
+            {/* Cases that have waited 24 hours without anyone acting */}
+            <EscalatedCases />
 
             {/* Activity Feed */}
             <AdminActivitySection />

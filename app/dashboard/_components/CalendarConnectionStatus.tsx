@@ -59,7 +59,7 @@ export function CalendarConnectionStatus({
 		if (connected) {
 			return <CheckCircle className="h-4 w-4 text-green-500" />;
 		}
-		return <XCircle className="h-4 w-4 text-red-500" />;
+		return <XCircle className="h-4 w-4 text-gray-400" />; // optional integration: neutral, not an error
 	};
 
 	const getStatusText = () => {
@@ -77,7 +77,7 @@ export function CalendarConnectionStatus({
 				? "bg-green-100 text-green-800"
 				: "bg-yellow-100 text-yellow-800";
 		}
-		return "bg-red-100 text-red-800";
+		return "bg-gray-100 text-gray-700";
 	};
 
 	// Don't show anything if connected and syncing

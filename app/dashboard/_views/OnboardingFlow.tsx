@@ -400,12 +400,12 @@ export default function OnboardingFlow() {
 				<CardTitle className="text-lg md:text-2xl font-bold text-serene-neutral-900 tracking-tight">
 					Choose Your Role
 				</CardTitle>
-				<p className="text-[10px] md:text-xs font-medium text-serene-neutral-500 max-w-xs mx-auto mt-0.5 px-4 leading-normal">
-					Select the role that best describes your needs.
+				<p className="text-sm text-serene-neutral-600 max-w-xs mx-auto mt-1 px-4 leading-normal">
+					Pick what fits you best. You can change this later in your profile.
 				</p>
 			</CardHeader>
 			<CardContent className="p-3 md:p-8 flex-1 overflow-y-auto no-scrollbar">
-				<div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-6">
+				<div role="radiogroup" aria-label="Choose your role" className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-6">
 					{/* Survivor Tile */}
 					<div
 						className={`cursor-pointer rounded-xl border-2 p-4 md:p-6 transition-all duration-300 group relative overflow-hidden bg-white h-full flex flex-col justify-center ${
@@ -413,6 +413,10 @@ export default function OnboardingFlow() {
 								? "border-serene-blue-500 shadow-xl ring-2 ring-serene-blue-500/10"
 								: "border-serene-neutral-100 hover:border-serene-blue-200 hover:shadow-md"
 						}`}
+						role="radio"
+						aria-checked={profile.user_type === "survivor"}
+						tabIndex={0}
+						onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setProfile(p => ({ ...p, user_type: "survivor" })); } }}
 						onClick={() => setProfile(p => ({ ...p, user_type: "survivor" }))}
 					>
 						<div className="flex flex-row sm:flex-col items-center sm:justify-center gap-4 relative z-10 w-full">
@@ -429,7 +433,7 @@ export default function OnboardingFlow() {
 								<h3 className="text-base sm:text-lg font-bold text-serene-neutral-900 group-hover:text-serene-blue-600 transition-colors">
 									Survivor
 								</h3>
-								<p className="text-[11px] sm:text-xs font-medium text-serene-neutral-500 mt-1 sm:mt-2 leading-tight">
+								<p className="text-xs sm:text-sm text-serene-neutral-600 mt-1 sm:mt-2 leading-tight">
 									Report abuse incidents and receive secure confidential support.
 								</p>
 							</div>
@@ -443,6 +447,10 @@ export default function OnboardingFlow() {
 								? "border-serene-blue-500 shadow-xl ring-2 ring-serene-blue-500/10"
 								: "border-serene-neutral-100 hover:border-serene-blue-200 hover:shadow-md"
 						}`}
+						role="radio"
+						aria-checked={profile.user_type === "professional"}
+						tabIndex={0}
+						onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setProfile(p => ({ ...p, user_type: "professional" })); } }}
 						onClick={() => setProfile(p => ({ ...p, user_type: "professional" }))}
 					>
 						<div className="flex flex-row sm:flex-col items-center sm:justify-center gap-4 relative z-10 w-full">
@@ -459,7 +467,7 @@ export default function OnboardingFlow() {
 								<h3 className="text-base sm:text-lg font-bold text-serene-neutral-900 group-hover:text-serene-blue-600 transition-colors">
 									Professional
 								</h3>
-								<p className="text-[11px] sm:text-xs font-medium text-serene-neutral-500 mt-1 sm:mt-2 leading-tight">
+								<p className="text-xs sm:text-sm text-serene-neutral-600 mt-1 sm:mt-2 leading-tight">
 									Provide expert support to survivors.
 								</p>
 							</div>
@@ -473,6 +481,10 @@ export default function OnboardingFlow() {
 								? "border-serene-blue-500 shadow-xl ring-2 ring-serene-blue-500/10"
 								: "border-serene-neutral-100 hover:border-serene-blue-200 hover:shadow-md"
 						}`}
+						role="radio"
+						aria-checked={profile.user_type === "ngo"}
+						tabIndex={0}
+						onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setProfile(p => ({ ...p, user_type: "ngo" })); } }}
 						onClick={() => setProfile(p => ({ ...p, user_type: "ngo" }))}
 					>
 						<div className="flex flex-row sm:flex-col items-center sm:justify-center gap-4 relative z-10 w-full">
@@ -489,7 +501,7 @@ export default function OnboardingFlow() {
 								<h3 className="text-base sm:text-lg font-bold text-serene-neutral-900 group-hover:text-serene-blue-600 transition-colors">
 									Organisation
 								</h3>
-								<p className="text-[11px] sm:text-xs font-medium text-serene-neutral-500 mt-1 sm:mt-2 leading-tight">
+								<p className="text-xs sm:text-sm text-serene-neutral-600 mt-1 sm:mt-2 leading-tight">
 									Manage non profit services, multiple professionals and provide support to survivors.
 								</p>
 							</div>

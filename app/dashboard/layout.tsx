@@ -11,6 +11,7 @@ import { DeviceRegistration } from "./_components/DeviceRegistration";
 import { PushAndBadge } from "@/components/dashboard/PushAndBadge";
 import { AppWarmup, SwrOwner } from "@/components/dashboard/AppWarmup";
 import { SuiteTracker } from "@/components/dashboard/SuiteTracker";
+import { ExitPageButton } from "@/components/safety/ExitPageButton";
 
 
 export default async function DashboardLayout({
@@ -42,7 +43,7 @@ export default async function DashboardLayout({
 	};
 
 	return (
-		<div className="flex min-h-screen bg-serene-neutral-50 dark:bg-neutral-950 overflow-x-hidden">
+		<div className="ss-calm flex min-h-screen bg-serene-neutral-50 dark:bg-neutral-950 overflow-x-hidden">
 			{/* A page opened inside a call (?embed=1 in a frame) drops the suite's own chrome. */}
 			<script dangerouslySetInnerHTML={{ __html: "try{if(self!==top&&/[?&]embed=1/.test(location.search))document.documentElement.classList.add('ss-embed')}catch(e){}" }} />
 			<DashboardDataProvider initialData={initialData || fallbackData}>
@@ -52,6 +53,8 @@ export default async function DashboardLayout({
 				<DeviceRegistration />
 				<PushAndBadge />
 				<SuiteTracker />
+				{/* Survivors can leave in one tap or Shift x3; providers never need it. */}
+				{(user.user_type === "survivor" || (user as any).is_anonymous) && <ExitPageButton always />}
 				{/* Desktop Sidebar */}
 				<div data-chrome className="contents"><EnhancedSidebar /></div>
 

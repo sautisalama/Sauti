@@ -552,24 +552,9 @@ function VisualizerContent({ initialCases, initialProStatus }: { initialCases: R
                 ) : !selectedCase && nodes.length === 0 ? (
                     <div className="absolute inset-0 flex flex-col items-center justify-center bg-[#FAFAFA] z-10 p-8">
                         <div className="max-w-3xl w-full flex flex-col items-center">
-                            <div className="grid grid-cols-3 gap-8 w-full mb-20 animate-in fade-in slide-in-from-bottom-5 duration-1000">
-                                {[
-                                    { label: 'Platform Load', value: '42%', color: 'border-serene-blue-100 ring-serene-blue-50', doodle: [40, 60, 45, 70, 50, 65] },
-                                    { label: 'Match Efficiency', value: '98.2%', color: 'border-emerald-100 ring-emerald-50', doodle: [80, 85, 90, 88, 95, 98] },
-                                    { label: 'Latency', value: '14ms', color: 'border-purple-100 ring-purple-50', doodle: [20, 15, 25, 10, 18, 14] }
-                                ].map((stat, i) => (
-                                    <div key={i} className={`flex flex-col items-start p-8 rounded-2xl border-2 bg-white ${stat.color} transition-all relative overflow-hidden group hover:-translate-y-2 hover:shadow-xl`}>
-                                        <p className="text-[10px] font-black uppercase tracking-widest text-serene-neutral-400 mb-2">{stat.label}</p>
-                                        <p className="text-3xl font-black tracking-tight text-serene-blue-950 mb-4">{stat.value}</p>
-                                        <div className="w-full h-8 flex items-end gap-1 px-1 opacity-20 group-hover:opacity-100 transition-opacity">
-                                            {stat.doodle.map((h, j) => (<div key={j} className={`flex-1 rounded-t-full ${stat.label.includes('Efficiency') ? 'bg-emerald-400' : stat.label.includes('Load') ? 'bg-serene-blue-400' : 'bg-purple-400'}`} style={{ height: `${h}%` }} />))}
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
                             <div className="text-center relative">
-                                <h2 className="text-5xl font-black text-serene-blue-950 tracking-tight mb-6">Select a Report</h2>
-                                <p className="text-serene-neutral-400 max-w-lg mx-auto leading-relaxed font-semibold text-lg">Pick an active incident from the pool to trigger the multi-vector matching simulation and witness algorithmic mapping.</p>
+                                <h2 className="text-3xl sm:text-4xl font-bold text-serene-blue-950 tracking-tight mb-4">Select a report</h2>
+                                <p className="text-serene-neutral-400 max-w-lg mx-auto leading-relaxed font-semibold text-lg">Choose a report from the list to see which providers fit it and why.</p>
                                 <div className="absolute -left-40 top-10 pointer-events-none">
                                     <div className="relative animate-bounce duration-[2000ms]">
                                         <span className="absolute -top-20 -left-6 w-56 text-serene-blue-400 font-handwriting italic text-lg tracking-tight transform rotate-[-12deg]">Initialize the Engine here!</span>

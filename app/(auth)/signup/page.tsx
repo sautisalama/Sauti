@@ -106,9 +106,20 @@ export default async function SignUp({ searchParams }: { searchParams: Promise<{
                                         name="password" autoComplete="new-password"
                                         id="password"
                                         required
+                                        minLength={8}
+                                        aria-describedby="password-hint"
                                         className="h-11 bg-serene-neutral-50 border-sauti-teal/50 rounded-xl focus-visible:ring-sauti-blue/20 focus-visible:border-sauti-blue transition-all"
                                     />
+                                    <p id="password-hint" className="text-xs text-serene-neutral-500 ml-1">
+                                        At least 8 characters. Use the eye icon to check what you typed.
+                                    </p>
                                 </div>
+                                <p className="text-xs text-serene-neutral-500 text-center">
+                                    Rather not use your name or email?{" "}
+                                    <Link href="/report-abuse" className="font-semibold text-sauti-blue underline underline-offset-2">
+                                        Report anonymously
+                                    </Link>
+                                </p>
                                 <SubmitButton
                                     pendingText="Creating your account..."
                                     className="w-full h-12 bg-sauti-blue hover:bg-sauti-blue/90 text-white font-bold rounded-xl shadow-lg shadow-sauti-blue/20 transition-all active:scale-[0.98] mt-2"
@@ -122,7 +133,7 @@ export default async function SignUp({ searchParams }: { searchParams: Promise<{
                                     <span className="w-full border-t border-serene-neutral-100" />
                                 </div>
                                 <div className="relative flex justify-center text-xs">
-                                    <span className="bg-white px-3 text-serene-neutral-400 font-medium">Or join with</span>
+                                    <span className="bg-white px-3 text-serene-neutral-600 font-medium">Or join with</span>
                                 </div>
                             </div>
 

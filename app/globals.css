@@ -465,3 +465,19 @@ html.mjengo-theme .text-sauti-blue { color: #068297; }
 html.ss-embed [data-chrome] { display: none !important; }
 html.ss-embed main { margin-left: 0 !important; }
 html.ss-embed #main-content { padding: 0 !important; }
+
+/*
+ * Calm typography for the signed-in app. Long sessions tire people out when every label
+ * shouts, tiny text strains the eyes and light greys fall under AA contrast. These rules
+ * soften all of that in one place instead of across hundreds of components.
+ */
+.ss-calm .uppercase { text-transform: none; }
+.ss-calm [class*="tracking-widest"],
+.ss-calm [class*="tracking-[0."] { letter-spacing: 0.01em; }
+.ss-calm [class*="text-[9px]"],
+.ss-calm [class*="text-[10px]"] { font-size: 0.75rem; line-height: 1rem; }
+.ss-calm .font-black { font-weight: 700; }
+.ss-calm .text-slate-400, .ss-calm .text-slate-300 { color: rgb(100 116 139); }
+.ss-calm .text-gray-400, .ss-calm .text-gray-300 { color: rgb(107 114 128); }
+.ss-calm .text-neutral-400 { color: rgb(115 115 115); }
+.ss-calm .text-serene-neutral-400 { color: rgb(100 100 100); }

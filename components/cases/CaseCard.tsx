@@ -1,4 +1,5 @@
-import { format } from "date-fns";
+import { format, formatDistanceToNowStrict } from "date-fns";
+import { incidentLabel, matchStatusLabel } from "@/lib/report-labels";
 import {
 	CalendarDays,
 	ChevronRight,
@@ -103,6 +104,12 @@ export function CaseCard({
 	const isCompleted = "completed" === matchStatus?.toLowerCase();
 	const hasUnreadMessages = (data.unread_messages || 0) > 0;
 	
+	const status = matchStatusLabel(matchStatus);
+	const receivedAt = data.match_date || data.report?.submission_timestamp;
+	let receivedAgo = "";
+	try {
+		if (receivedAt) receivedAgo = formatDistanceToNowStrict(new Date(receivedAt));
+	} catch {}
 	const urgency = (data.report?.urgency || "low").toLowerCase();
 	const urgencyColors = {
 		high: "bg-red-50 text-red-700 border-red-200",
@@ -136,7 +143,7 @@ export function CaseCard({
 					<div className="min-w-0 py-0.5">
 						<div className="flex items-center gap-2 mb-1">
 							<h3 className="font-bold text-gray-900 truncate text-base group-hover:text-blue-700 transition-colors">
-								{data.report?.type_of_incident || "Case File"}
+								{incidentLabel(data.report?.type_of_incident)}
 							</h3>
 							{hasUnreadMessages && (
 								<Badge variant="secondary" className="bg-blue-100 text-blue-700 hover:bg-blue-100 border-0 h-5 px-1.5 text-[10px] font-bold">
@@ -150,14 +157,15 @@ export function CaseCard({
 							)}
 						</div>
 						<p className="text-xs text-gray-500 font-medium truncate flex items-center gap-1.5">
-							<User className="h-3 w-3 text-gray-400" />
-							{data.support_service?.name || "Unassigned"}
+							<Clock className="h-3 w-3 text-gray-400" />
+							{receivedAgo ? `Received ${receivedAgo} ago` : data.support_service?.name || ""}
+							{data.support_service?.name && receivedAgo ? ` · ${data.support_service.name}` : ""}
 						</p>
 					</div>
 				</div>
 				
 				<Badge variant="outline" className={cn("capitalize font-bold border-0 px-2.5 py-1 rounded-lg text-[10px] tracking-wide", urgencyColors[urgency as keyof typeof urgencyColors])}>
-					{urgency}
+					{urgency} urgency
 				</Badge>
 			</div>
 
@@ -169,14 +177,23 @@ export function CaseCard({
 				<div className="flex items-center justify-between pt-2 border-t border-gray-50">
 					<div className="flex items-center gap-2">
 						<div className={cn(
-							"px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider rounded-md border flex items-center gap-1.5",
-							isCompleted ? "bg-green-50 text-green-700 border-green-200" : "bg-gray-50 text-gray-600 border-gray-200"
+							"px-2.5 py-1 text-xs font-semibold rounded-md border flex items-center gap-1.5",
+							status.tone === "action" && "bg-amber-50 text-amber-800 border-amber-200",
+							status.tone === "active" && "bg-teal-50 text-teal-800 border-teal-200",
+							status.tone === "done" && "bg-green-50 text-green-700 border-green-200",
+							status.tone === "quiet" && "bg-gray-50 text-gray-600 border-gray-200"
 						)}>
-							<div className={cn("w-1.5 h-1.5 rounded-full", isCompleted ? "bg-green-500" : "bg-gray-400")} />
-							{matchStatus}
+							<div className={cn(
+								"w-1.5 h-1.5 rounded-full",
+								status.tone === "action" && "bg-amber-500",
+								status.tone === "active" && "bg-teal-500",
+								status.tone === "done" && "bg-green-500",
+								status.tone === "quiet" && "bg-gray-400"
+							)} />
+							{status.text}
 						</div>
 						{hasAppointment && (
-							<span className="text-[10px] font-bold text-blue-600 flex items-center gap-1.5 bg-blue-50 px-2.5 py-1 rounded-md border border-blue-100">
+							<span className="text-xs font-semibold text-blue-600 flex items-center gap-1.5 bg-blue-50 px-2.5 py-1 rounded-md border border-blue-100">
 								<CalendarDays className="h-3 w-3" />
 								{formatAppointmentDate(appointment.appointment_date)}
 							</span>

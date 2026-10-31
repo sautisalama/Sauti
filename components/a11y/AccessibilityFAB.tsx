@@ -95,7 +95,7 @@ function FABContent({
   setScale: (v: string) => void; 
 }) {
     return (
-        <div className="fixed bottom-6 left-6 z-[100]">
+        <div className="fixed bottom-24 left-3 lg:bottom-6 lg:left-6 z-[100]">
 			{open && (
 				<div className="mb-4 w-[calc(100vw-3rem)] sm:w-80 rounded-2xl border-2 border-gray-100 bg-white/95 backdrop-blur-xl shadow-2xl p-6 space-y-4 animate-in slide-in-from-bottom-4 duration-300">
 					<div className="flex items-center justify-between mb-2">
@@ -159,7 +159,7 @@ function FABContent({
 			<button
 				onClick={() => setOpen((v: boolean) => !v)}
 				className={cn(
-                    "group relative rounded-full h-14 w-14 flex items-center justify-center transition-all duration-300 shadow-xl hover:scale-110 active:scale-95",
+                    "group relative rounded-full h-11 w-11 lg:h-14 lg:w-14 flex items-center justify-center transition-all duration-300 shadow-md lg:shadow-xl hover:scale-110 active:scale-95 opacity-70 hover:opacity-100 focus-visible:opacity-100",
                     open 
                         ? "bg-sauti-dark text-white rotate-90" 
                         : "bg-white text-sauti-teal border-2 border-sauti-teal/20"
@@ -167,7 +167,7 @@ function FABContent({
 				aria-label="Accessibility options"
 				aria-expanded={open}
 			>
-				{open ? <X className="h-6 w-6" /> : <Eye className="h-6 w-6" />}
+				{open ? <X className="h-6 w-6" /> : <Eye className="h-5 w-5 lg:h-6 lg:w-6" />}
                 
                 {/* Tooltip */}
                 {!open && (

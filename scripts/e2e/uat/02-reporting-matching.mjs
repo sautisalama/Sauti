@@ -120,7 +120,7 @@ await signIn(pro, "professional");
 await pro.goto(`${BASE}/dashboard/cases`, { waitUntil: "networkidle", timeout: 120000 });
 await pro.waitForTimeout(5000);
 const cases = await pro.locator("body").innerText();
-check("MAT-21 the matched provider sees the case in their queue as PENDING", /PENDING/.test(cases) && /physical/i.test(cases));
+check("MAT-21 the matched provider sees the case in their queue as needing a response", /Needs your response/.test(cases) && /Physical abuse/.test(cases));
 await pro.getByText(/physical/i).first().click();
 await pro.getByRole("button", { name: /ACCEPT & SCHEDULE/i }).waitFor({ timeout: 60000 });
 const detail = await pro.locator("body").innerText();

@@ -1,5 +1,6 @@
 "use client";
 
+import { NextStepCard } from "@/components/dashboard/NextStepCard";
 import { useMemo, useState, useEffect } from "react";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { 
@@ -104,8 +105,10 @@ export default function SurvivorView({
                             }
                         />
 
+                        <NextStepCard reports={reports as any[]} />
+
                         <div className="space-y-4">
-                            <h3 className="text-sm font-bold text-serene-neutral-400 uppercase tracking-wider px-1">Dashboard</h3>
+                            <h3 className="text-sm font-semibold text-serene-neutral-500 px-1">Shortcuts</h3>
                             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 w-full auto-rows-fr min-w-0">
                                 <SereneQuickActionCard
                                     title="Reports"
@@ -119,9 +122,9 @@ export default function SurvivorView({
                                 />
                                 <SereneQuickActionCard
                                     title="Matches"
-                                    description={`${stats.matchedReportsCount} Found`}
+                                    description={stats.matchedReportsCount > 0 ? `${stats.matchedReportsCount} found` : stats.activeReportsCount > 0 ? "Finding support" : "None yet"}
                                     icon={<Heart className="h-5 w-5 text-sauti-yellow" />}
-                                    href="/dashboard/reports"
+                                    href="/dashboard/matches"
                                     variant="custom"
                                     className="bg-sauti-yellow-light border-sauti-yellow/10"
                                     badge={stats.matchedReportsCount || undefined}

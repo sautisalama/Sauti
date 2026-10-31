@@ -43,6 +43,13 @@ export default function MatchesPage() {
   const [matches, setMatches] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
+  const hasReports = ((dash?.data?.reports as any[]) ?? []).length > 0;
+  const isProvider = dash?.data?.userType === "professional" || dash?.data?.userType === "ngo";
+
+  // Matches are a survivor view; providers work their offers from Cases.
+  useEffect(() => {
+    if (isProvider) router.replace("/dashboard/cases");
+  }, [isProvider, router]);
 
   useEffect(() => {
     // Attempt to seed from provider first
@@ -210,12 +217,18 @@ export default function MatchesPage() {
                   <div className="bg-serene-blue-50 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
                      <Heart className="h-6 w-6 text-serene-blue-400" />
                   </div>
-                  <h3 className="text-lg font-bold text-serene-neutral-900 mb-2">No Active Matches</h3>
+                  <h3 className="text-lg font-bold text-serene-neutral-900 mb-2">
+                     {hasReports ? "We're finding the right support" : "No matches yet"}
+                  </h3>
                   <p className="text-serene-neutral-500 text-sm max-w-xs mx-auto mb-6">
-                     When you file a report, our system automatically connects you with the best support services for your needs.
+                     {hasReports
+                        ? "Your report is with our matching system. When a provider accepts, you'll get a notification here and in Messages. You don't need to do anything."
+                        : "When you file a report, our system connects you with the support services that fit your needs."}
                   </p>
                   <Button className="rounded-xl bg-serene-blue-600 hover:bg-serene-blue-700 text-white font-semibold" asChild>
-                     <Link href="/report-abuse">File a Report</Link>
+                     <Link href={hasReports ? "/dashboard/reports" : "/report-abuse"}>
+                        {hasReports ? "View my report" : "File a report"}
+                     </Link>
                   </Button>
                </div>
             )}
