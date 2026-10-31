@@ -1,5 +1,5 @@
 import { format, formatDistanceToNowStrict } from "date-fns";
-import { incidentLabel, matchStatusLabel } from "@/lib/report-labels";
+import { incidentLabel, matchStatusLabel, responseClock } from "@/lib/report-labels";
 import {
 	CalendarDays,
 	ChevronRight,
@@ -15,7 +15,7 @@ import {
 	Shield,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 
 // ... Keep CaseCardData interface as is ...
@@ -65,6 +65,8 @@ interface CaseCardProps {
 	actions?: React.ReactNode;
 	className?: string;
 	isLoadingMessages?: boolean;
+	/** Declines an offer waiting on the provider. Shown only while the case needs a response. */
+	onDecline?: () => void;
 }
 
 // Utility for formatting dates consistently across the dashboard
@@ -97,7 +99,9 @@ export function CaseCard({
 	actions,
 	className,
 	isLoadingMessages = false,
+	onDecline,
 }: CaseCardProps) {
+	const [confirmingDecline, setConfirmingDecline] = useState(false);
 	const appointment = data.appointments?.[0];
 	const hasAppointment = !!appointment?.appointment_date;
 	const matchStatus = data.match_status_type || data.match_status || "pending";
@@ -110,6 +114,8 @@ export function CaseCard({
 	try {
 		if (receivedAt) receivedAgo = formatDistanceToNowStrict(new Date(receivedAt));
 	} catch {}
+	const waitingOnYou = status.tone === "action";
+	const clock = waitingOnYou ? responseClock(receivedAt) : null;
 	const urgency = (data.report?.urgency || "low").toLowerCase();
 	const urgencyColors = {
 		high: "bg-red-50 text-red-700 border-red-200",
@@ -192,6 +198,12 @@ export function CaseCard({
 							)} />
 							{status.text}
 						</div>
+						{clock && (
+							<span className={cn("inline-flex items-center gap-1 text-xs font-semibold", clock.tone === "overdue" ? "text-red-700" : clock.tone === "soon" ? "text-amber-800" : "text-gray-600")}>
+								<Clock className="h-3 w-3" aria-hidden />
+								{clock.text}
+							</span>
+						)}
 						{hasAppointment && (
 							<span className="text-xs font-semibold text-blue-600 flex items-center gap-1.5 bg-blue-50 px-2.5 py-1 rounded-md border border-blue-100">
 								<CalendarDays className="h-3 w-3" />
@@ -217,7 +229,41 @@ export function CaseCard({
 						)}
 					</div>
 					
-					{actions || (
+					{actions || (waitingOnYou && onDecline ? (
+						<div className="flex shrink-0 items-center gap-2" onClick={(e) => e.stopPropagation()}>
+							{confirmingDecline ? (
+								<>
+									<button
+										onClick={(e) => { e.preventDefault(); e.stopPropagation(); setConfirmingDecline(false); onDecline(); }}
+										className="min-h-10 rounded-full bg-red-600 px-4 text-sm font-semibold text-white hover:bg-red-700"
+									>
+										Yes, decline
+									</button>
+									<button
+										onClick={(e) => { e.preventDefault(); e.stopPropagation(); setConfirmingDecline(false); }}
+										className="min-h-10 rounded-full px-3 text-sm font-medium text-gray-700 hover:bg-gray-100"
+									>
+										Keep
+									</button>
+								</>
+							) : (
+								<>
+									<button
+										onClick={(e) => { e.preventDefault(); e.stopPropagation(); setConfirmingDecline(true); }}
+										className="min-h-10 rounded-full px-3 text-sm font-medium text-gray-700 hover:bg-gray-100"
+									>
+										Decline
+									</button>
+									<button
+										onClick={(e) => { e.preventDefault(); e.stopPropagation(); onClick?.(); }}
+										className="min-h-10 rounded-full bg-gray-900 px-4 text-sm font-semibold text-white hover:bg-gray-800"
+									>
+										Review and accept
+									</button>
+								</>
+							)}
+						</div>
+					) : 
 						<button
 							onClick={(e) => {
 								e.preventDefault();

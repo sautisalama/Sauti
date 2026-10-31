@@ -11,7 +11,8 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { createClient } from '@/utils/supabase/client';
-import { addAvailabilityBlock, addRecurringBlock, getAvailabilityBlocks, removeAvailabilityBlock, toggleOutOfOffice } from '@/app/actions/availability';
+import { addAvailabilityBlock, addRecurringBlock, getAvailabilityBlocks, removeAvailabilityBlock } from '@/app/actions/availability';
+import { useAvailability } from './availability-store';
 import type { AvailabilityBlock } from '@/types/chat';
 
 const card = 'rounded-2xl border border-serene-neutral-100 bg-white p-5 shadow-sm sm:p-6';
@@ -35,6 +36,7 @@ export function CalendarSettings() {
   const [verified, setVerified] = useState(false);
   const [blocks, setBlocks] = useState<AvailabilityBlock[]>([]);
   const [loading, setLoading] = useState(true);
+  const availability = useAvailability(userId, loading ? null : outOfOffice);
   const [dialog, setDialog] = useState(false);
   const [saving, setSaving] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -65,10 +67,9 @@ export function CalendarSettings() {
     })();
   }, [supabase, load]);
 
-  async function toggleOoo(checked: boolean) {
-    setOutOfOffice(checked);
-    try { await toggleOutOfOffice(checked); toast({ title: checked ? 'You are out of office' : 'You are back in office', description: checked ? 'You will not be offered new cases or bookings.' : 'You can receive new cases and bookings again.' }); }
-    catch { setOutOfOffice(!checked); toast({ title: 'Could not update', variant: 'destructive' }); }
+  async function toggleOoo(taking: boolean) {
+    const ok = await availability.setTaking(taking);
+    toast(!ok ? { title: 'Could not update', variant: 'destructive' } : taking ? { title: "You're taking new cases again", description: 'Matching and bookings have resumed.' } : { title: 'New cases are paused', description: "You won't be offered new cases or bookings." });
   }
 
   async function togglePublic(checked: boolean) {
@@ -115,10 +116,10 @@ export function CalendarSettings() {
       <section className={card}>
         <div className="flex items-start justify-between gap-4">
           <div>
-            <h2 className="text-base font-semibold text-serene-neutral-900">Out of office</h2>
-            <p className="mt-1 text-sm text-serene-neutral-600">While this is on you are not offered new cases and your booking page does not accept requests. Cases you already have are not affected.</p>
+            <h2 className="text-base font-semibold text-serene-neutral-900">Taking new cases</h2>
+            <p className="mt-1 text-sm text-serene-neutral-600">Turn this off to pause new cases and bookings. Your booking page stops accepting requests. Cases you already have are not affected.</p>
           </div>
-          <Switch checked={outOfOffice} onCheckedChange={toggleOoo} aria-label="Out of office" />
+          <Switch checked={availability.taking ?? !outOfOffice} disabled={availability.busy} onCheckedChange={toggleOoo} aria-label="Taking new cases" />
         </div>
       </section>
 

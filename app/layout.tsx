@@ -11,6 +11,8 @@ import { AccessibilityProvider } from "@/components/a11y/AccessibilityProvider";
 import { KeyboardFocusScript } from "@/components/a11y/KeyboardFocusScript";
 import AccessibilityFAB from "@/components/a11y/AccessibilityFAB";
 import { ExitPageButton } from "@/components/safety/ExitPageButton";
+import { ThemeSync } from "@/components/theme/ThemeSync";
+import { THEME_BOOT_SCRIPT } from "@/components/theme/boot";
 
 import { Suspense } from "react";
 import { DeviceInitializer } from "@/components/auth/DeviceInitializer";
@@ -146,6 +148,8 @@ export default function RootLayout({
 	return (
 		<html lang="en" suppressHydrationWarning>
 			<head>
+				{/* Before first paint: set the dark class so the app never flashes light. */}
+				<script dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }} />
 				<script
 					dangerouslySetInnerHTML={{
 						__html: `
@@ -172,6 +176,7 @@ export default function RootLayout({
 			<body className={`${inter.className} ${hyper.variable}`} suppressHydrationWarning>
 				<DeviceInitializer />
 				<ExitPageButton />
+				<ThemeSync />
 				<a
 					href="#main-content"
 					className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50 bg-white text-black px-3 py-2 rounded shadow"

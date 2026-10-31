@@ -1,43 +1,28 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Moon } from "lucide-react";
+import { Moon, Sun } from "lucide-react";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { Switch } from "@/components/ui/switch";
-import { createClient } from "@/utils/supabase/client";
-import { toggleOutOfOffice } from "@/app/actions/availability";
 import { useToast } from "@/hooks/use-toast";
+import { useDashboardData } from "@/components/providers/DashboardDataProvider";
+import { useAvailability } from "./availability-store";
 
-/** One-tap "Out of office" switch for the account menu: while on, no new cases or bookings are offered. */
+/** The same setting as the overview card, one tap from the account menu. On means taking new cases. */
 export function OutOfOfficeMenuItem({ userId }: { userId: string }) {
-	const [away, setAway] = useState(false);
-	const [busy, setBusy] = useState(false);
+	const dash = useDashboardData();
+	const { taking, setTaking, busy } = useAvailability(userId, (dash?.data?.profile as { out_of_office?: boolean | null } | undefined)?.out_of_office ?? null);
 	const { toast } = useToast();
-
-	useEffect(() => {
-		createClient()
-			.from("profiles")
-			.select("out_of_office")
-			.eq("id", userId)
-			.maybeSingle()
-			.then(({ data }) => setAway(!!data?.out_of_office));
-	}, [userId]);
+	if (taking === null) return null;
 
 	const change = async (next: boolean) => {
-		setBusy(true);
-		setAway(next);
-		try {
-			await toggleOutOfOffice(next);
-			toast({
-				title: next ? "You are out of office" : "You are back in office",
-				description: next ? "You will not be matched to new cases or bookings." : "You can be matched to new cases again.",
-			});
-		} catch {
-			setAway(!next);
-			toast({ title: "Could not update", description: "Please try again.", variant: "destructive" });
-		} finally {
-			setBusy(false);
-		}
+		const ok = await setTaking(next);
+		toast(
+			!ok
+				? { title: "Could not update", description: "Nothing changed. Please try again.", variant: "destructive" }
+				: next
+					? { title: "You're taking new cases again", description: "Matching and bookings have resumed." }
+					: { title: "New cases are paused", description: "You won't be offered new cases or bookings." }
+		);
 	};
 
 	return (
@@ -45,16 +30,16 @@ export function OutOfOfficeMenuItem({ userId }: { userId: string }) {
 		<DropdownMenuItem
 			onSelect={(e) => {
 				e.preventDefault();
-				if (!busy) change(!away);
+				if (!busy) change(!taking);
 			}}
 			className="flex cursor-pointer items-center gap-3 rounded-xl p-3"
 		>
-			<Moon className="h-4 w-4 text-amber-600" />
+			{taking ? <Sun className="h-4 w-4 text-teal-600" aria-hidden /> : <Moon className="h-4 w-4 text-amber-700" aria-hidden />}
 			<div className="min-w-0 flex-1">
-				<p className="text-sm font-medium leading-none">Out of office</p>
-				<p className="mt-1 text-[11px] leading-tight text-serene-neutral-500">{away ? "Not receiving matches" : "Pause new matches"}</p>
+				<p className="text-sm font-medium leading-none">Taking new cases</p>
+				<p className="mt-1 text-xs leading-tight text-serene-neutral-600">{taking ? "On: you can be matched" : "Off: matches paused"}</p>
 			</div>
-			<Switch checked={away} disabled={busy} aria-label="Out of office" tabIndex={-1} className="pointer-events-none" />
+			<Switch checked={taking} disabled={busy} aria-label="Taking new cases" tabIndex={-1} className="pointer-events-none" />
 		</DropdownMenuItem>
 	);
 }

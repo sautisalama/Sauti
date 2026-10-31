@@ -250,8 +250,10 @@ export function EntityWorkspace({ kind, pageId }: { kind: Kind; pageId?: string 
 		}
 	};
 
+	const [confirmingDelete, setConfirmingDelete] = useState(false);
 	const remove = async () => {
-		if (!editing?.id || !window.confirm(`Delete this ${cfg.noun} and all its documents? This cannot be undone.`)) return;
+		if (!editing?.id) return;
+		setConfirmingDelete(false);
 		try {
 			await deleteEntity(kind, editing.id);
 			setEditing(null);
@@ -376,7 +378,14 @@ export function EntityWorkspace({ kind, pageId }: { kind: Kind; pageId?: string 
 	) : null;
 	const footerBar = (
 					<div className="sticky bottom-0 flex items-center gap-2 border-t bg-white p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
-						{editing?.id && <Button variant="ghost" className="gap-1.5 text-red-600 hover:bg-red-50 hover:text-red-700" onClick={remove}><Trash2 className="h-4 w-4" /> Delete</Button>}
+						{editing?.id && (confirmingDelete ? (
+							<span className="flex items-center gap-1" role="group" aria-label={`Confirm deleting this ${cfg.noun}`}>
+								<Button variant="ghost" className="gap-1.5 text-red-700 hover:bg-red-50" onClick={remove}><Trash2 className="h-4 w-4" /> Yes, delete it and its documents</Button>
+								<Button variant="ghost" onClick={() => setConfirmingDelete(false)}>Keep</Button>
+							</span>
+						) : (
+							<Button variant="ghost" className="gap-1.5 text-red-600 hover:bg-red-50 hover:text-red-700" onClick={() => setConfirmingDelete(true)}><Trash2 className="h-4 w-4" /> Delete</Button>
+						))}
 						<div className="flex-1" />
 						<Button variant="ghost" onClick={() => (pageId ? router.push(listHref) : setEditing(null))}>{pageId ? "Back" : "Close"}</Button>
 						<Button onClick={save} disabled={saving} className="gap-1.5 bg-sauti-teal hover:bg-sauti-dark">{saving && <Loader2 className="h-4 w-4 animate-spin" />} Save</Button>
@@ -513,7 +522,14 @@ export function EntityWorkspace({ kind, pageId }: { kind: Kind; pageId?: string 
 					</SheetHeader>
 					{editing && <div className="flex-1 space-y-6 p-4">{fieldsPart}{panelsPart}</div>}
 					<div className="sticky bottom-0 flex items-center gap-2 border-t bg-white p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
-						{editing?.id && <Button variant="ghost" className="gap-1.5 text-red-600 hover:bg-red-50 hover:text-red-700" onClick={remove}><Trash2 className="h-4 w-4" /> Delete</Button>}
+						{editing?.id && (confirmingDelete ? (
+							<span className="flex items-center gap-1" role="group" aria-label={`Confirm deleting this ${cfg.noun}`}>
+								<Button variant="ghost" className="gap-1.5 text-red-700 hover:bg-red-50" onClick={remove}><Trash2 className="h-4 w-4" /> Yes, delete it and its documents</Button>
+								<Button variant="ghost" onClick={() => setConfirmingDelete(false)}>Keep</Button>
+							</span>
+						) : (
+							<Button variant="ghost" className="gap-1.5 text-red-600 hover:bg-red-50 hover:text-red-700" onClick={() => setConfirmingDelete(true)}><Trash2 className="h-4 w-4" /> Delete</Button>
+						))}
 						<div className="flex-1" />
 						<Button variant="ghost" onClick={() => (pageId ? router.push(listHref) : setEditing(null))}>{pageId ? "Back" : "Close"}</Button>
 						<Button onClick={save} disabled={saving} className="gap-1.5 bg-sauti-teal hover:bg-sauti-dark">{saving && <Loader2 className="h-4 w-4 animate-spin" />} Save</Button>

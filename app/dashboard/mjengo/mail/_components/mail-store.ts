@@ -1,7 +1,7 @@
 import { useSyncExternalStore } from "react";
 import { peek, put } from "@/lib/client/swr";
 import { cacheList, readList } from "@/lib/mail/offline-cache";
-import { getMailboxes, getMessageDetail, getMessageDetails, mailBootstrap, type MessageRow, type PendingItem } from "./api";
+import { getMailboxes, getMessageDetail, mailBootstrap, type MessageRow, type PendingItem } from "./api";
 
 type Boot = Awaited<ReturnType<typeof mailBootstrap>>;
 type Boxes = Awaited<ReturnType<typeof getMailboxes>>;
@@ -28,6 +28,8 @@ export const mailStore = {
 	lists: new Map<string, Page>(),
 	/** Message bodies already fetched, so opening one (or flipping through the list) shows at once. */
 	details: new Map<string, Detail>(),
+	/** When each body was fetched, so an old one is shown at once and refreshed behind the scenes. */
+	detailAt: new Map<string, number>(),
 	/** The earlier messages of a conversation, by account, folder and subject. */
 	convos: new Map<string, MessageRow[]>(),
 	/** AI summaries already written, so coming back to a message shows its summary at once. */
@@ -37,6 +39,28 @@ export const mailStore = {
 export const detailKey = (accountId: string, mailbox: string, uid: number) => `${accountId}:${mailbox}:${uid}`;
 
 const inflight = new Set<string>();
+
+/** A body older than this is still shown at once, then refreshed quietly. */
+export const DETAIL_FRESH_MS = 5 * 60_000;
+
+type Thread = Awaited<ReturnType<typeof import("./api").getThread>>;
+
+/** Reads go through plain requests: server actions queue one behind another, these run side by side. */
+async function readRoute<T>(params: Record<string, string>, signal?: AbortSignal): Promise<T> {
+	const res = await fetch(`/api/mail/read?${new URLSearchParams(params)}`, { credentials: "same-origin", signal });
+	const body = (await res.json()) as { ok: boolean; data?: T; error?: string };
+	if (!body.ok) throw new Error(body.error || "Could not read that message.");
+	return body.data as T;
+}
+
+export const fetchDetail = (accountId: string, mailbox: string, uid: number, images = true) => readRoute<Detail>({ op: "detail", account: accountId, mailbox, uid: String(uid), images: images ? "1" : "0" });
+export const fetchThread = (accountId: string, mailbox: string, subject: string) => readRoute<Thread>({ op: "thread", account: accountId, mailbox, subject });
+
+export function holdDetail(accountId: string, mailbox: string, d: Detail) {
+	const k = detailKey(accountId, mailbox, d.uid);
+	mailStore.details.set(k, d);
+	mailStore.detailAt.set(k, Date.now());
+}
 
 /**
  * Fetch the bodies of messages that are not cached yet, a few at a time and without marking them read.
@@ -50,23 +74,34 @@ export async function prefetchDetails(accountId: string, rows: Pick<MessageRow, 
 		if ((byBox.get(r.mailbox)?.length ?? 0) >= limit) continue;
 		byBox.set(r.mailbox, [...(byBox.get(r.mailbox) ?? []), r.uid]);
 	}
-	for (const [mailbox, uids] of byBox) {
+	await Promise.all(Array.from(byBox).map(async ([mailbox, uids]) => {
 		const keys = uids.map((u) => detailKey(accountId, mailbox, u));
 		keys.forEach((k) => inflight.add(k));
 		try {
-			const got = await getMessageDetails(accountId, mailbox, uids);
-			for (const d of got) mailStore.details.set(detailKey(accountId, mailbox, d.uid), d);
+			const got = await readRoute<Detail[]>({ op: "details", account: accountId, mailbox, uids: uids.join(",") });
+			for (const d of got) holdDetail(accountId, mailbox, d);
 		} catch {
 			// Best effort: opening a message fetches it as before.
 		} finally {
 			keys.forEach((k) => inflight.delete(k));
 		}
-	}
+	}));
 	// Keep the cache from growing without limit.
-	if (mailStore.details.size > 120) {
-		const drop = Array.from(mailStore.details.keys()).slice(0, mailStore.details.size - 100);
-		drop.forEach((k) => mailStore.details.delete(k));
+	if (mailStore.details.size > 160) {
+		const drop = Array.from(mailStore.details.keys()).slice(0, mailStore.details.size - 140);
+		drop.forEach((k) => { mailStore.details.delete(k); mailStore.detailAt.delete(k); });
 	}
+}
+
+/** Rows from several mailboxes (the combined inbox) are prefetched mailbox by mailbox, in parallel. */
+export function prefetchRows(rows: (Pick<MessageRow, "mailbox" | "uid"> & { account?: string })[], fallbackAccount?: string | null, limit = 12): Promise<void> {
+	const byAccount = new Map<string, typeof rows>();
+	for (const r of rows) {
+		const a = r.account ?? fallbackAccount;
+		if (!a || a === ALL) continue;
+		byAccount.set(a, [...(byAccount.get(a) ?? []), r]);
+	}
+	return Promise.all(Array.from(byAccount).map(([a, rs]) => prefetchDetails(a, rs, limit))).then(() => undefined);
 }
 
 export const listKey = (accountId: string, viewKey: string, onlyUnread: boolean) => `${accountId}:${viewKey}:${onlyUnread ? 1 : 0}`;
@@ -116,7 +151,11 @@ export function prefetchMail(): Promise<void> {
 			for (const [id, b] of Object.entries(w.boxes)) if (b) { mailStore.boxes.set(id, { ...b, at: Date.now() }); unread += b.unread; }
 			setMailUnread(unread);
 			if (w.toAnswer) put("mail-to-answer", w.toAnswer);
-			if (w.target && w.list) keepList(w.target, "inbox", false, { items: w.list.items, total: w.list.total, extra: { counts: w.list.counts, pending: w.list.pending, failed: w.list.failed } });
+			if (w.target && w.list) {
+				keepList(w.target, "inbox", false, { items: w.list.items, total: w.list.total, extra: { counts: w.list.counts, pending: w.list.pending, failed: w.list.failed } });
+				// The first messages' bodies come right behind the list, so the first click is already instant.
+				void prefetchRows(w.list.items.slice(0, 10), w.target === ALL ? null : w.target, 10);
+			}
 		} catch {
 			// Warming is best effort; the screen loads normally if it failed.
 		} finally {

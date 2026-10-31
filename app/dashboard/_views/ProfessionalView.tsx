@@ -34,7 +34,6 @@ import {
 	LocationDisplay
 } from "../_components/SereneDashboardUI";
 import { CalendarConnectionStatus } from "../_components/CalendarConnectionStatus";
-import { OutOfOfficeBanner } from "@/components/dashboard/OutOfOfficeBanner";
 import { OutOfOfficeSwitch } from "@/components/dashboard/OutOfOfficeSwitch";
 import { getMatchStatus, getStatusTheme } from "@/lib/utils/case-status";
 
@@ -146,7 +145,6 @@ export default function ProfessionalView({
 							welcomeMessage="Welcome back, ready to make a difference?"
 						/>
 
-						<OutOfOfficeBanner userId={userId} />
 						<OutOfOfficeSwitch userId={userId} />
 
 						<VerificationBanner 

@@ -29,7 +29,7 @@ import { unwrap } from "@/lib/action-result";
 import { listLabels, saveLabel, deleteLabel, setMessageLabel, projectLabel, listGrantsLite, linkToWork, mailTriage, type LabelRow, type ProjectLite, type GrantLite } from "./api";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { AccountSwitcher } from "./AccountSwitcher";
-import { bootMail, heldBoot, coldList, detailKey, keepList, listKey, mailStore, mergeFresh, prefetchDetails, setMailUnread } from "./mail-store";
+import { bootMail, heldBoot, coldList, detailKey, DETAIL_FRESH_MS, fetchDetail, fetchThread, holdDetail, keepList, listKey, mailStore, mergeFresh, prefetchRows, setMailUnread } from "./mail-store";
 import { AvatarStack, useTeam } from "../../_components/People";
 import { checkNewMail, listSorted, dismissPending, type MailBucket, type PendingItem } from "./api";
 import { Avatar, ScopeTag } from "./AccountSwitcher";
@@ -374,7 +374,9 @@ export function MailApp() {
 		const acct = acctOf(m);
 		if (!acct) return;
 		const key = detailKey(acct, m.mailbox, m.uid);
-		const cached = mailStore.details.get(key);
+		// Memory first, then what this device kept from an earlier visit: either paints at once.
+		const cached = mailStore.details.get(key) ?? readDetail<Detail>(`${acct}:${m.mailbox}:${m.uid}`) ?? undefined;
+		const stale = !!cached && Date.now() - (mailStore.detailAt.get(key) ?? 0) > DETAIL_FRESH_MS;
 		setSelected(m);
 		setSummary(null);
 		// What we already have is shown at once; the rest streams in behind it.
@@ -394,8 +396,8 @@ export function MailApp() {
 		}
 		try {
 			if (!cached) {
-				const d = await getMessageDetail(acct, m.mailbox, m.uid, images);
-				mailStore.details.set(key, d);
+				const d = await fetchDetail(acct, m.mailbox, m.uid, images);
+				holdDetail(acct, m.mailbox, d);
 				// The person may have moved on while this loaded.
 				if ((selectedRef.current ? rkey(selectedRef.current) : "") !== rkey(m)) return;
 				setDetail(d);
@@ -403,11 +405,19 @@ export function MailApp() {
 				setRows((prev) => prev.map((r) => (rkey(r) === rkey(m) ? { ...r, seen: true } : r)));
 				if (!m.seen) setUnread((u) => Math.max(0, u - 1));
 			}
+			// An old copy was shown at once; bring it up to date behind the person's back and swap it in if it changed.
+			if (stale) {
+				fetchDetail(acct, m.mailbox, m.uid, images).then((d) => {
+					holdDetail(acct, m.mailbox, d);
+					cacheDetail(`${acct}:${m.mailbox}:${m.uid}`, d);
+					if ((selectedRef.current ? rkey(selectedRef.current) : "") === rkey(m)) setDetail(d);
+				}).catch(() => undefined);
+			}
 			const subject = (mailStore.details.get(key) ?? cached)?.subject ?? m.subject;
 			const ck = `${acct}:${m.mailbox}:${subject}`;
-			getThread(acct, m.mailbox, subject).then((t) => {
+			fetchThread(acct, m.mailbox, subject).then((t) => {
 				// Bodies first, then the list that points at them, so every row can show its text at once.
-				for (const d of t.details) mailStore.details.set(detailKey(acct, d.mailbox, d.uid), d as never);
+				for (const d of t.details) { const k = detailKey(acct, d.mailbox, d.uid); mailStore.details.set(k, d as never); mailStore.detailAt.set(k, Date.now()); }
 				mailStore.convos.set(ck, t.rows);
 				if ((selectedRef.current ? rkey(selectedRef.current) : "") === rkey(m)) setConversation(t.rows.filter((x) => !(x.uid === m.uid && x.mailbox === m.mailbox)));
 			}).catch(() => undefined);
@@ -427,11 +437,12 @@ export function MailApp() {
 
 	// The message list keeps the next messages' bodies ready, so flipping between emails has no wait.
 	useEffect(() => {
-		if (!accountId || accountId === ALL || rows.length === 0) return;
+		if (!accountId || rows.length === 0) return;
 		const idx = selected ? rows.findIndex((r) => rkey(r) === rkey(selected)) : 0;
 		const from = Math.max(0, idx - 2);
 		const near = rows.slice(from, from + 14);
-		const t = setTimeout(() => { prefetchDetails(accountId, near).catch(() => undefined); }, 350);
+		// Straight away, not after a pause: the person's next click is usually only a moment off.
+		const t = setTimeout(() => { prefetchRows(near, accountId).catch(() => undefined); }, 60);
 		return () => clearTimeout(t);
 	}, [accountId, rows, selected?.uid]);
 
@@ -766,7 +777,7 @@ const Pane = (
 								{g.items.map((m) => (
 									<SwipeRow key={rkey(m)} seen={m.seen} onArchive={() => act(m, "archive")} onToggleRead={() => act(m, m.seen ? "unread" : "read")}>
 <li className="group relative" draggable={!!m.messageId} onDragStart={(e) => { if (m.messageId) { e.dataTransfer.setData("text/x-message-id", m.messageId); e.dataTransfer.effectAllowed = "copy"; } }}>
-										<button onClick={() => open(m)} className={cn("-mx-2 flex w-[calc(100%+1rem)] touch-manipulation items-center gap-3 rounded-md px-2 text-left text-[15px]", prefs.density === "compact" ? "py-1.5" : "py-[11px]", " transition-colors hover:bg-black/[0.04]", selected && rkey(selected) === rkey(m) && "bg-black/[0.05]")}>
+										<button onClick={() => open(m)} onPointerEnter={() => { void prefetchRows([m], accountId, 1); }} onFocus={() => { void prefetchRows([m], accountId, 1); }} className={cn("-mx-2 flex w-[calc(100%+1rem)] touch-manipulation items-center gap-3 rounded-md px-2 text-left text-[15px]", prefs.density === "compact" ? "py-1.5" : "py-[11px]", " transition-colors hover:bg-black/[0.04]", selected && rkey(selected) === rkey(m) && "bg-black/[0.05]")}>
 											<span className={cn("h-[7px] w-[7px] shrink-0 rounded-full", m.seen ? "bg-transparent" : "bg-sauti-teal")} aria-label={m.seen ? undefined : "Unread"} />
 											{accountId === ALL && m.accountEmail && <Avatar email={m.accountEmail} className="h-5 w-5 rounded-full text-[10px]" />}
 												<span className={cn("w-[34%] max-w-[300px] shrink-0 truncate text-[#37352f] sm:w-[28%]", !m.seen && "font-semibold")}>{displayName(m.from)}</span>

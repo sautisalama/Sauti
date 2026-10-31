@@ -1,5 +1,6 @@
 "use client";
 
+import { rejectMatchRequest } from "@/app/actions/matching";
 import { useSignedAudioUrl } from "@/lib/audio/use-signed-audio-url";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { format } from "date-fns";
@@ -512,7 +513,18 @@ export default function CasesMasterDetail({ userId }: { userId: string }) {
 			);
 		}
 
-		return filteredCases;
+		// Triage order: offers waiting on you first, then by urgency, then whoever has waited longest.
+		const rank = (c: (typeof filteredCases)[number]) => {
+			const waiting = (c.match_status_type || "pending").toLowerCase() === "pending" ? 0 : 1;
+			const urgency = { high: 0, medium: 1, low: 2 }[(c.report?.urgency || "low").toLowerCase() as "high" | "medium" | "low"] ?? 2;
+			return [waiting, urgency] as const;
+		};
+		const since = (c: (typeof filteredCases)[number]) => new Date(c.match_date || c.report?.submission_timestamp || 0).getTime();
+		return [...filteredCases].sort((a, b) => {
+			const [aw, au] = rank(a);
+			const [bw, bu] = rank(b);
+			return aw - bw || au - bu || since(a) - since(b);
+		});
 	}, [cases, q, urgencyFilter, statusFilter, onBehalfFilter, showArchived]);
 
 	const selected = useMemo(
@@ -611,6 +623,19 @@ export default function CasesMasterDetail({ userId }: { userId: string }) {
 			setIsUpdatingStatus(false);
 		}
 	};
+
+    // Decline an offer straight from the list. The row leaves at once; it comes back if the server refuses.
+    const handleDeclineOffer = async (caseId: string) => {
+        const before = cases;
+        setCases((prev) => prev.map((c) => (c.id === caseId ? { ...c, match_status_type: "declined" } : c)));
+        try {
+            await rejectMatchRequest(caseId);
+            toast({ title: "Offer declined", description: "We'll look for another provider for this survivor." });
+        } catch {
+            setCases(before);
+            toast({ title: "Could not decline", description: "Nothing changed. Please try again.", variant: "destructive" });
+        }
+    };
 
     // Handle case acceptance trigger
     const handleAcceptCase = (caseId: string, apptData?: any) => {
@@ -1100,6 +1125,7 @@ export default function CasesMasterDetail({ userId }: { userId: string }) {
 												setActiveTab('chat');
 											}}
 											isLoadingMessages={isLoadingMessages}
+											onDecline={() => handleDeclineOffer(c.id)}
 										/>
 									</div>
 								);

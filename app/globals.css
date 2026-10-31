@@ -202,24 +202,24 @@ html[data-a11y-high-contrast="1"] {
 	}
 
 	.dark {
-		--background: 0 0% 3.9%;
-		--foreground: 0 0% 98%;
-		--card: 0 0% 3.9%;
-		--card-foreground: 0 0% 98%;
-		--popover: 0 0% 3.9%;
+		--background: 195 24% 7%;
+		--foreground: 195 20% 93%;
+		--card: 195 20% 10%;
+		--card-foreground: 195 20% 93%;
+		--popover: 195 20% 11%;
 		--popover-foreground: 0 0% 98%;
 		--primary: 0 0% 98%;
 		--primary-foreground: 0 0% 9%;
-		--secondary: 0 0% 14.9%;
-		--secondary-foreground: 0 0% 98%;
-		--muted: 0 0% 14.9%;
-		--muted-foreground: 0 0% 63.9%;
-		--accent: 0 0% 14.9%;
+		--secondary: 195 16% 16%;
+		--secondary-foreground: 195 20% 93%;
+		--muted: 195 16% 16%;
+		--muted-foreground: 195 12% 68%;
+		--accent: 195 16% 16%;
 		--accent-foreground: 0 0% 98%;
 		--destructive: 0 62.8% 30.6%;
 		--destructive-foreground: 0 0% 98%;
-		--border: 0 0% 14.9%;
-		--input: 0 0% 14.9%;
+		--border: 195 14% 21%;
+		--input: 195 14% 21%;
 		--ring: 0 0% 83.1%;
 		--chart-1: 220 70% 50%;
 		--chart-2: 160 60% 45%;
@@ -481,3 +481,88 @@ html.ss-embed #main-content { padding: 0 !important; }
 .ss-calm .text-gray-400, .ss-calm .text-gray-300 { color: rgb(107 114 128); }
 .ss-calm .text-neutral-400 { color: rgb(115 115 115); }
 .ss-calm .text-serene-neutral-400 { color: rgb(100 100 100); }
+
+/*
+ * Dark theme. The app's colours are fixed Tailwind utilities, not variables, so the ones that carry most of
+ * the interface are remapped here under html.dark. Layers from back to front:
+ *   page #0e1517 < surface #162024 < raised #1e2b30 < border #2b3a40.
+ * Text steps: strong #e8eef0, body #c3ced2, quiet #9fb0b6 (all at least 4.5:1 on the surface).
+ */
+html.dark { color-scheme: dark; }
+html.dark body { background-color: #0e1517; color: #e8eef0; }
+/* page and surfaces */
+html.dark .bg-serene-neutral-50, html.dark .bg-gray-50, html.dark .bg-slate-50, html.dark .bg-neutral-50,
+html.dark .bg-serene-neutral-50\/50 { background-color: #0e1517; }
+html.dark .bg-white, html.dark .bg-white\/80, html.dark .bg-white\/90, html.dark .bg-white\/95 { background-color: #162024; }
+html.dark .bg-serene-neutral-100, html.dark .bg-gray-100, html.dark .bg-slate-100, html.dark .bg-neutral-100,
+html.dark .bg-serene-neutral-200, html.dark .bg-gray-200, html.dark .bg-black\/5 { background-color: #1e2b30; }
+html.dark .bg-serene-blue-50, html.dark .bg-serene-blue-100, html.dark .bg-blue-50, html.dark .bg-blue-100 { background-color: rgb(56 138 186 / 0.16); }
+html.dark .bg-sauti-teal-light { background-color: rgb(6 130 151 / 0.2); }
+html.dark .bg-sauti-yellow-light, html.dark .bg-amber-50, html.dark .bg-amber-100 { background-color: rgb(245 176 23 / 0.14); }
+html.dark .bg-sauti-red-light, html.dark .bg-red-50, html.dark .bg-red-100 { background-color: rgb(232 92 74 / 0.16); }
+html.dark .bg-green-50, html.dark .bg-green-100, html.dark .bg-emerald-50 { background-color: rgb(52 168 107 / 0.16); }
+html.dark .bg-teal-50 { background-color: rgb(6 130 151 / 0.16); }
+/* brand-dark fills (primary buttons) must stay visible on dark surfaces */
+html.dark .bg-sauti-dark { background-color: #0d6b7d; }
+/* text */
+html.dark .text-serene-neutral-900, html.dark .text-serene-neutral-800, html.dark .text-serene-neutral-700, html.dark .text-sauti-dark,
+html.dark .text-gray-900, html.dark .text-gray-800, html.dark .text-gray-700, html.dark .text-slate-800, html.dark .text-slate-700,
+html.dark .text-neutral-900, html.dark .text-neutral-800, html.dark .text-neutral-700 { color: #e8eef0; }
+html.dark .text-serene-neutral-600, html.dark .text-gray-600, html.dark .text-slate-600, html.dark .text-neutral-600 { color: #c3ced2; }
+html.dark .text-serene-neutral-500, html.dark .text-serene-neutral-400, html.dark .text-serene-neutral-300,
+html.dark .text-gray-500, html.dark .text-gray-400, html.dark .text-slate-500, html.dark .text-slate-400,
+html.dark .text-neutral-500, html.dark .text-neutral-400 { color: #9fb0b6; }
+html.dark .text-red-500, html.dark .text-red-600, html.dark .text-red-700, html.dark .text-red-800 { color: #ff9a8c; }
+html.dark .text-amber-600, html.dark .text-amber-700, html.dark .text-amber-800, html.dark .text-amber-900, html.dark .text-amber-950 { color: #f5c65f; }
+html.dark .text-green-600, html.dark .text-green-700, html.dark .text-emerald-600, html.dark .text-emerald-700 { color: #74d6a1; }
+html.dark .text-blue-600, html.dark .text-blue-700, html.dark .text-serene-blue-600, html.dark .text-serene-blue-700 { color: #86c4ee; }
+html.dark .text-teal-600, html.dark .text-teal-700, html.dark .text-teal-800, html.dark .text-sauti-teal { color: #55c4d6; }
+/* lines */
+html.dark .border-serene-neutral-100, html.dark .border-serene-neutral-200, html.dark .border-serene-neutral-300,
+html.dark .border-serene-neutral-200\/70, html.dark .border-gray-100, html.dark .border-gray-200, html.dark .border-gray-300,
+html.dark .border-neutral-100, html.dark .border-neutral-200, html.dark .border-slate-100, html.dark .border-slate-200,
+html.dark .border-black\/10, html.dark .divide-gray-100 > * + *, html.dark .divide-gray-200 > * + * { border-color: #2b3a40; }
+html.dark .border-white { border-color: #162024; }
+html.dark .border-amber-200 { border-color: rgb(245 176 23 / 0.35); }
+html.dark .border-red-200 { border-color: rgb(232 92 74 / 0.4); }
+html.dark .border-serene-blue-200 { border-color: rgb(56 138 186 / 0.4); }
+/* controls and embedded pages */
+html.dark input, html.dark textarea, html.dark select { color-scheme: dark; }
+html.dark ::placeholder { color: #8a9ba1; }
+html.dark .shadow-sm, html.dark .shadow-md, html.dark .shadow-lg, html.dark .shadow-xl, html.dark .shadow-2xl { --tw-shadow-color: rgb(0 0 0 / 0.5); }
+/* An email's own HTML is written for white paper; show it that way instead of guessing its colours. */
+html.dark iframe { color-scheme: light; background-color: #fff; border-radius: 8px; }
+
+/* Dark theme, second pass: translucent surfaces, gradient stops and tinted text that the first pass missed. */
+html.dark .bg-serene-neutral-50\/80, html.dark .bg-serene-neutral-50\/60, html.dark .bg-serene-neutral-50\/30,
+html.dark .bg-slate-50\/50, html.dark .bg-white\/50, html.dark .bg-white\/60, html.dark .bg-white\/70 { background-color: rgb(14 21 23 / 0.8); }
+html.dark .bg-white\/40 { background-color: rgb(255 255 255 / 0.08); }
+html.dark .bg-serene-blue-50\/50, html.dark .bg-serene-blue-50\/30 { background-color: rgb(56 138 186 / 0.12); }
+html.dark .bg-serene-neutral-50\/50 { background-color: rgb(30 43 48 / 0.5); }
+html.dark .border-serene-neutral-200\/60, html.dark .border-serene-neutral-200\/50, html.dark .border-serene-neutral-100\/50 { border-color: #2b3a40; }
+html.dark .from-white { --tw-gradient-from: #162024 var(--tw-gradient-from-position); --tw-gradient-to: rgb(22 32 36 / 0) var(--tw-gradient-to-position); --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to); }
+html.dark .to-white { --tw-gradient-to: #162024 var(--tw-gradient-to-position); }
+html.dark .via-white { --tw-gradient-stops: var(--tw-gradient-from), #162024 var(--tw-gradient-via-position), var(--tw-gradient-to); }
+html.dark .from-serene-blue-50, html.dark .from-blue-50, html.dark .from-serene-neutral-50, html.dark .from-slate-50, html.dark .from-gray-50 {
+	--tw-gradient-from: #1a2a31 var(--tw-gradient-from-position); --tw-gradient-to: rgb(26 42 49 / 0) var(--tw-gradient-to-position); --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to); }
+html.dark .to-serene-blue-50, html.dark .to-blue-50, html.dark .to-serene-neutral-50, html.dark .to-slate-50, html.dark .to-gray-50 { --tw-gradient-to: #162024 var(--tw-gradient-to-position); }
+html.dark .text-serene-blue-900, html.dark .text-serene-blue-800, html.dark .text-blue-900, html.dark .text-blue-800 { color: #b9dcf3; }
+html.dark .text-serene-green-700, html.dark .text-serene-green-800, html.dark .text-green-800, html.dark .text-yellow-800 { color: #a6e4c0; }
+html.dark .text-slate-200, html.dark .text-slate-300, html.dark .text-gray-300 { color: #5d7077; }
+html.dark .border-slate-100, html.dark .border-slate-200\/60 { border-color: #2b3a40; }
+html.dark .bg-yellow-100 { background-color: rgb(245 176 23 / 0.14); }
+html.dark .hover\:bg-serene-neutral-50:hover, html.dark .hover\:bg-gray-50:hover, html.dark .hover\:bg-slate-50:hover { background-color: #1e2b30; }
+html.dark .hover\:bg-serene-neutral-100:hover, html.dark .hover\:bg-gray-100:hover { background-color: #24343a; }
+html.dark .hover\:bg-serene-blue-50:hover { background-color: rgb(56 138 186 / 0.2); }
+html.dark .bg-sauti-teal-light\/70, html.dark .bg-sauti-teal-light\/50, html.dark .bg-sauti-teal-light\/30 { background-color: rgb(6 130 151 / 0.24); }
+html.dark .hover\:bg-serene-neutral-100\/80:hover { background-color: #1e2b30; }
+html.dark .border-serene-blue-100, html.dark .border-serene-blue-50, html.dark .border-blue-100, html.dark .border-serene-green-200, html.dark .border-serene-green-100 { border-color: #2b3a40; }
+/* The suite theme sets light values for these variables; in dark they must follow the dark palette. */
+html.dark.mjengo-theme {
+	--accent: 195 16% 16%; --accent-foreground: 195 20% 93%;
+	--secondary: 195 16% 18%; --secondary-foreground: 195 20% 93%;
+	--muted: 195 16% 16%; --muted-foreground: 195 12% 68%;
+	--border: 195 14% 21%; --input: 195 14% 24%;
+}
+html.dark .bg-background { background-color: #0e1517; }
+html.dark input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]), html.dark textarea, html.dark select { background-color: #101a1d; color: #e8eef0; }

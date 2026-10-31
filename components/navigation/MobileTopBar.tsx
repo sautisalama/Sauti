@@ -1,5 +1,6 @@
 "use client";
 
+import { ThemeMenuItem } from "@/components/theme/ThemeControls";
 import { useUser } from "@/hooks/useUser";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -157,6 +158,7 @@ export function MobileTopBar() {
                         {(user?.profile?.user_type === "professional" || user?.profile?.user_type === "ngo") && (user?.id || dash?.data?.userId) && (
                             <OutOfOfficeMenuItem userId={(user?.id || dash?.data?.userId)!} />
                         )}
+                        <ThemeMenuItem />
 
                         {/* Role Switcher Options */}
                         {roleContext?.can_switch_to_admin && (

@@ -1,59 +1,47 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Moon } from "lucide-react";
+import { Moon, Sun } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
-import { createClient } from "@/utils/supabase/client";
-import { toggleOutOfOffice } from "@/app/actions/availability";
 import { useToast } from "@/hooks/use-toast";
+import { useDashboardData } from "@/components/providers/DashboardDataProvider";
+import { useAvailability } from "./availability-store";
 
 /**
- * One-tap "pause new cases" for any provider, whether or not they have listed services: matching skips
- * the person themselves, not just their services. (When it is on, the banner above takes over.)
+ * The one place a provider sees and changes whether they are taking new cases. It shows the state, what
+ * it means for them, and (when paused) a single clear way back. Switch on always means "taking cases".
  */
 export function OutOfOfficeSwitch({ userId }: { userId: string }) {
-	const [away, setAway] = useState<boolean | null>(null);
-	const [busy, setBusy] = useState(false);
+	const dash = useDashboardData();
+	const { taking, setTaking, busy } = useAvailability(userId, (dash?.data?.profile as { out_of_office?: boolean | null } | undefined)?.out_of_office ?? null);
 	const { toast } = useToast();
 
-	useEffect(() => {
-		const supabase = createClient();
-		supabase.from("profiles").select("out_of_office").eq("id", userId).maybeSingle().then(({ data }) => setAway(!!data?.out_of_office));
-		const channel = supabase
-			.channel(`ooo-switch-${userId}-${Math.random().toString(36).slice(2)}`)
-			.on("postgres_changes", { event: "UPDATE", schema: "public", table: "profiles", filter: `id=eq.${userId}` }, (p) => setAway(!!(p.new as { out_of_office?: boolean }).out_of_office))
-			.subscribe();
-		return () => {
-			supabase.removeChannel(channel);
-		};
-	}, [userId]);
-
-	if (away === null) return null;
+	if (taking === null) return <div className="h-[68px] rounded-2xl bg-serene-neutral-100/70" aria-hidden />;
 
 	const change = async (next: boolean) => {
-		setBusy(true);
-		setAway(next);
-		try {
-			await toggleOutOfOffice(next);
-			toast(next ? { title: "You are out of office", description: "You will not be matched to new cases or bookings until you turn it back on." } : { title: "You are taking new cases again", description: "Matching and bookings have resumed." });
-		} catch {
-			setAway(!next);
-			toast({ title: "Could not update", variant: "destructive" });
-		} finally {
-			setBusy(false);
-		}
+		const ok = await setTaking(next);
+		if (!ok) return toast({ title: "Could not update", description: "Nothing changed. Please try again.", variant: "destructive" });
+		toast(
+			next
+				? { title: "You're taking new cases again", description: "Matching and bookings have resumed." }
+				: { title: "New cases are paused", description: "You won't be offered new cases or bookings. Your current cases stay as they are." }
+		);
 	};
 
 	return (
-		<div className={`flex items-center justify-between gap-3 rounded-2xl border px-4 py-3 ${away ? "border-amber-200 bg-amber-50" : "border-serene-neutral-100 bg-white"}`}>
+		<section
+			aria-label="Availability"
+			className={`flex items-center justify-between gap-3 rounded-2xl border px-4 py-3 transition-colors ${taking ? "border-serene-neutral-100 bg-white" : "border-amber-200 bg-amber-50"}`}
+		>
 			<div className="flex min-w-0 items-center gap-3">
-				<Moon className="h-4 w-4 shrink-0 text-amber-600" />
+				{taking ? <Sun className="h-5 w-5 shrink-0 text-teal-600" aria-hidden /> : <Moon className="h-5 w-5 shrink-0 text-amber-700" aria-hidden />}
 				<div className="min-w-0">
-					<p className="text-sm font-semibold text-serene-neutral-900">{away ? "Paused: not taking new cases" : "Taking new cases"}</p>
-					<p className="text-xs text-serene-neutral-500">{away ? "Switch on to resume matches and bookings" : "Switch off to pause new matches and bookings"}</p>
+					<p className="text-sm font-semibold text-serene-neutral-900">{taking ? "Taking new cases" : "Not taking new cases"}</p>
+					<p className="text-sm text-serene-neutral-600">
+						{taking ? "Turn off to pause new matches and bookings." : "You won't be offered new cases or bookings. Turn on when you're back."}
+					</p>
 				</div>
 			</div>
-			<Switch className="shrink-0" checked={!away} disabled={busy} onCheckedChange={(on) => change(!on)} aria-label="Taking new cases" />
-		</div>
+			<Switch className="shrink-0" checked={taking} disabled={busy} onCheckedChange={change} aria-label="Taking new cases" />
+		</section>
 	);
 }

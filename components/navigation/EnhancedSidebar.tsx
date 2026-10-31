@@ -1,5 +1,6 @@
 "use client";
 
+import { ThemeMenuItem } from "@/components/theme/ThemeControls";
 import { useState, useEffect, useMemo, useCallback } from "react";
 import Link from "next/link";
 import Image from "next/image";
@@ -856,6 +857,7 @@ export function EnhancedSidebar({
 									{(role === "professional" || role === "ngo") && dash?.data?.userId && (
 										<OutOfOfficeMenuItem userId={dash.data.userId} />
 									)}
+									<ThemeMenuItem />
 									{(role === "professional" || role === "ngo") && (
 										<DropdownMenuItem asChild>
 											<Link href="/dashboard/profile?section=verification" className="cursor-pointer rounded-xl focus:bg-serene-neutral-50 focus:text-serene-blue-600 m-1">

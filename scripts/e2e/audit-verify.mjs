@@ -6,7 +6,7 @@ const OUT = process.env.AUDIT_OUT || path.resolve("audit-out");
 const browser = await launch();
 const btn = (p) => p.getByRole("button", { name: /exit this page/i });
 const hits = [];
-async function trap(page) { await page.route(/bbc\.com/, (r) => { hits.push(r.request().url()); r.abort(); }); }
+async function trap(page) { await page.route(/google\.com/, (r) => { hits.push(r.request().url()); r.abort(); }); }
 
 // public page, phone
 let ph = await newPage(browser, { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });

@@ -6,7 +6,7 @@ import { LogOut } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 /** Where "Exit this page" sends people: an ordinary, expected site. */
-const EXIT_URL = "https://www.bbc.com/weather";
+const EXIT_URL = "https://www.google.com";
 
 /** Public pages where someone may need to leave in a hurry. Dashboards opt in with `always`. */
 const SENSITIVE_PUBLIC = [/^\/report-abuse/, /^\/signup/, /^\/signin/];

@@ -1,5 +1,6 @@
 "use client";
 
+import { ThemeSegmented } from "@/components/theme/ThemeControls";
 import { useState } from "react";
 import { useAccessibility } from "@/components/a11y/AccessibilityProvider";
 import { cn } from "@/lib/utils";
@@ -108,6 +109,11 @@ function FABContent({
                         >
                             <X className="h-4 w-4 text-gray-400" />
                         </button>
+                    </div>
+
+                    <div className="pb-1">
+                        <div className="mb-2 text-gray-500 font-bold text-xs">Appearance (signed-in app)</div>
+                        <ThemeSegmented />
                     </div>
 
                     <div className="grid grid-cols-1 gap-2">
