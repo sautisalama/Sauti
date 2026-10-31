@@ -1,6 +1,8 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
+import { after } from 'next/server';
+import { sendNotification } from '@/lib/notifications';
 import { looseAdmin } from '@/lib/loose-db';
 import { logAudit } from '@/lib/access/audit';
 import { MAX_ADDED_PER_SUPER_ADMIN, requireSuperAdmin, type SuperAdminRow } from '@/lib/access/super-admin';
@@ -170,11 +172,26 @@ async function guardTarget(actorId: string, userId: string) {
   return { db, p };
 }
 
+/** Let the person know an administrator changed their access. Never blocks or fails the change itself. */
+async function tellOfRoleChange(userId: string, note: { title: string; message: string }) {
+  try {
+    await sendNotification({ userId, type: 'system_alert', title: note.title, message: note.message, link: '/dashboard', metadata: { kind: 'role_change' }, sendEmail: true });
+  } catch (e) {
+    console.error('[access] could not notify of role change:', e instanceof Error ? e.message : e);
+  }
+}
+
 export async function setAdminStatus(userId: string, makeAdmin: boolean) {
   const actor = await requireSuperAdmin();
   const { db, p } = await guardTarget(actor.id, userId);
+  const changed = !!p.is_admin !== makeAdmin;
   const { error } = await db.from('profiles').update({ is_admin: makeAdmin }).eq('id', userId);
   if (error) throw new Error('Could not change the role.');
+  if (changed) {
+    after(() => tellOfRoleChange(userId, makeAdmin
+      ? { title: 'You are now an administrator', message: 'An administrator has given you admin access on Sauti Salama. Your dashboard now includes the admin tools, such as reviewing profiles and approving publications.' }
+      : { title: 'Your admin access has been removed', message: 'An administrator has removed your admin access on Sauti Salama. You keep your account and your regular dashboard.' }));
+  }
   await logAudit({ actorId: actor.id, actorEmail: actor.email, action: makeAdmin ? 'role.admin_granted' : 'role.admin_revoked', targetType: 'user', targetId: userId, targetLabel: p.email ?? fullName(p) ?? userId });
   revalidatePath('/dashboard/mjengo/people');
   return { success: true };
@@ -186,6 +203,10 @@ export async function setAccountType(userId: string, userType: 'survivor' | 'pro
   const { db, p } = await guardTarget(actor.id, userId);
   const { error } = await db.from('profiles').update({ user_type: userType }).eq('id', userId);
   if (error) throw new Error('Could not change the account type.');
+  if (p.user_type !== userType) {
+    const label = { survivor: 'a survivor', professional: 'a professional', ngo: 'an NGO' }[userType];
+    after(() => tellOfRoleChange(userId, { title: 'Your account type has changed', message: `An administrator has changed your account to ${label}. Refresh your dashboard to see what is available to you.` }));
+  }
   await logAudit({ actorId: actor.id, actorEmail: actor.email, action: 'role.account_type_changed', targetType: 'user', targetId: userId, targetLabel: p.email ?? userId, details: { from: p.user_type, to: userType } });
   revalidatePath('/dashboard/mjengo/people');
   return { success: true };
