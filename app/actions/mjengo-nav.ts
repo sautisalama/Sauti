@@ -14,15 +14,42 @@ export interface MjengoNav {
   /** Which kinds of work this person has any of. Grants, projects and fellowships show in the menu only once there is one
    *  (an opportunity that was won, or one made directly), so the menu starts small and grows with the work. */
   has: { grants: boolean; projects: boolean; fellowships: boolean };
+  /** The person's own menu: order, headings and what they took off. Kept on their profile so every device shows the same. */
+  pref: NavPref | null;
+}
+
+export interface NavPref { order: string[]; group: Record<string, string>; hidden: string[]; at: number }
+
+function cleanPref(raw: unknown): NavPref | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const r = raw as Record<string, unknown>;
+  const ids = (v: unknown) => (Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string' && /^[a-z0-9_-]{1,40}$/i.test(x)).slice(0, 60) : []);
+  const group: Record<string, string> = {};
+  if (r.group && typeof r.group === 'object') for (const [k, v] of Object.entries(r.group as Record<string, unknown>).slice(0, 60)) if (/^[a-z0-9_-]{1,40}$/i.test(k) && typeof v === 'string') group[k] = v.slice(0, 40);
+  return { order: ids(r.order), group, hidden: ids(r.hidden).filter((x) => x !== 'mj-overview'), at: typeof r.at === 'number' ? r.at : 0 };
+}
+
+/** Save the person's menu (what is shown, hidden and in what order) to their profile. */
+export async function saveMjengoNavPref(pref: NavPref): Promise<void> {
+  const actor = await getActor();
+  if (!actor?.isAdmin) return;
+  const clean = cleanPref(pref);
+  if (!clean) return;
+  const db = looseAdmin();
+  const { data } = await db.from('profiles').select('settings').eq('id', actor.id).maybeSingle();
+  const settings = ((data as { settings?: Record<string, unknown> } | null)?.settings ?? {}) as Record<string, unknown>;
+  await db.from('profiles').update({ settings: { ...settings, mjengo_nav: clean } }).eq('id', actor.id);
 }
 
 export async function mjengoNav(): Promise<MjengoNav> {
   const actor = await getActor();
-  if (!actor?.isAdmin) return { isAdmin: false, isSuper: false, allowed: null, has: { grants: true, projects: true, fellowships: true } };
+  if (!actor?.isAdmin) return { isAdmin: false, isSuper: false, allowed: null, has: { grants: true, projects: true, fellowships: true }, pref: null };
   const perms = await permissionsFor(actor.id, actor.email);
   const mine = await entitiesFor({ id: actor.id, email: actor.email }, ['grant', 'project', 'fellowship']).catch(() => null);
   const has = mine ? { grants: mine.some((e) => e.kind === 'grant'), projects: mine.some((e) => e.kind === 'project'), fellowships: mine.some((e) => e.kind === 'fellowship') } : { grants: true, projects: true, fellowships: true };
-  return { isAdmin: true, isSuper: await isSuperAdminEmail(actor.email), allowed: perms === 'all' ? null : [...perms.keys()], has };
+  const { data: prof } = await looseAdmin().from('profiles').select('settings').eq('id', actor.id).maybeSingle();
+  const pref = cleanPref(((prof as { settings?: Record<string, unknown> } | null)?.settings ?? {}).mjengo_nav);
+  return { isAdmin: true, isSuper: await isSuperAdminEmail(actor.email), allowed: perms === 'all' ? null : [...perms.keys()], has, pref };
 }
 
 export interface SuiteCounts {

@@ -3,7 +3,8 @@
 import { WorkspaceMenu } from "@/components/navigation/WorkspaceMenu";
 import { useWorkspaceSync } from "@/hooks/useWorkspace";
 import { ThemeMenuItem } from "@/components/theme/ThemeControls";
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import { saveMjengoNavPref } from "@/app/actions/mjengo-nav";
 import Link from "next/link";
 import Image from "next/image";
 import logo from "@/public/logo-small.png";
@@ -22,6 +23,8 @@ import {
 	Bell,
 	Search,
 	Plus,
+	EyeOff,
+	X,
 	Home,
 	Cloud,
 	Users,
@@ -128,11 +131,23 @@ export function EnhancedSidebar({
 	const liveNotes = useSuiteNotifications();
 	useEffect(() => { if (onMjengo) startSuiteNotifications(); }, [onMjengo]);
 	// The order of the suite's modules is the person's own: drag a module (or a heading) to move it.
-	const [navPref, setNavPref] = useState<{ order: string[]; group: Record<string, string> }>({ order: [], group: {} });
+	// It also holds what they took off the menu, and follows their account to every device they sign in on.
+	type NavPrefState = { order: string[]; group: Record<string, string>; hidden?: string[]; at?: number };
+	const [navPref, setNavPref] = useState<NavPrefState>({ order: [], group: {}, hidden: [] });
+	const [showHiddenNav, setShowHiddenNav] = useState(false);
+	const navAt = useRef(0);
 	useEffect(() => {
-		try { const raw = localStorage.getItem("ss_mj_nav_v1"); if (raw) setNavPref(JSON.parse(raw)); } catch { /* default order */ }
+		try { const raw = localStorage.getItem("ss_mj_nav_v1"); if (raw) { const p = JSON.parse(raw) as NavPrefState; navAt.current = p.at ?? 0; setNavPref(p); } } catch { /* default order */ }
 	}, []);
-	const saveNav = (n: { order: string[]; group: Record<string, string> }) => { setNavPref(n); try { localStorage.setItem("ss_mj_nav_v1", JSON.stringify(n)); } catch { /* ignore */ } };
+	const saveNav = (n: NavPrefState) => {
+		const next = { ...n, hidden: n.hidden ?? navPref.hidden ?? [], at: Date.now() };
+		navAt.current = next.at;
+		setNavPref(next);
+		try { localStorage.setItem("ss_mj_nav_v1", JSON.stringify(next)); } catch { /* ignore */ }
+		saveMjengoNavPref({ order: next.order, group: next.group, hidden: next.hidden, at: next.at }).catch(() => undefined);
+	};
+	const hideNav = (id: string) => saveNav({ ...navPref, hidden: [...new Set([...(navPref.hidden ?? []), id])] });
+	const showNav = (id: string) => saveNav({ ...navPref, hidden: (navPref.hidden ?? []).filter((x) => x !== id) });
 	const counts = { opportunities: suite.opportunities, mail: mailUnread };
 	// Small counters on the suite items: phone arrivals and unread notifications, refreshed once a minute.
 	useEffect(() => {
@@ -148,7 +163,7 @@ export function EnhancedSidebar({
 	}, [onMjengo, pathname]);
 	useEffect(() => {
 		if (!onMjengo) return;
-		return fromCache(R.nav, (n) => { setMjengoSuper(n.isSuper); setMjengoAdmin(n.isAdmin); setMjengoAllowed(n.allowed); setMjengoHas(n.has); }, { maxAge: 300_000, onError: () => setMjengoSuper(false) });
+		return fromCache(R.nav, (n) => { setMjengoSuper(n.isSuper); setMjengoAdmin(n.isAdmin); setMjengoAllowed(n.allowed); setMjengoHas(n.has); if (n.pref && n.pref.at > navAt.current) { navAt.current = n.pref.at; setNavPref(n.pref); try { localStorage.setItem("ss_mj_nav_v1", JSON.stringify(n.pref)); } catch { /* ignore */ } } }, { maxAge: 300_000, onError: () => setMjengoSuper(false) });
 	}, [onMjengo]);
 	const supabase = useMemo(() => createClient(), []);
 	const userType = dash?.data?.profile?.user_type || user?.profile?.user_type || null;
@@ -657,7 +672,7 @@ export function EnhancedSidebar({
 			const order = orderNow.filter((x) => x !== dragged);
 			order.splice(order.indexOf(target), 0, dragged);
 			const t = list.find((x) => x.id === target);
-			saveNav({ order, group: { ...navPref.group, [dragged]: t?.group ?? "" } });
+			saveNav({ ...navPref, order, group: { ...navPref.group, [dragged]: t?.group ?? "" } });
 		};
 		const moveGroup = (g: string, target: string) => {
 			if (g === target) return;
@@ -665,7 +680,7 @@ export function EnhancedSidebar({
 			const rest = orderNow.filter((x) => !members.includes(x));
 			const at = rest.findIndex((id) => (list.find((x) => x.id === id)?.group ?? "") === target);
 			rest.splice(at === -1 ? rest.length : at, 0, ...members);
-			saveNav({ order: rest, group: navPref.group });
+			saveNav({ ...navPref, order: rest });
 		};
 		return list.map((item) => {
 			const heading = item.group && item.group !== last ? item.group : null;
@@ -684,7 +699,7 @@ export function EnhancedSidebar({
 						if (d.startsWith("item:")) moveItem(d.slice(5), item.id);
 						else if (d.startsWith("group:")) moveGroup(d.slice(6), item.group ?? "");
 					}}
-					className={cn(drag && "cursor-grab active:cursor-grabbing")}
+					className={cn("group/nav relative", drag && "cursor-grab active:cursor-grabbing")}
 				>
 					{heading && (isCollapsed
 						? <div className="mx-4 my-2 h-px bg-serene-neutral-200/70" />
@@ -697,6 +712,9 @@ export function EnhancedSidebar({
 							>{heading}</p>
 						))}
 					{renderItem(item)}
+					{drag && !isCollapsed && item.id !== "mj-overview" && (
+							<button type="button" onClick={() => hideNav(item.id)} aria-label={`Hide ${item.label} from the menu`} title="Hide from the menu" className="absolute right-3 top-1/2 hidden h-6 w-6 -translate-y-1/2 items-center justify-center rounded-md text-serene-neutral-400 hover:bg-serene-neutral-100 hover:text-serene-neutral-700 focus-visible:flex group-hover/nav:flex"><X className="h-3.5 w-3.5" /></button>
+					)}
 				</div>
 			);
 		});
@@ -705,7 +723,8 @@ export function EnhancedSidebar({
 	const baseMain = sidebarItems.filter((item) => item.section === "main");
 	const mainItems = useMemo(() => {
 		if (!onMjengo) return baseMain;
-		const withGroups = baseMain.map((i) => (navPref.group[i.id] !== undefined ? { ...i, group: navPref.group[i.id] } : i));
+		const hidden = navPref.hidden ?? [];
+		const withGroups = baseMain.filter((i) => !hidden.includes(i.id)).map((i) => (navPref.group[i.id] !== undefined ? { ...i, group: navPref.group[i.id] } : i));
 		const rank = (id: string, natural: number) => { const k = navPref.order.indexOf(id); return k === -1 ? 1000 + natural : k; };
 		return withGroups.map((i, n) => ({ i, r: rank(i.id, n) })).sort((a, b) => a.r - b.r).map((x) => x.i);
 		// eslint-disable-next-line react-hooks/exhaustive-deps
@@ -934,8 +953,25 @@ export function EnhancedSidebar({
 						</div>
 
 						{onMjengo && !isCollapsed && (navPref.order.length > 0) && (
-							<button onClick={() => saveNav({ order: [], group: {} })} className="mx-5 mt-2 text-[11px] font-medium text-serene-neutral-400 underline hover:text-serene-neutral-600">Reset the order</button>
+							<button onClick={() => saveNav({ order: [], group: {}, hidden: [] })} className="mx-5 mt-2 text-[11px] font-medium text-serene-neutral-400 underline hover:text-serene-neutral-600">Reset the menu</button>
 						)}
+
+						{onMjengo && !isCollapsed && (() => {
+							const gone = baseMain.filter((i) => (navPref.hidden ?? []).includes(i.id));
+							if (gone.length === 0) return null;
+							return (
+								<div className="mx-3 mt-2">
+									<button type="button" onClick={() => setShowHiddenNav((o) => !o)} aria-expanded={showHiddenNav} className="flex w-full items-center gap-1.5 rounded-md px-2 py-1 text-[11px] font-semibold uppercase tracking-wider text-serene-neutral-400 hover:text-serene-neutral-600"><EyeOff className="h-3 w-3" aria-hidden /> Hidden ({gone.length})</button>
+									{showHiddenNav && (
+										<ul aria-label="Hidden from the menu" className="mt-1 space-y-0.5">
+											{gone.map((i) => (
+												<li key={i.id}><button type="button" onClick={() => showNav(i.id)} aria-label={`Show ${i.label} in the menu again`} className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm text-serene-neutral-600 hover:bg-serene-neutral-100"><i.icon className="h-4 w-4" aria-hidden /><span className="flex-1 truncate text-left">{i.label}</span><Plus className="h-3.5 w-3.5 text-serene-neutral-400" aria-hidden /></button></li>
+											))}
+										</ul>
+									)}
+								</div>
+							);
+						})()}
 
 						{/* Secondary Navigation */}
 						{secondaryItems.length > 0 && (
