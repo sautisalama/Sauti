@@ -24,6 +24,7 @@ import {
 	Search,
 	Plus,
 	EyeOff,
+	Check,
 	X,
 	Home,
 	Cloud,
@@ -134,7 +135,7 @@ export function EnhancedSidebar({
 	// It also holds what they took off the menu, and follows their account to every device they sign in on.
 	type NavPrefState = { order: string[]; group: Record<string, string>; hidden?: string[]; at?: number };
 	const [navPref, setNavPref] = useState<NavPrefState>({ order: [], group: {}, hidden: [] });
-	const [showHiddenNav, setShowHiddenNav] = useState(false);
+	const [editNav, setEditNav] = useState(false);
 	const navAt = useRef(0);
 	useEffect(() => {
 		try { const raw = localStorage.getItem("ss_mj_nav_v1"); if (raw) { const p = JSON.parse(raw) as NavPrefState; navAt.current = p.at ?? 0; setNavPref(p); } } catch { /* default order */ }
@@ -146,8 +147,7 @@ export function EnhancedSidebar({
 		try { localStorage.setItem("ss_mj_nav_v1", JSON.stringify(next)); } catch { /* ignore */ }
 		saveMjengoNavPref({ order: next.order, group: next.group, hidden: next.hidden, at: next.at }).catch(() => undefined);
 	};
-	const hideNav = (id: string) => saveNav({ ...navPref, hidden: [...new Set([...(navPref.hidden ?? []), id])] });
-	const showNav = (id: string) => saveNav({ ...navPref, hidden: (navPref.hidden ?? []).filter((x) => x !== id) });
+	const toggleNav = (id: string) => { const gone = navPref.hidden ?? []; saveNav({ ...navPref, hidden: gone.includes(id) ? gone.filter((x) => x !== id) : [...gone, id] }); };
 	const counts = { opportunities: suite.opportunities, mail: mailUnread };
 	// Small counters on the suite items: phone arrivals and unread notifications, refreshed once a minute.
 	useEffect(() => {
@@ -685,7 +685,8 @@ export function EnhancedSidebar({
 		return list.map((item) => {
 			const heading = item.group && item.group !== last ? item.group : null;
 			if (item.group !== undefined) last = item.group;
-			const drag = reorderable && onMjengo;
+			const drag = reorderable && onMjengo && !editNav;
+			const editing = reorderable && onMjengo && editNav && !isCollapsed;
 			return (
 				<div
 					key={item.id}
@@ -711,10 +712,17 @@ export function EnhancedSidebar({
 								className="px-5 pb-1 pt-4 text-[11px] font-semibold uppercase tracking-wider text-serene-neutral-400"
 							>{heading}</p>
 						))}
-					{renderItem(item)}
-					{drag && !isCollapsed && item.id !== "mj-overview" && (
-							<button type="button" onClick={() => hideNav(item.id)} aria-label={`Hide ${item.label} from the menu`} title="Hide from the menu" className="absolute right-3 top-1/2 hidden h-6 w-6 -translate-y-1/2 items-center justify-center rounded-md text-serene-neutral-400 hover:bg-serene-neutral-100 hover:text-serene-neutral-700 focus-visible:flex group-hover/nav:flex"><X className="h-3.5 w-3.5" /></button>
-					)}
+					{editing ? (() => {
+						const on = !(navPref.hidden ?? []).includes(item.id);
+						const fixed = item.id === "mj-overview";
+						return (
+							<button type="button" role="checkbox" aria-checked={on} aria-label={`Show ${item.label} in the menu`} disabled={fixed} onClick={() => toggleNav(item.id)} className={cn("flex w-full items-center gap-3 px-5 py-2.5 text-left text-sm transition-colors hover:bg-serene-neutral-50 disabled:cursor-default disabled:opacity-60", on ? "text-serene-neutral-900" : "text-serene-neutral-400")}>
+								<span className={cn("flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-2", on ? "border-sauti-teal" : "border-serene-neutral-300")} aria-hidden>{on && <span className="h-2 w-2 rounded-full bg-sauti-teal" />}</span>
+								<item.icon className="h-4 w-4 shrink-0" aria-hidden />
+								<span className="min-w-0 flex-1 truncate">{item.label}</span>
+							</button>
+						);
+					})() : renderItem(item)}
 				</div>
 			);
 		});
@@ -724,11 +732,12 @@ export function EnhancedSidebar({
 	const mainItems = useMemo(() => {
 		if (!onMjengo) return baseMain;
 		const hidden = navPref.hidden ?? [];
-		const withGroups = baseMain.filter((i) => !hidden.includes(i.id)).map((i) => (navPref.group[i.id] !== undefined ? { ...i, group: navPref.group[i.id] } : i));
+		const withGroups = baseMain.filter((i) => editNav || !hidden.includes(i.id)).map((i) => (navPref.group[i.id] !== undefined ? { ...i, group: navPref.group[i.id] } : i));
 		const rank = (id: string, natural: number) => { const k = navPref.order.indexOf(id); return k === -1 ? 1000 + natural : k; };
 		return withGroups.map((i, n) => ({ i, r: rank(i.id, n) })).sort((a, b) => a.r - b.r).map((x) => x.i);
 		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [sidebarItems, navPref, onMjengo]);
+	}, [sidebarItems, navPref, onMjengo, editNav]);
+	const centred = onMjengo && (navPref.hidden ?? []).length > 0 && !isCollapsed;
 	const secondaryItems = sidebarItems.filter(
 		(item) => item.section === "secondary"
 	);
@@ -948,32 +957,22 @@ export function EnhancedSidebar({
 					) : (
 					<div className="flex min-h-full flex-1 flex-col gap-1">
 						{/* Main Navigation */}
-						<div className="space-y-1">
+						<div className={cn("space-y-1", centred && "my-auto")}>
 							{renderGroup(mainItems, true)}
 						</div>
 
 						{/* Reset, Hidden and Back to dashboard keep their place at the bottom, however many items are hidden. */}
-						<div className="sticky bottom-0 z-10 mt-auto bg-white shadow-[0_-8px_8px_-8px_rgba(16,24,40,0.08)]">
+						<div className={cn("sticky bottom-0 z-10 bg-white shadow-[0_-8px_8px_-8px_rgba(16,24,40,0.08)]", !centred && "mt-auto")}>
 						{onMjengo && !isCollapsed && (navPref.order.length > 0 || (navPref.hidden ?? []).length > 0) && (
 							<button onClick={() => saveNav({ order: [], group: {}, hidden: [] })} className="mx-5 mt-2 text-[11px] font-medium text-serene-neutral-400 underline hover:text-serene-neutral-600">Reset the menu</button>
 						)}
 
-						{onMjengo && !isCollapsed && (() => {
-							const gone = baseMain.filter((i) => (navPref.hidden ?? []).includes(i.id));
-							if (gone.length === 0) return null;
-							return (
-								<div className="mx-3 mt-2">
-									<button type="button" onClick={() => setShowHiddenNav((o) => !o)} aria-expanded={showHiddenNav} className="flex w-full items-center gap-1.5 rounded-md px-2 py-1 text-[11px] font-semibold uppercase tracking-wider text-serene-neutral-400 hover:text-serene-neutral-600"><EyeOff className="h-3 w-3" aria-hidden /> Hidden ({gone.length})</button>
-									{showHiddenNav && (
-										<ul aria-label="Hidden from the menu" className="mt-1 space-y-0.5">
-											{gone.map((i) => (
-												<li key={i.id}><button type="button" onClick={() => showNav(i.id)} aria-label={`Show ${i.label} in the menu again`} className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm text-serene-neutral-600 hover:bg-serene-neutral-100"><i.icon className="h-4 w-4" aria-hidden /><span className="flex-1 truncate text-left">{i.label}</span><Plus className="h-3.5 w-3.5 text-serene-neutral-400" aria-hidden /></button></li>
-											))}
-										</ul>
-									)}
-								</div>
-							);
-						})()}
+						{onMjengo && !isCollapsed && (
+							<button type="button" onClick={() => setEditNav((o) => !o)} aria-pressed={editNav} className="mx-3 mt-2 flex w-[calc(100%-1.5rem)] items-center gap-2 rounded-md px-2 py-1.5 text-xs font-semibold text-serene-neutral-500 hover:bg-serene-neutral-100 hover:text-serene-neutral-800">
+								{editNav ? <Check className="h-3.5 w-3.5" aria-hidden /> : <EyeOff className="h-3.5 w-3.5" aria-hidden />}
+								{editNav ? "Done" : "Hide items"}
+							</button>
+						)}
 
 						{/* Secondary Navigation */}
 						{secondaryItems.length > 0 && (

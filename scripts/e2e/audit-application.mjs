@@ -21,8 +21,6 @@ const tplPath = `vault/${admin.id}/e2e-template-${stamp}.txt`;
 await db.storage.from("mjengo-docs").upload(tplPath, new Blob(["# Name\nContact line\n\n## Why this role\n## My evidence\n## Closing"], { type: "text/plain" }), { contentType: "text/plain", upsert: true });
 const { data: tpl } = await db.from("vault_files").insert({ folder_id: null, name: `E2E letter template ${stamp}.txt`, storage_path: tplPath, mime: "text/plain", size: 60, owner_id: admin.id }).select("id").single();
 
-// Start with nothing hidden in the side panel.
-{ const { data: pr } = await db.from("profiles").select("settings").eq("id", admin.id).single(); const st = { ...(pr?.settings ?? {}) }; delete st.mjengo_panel_hidden; await db.from("profiles").update({ settings: st }).eq("id", admin.id); }
 async function chatCheck(page) {
 	await page.getByRole("tab", { name: "Application" }).click();
 	await page.getByRole("button", { name: "Add", exact: true }).click();
@@ -44,33 +42,13 @@ try {
 		await page.goto(`${BASE}/dashboard/mjengo/opportunities/${opp.id}`, { waitUntil: "domcontentloaded", timeout: 120000 });
 		await page.getByLabel("opportunity name").waitFor({ timeout: 90000 });
 		if (!dark) {
-			check("details with nothing in them are a quiet row of chips", (await page.getByRole("group", { name: "Add details" }).count()) === 1 && (await page.getByRole("heading", { name: "At a glance" }).count()) === 0);
+			check("every side panel item is visible, with nothing to hide", (await page.getByRole("button", { name: /Hide .* from this panel|Show or hide/ }).count()) === 0);
+		check("details with nothing in them are a quiet row of chips", (await page.getByRole("group", { name: "Add details" }).count()) === 1 && (await page.getByRole("heading", { name: "At a glance" }).count()) === 0);
 			await page.getByRole("button", { name: /^\+?\s*Amount/ }).first().click();
 			check("a chip opens its field", (await page.getByLabel(/Estimated value|Amount/i).count()) > 0);
 		}
 		await page.screenshot({ path: path.join(OUT, `app_overview_${dark ? "dark" : "light"}.png`) });
 
-		if (!dark) {
-			await page.getByRole("button", { name: "Hide tags from this panel" }).click();
-			await page.getByRole("button", { name: "Show tags again" }).waitFor({ timeout: 10000 });
-			check("an item can be taken off the panel and put back", (await page.getByText("No tags yet").count()) === 0);
-			await page.getByRole("button", { name: "Show tags again" }).click();
-			await page.getByText("No tags yet").waitFor({ timeout: 10000 });
-			await poll(async () => { const h = (await db.from("profiles").select("settings").eq("id", admin.id).single()).data?.settings?.mjengo_panel_hidden?.opportunity; return Array.isArray(h) && !h.includes("tags"); }, { timeout: 30000, interval: 1000 });
-			await page.getByRole("button", { name: "Choose what shows in this panel" }).click();
-			await page.getByRole("switch", { name: "Tags" }).click();
-			await page.keyboard.press("Escape");
-			const saved = await poll(async () => { const h = (await db.from("profiles").select("settings").eq("id", admin.id).single()).data?.settings?.mjengo_panel_hidden?.opportunity; return Array.isArray(h) && h.includes("tags"); }, { timeout: 45000, interval: 1000 });
-			check("hiding a side panel item is saved to the account", !!saved);
-			await page.reload({ waitUntil: "domcontentloaded" });
-			await page.getByLabel("opportunity name").waitFor({ timeout: 90000 });
-			await page.getByText("No tags yet").waitFor({ state: "detached", timeout: 20000 }).catch(() => {});
-			check("the hidden item stays hidden after a reload", (await page.getByText("No tags yet").count()) === 0);
-			await page.getByRole("button", { name: "Choose what shows in this panel" }).click();
-			await page.getByRole("switch", { name: "Tags" }).click();
-			await page.keyboard.press("Escape");
-			await poll(async () => { const h = (await db.from("profiles").select("settings").eq("id", admin.id).single()).data?.settings?.mjengo_panel_hidden?.opportunity; return Array.isArray(h) && !h.includes("tags"); }, { timeout: 20000, interval: 1000 });
-		}
 		await page.getByRole("tab", { name: "Application" }).click();
 		await page.getByRole("region", { name: "Application agent" }).waitFor({ timeout: 90000 });
 		if (dark) {

@@ -6,7 +6,7 @@ import { MjengoLoader } from "./MjengoLoader";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AlertCircle, ArrowLeft, BadgeCheck, Check, CheckSquare, Globe, Maximize2, EyeOff, Lock, Users, ExternalLink, FileWarning, Kanban, List, Loader2, Pencil, Plus, Search, SlidersHorizontal, Trash2, Eye, X } from "lucide-react";
+import { AlertCircle, ArrowLeft, BadgeCheck, Check, CheckSquare, Globe, Maximize2, EyeOff, Lock, Users, ExternalLink, FileWarning, Kanban, List, Loader2, Pencil, Plus, Search, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -26,8 +26,6 @@ import { linkPreview, type LinkPreview } from "@/app/actions/mjengo-link-preview
 import { extractFundDetails } from "@/app/actions/mjengo-fund-extract";
 import { DocumentsPanel } from "./DocumentsPanel";
 import { ApplicationStudio } from "./ApplicationStudio";
-import { Switch } from "@/components/ui/switch";
-import { getPanelHidden, setPanelHidden } from "@/app/actions/mjengo-panel-prefs";
 import { OpportunityVerifyCard } from "./OpportunityVerify";
 import { GrantCharts, type GrantLite } from "./GrantCharts";
 import { Avatars, DeadlineChip, STATUSES, StatusPill, money, type Kind } from "./shared";
@@ -309,22 +307,6 @@ export function EntityWorkspace({ kind, pageId }: { kind: Kind; pageId?: string 
 	const [seen, setSeen] = useState<Set<string>>(() => new Set(["overview"]));
 	useEffect(() => { setSeen((cur) => (cur.has(tab) ? cur : new Set(cur).add(tab))); }, [tab]);
 	const [glanceOpen, setGlanceOpen] = useState<Set<string>>(new Set());
-	const [panelHidden, setPanelHiddenState] = useState<string[]>([]);
-	const panelTouched = useRef(false);
-	useEffect(() => {
-		if (kind !== "opportunity" && kind !== "grant") return;
-		try { const c = localStorage.getItem(`ss_panel_hidden_${kind}`); if (c) setPanelHiddenState(JSON.parse(c) as string[]); } catch { /* none */ }
-		let live = true;
-		unwrap(getPanelHidden(kind)).then((h) => { if (!live || panelTouched.current) return; setPanelHiddenState(h); try { localStorage.setItem(`ss_panel_hidden_${kind}`, JSON.stringify(h)); } catch { /* ignore */ } }).catch(() => {});
-		return () => { live = false; };
-	}, [kind]);
-	const setPanelItem = (key: string, show: boolean) => {
-		panelTouched.current = true;
-		const next = show ? panelHidden.filter((x) => x !== key) : [...new Set([...panelHidden, key])];
-		setPanelHiddenState(next);
-		try { localStorage.setItem(`ss_panel_hidden_${kind}`, JSON.stringify(next)); } catch { /* ignore */ }
-		unwrap(setPanelHidden(kind, next)).catch(() => {});
-	};
 	const [autoState, setAutoState] = useState<"idle" | "saving" | "saved" | "error">("idle");
 	const lastSaved = useRef("");
 	const payloadOf = useCallback((v: Record<string, any>) => {
@@ -623,72 +605,35 @@ export function EntityWorkspace({ kind, pageId }: { kind: Kind; pageId?: string 
 									const web = (u: string | null | undefined) => (u && /^https?:\/\//i.test(u.trim()) ? u.trim() : null);
 									const applyUrl = web(ver?.applyUrl);
 									const siteUrl = web(ver?.website?.url);
-									const shown = (k: string) => !panelHidden.includes(k);
 									const facts = [
 										{ id: "deadline", key: dueK, label: "Deadline", show: () => new Date(`${String(v[dueK]).slice(0, 10)}T12:00:00`).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" }) },
 										{ id: "owner", key: ownerK, label: "Owner", show: () => admins.find((x) => x.id === v[ownerK])?.name ?? "Assigned" },
 										...(cfg.amountKey ? [{ id: "amount", key: cfg.amountKey, label: "Amount", show: () => `${String(v.currency ?? "").trim()} ${Number(v[cfg.amountKey as string]).toLocaleString()}`.trim() }] : []),
 										{ id: "source", key: urlKey, label: "Source link", show: () => host(String(v[urlKey])) },
-									].filter((f) => shown(f.id));
+									];
 									const links = [
 										{ id: "apply", label: "Where to apply", url: applyUrl },
 										{ id: "site", label: "Organisation", url: siteUrl },
-									].filter((l) => l.url && shown(l.id));
+									].filter((l) => l.url);
 									const editingKey = (k: string) => glanceOpen.has(k);
 									const filled = facts.filter((f) => has(f.key) && !editingKey(f.key));
 									const open = facts.filter((f) => editingKey(f.key));
 									const empty = facts.filter((f) => !has(f.key) && !editingKey(f.key));
 									const toggle = (k: string, on: boolean) => setGlanceOpen((cur) => { const n = new Set(cur); if (on) n.add(k); else n.delete(k); return n; });
-									const items = [
-										{ id: "deadline", label: "Deadline" }, { id: "owner", label: "Owner" },
-										...(cfg.amountKey ? [{ id: "amount", label: "Amount" }] : []),
-										{ id: "source", label: "Source link" }, { id: "apply", label: "Where to apply" }, { id: "site", label: "Organisation site" }, { id: "tags", label: "Tags" },
-									];
-									const customise = (
-										<Popover>
-											<PopoverTrigger asChild>
-												<button type="button" className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium text-serene-neutral-500 hover:bg-serene-neutral-100 hover:text-serene-neutral-800" aria-label="Choose what shows in this panel"><SlidersHorizontal className="h-3.5 w-3.5" aria-hidden /> Show or hide</button>
-											</PopoverTrigger>
-											<PopoverContent align="end" className="w-64 p-3">
-												<p className="mb-2 text-xs text-serene-neutral-600">Hide what you do not need. This follows your account on every device.</p>
-												<ul className="space-y-1.5">
-													{items.map((it) => (
-														<li key={it.id} className="flex items-center justify-between gap-3">
-															<span id={`panel-item-${it.id}`} className="text-sm text-serene-neutral-800">{it.label}</span>
-															<Switch checked={shown(it.id)} onCheckedChange={(on) => setPanelItem(it.id, on)} aria-labelledby={`panel-item-${it.id}`} />
-														</li>
-													))}
-												</ul>
-											</PopoverContent>
-										</Popover>
-									);
 									const chips = empty.length > 0 && (
 										<div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="Add details">
 											{filled.length + open.length + links.length === 0 && <span className="mr-0.5 text-xs text-serene-neutral-500">No details yet</span>}
 											{empty.map((f) => <button key={f.key} type="button" onClick={() => toggle(f.key, true)} className="inline-flex items-center gap-1 rounded-full border border-dashed border-serene-neutral-300 px-2.5 py-1 text-xs text-serene-neutral-600 hover:border-sauti-teal hover:text-sauti-teal"><Plus className="h-3 w-3" aria-hidden /> {f.label}</button>)}
 										</div>
 									);
-									const tagsShown = shown("tags") ? (
-										<div className="group relative">
-											{tagsEl}
-											<button type="button" onClick={() => setPanelItem("tags", false)} aria-label="Hide tags from this panel" title="Hide from this panel" className="absolute right-2 top-2 rounded-md p-1 text-serene-neutral-400 opacity-60 hover:bg-serene-neutral-100 hover:opacity-100 focus-visible:opacity-100 group-hover:opacity-100"><X className="h-3.5 w-3.5" /></button>
-										</div>
-									) : null;
-									// What was taken off the panel stays one click away.
-									const hiddenItems = items.filter((it) => !shown(it.id));
-									const restore = hiddenItems.length > 0 && (
-										<div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="Hidden from this panel">
-											<span className="text-xs text-serene-neutral-500">Hidden</span>
-											{hiddenItems.map((it) => <button key={it.id} type="button" onClick={() => setPanelItem(it.id, true)} aria-label={`Show ${it.label.toLowerCase()} again`} className="inline-flex items-center gap-1 rounded-full border border-serene-neutral-200 px-2.5 py-1 text-xs text-serene-neutral-600 hover:border-sauti-teal hover:text-sauti-teal"><Eye className="h-3 w-3" aria-hidden /> {it.label}</button>)}
-										</div>
-									);
-									if (filled.length + open.length + links.length === 0) return <aside className="space-y-3 px-1" aria-label="Key facts">{chips}{tagsShown}{restore}<div className="flex justify-end">{customise}</div></aside>;
+									const tagsShown = tagsEl;
+									if (filled.length + open.length + links.length === 0) return <aside className="space-y-3 px-1" aria-label="Key facts">{chips}{tagsShown}</aside>;
 									return (
 										<aside className="space-y-4 lg:sticky lg:top-16" aria-label="Key facts">
 											<section className={cn(card, "space-y-2.5")}>
 												<div className="flex items-center justify-between gap-2">
 													<h2 className="text-sm font-semibold text-serene-neutral-900">Details</h2>
-													{shown("deadline") && <DeadlineChip date={v[dueK]} done={finished} />}
+													<DeadlineChip date={v[dueK]} done={finished} />
 												</div>
 												<dl className="divide-y divide-serene-neutral-200">
 													{filled.map((f) => (
@@ -696,14 +641,12 @@ export function EntityWorkspace({ kind, pageId }: { kind: Kind; pageId?: string 
 															<dt className="w-20 shrink-0 text-xs text-serene-neutral-500">{f.label}</dt>
 															<dd className="min-w-0 flex-1 truncate text-sm font-medium text-serene-neutral-900">{f.key === urlKey && String(v[urlKey]).startsWith("http") ? <a href={String(v[urlKey])} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-sauti-teal hover:underline">{f.show()} <ExternalLink className="h-3 w-3" aria-hidden /></a> : f.show()}</dd>
 															<button type="button" onClick={() => toggle(f.key, true)} aria-label={`Edit ${f.label.toLowerCase()}`} className="rounded-md p-1 text-serene-neutral-400 opacity-60 hover:bg-serene-neutral-100 hover:opacity-100 focus-visible:opacity-100 group-hover:opacity-100"><Pencil className="h-3.5 w-3.5" /></button>
-															<button type="button" onClick={() => setPanelItem(f.id, false)} aria-label={`Hide ${f.label.toLowerCase()} from this panel`} title="Hide from this panel" className="rounded-md p-1 text-serene-neutral-400 opacity-60 hover:bg-serene-neutral-100 hover:opacity-100 focus-visible:opacity-100 group-hover:opacity-100"><X className="h-3.5 w-3.5" /></button>
 														</div>
 													))}
 													{links.map((l) => (
 														<div key={l.id} className="group flex items-center gap-2 py-1.5">
 															<dt className="w-20 shrink-0 text-xs text-serene-neutral-500">{l.label}</dt>
 															<dd className="min-w-0 flex-1 truncate text-sm font-medium"><a href={l.url as string} target="_blank" rel="noreferrer" className="inline-flex max-w-full items-center gap-1 text-sauti-teal hover:underline"><span className="truncate">{host(l.url as string)}</span> <ExternalLink className="h-3 w-3 shrink-0" aria-hidden /></a></dd>
-															<button type="button" onClick={() => setPanelItem(l.id, false)} aria-label={`Hide ${l.label.toLowerCase()} from this panel`} title="Hide from this panel" className="rounded-md p-1 text-serene-neutral-400 opacity-60 hover:bg-serene-neutral-100 hover:opacity-100 focus-visible:opacity-100 group-hover:opacity-100"><X className="h-3.5 w-3.5" /></button>
 														</div>
 													))}
 												</dl>
@@ -716,8 +659,6 @@ export function EntityWorkspace({ kind, pageId }: { kind: Kind; pageId?: string 
 												{chips}
 											</section>
 											{tagsShown}
-											{restore}
-											<div className="flex justify-end">{customise}</div>
 										</aside>
 									);
 								})()}
