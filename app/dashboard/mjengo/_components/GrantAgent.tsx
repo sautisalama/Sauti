@@ -12,26 +12,7 @@ import { draftForFunder, exportApplication, getBrief, readCall, reviewApplicatio
 import { TagEditor } from "./Facets";
 import { wordCount, type Review, type Section } from "@/lib/mjengo/grant-agent-shared";
 
-/**
- * The application agent for a grant or opportunity: it reads what the funder asks for, writes each section to fit
- * (from the organisation's own record, with [to confirm] where the record is silent), keeps what the funder has said
- * before, and reviews the whole against the scoring before it goes. People edit every word.
- */
-export function GrantAgent({ kind, id }: { kind: "grant" | "opportunity"; id: string }) {
-	// It does nothing until it is opened: opening a record should not start a dozen server calls at once.
-	const [open, setOpen] = useState(false);
-	if (!open) {
-		return (
-			<button type="button" onClick={() => setOpen(true)} aria-expanded={false} className="flex w-full items-center gap-2 rounded-xl border border-serene-neutral-100 p-3 text-left hover:bg-serene-neutral-50">
-				<Sparkles className="h-4 w-4 text-sauti-teal" />
-				<span className="mr-auto text-sm font-semibold text-serene-neutral-900">Application form</span>
-				<span className="hidden text-xs text-serene-neutral-500 sm:inline">Reads the funder&apos;s call and writes each section it asks for</span>
-				<ChevronDown className="h-4 w-4 text-serene-neutral-400" />
-			</button>
-		);
-	}
-	return <GrantAgentBody kind={kind} id={id} />;
-}
+
 
 function GrantAgentBody({ kind, id }: { kind: "grant" | "opportunity"; id: string }) {
 	const { toast } = useToast();

@@ -245,7 +245,6 @@ function AgentPanel({ kind, id, title, wb, includedCount, onDone, onChat, contex
 				<span className="flex h-8 w-8 items-center justify-center rounded-xl bg-sauti-teal text-white"><Sparkles className="h-4 w-4" aria-hidden /></span>
 				<div className="min-w-0 flex-1">
 					<h2 className="text-sm font-bold text-sauti-dark">Application agent</h2>
-					<p className="truncate text-xs text-serene-neutral-600">Writes from this opportunity, your context and your files. Nothing is invented; gaps are marked.</p>
 				</div>
 				<Button size="sm" variant="ghost" className="h-8 shrink-0 gap-1.5 text-sauti-teal" onClick={onChat}><MessageCircle className="h-4 w-4" /> Chat about this</Button>
 				{wb.ai.available && (
