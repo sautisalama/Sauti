@@ -13,6 +13,7 @@ const page = await newPage(browser, { viewport: { width: 1280, height: 900 } });
 try {
 	await signIn(page, "admin");
 	await page.goto(`${BASE}/dashboard/mjengo/opportunities/${opp.id}`, { waitUntil: "domcontentloaded", timeout: 120000 });
+	await page.getByRole("tab", { name: "To-dos and reminders" }).click();
 	await page.getByText("Worked back from the deadline").waitFor({ timeout: 90000 });
 	check("suggestions are shown, worked back from the deadline", true);
 	await page.getByRole("button", { name: /Add these 4/ }).click();
@@ -28,6 +29,7 @@ try {
 	// Move the deadline, then redo: untouched suggestions follow it, the finished one stays.
 	await db.from("mjengo_opportunities").update({ deadline: later }).eq("id", opp.id);
 	await page.reload({ waitUntil: "domcontentloaded" });
+	await page.getByRole("tab", { name: "To-dos and reminders" }).click();
 	await page.getByText("Add a to-do and press Enter").first().waitFor({ state: "attached", timeout: 60000 }).catch(() => {});
 	await page.getByRole("checkbox", { name: /Mark done: Gather the documents/ }).waitFor({ timeout: 60000 });
 	const input = page.getByLabel("Add a to-do");
@@ -36,6 +38,7 @@ try {
 	await page.getByRole("checkbox", { name: /Mark done: Phone the programme officer/ }).waitFor({ timeout: 90000 });
 	check("a typed to-do is added and linked", (await db.from("mjengo_todos").select("id").eq("entity_id", opp.id)).data?.length === 5);
 
+	await page.getByRole("tab", { name: "Sharing" }).click();
 	await page.getByRole("button", { name: /^Delete$/ }).first().click();
 	check("delete asks inline, not with a browser prompt", await page.getByRole("button", { name: /Yes, delete it/ }).first().isVisible());
 	await page.getByRole("button", { name: "Keep" }).first().click();

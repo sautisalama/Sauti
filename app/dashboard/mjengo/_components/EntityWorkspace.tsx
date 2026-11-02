@@ -6,7 +6,7 @@ import { MjengoLoader } from "./MjengoLoader";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AlertCircle, ArrowLeft, BadgeCheck, CheckSquare, Maximize2, EyeOff, Lock, Users, ExternalLink, FileWarning, Kanban, List, Loader2, Plus, Search, Trash2 } from "lucide-react";
+import { AlertCircle, ArrowLeft, BadgeCheck, CheckSquare, Globe, Maximize2, EyeOff, Lock, Users, ExternalLink, FileWarning, Kanban, List, Loader2, Plus, Search, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -19,6 +19,7 @@ import { clearOpportunityInbox } from "@/app/actions/mjengo-nav";
 import { deleteEntity, listAdmins, listEntities, saveEntity, type AdminLite, type EntityRow } from "@/app/actions/mjengo";
 import { cn } from "@/lib/utils";
 import { unwrap } from "@/lib/action-result";
+import type { Verification } from "@/lib/mjengo/opportunity-types";
 import { linkPreview, type LinkPreview } from "@/app/actions/mjengo-link-preview";
 import { extractFundDetails } from "@/app/actions/mjengo-fund-extract";
 import { DocumentsPanel } from "./DocumentsPanel";
@@ -242,6 +243,7 @@ export function EntityWorkspace({ kind, pageId }: { kind: Kind; pageId?: string 
 			for (const f of cfg.fields) payload[f.key] = editing.values[f.key] === "" ? null : editing.values[f.key];
 			if (!editing.id) payload.visibility = editing.values.visibility === "restricted" ? "restricted" : "team";
 			const row = await saveEntity(kind, editing.id, payload);
+			lastSaved.current = JSON.stringify(payloadOf(row as Record<string, any>));
 			await load();
 			setEditing({ id: row.id, values: { ...row } }); // stay open so documents can be added
 			toast({ title: editing.id ? "Saved" : `${cfg.noun[0].toUpperCase()}${cfg.noun.slice(1)} created`, description: editing.id ? undefined : "You can now add its documents." });
@@ -298,102 +300,152 @@ export function EntityWorkspace({ kind, pageId }: { kind: Kind; pageId?: string 
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [pendingRefresh, editing, saving]);
 
+	// On the full page, edits save themselves a moment after typing stops; there is no Save button to forget.
+	const [tab, setTab] = useState<"overview" | "work" | "files" | "activity" | "settings">("overview");
+	const [autoState, setAutoState] = useState<"idle" | "saving" | "saved" | "error">("idle");
+	const lastSaved = useRef("");
+	const payloadOf = useCallback((v: Record<string, any>) => {
+		const p: Record<string, unknown> = {};
+		for (const f of cfg.fields) p[f.key] = v[f.key] === "" ? null : v[f.key];
+		return p;
+	}, [cfg]);
+	const savedKey = editing?.id ?? null;
+	useEffect(() => {
+		if (editing?.id) lastSaved.current = JSON.stringify(payloadOf(editing.values));
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [savedKey]);
+	const dirty = !!pageId && !!editing?.id && JSON.stringify(payloadOf(editing.values)) !== lastSaved.current;
+	useEffect(() => {
+		if (!pageId || !editing?.id || saving || !dirty) return;
+		const id = editing.id;
+		const payload = payloadOf(editing.values);
+		const key = JSON.stringify(payload);
+		const t = setTimeout(async () => {
+			if (key === lastSaved.current) return;
+			setAutoState("saving");
+			try { await saveEntity(kind, id, payload); lastSaved.current = key; setAutoState("saved"); void load(); } catch { setAutoState("error"); }
+		}, 1200);
+		return () => clearTimeout(t);
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [editing?.values, pageId, saving, dirty]);
+	useEffect(() => {
+		if (!dirty) return;
+		const h = (e: BeforeUnloadEvent) => e.preventDefault();
+		window.addEventListener("beforeunload", h);
+		return () => window.removeEventListener("beforeunload", h);
+	}, [dirty]);
+	const goBack = async () => {
+		if (dirty && editing?.id) {
+			try { await saveEntity(kind, editing.id, payloadOf(editing.values)); lastSaved.current = JSON.stringify(payloadOf(editing.values)); }
+			catch (e) { toast({ title: "Could not save before leaving", description: e instanceof Error ? e.message : undefined, variant: "destructive" }); return; }
+		}
+		router.push(listHref);
+	};
+
 	if (!rows) {
 		return <MjengoLoader label="Loading" />;
 	}
 
-	const fieldsPart = editing ? (
-		<div className="space-y-6">
-							<div className="grid gap-4 sm:grid-cols-2">
-								{cfg.fields.filter((f) => shownField(f.key)).map((f) => (
-									<div key={f.key} className={cn("space-y-1.5", f.wide && "sm:col-span-2")}>
-										<Label htmlFor={`f-${f.key}`} className="text-xs font-semibold text-serene-neutral-600">{f.label}</Label>
-										{((editing.values._hidden as string[] | undefined) ?? []).includes(f.key)
-											? <p className="flex h-10 items-center gap-2 rounded-md border border-dashed border-amber-200 bg-amber-50/60 px-3 text-sm text-amber-800"><EyeOff className="h-4 w-4" /> Hidden by whoever added it</p>
-											: <FieldInput f={f} value={editing.values[f.key]} onChange={(v) => set(f.key, v)} admins={admins} grants={grants} />}
-									</div>
-								))}
-							</div>
-
-							{hiddenFields.length > 0 && (
-								<div className="flex flex-wrap items-center gap-1.5">
-									<span className="text-xs text-serene-neutral-500">Add:</span>
-									{hiddenFields.map((f) => (
-										<button key={f.key} type="button" onClick={() => setRevealed((r) => new Set(r).add(f.key))} className="flex h-7 items-center gap-1 rounded-full border border-serene-neutral-200 px-2.5 text-xs font-medium text-serene-neutral-700 hover:bg-serene-neutral-50"><Plus className="h-3 w-3" />{f.label}</button>
-									))}
-								</div>
-							)}
-
-							{(kind === "grant" || kind === "opportunity" || kind === "fellowship") && (
-								<FundFromLink
-									url={String(editing.values[urlKey] ?? "")}
-									values={editing.values}
-									existing={!!editing.id}
-									onRefreshed={() => setPendingRefresh(true)}
-									onFill={(patch) => Object.entries(patch).forEach(([k, v]) => set(k, v))}
-								/>
-							)}
-							{kind === "grant" && (
-								<LinkPreviewCard
-									url={String(editing.values.link ?? "")}
-									values={editing.values}
-									onFill={(patch) => Object.entries(patch).forEach(([k, v]) => v != null && v !== "" && set(k, v))}
-								/>
-							)}
-							{kind === "opportunity" && (
-								<OpportunityVerifyCard
-									id={editing.id ?? null}
-									values={editing.values}
-									onFill={(patch) => Object.entries(patch).forEach(([k, v]) => v != null && v !== "" && set(k, v))}
-									onChanged={load}
-								/>
-							)}
+	const eid = editing?.id ?? null;
+	const gridFor = (omit: Set<string>) => editing ? (
+		<div className="grid gap-4 sm:grid-cols-2">
+			{cfg.fields.filter((f) => shownField(f.key) && !omit.has(f.key)).map((f) => (
+				<div key={f.key} className={cn("space-y-1.5", f.wide && "sm:col-span-2")}>
+					<Label htmlFor={`f-${f.key}`} className="text-xs font-semibold text-serene-neutral-600">{f.label}</Label>
+					{((editing.values._hidden as string[] | undefined) ?? []).includes(f.key)
+						? <p className="flex h-10 items-center gap-2 rounded-md border border-dashed border-amber-200 bg-amber-50/60 px-3 text-sm text-amber-800"><EyeOff className="h-4 w-4" /> Hidden by whoever added it</p>
+						: <FieldInput f={f} value={editing.values[f.key]} onChange={(v) => set(f.key, v)} admins={admins} grants={grants} />}
+				</div>
+			))}
 		</div>
 	) : null;
+	const addChips = editing && hiddenFields.length > 0 ? (
+		<div className="flex flex-wrap items-center gap-1.5">
+			<span className="text-xs text-serene-neutral-500">Add:</span>
+			{hiddenFields.map((f) => (
+				<button key={f.key} type="button" onClick={() => setRevealed((r) => new Set(r).add(f.key))} className="flex h-7 items-center gap-1 rounded-full border border-serene-neutral-200 px-2.5 text-xs font-medium text-serene-neutral-700 hover:bg-serene-neutral-50"><Plus className="h-3 w-3" />{f.label}</button>
+			))}
+		</div>
+	) : null;
+	const fundEl = editing && (kind === "grant" || kind === "opportunity" || kind === "fellowship") ? (
+		<FundFromLink
+			url={String(editing.values[urlKey] ?? "")}
+			values={editing.values}
+			existing={!!editing.id}
+			onRefreshed={() => setPendingRefresh(true)}
+			onFill={(patch) => Object.entries(patch).forEach(([k, v]) => set(k, v))}
+		/>
+	) : null;
+	const previewEl = editing && kind === "grant" ? (
+		<LinkPreviewCard
+			url={String(editing.values.link ?? "")}
+			values={editing.values}
+			onFill={(patch) => Object.entries(patch).forEach(([k, v]) => v != null && v !== "" && set(k, v))}
+		/>
+	) : null;
+	const verifyEl = editing && kind === "opportunity" ? (
+		<OpportunityVerifyCard
+			id={editing.id ?? null}
+			values={editing.values}
+			onFill={(patch) => Object.entries(patch).forEach(([k, v]) => v != null && v !== "" && set(k, v))}
+			onChanged={load}
+		/>
+	) : null;
+	const fieldsPart = editing ? (
+		<div className="space-y-6">{gridFor(new Set())}{addChips}{fundEl}{previewEl}{verifyEl}</div>
+	) : null;
+
+	const extrasEl = editing && eid ? (
+		<>
+			{kind === "project" && <ProjectMoney v={editing.values} />}
+			{kind === "fellowship" && <FellowshipAssignments fellowshipId={eid} />}
+			{kind === "opportunity" && editing.values.converted_to_type && (
+				<Link href={`/dashboard/mjengo/${editing.values.converted_to_type}s`} className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm font-medium text-emerald-800 hover:bg-emerald-100">Won, and now a {String(editing.values.converted_to_type)}. Open it <ExternalLink className="ml-auto h-3.5 w-3.5" /></Link>
+			)}
+		</>
+	) : null;
+	const tasksEl = eid ? <EntityTasks kind={kind} id={eid} version={linkVersion} noun={cfg.noun} /> : null;
+	const tagsEl = eid && editing ? (
+		<div className="rounded-xl border border-serene-neutral-100 p-3">
+			<p className="mb-2 text-sm font-semibold text-serene-neutral-900">Tags</p>
+			<TagEditor key={`tags-${linkVersion}`} type={kind} id={eid} tags={(editing.values.tags as string[] | undefined) ?? []} onChange={(t) => { set("tags", t); void load(); }} />
+		</div>
+	) : null;
+	const docsEl = eid ? <DocumentsPanel kind={kind} entityId={eid} onChange={load} /> : null;
+	const remindersEl = eid ? (
+		<div className="rounded-xl border border-serene-neutral-100 p-3">
+			<p className="mb-2 text-sm font-semibold text-serene-neutral-900">Reminders</p>
+			<EntityReminders type={kind} id={eid} />
+		</div>
+	) : null;
+	const timelineEl = eid ? <EntityTimeline kind={kind} id={eid} /> : null;
+	const reportEl = eid ? <ProgressReport kind={kind} id={eid} /> : null;
+	const agentEl = eid && (kind === "grant" || kind === "opportunity") ? <GrantAgent kind={kind} id={eid} /> : null;
+	const similarEl = eid ? <SimilarItems type={kind} id={eid} /> : null;
+	const accessEl = eid ? <EntityAccessPanel kind={kind} id={eid} /> : null;
 	const panelsPart = editing ? (
 		<div className="space-y-6">
-							{editing.id ? (
-								<>
-									{kind === "project" && <ProjectMoney v={editing.values} />}
-									{kind === "fellowship" && <FellowshipAssignments fellowshipId={editing.id} />}
-									{kind === "opportunity" && editing.values.converted_to_type && (
-										<Link href={`/dashboard/mjengo/${editing.values.converted_to_type}s`} className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm font-medium text-emerald-800 hover:bg-emerald-100">Won, and now a {String(editing.values.converted_to_type)}. Open it <ExternalLink className="ml-auto h-3.5 w-3.5" /></Link>
-									)}
-									<EntityTasks kind={kind} id={editing.id} version={linkVersion} noun={cfg.noun} />
-									<div className="rounded-xl border border-serene-neutral-100 p-3">
-										<p className="mb-2 text-sm font-semibold text-serene-neutral-900">Tags</p>
-										<TagEditor key={`tags-${linkVersion}`} type={kind} id={editing.id} tags={(editing.values.tags as string[] | undefined) ?? []} onChange={(t) => { set("tags", t); void load(); }} />
-									</div>
-									<DocumentsPanel kind={kind} entityId={editing.id} onChange={load} />
-									<div className="rounded-xl border border-serene-neutral-100 p-3">
-										<p className="mb-2 text-sm font-semibold text-serene-neutral-900">Reminders</p>
-										<EntityReminders type={kind} id={editing.id} />
-									</div>
-									<EntityTimeline kind={kind} id={editing.id} />
-									<ProgressReport kind={kind} id={editing.id} />
-									{(kind === "grant" || kind === "opportunity") && <GrantAgent kind={kind} id={editing.id} />}
-									<SimilarItems type={kind} id={editing.id} />
-									<EntityAccessPanel kind={kind} id={editing.id} />
-								</>
-							) : (
-								<>
-									<div className="rounded-xl border border-serene-neutral-100 p-3">
-										<p className="mb-2 text-sm font-semibold text-serene-neutral-900">Who sees this {cfg.noun}</p>
-										<div className="grid grid-cols-2 gap-2">
-											{([["team", "Whole team", "Everyone on the team can open it.", Users], ["restricted", "Only me", "Private until you add people.", Lock]] as const).map(([v, label, hint, Icon]) => {
-												const on = (editing.values.visibility === "restricted" ? "restricted" : "team") === v;
-												return (
-													<button key={v} type="button" aria-pressed={on} onClick={() => set("visibility", v)} className={cn("flex items-start gap-2 rounded-xl border p-3 text-left", on ? "border-sauti-teal bg-sauti-teal-light/50" : "border-serene-neutral-200 hover:bg-serene-neutral-50")}>
-														<Icon className="mt-0.5 h-4 w-4 shrink-0 text-sauti-teal" />
-														<span><span className="block text-sm font-medium text-serene-neutral-900">{label}</span><span className="block text-xs text-serene-neutral-500">{hint}</span></span>
-													</button>
-												);
-											})}
-										</div>
-									</div>
-									<p className="flex items-start gap-2 rounded-xl bg-sauti-teal-light/40 p-3 text-sm text-sauti-dark"><AlertCircle className="mt-0.5 h-4 w-4 shrink-0" /> Save first, then add the documents this {cfg.noun} needs.</p>
-								</>
-							)}
+			{eid ? (
+				<>{extrasEl}{tasksEl}{tagsEl}{docsEl}{remindersEl}{timelineEl}{reportEl}{agentEl}{similarEl}{accessEl}</>
+			) : (
+				<>
+					<div className="rounded-xl border border-serene-neutral-100 p-3">
+						<p className="mb-2 text-sm font-semibold text-serene-neutral-900">Who sees this {cfg.noun}</p>
+						<div className="grid grid-cols-2 gap-2">
+							{([["team", "Whole team", "Everyone on the team can open it.", Users], ["restricted", "Only me", "Private until you add people.", Lock]] as const).map(([v, label, hint, Icon]) => {
+								const on = (editing.values.visibility === "restricted" ? "restricted" : "team") === v;
+								return (
+									<button key={v} type="button" aria-pressed={on} onClick={() => set("visibility", v)} className={cn("flex items-start gap-2 rounded-xl border p-3 text-left", on ? "border-sauti-teal bg-sauti-teal-light/50" : "border-serene-neutral-200 hover:bg-serene-neutral-50")}>
+										<Icon className="mt-0.5 h-4 w-4 shrink-0 text-sauti-teal" />
+										<span><span className="block text-sm font-medium text-serene-neutral-900">{label}</span><span className="block text-xs text-serene-neutral-500">{hint}</span></span>
+									</button>
+								);
+							})}
+						</div>
+					</div>
+					<p className="flex items-start gap-2 rounded-xl bg-sauti-teal-light/40 p-3 text-sm text-sauti-dark"><AlertCircle className="mt-0.5 h-4 w-4 shrink-0" /> Save first, then add the documents this {cfg.noun} needs.</p>
+				</>
+			)}
 		</div>
 	) : null;
 	const footerBar = (
@@ -413,13 +465,51 @@ export function EntityWorkspace({ kind, pageId }: { kind: Kind; pageId?: string 
 	);
 
 	if (pageId) {
-		const title = String(editing?.values[cfg.titleKey] ?? rows.find((r) => r.id === pageId)?.[cfg.titleKey] ?? cfg.noun);
+		const row = rows.find((r) => r.id === pageId);
+		const v = editing?.values ?? {};
+		const title = String(v[cfg.titleKey] ?? row?.[cfg.titleKey] ?? cfg.noun);
+		const ownerK = ownerKey(kind);
+		const dueK = dueKey(kind);
+		const finished = ["awarded", "declined", "closed", "won", "lost", "passed", "completed", "cancelled"].includes(String(v.status));
+		const railKeys = [ownerK, dueK, cfg.amountKey, "currency", urlKey].filter(Boolean) as string[];
+		const headKeys = [cfg.titleKey, "status", ...(kind !== "project" ? [cfg.subKey] : [])];
+		const omit = new Set<string>([...railKeys, ...headKeys]);
+		const field = (key: string) => cfg.fields.find((f) => f.key === key);
+		const railField = (key: string) => {
+			const f = field(key);
+			if (!f || !editing) return null;
+			return (
+				<div key={key} className="space-y-1">
+					<Label htmlFor={`f-${key}`} className="text-[11px] font-semibold uppercase tracking-wide text-serene-neutral-500">{f.label}</Label>
+					<FieldInput f={f} value={editing.values[key]} onChange={(x) => set(key, x)} admins={admins} grants={grants} />
+				</div>
+			);
+		};
+		const nudges: { label: string; tab?: typeof tab }[] = [];
+		const missing = row?.docs?.missing ?? 0;
+		if (missing > 0) nudges.push({ label: `${missing} document${missing === 1 ? "" : "s"} still needed`, tab: "files" });
+		if ((row?.openTodos ?? 0) > 0) nudges.push({ label: `${row?.openTodos} open to-do${row?.openTodos === 1 ? "" : "s"}`, tab: "work" });
+		if (!finished && !v[ownerK]) nudges.push({ label: "Nobody is responsible yet" });
+		if (!finished && !v[dueK]) nudges.push({ label: "No deadline set" });
+		if (kind === "opportunity" && row?.verification && ["suspicious", "repost"].includes(row.verification.trust)) nudges.push({ label: "Check where this came from", tab: "files" });
+		const curIdx = statuses.findIndex((s) => s.value === v.status);
+		const tabs = [
+			{ id: "overview", label: "Overview", badge: 0 },
+			{ id: "work", label: "To-dos and reminders", badge: row?.openTodos ?? 0 },
+			{ id: "files", label: "Pages and copies", badge: missing },
+			{ id: "activity", label: "Activity", badge: 0 },
+			{ id: "settings", label: "Sharing", badge: 0 },
+		] as const;
+		const showTab = (t: string) => (t === tab ? undefined : true);
+		const card = "rounded-2xl border border-serene-neutral-200/70 bg-white p-4 shadow-[0_1px_2px_rgba(16,24,40,0.04)]";
 		return (
-			<div className="mx-auto max-w-6xl space-y-5">
+			<div className="mx-auto max-w-6xl space-y-4">
 				<div className="flex flex-wrap items-center gap-3">
-					<Link href={listHref} className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium text-serene-neutral-600 hover:bg-white"><ArrowLeft className="h-4 w-4" /> {cfg.plural}</Link>
-					<h1 className="min-w-0 flex-1 truncate text-xl font-bold text-sauti-dark">{title}</h1>
-					{editing?.values.status && <StatusPill kind={kind} value={String(editing.values.status)} />}
+					<button type="button" onClick={() => void goBack()} className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium text-serene-neutral-600 hover:bg-white"><ArrowLeft className="h-4 w-4" /> {cfg.plural}</button>
+					<div className="flex-1" />
+					<p className="flex items-center gap-1.5 text-xs text-serene-neutral-500" aria-live="polite">
+						{autoState === "saving" || saving ? <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Saving…</> : autoState === "error" ? <span className="text-red-700">Not saved. <button type="button" className="font-medium underline" onClick={() => setAutoState("idle")}>Dismiss</button> and keep typing to retry.</span> : dirty ? "Unsaved changes" : autoState === "saved" ? "All changes saved" : ""}
+					</p>
 				</div>
 				{!editing ? (
 					<div className="rounded-2xl border border-dashed border-serene-neutral-200 bg-white p-12 text-center">
@@ -428,11 +518,108 @@ export function EntityWorkspace({ kind, pageId }: { kind: Kind; pageId?: string 
 					</div>
 				) : (
 					<>
-						<div className="grid items-start gap-5 lg:grid-cols-2">
-							<section className="rounded-2xl border border-serene-neutral-200/70 bg-white p-4 shadow-[0_1px_2px_rgba(16,24,40,0.04)]">{fieldsPart}</section>
-							<section className="rounded-2xl border border-serene-neutral-200/70 bg-white p-4 shadow-[0_1px_2px_rgba(16,24,40,0.04)]">{panelsPart}</section>
+						<header className={cn(card, "space-y-3")}>
+							<div className="space-y-1">
+								<Input aria-label={`${cfg.noun} name`} value={v[cfg.titleKey] ?? ""} onChange={(e) => set(cfg.titleKey, e.target.value)} className="h-auto border-0 bg-transparent px-0 text-2xl font-bold text-sauti-dark shadow-none focus-visible:ring-0" placeholder={`Name this ${cfg.noun}`} />
+								{kind !== "project" && <Input aria-label={cfg.subLabel} value={v[cfg.subKey] ?? ""} onChange={(e) => set(cfg.subKey, e.target.value)} className="h-auto border-0 bg-transparent px-0 text-sm text-serene-neutral-600 shadow-none focus-visible:ring-0" placeholder={cfg.subLabel} />}
+							</div>
+							<ol className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1" aria-label="Stage">
+								{statuses.map((s, i) => {
+									const current = s.value === v.status;
+									return (
+										<li key={s.value}>
+											<button type="button" aria-current={current ? "step" : undefined} onClick={() => set("status", s.value)} className={cn("flex items-center gap-1.5 whitespace-nowrap rounded-full border px-3 py-1 text-xs font-medium transition-colors", current ? cn("border-current font-semibold", s.tone) : i < curIdx ? "border-serene-neutral-200 bg-serene-neutral-100 text-serene-neutral-700" : "border-serene-neutral-200 text-serene-neutral-500 hover:bg-serene-neutral-50")}>
+												{i < curIdx && <CheckSquare className="h-3 w-3" aria-hidden />}{s.label}
+											</button>
+										</li>
+									);
+								})}
+							</ol>
+							{nudges.length > 0 && (
+								<ul className="flex flex-wrap gap-1.5" aria-label="What needs attention">
+									{nudges.map((n) => (
+										<li key={n.label}>
+											{n.tab ? <button type="button" onClick={() => setTab(n.tab as typeof tab)} className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-900 hover:bg-amber-200">{n.label}</button> : <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-900">{n.label}</span>}
+										</li>
+									))}
+								</ul>
+							)}
+						</header>
+
+						<div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_300px]">
+							<div className="min-w-0 space-y-4">
+								<div role="tablist" aria-label="Sections" className="flex gap-1 overflow-x-auto rounded-xl bg-serene-neutral-100/70 p-1">
+									{tabs.map((t) => (
+										<button key={t.id} role="tab" type="button" id={`tab-${t.id}`} aria-selected={tab === t.id} aria-controls={`panel-${t.id}`} onClick={() => setTab(t.id)} className={cn("flex items-center gap-1.5 whitespace-nowrap rounded-lg px-3 py-1.5 text-sm font-medium transition-colors", tab === t.id ? "bg-white text-sauti-dark shadow-sm" : "text-serene-neutral-600 hover:text-serene-neutral-900")}>
+											{t.label}{t.badge > 0 && <span className="rounded-full bg-amber-100 px-1.5 text-[11px] font-semibold text-amber-900">{t.badge}</span>}
+										</button>
+									))}
+								</div>
+
+								{/* Every tab stays mounted so switching is instant and nothing is fetched twice. */}
+								<div role="tabpanel" id="panel-overview" aria-labelledby="tab-overview" hidden={showTab("overview")} className="space-y-4">
+									{verifyEl}
+									<section className={cn(card, "space-y-5")}>
+										{gridFor(omit)}
+										{addChips}
+										{fundEl}
+										{previewEl}
+									</section>
+									{extrasEl}
+								</div>
+								<div role="tabpanel" id="panel-work" aria-labelledby="tab-work" hidden={showTab("work")} className="space-y-4">
+									{tasksEl}
+									{remindersEl}
+									{agentEl}
+								</div>
+								<div role="tabpanel" id="panel-files" aria-labelledby="tab-files" hidden={showTab("files")} className="space-y-4">
+									<RelatedPages values={v} urlKey={urlKey} />
+									{docsEl}
+									{similarEl}
+								</div>
+								<div role="tabpanel" id="panel-activity" aria-labelledby="tab-activity" hidden={showTab("activity")} className="space-y-4">
+									{timelineEl}
+									{reportEl}
+								</div>
+								<div role="tabpanel" id="panel-settings" aria-labelledby="tab-settings" hidden={showTab("settings")} className="space-y-4">
+									{accessEl}
+									<section className={cn(card, "space-y-2")}>
+										<p className="text-sm font-semibold text-serene-neutral-900">Delete this {cfg.noun}</p>
+										<p className="text-xs text-serene-neutral-600">This removes it and its documents for everyone.</p>
+										{confirmingDelete ? (
+											<span className="flex items-center gap-1" role="group" aria-label={`Confirm deleting this ${cfg.noun}`}>
+												<Button variant="ghost" className="gap-1.5 text-red-700 hover:bg-red-50" onClick={remove}><Trash2 className="h-4 w-4" /> Yes, delete it and its documents</Button>
+												<Button variant="ghost" onClick={() => setConfirmingDelete(false)}>Keep</Button>
+											</span>
+										) : (
+											<Button variant="outline" className="gap-1.5 text-red-600 hover:bg-red-50 hover:text-red-700" onClick={() => setConfirmingDelete(true)}><Trash2 className="h-4 w-4" /> Delete</Button>
+										)}
+									</section>
+								</div>
+							</div>
+
+							<aside className="space-y-4 lg:sticky lg:top-4" aria-label="Key facts">
+								<section className={cn(card, "space-y-3")}>
+									<div className="flex items-center justify-between gap-2">
+										<h2 className="text-sm font-semibold text-serene-neutral-900">At a glance</h2>
+										<DeadlineChip date={v[dueK]} done={finished} />
+									</div>
+									{railField(dueK)}
+									{railField(ownerK)}
+									{cfg.amountKey && (
+										<div className="grid grid-cols-[1fr_92px] gap-2">
+											{railField(cfg.amountKey)}
+											{railField("currency")}
+										</div>
+									)}
+									{railField(urlKey)}
+									{String(v[urlKey] ?? "").startsWith("http") && (
+										<a href={String(v[urlKey])} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs font-medium text-sauti-teal hover:underline">Open the original page <ExternalLink className="h-3 w-3" /></a>
+									)}
+								</section>
+								{tagsEl}
+							</aside>
 						</div>
-						{footerBar}
 					</>
 				)}
 			</div>
@@ -557,6 +744,50 @@ export function EntityWorkspace({ kind, pageId }: { kind: Kind; pageId?: string 
 				</SheetContent>
 			</Sheet>
 		</div>
+	);
+}
+
+/** Every page this record came from or points to: where it was shared, the organisation's own site, where to apply. */
+function RelatedPages({ values, urlKey }: { values: Record<string, any>; urlKey: string }) {
+	const ver = (values.verification ?? null) as Verification | null;
+	const seen = new Set<string>();
+	const pages: { url: string; label: string; note?: string }[] = [];
+	const add = (url: string | null | undefined, label: string, note?: string) => {
+		const u = (url ?? "").trim();
+		if (!/^https?:\/\//i.test(u)) return;
+		const key = u.replace(/\/$/, "").toLowerCase();
+		if (seen.has(key)) return;
+		seen.add(key);
+		pages.push({ url: u, label, note });
+	};
+	add(values[urlKey], "Link saved with it");
+	add(ver?.finalUrl, "Where the link ends up");
+	add(ver?.website?.url, "The organisation's own site", ver?.website?.title ?? undefined);
+	add(ver?.applyUrl, "Where to apply");
+	const host = (u: string) => { try { return new URL(u).host.replace(/^www\./, ""); } catch { return u; } };
+	return (
+		<section className="rounded-2xl border border-serene-neutral-200/70 bg-white p-4 shadow-[0_1px_2px_rgba(16,24,40,0.04)]">
+			<h2 className="text-sm font-semibold text-serene-neutral-900">Related pages</h2>
+			{pages.length === 0 ? (
+				<p className="mt-1 text-sm text-serene-neutral-600">No link saved yet. Add the source link on the right and the organisation&apos;s page and application link are found for you.</p>
+			) : (
+				<ul className="mt-2 divide-y divide-serene-neutral-100">
+					{pages.map((p) => (
+						<li key={p.url}>
+							<a href={p.url} target="_blank" rel="noreferrer" className="flex items-center gap-3 py-2 hover:bg-serene-neutral-50">
+								<Globe className="h-4 w-4 shrink-0 text-serene-neutral-400" aria-hidden />
+								<span className="min-w-0 flex-1">
+									<span className="block truncate text-sm font-medium text-serene-neutral-900">{p.label}</span>
+									<span className="block truncate text-xs text-serene-neutral-500">{p.note ? `${p.note} · ` : ""}{host(p.url)}</span>
+								</span>
+								<ExternalLink className="h-3.5 w-3.5 shrink-0 text-serene-neutral-400" aria-hidden />
+							</a>
+						</li>
+					))}
+				</ul>
+			)}
+			<p className="mt-2 text-xs text-serene-neutral-500">Copies of what was submitted are the files in the checklist below. Add the final application there so the team can find it later.</p>
+		</section>
 	);
 }
 
