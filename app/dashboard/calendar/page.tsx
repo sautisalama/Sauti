@@ -9,6 +9,8 @@ import { cn } from "@/lib/utils";
 import { unwrap } from "@/lib/action-result";
 import { myCalendar, type MyCalItem } from "@/app/actions/my-calendar";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useDashboardData } from "@/components/providers/DashboardDataProvider";
+import { useCalendarStatus } from "@/hooks/useCalendarStatus";
 
 const timeOf = (iso: string) => format(new Date(iso), "h:mm a").replace(":00", "");
 
@@ -24,9 +26,34 @@ const chipFor = (i: MyCalItem) =>
 const statusText = (i: MyCalItem) =>
 	i.kind === "block" ? "Blocked time" : i.status === "confirmed" ? "Confirmed" : i.status === "completed" ? "Done" : "Waiting to be confirmed";
 
+/** Whether Google Calendar is linked, with a one-tap way to connect it. Quiet when everything is fine. */
+function GoogleStatus({ userId }: { userId: string }) {
+	const { connected, syncEnabled, lastSync, isLoading, isRefreshing, connectCalendar, toggleSync } = useCalendarStatus(userId);
+	const checking = isLoading || isRefreshing;
+	return (
+		<section aria-label="Google Calendar" className="rounded-2xl border border-serene-neutral-200/70 bg-white p-4">
+			<h2 className="flex items-center gap-2 text-sm font-semibold text-serene-neutral-900">
+				<span className={cn("h-2 w-2 rounded-full", checking ? "bg-serene-neutral-300" : connected && syncEnabled ? "bg-green-500" : connected ? "bg-amber-500" : "bg-serene-neutral-400")} aria-hidden />
+				Google Calendar
+			</h2>
+			<p className="mt-1 text-sm text-serene-neutral-600">
+				{checking ? "Checking…" : connected ? (syncEnabled ? "Connected. New sessions are added to your Google Calendar." : "Connected, but sync is paused.") : "Not connected. Connect to see your sessions in Google Calendar too."}
+				{connected && lastSync ? <span className="block text-xs">Last synced {format(new Date(lastSync), "d MMM, h:mm a")}</span> : null}
+			</p>
+			{!checking && (
+				<div className="mt-2 flex gap-2">
+					{!connected ? <Button size="sm" onClick={() => void connectCalendar()}>Connect Google Calendar</Button> : !syncEnabled ? <Button size="sm" variant="outline" onClick={() => void toggleSync()}>Resume sync</Button> : null}
+				</div>
+			)}
+		</section>
+	);
+}
+
 /** Your own calendar: sessions and blocked time, as a month you can step through, with the chosen day listed beside it. */
 export default function MyCalendarPage() {
 	const mobile = useIsMobile();
+	const dash = useDashboardData();
+	const userId = dash?.data?.userId ?? "";
 	const [cursor, setCursor] = useState(() => new Date());
 	const [mode, setMode] = useState<"month" | "week">("month");
 	const [selected, setSelected] = useState(() => new Date());
@@ -144,6 +171,8 @@ export default function MyCalendarPage() {
 							</ul>
 						</section>
 					)}
+
+					{userId && <GoogleStatus userId={userId} />}
 
 					<p className="px-1 text-xs text-serene-neutral-600">Sync with Google Calendar, block time off, or share a booking link in <Link href="/dashboard/profile?section=calendar" className="font-medium text-sauti-teal underline">calendar settings</Link>.</p>
 				</aside>

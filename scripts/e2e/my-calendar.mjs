@@ -13,6 +13,7 @@ for (const role of ["survivor", "professional"]) {
 	await page.waitForFunction(() => !document.body.innerText.includes("Loading"), null, { timeout: 30000 }).catch(() => {});
 	check(`${role}: month grid shows`, (await page.locator('button[aria-label*=" items"], button[aria-label*=" item"]').count()) >= 28);
 	check(`${role}: no error`, (await page.getByText("Could not load your calendar").count()) === 0);
+	check(`${role}: Google Calendar status shown`, (await page.getByRole("heading", { name: "Google Calendar" }).count()) === 1);
 	await page.getByRole("button", { name: "Next", exact: true }).click();
 	await page.getByRole("button", { name: "week", exact: true }).click();
 	check(`${role}: week view has 7 days`, (await page.locator('button[aria-label*=" item"]').count()) === 7);
