@@ -6,7 +6,7 @@ import { BellRing, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/utils/supabase/client";
 import { useDashboardData } from "@/components/providers/DashboardDataProvider";
-import { getUnreadChatTotal } from "@/app/actions/chat";
+import { side } from "@/lib/client/side";
 import { markChatDelivered } from "@/app/actions/chat-social";
 import { CHATS_CHANGED_EVENT } from "@/lib/chat/client-read";
 
@@ -51,6 +51,7 @@ export function PushAndBadge() {
 	const dash = useDashboardData();
 	const setUnreadChatCount = dash?.setUnreadChatCount;
 	const myId = useRef<string | null>(null);
+	const recountRef = useRef<(() => void) | null>(null);
 	const pathname = usePathname(); // recount after navigation (a server refresh resets the shared count)
 
 	// Unread chat messages -> nav badges (bottom bar, sidebar). Recounted when a message arrives
@@ -60,7 +61,8 @@ export function PushAndBadge() {
 		const supabase = createClient();
 		let active = true;
 		supabase.auth.getUser().then(({ data }) => (myId.current = data.user?.id ?? null));
-		const recount = () => getUnreadChatTotal().then((n) => active && setUnreadChatCount(n)).catch(() => {});
+		const recount = () => side(["unread"]).then((r) => active && typeof r.unread === "number" && setUnreadChatCount(r.unread)).catch(() => {});
+		recountRef.current = recount;
 		recount();
 		const channel = supabase
 			.channel(`unread-chats-${Math.random().toString(36).slice(2)}`)
@@ -80,7 +82,9 @@ export function PushAndBadge() {
 			document.removeEventListener("visibilitychange", onVisible);
 			window.removeEventListener(CHATS_CHANGED_EVENT, recount);
 		};
-	}, [setUnreadChatCount, pathname]);
+	}, [setUnreadChatCount]);
+	// After a page change, count again without tearing down and rebuilding the live subscription.
+	useEffect(() => { recountRef.current?.(); }, [pathname]);
 
 	// Unread count -> app-icon badge.
 	useEffect(() => {

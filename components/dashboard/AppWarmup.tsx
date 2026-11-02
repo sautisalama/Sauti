@@ -98,7 +98,7 @@ export function AppWarmup() {
 				...(type === "professional" || type === "ngo" ? ROUTES.professional : []),
 				...(adminMode ? ROUTES.admin : []),
 			];
-			const nav = await prime("nav", async () => (await import("@/app/actions/mjengo-nav")).mjengoNav(), 300_000);
+			const nav = await prime("nav", async () => (await (await import("@/lib/client/side")).side(["nav"])).nav, 300_000);
 			if (nav?.isAdmin) list.push(...ROUTES.admin, ...ROUTES.mjengo);
 			for (const href of [...new Set(list)]) {
 				if (dead) return;
@@ -112,7 +112,7 @@ export function AppWarmup() {
 		const warmChunks = async () => {
 			const fast = !c?.effectiveType || c.effectiveType === "4g";
 			if (!fast) return;
-			const nav = await prime("nav", async () => (await import("@/app/actions/mjengo-nav")).mjengoNav(), 300_000);
+			const nav = await prime("nav", async () => (await (await import("@/lib/client/side")).side(["nav"])).nav, 300_000);
 			if (!nav?.isAdmin) return;
 			// The spreadsheet and drawing engines are large; fetching them now means opening a file does not wait on them.
 			await pool([

@@ -3,8 +3,8 @@
 import { useEffect, useState } from "react";
 import { AlertTriangle, Coins } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { unwrap } from "@/lib/action-result";
-import { openRouterBalance, type OpenRouterBalance as Balance } from "@/app/actions/mjengo-openrouter";
+import { side } from "@/lib/client/side";
+import type { OpenRouterBalance as Balance } from "@/app/actions/mjengo-openrouter";
 
 const usd = (n: number) => `$${n.toFixed(n < 10 ? 2 : 0)}`;
 
@@ -13,7 +13,7 @@ export function OpenRouterBalance() {
 	const [b, setB] = useState<Balance | null>(null);
 	useEffect(() => {
 		let live = true;
-		const load = () => unwrap(openRouterBalance()).then((r) => live && setB(r)).catch(() => live && setB(null));
+		const load = () => side(["balance"]).then((r) => live && setB(r.balance ?? null)).catch(() => live && setB(null));
 		load();
 		const t = setInterval(load, 5 * 60_000);
 		const onFocus = () => load();

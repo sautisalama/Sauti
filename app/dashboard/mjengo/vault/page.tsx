@@ -25,7 +25,7 @@ import { useToast } from "@/hooks/use-toast";
 import { putToSignedUrl } from "@/lib/client/upload";
 import { cn } from "@/lib/utils";
 import { fmtBytes } from "../_components/shared";
-import { MemberFilter, SimilarItems, TagEditor, TagFilter } from "../_components/Facets";
+import { MemberFilter, SimilarItems, TagEditor } from "../_components/Facets";
 import { ApprovalSection } from "../_components/ApprovalSection";
 import { AccessExplainer } from "../_components/AccessExplainer";
 import {
@@ -56,7 +56,6 @@ export default function VaultPage() {
 	const [typeFilter, setTypeFilter] = useState<string>("all");
 	// Only the things I have shared, so an old share can be found and taken back.
 	const [sharedOnly, setSharedOnly] = useState(false);
-	const [tagFilter, setTagFilter] = useState<string[]>([]);
 	const [memberFilter, setMemberFilter] = useState<string | null>(null);
 	const [tagging, setTagging] = useState<VaultItem | null>(null);
 	const [driveRename, setDriveRename] = useState<{ id: string; name: string } | null>(null);
@@ -181,7 +180,7 @@ export default function VaultPage() {
 	const types = ["all", ...Array.from(new Set(allFiles.map((f) => extOf(f.name)))).sort()];
 	const shownFiles = allFiles
 		.filter((f) => typeFilter === "all" || extOf(f.name) === typeFilter)
-		.filter((f) => (!tagFilter.length || tagFilter.some((t) => (f.tags ?? []).includes(t))) && (!memberFilter || f.people.includes(memberFilter) || f.ownerId === memberFilter))
+		.filter((f) => (!memberFilter || f.people.includes(memberFilter) || f.ownerId === memberFilter))
 		.sort((x, y) => {
 			const d = sortDir === "asc" ? 1 : -1;
 			if (sortKey === "name") return d * x.name.localeCompare(y.name);
@@ -254,7 +253,6 @@ export default function VaultPage() {
 
 			<div className="flex flex-wrap items-center gap-2">
 				<MemberFilter value={memberFilter} onChange={setMemberFilter} label="Anyone's files" />
-				<TagFilter selected={tagFilter} onChange={setTagFilter} extra={allFiles.flatMap((f) => f.tags ?? [])} className="min-w-0 flex-1" />
 			</div>
 
 			{false && uploads.length > 0 && (

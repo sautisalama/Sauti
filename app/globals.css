@@ -620,6 +620,8 @@ html.dark .hover\:bg-sauti-dark:hover { background-color: #0d5767; }
 html.dark [class~="bg-sauti-yellow"], html.dark [class~="bg-sauti-yellow"] * { color: #10181a; }
 html.dark [class~="bg-sauti-yellow/90"], html.dark [class~="bg-sauti-yellow/90"] * { color: #10181a; }
 html.dark .text-black { color: #e8eef0; }
+/* Hover surfaces written as white (rows, links, menu items) step up to the raised dark surface, never to white. */
+html.dark .hover\:bg-white:hover, html.dark .hover\:bg-white\/80:hover, html.dark .hover\:bg-white\/90:hover, html.dark .group:hover .group-hover\:bg-white, html.dark .group-hover\:bg-white:hover, html.dark .focus\:bg-white:focus { background-color: #1e2b30; }
 html.dark .sr-only.bg-white { background-color: #e8eef0; color: #0e1517; }
 html.dark .text-sauti-blue { color: #7cc3e0; }
 html.dark .text-white\/40 { color: rgb(255 255 255 / 0.62); }

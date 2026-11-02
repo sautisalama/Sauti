@@ -12,7 +12,7 @@ import { cn } from "@/lib/utils";
 import { listMeetings, makeMeetingNotes, meetingDetail, type MeetingDetail, type MeetingRow } from "@/app/actions/mjengo-meet";
 import { Markdown } from "../_components/Markdown";
 import { MjengoLoader } from "../_components/MjengoLoader";
-import { MemberFilter, SimilarItems, TagEditor, TagFilter, tagLabel } from "../_components/Facets";
+import { MemberFilter, SimilarItems, TagEditor, tagLabel } from "../_components/Facets";
 
 function Meetings() {
 	const { toast } = useToast();
@@ -21,7 +21,6 @@ function Meetings() {
 	const [code, setCode] = useState<string | null>(params.get("code"));
 	const [detail, setDetail] = useState<MeetingDetail | null>(null);
 	const [busy, setBusy] = useState(false);
-	const [tagFilter, setTagFilter] = useState<string[]>([]);
 	const [memberFilter, setMemberFilter] = useState<string | null>(null);
 
 	useEffect(() => fromCache(R.meetings, setList, { onError: () => setList([]) }), []);
@@ -33,14 +32,14 @@ function Meetings() {
 	useEffect(() => { if (code) open(code); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
 
 	if (!list) return <MjengoLoader label="Loading calls" />;
-	const shown = list.filter((m) => (!tagFilter.length || tagFilter.some((t) => (m.tags ?? []).includes(t))) && (!memberFilter || m.created_by === memberFilter || (m.participants ?? []).includes(memberFilter)));
+	const shown = list.filter((m) => (!memberFilter || m.created_by === memberFilter || (m.participants ?? []).includes(memberFilter)));
 
 	return (
 		<div className="mx-auto grid max-w-6xl gap-4 lg:grid-cols-[320px_1fr]">
 			<aside>
 				<h2 className="mb-1 text-xl font-bold tracking-tight text-sauti-dark">Calls</h2>
 				<p className="mb-3 text-sm text-serene-neutral-500">Transcripts and notes from your calls. Notes are written when a call goes quiet and shared with everyone who took part.</p>
-				<div className="mb-3 space-y-2"><MemberFilter value={memberFilter} onChange={setMemberFilter} label="Anyone on the call" className="w-full" /><TagFilter selected={tagFilter} onChange={setTagFilter} extra={list.flatMap((m) => m.tags ?? [])} limit={8} /></div>
+				<div className="mb-3 space-y-2"><MemberFilter value={memberFilter} onChange={setMemberFilter} label="Anyone on the call" className="w-full" /></div>
 				<ul className="space-y-1.5">
 					{shown.length === 0 && list.length > 0 && <li className="rounded-xl border border-dashed border-serene-neutral-200 p-6 text-center text-sm text-serene-neutral-500">No calls match.</li>}
 					{list.length === 0 && <li className="rounded-xl border border-dashed border-serene-neutral-200 p-6 text-center text-sm text-serene-neutral-500">No calls yet.</li>}

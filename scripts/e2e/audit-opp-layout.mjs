@@ -22,24 +22,25 @@ for (const dark of [false, true]) {
 	await page.getByLabel("opportunity name").waitFor({ timeout: 90000 });
 	if (!dark) {
 		check("title is editable in the header", (await page.getByLabel("opportunity name").inputValue()) === "E2E layout opportunity");
-		check("stage steps are shown", (await page.getByRole("list", { name: "Stage" }).count()) === 1);
+		check("stage is a compact menu", (await page.getByRole("combobox", { name: "Stage" }).count()) === 1);
 		check("no Save button", (await page.getByRole("button", { name: /^Save$/ }).count()) === 0);
 
 		await page.getByLabel("opportunity name").fill("E2E layout opportunity renamed");
 		const saved = await poll(async () => (await db.from("mjengo_opportunities").select("title").eq("id", opp.id).single()).data?.title === "E2E layout opportunity renamed", { timeout: 30000, interval: 1000 });
 		check("typing saves by itself", !!saved);
 
-		await page.getByRole("button", { name: "In progress" }).first().click().catch(() => {});
-		const stages = await page.getByRole("list", { name: "Stage" }).locator("button").allInnerTexts();
-		await page.getByRole("list", { name: "Stage" }).locator("button").nth(1).click();
+		await page.getByRole("combobox", { name: "Stage" }).click();
+		const stages = await page.getByRole("option").allInnerTexts();
+		await page.getByRole("option").nth(1).click();
 		const moved = await poll(async () => (await db.from("mjengo_opportunities").select("status").eq("id", opp.id).single()).data?.status !== "new", { timeout: 30000, interval: 1000 });
-		check(`clicking a stage saves it (${stages.join(", ")})`, !!moved);
+		check(`choosing a stage saves it (${stages.join(", ")})`, !!moved);
 
 		await page.getByRole("tab", { name: "Pages and copies" }).click();
 		check("related pages list the source, the site and where to apply", (await page.getByText("The organisation's own site").count()) === 1 && (await page.getByText("Where to apply").count()) === 1);
 		check("documents checklist sits beside the pages", (await page.getByText(/Documents|Add a document|needed/i).count()) > 0);
 		await page.getByRole("tab", { name: "To-dos and reminders" }).click();
-		check("to-dos tab shows to-dos", (await page.getByLabel("Add a to-do").count()) > 0);
+		await page.getByLabel("Add a to-do").waitFor({ timeout: 60000 }).catch(() => {});
+			check("to-dos tab shows to-dos", (await page.getByLabel("Add a to-do").count()) > 0);
 		await page.getByRole("tab", { name: "Sharing" }).click();
 		check("delete is in Sharing", (await page.getByRole("button", { name: /^Delete$/ }).count()) > 0);
 		await page.getByRole("tab", { name: "Pages and copies" }).click();

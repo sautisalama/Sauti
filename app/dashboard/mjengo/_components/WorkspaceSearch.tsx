@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 import { unwrap } from "@/lib/action-result";
 import { searchAll, similarTo } from "@/app/actions/mjengo-search";
 import { SEARCH_TYPE_LABEL, type SearchHit, type SearchResult, type SearchType } from "@/lib/mjengo/search-shared";
-import { MemberFilter, TagFilter, tagLabel } from "./Facets";
+import { MemberFilter, tagLabel } from "./Facets";
 
 const ICON: Record<SearchType, typeof FileText> = { file: FileText, meeting: Phone, todo: CheckSquare, event: CalendarDays, grant: Briefcase, opportunity: Lightbulb, project: FolderKanban, fellowship: GraduationCap };
 const TYPE_CHIPS: SearchType[] = ["file", "meeting", "grant", "opportunity", "project", "fellowship", "todo", "event"];
@@ -20,7 +20,9 @@ function Marked({ text, hit }: { text: string; hit: string | null }) {
 	return <>{text.slice(0, at)}<mark className="rounded bg-yellow-200 px-0.5 text-inherit">{text.slice(at, at + hit.length)}</mark>{text.slice(at + hit.length)}</>;
 }
 
-function Row({ h, onTag, onSimilar, similarOpen }: { h: SearchHit; onTag: (t: string) => void; onSimilar: () => void; similarOpen: boolean }) {
+const NO_TAGS: string[] = [];
+
+function Row({ h, onSimilar, similarOpen }: { h: SearchHit; onSimilar: () => void; similarOpen: boolean }) {
 	const Icon = ICON[h.type];
 	return (
 		<li className="rounded-xl border border-serene-neutral-200/70 bg-white p-3 shadow-[0_1px_2px_rgba(16,24,40,0.04)]">
@@ -34,7 +36,7 @@ function Row({ h, onTag, onSimilar, similarOpen }: { h: SearchHit; onTag: (t: st
 					</div>
 					<p className="mt-1 text-sm leading-relaxed text-serene-neutral-700"><Marked text={h.snippet} hit={h.hit} /></p>
 					<div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-						{h.tags.slice(0, 6).map((t) => <button key={t} type="button" onClick={() => onTag(t)} className="rounded-full bg-serene-neutral-100 px-2 py-0.5 text-[11px] text-serene-neutral-600 hover:bg-sauti-teal-light hover:text-sauti-teal">{tagLabel(t)}</button>)}
+						{h.tags.slice(0, 6).map((t) => <span key={t} className="rounded-full bg-serene-neutral-100 px-2 py-0.5 text-[11px] text-serene-neutral-600">{tagLabel(t)}</span>)}
 						{h.people.length > 0 && <span className="text-[11px] text-serene-neutral-500">{h.people.map((p) => p.name).join(", ")}</span>}
 						<button type="button" onClick={onSimilar} aria-expanded={similarOpen} className="ml-auto flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium text-sauti-teal hover:bg-sauti-teal-light"><Shapes className="h-3 w-3" /> {similarOpen ? "Hide similar" : "Find similar"}</button>
 					</div>
@@ -52,7 +54,7 @@ function Row({ h, onTag, onSimilar, similarOpen }: { h: SearchHit; onTag: (t: st
 export function WorkspaceSearch() {
 	const [q, setQ] = useState("");
 	const [types, setTypes] = useState<SearchType[]>([]);
-	const [tags, setTags] = useState<string[]>([]);
+	const tags = NO_TAGS;
 	const [member, setMember] = useState<string | null>(null);
 	const [res, setRes] = useState<SearchResult | null>(null);
 	const [busy, setBusy] = useState(false);
@@ -111,7 +113,6 @@ export function WorkspaceSearch() {
 						{TYPE_CHIPS.map((t) => <button key={t} type="button" aria-pressed={types.includes(t)} onClick={() => setTypes((cur) => (cur.includes(t) ? cur.filter((x) => x !== t) : [...cur, t]))} className={cn("rounded-full border px-2.5 py-0.5 text-xs", types.includes(t) ? "border-sauti-teal bg-sauti-teal text-white" : "border-serene-neutral-200 bg-white text-serene-neutral-700 hover:bg-serene-neutral-50")}>{SEARCH_TYPE_LABEL[t]}s</button>)}
 						<MemberFilter value={member} onChange={setMember} label="Anyone on the team" className="ml-auto" />
 					</div>
-					<TagFilter selected={tags} onChange={setTags} extra={res?.hits.flatMap((h) => h.tags) ?? []} />
 				</div>
 			)}
 
@@ -126,7 +127,7 @@ export function WorkspaceSearch() {
 					<ul className="space-y-2">
 						{res.hits.map((h) => (
 							<Fragment key={`${h.type}:${h.id}`}>
-								<Row h={h} onTag={(t) => setTags((cur) => (cur.includes(t) ? cur : [...cur, t]))} onSimilar={() => openSimilar(h)} similarOpen={similar?.key === `${h.type}:${h.id}`} />
+								<Row h={h} onSimilar={() => openSimilar(h)} similarOpen={similar?.key === `${h.type}:${h.id}`} />
 								{similar?.key === `${h.type}:${h.id}` && (
 									<li className="ml-6 rounded-xl border border-dashed border-serene-neutral-200 bg-serene-neutral-50/60 p-3">
 										<p className="mb-2 text-xs font-semibold text-serene-neutral-600">Similar to {h.title}</p>

@@ -18,7 +18,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { getDocumentUrl, listDocuments, type DocRow } from "@/app/actions/mjengo";
-import { DeadlineChip, KIND_HREF, KIND_LABEL, fmtBytes, type Kind } from "../_components/shared";
+import { DeadlineChip, KIND_HREF, KIND_LABEL, fmtBytes, hasFile, type Kind } from "../_components/shared";
 import { cn } from "@/lib/utils";
 
 /** Every document across grants, opportunities and projects in one place. */
@@ -62,7 +62,7 @@ export default function DocumentsPage() {
 		return (docs ?? []).filter(
 			(d) =>
 				(kind === "all" || d.entity_type === kind) &&
-				(state === "all" || (state === "needed" ? d.required && !d.file_path : !!d.file_path)) &&
+				(state === "all" || (state === "needed" ? d.required && !hasFile(d) : hasFile(d))) &&
 				(!term || [d.name, d.file_name, d.entity_label].some((v) => (v ?? "").toLowerCase().includes(term)))
 		);
 	}, [docs, q, kind, state]);
@@ -77,7 +77,7 @@ export default function DocumentsPage() {
 
 	if (!docs) return <MjengoLoader label="Loading documents" />;
 
-	const needed = docs.filter((d) => d.required && !d.file_path).length;
+	const needed = docs.filter((d) => d.required && !hasFile(d)).length;
 
 	return (
 		<div className="space-y-4">
@@ -85,7 +85,7 @@ export default function DocumentsPage() {
 			<div className="flex flex-wrap items-end justify-between gap-2">
 				<div>
 					<h2 className="text-xl font-bold tracking-tight text-sauti-dark">Documents</h2>
-					<p className="text-sm text-serene-neutral-500">{docs.filter((d) => d.file_path).length} uploaded · {needed} still needed across all grants, opportunities and projects</p>
+					<p className="text-sm text-serene-neutral-500">{docs.filter((d) => hasFile(d)).length} with a file · {needed} still needed across all grants, opportunities and projects</p>
 				</div>
 				<DropdownMenu>
 					<DropdownMenuTrigger asChild>
@@ -133,22 +133,26 @@ export default function DocumentsPage() {
 				<ul className="divide-y divide-serene-neutral-50">
 					{shown.map((d) => (
 						<li key={d.id} className="flex flex-wrap items-center gap-3 p-3 sm:flex-nowrap">
-							{d.file_path ? <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-600" /> : <Circle className="h-5 w-5 shrink-0 text-serene-neutral-300" />}
+							{hasFile(d) ? <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-600" /> : <Circle className="h-5 w-5 shrink-0 text-serene-neutral-300" />}
 							<div className="min-w-0 flex-1">
 								<p className="truncate text-sm font-medium text-serene-neutral-900">{d.name}</p>
 								<p className="truncate text-xs text-serene-neutral-500">
-									{d.file_path ? `${d.file_name} · ${fmtBytes(d.file_size)}${d.uploaded_at ? ` · ${format(new Date(d.uploaded_at), "d MMM yyyy")}` : ""}${d.uploaded_by_name ? ` · ${d.uploaded_by_name}` : ""}` : "Not uploaded yet"}
+									{hasFile(d) ? `${d.file_name} · ${fmtBytes(d.file_size)}${d.uploaded_at ? ` · ${format(new Date(d.uploaded_at), "d MMM yyyy")}` : ""}${d.uploaded_by_name ? ` · ${d.uploaded_by_name}` : ""}` : "Not uploaded yet"}
 								</p>
 							</div>
-							<Link href={KIND_HREF[d.entity_type]} className="max-w-[40%] truncate text-xs text-sauti-teal hover:underline sm:max-w-[220px]">
-								<Badge variant="secondary" className="mr-1.5">{KIND_LABEL[d.entity_type]}</Badge>
-								{d.entity_label ?? "Removed"}
-							</Link>
+							{d.entity_type ? (
+								<Link href={KIND_HREF[d.entity_type]} className="max-w-[40%] truncate text-xs text-sauti-teal hover:underline sm:max-w-[220px]">
+									<Badge variant="secondary" className="mr-1.5">{KIND_LABEL[d.entity_type]}</Badge>
+									{d.entity_label ?? "Removed"}
+								</Link>
+							) : (
+								<span className="max-w-[40%] truncate text-xs text-serene-neutral-500 sm:max-w-[220px]" title="The record it belonged to was deleted. The file is kept so it can be reused.">Not linked</span>
+							)}
 							{d.drive_link && <DriveBadge href={d.drive_link} />}
 							<AvatarStack ids={[d.uploaded_by]} team={team} />
-							{!d.file_path && <DeadlineChip date={d.due_date} />}
+							{!hasFile(d) && <DeadlineChip date={d.due_date} />}
 							{d.file_path && <Button size="icon" variant="ghost" onClick={() => saveToDrive("entity", d.id)} aria-label={`Save ${d.name} to Google Drive`} title="Save to Google Drive"><CloudUpload className="h-4 w-4" /></Button>}
-							{d.file_path && <Button size="icon" variant="ghost" onClick={() => open(d)} aria-label={`Download ${d.name}`}><Download className="h-4 w-4" /></Button>}
+							{hasFile(d) && <Button size="icon" variant="ghost" onClick={() => open(d)} aria-label={`Download ${d.name}`}><Download className="h-4 w-4" /></Button>}
 						</li>
 					))}
 					{shown.length === 0 && <li className="p-10 text-center text-sm text-serene-neutral-500">No documents match. Add them from a grant, opportunity or project.</li>}

@@ -8,6 +8,7 @@ import { isSuperAdminEmail, requireAdminActor, type Actor } from '@/lib/access/s
 import { requireModule, type ModuleKey } from '@/lib/access/permissions';
 import { sendAccessEmail, sendNoticeEmail } from '@/lib/mjengo/invite-email';
 import { runPlaybooks } from '@/lib/mjengo/playbooks';
+import { documentPreview } from '@/app/actions/mjengo-attach';
 import { convertWonOpportunity } from '@/lib/mjengo/won';
 
 export type Kind = 'grant' | 'opportunity' | 'project' | 'fellowship';
@@ -186,12 +187,12 @@ export type EntityRow = Record<string, unknown> & { id: string; docs: DocSummary
 async function docSummaries(kind: Kind, ids: string[]) {
   const map = new Map<string, DocSummary>();
   if (!ids.length) return map;
-  const { data } = await looseAdmin().from('mjengo_documents').select('entity_id, required, file_path').eq('entity_type', kind).in('entity_id', ids);
-  for (const d of (data ?? []) as { entity_id: string; required: boolean; file_path: string | null }[]) {
+  const { data } = await looseAdmin().from('mjengo_documents').select('entity_id, required, file_path, vault_file_id, drive_file_id').eq('entity_type', kind).in('entity_id', ids);
+  for (const d of (data ?? []) as { entity_id: string; required: boolean; file_path: string | null; vault_file_id: string | null; drive_file_id: string | null }[]) {
     const s = map.get(d.entity_id) ?? { total: 0, required: 0, missing: 0 };
     s.total += 1;
     if (d.required) s.required += 1;
-    if (d.required && !d.file_path) s.missing += 1;
+    if (d.required && !d.file_path && !d.vault_file_id && !d.drive_file_id) s.missing += 1;
     map.set(d.entity_id, s);
   }
   return map;
@@ -275,10 +276,10 @@ export async function deleteEntity(kind: Kind, id: string) {
   if (!row) return { success: true };
   if (row.visibility === 'restricted' && row.created_by && row.created_by !== actor.id && !(await isSuperAdminEmail(actor.email))) throw new Error('Only the person who added it can delete it.');
 
-  const { data: docs } = await db.from('mjengo_documents').select('file_path').eq('entity_type', kind).eq('entity_id', id);
-  const paths = (docs ?? []).map((d: { file_path: string | null }) => d.file_path).filter(Boolean) as string[];
-  if (paths.length) await db.storage.from('mjengo-docs').remove(paths);
-  await db.from('mjengo_documents').delete().eq('entity_type', kind).eq('entity_id', id);
+  // The files the team made stay: they can be reused, so only the link to this record is removed. A checklist item
+  // with no file attached means nothing without its record, so those go.
+  await db.from('mjengo_documents').delete().eq('entity_type', kind).eq('entity_id', id).is('file_path', null);
+  await db.from('mjengo_documents').update({ entity_type: null, entity_id: null }).eq('entity_type', kind).eq('entity_id', id);
   await db.from('mjengo_todos').update({ entity_type: null, entity_id: null }).eq('entity_type', kind).eq('entity_id', id);
   const { error } = await db.from(TABLE[kind]).delete().eq('id', id);
   if (error) throw new Error('Could not delete it.');
@@ -291,13 +292,18 @@ export async function deleteEntity(kind: Kind, id: string) {
 
 export interface DocRow {
   id: string;
-  entity_type: Kind;
-  entity_id: string;
+  /** Null once the record it belonged to was deleted: the file is kept for reuse. */
+  entity_type: Kind | null;
+  entity_id: string | null;
   entity_label: string | null;
   name: string;
   required: boolean;
   due_date: string | null;
   file_path: string | null;
+  /** A file in Files that this document points at (the file itself is not copied). */
+  vault_file_id: string | null;
+  /** A Google Drive file this document points at. */
+  drive_file_id: string | null;
   file_name: string | null;
   file_size: number | null;
   mime_type: string | null;
@@ -308,11 +314,11 @@ export interface DocRow {
   created_at: string;
 }
 
-async function labelsFor(rows: { entity_type: Kind; entity_id: string }[]) {
+async function labelsFor(rows: { entity_type: Kind | null; entity_id: string | null }[]) {
   const db = looseAdmin();
   const out = new Map<string, string>();
   for (const kind of ['grant', 'opportunity', 'project', 'fellowship'] as Kind[]) {
-    const ids = Array.from(new Set(rows.filter((r) => r.entity_type === kind).map((r) => r.entity_id)));
+    const ids = Array.from(new Set(rows.filter((r) => r.entity_type === kind && r.entity_id).map((r) => r.entity_id as string)));
     if (!ids.length) continue;
     const { data } = await db.from(TABLE[kind]).select(`id, ${LABEL_FIELD[kind]}`).in('id', ids);
     for (const e of (data ?? []) as unknown as Record<string, string>[]) out.set(`${kind}:${e.id}`, e[LABEL_FIELD[kind]]);
@@ -335,7 +341,7 @@ export async function listDocuments(opts: { kind?: Kind; entityId?: string } = {
     const { data: ps } = await db.from('profiles').select('id, first_name, last_name').in('id', uploaderIds);
     for (const p of (ps ?? []) as { id: string; first_name: string | null; last_name: string | null }[]) names.set(p.id, [p.first_name, p.last_name].filter(Boolean).join(' '));
   }
-  return rows.map((r) => ({ ...r, entity_label: labels.get(`${r.entity_type}:${r.entity_id}`) ?? null, uploaded_by_name: r.uploaded_by ? names.get(r.uploaded_by) ?? null : null }));
+  return rows.map((r) => ({ ...r, entity_label: (r.entity_type && r.entity_id ? labels.get(`${r.entity_type}:${r.entity_id}`) : null) ?? null, uploaded_by_name: r.uploaded_by ? names.get(r.uploaded_by) ?? null : null }));
 }
 
 /** A checklist item: "Audited accounts", "Board resolution"... Outstanding until a file is attached. */
@@ -362,7 +368,7 @@ export async function registerDocumentFile(input: { docId?: string; kind: Kind; 
   const actor = await requireAdminActor();
   if (!input.path.startsWith(`${input.kind}/${input.entityId}/`)) throw new Error('Invalid file location.');
   const db = looseAdmin();
-  const file = { file_path: input.path, file_name: input.fileName.slice(0, 255), file_size: input.size, mime_type: input.mime.slice(0, 120), uploaded_by: actor.id, uploaded_at: new Date().toISOString() };
+  const file = { vault_file_id: null, file_path: input.path, file_name: input.fileName.slice(0, 255), file_size: input.size, mime_type: input.mime.slice(0, 120), uploaded_by: actor.id, uploaded_at: new Date().toISOString() };
 
   if (input.docId) {
     const { data: old } = await db.from('mjengo_documents').select('file_path, name').eq('id', input.docId).maybeSingle();
@@ -394,7 +400,15 @@ export async function deleteDocument(docId: string) {
 export async function getDocumentUrl(docId: string): Promise<string> {
   await requireAdminActor();
   const db = looseAdmin();
-  const { data: d } = await db.from('mjengo_documents').select('file_path, file_name').eq('id', docId).maybeSingle();
+  const { data: d } = await db.from('mjengo_documents').select('file_path, file_name, vault_file_id, drive_file_id').eq('id', docId).maybeSingle();
+  if (d && !d.file_path && (d.vault_file_id || d.drive_file_id)) {
+    // A file kept in Files or Google Drive: open it from where it lives.
+    const r = await documentPreview(docId);
+    if (!r.ok) throw new Error(r.error);
+    const target = r.data.downloadUrl ?? r.data.link;
+    if (!target) throw new Error('Could not open the file.');
+    return target;
+  }
   if (!d?.file_path) throw new Error('No file attached yet.');
   const { data, error } = await db.storage.from('mjengo-docs').createSignedUrl(d.file_path, 300, { download: d.file_name ?? undefined });
   if (error || !data) throw new Error('Could not open the file.');
@@ -618,7 +632,7 @@ export async function getOverview(): Promise<Overview> {
     db.from('mjengo_grants').select('id, title, status, amount, currency, deadline, created_by, visibility, hidden_fields'),
     db.from('mjengo_opportunities').select('id, title, status, deadline, created_by, visibility, hidden_fields'),
     db.from('mjengo_projects').select('id, name, status, budget, spent, end_date, created_by, visibility, hidden_fields'),
-    db.from('mjengo_documents').select('id, name, entity_type, entity_id, required, file_path, due_date'),
+    db.from('mjengo_documents').select('id, name, entity_type, entity_id, required, file_path, vault_file_id, drive_file_id, due_date'),
     db.from('mjengo_todos').select('id, title, status, due_date, assignee_ids'),
     isSuperAdminEmail(actor.email),
     db.from('mjengo_entity_access').select('entity_type, entity_id').eq('user_id', actor.id),
@@ -641,7 +655,8 @@ export async function getOverview(): Promise<Overview> {
   const G = (grantsV ?? []) as { id: string; title: string; status: string; amount: number | null; currency: string; deadline: string | null }[];
   const O = (oppsV ?? []) as { id: string; title: string; status: string; deadline: string | null }[];
   const P = (projectsV ?? []) as { id: string; name: string; status: string; budget: number | null; spent: number | null; end_date: string | null }[];
-  const D = (docs ?? []) as { id: string; name: string; entity_type: Kind; entity_id: string; required: boolean; file_path: string | null; due_date: string | null }[];
+  const D = (docs ?? []) as { id: string; name: string; entity_type: Kind; entity_id: string; required: boolean; file_path: string | null; vault_file_id: string | null; drive_file_id: string | null; due_date: string | null }[];
+  const hasFile = (d: { file_path: string | null; vault_file_id: string | null; drive_file_id: string | null }) => !!(d.file_path || d.vault_file_id || d.drive_file_id);
   const T = (todos ?? []) as { id: string; title: string; status: string; due_date: string | null; assignee_ids: string[] }[];
 
   const group = <X extends { status: string }>(rows: X[], amount?: (r: X) => number) => {
@@ -664,7 +679,7 @@ export async function getOverview(): Promise<Overview> {
     ...G.filter((g) => g.deadline && !['submitted', 'awarded', 'declined', 'closed'].includes(g.status)).map((g) => ({ kind: 'grant' as const, id: g.id, label: g.title, date: g.deadline!, href: '/dashboard/mjengo/grants' })),
     ...O.filter((o) => o.deadline && !['applied', 'won', 'lost', 'passed'].includes(o.status)).map((o) => ({ kind: 'opportunity' as const, id: o.id, label: o.title, date: o.deadline!, href: '/dashboard/mjengo/opportunities' })),
     ...P.filter((p) => p.end_date && ['planning', 'active'].includes(p.status)).map((p) => ({ kind: 'project' as const, id: p.id, label: `${p.name} ends`, date: p.end_date!, href: '/dashboard/mjengo/projects' })),
-    ...D.filter((d) => d.due_date && d.required && !d.file_path).map((d) => ({ kind: 'document' as const, id: d.id, label: d.name, date: d.due_date!, href: '/dashboard/mjengo/documents', context: d.entity_type })),
+    ...D.filter((d) => d.due_date && d.required && !hasFile(d)).map((d) => ({ kind: 'document' as const, id: d.id, label: d.name, date: d.due_date!, href: '/dashboard/mjengo/documents', context: d.entity_type })),
     ...T.filter((t) => t.due_date && t.status !== 'done').map((t) => ({ kind: 'todo' as const, id: t.id, label: t.title, date: t.due_date!, href: `/dashboard/mjengo/todos?task=${t.id}` })),
   ].filter((d) => d.date >= today && !gone.has(addressedKey(d))).sort((a, b) => a.date.localeCompare(b.date));
   const notDone = T.filter((t) => t.status !== 'done');
@@ -679,7 +694,7 @@ export async function getOverview(): Promise<Overview> {
     projectsByStatus: group(P).map(({ status, count }) => ({ status, count })),
     budget: P.filter((p) => p.budget).map((p) => ({ name: p.name, budget: Number(p.budget ?? 0), spent: Number(p.spent ?? 0) })).slice(0, 8),
     deadlines: deadlines.slice(0, 40),
-    missingDocs: D.filter((d) => d.required && !d.file_path).length,
+    missingDocs: D.filter((d) => d.required && !hasFile(d)).length,
     openTodos: live.length,
     myTodos: live.filter((t) => t.assignee_ids?.includes(actor.id)).length,
     lateTodos: notDone.length - live.length,

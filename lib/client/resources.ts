@@ -7,7 +7,8 @@
 import { unwrap } from "@/lib/action-result";
 import { addDays, endOfMonth, endOfWeek, startOfMonth, startOfWeek } from "date-fns";
 import { getOverview, listAdmins, listDocuments, listEntities, getTodoBoard, type Kind } from "@/app/actions/mjengo";
-import { mjengoNav, suiteStatus } from "@/app/actions/mjengo-nav";
+import { suiteStatus } from "@/app/actions/mjengo-nav";
+import { side } from "./side";
 import { listTemplates } from "@/app/actions/mjengo-templates";
 import { listAssets } from "@/app/actions/mjengo-ai";
 import { financeFiles, financeInvoices, financeReceipts } from "@/app/actions/finance";
@@ -27,7 +28,7 @@ const res = <T,>(key: string, fetch: () => Promise<T>): Resource<T> => ({ key, f
 export const R = {
 	overview: res("overview", () => getOverview()),
 	suite: res("suite", () => suiteStatus()),
-	nav: res("nav", () => mjengoNav()),
+	nav: res("nav", async () => { const r = await side(["nav"]); if (!r.nav) throw new Error("nav missing"); return r.nav; }),
 	entities: (kind: Kind) => res(`entities:${kind}`, () => listEntities(kind)),
 	admins: res("admins", () => listAdmins()),
 	templates: (kind: "design" | "invoice" | "budget") => res(`templates:${kind}`, () => unwrap(listTemplates(kind))),

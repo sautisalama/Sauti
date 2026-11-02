@@ -6,6 +6,7 @@ import { Toaster } from "@/components/ui/toaster";
 
 import { PWAInstallPrompt } from "@/components/PWAInstallPrompt";
 import { ServiceWorkerRegister } from "@/components/ServiceWorkerRegister";
+import { VersionGuard } from "@/components/VersionGuard";
 // import { SafetyBar } from "@/components/SafetyBar";
 import { AccessibilityProvider } from "@/components/a11y/AccessibilityProvider";
 import { KeyboardFocusScript } from "@/components/a11y/KeyboardFocusScript";
@@ -197,6 +198,7 @@ export default function RootLayout({
 				<PWAInstallPrompt />
 				<ServiceWorkerRegister />
 				<Toaster />
+				<VersionGuard />
 			</body>
 		</html>
 	);

@@ -34,6 +34,7 @@ import { AvatarStack, useTeam } from "../../_components/People";
 import { checkNewMail, listSorted, dismissPending, type MailBucket, type PendingItem } from "./api";
 import { Avatar, ScopeTag } from "./AccountSwitcher";
 import { cacheDetail, cacheList, readDetail, readList } from "@/lib/mail/offline-cache";
+import { AttachmentList } from "./AttachmentList";
 
 type Detail = Awaited<ReturnType<typeof getMessageDetail>>;
 type Layout = "side" | "center" | "full";
@@ -1087,17 +1088,7 @@ function ReadingPane({ teamIds, team, onWrite, onAddContact, onPrev, onNext, has
 							onReply={onReply}
 							onForward={onForward}
 							inlineReply={inlineReply}
-							attachments={detail.attachments.filter((x) => !x.inline).length > 0 ? (
-								<ul className="mt-3 flex flex-wrap gap-2">
-									{detail.attachments.filter((x) => !x.inline).map((att) => (
-										<li key={att.index}>
-											<a href={`/api/mjengo/mail/attachment?account=${accountId}&mailbox=${encodeURIComponent(selected?.mailbox ?? "")}&uid=${detail.uid}&i=${att.index}`} className="flex items-center gap-2 rounded-xl border border-black/10 px-3 py-2 text-sm hover:bg-black/[0.03]">
-												<Paperclip className="h-4 w-4 text-[#787774]" /><span className="max-w-[200px] truncate">{att.filename}</span><span className="text-xs text-[#9b9a97]">{att.size > 1048576 ? `${(att.size / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(att.size / 1024))} KB`}</span>
-											</a>
-										</li>
-									))}
-								</ul>
-							) : null}
+							attachments={detail.attachments.filter((x) => !x.inline).length > 0 ? <AttachmentList accountId={accountId} mailbox={selected?.mailbox ?? ""} uid={detail.uid} attachments={detail.attachments.filter((x) => !x.inline)} /> : null}
 						/>
 
 					</article>

@@ -34,7 +34,8 @@ import {
 	GraduationCap, Briefcase,
 	Mail, Video, Sparkles, CalendarClock, Palette, CheckSquare, FolderKanban, Lightbulb, ScrollText, HardDrive, ShieldCheck, ArrowLeft
 } from "lucide-react";
-import { mjengoNav, suiteCounts } from "@/app/actions/mjengo-nav";
+import { R, fromCache } from "@/lib/client/resources";
+import { side } from "@/lib/client/side";
 import { useMailUnread } from "@/app/dashboard/mjengo/mail/_components/mail-store";
 import { startSuiteNotifications, useSuiteNotifications } from "@/lib/client/suite-notifications";
 import { Button } from "@/components/ui/button";
@@ -139,7 +140,7 @@ export function EnhancedSidebar({
 		let on = true;
 		// Not on every page change: at most every 20 seconds.
 		const w = window as unknown as { __ssCountsAt?: number };
-		const tick = () => { if (Date.now() - (w.__ssCountsAt ?? 0) < 20_000) return; w.__ssCountsAt = Date.now(); suiteCounts().then((c) => on && setSuite(c)).catch(() => undefined); };
+		const tick = () => { if (Date.now() - (w.__ssCountsAt ?? 0) < 20_000) return; w.__ssCountsAt = Date.now(); side(["counts"]).then((r) => on && r.counts && setSuite(r.counts)).catch(() => undefined); };
 		tick();
 		const t = setInterval(tick, 60_000);
 		window.addEventListener("focus", tick);
@@ -147,7 +148,7 @@ export function EnhancedSidebar({
 	}, [onMjengo, pathname]);
 	useEffect(() => {
 		if (!onMjengo) return;
-		mjengoNav().then((n) => { setMjengoSuper(n.isSuper); setMjengoAdmin(n.isAdmin); setMjengoAllowed(n.allowed); setMjengoHas(n.has); }).catch(() => setMjengoSuper(false));
+		return fromCache(R.nav, (n) => { setMjengoSuper(n.isSuper); setMjengoAdmin(n.isAdmin); setMjengoAllowed(n.allowed); setMjengoHas(n.has); }, { maxAge: 300_000, onError: () => setMjengoSuper(false) });
 	}, [onMjengo]);
 	const supabase = useMemo(() => createClient(), []);
 	const userType = dash?.data?.profile?.user_type || user?.profile?.user_type || null;

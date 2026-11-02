@@ -24,10 +24,14 @@ export async function GET(request: Request) {
 		const att = parsed?.attachments?.[index];
 		if (!att) return NextResponse.json({ error: "Not found" }, { status: 404 });
 		const name = encodeURIComponent(att.filename ?? `attachment-${index + 1}`);
+		// A preview is shown in place, but only for types a browser shows safely; anything else is still a download.
+		const type = (att.contentType || "application/octet-stream").toLowerCase().split(";")[0].trim();
+		const inline = sp.get("inline") === "1" && /^(image\/(png|jpe?g|gif|webp|avif|bmp)|application\/pdf|text\/(plain|csv|markdown)|video\/(mp4|webm)|audio\/(mpeg|mp4|wav|ogg|webm))$/.test(type);
 		return new Response(new Uint8Array(att.content), {
 			headers: {
-				"Content-Type": att.contentType || "application/octet-stream",
-				"Content-Disposition": `attachment; filename*=UTF-8''${name}`,
+				"Content-Type": inline ? type : att.contentType || "application/octet-stream",
+				"Content-Disposition": `${inline ? "inline" : "attachment"}; filename*=UTF-8''${name}`,
+				...(inline ? { "Content-Security-Policy": "default-src 'none'; img-src 'self' data:; media-src 'self'; style-src 'unsafe-inline'; sandbox" } : {}),
 				"X-Content-Type-Options": "nosniff",
 				"Cache-Control": "private, no-store",
 			},

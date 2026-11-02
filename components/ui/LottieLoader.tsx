@@ -8,13 +8,16 @@ interface LottieLoaderProps {
   size?: number;
   className?: string;
   loop?: boolean;
+  /** Skip the pale badge the dark theme puts behind the artwork. */
+  plain?: boolean;
 }
 
 export function LottieLoader({ 
   animationData, 
   size = 200, 
   className = "",
-  loop = true 
+  loop = true,
+  plain = false
 }: LottieLoaderProps) {
   return (
     <motion.div
@@ -24,7 +27,7 @@ export function LottieLoader({
       transition={{ duration: 0.5, ease: "easeOut" }}
       className={`flex flex-col items-center justify-center ${className}`}
     >
-      <div className="lottie-art" style={{ width: size, height: size }}>
+      <div className={plain ? "" : "lottie-art"} style={{ width: size, height: size }}>
         <Lottie 
           animationData={animationData} 
           loop={loop}

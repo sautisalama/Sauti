@@ -13,6 +13,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { clearOpportunityInbox } from "@/app/actions/mjengo-nav";
@@ -32,7 +33,7 @@ import { EntityTasks } from "./EntityTasks";
 import { autoTagItem } from "@/app/actions/mjengo-search";
 import { GrantAgent } from "./GrantAgent";
 import { ProgressReport } from "./ProgressReport";
-import { MemberFilter, SimilarItems, TagEditor, TagFilter, tagLabel } from "./Facets";
+import { MemberFilter, SimilarItems, TagEditor } from "./Facets";
 
 type FieldDef = { key: string; label: string; type: "text" | "textarea" | "number" | "date" | "select" | "owner" | "grant" | "url" | "tags" | "sdgs"; options?: { value: string; label: string }[]; wide?: boolean };
 
@@ -153,10 +154,10 @@ export function EntityWorkspace({ kind, pageId }: { kind: Kind; pageId?: string 
 	const listHref = `/dashboard/mjengo/${cfg.plural.toLowerCase()}`;
 	// Opportunities that arrived from a phone stop counting once the list has been looked at.
 	useEffect(() => {
-		if (kind !== "opportunity") return;
+		if (kind !== "opportunity" || pageId) return;
 		const t = setTimeout(() => { clearOpportunityInbox().catch(() => undefined); }, 2500);
 		return () => clearTimeout(t);
-	}, [kind]);
+	}, [kind, pageId]);
 	// Arriving from the phone share sheet.
 	useEffect(() => {
 		const p = new URLSearchParams(window.location.search);
@@ -172,7 +173,6 @@ export function EntityWorkspace({ kind, pageId }: { kind: Kind; pageId?: string 
 	const [view, setView] = useState<"board" | "list">("board");
 	const [q, setQ] = useState("");
 	const [statusFilter, setStatusFilter] = useState<string | null>(null);
-	const [tagFilter, setTagFilter] = useState<string[]>([]);
 	const [memberFilter, setMemberFilter] = useState<string | null>(null);
 	const [editing, setEditing] = useState<{ id: string | null; values: Record<string, any> } | null>(null);
 	const [saving, setSaving] = useState(false);
@@ -204,9 +204,8 @@ export function EntityWorkspace({ kind, pageId }: { kind: Kind; pageId?: string 
 		const term = q.trim().toLowerCase();
 		return (rows ?? []).filter((r) => (!statusFilter || r.status === statusFilter)
 			&& (!term || [r[cfg.titleKey], r[cfg.subKey], ...((r.tags as string[] | undefined) ?? [])].some((v) => String(v ?? "").toLowerCase().includes(term)))
-			&& (!tagFilter.length || tagFilter.some((t) => ((r.tags as string[] | undefined) ?? []).includes(t)))
 			&& (!memberFilter || [r[ownerKey(kind)], r.created_by].includes(memberFilter)));
-	}, [rows, q, statusFilter, tagFilter, memberFilter, cfg, kind]);
+	}, [rows, q, statusFilter, memberFilter, cfg, kind]);
 
 	const openNew = () => setEditing({ id: null, values: { status: statuses[0].value, currency: "USD", ...(kind === "opportunity" ? { kind: "grant" } : {}), ...(kind === "project" ? { progress: 0 } : {}) } });
 	const openRow = (r: Row) => setEditing({ id: r.id, values: { ...r } });
@@ -263,6 +262,7 @@ export function EntityWorkspace({ kind, pageId }: { kind: Kind; pageId?: string 
 		setConfirmingDelete(false);
 		try {
 			await deleteEntity(kind, editing.id);
+			void fresh(R.documents).catch(() => undefined);
 			setEditing(null);
 			if (pageId) { router.push(listHref); return; }
 			await load();
@@ -302,6 +302,9 @@ export function EntityWorkspace({ kind, pageId }: { kind: Kind; pageId?: string 
 
 	// On the full page, edits save themselves a moment after typing stops; there is no Save button to forget.
 	const [tab, setTab] = useState<"overview" | "work" | "files" | "activity" | "settings">("overview");
+	// Server actions run one at a time in the browser, so a tab that is not on screen waits until it is first opened.
+	const [seen, setSeen] = useState<Set<string>>(() => new Set(["overview"]));
+	useEffect(() => { setSeen((cur) => (cur.has(tab) ? cur : new Set(cur).add(tab))); }, [tab]);
 	const [autoState, setAutoState] = useState<"idle" | "saving" | "saved" | "error">("idle");
 	const lastSaved = useRef("");
 	const payloadOf = useCallback((v: Record<string, any>) => {
@@ -411,7 +414,7 @@ export function EntityWorkspace({ kind, pageId }: { kind: Kind; pageId?: string 
 			<TagEditor key={`tags-${linkVersion}`} type={kind} id={eid} tags={(editing.values.tags as string[] | undefined) ?? []} onChange={(t) => { set("tags", t); void load(); }} />
 		</div>
 	) : null;
-	const docsEl = eid ? <DocumentsPanel kind={kind} entityId={eid} onChange={load} /> : null;
+	const docsEl = eid ? <DocumentsPanel kind={kind} entityId={eid} entityName={String(editing?.values[cfg.titleKey] ?? "")} onChange={load} /> : null;
 	const remindersEl = eid ? (
 		<div className="rounded-xl border border-serene-neutral-100 p-3">
 			<p className="mb-2 text-sm font-semibold text-serene-neutral-900">Reminders</p>
@@ -452,7 +455,7 @@ export function EntityWorkspace({ kind, pageId }: { kind: Kind; pageId?: string 
 					<div className="sticky bottom-0 flex items-center gap-2 border-t bg-white p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
 						{editing?.id && (confirmingDelete ? (
 							<span className="flex items-center gap-1" role="group" aria-label={`Confirm deleting this ${cfg.noun}`}>
-								<Button variant="ghost" className="gap-1.5 text-red-700 hover:bg-red-50" onClick={remove}><Trash2 className="h-4 w-4" /> Yes, delete it and its documents</Button>
+								<Button variant="ghost" className="gap-1.5 text-red-700 hover:bg-red-50" onClick={remove}><Trash2 className="h-4 w-4" /> Yes, delete it</Button>
 								<Button variant="ghost" onClick={() => setConfirmingDelete(false)}>Keep</Button>
 							</span>
 						) : (
@@ -492,7 +495,6 @@ export function EntityWorkspace({ kind, pageId }: { kind: Kind; pageId?: string 
 		if (!finished && !v[ownerK]) nudges.push({ label: "Nobody is responsible yet" });
 		if (!finished && !v[dueK]) nudges.push({ label: "No deadline set" });
 		if (kind === "opportunity" && row?.verification && ["suspicious", "repost"].includes(row.verification.trust)) nudges.push({ label: "Check where this came from", tab: "files" });
-		const curIdx = statuses.findIndex((s) => s.value === v.status);
 		const tabs = [
 			{ id: "overview", label: "Overview", badge: 0 },
 			{ id: "work", label: "To-dos and reminders", badge: row?.openTodos ?? 0 },
@@ -504,13 +506,11 @@ export function EntityWorkspace({ kind, pageId }: { kind: Kind; pageId?: string 
 		const card = "rounded-2xl border border-serene-neutral-200/70 bg-white p-4 shadow-[0_1px_2px_rgba(16,24,40,0.04)]";
 		return (
 			<div className="mx-auto max-w-6xl space-y-4">
-				<div className="flex flex-wrap items-center gap-3">
-					<button type="button" onClick={() => void goBack()} className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium text-serene-neutral-600 hover:bg-white"><ArrowLeft className="h-4 w-4" /> {cfg.plural}</button>
-					<div className="flex-1" />
-					<p className="flex items-center gap-1.5 text-xs text-serene-neutral-500" aria-live="polite">
-						{autoState === "saving" || saving ? <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Saving…</> : autoState === "error" ? <span className="text-red-700">Not saved. <button type="button" className="font-medium underline" onClick={() => setAutoState("idle")}>Dismiss</button> and keep typing to retry.</span> : dirty ? "Unsaved changes" : autoState === "saved" ? "All changes saved" : ""}
-					</p>
-				</div>
+				{!editing && (
+					<div className="flex items-center gap-3">
+						<button type="button" onClick={() => void goBack()} className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium text-serene-neutral-600 hover:bg-white"><ArrowLeft className="h-4 w-4" /> {cfg.plural}</button>
+					</div>
+				)}
 				{!editing ? (
 					<div className="rounded-2xl border border-dashed border-serene-neutral-200 bg-white p-12 text-center">
 						<p className="font-semibold text-serene-neutral-900">This {cfg.noun} is not here</p>
@@ -518,33 +518,31 @@ export function EntityWorkspace({ kind, pageId }: { kind: Kind; pageId?: string 
 					</div>
 				) : (
 					<>
-						<header className={cn(card, "space-y-3")}>
-							<div className="space-y-1">
-								<Input aria-label={`${cfg.noun} name`} value={v[cfg.titleKey] ?? ""} onChange={(e) => set(cfg.titleKey, e.target.value)} className="h-auto border-0 bg-transparent px-0 text-2xl font-bold text-sauti-dark shadow-none focus-visible:ring-0" placeholder={`Name this ${cfg.noun}`} />
-								{kind !== "project" && <Input aria-label={cfg.subLabel} value={v[cfg.subKey] ?? ""} onChange={(e) => set(cfg.subKey, e.target.value)} className="h-auto border-0 bg-transparent px-0 text-sm text-serene-neutral-600 shadow-none focus-visible:ring-0" placeholder={cfg.subLabel} />}
-							</div>
-							<ol className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1" aria-label="Stage">
-								{statuses.map((s, i) => {
-									const current = s.value === v.status;
-									return (
-										<li key={s.value}>
-											<button type="button" aria-current={current ? "step" : undefined} onClick={() => set("status", s.value)} className={cn("flex items-center gap-1.5 whitespace-nowrap rounded-full border px-3 py-1 text-xs font-medium transition-colors", current ? cn("border-current font-semibold", s.tone) : i < curIdx ? "border-serene-neutral-200 bg-serene-neutral-100 text-serene-neutral-700" : "border-serene-neutral-200 text-serene-neutral-500 hover:bg-serene-neutral-50")}>
-												{i < curIdx && <CheckSquare className="h-3 w-3" aria-hidden />}{s.label}
-											</button>
-										</li>
-									);
-								})}
-							</ol>
+						<div className="sticky top-0 z-20 -mx-2 flex flex-wrap items-center gap-x-2 gap-y-1 border-b border-serene-neutral-200/70 bg-white/90 px-2 py-1.5 backdrop-blur">
+							<Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={() => void goBack()} aria-label={`Back to ${cfg.plural}`} title={`Back to ${cfg.plural}`}><ArrowLeft className="h-4 w-4" /></Button>
+							<Input aria-label={`${cfg.noun} name`} value={v[cfg.titleKey] ?? ""} onChange={(e) => set(cfg.titleKey, e.target.value)} className="h-9 min-w-0 flex-1 basis-48 truncate border-0 bg-transparent px-1 text-lg font-bold text-sauti-dark shadow-none focus-visible:ring-0" placeholder={`Name this ${cfg.noun}`} />
+							{kind !== "project" && <Input aria-label={cfg.subLabel} value={v[cfg.subKey] ?? ""} onChange={(e) => set(cfg.subKey, e.target.value)} className="h-9 min-w-0 basis-full border-0 bg-transparent px-1 text-sm text-serene-neutral-600 shadow-none focus-visible:ring-0 sm:w-44 sm:flex-none sm:basis-auto" placeholder={cfg.subLabel} />}
+							<Select value={v.status ?? undefined} onValueChange={(x) => set("status", x)}>
+								<SelectTrigger aria-label="Stage" className="h-8 w-auto gap-2 rounded-full px-3 text-xs font-medium"><SelectValue placeholder="Stage" /></SelectTrigger>
+								<SelectContent>{statuses.map((st) => <SelectItem key={st.value} value={st.value}><span className="flex items-center gap-2"><span className="h-2 w-2 rounded-full" style={{ background: st.color }} aria-hidden />{st.label}</span></SelectItem>)}</SelectContent>
+							</Select>
+							<DeadlineChip date={v[dueK]} done={finished} />
 							{nudges.length > 0 && (
-								<ul className="flex flex-wrap gap-1.5" aria-label="What needs attention">
-									{nudges.map((n) => (
-										<li key={n.label}>
-											{n.tab ? <button type="button" onClick={() => setTab(n.tab as typeof tab)} className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-900 hover:bg-amber-200">{n.label}</button> : <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-900">{n.label}</span>}
-										</li>
-									))}
-								</ul>
+								<Popover>
+									<PopoverTrigger asChild><button type="button" className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-900 hover:bg-amber-200">{nudges.length} to check</button></PopoverTrigger>
+									<PopoverContent align="end" className="w-64 p-1.5">
+										<ul aria-label="What needs attention">
+											{nudges.map((n) => (
+												<li key={n.label}>{n.tab ? <button type="button" onClick={() => setTab(n.tab as typeof tab)} className="w-full rounded-md px-2.5 py-1.5 text-left text-sm text-serene-neutral-900 hover:bg-serene-neutral-100">{n.label}</button> : <span className="block px-2.5 py-1.5 text-sm text-serene-neutral-700">{n.label}</span>}</li>
+											))}
+										</ul>
+									</PopoverContent>
+								</Popover>
 							)}
-						</header>
+							<p className="flex min-w-[6.5rem] items-center justify-end gap-1.5 text-xs text-serene-neutral-500" aria-live="polite">
+								{autoState === "saving" || saving ? <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Saving…</> : autoState === "error" ? <span className="text-red-700">Not saved. <button type="button" className="font-medium underline" onClick={() => setAutoState("idle")}>Dismiss</button></span> : dirty ? "Unsaved" : autoState === "saved" ? "Saved" : ""}
+							</p>
+						</div>
 
 						<div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_300px]">
 							<div className="min-w-0 space-y-4">
@@ -556,7 +554,7 @@ export function EntityWorkspace({ kind, pageId }: { kind: Kind; pageId?: string 
 									))}
 								</div>
 
-								{/* Every tab stays mounted so switching is instant and nothing is fetched twice. */}
+								{/* A tab loads the first time it is opened and stays mounted after that, so going back is instant. */}
 								<div role="tabpanel" id="panel-overview" aria-labelledby="tab-overview" hidden={showTab("overview")} className="space-y-4">
 									{verifyEl}
 									<section className={cn(card, "space-y-5")}>
@@ -568,27 +566,23 @@ export function EntityWorkspace({ kind, pageId }: { kind: Kind; pageId?: string 
 									{extrasEl}
 								</div>
 								<div role="tabpanel" id="panel-work" aria-labelledby="tab-work" hidden={showTab("work")} className="space-y-4">
-									{tasksEl}
-									{remindersEl}
-									{agentEl}
+									{seen.has("work") && <>{tasksEl}{remindersEl}{agentEl}</>}
 								</div>
 								<div role="tabpanel" id="panel-files" aria-labelledby="tab-files" hidden={showTab("files")} className="space-y-4">
 									<RelatedPages values={v} urlKey={urlKey} />
-									{docsEl}
-									{similarEl}
+									{seen.has("files") && <>{docsEl}{similarEl}</>}
 								</div>
 								<div role="tabpanel" id="panel-activity" aria-labelledby="tab-activity" hidden={showTab("activity")} className="space-y-4">
-									{timelineEl}
-									{reportEl}
+									{seen.has("activity") && <>{timelineEl}{reportEl}</>}
 								</div>
 								<div role="tabpanel" id="panel-settings" aria-labelledby="tab-settings" hidden={showTab("settings")} className="space-y-4">
-									{accessEl}
+									{seen.has("settings") && accessEl}
 									<section className={cn(card, "space-y-2")}>
 										<p className="text-sm font-semibold text-serene-neutral-900">Delete this {cfg.noun}</p>
-										<p className="text-xs text-serene-neutral-600">This removes it and its documents for everyone.</p>
+										<p className="text-xs text-serene-neutral-600">This removes it for everyone. Its documents stay in Documents so they can be reused.</p>
 										{confirmingDelete ? (
 											<span className="flex items-center gap-1" role="group" aria-label={`Confirm deleting this ${cfg.noun}`}>
-												<Button variant="ghost" className="gap-1.5 text-red-700 hover:bg-red-50" onClick={remove}><Trash2 className="h-4 w-4" /> Yes, delete it and its documents</Button>
+												<Button variant="ghost" className="gap-1.5 text-red-700 hover:bg-red-50" onClick={remove}><Trash2 className="h-4 w-4" /> Yes, delete it</Button>
 												<Button variant="ghost" onClick={() => setConfirmingDelete(false)}>Keep</Button>
 											</span>
 										) : (
@@ -598,7 +592,7 @@ export function EntityWorkspace({ kind, pageId }: { kind: Kind; pageId?: string 
 								</div>
 							</div>
 
-							<aside className="space-y-4 lg:sticky lg:top-4" aria-label="Key facts">
+							<aside className="space-y-4 lg:sticky lg:top-16" aria-label="Key facts">
 								<section className={cn(card, "space-y-3")}>
 									<div className="flex items-center justify-between gap-2">
 										<h2 className="text-sm font-semibold text-serene-neutral-900">At a glance</h2>
@@ -663,7 +657,6 @@ export function EntityWorkspace({ kind, pageId }: { kind: Kind; pageId?: string 
 			{rows.length > 0 && (
 				<div className="flex flex-wrap items-center gap-2">
 					<MemberFilter value={memberFilter} onChange={setMemberFilter} label={kind === "project" ? "Any lead" : "Anyone responsible"} />
-					<TagFilter selected={tagFilter} onChange={setTagFilter} extra={rows.flatMap((r) => (r.tags as string[] | undefined) ?? [])} className="min-w-0 flex-1" />
 				</div>
 			)}
 
@@ -731,7 +724,7 @@ export function EntityWorkspace({ kind, pageId }: { kind: Kind; pageId?: string 
 					<div className="sticky bottom-0 flex items-center gap-2 border-t bg-white p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
 						{editing?.id && (confirmingDelete ? (
 							<span className="flex items-center gap-1" role="group" aria-label={`Confirm deleting this ${cfg.noun}`}>
-								<Button variant="ghost" className="gap-1.5 text-red-700 hover:bg-red-50" onClick={remove}><Trash2 className="h-4 w-4" /> Yes, delete it and its documents</Button>
+								<Button variant="ghost" className="gap-1.5 text-red-700 hover:bg-red-50" onClick={remove}><Trash2 className="h-4 w-4" /> Yes, delete it</Button>
 								<Button variant="ghost" onClick={() => setConfirmingDelete(false)}>Keep</Button>
 							</span>
 						) : (
@@ -822,7 +815,6 @@ function Card({ fullHref, kind, r, admins, onOpen, onDragStart, onDragEnd, dragg
 				{r.docs.missing > 0 && <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800"><FileWarning className="h-3 w-3" />{r.docs.missing} doc{r.docs.missing === 1 ? "" : "s"} needed</span>}
 				{r.openTodos > 0 && <span className="inline-flex items-center gap-1 rounded-full bg-sauti-teal-light px-2 py-0.5 text-xs font-medium text-sauti-dark"><CheckSquare className="h-3 w-3" />{r.openTodos}</span>}
 			</div>
-			{((r.tags as string[] | undefined) ?? []).length > 0 && <div className="mt-2 flex flex-wrap gap-1">{((r.tags as string[]) ?? []).slice(0, 3).map((t) => <span key={t} className="rounded-full bg-serene-neutral-100 px-2 py-0.5 text-[10px] text-serene-neutral-600">{tagLabel(t)}</span>)}</div>}
 			<div className="mt-2"><Avatars ids={[...new Set([r[ownerKey(kind)], r.created_by].filter(Boolean))] as string[]} admins={admins} /></div>
 		</div>
 	);

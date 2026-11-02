@@ -1,6 +1,7 @@
 "use client";
 
 // Inspired by react-hot-toast library
+import { announceStale, friendly } from "@/lib/client/friendly-error";
 import * as React from "react";
 
 import type { ToastActionElement, ToastProps } from "@/components/ui/toast";
@@ -141,6 +142,14 @@ type Toast = Omit<ToasterToast, "id">;
 
 function toast({ ...props }: Toast) {
 	const id = genId();
+	// Technical failures are shown in plain words; a stale page also raises the "reload" banner.
+	if (props.variant === "destructive" && typeof props.description === "string") {
+		const f = friendly(props.description);
+		if (f) {
+			props = { ...props, title: f.kind === "other" ? props.title : f.title, description: f.message };
+			if (f.kind === "stale") announceStale();
+		}
+	}
 
 	const update = (props: ToasterToast) =>
 		dispatch({

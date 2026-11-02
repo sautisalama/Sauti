@@ -21,7 +21,7 @@ import { calendarMonth, createCalendarEvent, eventIcons, removeCalendarEvent, ty
 import { MjengoLoader } from "../_components/MjengoLoader";
 import { holidayOn } from "@/lib/mjengo/holidays-ke";
 import { Markdown } from "../_components/Markdown";
-import { TagEditor, TagFilter } from "../_components/Facets";
+import { TagEditor } from "../_components/Facets";
 import { meetingDetail, type MeetingDetail } from "@/app/actions/mjengo-meet";
 import { AddChooser, DeadlineDialog, PostDialog, TodoDialog, type AddKind, type Slot } from "./_AddDialogs";
 
@@ -82,7 +82,6 @@ export default function CalendarPage() {
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [mobile, month]);
 	const [hidden, setHidden] = useState<Set<CalKind>>(new Set());
-	const [tagFilter, setTagFilter] = useState<string[]>([]);
 
 	const gridStart = useMemo(() => startOfWeek(startOfMonth(month), { weekStartsOn: 1 }), [month]);
 	const gridEnd = useMemo(() => endOfWeek(endOfMonth(month), { weekStartsOn: 1 }), [month]);
@@ -116,14 +115,14 @@ export default function CalendarPage() {
 	}, [data, smart]);
 
 	// With a tag chosen, only events carrying it are shown (deadlines and to-dos have their own pages and filters).
-	const items = (data?.items ?? []).filter((i) => !hidden.has(i.kind) && (!tagFilter.length || tagFilter.some((t) => (i.tags ?? []).includes(t))));
+	const items = (data?.items ?? []).filter((i) => !hidden.has(i.kind));
 	const onDay = (d: Date) => items.filter((i) => {
 		const s = new Date(i.start);
 		const e = new Date(i.end);
 		if (i.allDay) return d >= new Date(s.getFullYear(), s.getMonth(), s.getDate()) && d <= new Date(e.getFullYear(), e.getMonth(), e.getDate() - (e > s && e.getHours() === 0 && e.getMinutes() === 0 ? 1 : 0));
 		return isSameDay(s, d);
 	}).sort((a, b) => Number(b.allDay) - Number(a.allDay) || a.start.localeCompare(b.start));
-	const upcoming = (data?.items ?? []).filter((i) => !hidden.has(i.kind) && (!tagFilter.length || tagFilter.some((t) => (i.tags ?? []).includes(t))) && new Date(i.end) >= new Date()).sort((a, b) => a.start.localeCompare(b.start)).slice(0, 8);
+	const upcoming = (data?.items ?? []).filter((i) => !hidden.has(i.kind) && new Date(i.end) >= new Date()).sort((a, b) => a.start.localeCompare(b.start)).slice(0, 8);
 
 	return (
 		<div className="mx-auto max-w-[1400px] space-y-3">
@@ -258,7 +257,6 @@ export default function CalendarPage() {
 							<input type="checkbox" checked={smart} onChange={(e) => toggleSmart(e.target.checked)} className="h-4 w-4 accent-[#068297]" />
 							<Sparkles className="h-3.5 w-3.5 text-sauti-teal" /> Smart icons for activities
 						</label>
-						<TagFilter selected={tagFilter} onChange={setTagFilter} limit={8} extra={(data?.items ?? []).flatMap((i) => i.tags ?? [])} className="mb-3" />
 						<ul className="space-y-1">
 							{(Object.keys(KIND) as CalKind[]).map((k) => (
 								<li key={k}>

@@ -1,7 +1,13 @@
 
 /** @type {import('next').NextConfig} */
 
+// One id per build. Tabs compare it with the server to notice an update before a stale page can fail.
+const BUILD_ID = process.env.VERCEL_GIT_COMMIT_SHA || process.env.VERCEL_DEPLOYMENT_ID || process.env.NEXT_DEPLOYMENT_ID || `local-${Date.now()}`;
+
 const nextConfig = {
+	// Version skew protection: assets and server actions are requested from the build that rendered the page.
+	deploymentId: process.env.VERCEL_DEPLOYMENT_ID || process.env.NEXT_DEPLOYMENT_ID || undefined,
+	env: { NEXT_PUBLIC_BUILD_ID: BUILD_ID },
 	allowedDevOrigins: ["192.168.150.110", "historiographical-baffledly-isadora.ngrok-free.dev"],
 	images: {
 		remotePatterns: [

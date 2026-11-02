@@ -18,7 +18,7 @@ import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { createTrack, deleteTodo, deleteTrack, getTodoBoard, renameTrack, saveTodo, type TodoRow, type TrackRow } from "@/app/actions/mjengo";
 import { Avatars, DeadlineChip, KIND_LABEL } from "../_components/shared";
-import { MemberFilter, SimilarItems, TagEditor, TagFilter, tagLabel } from "../_components/Facets";
+import { MemberFilter, SimilarItems, TagEditor, tagLabel } from "../_components/Facets";
 
 type Board = Awaited<ReturnType<typeof getTodoBoard>>;
 type Task = TodoRow & { trackName: string; trackColor: string };
@@ -43,7 +43,6 @@ export default function TodosPage() {
 	const [showDone, setShowDone] = useState(false);
 	const [quick, setQuick] = useState("");
 	const [newList, setNewList] = useState<string | null>(null);
-	const [tagFilter, setTagFilter] = useState<string[]>([]);
 	const [memberFilter, setMemberFilter] = useState<string | null>(null);
 
 	const load = useCallback(async () => setBoard(await fresh(R.todos)), []);
@@ -86,7 +85,7 @@ export default function TodosPage() {
 		}
 	}, [all, board, view, today]);
 	// Tags and team member narrow whichever list or smart view is open.
-	const inView = useMemo(() => inViewAll.filter((t) => (!tagFilter.length || tagFilter.some((x) => (t.tags ?? []).includes(x))) && (!memberFilter || t.assignee_ids.includes(memberFilter) || t.created_by === memberFilter)), [inViewAll, tagFilter, memberFilter]);
+	const inView = useMemo(() => inViewAll.filter((t) => (!memberFilter || t.assignee_ids.includes(memberFilter) || t.created_by === memberFilter)), [inViewAll, memberFilter]);
 
 	const count = (id: string) => {
 		if (!board) return 0;
@@ -191,7 +190,6 @@ export default function TodosPage() {
 
 				<div className="mb-3 flex flex-wrap items-center gap-2">
 					<MemberFilter value={memberFilter} onChange={setMemberFilter} label="Anyone" />
-					<TagFilter selected={tagFilter} onChange={setTagFilter} extra={all.flatMap((t) => t.tags ?? [])} className="min-w-0 flex-1" />
 				</div>
 
 				<form
