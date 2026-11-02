@@ -51,11 +51,17 @@ try {
 		await page.screenshot({ path: path.join(OUT, `app_overview_${dark ? "dark" : "light"}.png`) });
 
 		if (!dark) {
+			await page.getByRole("button", { name: "Hide tags from this panel" }).click();
+			await page.getByRole("button", { name: "Show tags again" }).waitFor({ timeout: 10000 });
+			check("an item can be taken off the panel and put back", (await page.getByText("No tags yet").count()) === 0);
+			await page.getByRole("button", { name: "Show tags again" }).click();
+			await page.getByText("No tags yet").waitFor({ timeout: 10000 });
+			await poll(async () => { const h = (await db.from("profiles").select("settings").eq("id", admin.id).single()).data?.settings?.mjengo_panel_hidden?.opportunity; return Array.isArray(h) && !h.includes("tags"); }, { timeout: 30000, interval: 1000 });
 			await page.getByRole("button", { name: "Choose what shows in this panel" }).click();
 			await page.getByRole("switch", { name: "Tags" }).click();
 			await page.keyboard.press("Escape");
-			const saved = await poll(async () => (await db.from("profiles").select("settings").eq("id", admin.id).single()).data?.settings?.mjengo_panel_hidden?.opportunity, { timeout: 20000, interval: 1000 });
-			check("hiding a side panel item is saved to the account", Array.isArray(saved) && saved.includes("tags"));
+			const saved = await poll(async () => { const h = (await db.from("profiles").select("settings").eq("id", admin.id).single()).data?.settings?.mjengo_panel_hidden?.opportunity; return Array.isArray(h) && h.includes("tags"); }, { timeout: 45000, interval: 1000 });
+			check("hiding a side panel item is saved to the account", !!saved);
 			await page.reload({ waitUntil: "domcontentloaded" });
 			await page.getByLabel("opportunity name").waitFor({ timeout: 90000 });
 			await page.getByText("No tags yet").waitFor({ state: "detached", timeout: 20000 }).catch(() => {});

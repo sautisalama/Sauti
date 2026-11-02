@@ -6,7 +6,7 @@ import { MjengoLoader } from "./MjengoLoader";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AlertCircle, ArrowLeft, BadgeCheck, Check, CheckSquare, Globe, Maximize2, EyeOff, Lock, Users, ExternalLink, FileWarning, Kanban, List, Loader2, Pencil, Plus, Search, SlidersHorizontal, Trash2 } from "lucide-react";
+import { AlertCircle, ArrowLeft, BadgeCheck, Check, CheckSquare, Globe, Maximize2, EyeOff, Lock, Users, ExternalLink, FileWarning, Kanban, List, Loader2, Pencil, Plus, Search, SlidersHorizontal, Trash2, Eye, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -668,8 +668,21 @@ export function EntityWorkspace({ kind, pageId }: { kind: Kind; pageId?: string 
 											{empty.map((f) => <button key={f.key} type="button" onClick={() => toggle(f.key, true)} className="inline-flex items-center gap-1 rounded-full border border-dashed border-serene-neutral-300 px-2.5 py-1 text-xs text-serene-neutral-600 hover:border-sauti-teal hover:text-sauti-teal"><Plus className="h-3 w-3" aria-hidden /> {f.label}</button>)}
 										</div>
 									);
-									const tagsShown = shown("tags") ? tagsEl : null;
-									if (filled.length + open.length + links.length === 0) return <aside className="space-y-3 px-1" aria-label="Key facts">{chips}{tagsShown}<div className="flex justify-end">{customise}</div></aside>;
+									const tagsShown = shown("tags") ? (
+										<div className="group relative">
+											{tagsEl}
+											<button type="button" onClick={() => setPanelItem("tags", false)} aria-label="Hide tags from this panel" title="Hide from this panel" className="absolute right-2 top-2 rounded-md p-1 text-serene-neutral-400 opacity-60 hover:bg-serene-neutral-100 hover:opacity-100 focus-visible:opacity-100 group-hover:opacity-100"><X className="h-3.5 w-3.5" /></button>
+										</div>
+									) : null;
+									// What was taken off the panel stays one click away.
+									const hiddenItems = items.filter((it) => !shown(it.id));
+									const restore = hiddenItems.length > 0 && (
+										<div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="Hidden from this panel">
+											<span className="text-xs text-serene-neutral-500">Hidden</span>
+											{hiddenItems.map((it) => <button key={it.id} type="button" onClick={() => setPanelItem(it.id, true)} aria-label={`Show ${it.label.toLowerCase()} again`} className="inline-flex items-center gap-1 rounded-full border border-serene-neutral-200 px-2.5 py-1 text-xs text-serene-neutral-600 hover:border-sauti-teal hover:text-sauti-teal"><Eye className="h-3 w-3" aria-hidden /> {it.label}</button>)}
+										</div>
+									);
+									if (filled.length + open.length + links.length === 0) return <aside className="space-y-3 px-1" aria-label="Key facts">{chips}{tagsShown}{restore}<div className="flex justify-end">{customise}</div></aside>;
 									return (
 										<aside className="space-y-4 lg:sticky lg:top-16" aria-label="Key facts">
 											<section className={cn(card, "space-y-2.5")}>
@@ -683,12 +696,14 @@ export function EntityWorkspace({ kind, pageId }: { kind: Kind; pageId?: string 
 															<dt className="w-20 shrink-0 text-xs text-serene-neutral-500">{f.label}</dt>
 															<dd className="min-w-0 flex-1 truncate text-sm font-medium text-serene-neutral-900">{f.key === urlKey && String(v[urlKey]).startsWith("http") ? <a href={String(v[urlKey])} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-sauti-teal hover:underline">{f.show()} <ExternalLink className="h-3 w-3" aria-hidden /></a> : f.show()}</dd>
 															<button type="button" onClick={() => toggle(f.key, true)} aria-label={`Edit ${f.label.toLowerCase()}`} className="rounded-md p-1 text-serene-neutral-400 opacity-60 hover:bg-serene-neutral-100 hover:opacity-100 focus-visible:opacity-100 group-hover:opacity-100"><Pencil className="h-3.5 w-3.5" /></button>
+															<button type="button" onClick={() => setPanelItem(f.id, false)} aria-label={`Hide ${f.label.toLowerCase()} from this panel`} title="Hide from this panel" className="rounded-md p-1 text-serene-neutral-400 opacity-60 hover:bg-serene-neutral-100 hover:opacity-100 focus-visible:opacity-100 group-hover:opacity-100"><X className="h-3.5 w-3.5" /></button>
 														</div>
 													))}
 													{links.map((l) => (
-														<div key={l.id} className="flex items-center gap-2 py-1.5">
+														<div key={l.id} className="group flex items-center gap-2 py-1.5">
 															<dt className="w-20 shrink-0 text-xs text-serene-neutral-500">{l.label}</dt>
 															<dd className="min-w-0 flex-1 truncate text-sm font-medium"><a href={l.url as string} target="_blank" rel="noreferrer" className="inline-flex max-w-full items-center gap-1 text-sauti-teal hover:underline"><span className="truncate">{host(l.url as string)}</span> <ExternalLink className="h-3 w-3 shrink-0" aria-hidden /></a></dd>
+															<button type="button" onClick={() => setPanelItem(l.id, false)} aria-label={`Hide ${l.label.toLowerCase()} from this panel`} title="Hide from this panel" className="rounded-md p-1 text-serene-neutral-400 opacity-60 hover:bg-serene-neutral-100 hover:opacity-100 focus-visible:opacity-100 group-hover:opacity-100"><X className="h-3.5 w-3.5" /></button>
 														</div>
 													))}
 												</dl>
@@ -701,6 +716,7 @@ export function EntityWorkspace({ kind, pageId }: { kind: Kind; pageId?: string 
 												{chips}
 											</section>
 											{tagsShown}
+											{restore}
 											<div className="flex justify-end">{customise}</div>
 										</aside>
 									);
