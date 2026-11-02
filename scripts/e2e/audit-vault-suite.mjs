@@ -81,6 +81,8 @@ try {
 	check("sharing wording is plain", (await page.getByText("Who can open this", { exact: false }).count()) > 0 && (await page.getByText("Everyone on the team can see it").count()) === 0);
 
 	await page.getByRole("tab", { name: "Application" }).click();
+	await page.getByRole("button", { name: /^Context/ }).click();
+	await page.getByRole("button", { name: /^Documents/ }).first().click();
 	await page.getByText("E2E word file").first().waitFor({ timeout: 90000 });
 	check("row actions are preview, download and delete only", (await page.getByRole("button", { name: "Preview E2E word file" }).count()) >= 1 && (await page.getByRole("button", { name: "Download E2E word file" }).count()) === 1 && (await page.getByRole("button", { name: /^Replace / }).count()) === 0);
 	await page.getByRole("button", { name: "Cards view" }).click();

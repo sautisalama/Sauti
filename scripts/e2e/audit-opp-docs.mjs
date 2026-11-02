@@ -28,6 +28,8 @@ try {
 	check("stage is a compact menu, not a row of steps", (await page.getByRole("combobox", { name: "Stage" }).count()) === 1);
 
 	await page.getByRole("tab", { name: "Application" }).click();
+	await page.getByRole("button", { name: /^Context/ }).click();
+	await page.getByRole("button", { name: /^Documents/ }).first().click();
 	await page.getByRole("button", { name: "Add a document" }).waitFor({ timeout: 60000 });
 
 	// Add a file that already exists in Files.

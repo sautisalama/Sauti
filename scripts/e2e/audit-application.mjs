@@ -21,6 +21,8 @@ const tplPath = `vault/${admin.id}/e2e-template-${stamp}.txt`;
 await db.storage.from("mjengo-docs").upload(tplPath, new Blob(["# Name\nContact line\n\n## Why this role\n## My evidence\n## Closing"], { type: "text/plain" }), { contentType: "text/plain", upsert: true });
 const { data: tpl } = await db.from("vault_files").insert({ folder_id: null, name: `E2E letter template ${stamp}.txt`, storage_path: tplPath, mime: "text/plain", size: 60, owner_id: admin.id }).select("id").single();
 
+// Start with nothing hidden in the side panel.
+{ const { data: pr } = await db.from("profiles").select("settings").eq("id", admin.id).single(); const st = { ...(pr?.settings ?? {}) }; delete st.mjengo_panel_hidden; await db.from("profiles").update({ settings: st }).eq("id", admin.id); }
 const browser = await launch();
 let madeFile = null;
 try {
@@ -37,6 +39,21 @@ try {
 		}
 		await page.screenshot({ path: path.join(OUT, `app_overview_${dark ? "dark" : "light"}.png`) });
 
+		if (!dark) {
+			await page.getByRole("button", { name: "Choose what shows in this panel" }).click();
+			await page.getByRole("switch", { name: "Tags" }).click();
+			await page.keyboard.press("Escape");
+			const saved = await poll(async () => (await db.from("profiles").select("settings").eq("id", admin.id).single()).data?.settings?.mjengo_panel_hidden?.opportunity, { timeout: 20000, interval: 1000 });
+			check("hiding a side panel item is saved to the account", Array.isArray(saved) && saved.includes("tags"));
+			await page.reload({ waitUntil: "domcontentloaded" });
+			await page.getByLabel("opportunity name").waitFor({ timeout: 90000 });
+			await page.getByText("No tags yet").waitFor({ state: "detached", timeout: 20000 }).catch(() => {});
+			check("the hidden item stays hidden after a reload", (await page.getByText("No tags yet").count()) === 0);
+			await page.getByRole("button", { name: "Choose what shows in this panel" }).click();
+			await page.getByRole("switch", { name: "Tags" }).click();
+			await page.keyboard.press("Escape");
+			await poll(async () => { const h = (await db.from("profiles").select("settings").eq("id", admin.id).single()).data?.settings?.mjengo_panel_hidden?.opportunity; return Array.isArray(h) && !h.includes("tags"); }, { timeout: 20000, interval: 1000 });
+		}
 		await page.getByRole("tab", { name: "Application" }).click();
 		await page.getByRole("region", { name: "Application agent" }).waitFor({ timeout: 90000 });
 		if (dark) {
@@ -46,22 +63,26 @@ try {
 			continue;
 		}
 		check("the tab is called Application, not Pages and copies", (await page.getByRole("tab", { name: "Pages and copies" }).count()) === 0);
-		check("cover letter, CV and another document are pills", (await page.getByRole("button", { name: "Cover letter" }).count()) === 1 && (await page.getByRole("button", { name: "CV", exact: true }).count()) === 1 && (await page.getByRole("button", { name: "Another document" }).count()) === 1);
+		check("cover letter, CV and another document are pills", (await page.getByRole("button", { name: "Cover letter", exact: true }).count()) === 1 && (await page.getByRole("button", { name: "CV", exact: true }).count()) === 1 && (await page.getByRole("button", { name: "Another document" }).count()) === 1);
 
-		await page.getByRole("button", { name: "Cover letter" }).click();
+		await page.getByRole("button", { name: "Cover letter", exact: true }).click();
 		await page.getByText("Do you want to use a template for your cover letter?").waitFor({ timeout: 10000 });
 		check("choosing a pill asks about a template", true);
+		await page.getByRole("button", { name: "Cover letter", exact: true }).click();
+		check("clicking a selected pill again unselects it", (await page.getByText("Do you want to use a template").count()) === 0);
+		await page.getByRole("button", { name: "Cover letter", exact: true }).click();
+		check("the model can be chosen", (await page.getByRole("combobox", { name: "AI model" }).count()) === 1);
 		check("it cannot run before that is answered", await page.getByRole("button", { name: /^Create cover letter/ }).isDisabled());
 
 		// Context: instructions, a note, skills, a link.
+		await page.getByRole("button", { name: "Add", exact: true }).click();
 		await page.getByLabel("Instructions").fill("Write in the first person and keep it to one page.");
-		await page.getByRole("button", { name: "Add context" }).click();
-		await page.getByRole("tab", { name: "Skills" }).click();
+		await page.getByRole("button", { name: "Skills", exact: true }).click();
 		await page.getByRole("textbox", { name: "Skills" }).fill("WordPress and Sanity CMS\nGoogle Tag Manager and Microsoft Clarity");
 		await page.getByRole("button", { name: "Add skills" }).click();
 		await page.getByRole("button", { name: "Open Skills" }).waitFor({ timeout: 40000 });
-		await page.getByRole("button", { name: "Add context" }).click();
-		await page.getByRole("tab", { name: "Note" }).click();
+		await page.getByRole("button", { name: "Add", exact: true }).click();
+		await page.getByRole("button", { name: "Note", exact: true }).click();
 		await page.getByRole("textbox", { name: "Note title" }).fill("German");
 		await page.getByRole("textbox", { name: "Note", exact: true }).fill("I am learning German and will keep improving.");
 		await page.getByRole("button", { name: "Add note" }).click();

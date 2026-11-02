@@ -1,12 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { BookOpen, Check, ExternalLink, FileText, Link2, Loader2, Paperclip, PenLine, Plus, Sparkles, StickyNote, Trash2, Upload, Wand2, Wrench, X } from "lucide-react";
+import { BookOpen, Check, ChevronDown, ExternalLink, FileText, Link2, Loader2, Paperclip, PenLine, Plus, Sparkles, StickyNote, Trash2, Upload, Wand2, Wrench, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { unwrap } from "@/lib/action-result";
@@ -21,6 +20,7 @@ import { prepareUpload, registerUpload } from "../vault/api";
 import { fmtBytes } from "./shared";
 import { Markdown } from "./Markdown";
 import { VaultPicker } from "./VaultPicker";
+import { DocumentsPanel } from "./DocumentsPanel";
 import { FilePreviewDialog, PreviewBody, type PreviewSource } from "./FilePreviewDialog";
 
 type Task = "cover_letter" | "cv" | "custom";
@@ -36,7 +36,7 @@ const snippet = (i: ContextItem) => (i.kind === "file" || i.kind === "drive" ? [
  * skills, notes and files from Files or Google Drive) sits in view, the agent writes from all of it plus the
  * opportunity itself, and what it writes is saved to Files and shown here in full.
  */
-export function ApplicationStudio({ kind, id, title, onChange }: { kind: "grant" | "opportunity"; id: string; title: string; onChange?: () => void }) {
+export function ApplicationStudio({ kind, id, title, sourceUrl, onChange }: { kind: "grant" | "opportunity"; id: string; title: string; sourceUrl?: string | null; onChange?: () => void }) {
 	const { toast } = useToast();
 	const [wb, setWb] = useState<Workbench | null>(null);
 	const [error, setError] = useState<string | null>(null);
@@ -45,6 +45,8 @@ export function ApplicationStudio({ kind, id, title, onChange }: { kind: "grant"
 	const [instr, setInstr] = useState("");
 	const instrSaved = useRef("");
 	const [adding, setAdding] = useState(false);
+	const [open, setOpen] = useState(false);
+	const [docsOpen, setDocsOpen] = useState(false);
 	const [detail, setDetail] = useState<ContextItem | null>(null);
 
 	const dismissKey = `ss_ctx_no_${id}`;
@@ -97,64 +99,86 @@ export function ApplicationStudio({ kind, id, title, onChange }: { kind: "grant"
 	const inContext = new Set(wb.items.map((i) => i.vaultFileId).filter(Boolean));
 	const shown = (suggest ?? []).filter((s) => !hidden.has(s.fileId) && !inContext.has(s.fileId));
 
-	return (
-		<div className="space-y-5">
-			<AgentPanel kind={kind} id={id} title={title} wb={wb} includedCount={included} onDone={onChange} />
+	const host = (u: string) => { try { return new URL(u).host.replace(/^www\./, ""); } catch { return u; } };
 
-			<section aria-label="Context" className="space-y-3">
-				<div className="flex items-center justify-between gap-2">
+	const contextEl = (
+		<section aria-label="Context">
+			<div className="flex items-center gap-2">
+				<button type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open} className="flex min-w-0 flex-1 items-center gap-2 rounded-lg py-1 text-left">
+					<ChevronDown className={cn("h-4 w-4 shrink-0 text-serene-neutral-500 transition-transform", !open && "-rotate-90")} aria-hidden />
+					<span className="text-sm font-semibold text-sauti-dark">Context</span>
+					<span className="truncate text-xs text-serene-neutral-500">{included === 0 && !sourceUrl && wb.documents === 0 ? "Nothing added yet" : `${included} in use${wb.documents ? ` · ${wb.documents} document${wb.documents === 1 ? "" : "s"}` : ""}${sourceUrl ? " · funder's call" : ""}`}</span>
+				</button>
+				<Button size="sm" variant="ghost" className="h-8 gap-1.5 text-sauti-teal" onClick={() => { setOpen(true); setAdding((a) => !a); }}><Plus className="h-4 w-4" /> Add</Button>
+			</div>
+
+			{open && (
+				<div className="mt-3 space-y-4 pl-1">
+					{adding && <AddContextPanel onClose={() => setAdding(false)} kind={kind} id={id} existing={new Set(wb.items.map((i) => i.vaultFileId).filter(Boolean) as string[])} onAdded={async () => { await reload(); void loadSuggestions(); }} />}
+
 					<div>
-						<h2 className="text-sm font-bold text-sauti-dark">Context <span className="font-normal text-serene-neutral-500">({wb.items.length})</span></h2>
-						<p className="text-xs text-serene-neutral-600">Everything here, and everything on this opportunity, is read each time the agent writes.</p>
+						<label htmlFor="agent-instructions" className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-serene-neutral-500"><PenLine className="h-3.5 w-3.5" /> Instructions</label>
+						<Textarea id="agent-instructions" rows={2} value={instr} onChange={(e) => setInstr(e.target.value)} placeholder="How should the agent work on this? For example: write in the first person, keep documents to one page." className="mt-1.5 resize-y text-sm" />
 					</div>
-					<Button size="sm" variant="outline" className="h-8 gap-1.5" onClick={() => setAdding(true)}><Plus className="h-4 w-4" /> Add context</Button>
-				</div>
 
-				<div className="rounded-2xl border border-serene-neutral-200 bg-white p-3">
-					<label htmlFor="agent-instructions" className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-serene-neutral-500"><PenLine className="h-3.5 w-3.5" /> Instructions</label>
-					<Textarea id="agent-instructions" rows={3} value={instr} onChange={(e) => setInstr(e.target.value)} placeholder="How should the agent work on this? For example: write in the first person, keep documents to one page, stress my data protection work, mention that I am based in Nairobi." className="mt-1.5 resize-y border-0 bg-transparent px-0 text-sm shadow-none focus-visible:ring-0" />
-				</div>
-
-				{wb.items.length > 0 && (
-					<ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-						{wb.items.map((i) => {
-							const Icon = ICON[i.kind];
-							return (
-								<li key={i.id} className={cn("group relative flex flex-col rounded-2xl border bg-white p-3 transition", i.include ? "border-serene-neutral-200" : "border-dashed border-serene-neutral-200 opacity-70")}>
-									<button type="button" onClick={() => setDetail(i)} className="flex min-h-[5.5rem] flex-1 flex-col text-left" aria-label={`Open ${i.title}`}>
-										<span className="flex items-center gap-2"><Icon className="h-4 w-4 shrink-0 text-sauti-teal" aria-hidden /><span className="truncate text-sm font-semibold text-serene-neutral-900">{i.title}</span></span>
-										<span className="mt-1.5 line-clamp-3 text-xs leading-relaxed text-serene-neutral-600">{snippet(i)}</span>
-									</button>
-									<div className="mt-2 flex items-center gap-1 border-t border-serene-neutral-200 pt-2">
-										<span className="mr-auto rounded-full bg-serene-neutral-100 px-2 py-0.5 text-[11px] font-medium text-serene-neutral-600">{KIND_LABEL[i.kind]}</span>
-										<button type="button" role="switch" aria-checked={i.include} onClick={() => toggle(i)} aria-label={`${i.include ? "Stop using" : "Use"} ${i.title}`} title={i.include ? "The agent reads this" : "The agent skips this"} className={cn("flex h-6 items-center gap-1 rounded-full px-2 text-[11px] font-medium", i.include ? "bg-sauti-teal text-white" : "bg-serene-neutral-100 text-serene-neutral-600")}>{i.include ? <><Check className="h-3 w-3" /> In use</> : "Off"}</button>
-										<Button size="icon" variant="ghost" className="h-7 w-7 text-serene-neutral-400 hover:text-red-600" onClick={() => remove(i)} aria-label={`Remove ${i.title}`}><Trash2 className="h-3.5 w-3.5" /></Button>
-									</div>
+					{(sourceUrl || wb.items.length > 0) && (
+						<ul className="divide-y divide-serene-neutral-200 rounded-xl border border-serene-neutral-200">
+							{sourceUrl && (
+								<li className="flex items-center gap-3 px-3 py-2.5">
+									<Link2 className="h-4 w-4 shrink-0 text-sauti-teal" aria-hidden />
+									<span className="min-w-0 flex-1"><span className="block text-sm font-medium text-serene-neutral-900">Funder&apos;s call</span><span className="block truncate text-xs text-serene-neutral-500">{host(sourceUrl)} · always read</span></span>
+									<a href={sourceUrl} target="_blank" rel="noreferrer" className="rounded-md p-1.5 text-serene-neutral-500 hover:bg-serene-neutral-100" aria-label="Open the funder's call"><ExternalLink className="h-4 w-4" /></a>
 								</li>
-							);
-						})}
-					</ul>
-				)}
-
-				{shown.length > 0 && (
-					<div className="rounded-2xl border border-dashed border-serene-neutral-200 p-3" role="group" aria-label="Suggested from your files">
-						<p className="text-sm font-medium text-serene-neutral-900">Found in your files</p>
-						<p className="mb-2 text-xs text-serene-neutral-600">These look useful for this application. Add the ones you want the agent to read.</p>
-						<ul className="divide-y divide-serene-neutral-200">
-							{shown.map((s) => (
-								<li key={s.fileId} className="flex items-center gap-3 py-2">
-									<FileText className="h-4 w-4 shrink-0 text-serene-neutral-400" aria-hidden />
-									<span className="min-w-0 flex-1"><span className="block truncate text-sm font-medium text-serene-neutral-900">{s.name}</span><span className="block truncate text-xs text-serene-neutral-500">{[s.why, s.folder, fmtBytes(s.size)].filter(Boolean).join(" · ")}</span></span>
-									<Button size="sm" variant="outline" className="h-8" onClick={() => useSuggestion(s)}>Add as context</Button>
-									<Button size="icon" variant="ghost" className="h-8 w-8 text-serene-neutral-400" onClick={() => skipSuggestion(s)} aria-label={`Not ${s.name}`} title="Not this one"><X className="h-4 w-4" /></Button>
-								</li>
-							))}
+							)}
+							{wb.items.map((i) => {
+								const Icon = ICON[i.kind];
+								return (
+									<li key={i.id} className={cn("flex items-center gap-3 px-3 py-2.5", !i.include && "opacity-60")}>
+										<Icon className="h-4 w-4 shrink-0 text-sauti-teal" aria-hidden />
+										<button type="button" onClick={() => setDetail(i)} className="min-w-0 flex-1 text-left" aria-label={`Open ${i.title}`}>
+											<span className="block truncate text-sm font-medium text-serene-neutral-900">{i.title}</span>
+											<span className="block truncate text-xs text-serene-neutral-500">{KIND_LABEL[i.kind]} · {snippet(i)}</span>
+										</button>
+										<button type="button" role="switch" aria-checked={i.include} onClick={() => toggle(i)} aria-label={`${i.include ? "Stop using" : "Use"} ${i.title}`} title={i.include ? "The agent reads this" : "The agent skips this"} className={cn("flex h-6 shrink-0 items-center gap-1 rounded-full px-2 text-[11px] font-medium", i.include ? "bg-sauti-teal text-white" : "bg-serene-neutral-100 text-serene-neutral-600")}>{i.include ? <><Check className="h-3 w-3" /> In use</> : "Off"}</button>
+										<Button size="icon" variant="ghost" className="h-7 w-7 shrink-0 text-serene-neutral-400 hover:text-red-600" onClick={() => remove(i)} aria-label={`Remove ${i.title}`}><Trash2 className="h-3.5 w-3.5" /></Button>
+									</li>
+								);
+							})}
 						</ul>
-					</div>
-				)}
-			</section>
+					)}
 
-			<AddContextDialog open={adding} onClose={() => setAdding(false)} kind={kind} id={id} existing={new Set(wb.items.map((i) => i.vaultFileId).filter(Boolean) as string[])} onAdded={async () => { await reload(); void loadSuggestions(); }} />
+					{shown.length > 0 && (
+						<div role="group" aria-label="Suggested from your files">
+							<p className="text-xs font-semibold uppercase tracking-wide text-serene-neutral-500">Found in your files</p>
+							<ul className="mt-1 divide-y divide-serene-neutral-200">
+								{shown.map((s) => (
+									<li key={s.fileId} className="flex items-center gap-3 py-2">
+										<FileText className="h-4 w-4 shrink-0 text-serene-neutral-400" aria-hidden />
+										<span className="min-w-0 flex-1"><span className="block truncate text-sm font-medium text-serene-neutral-900">{s.name}</span><span className="block truncate text-xs text-serene-neutral-500">{[s.why, s.folder, fmtBytes(s.size)].filter(Boolean).join(" · ")}</span></span>
+										<Button size="sm" variant="outline" className="h-8" onClick={() => useSuggestion(s)}>Add as context</Button>
+										<Button size="icon" variant="ghost" className="h-8 w-8 text-serene-neutral-400" onClick={() => skipSuggestion(s)} aria-label={`Not ${s.name}`} title="Not this one"><X className="h-4 w-4" /></Button>
+									</li>
+								))}
+							</ul>
+						</div>
+					)}
+
+					<div>
+						<button type="button" onClick={() => setDocsOpen((o) => !o)} aria-expanded={docsOpen} className="flex w-full items-center gap-2 rounded-lg py-1 text-left">
+							<ChevronDown className={cn("h-4 w-4 text-serene-neutral-500 transition-transform", !docsOpen && "-rotate-90")} aria-hidden />
+							<span className="text-sm font-semibold text-sauti-dark">Documents</span>
+							<span className="text-xs text-serene-neutral-500">{wb.documents ? `${wb.documents} on this ${kind}` : "What to send, and the files you have"}</span>
+						</button>
+						{docsOpen && <div className="mt-2"><DocumentsPanel kind={kind} entityId={id} entityName={title} onChange={() => { void reload(); onChange?.(); }} defaultView="full" /></div>}
+					</div>
+				</div>
+			)}
+		</section>
+	);
+
+	return (
+		<div>
+			<AgentPanel kind={kind} id={id} title={title} wb={wb} includedCount={included} onDone={() => { void reload(); onChange?.(); }} contextEl={contextEl} />
 			<ContextDetail item={detail} onClose={() => setDetail(null)} onSave={async (item, body, itemTitle) => { await unwrap(updateContext(kind, id, item.id, { body, title: itemTitle })); await reload(); }} />
 		</div>
 	);
@@ -162,7 +186,7 @@ export function ApplicationStudio({ kind, id, title, onChange }: { kind: "grant"
 
 /* ------------------------------------------------------------------ the agent */
 
-function AgentPanel({ kind, id, title, wb, includedCount, onDone }: { kind: "grant" | "opportunity"; id: string; title: string; wb: Workbench; includedCount: number; onDone?: () => void }) {
+function AgentPanel({ kind, id, title, wb, includedCount, onDone, contextEl }: { kind: "grant" | "opportunity"; id: string; title: string; wb: Workbench; includedCount: number; onDone?: () => void; contextEl: React.ReactNode }) {
 	const { toast } = useToast();
 	const [task, setTask] = useState<Task | null>(null);
 	const [label, setLabel] = useState("");
@@ -186,7 +210,7 @@ function AgentPanel({ kind, id, title, wb, includedCount, onDone }: { kind: "gra
 	const name = task === "cover_letter" ? "cover letter" : task === "cv" ? "CV" : label.trim().toLowerCase() || "document";
 	const ready = !!task && template !== undefined && (task !== "custom" || label.trim().length > 1);
 
-	const choose = (t: Task) => { setTask(t); setTemplate(undefined); setResult(null); };
+	const choose = (t: Task) => { if (task === t) { setTask(null); setTemplate(undefined); return; } setTask(t); setTemplate(undefined); };
 	const go = async (refine?: { docId: string; instruction: string }) => {
 		if (!task || busy) return;
 		setBusy(true);
@@ -208,13 +232,13 @@ function AgentPanel({ kind, id, title, wb, includedCount, onDone }: { kind: "gra
 
 	return (
 		<section aria-label="Application agent" className="overflow-hidden rounded-2xl border border-serene-neutral-200/70 bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04)]">
-			<div className="flex items-center gap-2 border-b border-serene-neutral-200 px-4 py-3">
+			<div className="flex items-center gap-2 border-b border-serene-neutral-200 px-5 py-3.5">
 				<span className="flex h-8 w-8 items-center justify-center rounded-xl bg-sauti-teal text-white"><Sparkles className="h-4 w-4" aria-hidden /></span>
 				<div className="min-w-0 flex-1">
 					<h2 className="text-sm font-bold text-sauti-dark">Application agent</h2>
 					<p className="truncate text-xs text-serene-neutral-600">Writes from this opportunity, your context and your files. Nothing is invented; gaps are marked.</p>
 				</div>
-				{wb.ai.available && wb.ai.models.length > 1 && (
+				{wb.ai.available && (
 					<Select value={model} onValueChange={setModel}>
 						<SelectTrigger aria-label="AI model" className="h-8 w-auto gap-2 rounded-full px-3 text-xs"><SelectValue /></SelectTrigger>
 						<SelectContent>{wb.ai.models.map((m) => <SelectItem key={m.id} value={m.id}>{m.label}</SelectItem>)}</SelectContent>
@@ -225,7 +249,7 @@ function AgentPanel({ kind, id, title, wb, includedCount, onDone }: { kind: "gra
 			{!wb.ai.available ? (
 				<p className="p-4 text-sm text-serene-neutral-700" role="status">The AI agent is switched off because no OpenRouter key is set on this site. Your context is kept, and the agent works as soon as an administrator adds the key.</p>
 			) : (
-				<div className="space-y-3 p-4">
+				<div className="space-y-4 p-5">
 					<div>
 						<p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-serene-neutral-500">What should it write for “{title || "this opportunity"}”?</p>
 						<div className="flex flex-wrap gap-2" role="group" aria-label="Document to write">
@@ -274,7 +298,7 @@ function AgentPanel({ kind, id, title, wb, includedCount, onDone }: { kind: "gra
 			)}
 
 			{result && (
-				<div className="border-t border-serene-neutral-200 bg-serene-neutral-50/60 p-4" role="region" aria-label="What the agent wrote">
+				<div className="border-t border-serene-neutral-200 bg-serene-neutral-50/60 p-5" role="region" aria-label="What the agent wrote">
 					<div className="mb-2 flex flex-wrap items-center gap-2">
 						<h3 className="mr-auto flex items-center gap-1.5 text-sm font-bold text-serene-neutral-900"><BookOpen className="h-4 w-4 text-sauti-teal" aria-hidden /> {result.name}</h3>
 						<span className="text-xs text-serene-neutral-600">Saved to Files and to this opportunity</span>
@@ -291,6 +315,7 @@ function AgentPanel({ kind, id, title, wb, includedCount, onDone }: { kind: "gra
 				</div>
 			)}
 
+			<div className="border-t border-serene-neutral-200 px-5 py-3">{contextEl}</div>
 			<VaultPicker open={picking} onClose={() => setPicking(false)} max={1} title={`Choose a template for your ${name}`} onPick={(items) => { const f = items.find((x) => x.kind === "file"); if (f) setTemplate({ id: f.id, name: f.name }); setPicking(false); }} />
 		</section>
 	);
@@ -298,9 +323,9 @@ function AgentPanel({ kind, id, title, wb, includedCount, onDone }: { kind: "gra
 
 /* ------------------------------------------------------------------ add context */
 
-function AddContextDialog({ open, onClose, kind, id, existing, onAdded }: { open: boolean; onClose: () => void; kind: "grant" | "opportunity"; id: string; existing: Set<string>; onAdded: () => Promise<void> | void }) {
+function AddContextPanel({ onClose, kind, id, existing, onAdded }: { onClose: () => void; kind: "grant" | "opportunity"; id: string; existing: Set<string>; onAdded: () => Promise<void> | void }) {
 	const { toast } = useToast();
-	const [tab, setTab] = useState("link");
+	const [tab, setTab] = useState<string | null>(null);
 	const [url, setUrl] = useState("");
 	const [skill, setSkill] = useState("");
 	const [noteTitle, setNoteTitle] = useState("");
@@ -311,11 +336,10 @@ function AddContextDialog({ open, onClose, kind, id, existing, onAdded }: { open
 	const [busy, setBusy] = useState<string | null>(null);
 	const file = useRef<HTMLInputElement>(null);
 
-	useEffect(() => { if (open) { setTab("link"); setUrl(""); setSkill(""); setNote(""); setNoteTitle(""); setDriveLink(""); } }, [open]);
 	useEffect(() => {
-		if (!open || tab !== "drive" || drive) return;
+		if (tab !== "drive" || drive) return;
 		unwrap(searchDrive("")).then(setDrive).catch(() => setDrive({ connected: false, available: true, files: [], error: "Could not search Google Drive." }));
-	}, [open, tab, drive]);
+	}, [tab, drive]);
 
 	const run = async (key: string, fn: () => Promise<void>, ok: string) => {
 		setBusy(key);
@@ -330,58 +354,73 @@ function AddContextDialog({ open, onClose, kind, id, existing, onAdded }: { open
 		await unwrap(addContext(kind, id, { type: "file", fileId: made.id }));
 	}, f.name);
 
+	const TYPES: [string, string, typeof FileText][] = [["link", "Link", Link2], ["skill", "Skills", Wrench], ["note", "Note", StickyNote], ["files", "From Files", FileText], ["drive", "Google Drive", FileText], ["upload", "Upload", Upload]];
+
 	return (
-		<>
-			<Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-				<DialogContent className="max-h-[88vh] w-[96vw] max-w-xl overflow-y-auto">
-					<DialogHeader><DialogTitle>Add context</DialogTitle><DialogDescription>Anything the agent should know when it writes: where you have worked, what you can do, what the funder cares about.</DialogDescription></DialogHeader>
-					<Tabs value={tab} onValueChange={setTab}>
-						<TabsList className="grid w-full grid-cols-3 sm:grid-cols-6">
-							<TabsTrigger value="link">Link</TabsTrigger><TabsTrigger value="skill">Skills</TabsTrigger><TabsTrigger value="note">Note</TabsTrigger>
-							<TabsTrigger value="files">Files</TabsTrigger><TabsTrigger value="drive">Drive</TabsTrigger><TabsTrigger value="upload">Upload</TabsTrigger>
-						</TabsList>
-						<TabsContent value="link" className="mt-3 space-y-2">
-							<Input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://your-portfolio.org or the organisation's about page" aria-label="Web address" />
-							<p className="text-xs text-serene-neutral-600">The page is read now and kept as text for the agent.</p>
-							<DialogFooter><Button disabled={!/^https?:\/\//i.test(url.trim()) || busy === "link"} onClick={() => run("link", async () => { await unwrap(addContext(kind, id, { type: "link", url })); }, url)}>{busy === "link" ? <Loader2 className="h-4 w-4 animate-spin" /> : "Add link"}</Button></DialogFooter>
-						</TabsContent>
-						<TabsContent value="skill" className="mt-3 space-y-2">
-							<Textarea rows={5} value={skill} onChange={(e) => setSkill(e.target.value)} placeholder={"One per line, with where you used it.\nWordPress and Sanity CMS, qwerise.org and two real estate sites\nGoogle Tag Manager, Microsoft Clarity, Meta Ads\nKenya Data Protection Act, data handler on WHRD Hub"} aria-label="Skills" />
-							<DialogFooter><Button disabled={skill.trim().length < 2 || busy === "skill"} onClick={() => run("skill", async () => { await unwrap(addContext(kind, id, { type: "skill", body: skill })); }, "Skills")}>{busy === "skill" ? <Loader2 className="h-4 w-4 animate-spin" /> : "Add skills"}</Button></DialogFooter>
-						</TabsContent>
-						<TabsContent value="note" className="mt-3 space-y-2">
-							<Input value={noteTitle} onChange={(e) => setNoteTitle(e.target.value)} placeholder="Title (optional)" aria-label="Note title" />
-							<Textarea rows={6} value={note} onChange={(e) => setNote(e.target.value)} placeholder="Anything else: a project they should hear about, a gap to explain, what the interviewer asked last time." aria-label="Note" />
-							<DialogFooter><Button disabled={note.trim().length < 2 || busy === "note"} onClick={() => run("note", async () => { await unwrap(addContext(kind, id, { type: "note", title: noteTitle, body: note })); }, "Note")}>{busy === "note" ? <Loader2 className="h-4 w-4 animate-spin" /> : "Add note"}</Button></DialogFooter>
-						</TabsContent>
-						<TabsContent value="files" className="mt-3 space-y-2">
-							<p className="text-sm text-serene-neutral-700">Pick files from Files: your CV, past applications, a project report. Only a link is kept; the file stays where it is.</p>
-							<Button variant="outline" className="gap-1.5" onClick={() => setPicking(true)}><FileText className="h-4 w-4" /> Choose from Files</Button>
-						</TabsContent>
-						<TabsContent value="drive" className="mt-3 space-y-2">
-							{drive === null ? <p className="flex items-center gap-2 text-sm text-serene-neutral-600"><Loader2 className="h-4 w-4 animate-spin" /> Looking</p> : !drive.connected ? (
-								<p className="text-sm text-serene-neutral-700">{drive.error ?? "Connect Google Drive to pick files from it."}{drive.available && <> <a className="font-medium text-sauti-teal hover:underline" href={`/api/mjengo/drive/google/start?kind=connect&return=${encodeURIComponent(typeof window === "undefined" ? "/" : window.location.pathname)}`}>Connect Google Drive</a></>}</p>
-							) : (
-								<ul className="max-h-48 divide-y divide-serene-neutral-200 overflow-y-auto">
-									{drive.files.map((f) => <li key={f.id} className="flex items-center gap-2 py-1.5"><span className="min-w-0 flex-1 truncate text-sm">{f.name}</span><Button size="sm" variant="outline" disabled={busy === f.id} onClick={() => run(f.id, async () => { await unwrap(addContext(kind, id, { type: "drive", driveId: f.id, name: f.name })); }, f.name)}>Add</Button></li>)}
-									{drive.files.length === 0 && <li className="py-2 text-sm text-serene-neutral-600">No files to show yet.</li>}
-								</ul>
-							)}
-							<form className="flex gap-2" onSubmit={(e) => { e.preventDefault(); if (driveLink.trim()) void run("dlink", async () => { await unwrap(addContext(kind, id, { type: "drive", link: driveLink })); }, "Google Drive file"); }}>
-								<Input value={driveLink} onChange={(e) => setDriveLink(e.target.value)} placeholder="Or paste a Google Drive link" aria-label="Google Drive link" />
-								<Button type="submit" variant="outline" disabled={!driveLink.trim() || busy === "dlink"}>Add link</Button>
-							</form>
-						</TabsContent>
-						<TabsContent value="upload" className="mt-3 space-y-2">
-							<p className="text-sm text-serene-neutral-700">Upload a file from this device. It is saved in Files and used as context.</p>
-							<Button variant="outline" className="gap-1.5" disabled={busy === "upload"} onClick={() => file.current?.click()}>{busy === "upload" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />} Choose a file</Button>
-							<input ref={file} type="file" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) void upload(f); e.target.value = ""; }} />
-						</TabsContent>
-					</Tabs>
-				</DialogContent>
-			</Dialog>
+		<div className="rounded-xl border border-sauti-teal/30 bg-serene-neutral-50 p-4" role="group" aria-label="Add context">
+			<div className="flex items-start justify-between gap-2">
+				<p className="text-sm font-semibold text-serene-neutral-900">What do you want to add?</p>
+				<Button size="icon" variant="ghost" className="-mr-2 -mt-1 h-7 w-7" onClick={onClose} aria-label="Close"><X className="h-4 w-4" /></Button>
+			</div>
+			<div className="mt-2 flex flex-wrap gap-2" role="group" aria-label="Type of context">
+				{TYPES.map(([key, label, Icon]) => (
+					<button key={key} type="button" aria-pressed={tab === key} onClick={() => setTab(tab === key ? null : key)} className={cn("inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-medium transition", tab === key ? "border-sauti-teal bg-sauti-teal text-white" : "border-serene-neutral-200 bg-white text-serene-neutral-800 hover:border-sauti-teal/50")}>
+						<Icon className="h-3.5 w-3.5" aria-hidden /> {label}
+					</button>
+				))}
+			</div>
+
+			{tab === "link" && (
+				<div className="mt-3 space-y-2">
+					<Input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://your-portfolio.org or the organisation's about page" aria-label="Web address" autoFocus />
+					<p className="text-xs text-serene-neutral-600">The page is read now and kept as text for the agent.</p>
+					<Button size="sm" disabled={!/^https?:\/\//i.test(url.trim()) || busy === "link"} onClick={() => run("link", async () => { await unwrap(addContext(kind, id, { type: "link", url })); }, url)}>{busy === "link" ? <Loader2 className="h-4 w-4 animate-spin" /> : "Add link"}</Button>
+				</div>
+			)}
+			{tab === "skill" && (
+				<div className="mt-3 space-y-2">
+					<Textarea rows={4} value={skill} onChange={(e) => setSkill(e.target.value)} placeholder={"One per line, with where you used it.\nWordPress and Sanity CMS, qwerise.org and two real estate sites\nKenya Data Protection Act, data handler on WHRD Hub"} aria-label="Skills" autoFocus />
+					<Button size="sm" disabled={skill.trim().length < 2 || busy === "skill"} onClick={() => run("skill", async () => { await unwrap(addContext(kind, id, { type: "skill", body: skill })); }, "Skills")}>{busy === "skill" ? <Loader2 className="h-4 w-4 animate-spin" /> : "Add skills"}</Button>
+				</div>
+			)}
+			{tab === "note" && (
+				<div className="mt-3 space-y-2">
+					<Input value={noteTitle} onChange={(e) => setNoteTitle(e.target.value)} placeholder="Title (optional)" aria-label="Note title" />
+					<Textarea rows={4} value={note} onChange={(e) => setNote(e.target.value)} placeholder="Anything else: a project they should hear about, a gap to explain." aria-label="Note" />
+					<Button size="sm" disabled={note.trim().length < 2 || busy === "note"} onClick={() => run("note", async () => { await unwrap(addContext(kind, id, { type: "note", title: noteTitle, body: note })); }, "Note")}>{busy === "note" ? <Loader2 className="h-4 w-4 animate-spin" /> : "Add note"}</Button>
+				</div>
+			)}
+			{tab === "files" && (
+				<div className="mt-3 space-y-2">
+					<p className="text-sm text-serene-neutral-700">Pick your CV, past applications or a project report. Only a link is kept; the file stays where it is.</p>
+					<Button size="sm" variant="outline" className="gap-1.5" onClick={() => setPicking(true)}><FileText className="h-4 w-4" /> Choose from Files</Button>
+				</div>
+			)}
+			{tab === "drive" && (
+				<div className="mt-3 space-y-2">
+					{drive === null ? <p className="flex items-center gap-2 text-sm text-serene-neutral-600"><Loader2 className="h-4 w-4 animate-spin" /> Looking</p> : !drive.connected ? (
+						<p className="text-sm text-serene-neutral-700">{drive.error ?? "Connect Google Drive to pick files from it."}{drive.available && <> <a className="font-medium text-sauti-teal hover:underline" href={`/api/mjengo/drive/google/start?kind=connect&return=${encodeURIComponent(typeof window === "undefined" ? "/" : window.location.pathname)}`}>Connect Google Drive</a></>}</p>
+					) : (
+						<ul className="max-h-48 divide-y divide-serene-neutral-200 overflow-y-auto">
+							{drive.files.map((f) => <li key={f.id} className="flex items-center gap-2 py-1.5"><span className="min-w-0 flex-1 truncate text-sm">{f.name}</span><Button size="sm" variant="outline" disabled={busy === f.id} onClick={() => run(f.id, async () => { await unwrap(addContext(kind, id, { type: "drive", driveId: f.id, name: f.name })); }, f.name)}>Add</Button></li>)}
+							{drive.files.length === 0 && <li className="py-2 text-sm text-serene-neutral-600">No files to show yet.</li>}
+						</ul>
+					)}
+					<form className="flex gap-2" onSubmit={(e) => { e.preventDefault(); if (driveLink.trim()) void run("dlink", async () => { await unwrap(addContext(kind, id, { type: "drive", link: driveLink })); }, "Google Drive file"); }}>
+						<Input value={driveLink} onChange={(e) => setDriveLink(e.target.value)} placeholder="Or paste a Google Drive link" aria-label="Google Drive link" />
+						<Button type="submit" size="sm" variant="outline" disabled={!driveLink.trim() || busy === "dlink"}>Add link</Button>
+					</form>
+				</div>
+			)}
+			{tab === "upload" && (
+				<div className="mt-3 space-y-2">
+					<p className="text-sm text-serene-neutral-700">Upload a file from this device. It is saved in Files and used as context.</p>
+					<Button size="sm" variant="outline" className="gap-1.5" disabled={busy === "upload"} onClick={() => file.current?.click()}>{busy === "upload" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />} Choose a file</Button>
+					<input ref={file} type="file" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) void upload(f); e.target.value = ""; }} />
+				</div>
+			)}
 			<VaultPicker open={picking} onClose={() => setPicking(false)} max={6} already={[...existing]} title="Choose files for the agent to read" onPick={(items) => { setPicking(false); const files = items.filter((x) => x.kind === "file"); if (files.length) void run("files", async () => { for (const f of files) await unwrap(addContext(kind, id, { type: "file", fileId: f.id })); }, `${files.length} file${files.length === 1 ? "" : "s"}`); }} />
-		</>
+		</div>
 	);
 }
 

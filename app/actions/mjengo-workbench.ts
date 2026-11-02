@@ -35,7 +35,7 @@ export interface ContextItem {
   at: string;
 }
 export interface AiInfo { available: boolean; models: { id: string; label: string }[]; defaultModel: string }
-export interface Workbench { instructions: string; items: ContextItem[]; ai: AiInfo }
+export interface Workbench { instructions: string; items: ContextItem[]; ai: AiInfo; documents: number }
 export interface Suggestion { fileId: string; name: string; why: string; size: number; folder: string | null }
 export interface AgentResult { docId: string; fileId: string; name: string; text: string; gaps: number; usedContext: string[]; model: string }
 
@@ -53,7 +53,9 @@ async function open(kind: string, id: string, need: Level = 'view') {
 function aiInfo(): AiInfo {
   const def = process.env.OPENROUTER_MODEL || 'qwen/qwen3.7-flash';
   const listed = (process.env.OPENROUTER_MODELS ?? '').split(',').map((s) => s.trim()).filter(Boolean).map((s) => { const [id, label] = s.split('|'); return { id: id.trim(), label: (label ?? id).trim() }; });
-  const models = listed.length ? listed : [{ id: def, label: 'Standard' }];
+  // With nothing listed, offer a few well-known OpenRouter models next to the site's own, so there is always a choice.
+  const common = [{ id: 'anthropic/claude-sonnet-4.5', label: 'Claude Sonnet' }, { id: 'google/gemini-2.5-flash', label: 'Gemini Flash' }, { id: 'openai/gpt-4o-mini', label: 'GPT-4o mini' }, { id: 'deepseek/deepseek-chat', label: 'DeepSeek' }];
+  const models = listed.length ? listed : [{ id: def, label: 'Standard' }, ...common.filter((m) => m.id !== def)];
   if (!models.some((m) => m.id === def)) models.unshift({ id: def, label: 'Standard' });
   return { available: !!process.env.OPENROUTER_API_KEY, models, defaultModel: def };
 }
@@ -83,7 +85,8 @@ async function workbench_(kind: string, id: string): Promise<Workbench> {
     }
     return [{ id: r.id, kind: r.kind as ContextItem['kind'], title, body: r.body, url: r.url, vaultFileId: r.vault_file_id, driveFileId: r.drive_file_id, include: r.include, mime, size, at: r.created_at }];
   });
-  return { instructions: all.find((r) => r.kind === 'instruction')?.body ?? '', items, ai: aiInfo() };
+  const { count } = await looseAdmin().from('mjengo_documents').select('id', { count: 'exact', head: true }).eq('entity_type', k).eq('entity_id', id);
+  return { instructions: all.find((r) => r.kind === 'instruction')?.body ?? '', items, ai: aiInfo(), documents: count ?? 0 };
 }
 export const getWorkbench = guard(workbench_);
 
