@@ -35,7 +35,6 @@ import { EntityAccessPanel, FellowshipAssignments } from "./EntityExtras";
 import { EntityTimeline } from "./EntityTimeline";
 import { EntityTasks } from "./EntityTasks";
 import { autoTagItem } from "@/app/actions/mjengo-search";
-import { GrantAgent } from "./GrantAgent";
 import { ProgressReport } from "./ProgressReport";
 import { MemberFilter, SimilarItems, TagEditor } from "./Facets";
 
@@ -444,7 +443,7 @@ export function EntityWorkspace({ kind, pageId }: { kind: Kind; pageId?: string 
 	) : null;
 	const timelineEl = eid ? <EntityTimeline kind={kind} id={eid} /> : null;
 	const reportEl = eid ? <ProgressReport kind={kind} id={eid} /> : null;
-	const agentEl = eid && (kind === "grant" || kind === "opportunity") ? <GrantAgent kind={kind} id={eid} /> : null;
+	const agentEl = eid ? (kind === "grant" || kind === "opportunity")  : null;
 	const similarEl = eid ? <SimilarItems type={kind} id={eid} /> : null;
 	const accessEl = eid ? <EntityAccessPanel kind={kind} id={eid} /> : null;
 	const panelsPart = editing ? (
