@@ -24,7 +24,7 @@ export function LottieLoader({
       transition={{ duration: 0.5, ease: "easeOut" }}
       className={`flex flex-col items-center justify-center ${className}`}
     >
-      <div style={{ width: size, height: size }}>
+      <div className="lottie-art" style={{ width: size, height: size }}>
         <Lottie 
           animationData={animationData} 
           loop={loop}

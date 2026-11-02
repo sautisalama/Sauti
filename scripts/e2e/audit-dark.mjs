@@ -54,7 +54,7 @@ for (const role of ["survivor", "professional", "admin"]) {
 	// Public pages must stay light.
 	await page.goto(BASE + "/report-abuse", { waitUntil: "domcontentloaded" });
 	await page.waitForTimeout(1500);
-	check(`${role}: dark follows the choice on public pages too`, (await page.evaluate(() => document.documentElement.classList.contains("dark"))));
+	check(`${role}: public pages stay light`, !(await page.evaluate(() => document.documentElement.classList.contains("dark"))));
 	await page.evaluate(() => localStorage.removeItem("ss_theme"));
 	await page.close();
 }
