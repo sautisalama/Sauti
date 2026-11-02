@@ -346,7 +346,6 @@ export function EnhancedSidebar({
 					{ id: "mj-logs", group: "Administration", label: "Logs", icon: ScrollText, href: `${B}/logs`, section: "main", hint: "Audit trail of actions in the suite" }
 				);
 			}
-			items.push({ id: "mj-back", label: "Back to dashboard", icon: ArrowLeft, href: "/dashboard", section: "secondary", separator: true, hint: "Leave the Mjengo suite" });
 			// Roles: only the parts of the suite this person has been given.
 			const MODULE_OF: Record<string, string> = { "mj-assistant": "assistant", "mj-mail": "mail", "mj-contacts": "contacts", "mj-meet": "meet", "mj-calendar": "calendar", "mj-files": "files", "mj-grants": "grants", "mj-opps": "opportunities", "mj-projects": "projects", "mj-fellowships": "fellowships", "mj-forms": "forms", "mj-todos": "todos", "mj-design": "design" };
 			// The menu starts small: grants, projects and fellowships appear once there is one (an opportunity that was won).
@@ -959,23 +958,21 @@ export function EnhancedSidebar({
 						{/* Main Navigation */}
 						<div className={cn("space-y-1", centred && "my-auto")}>
 							{renderGroup(mainItems, true)}
+							{onMjengo && !isCollapsed && (
+								<div className="mx-3 flex items-center gap-1 pt-3">
+									<button type="button" onClick={() => setEditNav((o) => !o)} aria-pressed={editNav} className="flex items-center gap-2 rounded-md px-2 py-1.5 text-xs font-semibold text-serene-neutral-500 hover:bg-serene-neutral-100 hover:text-serene-neutral-800">
+										{editNav ? <Check className="h-3.5 w-3.5" aria-hidden /> : <EyeOff className="h-3.5 w-3.5" aria-hidden />}
+										{editNav ? "Done" : "Hide items"}
+									</button>
+									{editNav && (navPref.order.length > 0 || (navPref.hidden ?? []).length > 0) && (
+										<button type="button" onClick={() => saveNav({ order: [], group: {}, hidden: [] })} className="rounded-md px-2 py-1.5 text-xs font-medium text-serene-neutral-400 underline hover:text-serene-neutral-600">Reset the menu</button>
+									)}
+								</div>
+							)}
 						</div>
 
-						{/* Reset, Hidden and Back to dashboard keep their place at the bottom, however many items are hidden. */}
-						<div className={cn("sticky bottom-0 z-10 bg-white shadow-[0_-8px_8px_-8px_rgba(16,24,40,0.08)]", !centred && "mt-auto")}>
-						{onMjengo && !isCollapsed && (navPref.order.length > 0 || (navPref.hidden ?? []).length > 0) && (
-							<button onClick={() => saveNav({ order: [], group: {}, hidden: [] })} className="mx-5 mt-2 text-[11px] font-medium text-serene-neutral-400 underline hover:text-serene-neutral-600">Reset the menu</button>
-						)}
-
-						{onMjengo && !isCollapsed && (
-							<button type="button" onClick={() => setEditNav((o) => !o)} aria-pressed={editNav} className="mx-3 mt-2 flex w-[calc(100%-1.5rem)] items-center gap-2 rounded-md px-2 py-1.5 text-xs font-semibold text-serene-neutral-500 hover:bg-serene-neutral-100 hover:text-serene-neutral-800">
-								{editNav ? <Check className="h-3.5 w-3.5" aria-hidden /> : <EyeOff className="h-3.5 w-3.5" aria-hidden />}
-								{editNav ? "Done" : "Hide items"}
-							</button>
-						)}
-
 						{/* Secondary Navigation */}
-						{secondaryItems.length > 0 && (
+						{!onMjengo && secondaryItems.length > 0 && (
 							<div className="pt-6 space-y-1">
 								{secondaryItems.some((item) => item.separator) && (
 									<div className="px-3 pb-2">
@@ -985,7 +982,6 @@ export function EnhancedSidebar({
 								{renderGroup(secondaryItems)}
 							</div>
 						)}
-						</div>
 					</div>
                     )}
 

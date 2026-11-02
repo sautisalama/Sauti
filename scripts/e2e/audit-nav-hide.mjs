@@ -14,7 +14,7 @@ try {
 	const link = (n) => page.getByRole("link", { name: n, exact: true });
 	await link("Contacts").first().waitFor({ timeout: 90000 });
 	const y = async (loc) => (await loc.first().boundingBox())?.y ?? -1;
-	const backBefore = await y(page.getByRole("link", { name: /Back to dashboard/ }));
+	check("there is no Back to dashboard in the menu", (await page.getByRole("link", { name: /Back to dashboard/ }).count()) === 0);
 	const overviewBefore = await y(link("Overview"));
 	check("no choices show on the items until Hide items is chosen", (await page.getByRole("checkbox").count()) === 0);
 
@@ -26,8 +26,7 @@ try {
 	await link("Contacts").first().waitFor({ state: "detached", timeout: 10000 }).catch(() => {});
 	check("an unticked item leaves the menu", (await link("Contacts").count()) === 0);
 	await page.waitForTimeout(600);
-	const backAfter = await y(page.getByRole("link", { name: /Back to dashboard/ }));
-	check("Back to dashboard stays at the bottom, in view", backBefore > 0 && backAfter > 0 && Math.abs(backBefore - backAfter) < 3 && backAfter < 1500);
+	check("Hide items stays with the items, with no bar of controls at the bottom", (await page.getByRole("button", { name: "Hide items" }).count()) === 1 && (await page.getByRole("button", { name: "Reset the menu" }).count()) === 0);
 	check("the remaining items move to the middle", (await y(link("Overview"))) > overviewBefore + 20);
 	await page.screenshot({ path: "audit-out/nav_hidden.png" });
 
