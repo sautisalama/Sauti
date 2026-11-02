@@ -11,6 +11,7 @@ import { unwrap } from "@/lib/action-result";
 import { cn } from "@/lib/utils";
 import { putToSignedUrl } from "@/lib/client/upload";
 import { coloursFromPictures, lookFromAccent, pickAccent, shrinkPicture, type DeckLook } from "@/lib/client/deck-look";
+import { buildDeck, THEMES, type LayoutSpec, type Theme } from "@/lib/deck/model";
 import { makeDeck, type DeckTheme } from "@/app/actions/mjengo-assist";
 import { getBrand } from "@/app/actions/mjengo-brand";
 import { prepareUpload, registerUpload } from "../vault/api";
@@ -25,8 +26,9 @@ const PRESETS: Record<DeckTheme, { label: string; a: string; b: string }> = {
 interface Pic { id: string; name: string; kind: "photo" | "logo"; note: string; dataUrl: string; width: number; height: number; /** Its colours are used for the theme. */ theme: boolean }
 
 /**
- * Presentation with AI. Say what it is about, add the pictures and the logo to use, and the colours are taken
+ * New presentation. Say what it is about, add the pictures and the logo to use, and the colours are taken
  * from them (shown, and changeable) so the whole deck is drawn in the organisation's own look.
+ * It is saved as slides that can be edited together live, or as a PowerPoint file; the one form serves both.
  */
 export function DeckStudio({ open, onClose, folderId, onDone }: { open: boolean; onClose: () => void; folderId: string | null; onDone: () => void }) {
 	const { toast } = useToast();
@@ -42,9 +44,10 @@ export function DeckStudio({ open, onClose, folderId, onDone }: { open: boolean;
 	const [dark, setDark] = useState(false);
 	const [brandColours, setBrandColours] = useState<string[] | null>(null);
 	const [reading, setReading] = useState(false);
+	const [format, setFormat] = useState<"slides" | "pptx">("slides");
 	const file = useRef<HTMLInputElement>(null);
 
-	useEffect(() => { if (open) { setTopic(""); setOutline(null); setPics([]); setSource("preset"); setExtracted([]); setDark(false); } }, [open]);
+	useEffect(() => { if (open) { setTopic(""); setOutline(null); setPics([]); setSource("preset"); setExtracted([]); setDark(false); setFormat("slides"); } }, [open]);
 
 	// Colours come from the pictures marked for theming; they are read again whenever that choice changes.
 	const themed = pics.filter((p) => p.theme).map((p) => p.dataUrl);
@@ -95,6 +98,24 @@ export function DeckStudio({ open, onClose, folderId, onDone }: { open: boolean;
 		try {
 			const images = pics.map((p) => ({ name: p.name, kind: p.kind, note: p.note, dataUrl: p.dataUrl, width: p.width, height: p.height }));
 			const r = await unwrap(makeDeck(topic, look, slides, images));
+			if (format === "slides") {
+				// Editable slides: the written outline becomes a deck in the same colours, opened in the editor.
+				const theme: Theme = { ...THEMES.find((t) => t.id === (typeof look === "string" ? ({ teal: "sauti", purple: "royal", sunrise: "sunrise", night: "ink" } as Record<string, string>)[look] : "sauti")) ?? THEMES[0] };
+				if (typeof look !== "string") Object.assign(theme, { id: "custom", name: "Custom", bg: `#${look.bg}`, surface: `#${look.band}`, text: `#${look.title}`, muted: `#${look.text}`, accent: `#${look.accent}`, dark: darkShown });
+				const [first, ...rest] = r.outline;
+				const specs: LayoutSpec[] = [
+					{ kind: "title", title: first?.title || topic.slice(0, 80), subtitle: (first?.bullets ?? []).slice(0, 2).join(" ") },
+					...rest.map((o): LayoutSpec => ({ kind: "bullets", title: o.title, bullets: o.bullets.slice(0, 7) })),
+				];
+				const d = buildDeck(first?.title || "Presentation", theme, specs);
+				const name = `${d.title.replace(/[\/:*?"<>|]+/g, "").trim().slice(0, 80) || "Presentation"}.deck`;
+				const json = new File([JSON.stringify(d)], name, { type: "application/json" });
+				const up = await prepareUpload(folderId, name, json.size);
+				await putToSignedUrl(up.signedUrl, json);
+				const made = await registerUpload(folderId, up.path, name, json.size, "application/json");
+				window.location.href = `/dashboard/mjengo/files/deck?file=${made.id}`;
+				return;
+			}
 			const bytes = Uint8Array.from(atob(r.base64), (c) => c.charCodeAt(0));
 			const f = new File([bytes], r.name, { type: "application/vnd.openxmlformats-officedocument.presentationml.presentation" });
 			const { path, signedUrl } = await prepareUpload(folderId, r.name, f.size);
@@ -111,7 +132,7 @@ export function DeckStudio({ open, onClose, folderId, onDone }: { open: boolean;
 	return (
 		<Dialog open={open} onOpenChange={(o) => !o && !busy && onClose()}>
 			<DialogContent className="max-h-[92vh] max-w-2xl overflow-y-auto">
-				<DialogHeader><DialogTitle>Presentation with AI</DialogTitle><DialogDescription>Say what it is about, add your pictures and logo, and the deck is made in their colours.</DialogDescription></DialogHeader>
+				<DialogHeader><DialogTitle>New presentation</DialogTitle><DialogDescription>Say what it is about, add your pictures and logo, and the slides are written in their colours.</DialogDescription></DialogHeader>
 				{outline ? (
 					<div className="space-y-3">
 						<p className="text-sm text-serene-neutral-600">Saved to Files. Here is what is in it:</p>
@@ -200,10 +221,21 @@ export function DeckStudio({ open, onClose, folderId, onDone }: { open: boolean;
 							</div>
 						</div>
 
+						<div>
+							<p className="mb-1.5 text-xs font-semibold uppercase tracking-wider text-serene-neutral-500">Save it as</p>
+							<div className="inline-flex rounded-lg border border-serene-neutral-200 p-0.5 text-xs" role="group" aria-label="Save as">
+								{([["slides", "Slides to edit together"], ["pptx", "PowerPoint file"]] as const).map(([v, l]) => (
+									<button key={v} type="button" aria-pressed={format === v} onClick={() => setFormat(v)} className={cn("rounded-md px-3 py-1.5", format === v ? "bg-sauti-teal font-semibold text-white" : "text-serene-neutral-600 hover:bg-serene-neutral-50")}>{l}</button>
+								))}
+							</div>
+							<p className="mt-1 text-xs text-serene-neutral-500">{format === "slides" ? "Opens in the slide editor, where everyone you share it with edits live." : "A .pptx saved to Files, to open in PowerPoint or Canva."}</p>
+						</div>
+
 						<label className="block max-w-[10rem] text-xs font-medium text-serene-neutral-600">Slides<Input type="number" min={4} max={14} value={slides} onChange={(e) => setSlides(Number(e.target.value))} className="mt-1 h-9" /></label>
 
 						<DialogFooter>
-							<Button variant="outline" onClick={onClose} disabled={busy}>Cancel</Button>
+							<Button variant="outline" asChild disabled={busy}><a href={`/dashboard/mjengo/files/deck${folderId ? `?folder=${folderId}` : ""}`}>Start blank or from a template</a></Button>
+							<Button variant="ghost" onClick={onClose} disabled={busy}>Cancel</Button>
 							<Button className="gap-2 bg-sauti-teal hover:bg-sauti-dark" disabled={busy || topic.trim().length < 6} onClick={() => void create()}>
 								{busy && <Loader2 className="h-4 w-4 animate-spin" />} {busy ? "Writing the slides..." : "Create"}
 							</Button>

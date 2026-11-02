@@ -1,14 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { FilePlus2, FileSpreadsheet, FileText, FolderOpen, Link2, Loader2, Presentation, Search } from "lucide-react";
+import { ClipboardList, FilePlus2, FileSpreadsheet, FileText, FolderOpen, Link2, Loader2, Presentation, Search, Workflow } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { unwrap } from "@/lib/action-result";
-import { attachDriveFile, attachVaultFile, searchDrive, type DriveSearch } from "@/app/actions/mjengo-attach";
+import { attachDriveFile, attachVaultFile, createFormForRecord, searchDrive, type DriveSearch } from "@/app/actions/mjengo-attach";
 import { recentFiles, searchFiles } from "../vault/api";
 import { fmtBytes, type Kind } from "./shared";
 import { setPendingAttach } from "@/lib/client/pending-attach";
@@ -19,6 +19,8 @@ const NEW_FILES = [
 	{ id: "doc", label: "Document", hint: "Write it with the document editor", href: "/dashboard/mjengo/documents/editor", Icon: FileText },
 	{ id: "sheet", label: "Spreadsheet", hint: "A budget or a table", href: "/dashboard/mjengo/files/sheet", Icon: FileSpreadsheet },
 	{ id: "deck", label: "Presentation", hint: "Slides for a pitch", href: "/dashboard/mjengo/files/deck", Icon: Presentation },
+	{ id: "flow", label: "Flow or diagram", hint: "Draw a process or a plan", href: "/dashboard/mjengo/files/draw", Icon: Workflow },
+	{ id: "form", label: "Form", hint: "Questions for people to answer", href: "/dashboard/mjengo/forms", Icon: ClipboardList },
 ] as const;
 
 const useDebounced = <T,>(v: T, ms = 300) => {
@@ -82,7 +84,18 @@ export function AddDocumentDialog({ open, onClose, kind, entityId, entityName, d
 		setBusy(key);
 		try { await unwrap(attachDriveFile(kind, entityId, input, docId)); done(label); } catch (e) { fail(e); } finally { setBusy(null); }
 	};
+	const createForm = async () => {
+		// The tab is opened first, while the click still counts, then sent to the new form.
+		const tab = window.open("", "_blank");
+		setBusy("form");
+		try {
+			const r = await unwrap(createFormForRecord(kind, entityId, entityName ? `${entityName}: form` : "New form", docId));
+			if (tab) tab.location.href = `/dashboard/mjengo/forms/${r.formId}`; else window.open(`/dashboard/mjengo/forms/${r.formId}`, "_blank");
+			done("A new form");
+		} catch (e) { tab?.close(); fail(e); } finally { setBusy(null); }
+	};
 	const create = (n: (typeof NEW_FILES)[number]) => {
+		if (n.id === "form") { void createForm(); return; }
 		setPendingAttach({ kind, entityId, docId, name: entityName ?? "" });
 		window.open(n.href, "_blank");
 		toast({ title: `Opening the ${n.label.toLowerCase()} editor`, description: "It is added here as soon as you save it." });
@@ -161,14 +174,14 @@ export function AddDocumentDialog({ open, onClose, kind, entityId, entityName, d
 					<TabsContent value="new" className="mt-3">
 						<div className="grid gap-2 sm:grid-cols-3">
 							{NEW_FILES.map((n) => (
-								<button key={n.id} type="button" onClick={() => create(n)} className="flex flex-col items-start gap-1 rounded-xl border border-serene-neutral-200 p-3 text-left hover:bg-serene-neutral-50">
+								<button key={n.id} type="button" disabled={busy === n.id} onClick={() => create(n)} className="flex flex-col items-start gap-1 rounded-xl border border-serene-neutral-200 p-3 text-left hover:bg-serene-neutral-50">
 									<n.Icon className="h-5 w-5 text-sauti-teal" aria-hidden />
 									<span className="text-sm font-semibold text-serene-neutral-900">{n.label}</span>
 									<span className="text-xs text-serene-neutral-600">{n.hint}</span>
 								</button>
 							))}
 						</div>
-						<p className="mt-3 text-xs text-serene-neutral-500">The editor opens in a new tab. When you save the file, it is kept in Files and added to this {kind}.</p>
+						<p className="mt-3 text-xs text-serene-neutral-500">Documents, spreadsheets, presentations and flows open their editor in a new tab; when you save, the file is kept in Files and added to this {kind}. A form is added straight away and opens so you can write its questions.</p>
 					</TabsContent>
 				</Tabs>
 			</DialogContent>

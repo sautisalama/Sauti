@@ -269,12 +269,11 @@ export default function VaultPage() {
 
 			{!folderId && tab === "mine" && (
 				<Fold id="new" title="Start something new" openMap={fold} onToggle={toggleFold}>
-					<section aria-label="Start something new" className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-7">
+					<section aria-label="Start something new" className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-6">
 						<NewCard badge="DOCX" tone="bg-[#3b8bc2]" label="Document" onClick={() => setPickDoc(true)} hint="Blank or from a template" />
 						<NewCard badge="XLSX" tone="bg-[#43a047]" label="Spreadsheet" onClick={() => { window.location.href = "/dashboard/mjengo/files/sheet"; }} />
-						<NewCard badge="SLIDES" tone="bg-[#ef7d3c]" label="Presentation" onClick={() => { window.location.href = `/dashboard/mjengo/files/deck${folderId ? `?folder=${folderId}` : ""}`; }} hint="Templates, AI, edit together" />
-						<NewCard badge="PPTX" tone="bg-[#d9622b]" label="PowerPoint from AI" onClick={() => setDeck(true)} hint="A .pptx file from a topic" />
-						<NewCard badge="PDF" tone="bg-[#e0483d]" label="PDF" onClick={() => pdfInput.current?.click()} hint="Add a PDF to sign or mark up" />
+						<NewCard badge="SLIDES" tone="bg-[#c2551f]" label="Presentation" onClick={() => setDeck(true)} hint="Written by AI, or from a template" />
+						<NewCard badge="PDF" tone="bg-[#d6362b]" label="PDF" onClick={() => pdfInput.current?.click()} hint="Add a PDF to sign or mark up" />
 						<NewCard badge="FLOW" tone="bg-[#7c3aed]" label="Flow or diagram" onClick={() => { window.location.href = "/dashboard/mjengo/files/draw"; }} hint="Draw with Excalidraw" />
 						<NewCard badge="URL" tone="bg-[#6b7280]" label="Link" onClick={() => setAddLink(true)} hint="Save a web address" />
 						<input ref={pdfInput} type="file" accept="application/pdf,.pdf" multiple className="hidden" onChange={(e) => upload(e.target.files)} />
@@ -554,7 +553,7 @@ function NameDialog({ open, title, action, initial, busy, onClose, onSubmit }: {
 }
 
 
-const TYPE_STYLE: Record<string, string> = { pdf: "bg-[#e0483d]", doc: "bg-[#3b8bc2]", docx: "bg-[#3b8bc2]", xls: "bg-[#43a047]", xlsx: "bg-[#43a047]", csv: "bg-[#43a047]", ppt: "bg-[#ef7d3c]", pptx: "bg-[#ef7d3c]", deck: "bg-[#ef7d3c]", png: "bg-[#8e5bd6]", jpg: "bg-[#8e5bd6]", jpeg: "bg-[#8e5bd6]", txt: "bg-[#6b7280]", md: "bg-[#6b7280]", url: "bg-[#0f766e]" };
+const TYPE_STYLE: Record<string, string> = { pdf: "bg-[#d6362b]", doc: "bg-[#3b8bc2]", docx: "bg-[#3b8bc2]", xls: "bg-[#43a047]", xlsx: "bg-[#43a047]", csv: "bg-[#43a047]", ppt: "bg-[#c2551f]", pptx: "bg-[#c2551f]", deck: "bg-[#c2551f]", png: "bg-[#8e5bd6]", jpg: "bg-[#8e5bd6]", jpeg: "bg-[#8e5bd6]", txt: "bg-[#6b7280]", md: "bg-[#6b7280]", url: "bg-[#0f766e]" };
 
 function TypeIcon({ name, big }: { name: string; big?: boolean }) {
 	const ext = name.includes(".") ? name.split(".").pop()!.toLowerCase() : "";

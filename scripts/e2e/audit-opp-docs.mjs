@@ -36,13 +36,13 @@ try {
 	await page.getByLabel("Search").fill(`e2e-note-${stamp}`);
 	await page.getByText(`e2e-note-${stamp}.txt`).first().waitFor({ timeout: 30000 });
 	await page.getByRole("button", { name: "Add", exact: true }).first().click();
-	await page.getByRole("button", { name: `Preview e2e-note-${stamp}.txt` }).waitFor({ timeout: 30000 });
+	await page.getByRole("button", { name: `Preview e2e-note-${stamp}.txt` }).first().waitFor({ timeout: 30000 });
 	check("the file from Files is on the opportunity", true);
 	const link = await poll(async () => (await db.from("mjengo_documents").select("vault_file_id, file_path").eq("entity_id", opp.id).eq("vault_file_id", vf.id).maybeSingle()).data, { timeout: 15000, interval: 1000 });
 	check("only a link was stored, not a copy of the file", !!link && link.file_path === null);
 
 	// Preview the uploaded file, then move on to the next.
-	await page.getByRole("button", { name: "Preview E2E uploaded budget" }).click();
+	await page.getByRole("button", { name: "Preview E2E uploaded budget" }).first().click();
 	await page.getByText("hello from an upload").waitFor({ timeout: 30000 });
 	check("clicking a document shows it in a window", true);
 	await page.screenshot({ path: path.join(OUT, "opp_preview.png") });

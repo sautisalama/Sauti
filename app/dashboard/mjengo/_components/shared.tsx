@@ -115,7 +115,7 @@ export function Avatars({ ids, admins, max = 3 }: { ids: string[]; admins: { id:
 	);
 }
 
-/** A document has a file when it holds an upload, or points at a file in Files or Google Drive. */
-export const hasFile = (d: { file_path?: string | null; vault_file_id?: string | null; drive_file_id?: string | null }) => !!(d.file_path || d.vault_file_id || d.drive_file_id);
+/** A document has a file when it holds an upload, or points at a file in Files, a Google Drive file or a form. */
+export const hasFile = (d: { file_path?: string | null; vault_file_id?: string | null; drive_file_id?: string | null; form_id?: string | null }) => !!(d.file_path || d.vault_file_id || d.drive_file_id || d.form_id);
 
 export const fmtBytes = (n: number | null | undefined) => (n == null ? "" : n > 1024 * 1024 ? `${(n / 1024 / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`);

@@ -3,9 +3,10 @@
 import { MjengoLoader } from "./MjengoLoader";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { format } from "date-fns";
-import { CheckCircle2, Circle, Download, FileText, FolderSearch, Loader2, Plus, Trash2, Upload } from "lucide-react";
+import { CheckCircle2, ClipboardList, Download, ExternalLink, Eye, FileImage, FileSpreadsheet, FileText, FolderSearch, LayoutGrid, List, Loader2, Plus, Presentation, Trash2, Upload, Workflow } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { unwrap } from "@/lib/action-result";
 import {
@@ -22,6 +23,18 @@ const MAX_BYTES = 25 * 1024 * 1024;
 /** Where a document's file lives, in words. */
 const whereIs = (d: DocRow) => (d.vault_file_id ? "From Files" : d.drive_file_id && !d.file_path ? "Google Drive" : null);
 
+/** A small picture and colour for what kind of file it is, from its name. */
+function glyph(d: DocRow): { Icon: typeof FileText; tone: string; label: string } {
+	if (d.form_id) return { Icon: ClipboardList, tone: "#7c3aed", label: "Form" };
+	const ext = (d.file_name || d.name).toLowerCase().split(".").pop() ?? "";
+	if (["xlsx", "xls", "csv"].includes(ext)) return { Icon: FileSpreadsheet, tone: "#2e7d32", label: "Spreadsheet" };
+	if (["pptx", "ppt", "deck"].includes(ext)) return { Icon: Presentation, tone: "#d9622b", label: "Presentation" };
+	if (ext === "excalidraw") return { Icon: Workflow, tone: "#7c3aed", label: "Flow" };
+	if (["png", "jpg", "jpeg", "gif", "webp", "svg"].includes(ext)) return { Icon: FileImage, tone: "#0e7490", label: "Image" };
+	if (ext === "pdf") return { Icon: FileText, tone: "#d6362b", label: "PDF" };
+	return { Icon: FileText, tone: "#2f78b3", label: ext && ext.length <= 5 && (d.file_name || "").includes(".") ? ext.toUpperCase() : "Document" };
+}
+
 /**
  * The paperwork for one grant, opportunity or project: a checklist of what is needed, and the files. A file can be
  * uploaded, chosen from Files or Google Drive, or created here. Clicking a document shows it in a preview window.
@@ -34,6 +47,9 @@ export function DocumentsPanel({ kind, entityId, entityName, onChange }: { kind:
 	const [progress, setProgress] = useState<Record<string, number>>({});
 	const [adding, setAdding] = useState<{ docId?: string; docName?: string } | null>(null);
 	const [previewId, setPreviewId] = useState<string | null>(null);
+	const [view, setView] = useState<"list" | "cards">("list");
+	useEffect(() => { try { const v = localStorage.getItem("ss_docs_view"); if (v === "list" || v === "cards") setView(v); } catch { /* default */ } }, []);
+	const changeView = (v: "list" | "cards") => { setView(v); try { localStorage.setItem("ss_docs_view", v); } catch { /* ignore */ } };
 	const input = useRef<HTMLInputElement>(null);
 	const target = useRef<string | "extra" | null>(null);
 
@@ -106,8 +122,8 @@ export function DocumentsPanel({ kind, entityId, entityName, onChange }: { kind:
 	};
 
 	const remove = async (d: DocRow) => {
-		const linked = !!whereIs(d);
-		if (!window.confirm(linked ? `Remove "${d.name}" from this ${kind}? The file stays where it is.` : `Delete "${d.name}"${d.file_name ? " and its file" : ""}?`)) return;
+		const linked = !!whereIs(d) || !!d.form_id;
+		if (!window.confirm(linked ? `Remove "${d.name}" from this ${kind}? ${d.form_id ? "The form stays as it is." : "The file stays where it is."}` : `Delete "${d.name}"${d.file_name ? " and its file" : ""}?`)) return;
 		try {
 			await deleteDocument(d.id);
 			await load();
@@ -117,6 +133,32 @@ export function DocumentsPanel({ kind, entityId, entityName, onChange }: { kind:
 		}
 	};
 
+	const metaOf = (d: DocRow, has: boolean, label: string) => {
+		if (!has) return "Not added yet";
+		const where = whereIs(d);
+		return [where ?? label, d.file_name && d.file_name !== d.name && !d.form_id ? d.file_name : null, d.file_size ? fmtBytes(d.file_size) : null, d.uploaded_at ? format(new Date(d.uploaded_at), "d MMM") : null, d.uploaded_by_name].filter(Boolean).join(" · ");
+	};
+
+	/** A document with a file can be previewed, downloaded or removed; one still waiting for its file can be given one or removed. */
+	const RowActions = ({ d, has, uploading }: { d: DocRow; has: boolean; uploading: boolean }) => (
+		<>
+			{has ? (
+				<>
+					<Button size="icon" variant="ghost" onClick={() => setPreviewId(d.id)} aria-label={`Preview ${d.name}`} title="Preview"><Eye className="h-4 w-4" /></Button>
+					{d.form_id
+						? <Button asChild size="icon" variant="ghost" aria-label={`Open the form ${d.name}`} title="Open the form"><a href={`/dashboard/mjengo/forms/${d.form_id}`} target="_blank" rel="noopener noreferrer"><ExternalLink className="h-4 w-4" /></a></Button>
+						: <Button size="icon" variant="ghost" onClick={() => download(d)} aria-label={`Download ${d.name}`} title="Download"><Download className="h-4 w-4" /></Button>}
+				</>
+			) : (
+				<>
+					<Button size="sm" variant="ghost" className="h-8 gap-1.5 px-2" onClick={() => setAdding({ docId: d.id, docName: d.name })} title="Choose from Files or Google Drive"><FolderSearch className="h-4 w-4" /> Choose</Button>
+					<Button size="sm" variant="ghost" className="h-8 gap-1.5 px-2" disabled={uploading} onClick={() => chooseFile(d.id)}>{uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />} Upload</Button>
+				</>
+			)}
+			<Button size="icon" variant="ghost" className="text-serene-neutral-400 hover:text-red-600" onClick={() => remove(d)} aria-label={`Delete ${d.name}`} title={whereIs(d) || d.form_id ? "Remove from here" : "Delete"}><Trash2 className="h-4 w-4" /></Button>
+		</>
+	);
+
 	const missing = docs?.filter((d) => d.required && !hasFile(d)).length ?? 0;
 
 	return (
@@ -124,6 +166,13 @@ export function DocumentsPanel({ kind, entityId, entityName, onChange }: { kind:
 			<div className="mb-2 flex items-center justify-between gap-2">
 				<h3 className="text-sm font-bold text-sauti-dark">Documents</h3>
 				<div className="flex items-center gap-2">
+					{docs && docs.length > 0 && (
+						<div className="inline-flex rounded-lg border border-serene-neutral-200 p-0.5" role="group" aria-label="View">
+							{([["list", List, "List"], ["cards", LayoutGrid, "Cards"]] as const).map(([v, Icon, l]) => (
+								<button key={v} type="button" aria-pressed={view === v} aria-label={`${l} view`} title={`${l} view`} onClick={() => changeView(v)} className={cn("flex h-7 w-7 items-center justify-center rounded-md", view === v ? "bg-sauti-teal text-white" : "text-serene-neutral-600 hover:bg-serene-neutral-100")}><Icon className="h-4 w-4" /></button>
+							))}
+						</div>
+					)}
 					{docs && docs.length > 0 && <span className={`text-xs font-medium ${missing ? "text-amber-700" : "text-emerald-700"}`}>{missing ? `${missing} still needed` : "All in"}</span>}
 					<Button size="sm" variant="outline" className="h-8 gap-1.5" onClick={() => setAdding({})}><Plus className="h-4 w-4" /> Add a document</Button>
 				</div>
@@ -131,15 +180,19 @@ export function DocumentsPanel({ kind, entityId, entityName, onChange }: { kind:
 
 			{!docs ? (
 				<MjengoLoader label="Loading documents" compact />
-			) : (
-				<ul className="divide-y divide-serene-neutral-100 rounded-xl border border-serene-neutral-100 bg-white">
+			) : docs.length === 0 ? (
+				<p className="flex items-center gap-3 rounded-xl border border-serene-neutral-200 bg-white p-4 text-sm text-serene-neutral-500">
+					<FileText className="h-5 w-5 text-serene-neutral-300" /> Add a file from Files or Google Drive, create one here, or list what is needed below.
+				</p>
+			) : view === "list" ? (
+				<ul className="divide-y divide-serene-neutral-200 rounded-xl border border-serene-neutral-200 bg-white">
 					{docs.map((d) => {
 						const p = progress[d.id];
 						const has = hasFile(d);
-						const where = whereIs(d);
+						const g = glyph(d);
 						return (
 							<li key={d.id} className="flex items-center gap-3 p-3">
-								{has ? <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-600" /> : <Circle className="h-5 w-5 shrink-0 text-serene-neutral-300" />}
+								{has ? <g.Icon className="h-5 w-5 shrink-0" style={{ color: g.tone }} aria-hidden /> : <span className="h-5 w-5 shrink-0 rounded-full border-2 border-dashed border-serene-neutral-300" aria-hidden />}
 								<div className="min-w-0 flex-1">
 									{has ? (
 										<button type="button" onClick={() => setPreviewId(d.id)} className="block max-w-full truncate text-left text-sm font-medium text-serene-neutral-900 hover:text-sauti-teal hover:underline" aria-label={`Preview ${d.name}`}>
@@ -152,9 +205,7 @@ export function DocumentsPanel({ kind, entityId, entityName, onChange }: { kind:
 											{!d.required && <span className="ml-2 text-xs font-normal text-serene-neutral-400">optional</span>}
 										</p>
 									)}
-									<p className="truncate text-xs text-serene-neutral-500">
-										{has ? [where, d.file_name !== d.name ? d.file_name : null, d.file_size ? fmtBytes(d.file_size) : null, d.uploaded_at ? format(new Date(d.uploaded_at), "d MMM") : null, d.uploaded_by_name].filter(Boolean).join(" · ") : "Not added yet"}
-									</p>
+									<p className="truncate text-xs text-serene-neutral-500">{metaOf(d, has, g.label)}</p>
 									{p !== undefined && (
 										<div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-serene-neutral-100" role="progressbar" aria-valuenow={p}>
 											<div className="h-full rounded-full bg-sauti-teal transition-[width]" style={{ width: `${p}%` }} />
@@ -162,20 +213,38 @@ export function DocumentsPanel({ kind, entityId, entityName, onChange }: { kind:
 									)}
 								</div>
 								{!has && <DeadlineChip date={d.due_date} />}
-								{has && <Button size="icon" variant="ghost" onClick={() => download(d)} aria-label={`Download ${d.name}`}><Download className="h-4 w-4" /></Button>}
-								<Button size="icon" variant="ghost" onClick={() => setAdding({ docId: d.id, docName: d.name })} aria-label={`Choose an existing file for ${d.name}`} title="Choose from Files or Google Drive"><FolderSearch className="h-4 w-4" /></Button>
-								<Button size="icon" variant="ghost" disabled={p !== undefined} onClick={() => chooseFile(d.id)} aria-label={has ? `Replace ${d.name}` : `Upload ${d.name}`}>
-									{p !== undefined ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
-								</Button>
-								<Button size="icon" variant="ghost" className="text-serene-neutral-400 hover:text-red-600" onClick={() => remove(d)} aria-label={`Delete ${d.name}`}><Trash2 className="h-4 w-4" /></Button>
+								<RowActions d={d} has={has} uploading={p !== undefined} />
 							</li>
 						);
 					})}
-					{docs.length === 0 && (
-						<li className="flex items-center gap-3 p-4 text-sm text-serene-neutral-500">
-							<FileText className="h-5 w-5 text-serene-neutral-300" /> Add a file from Files or Google Drive, create one here, or list what is needed below.
-						</li>
-					)}
+				</ul>
+			) : (
+				<ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+					{docs.map((d) => {
+						const p = progress[d.id];
+						const has = hasFile(d);
+						const g = glyph(d);
+						return (
+							<li key={d.id} className="flex flex-col overflow-hidden rounded-xl border border-serene-neutral-200 bg-white">
+								<button type="button" disabled={!has} onClick={() => setPreviewId(d.id)} aria-label={has ? `Preview ${d.name}` : undefined} className={cn("flex h-24 items-center justify-center", has ? "hover:opacity-90" : "cursor-default")} style={{ background: has ? `${g.tone}1a` : undefined }}>
+									{has ? <g.Icon className="h-9 w-9" style={{ color: g.tone }} aria-hidden /> : <span className="rounded-full border-2 border-dashed border-serene-neutral-300 px-3 py-1 text-xs text-serene-neutral-500">Not added yet</span>}
+								</button>
+								<div className="min-w-0 flex-1 space-y-0.5 p-3">
+									<p className="truncate text-sm font-medium text-serene-neutral-900">{d.name}{!d.required && <span className="ml-2 text-xs font-normal text-serene-neutral-400">optional</span>}</p>
+									<p className="truncate text-xs text-serene-neutral-500">{metaOf(d, has, g.label)}</p>
+									{!has && <div className="pt-1"><DeadlineChip date={d.due_date} /></div>}
+									{p !== undefined && (
+										<div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-serene-neutral-100" role="progressbar" aria-valuenow={p}>
+											<div className="h-full rounded-full bg-sauti-teal transition-[width]" style={{ width: `${p}%` }} />
+										</div>
+									)}
+								</div>
+								<div className="flex items-center justify-end gap-0.5 border-t border-serene-neutral-200 px-2 py-1.5">
+									<RowActions d={d} has={has} uploading={p !== undefined} />
+								</div>
+							</li>
+						);
+					})}
 				</ul>
 			)}
 

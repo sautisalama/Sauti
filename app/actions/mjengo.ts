@@ -187,12 +187,12 @@ export type EntityRow = Record<string, unknown> & { id: string; docs: DocSummary
 async function docSummaries(kind: Kind, ids: string[]) {
   const map = new Map<string, DocSummary>();
   if (!ids.length) return map;
-  const { data } = await looseAdmin().from('mjengo_documents').select('entity_id, required, file_path, vault_file_id, drive_file_id').eq('entity_type', kind).in('entity_id', ids);
-  for (const d of (data ?? []) as { entity_id: string; required: boolean; file_path: string | null; vault_file_id: string | null; drive_file_id: string | null }[]) {
+  const { data } = await looseAdmin().from('mjengo_documents').select('entity_id, required, file_path, vault_file_id, drive_file_id, form_id').eq('entity_type', kind).in('entity_id', ids);
+  for (const d of (data ?? []) as { entity_id: string; required: boolean; file_path: string | null; vault_file_id: string | null; drive_file_id: string | null; form_id: string | null }[]) {
     const s = map.get(d.entity_id) ?? { total: 0, required: 0, missing: 0 };
     s.total += 1;
     if (d.required) s.required += 1;
-    if (d.required && !d.file_path && !d.vault_file_id && !d.drive_file_id) s.missing += 1;
+    if (d.required && !d.file_path && !d.vault_file_id && !d.drive_file_id && !d.form_id) s.missing += 1;
     map.set(d.entity_id, s);
   }
   return map;
@@ -304,6 +304,8 @@ export interface DocRow {
   vault_file_id: string | null;
   /** A Google Drive file this document points at. */
   drive_file_id: string | null;
+  /** A form made for this record that this document points at. */
+  form_id: string | null;
   file_name: string | null;
   file_size: number | null;
   mime_type: string | null;
@@ -400,8 +402,8 @@ export async function deleteDocument(docId: string) {
 export async function getDocumentUrl(docId: string): Promise<string> {
   await requireAdminActor();
   const db = looseAdmin();
-  const { data: d } = await db.from('mjengo_documents').select('file_path, file_name, vault_file_id, drive_file_id').eq('id', docId).maybeSingle();
-  if (d && !d.file_path && (d.vault_file_id || d.drive_file_id)) {
+  const { data: d } = await db.from('mjengo_documents').select('file_path, file_name, vault_file_id, drive_file_id, form_id').eq('id', docId).maybeSingle();
+  if (d && !d.file_path && (d.vault_file_id || d.drive_file_id || d.form_id)) {
     // A file kept in Files or Google Drive: open it from where it lives.
     const r = await documentPreview(docId);
     if (!r.ok) throw new Error(r.error);
@@ -632,7 +634,7 @@ export async function getOverview(): Promise<Overview> {
     db.from('mjengo_grants').select('id, title, status, amount, currency, deadline, created_by, visibility, hidden_fields'),
     db.from('mjengo_opportunities').select('id, title, status, deadline, created_by, visibility, hidden_fields'),
     db.from('mjengo_projects').select('id, name, status, budget, spent, end_date, created_by, visibility, hidden_fields'),
-    db.from('mjengo_documents').select('id, name, entity_type, entity_id, required, file_path, vault_file_id, drive_file_id, due_date'),
+    db.from('mjengo_documents').select('id, name, entity_type, entity_id, required, file_path, vault_file_id, drive_file_id, form_id, due_date'),
     db.from('mjengo_todos').select('id, title, status, due_date, assignee_ids'),
     isSuperAdminEmail(actor.email),
     db.from('mjengo_entity_access').select('entity_type, entity_id').eq('user_id', actor.id),
@@ -655,8 +657,8 @@ export async function getOverview(): Promise<Overview> {
   const G = (grantsV ?? []) as { id: string; title: string; status: string; amount: number | null; currency: string; deadline: string | null }[];
   const O = (oppsV ?? []) as { id: string; title: string; status: string; deadline: string | null }[];
   const P = (projectsV ?? []) as { id: string; name: string; status: string; budget: number | null; spent: number | null; end_date: string | null }[];
-  const D = (docs ?? []) as { id: string; name: string; entity_type: Kind; entity_id: string; required: boolean; file_path: string | null; vault_file_id: string | null; drive_file_id: string | null; due_date: string | null }[];
-  const hasFile = (d: { file_path: string | null; vault_file_id: string | null; drive_file_id: string | null }) => !!(d.file_path || d.vault_file_id || d.drive_file_id);
+  const D = (docs ?? []) as { id: string; name: string; entity_type: Kind; entity_id: string; required: boolean; file_path: string | null; vault_file_id: string | null; drive_file_id: string | null; form_id: string | null; due_date: string | null }[];
+  const hasFile = (d: { file_path: string | null; vault_file_id: string | null; drive_file_id: string | null; form_id: string | null }) => !!(d.file_path || d.vault_file_id || d.drive_file_id || d.form_id);
   const T = (todos ?? []) as { id: string; title: string; status: string; due_date: string | null; assignee_ids: string[] }[];
 
   const group = <X extends { status: string }>(rows: X[], amount?: (r: X) => number) => {

@@ -327,8 +327,8 @@ function ContactShareDialog({ contact, onClose }: { contact: ContactRow | null; 
 				{!view ? <div className="flex justify-center p-8"><Loader2 className="h-5 w-5 animate-spin text-serene-neutral-400" /></div> : (
 					<div className="space-y-4">
 						<label className="flex items-center justify-between gap-4 rounded-xl bg-serene-neutral-50 p-3 text-sm">
-							<span><span className="font-medium">Everyone on the team can see this contact</span><span className="block text-xs text-serene-neutral-500">{view.visibility === "team" ? "Switch off to keep it to the people below." : "Switch on to put it in the shared contact book."}</span></span>
-							<Switch checked={view.visibility === "team"} disabled={busy || !view.canManage} onCheckedChange={(on) => run(() => unwrap(raw.setContactVisibility(contact!.id, on ? "team" : "private")))} aria-label="Visible to the whole team" />
+							<span><span className="font-medium">{view.visibility === "team" ? "Shared with the whole team" : "Private"}</span><span className="block text-xs text-serene-neutral-500">{view.visibility === "team" ? "Every teammate can see this contact. Turn this off to keep it to the people you add below." : "Only you and the people you add below can see this contact. Turn this on to put it in the shared contact book."}</span></span>
+							<Switch checked={view.visibility === "team"} disabled={busy || !view.canManage} onCheckedChange={(on) => run(() => unwrap(raw.setContactVisibility(contact!.id, on ? "team" : "private")))} aria-label="Share with the whole team" />
 						</label>
 						{view.visibility === "private" && (
 							<>

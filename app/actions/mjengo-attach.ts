@@ -6,6 +6,7 @@ import { logAudit } from '@/lib/access/audit';
 import { requireAdminActor, type Actor } from '@/lib/access/super-admin';
 import { atLeast, levelFor, loadIndex, oversightFor } from '@/lib/vault/access';
 import { driveConnection, driveToken } from '@/lib/google-drive';
+import { createForm } from '@/app/actions/mjengo-forms';
 import { fileInfo, searchFiles as driveSearch, type DriveFileHit } from '@/lib/google-drive-search';
 
 type Kind = 'grant' | 'opportunity' | 'project' | 'fellowship';
@@ -48,6 +49,16 @@ async function attachVaultFile_(kind: Kind, entityId: string, fileId: string, do
   const id = await place(kind, entityId, docId, { vault_file_id: fileId, file_name: f.name, file_size: f.size, mime_type: f.mime }, f.name, actor.id);
   await audit(actor, 'document.attached_from_files', kind, entityId, f.name);
   return { id };
+}
+
+/** A new form made for this record. The form is its own thing: the document only points at it. */
+async function createFormFor_(kind: Kind, entityId: string, title: string, docId?: string) {
+  check(kind, entityId);
+  const actor = await requireAdminActor();
+  const formId = await createForm(title.trim().slice(0, 120) || 'Untitled form');
+  const id = await place(kind, entityId, docId, { form_id: formId, file_name: title.trim().slice(0, 120) || 'Form', mime_type: 'application/x-form' }, title.trim().slice(0, 120) || 'Form', actor.id);
+  await audit(actor, 'document.form_created', kind, entityId, title);
+  return { id, formId };
 }
 
 export interface DriveSearch { connected: boolean; available: boolean; files: DriveFileHit[]; error: string | null }
@@ -99,7 +110,7 @@ export interface DocPreview {
   /** A Google Drive file is shown through Drive's own viewer. */
   embed: string | null;
   link: string | null;
-  source: 'upload' | 'files' | 'drive';
+  source: 'upload' | 'files' | 'drive' | 'form';
 }
 
 const EXT_MIME: Record<string, string> = {
@@ -115,7 +126,7 @@ async function documentPreview_(docId: string): Promise<DocPreview> {
   if (!ID.test(docId)) throw new Error('That document could not be found.');
   const actor = await requireAdminActor();
   const db = looseAdmin();
-  const { data: d } = await db.from('mjengo_documents').select('name, file_path, file_name, file_size, mime_type, vault_file_id, drive_file_id, drive_link').eq('id', docId).maybeSingle();
+  const { data: d } = await db.from('mjengo_documents').select('name, file_path, file_name, file_size, mime_type, vault_file_id, drive_file_id, drive_link, form_id').eq('id', docId).maybeSingle();
   if (!d) throw new Error('That document could not be found.');
   const sign = async (path: string, download?: string) => {
     const { data, error } = await db.storage.from('mjengo-docs').createSignedUrl(path, 600, download ? { download } : undefined);
@@ -136,10 +147,16 @@ async function documentPreview_(docId: string): Promise<DocPreview> {
   if (d.drive_file_id) {
     return { name: d.file_name || d.name, mime: d.mime_type, size: null, url: null, downloadUrl: null, embed: `https://drive.google.com/file/d/${encodeURIComponent(d.drive_file_id)}/preview`, link: d.drive_link, source: 'drive' };
   }
+  if (d.form_id) {
+    const { data: f } = await db.from('mjengo_forms').select('id, slug, title').eq('id', d.form_id).maybeSingle();
+    if (!f) throw new Error('That form no longer exists.');
+    return { name: f.title || d.name, mime: 'application/x-form', size: null, url: null, downloadUrl: null, embed: `/f/${encodeURIComponent(f.slug)}`, link: `/dashboard/mjengo/forms/${f.id}`, source: 'form' };
+  }
   throw new Error('No file is attached yet.');
 }
 
 export const documentPreview = guard(documentPreview_);
 export const attachVaultFile = guard(attachVaultFile_);
+export const createFormForRecord = guard(createFormFor_);
 export const searchDrive = guard(searchDrive_);
 export const attachDriveFile = guard(attachDriveFile_);

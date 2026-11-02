@@ -20,6 +20,7 @@ import { clearOpportunityInbox } from "@/app/actions/mjengo-nav";
 import { deleteEntity, listAdmins, listEntities, saveEntity, type AdminLite, type EntityRow } from "@/app/actions/mjengo";
 import { cn } from "@/lib/utils";
 import { unwrap } from "@/lib/action-result";
+import { invalidate } from "@/lib/client/swr";
 import type { Verification } from "@/lib/mjengo/opportunity-types";
 import { linkPreview, type LinkPreview } from "@/app/actions/mjengo-link-preview";
 import { extractFundDetails } from "@/app/actions/mjengo-fund-extract";
@@ -262,7 +263,7 @@ export function EntityWorkspace({ kind, pageId }: { kind: Kind; pageId?: string 
 		setConfirmingDelete(false);
 		try {
 			await deleteEntity(kind, editing.id);
-			void fresh(R.documents).catch(() => undefined);
+			invalidate(R.documents.key);
 			setEditing(null);
 			if (pageId) { router.push(listHref); return; }
 			await load();
@@ -433,9 +434,9 @@ export function EntityWorkspace({ kind, pageId }: { kind: Kind; pageId?: string 
 			) : (
 				<>
 					<div className="rounded-xl border border-serene-neutral-100 p-3">
-						<p className="mb-2 text-sm font-semibold text-serene-neutral-900">Who sees this {cfg.noun}</p>
+						<p className="mb-2 text-sm font-semibold text-serene-neutral-900">Who can open this {cfg.noun}</p>
 						<div className="grid grid-cols-2 gap-2">
-							{([["team", "Whole team", "Everyone on the team can open it.", Users], ["restricted", "Only me", "Private until you add people.", Lock]] as const).map(([v, label, hint, Icon]) => {
+							{([["team", "Whole team", "Every teammate can open it.", Users], ["restricted", "Only me", "Private. You choose who else can open it.", Lock]] as const).map(([v, label, hint, Icon]) => {
 								const on = (editing.values.visibility === "restricted" ? "restricted" : "team") === v;
 								return (
 									<button key={v} type="button" aria-pressed={on} onClick={() => set("visibility", v)} className={cn("flex items-start gap-2 rounded-xl border p-3 text-left", on ? "border-sauti-teal bg-sauti-teal-light/50" : "border-serene-neutral-200 hover:bg-serene-neutral-50")}>

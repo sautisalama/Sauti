@@ -849,3 +849,34 @@ html.dark [class~="bg-amber-50/10"], html.dark [class~="bg-amber-50/20"], html.d
 html.dark [class~="bg-red-50/10"], html.dark [class~="bg-red-50/20"], html.dark [class~="bg-red-50/30"], html.dark [class~="bg-red-50/40"], html.dark [class~="bg-red-50/50"], html.dark [class~="bg-red-50/60"], html.dark [class~="bg-red-50/70"], html.dark [class~="bg-red-50/80"], html.dark [class~="bg-red-50/90"], html.dark [class~="bg-rose-50/10"], html.dark [class~="bg-rose-50/20"], html.dark [class~="bg-rose-50/30"], html.dark [class~="bg-rose-50/40"], html.dark [class~="bg-rose-50/50"], html.dark [class~="bg-rose-50/60"], html.dark [class~="bg-rose-50/70"], html.dark [class~="bg-rose-50/80"], html.dark [class~="bg-rose-50/90"] { background-color: rgb(232 92 74 / 0.14); }
 html.dark .hover\:bg-serene-neutral-50\/80:hover, html.dark .hover\:bg-serene-neutral-50\/50:hover { background-color: #1e2b30; }
 html.dark .text-serene-blue-700, html.dark .text-serene-blue-600, html.dark .text-serene-blue-500 { color: #86c4ee; }
+
+/* Saturated brand colours that merely start with e, d or f are not light surfaces: keep them as written in dark mode. */
+html.dark.dark [class~="bg-[#e0483d]" i] { background-color: #e0483d; }
+html.dark.dark [class~="bg-[#e1580e]" i] { background-color: #e1580e; }
+html.dark.dark [class~="bg-[#e8b866]" i] { background-color: #e8b866; }
+html.dark.dark [class~="bg-[#ea4335]" i] { background-color: #ea4335; }
+html.dark.dark [class~="bg-[#ebc13d]" i] { background-color: #ebc13d; }
+html.dark.dark [class~="bg-[#ef7d3c]" i] { background-color: #ef7d3c; }
+html.dark.dark [class~="bg-[#f5b017]" i] { background-color: #f5b017; }
+html.dark.dark [class~="bg-[#f8941c]" i] { background-color: #f8941c; }
+html.dark.dark [class~="bg-[#fc8e00]" i] { background-color: #fc8e00; }
+html.dark.dark [class~="bg-[#ff3d81]" i] { background-color: #ff3d81; }
+
+/* Hairlines in dark mode: every divider and light border shade reads as a quiet line, never white. */
+html.dark [class*="divide-serene-neutral"] > *,
+html.dark [class*="divide-gray"] > *,
+html.dark [class*="divide-slate"] > *,
+html.dark [class*="divide-neutral"] > *,
+html.dark [class*="divide-black"] > *,
+html.dark [class*="divide-stone"] > * { border-color: #1a252a; }
+html.dark [class*="border-serene-neutral-50"]:not(:focus):not(:focus-within),
+html.dark [class*="border-gray-50"]:not(:focus):not(:focus-within),
+html.dark [class*="border-slate-50"]:not(:focus):not(:focus-within),
+html.dark [class*="border-neutral-50"]:not(:focus):not(:focus-within),
+html.dark [class*="border-stone-"]:not(:focus):not(:focus-within),
+html.dark [class*="border-black/"]:not(:focus):not(:focus-within),
+html.dark [class*="border-serene-neutral-100/"]:not(:focus):not(:focus-within),
+html.dark [class*="border-serene-neutral-200/"]:not(:focus):not(:focus-within),
+html.dark [class*="border-gray-200/"]:not(:focus):not(:focus-within),
+html.dark [class*="border-gray-100/"]:not(:focus):not(:focus-within) { border-color: #1f2b30; }
+html.dark hr { border-color: #1f2b30; }

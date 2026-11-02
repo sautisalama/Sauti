@@ -5,6 +5,7 @@ import { ChevronLeft, ChevronRight, Download, ExternalLink, FileText, Loader2 } 
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { fmtBytes } from "./shared";
+import { FileRender, renderKindOf } from "./FileRender";
 
 /** What the window needs to show one file. `url` is shown in place; `embed` is another site's own viewer. */
 export interface PreviewSource {
@@ -17,11 +18,12 @@ export interface PreviewSource {
 	link?: string | null;
 }
 
-type Shown = "image" | "pdf" | "text" | "video" | "audio" | "embed" | "none";
+type Shown = "image" | "pdf" | "text" | "video" | "audio" | "embed" | "render" | "none";
 const shownAs = (s: PreviewSource): Shown => {
 	if (s.embed) return "embed";
 	const m = (s.mime ?? "").toLowerCase();
 	if (!s.url) return "none";
+	if (renderKindOf(s.name, s.mime)) return "render";
 	if (m.startsWith("image/") && !m.includes("svg")) return "image";
 	if (m === "application/pdf") return "pdf";
 	if (m.startsWith("video/")) return "video";
@@ -101,6 +103,8 @@ export function FilePreviewDialog({ open, onClose, load, label, onPrev, onNext, 
 					) : kind === "image" ? (
 						// eslint-disable-next-line @next/next/no-img-element
 						<img src={src.url!} alt={src.name} className="max-h-full max-w-full object-contain" />
+					) : kind === "render" ? (
+						<FileRender kind={renderKindOf(src.name, src.mime)!} url={src.url!} name={src.name} />
 					) : kind === "pdf" ? (
 						<iframe src={src.url!} title={src.name} className="h-full w-full border-0 bg-white" />
 					) : kind === "embed" ? (
@@ -114,8 +118,8 @@ export function FilePreviewDialog({ open, onClose, load, label, onPrev, onNext, 
 					) : (
 						<div className="flex max-w-sm flex-col items-center gap-3 px-6 text-center">
 							<FileText className="h-10 w-10 text-serene-neutral-400" aria-hidden />
-							<p className="text-sm font-medium text-serene-neutral-900">No preview for this kind of file</p>
-							<p className="text-xs text-serene-neutral-600">Download it to open it in its own app.</p>
+							<p className="text-sm font-medium text-serene-neutral-900">This kind of file cannot be shown here</p>
+							<p className="text-xs text-serene-neutral-600">Download it to open it in the app that made it.</p>
 							{src.downloadUrl && <Button asChild size="sm"><a href={src.downloadUrl}><Download className="mr-1.5 h-4 w-4" /> Download</a></Button>}
 						</div>
 					)}

@@ -64,10 +64,10 @@ export function EntityAccessPanel({ kind, id }: { kind: Kind; id: string }) {
 
 	return (
 		<div className="space-y-3 rounded-xl border border-serene-neutral-100 p-3">
-			<p className="flex items-center gap-2 text-sm font-semibold text-serene-neutral-900"><Lock className="h-4 w-4 text-sauti-teal" /> Who sees this</p>
+			<p className="flex items-center gap-2 text-sm font-semibold text-serene-neutral-900"><Lock className="h-4 w-4 text-sauti-teal" /> Who can open this</p>
 			<label className="flex items-center justify-between gap-3 text-sm">
-				<span>Everyone on the team can see it<span className="block text-xs text-serene-neutral-500">{view.visibility === "team" ? "Switch off to keep it to the people you add." : "Only you and the people added below."}</span></span>
-				<Switch checked={view.visibility === "team"} disabled={busy} onCheckedChange={(on) => run(() => setEntityControls(kind, id, { visibility: on ? "team" : "restricted" }))} aria-label="Visible to the whole team" />
+				<span><span className="font-medium">{view.visibility === "team" ? "Shared with the whole team" : "Private"}</span><span className="block text-xs text-serene-neutral-500">{view.visibility === "team" ? "Every teammate can open it. Turn this off to make it private and choose who else can." : "Only you and the people you add below can open it. Turn this on to share it with the whole team."}</span></span>
+				<Switch checked={view.visibility === "team"} disabled={busy} onCheckedChange={(on) => run(() => setEntityControls(kind, id, { visibility: on ? "team" : "restricted" }))} aria-label="Share with the whole team" />
 			</label>
 
 			{view.visibility === "restricted" && (
