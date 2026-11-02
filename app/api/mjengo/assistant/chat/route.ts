@@ -5,6 +5,7 @@ import { looseAdmin } from "@/lib/loose-db";
 import { decryptField, encryptField } from "@/lib/security/crypto";
 import { NO_DASH_RULE, stripDashes } from "@/lib/plain-text";
 import { readableFile, readableFolder } from "@/lib/mjengo/files-text";
+import { entityBrief } from "@/lib/mjengo/entity-brief";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -71,10 +72,12 @@ export async function POST(request: Request) {
 	// The thread (a new one is started when none is given) and its history.
 	let threadId = body.threadId ?? null;
 	let designId = body.designSystemId ?? null;
+	let about = "";
 	if (threadId) {
-		const { data: t } = await db.from("mjengo_ai_threads").select("id, design_system_id").eq("id", threadId).eq("owner_id", actor.id).maybeSingle();
+		const { data: t } = await db.from("mjengo_ai_threads").select("id, design_system_id, entity_type, entity_id").eq("id", threadId).eq("owner_id", actor.id).maybeSingle();
 		if (!t) return new Response(line({ t: "error", message: "That chat no longer exists." }), { status: 404 });
 		designId = designId ?? t.design_system_id;
+		if (t.entity_type && t.entity_id) about = await entityBrief({ id: actor.id, email: actor.email }, t.entity_type, t.entity_id).catch(() => "");
 	} else {
 		const { data: t } = await db.from("mjengo_ai_threads").insert({ owner_id: actor.id, title: text.slice(0, 60), design_system_id: designId }).select("id").single();
 		threadId = t?.id ?? null;
@@ -152,6 +155,7 @@ export async function POST(request: Request) {
 					NO_DASH_RULE,
 					brandText ? `The organisation's brand. Follow it for anything written, laid out or designed, including letterheads:\n${brandText}` : "",
 					design,
+					about ? `This chat is about one opportunity. Use what follows when answering, say when something is not in it rather than guessing, and help the person decide whether and how to apply.\n\n${about}` : "",
 				].filter(Boolean).join("\n\n");
 				const remaining = Math.max(0, FREE_TOKENS - used);
 				const maxTokens = key!.shared ? Math.max(1, remaining) : 2000;

@@ -90,6 +90,12 @@ export default function AssistantPage() {
 	useEffect(() => {
 		refresh().catch(() => { setThreads([]); toast({ title: "Could not load the assistant", variant: "destructive" }); });
 	}, [refresh, toast]);
+	// A chat linked from an opportunity opens straight away.
+	useEffect(() => {
+		const id = new URLSearchParams(window.location.search).get("thread");
+		if (id && /^[0-9a-f-]{36}$/i.test(id)) void open(id);
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, []);
 
 	// Chats that are still being answered keep updating in the list, and a finished one refreshes the open chat.
 	const anyRunning = (threads ?? []).some((t) => t.status === "running");

@@ -9,6 +9,7 @@ import { fetchPageOrPdf, pageText } from '@/lib/mjengo/safe-fetch';
 import { extractText, readableFile, textFromBytes } from '@/lib/mjengo/files-text';
 import { saveToVault, linkFileToRecord } from '@/lib/mjengo/vault-save';
 import { gatherSources } from '@/lib/mjengo/salama';
+import { funderUrl } from '@/lib/mjengo/entity-brief';
 import { askAi } from '@/lib/mjengo/ai';
 import { markdownDocx } from '@/lib/mjengo/md-docx';
 import { driveToken } from '@/lib/google-drive';
@@ -23,7 +24,8 @@ const ID = /^[0-9a-f-]{36}$/i;
 
 export interface ContextItem {
   id: string;
-  kind: 'link' | 'skill' | 'note' | 'file' | 'drive';
+  kind: 'link' | 'skill' | 'note' | 'file' | 'drive' | 'chat';
+  threadId: string | null;
   title: string;
   body: string;
   url: string | null;
@@ -36,6 +38,7 @@ export interface ContextItem {
 }
 export interface AiInfo { available: boolean; models: { id: string; label: string }[]; defaultModel: string }
 export interface Workbench { instructions: string; items: ContextItem[]; ai: AiInfo; documents: number }
+export interface ChatRef { id: string; title: string; updatedAt: string; about: boolean }
 export interface Suggestion { fileId: string; name: string; why: string; size: number; folder: string | null }
 export interface AgentResult { docId: string; fileId: string; name: string; text: string; gaps: number; usedContext: string[]; model: string }
 
@@ -62,10 +65,10 @@ function aiInfo(): AiInfo {
 
 const clip = (s: string, n: number) => s.replace(/\r/g, '').replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim().slice(0, n);
 
-type Row = { id: string; kind: ContextItem['kind'] | 'instruction'; title: string; body: string; url: string | null; vault_file_id: string | null; drive_file_id: string | null; include: boolean; created_at: string };
+type Row = { id: string; kind: ContextItem['kind'] | 'instruction'; title: string; body: string; url: string | null; vault_file_id: string | null; drive_file_id: string | null; thread_id: string | null; include: boolean; created_at: string };
 
 async function rows(kind: Kind, id: string): Promise<Row[]> {
-  const { data } = await looseAdmin().from('mjengo_context_items').select('id, kind, title, body, url, vault_file_id, drive_file_id, include, created_at').eq('entity_type', kind).eq('entity_id', id).order('created_at');
+  const { data } = await looseAdmin().from('mjengo_context_items').select('id, kind, title, body, url, vault_file_id, drive_file_id, thread_id, include, created_at').eq('entity_type', kind).eq('entity_id', id).order('created_at');
   return (data ?? []) as Row[];
 }
 
@@ -83,7 +86,7 @@ async function workbench_(kind: string, id: string): Promise<Workbench> {
       if (!f || !atLeast(levelFor(ix, actor.id, 'file', f.id, oversight), 'view')) return [];
       mime = f.mime; size = f.size; title = f.name;
     }
-    return [{ id: r.id, kind: r.kind as ContextItem['kind'], title, body: r.body, url: r.url, vaultFileId: r.vault_file_id, driveFileId: r.drive_file_id, include: r.include, mime, size, at: r.created_at }];
+    return [{ id: r.id, kind: r.kind as ContextItem['kind'], title, body: r.body, url: r.url, vaultFileId: r.vault_file_id, driveFileId: r.drive_file_id, threadId: r.thread_id, include: r.include, mime, size, at: r.created_at }];
   });
   const { count } = await looseAdmin().from('mjengo_documents').select('id', { count: 'exact', head: true }).eq('entity_type', k).eq('entity_id', id);
   return { instructions: all.find((r) => r.kind === 'instruction')?.body ?? '', items, ai: aiInfo(), documents: count ?? 0 };
@@ -102,6 +105,8 @@ export const saveInstructions = guard(saveInstructions_);
 
 export type AddInput =
   | { type: 'link'; url: string }
+  | { type: 'github'; url: string }
+  | { type: 'chat'; threadId: string }
   | { type: 'skill'; title?: string; body: string }
   | { type: 'note'; title?: string; body: string }
   | { type: 'file'; fileId: string }
@@ -127,6 +132,34 @@ async function add_(kind: string, id: string, input: AddInput): Promise<void> {
       }
     } catch { /* the link is kept even when the page could not be read; the agent is told so */ }
     await db.from('mjengo_context_items').insert({ ...base, kind: 'link', title, body, url: raw });
+  } else if (input.type === 'github') {
+    const m = /^https?:\/\/(?:www\.)?github\.com\/([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+?)(?:\.git)?(?:[/?#].*)?$/i.exec(input.url.trim());
+    if (!m) throw new Error('Paste the address of a GitHub repository, for example https://github.com/owner/project');
+    const [, owner, repo] = m;
+    const gh = async (path: string, accept = 'application/vnd.github+json') => fetch(`https://api.github.com/repos/${owner}/${repo}${path}`, { headers: { Accept: accept, 'User-Agent': 'sauti-salama', ...(process.env.GITHUB_TOKEN ? { Authorization: `Bearer ${process.env.GITHUB_TOKEN}` } : {}) }, signal: AbortSignal.timeout(12_000) });
+    const meta = await gh('').catch(() => null);
+    if (!meta || meta.status === 404) throw new Error('That repository could not be found. Only public repositories can be read.');
+    if (!meta.ok) throw new Error('GitHub did not answer. Try again in a moment.');
+    const info = (await meta.json()) as { full_name?: string; description?: string | null; homepage?: string | null; language?: string | null; topics?: string[]; stargazers_count?: number; html_url?: string; pushed_at?: string };
+    const [langs, readme] = await Promise.all([
+      gh('/languages').then((r) => (r.ok ? (r.json() as Promise<Record<string, number>>) : {})).catch(() => ({} as Record<string, number>)),
+      gh('/readme', 'application/vnd.github.raw+json').then((r) => (r.ok ? r.text() : '')).catch(() => ''),
+    ]);
+    const body = clip([
+      info.description ? `Description: ${info.description}` : '',
+      info.homepage ? `Website: ${info.homepage}` : '',
+      Object.keys(langs).length ? `Languages: ${Object.keys(langs).slice(0, 6).join(', ')}` : info.language ? `Language: ${info.language}` : '',
+      info.topics?.length ? `Topics: ${info.topics.join(', ')}` : '',
+      info.pushed_at ? `Last updated: ${info.pushed_at.slice(0, 10)}` : '',
+      readme ? `\nREADME:\n${readme}` : '',
+    ].filter(Boolean).join('\n'), 9000);
+    await db.from('mjengo_context_items').insert({ ...base, kind: 'link', title: `GitHub: ${info.full_name ?? `${owner}/${repo}`}`, body, url: info.html_url ?? `https://github.com/${owner}/${repo}` });
+  } else if (input.type === 'chat') {
+    if (!ID.test(input.threadId)) throw new Error('That chat could not be found.');
+    const { data: t } = await db.from('mjengo_ai_threads').select('id, title').eq('id', input.threadId).eq('owner_id', actor.id).maybeSingle();
+    if (!t) throw new Error('That chat could not be found.');
+    const { data: have } = await db.from('mjengo_context_items').select('id').eq('entity_type', k).eq('entity_id', id).eq('thread_id', t.id).maybeSingle();
+    if (!have) await db.from('mjengo_context_items').insert({ ...base, kind: 'chat', title: String(t.title ?? 'AI chat').slice(0, 120), thread_id: t.id });
   } else if (input.type === 'skill' || input.type === 'note') {
     const body = clip(input.body, 6000);
     if (body.length < 2) throw new Error(input.type === 'skill' ? 'Write the skill, for example "Google Tag Manager and Microsoft Clarity".' : 'Write something for the agent to know.');
@@ -155,6 +188,25 @@ async function add_(kind: string, id: string, input: AddInput): Promise<void> {
   await logAudit({ actorId: actor.id, actorEmail: actor.email, action: 'mjengo.context.added', targetType: k, targetId: id, targetLabel: input.type });
 }
 export const addContext = guard(add_);
+
+/** The person's AI chats, newest first, with the ones already about this opportunity marked. */
+async function chats_(kind: string, id: string): Promise<ChatRef[]> {
+  const { actor, kind: k } = await open(kind, id);
+  const { data } = await looseAdmin().from('mjengo_ai_threads').select('id, title, updated_at, entity_type, entity_id').eq('owner_id', actor.id).order('updated_at', { ascending: false }).limit(30);
+  return ((data ?? []) as { id: string; title: string; updated_at: string; entity_type: string | null; entity_id: string | null }[]).map((t) => ({ id: t.id, title: t.title, updatedAt: t.updated_at, about: t.entity_type === k && t.entity_id === id }));
+}
+export const myChats = guard(chats_);
+
+/** Start an AI chat about this opportunity. It shows in the Assistant's chats and is linked into the context. */
+async function startChat_(kind: string, id: string): Promise<{ threadId: string }> {
+  const { actor, entity, kind: k } = await open(kind, id, 'write');
+  const db = looseAdmin();
+  const { data: t, error } = await db.from('mjengo_ai_threads').insert({ owner_id: actor.id, title: `About: ${entity.title}`.slice(0, 80), entity_type: k, entity_id: id }).select('id').single();
+  if (error || !t) throw new Error('Could not start the chat.');
+  await db.from('mjengo_context_items').insert({ entity_type: k, entity_id: id, created_by: actor.id, kind: 'chat', title: `About: ${entity.title}`.slice(0, 120), thread_id: t.id });
+  return { threadId: t.id as string };
+}
+export const startChat = guard(startChat_);
 
 async function update_(kind: string, id: string, itemId: string, patch: { include?: boolean; title?: string; body?: string }): Promise<void> {
   const { kind: k } = await open(kind, id, 'write');
@@ -276,10 +328,12 @@ async function run_(kind: string, id: string, input: { task: 'cover_letter' | 'c
   // 1. The opportunity itself and the page it came from.
   take('The opportunity (what the team recorded)', entityText(entity), 3500);
   const src = String(entity.row[k === 'grant' ? 'link' : 'source_url'] ?? '');
-  if (/^https?:\/\//i.test(src)) {
+  const funder = funderUrl(entity.row, src);
+  const pages = [...new Set([funder, src].filter((u) => /^https?:\/\//i.test(u)))];
+  for (const [n, u] of pages.entries()) {
     try {
-      const p = await fetchPageOrPdf(src);
-      take('The opportunity page', p.kind === 'html' ? pageText(p.html) : await textFromBytes(p.bytes, 'call.pdf', 'application/pdf', 9000), 7000);
+      const p = await fetchPageOrPdf(u);
+      take(n === 0 && funder ? "The funder's own page for this call" : 'The page the opportunity was shared from', p.kind === 'html' ? pageText(p.html) : await textFromBytes(p.bytes, 'call.pdf', 'application/pdf', 9000), n === 0 ? 8000 : 3500);
     } catch { /* the record text is still there */ }
   }
 
@@ -292,6 +346,12 @@ async function run_(kind: string, id: string, input: { task: 'cover_letter' | 'c
       const f = ix.files.get(r.vault_file_id);
       if (!f || !atLeast(levelFor(ix, actor.id, 'file', f.id, oversight), 'view')) continue;
       take(`File: ${f.name}`, await extractText(f.storage_path, f.name, f.mime, 9000).catch(() => ''), 7000);
+    } else if (r.kind === 'chat' && r.thread_id) {
+      const { data: th } = await db.from('mjengo_ai_threads').select('id').eq('id', r.thread_id).eq('owner_id', actor.id).maybeSingle();
+      if (!th) continue;
+      const { data: ms } = await db.from('mjengo_ai_messages').select('role, content').eq('thread_id', r.thread_id).order('created_at', { ascending: false }).limit(24);
+      const text = ((ms ?? []) as { role: string; content: string }[]).reverse().filter((m) => m.content).map((m) => `${m.role === 'user' ? 'Person' : 'AI'}: ${m.content}`).join('\n\n');
+      take(`AI chat: ${r.title}`, text, 6000);
     } else if (r.kind === 'skill') take(`Skills: ${r.title}`, r.body, 3000);
     else if (r.kind === 'note') take(`Note: ${r.title}`, r.body, 4000);
     else if (r.kind === 'link') take(`Link: ${r.title} (${r.url})`, r.body || 'The page could not be read; only its address is known.', 5000);

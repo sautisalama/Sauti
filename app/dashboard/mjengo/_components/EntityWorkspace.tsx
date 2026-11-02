@@ -592,7 +592,7 @@ export function EntityWorkspace({ kind, pageId }: { kind: Kind; pageId?: string 
 								<div role="tabpanel" id="panel-files" aria-labelledby="tab-files" hidden={showTab("files")} className="space-y-4">
 									{seen.has("files") && (kind === "opportunity" && eid ? (
 										<>
-											<ApplicationStudio kind="opportunity" id={eid} title={title} sourceUrl={/^https?:\/\//i.test(String(v[urlKey] ?? "")) ? String(v[urlKey]) : null} onChange={load} />
+											<ApplicationStudio kind="opportunity" id={eid} title={title} sourceUrl={((): string | null => { const ver = (v.verification ?? null) as Verification | null; const ok = (u?: string | null) => (u && /^https?:\/\//i.test(u.trim()) ? u.trim() : null); return ok(ver?.finalUrl) ?? ok(ver?.applyUrl) ?? ok(String(v[urlKey] ?? "")); })()} onChange={load} />
 											{agentEl}
 										</>
 									) : <>{docsEl}{similarEl}</>)}

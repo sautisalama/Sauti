@@ -9,7 +9,7 @@ const admin = acc("admin");
 const stamp = Date.now();
 const live = !!process.env.OPENROUTER_API_KEY && process.env.E2E_NO_AI !== "1";
 const { data: opp } = await db.from("mjengo_opportunities").insert({
-	title: "E2E Digital Technology Advisor", organisation: "E2E Light Foundation", status: "new", created_by: admin.id, visibility: "team",
+	title: "E2E Digital Technology Advisor", organisation: "E2E Light Foundation", status: "new", created_by: admin.id, visibility: "team", verification: { status: "done", at: new Date().toISOString(), trust: "verified", trustReason: "E2E", sourceKind: "official", sourceHost: null, account: null, organisation: null, website: null, applyUrl: null, title: null, category: null, deadline: null, deadlineQuote: null, eligibility: null, deliverables: null, email: null, checks: [], foundBy: null, finalUrl: "https://example.org/funder-call" },
 	description: "Lead the governance of digital platforms: websites, analytics, accessibility and GDPR. Excellent English and German required. Experience with CMS platforms and external vendors.",
 }).select("id").single();
 
@@ -23,6 +23,17 @@ const { data: tpl } = await db.from("vault_files").insert({ folder_id: null, nam
 
 // Start with nothing hidden in the side panel.
 { const { data: pr } = await db.from("profiles").select("settings").eq("id", admin.id).single(); const st = { ...(pr?.settings ?? {}) }; delete st.mjengo_panel_hidden; await db.from("profiles").update({ settings: st }).eq("id", admin.id); }
+async function chatCheck(page) {
+	await page.getByRole("tab", { name: "Application" }).click();
+	await page.getByRole("button", { name: "Add", exact: true }).click();
+	await page.getByRole("button", { name: "AI chat", exact: true }).click();
+	await page.getByRole("button", { name: /Start a chat about this/ }).click();
+	await page.waitForURL(/assistant\?thread=/, { timeout: 60000 });
+	const { data: th } = await db.from("mjengo_ai_threads").select("id, entity_id").eq("entity_id", opp.id).maybeSingle();
+	check("an AI chat about the opportunity is started in the Assistant", !!th && page.url().includes(th.id));
+	const { data: item } = await db.from("mjengo_context_items").select("id").eq("entity_id", opp.id).eq("kind", "chat").maybeSingle();
+	check("it is linked into the context", !!item);
+}
 const browser = await launch();
 let madeFile = null;
 try {
@@ -91,6 +102,14 @@ try {
 		const ins = await poll(async () => (await db.from("mjengo_context_items").select("body").eq("entity_id", opp.id).eq("kind", "instruction").maybeSingle()).data?.body, { timeout: 30000, interval: 1000 });
 		check("instructions save by themselves", !!ins && /first person/.test(ins));
 
+		check("the funder's own page is the funder's call", (await page.getByText("example.org", { exact: false }).count()) >= 1);
+		await page.getByRole("button", { name: "Add", exact: true }).click();
+		await page.getByRole("button", { name: "GitHub", exact: true }).click();
+		await page.getByLabel("GitHub repository").fill("https://github.com/vercel/swr");
+		await page.getByRole("button", { name: "Add repository" }).click();
+		await page.getByRole("button", { name: "Open GitHub: vercel/swr" }).waitFor({ timeout: 60000 });
+		check("a GitHub repository is read and added as context", true);
+
 		// Suggestions from Files, one at a time.
 		await page.getByText("Found in your files").waitFor({ timeout: 60000 });
 		check("the CV in Files is suggested", (await page.getByText(`E2E CV ${stamp}.txt`).count()) >= 1);
@@ -104,7 +123,7 @@ try {
 
 		await page.screenshot({ path: path.join(OUT, "app_application_light.png"), fullPage: true });
 
-		if (!live) { console.log("(no AI key: the writing step is skipped)"); await page.close(); continue; }
+		if (!live) { console.log("(no AI key: the writing step is skipped)"); await chatCheck(page); await page.close(); continue; }
 		// Template then write.
 		await page.getByRole("button", { name: /Choose a template from Files/ }).click();
 		await page.getByRole("dialog").getByText(`E2E letter template ${stamp}.txt`).first().click();
@@ -123,10 +142,12 @@ try {
 		await page.getByRole("tab", { name: "To-dos and reminders" }).click();
 		await page.getByText("Similar", { exact: true }).first().waitFor({ timeout: 60000 });
 		check("Similar sits with the to-dos and reminders", true);
+		await chatCheck(page);
 		await page.close();
 	}
 } finally {
 	await db.from("mjengo_context_items").delete().eq("entity_id", opp.id);
+	await db.from("mjengo_ai_threads").delete().eq("entity_id", opp.id);
 	await db.from("mjengo_documents").delete().eq("entity_id", opp.id);
 	await db.from("mjengo_links").delete().eq("entity_id", opp.id);
 	await db.from("mjengo_opportunities").delete().eq("id", opp.id);

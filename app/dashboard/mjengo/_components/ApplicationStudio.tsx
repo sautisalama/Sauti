@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { BookOpen, Check, ChevronDown, ExternalLink, FileText, Link2, Loader2, Paperclip, PenLine, Plus, Sparkles, StickyNote, Trash2, Upload, Wand2, Wrench, X } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { BookOpen, Check, ChevronDown, ExternalLink, Github, MessageCircle, FileText, Link2, Loader2, Paperclip, PenLine, Plus, Sparkles, StickyNote, Trash2, Upload, Wand2, Wrench, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -12,8 +13,8 @@ import { unwrap } from "@/lib/action-result";
 import { cn } from "@/lib/utils";
 import { putToSignedUrl } from "@/lib/client/upload";
 import {
-	addContext, contextFileSource, getWorkbench, removeContext, runAgent, saveInstructions, suggestContext, updateContext,
-	type AgentResult, type ContextItem, type Suggestion, type Workbench,
+	addContext, contextFileSource, getWorkbench, myChats, removeContext, runAgent, saveInstructions, startChat, suggestContext, updateContext,
+	type AgentResult, type ChatRef, type ContextItem, type Suggestion, type Workbench,
 } from "@/app/actions/mjengo-workbench";
 import { searchDrive, type DriveSearch } from "@/app/actions/mjengo-attach";
 import { prepareUpload, registerUpload } from "../vault/api";
@@ -26,10 +27,10 @@ import { FilePreviewDialog, PreviewBody, type PreviewSource } from "./FilePrevie
 type Task = "cover_letter" | "cv" | "custom";
 type TemplateChoice = undefined | null | { id: string; name: string };
 
-const ICON: Record<ContextItem["kind"], typeof FileText> = { link: Link2, skill: Wrench, note: StickyNote, file: FileText, drive: FileText };
-const KIND_LABEL: Record<ContextItem["kind"], string> = { link: "Link", skill: "Skills", note: "Note", file: "File", drive: "Google Drive" };
+const ICON: Record<ContextItem["kind"], typeof FileText> = { link: Link2, skill: Wrench, note: StickyNote, file: FileText, drive: FileText, chat: MessageCircle };
+const KIND_LABEL: Record<ContextItem["kind"], string> = { link: "Link", skill: "Skills", note: "Note", file: "File", drive: "Google Drive", chat: "AI chat" };
 
-const snippet = (i: ContextItem) => (i.kind === "file" || i.kind === "drive" ? [i.mime?.split("/").pop()?.toUpperCase(), i.size ? fmtBytes(i.size) : null].filter(Boolean).join(" · ") || "Read in full when the agent works" : i.body.replace(/\s+/g, " ").slice(0, 150) || (i.kind === "link" ? "The page could not be read, so only the address is kept." : ""));
+const snippet = (i: ContextItem) => (i.kind === "chat" ? "Read when the agent writes; opens in the Assistant" : i.kind === "file" || i.kind === "drive" ? [i.mime?.split("/").pop()?.toUpperCase(), i.size ? fmtBytes(i.size) : null].filter(Boolean).join(" · ") || "Read in full when the agent works" : i.body.replace(/\s+/g, " ").slice(0, 150) || (i.kind === "link" ? "The page could not be read, so only the address is kept." : ""));
 
 /**
  * The application workspace for an opportunity. Like a project: what the agent should know (instructions, links,
@@ -45,6 +46,7 @@ export function ApplicationStudio({ kind, id, title, sourceUrl, onChange }: { ki
 	const [instr, setInstr] = useState("");
 	const instrSaved = useRef("");
 	const [adding, setAdding] = useState(false);
+	const router = useRouter();
 	const [open, setOpen] = useState(false);
 	const [docsOpen, setDocsOpen] = useState(false);
 	const [detail, setDetail] = useState<ContextItem | null>(null);
@@ -99,6 +101,13 @@ export function ApplicationStudio({ kind, id, title, sourceUrl, onChange }: { ki
 	const inContext = new Set(wb.items.map((i) => i.vaultFileId).filter(Boolean));
 	const shown = (suggest ?? []).filter((s) => !hidden.has(s.fileId) && !inContext.has(s.fileId));
 
+	const chatAbout = async () => {
+		const have = wb.items.find((i) => i.kind === "chat" && i.threadId);
+		try {
+			const threadId = have?.threadId ?? (await unwrap(startChat(kind, id))).threadId;
+			router.push(`/dashboard/mjengo/assistant?thread=${threadId}`);
+		} catch (e) { fail("Could not open the chat", e); }
+	};
 	const host = (u: string) => { try { return new URL(u).host.replace(/^www\./, ""); } catch { return u; } };
 
 	const contextEl = (
@@ -135,7 +144,7 @@ export function ApplicationStudio({ kind, id, title, sourceUrl, onChange }: { ki
 								return (
 									<li key={i.id} className={cn("flex items-center gap-3 px-3 py-2.5", !i.include && "opacity-60")}>
 										<Icon className="h-4 w-4 shrink-0 text-sauti-teal" aria-hidden />
-										<button type="button" onClick={() => setDetail(i)} className="min-w-0 flex-1 text-left" aria-label={`Open ${i.title}`}>
+										<button type="button" onClick={() => (i.kind === "chat" && i.threadId ? router.push(`/dashboard/mjengo/assistant?thread=${i.threadId}`) : setDetail(i))} className="min-w-0 flex-1 text-left" aria-label={`Open ${i.title}`}>
 											<span className="block truncate text-sm font-medium text-serene-neutral-900">{i.title}</span>
 											<span className="block truncate text-xs text-serene-neutral-500">{KIND_LABEL[i.kind]} · {snippet(i)}</span>
 										</button>
@@ -178,7 +187,7 @@ export function ApplicationStudio({ kind, id, title, sourceUrl, onChange }: { ki
 
 	return (
 		<div>
-			<AgentPanel kind={kind} id={id} title={title} wb={wb} includedCount={included} onDone={() => { void reload(); onChange?.(); }} contextEl={contextEl} />
+			<AgentPanel kind={kind} id={id} title={title} wb={wb} includedCount={included} onDone={() => { void reload(); onChange?.(); }} onChat={chatAbout} contextEl={contextEl} />
 			<ContextDetail item={detail} onClose={() => setDetail(null)} onSave={async (item, body, itemTitle) => { await unwrap(updateContext(kind, id, item.id, { body, title: itemTitle })); await reload(); }} />
 		</div>
 	);
@@ -186,7 +195,7 @@ export function ApplicationStudio({ kind, id, title, sourceUrl, onChange }: { ki
 
 /* ------------------------------------------------------------------ the agent */
 
-function AgentPanel({ kind, id, title, wb, includedCount, onDone, contextEl }: { kind: "grant" | "opportunity"; id: string; title: string; wb: Workbench; includedCount: number; onDone?: () => void; contextEl: React.ReactNode }) {
+function AgentPanel({ kind, id, title, wb, includedCount, onDone, onChat, contextEl }: { kind: "grant" | "opportunity"; id: string; title: string; wb: Workbench; includedCount: number; onDone?: () => void; onChat: () => void; contextEl: React.ReactNode }) {
 	const { toast } = useToast();
 	const [task, setTask] = useState<Task | null>(null);
 	const [label, setLabel] = useState("");
@@ -238,6 +247,7 @@ function AgentPanel({ kind, id, title, wb, includedCount, onDone, contextEl }: {
 					<h2 className="text-sm font-bold text-sauti-dark">Application agent</h2>
 					<p className="truncate text-xs text-serene-neutral-600">Writes from this opportunity, your context and your files. Nothing is invented; gaps are marked.</p>
 				</div>
+				<Button size="sm" variant="ghost" className="h-8 shrink-0 gap-1.5 text-sauti-teal" onClick={onChat}><MessageCircle className="h-4 w-4" /> Chat about this</Button>
 				{wb.ai.available && (
 					<Select value={model} onValueChange={setModel}>
 						<SelectTrigger aria-label="AI model" className="h-8 w-auto gap-2 rounded-full px-3 text-xs"><SelectValue /></SelectTrigger>
@@ -335,7 +345,14 @@ function AddContextPanel({ onClose, kind, id, existing, onAdded }: { onClose: ()
 	const [picking, setPicking] = useState(false);
 	const [busy, setBusy] = useState<string | null>(null);
 	const file = useRef<HTMLInputElement>(null);
+	const router = useRouter();
+	const [repo, setRepo] = useState("");
+	const [chats, setChats] = useState<ChatRef[] | null>(null);
 
+	useEffect(() => {
+		if (tab !== "chat" || chats) return;
+		unwrap(myChats(kind, id)).then(setChats).catch(() => setChats([]));
+	}, [tab, chats, kind, id]);
 	useEffect(() => {
 		if (tab !== "drive" || drive) return;
 		unwrap(searchDrive("")).then(setDrive).catch(() => setDrive({ connected: false, available: true, files: [], error: "Could not search Google Drive." }));
@@ -354,7 +371,7 @@ function AddContextPanel({ onClose, kind, id, existing, onAdded }: { onClose: ()
 		await unwrap(addContext(kind, id, { type: "file", fileId: made.id }));
 	}, f.name);
 
-	const TYPES: [string, string, typeof FileText][] = [["link", "Link", Link2], ["skill", "Skills", Wrench], ["note", "Note", StickyNote], ["files", "From Files", FileText], ["drive", "Google Drive", FileText], ["upload", "Upload", Upload]];
+	const TYPES: [string, string, typeof FileText][] = [["link", "Link", Link2], ["skill", "Skills", Wrench], ["note", "Note", StickyNote], ["files", "From Files", FileText], ["drive", "Google Drive", FileText], ["upload", "Upload", Upload], ["github", "GitHub", Github], ["chat", "AI chat", MessageCircle]];
 
 	return (
 		<div className="rounded-xl border border-sauti-teal/30 bg-serene-neutral-50 p-4" role="group" aria-label="Add context">
@@ -410,6 +427,24 @@ function AddContextPanel({ onClose, kind, id, existing, onAdded }: { onClose: ()
 						<Input value={driveLink} onChange={(e) => setDriveLink(e.target.value)} placeholder="Or paste a Google Drive link" aria-label="Google Drive link" />
 						<Button type="submit" size="sm" variant="outline" disabled={!driveLink.trim() || busy === "dlink"}>Add link</Button>
 					</form>
+				</div>
+			)}
+			{tab === "github" && (
+				<div className="mt-3 space-y-2">
+					<Input value={repo} onChange={(e) => setRepo(e.target.value)} placeholder="https://github.com/owner/project" aria-label="GitHub repository" autoFocus />
+				<p className="text-xs text-serene-neutral-600">Its description, languages and README are read now and kept as text for the agent. Public repositories only.</p>
+					<Button size="sm" disabled={!/github\.com\/[^/]+\/[^/]+/i.test(repo.trim()) || busy === "github"} onClick={() => run("github", async () => { await unwrap(addContext(kind, id, { type: "github", url: repo })); }, repo)}>{busy === "github" ? <Loader2 className="h-4 w-4 animate-spin" /> : "Add repository"}</Button>
+				</div>
+			)}
+			{tab === "chat" && (
+				<div className="mt-3 space-y-2">
+					<p className="text-sm text-serene-neutral-700">An AI chat is read by the agent when it writes. Start one about this opportunity, or link one you already have.</p>
+					<Button size="sm" className="gap-1.5" disabled={busy === "newchat"} onClick={async () => { setBusy("newchat"); try { const { threadId } = await unwrap(startChat(kind, id)); await onAdded(); router.push(`/dashboard/mjengo/assistant?thread=${threadId}`); } catch (e) { toast({ title: "Could not start the chat", description: e instanceof Error ? e.message : undefined, variant: "destructive" }); setBusy(null); } }}>{busy === "newchat" ? <Loader2 className="h-4 w-4 animate-spin" /> : <MessageCircle className="h-4 w-4" />} Start a chat about this</Button>
+					{chats === null ? <p className="flex items-center gap-2 text-sm text-serene-neutral-600"><Loader2 className="h-4 w-4 animate-spin" /> Looking</p> : chats.length > 0 && (
+						<ul className="max-h-48 divide-y divide-serene-neutral-200 overflow-y-auto">
+							{chats.map((c) => <li key={c.id} className="flex items-center gap-2 py-1.5"><span className="min-w-0 flex-1 truncate text-sm">{c.title}{c.about && <span className="ml-2 text-xs text-sauti-teal">about this</span>}</span><Button size="sm" variant="outline" disabled={busy === c.id} onClick={() => run(c.id, async () => { await unwrap(addContext(kind, id, { type: "chat", threadId: c.id })); }, c.title)}>Link</Button></li>)}
+						</ul>
+					)}
 				</div>
 			)}
 			{tab === "upload" && (
