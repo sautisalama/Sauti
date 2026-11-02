@@ -127,7 +127,7 @@ export default function MyCalendarPage() {
 									) : (
 										<>
 											{list.slice(0, mode === "week" ? 6 : 2).map((i) => (
-												<span key={i.id} className={cn("truncate rounded px-1.5 py-0.5 text-[11px] font-medium", chipFor(i))}>{timeOf(i.start)} {i.title}</span>
+												<span key={i.id} className={cn("truncate rounded px-1.5 py-0.5 text-[11px] font-medium", chipFor(i))}>{timeOf(i.start)} {i.title.replace("Client s", "S")}</span>
 											))}
 											{list.length > (mode === "week" ? 6 : 2) && <span className="px-1 text-[11px] text-serene-neutral-500">+{list.length - (mode === "week" ? 6 : 2)} more</span>}
 										</>
