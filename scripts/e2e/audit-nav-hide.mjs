@@ -11,10 +11,16 @@ try {
 	await page.goto(`${BASE}/dashboard/mjengo`, { waitUntil: "domcontentloaded", timeout: 120000 });
 	const menu = page.locator("aside, nav").filter({ has: page.getByRole("link", { name: "Opportunities" }) }).first();
 	await page.getByRole("link", { name: "Contacts" }).first().waitFor({ timeout: 90000 });
+	const backY = async () => (await page.getByRole("link", { name: /Back to dashboard/ }).first().boundingBox())?.y ?? -1;
+	const before = await backY();
 	await page.getByRole("link", { name: "Contacts" }).first().hover();
 	await page.getByRole("button", { name: "Hide Contacts from the menu" }).click();
 	await page.getByRole("link", { name: "Contacts" }).first().waitFor({ state: "detached", timeout: 10000 }).catch(() => {});
 	check("an item can be hidden from the menu", (await page.getByRole("link", { name: "Contacts", exact: true }).count()) === 0);
+	await page.waitForTimeout(500);
+	const after = await backY();
+	await page.screenshot({ path: "audit-out/nav_hidden.png" });
+	check("Back to dashboard stays at the bottom of the menu, in view", before > 0 && after > 0 && Math.abs(before - after) < 3 && after < 900);
 	check("Overview cannot be hidden", (await page.getByRole("button", { name: "Hide Overview from the menu" }).count()) === 0);
 	await page.getByRole("button", { name: /^Hidden \(1\)/ }).click();
 	check("hidden items are listed so they can be added back", (await page.getByRole("button", { name: "Show Contacts in the menu again" }).count()) === 1);

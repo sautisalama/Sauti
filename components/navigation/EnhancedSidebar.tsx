@@ -946,13 +946,15 @@ export function EnhancedSidebar({
 							</TooltipProvider>
 						</div>
 					) : (
-					<div className="space-y-1">
+					<div className="flex min-h-full flex-1 flex-col gap-1">
 						{/* Main Navigation */}
 						<div className="space-y-1">
 							{renderGroup(mainItems, true)}
 						</div>
 
-						{onMjengo && !isCollapsed && (navPref.order.length > 0) && (
+						{/* Reset, Hidden and Back to dashboard keep their place at the bottom, however many items are hidden. */}
+						<div className="sticky bottom-0 z-10 mt-auto bg-white shadow-[0_-8px_8px_-8px_rgba(16,24,40,0.08)]">
+						{onMjengo && !isCollapsed && (navPref.order.length > 0 || (navPref.hidden ?? []).length > 0) && (
 							<button onClick={() => saveNav({ order: [], group: {}, hidden: [] })} className="mx-5 mt-2 text-[11px] font-medium text-serene-neutral-400 underline hover:text-serene-neutral-600">Reset the menu</button>
 						)}
 
@@ -984,6 +986,7 @@ export function EnhancedSidebar({
 								{renderGroup(secondaryItems)}
 							</div>
 						)}
+						</div>
 					</div>
                     )}
 
