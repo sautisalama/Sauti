@@ -42,7 +42,7 @@ function GoogleStatus({ userId }: { userId: string }) {
 			</p>
 			{!checking && (
 				<div className="mt-2 flex gap-2">
-					{!connected ? <Button size="sm" onClick={() => void connectCalendar()}>Connect Google Calendar</Button> : !syncEnabled ? <Button size="sm" variant="outline" onClick={() => void toggleSync()}>Resume sync</Button> : null}
+					{!connected ? <Button size="sm" style={{ color: "#1a1000" }} onClick={() => void connectCalendar()}>Connect Google Calendar</Button> : !syncEnabled ? <Button size="sm" variant="outline" onClick={() => void toggleSync()}>Resume sync</Button> : null}
 				</div>
 			)}
 		</section>

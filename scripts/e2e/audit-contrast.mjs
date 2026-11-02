@@ -9,8 +9,8 @@ fs.mkdirSync(OUT, { recursive: true });
 
 const PAGES = {
 	public: ["/", "/about", "/faq", "/contact", "/signin", "/signup", "/report-abuse", "/publications", "/learn", "/programs", "/impact", "/join", "/volunteer", "/terms-conditions", "/privacy-policy"],
-	survivor: ["/dashboard", "/dashboard/matches", "/dashboard/reports", "/dashboard/chat", "/dashboard/resources", "/dashboard/learning", "/dashboard/profile", "/dashboard/about", "/dashboard/activity", "/dashboard/blogs"],
-	professional: ["/dashboard", "/dashboard/cases", "/dashboard/services", "/dashboard/chat", "/dashboard/resources", "/dashboard/learning", "/dashboard/profile", "/dashboard/profile?section=calendar", "/dashboard/blogs"],
+	survivor: ["/dashboard", "/dashboard/matches", "/dashboard/reports", "/dashboard/chat", "/dashboard/resources", "/dashboard/learning", "/dashboard/profile", "/dashboard/about", "/dashboard/activity", "/dashboard/calendar", "/dashboard/blogs"],
+	professional: ["/dashboard", "/dashboard/cases", "/dashboard/services", "/dashboard/chat", "/dashboard/resources", "/dashboard/learning", "/dashboard/profile", "/dashboard/calendar", "/dashboard/profile?section=calendar", "/dashboard/blogs"],
 	admin: ["/dashboard/admin", "/dashboard/admin/matching", "/dashboard/admin/professionals", "/dashboard/admin/users", "/dashboard/admin/services", "/dashboard/admin/review", "/dashboard/admin/publications", "/dashboard/mjengo", "/dashboard/mjengo/opportunities", "/dashboard/mjengo/mail", "/dashboard/mjengo/forms", "/dashboard/mjengo/todos", "/dashboard/mjengo/calendar", "/dashboard/mjengo/vault", "/dashboard/mjengo/contacts", "/dashboard/mjengo/design", "/dashboard/mjengo/design/editor"],
 };
 
@@ -62,7 +62,7 @@ for (const who of want) {
 	const page = await newPage(browser, { viewport: { width: 1280, height: 860 } });
 	if (who !== "public") await signIn(page, who);
 	await page.addInitScript(() => localStorage.setItem("ss_theme", "dark"));
-	for (const p of PAGES[who]) {
+	for (const p of PAGES[who].filter((x) => !process.env.ONLY || x.endsWith(process.env.ONLY))) {
 		try {
 			await page.goto(BASE + p, { waitUntil: "domcontentloaded", timeout: 120000 });
 			await page.waitForFunction(() => !/(^|\n)(Loading|Opening your mail|Loading dashboard\.\.\.)(\n|$)/.test(document.body.innerText), null, { timeout: 60000 }).catch(() => {});
