@@ -6,7 +6,7 @@ import { MjengoLoader } from "./MjengoLoader";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AlertCircle, ArrowLeft, BadgeCheck, CheckSquare, Globe, Maximize2, EyeOff, Lock, Users, ExternalLink, FileWarning, Kanban, List, Loader2, Plus, Search, Trash2 } from "lucide-react";
+import { AlertCircle, ArrowLeft, BadgeCheck, Check, CheckSquare, Globe, Maximize2, EyeOff, Lock, Users, ExternalLink, FileWarning, Kanban, List, Loader2, Pencil, Plus, Search, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -25,6 +25,7 @@ import type { Verification } from "@/lib/mjengo/opportunity-types";
 import { linkPreview, type LinkPreview } from "@/app/actions/mjengo-link-preview";
 import { extractFundDetails } from "@/app/actions/mjengo-fund-extract";
 import { DocumentsPanel } from "./DocumentsPanel";
+import { ApplicationStudio } from "./ApplicationStudio";
 import { OpportunityVerifyCard } from "./OpportunityVerify";
 import { GrantCharts, type GrantLite } from "./GrantCharts";
 import { Avatars, DeadlineChip, STATUSES, StatusPill, money, type Kind } from "./shared";
@@ -306,6 +307,7 @@ export function EntityWorkspace({ kind, pageId }: { kind: Kind; pageId?: string 
 	// Server actions run one at a time in the browser, so a tab that is not on screen waits until it is first opened.
 	const [seen, setSeen] = useState<Set<string>>(() => new Set(["overview"]));
 	useEffect(() => { setSeen((cur) => (cur.has(tab) ? cur : new Set(cur).add(tab))); }, [tab]);
+	const [glanceOpen, setGlanceOpen] = useState<Set<string>>(new Set());
 	const [autoState, setAutoState] = useState<"idle" | "saving" | "saved" | "error">("idle");
 	const lastSaved = useRef("");
 	const payloadOf = useCallback((v: Record<string, any>) => {
@@ -499,7 +501,7 @@ export function EntityWorkspace({ kind, pageId }: { kind: Kind; pageId?: string 
 		const tabs = [
 			{ id: "overview", label: "Overview", badge: 0 },
 			{ id: "work", label: "To-dos and reminders", badge: row?.openTodos ?? 0 },
-			{ id: "files", label: "Pages and copies", badge: missing },
+			{ id: "files", label: kind === "opportunity" ? "Application" : "Pages and copies", badge: missing },
 			{ id: "activity", label: "Activity", badge: 0 },
 			{ id: "settings", label: "Sharing", badge: 0 },
 		] as const;
@@ -567,11 +569,17 @@ export function EntityWorkspace({ kind, pageId }: { kind: Kind; pageId?: string 
 									{extrasEl}
 								</div>
 								<div role="tabpanel" id="panel-work" aria-labelledby="tab-work" hidden={showTab("work")} className="space-y-4">
-									{seen.has("work") && <>{tasksEl}{remindersEl}{agentEl}</>}
+									{seen.has("work") && <>{tasksEl}{remindersEl}{kind === "opportunity" ? similarEl : agentEl}</>}
 								</div>
 								<div role="tabpanel" id="panel-files" aria-labelledby="tab-files" hidden={showTab("files")} className="space-y-4">
 									<RelatedPages values={v} urlKey={urlKey} />
-									{seen.has("files") && <>{docsEl}{similarEl}</>}
+									{seen.has("files") && (kind === "opportunity" && eid ? (
+										<>
+											<ApplicationStudio kind="opportunity" id={eid} title={title} onChange={load} />
+											<DocumentsPanel kind={kind} entityId={eid} entityName={String(editing?.values[cfg.titleKey] ?? "")} onChange={load} defaultView="full" />
+											{agentEl}
+										</>
+									) : <>{docsEl}{similarEl}</>)}
 								</div>
 								<div role="tabpanel" id="panel-activity" aria-labelledby="tab-activity" hidden={showTab("activity")} className="space-y-4">
 									{seen.has("activity") && <>{timelineEl}{reportEl}</>}
@@ -593,27 +601,55 @@ export function EntityWorkspace({ kind, pageId }: { kind: Kind; pageId?: string 
 								</div>
 							</div>
 
-							<aside className="space-y-4 lg:sticky lg:top-16" aria-label="Key facts">
-								<section className={cn(card, "space-y-3")}>
-									<div className="flex items-center justify-between gap-2">
-										<h2 className="text-sm font-semibold text-serene-neutral-900">At a glance</h2>
-										<DeadlineChip date={v[dueK]} done={finished} />
-									</div>
-									{railField(dueK)}
-									{railField(ownerK)}
-									{cfg.amountKey && (
-										<div className="grid grid-cols-[1fr_92px] gap-2">
-											{railField(cfg.amountKey)}
-											{railField("currency")}
+								{(() => {
+									const has = (k: string) => v[k] != null && String(v[k]).trim() !== "";
+									const host = (u: string) => { try { return new URL(u).host.replace(/^www\./, ""); } catch { return u; } };
+									const facts = [
+										{ key: dueK, label: "Deadline", show: () => new Date(`${String(v[dueK]).slice(0, 10)}T12:00:00`).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" }) },
+										{ key: ownerK, label: "Owner", show: () => admins.find((x) => x.id === v[ownerK])?.name ?? "Assigned" },
+										...(cfg.amountKey ? [{ key: cfg.amountKey, label: "Amount", show: () => `${String(v.currency ?? "").trim()} ${Number(v[cfg.amountKey as string]).toLocaleString()}`.trim() }] : []),
+										{ key: urlKey, label: "Source link", show: () => host(String(v[urlKey])) },
+									];
+									const editingKey = (k: string) => glanceOpen.has(k);
+									const filled = facts.filter((f) => has(f.key) && !editingKey(f.key));
+									const open = facts.filter((f) => editingKey(f.key));
+									const empty = facts.filter((f) => !has(f.key) && !editingKey(f.key));
+									const toggle = (k: string, on: boolean) => setGlanceOpen((cur) => { const n = new Set(cur); if (on) n.add(k); else n.delete(k); return n; });
+									const chips = empty.length > 0 && (
+										<div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="Add details">
+											{filled.length + open.length === 0 && <span className="mr-0.5 text-xs text-serene-neutral-500">No details yet</span>}
+											{empty.map((f) => <button key={f.key} type="button" onClick={() => toggle(f.key, true)} className="inline-flex items-center gap-1 rounded-full border border-dashed border-serene-neutral-300 px-2.5 py-1 text-xs text-serene-neutral-600 hover:border-sauti-teal hover:text-sauti-teal"><Plus className="h-3 w-3" aria-hidden /> {f.label}</button>)}
 										</div>
-									)}
-									{railField(urlKey)}
-									{String(v[urlKey] ?? "").startsWith("http") && (
-										<a href={String(v[urlKey])} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs font-medium text-sauti-teal hover:underline">Open the original page <ExternalLink className="h-3 w-3" /></a>
-									)}
-								</section>
-								{tagsEl}
-							</aside>
+									);
+									if (filled.length + open.length === 0) return <aside className="px-1" aria-label="Key facts">{chips}{tagsEl}</aside>;
+									return (
+										<aside className="space-y-4 lg:sticky lg:top-16" aria-label="Key facts">
+											<section className={cn(card, "space-y-2.5")}>
+												<div className="flex items-center justify-between gap-2">
+													<h2 className="text-sm font-semibold text-serene-neutral-900">Details</h2>
+													<DeadlineChip date={v[dueK]} done={finished} />
+												</div>
+												<dl className="divide-y divide-serene-neutral-200">
+													{filled.map((f) => (
+														<div key={f.key} className="group flex items-center gap-2 py-1.5 first:pt-0">
+															<dt className="w-20 shrink-0 text-xs text-serene-neutral-500">{f.label}</dt>
+															<dd className="min-w-0 flex-1 truncate text-sm font-medium text-serene-neutral-900">{f.key === urlKey && String(v[urlKey]).startsWith("http") ? <a href={String(v[urlKey])} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-sauti-teal hover:underline">{f.show()} <ExternalLink className="h-3 w-3" aria-hidden /></a> : f.show()}</dd>
+															<button type="button" onClick={() => toggle(f.key, true)} aria-label={`Edit ${f.label.toLowerCase()}`} className="rounded-md p-1 text-serene-neutral-400 opacity-60 hover:bg-serene-neutral-100 hover:opacity-100 focus-visible:opacity-100 group-hover:opacity-100"><Pencil className="h-3.5 w-3.5" /></button>
+														</div>
+													))}
+												</dl>
+												{open.map((f) => (
+													<div key={f.key} className="space-y-1.5">
+														{f.key === cfg.amountKey ? <div className="grid grid-cols-[1fr_92px] gap-2">{railField(cfg.amountKey)}{railField("currency")}</div> : railField(f.key)}
+														<button type="button" onClick={() => toggle(f.key, false)} className="inline-flex items-center gap-1 text-xs font-medium text-sauti-teal hover:underline"><Check className="h-3 w-3" /> Done</button>
+													</div>
+												))}
+												{chips}
+											</section>
+											{tagsEl}
+										</aside>
+									);
+								})()}
 						</div>
 					</>
 				)}
@@ -759,6 +795,7 @@ function RelatedPages({ values, urlKey }: { values: Record<string, any>; urlKey:
 	add(ver?.website?.url, "The organisation's own site", ver?.website?.title ?? undefined);
 	add(ver?.applyUrl, "Where to apply");
 	const host = (u: string) => { try { return new URL(u).host.replace(/^www\./, ""); } catch { return u; } };
+	if (pages.length === 0) return <p className="px-1 text-xs text-serene-neutral-500">No source link yet. Add it under Details and the organisation&apos;s site and application link are found for you.</p>;
 	return (
 		<section className="rounded-2xl border border-serene-neutral-200/70 bg-white p-4 shadow-[0_1px_2px_rgba(16,24,40,0.04)]">
 			<h2 className="text-sm font-semibold text-serene-neutral-900">Related pages</h2>
@@ -780,7 +817,7 @@ function RelatedPages({ values, urlKey }: { values: Record<string, any>; urlKey:
 					))}
 				</ul>
 			)}
-			<p className="mt-2 text-xs text-serene-neutral-500">Copies of what was submitted are the files in the checklist below. Add the final application there so the team can find it later.</p>
+			<p className="mt-2 text-xs text-serene-neutral-500">Files, including what was submitted, are listed further down this tab.</p>
 		</section>
 	);
 }

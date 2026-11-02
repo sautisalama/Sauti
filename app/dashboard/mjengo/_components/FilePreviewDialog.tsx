@@ -32,6 +32,51 @@ const shownAs = (s: PreviewSource): Shown => {
 	return "none";
 };
 
+/** The file itself, drawn to fill whatever box it is put in: the window, or a card on a page. */
+export function PreviewBody({ src, error }: { src: PreviewSource | null; error?: string | null }) {
+	const kind = src ? shownAs(src) : "none";
+	const [text, setText] = useState<string | null>(null);
+	useEffect(() => {
+		if (!src?.url || kind !== "text") return;
+		let live = true;
+		setText(null);
+		fetch(src.url).then((r) => r.text()).then((t) => live && setText(t.slice(0, 200_000))).catch(() => live && setText(null));
+		return () => { live = false; };
+	}, [src, kind]);
+	return (
+		<>
+		{error ? (
+			<p className="max-w-sm px-6 text-center text-sm text-serene-neutral-700" role="alert">{error}</p>
+		) : !src ? (
+			<span className="flex items-center gap-2 text-sm text-serene-neutral-600" role="status"><Loader2 className="h-4 w-4 animate-spin" /> Opening</span>
+		) : kind === "image" ? (
+			// eslint-disable-next-line @next/next/no-img-element
+			<img src={src.url!} alt={src.name} className="max-h-full max-w-full object-contain" />
+		) : kind === "render" ? (
+			<FileRender kind={renderKindOf(src.name, src.mime)!} url={src.url!} name={src.name} />
+		) : kind === "pdf" ? (
+			<iframe src={src.url!} title={src.name} className="h-full w-full border-0 bg-white" />
+		) : kind === "embed" ? (
+			<iframe src={src.embed!} title={src.name} className="h-full w-full border-0 bg-white" allow="autoplay" />
+		) : kind === "video" ? (
+			<video src={src.url!} controls className="max-h-full max-w-full" />
+		) : kind === "audio" ? (
+			<audio src={src.url!} controls className="w-[min(480px,90%)]" />
+		) : kind === "text" ? (
+			<pre className="h-full w-full overflow-auto whitespace-pre-wrap break-words bg-white p-5 text-sm text-serene-neutral-900">{text ?? "Loading…"}</pre>
+		) : (
+			<div className="flex max-w-sm flex-col items-center gap-3 px-6 text-center">
+				<FileText className="h-10 w-10 text-serene-neutral-400" aria-hidden />
+				<p className="text-sm font-medium text-serene-neutral-900">This kind of file cannot be shown here</p>
+				<p className="text-xs text-serene-neutral-600">Download it to open it in the app that made it.</p>
+				{src.downloadUrl && <Button asChild size="sm"><a href={src.downloadUrl}><Download className="mr-1.5 h-4 w-4" /> Download</a></Button>}
+			</div>
+		)}
+
+		</>
+	);
+}
+
 /**
  * A file shown in a window over the page, the way Gmail shows an attachment: the file fills the window, with
  * download and open actions on top, and arrows to move to the next file of the same list.
@@ -48,26 +93,17 @@ export function FilePreviewDialog({ open, onClose, load, label, onPrev, onNext, 
 }) {
 	const [src, setSrc] = useState<PreviewSource | null>(null);
 	const [error, setError] = useState<string | null>(null);
-	const [text, setText] = useState<string | null>(null);
 
 	useEffect(() => {
 		if (!open) return;
 		let live = true;
-		setSrc(null); setError(null); setText(null);
+		setSrc(null); setError(null);
 		load()
 			.then((s) => { if (live) setSrc(s); })
 			.catch((e) => { if (live) setError(e instanceof Error ? e.message : "Could not open the file."); });
 		return () => { live = false; };
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [open, load]);
-
-	const kind = src ? shownAs(src) : "none";
-	useEffect(() => {
-		if (!src?.url || kind !== "text") return;
-		let live = true;
-		fetch(src.url).then((r) => r.text()).then((t) => live && setText(t.slice(0, 200_000))).catch(() => live && setText(null));
-		return () => { live = false; };
-	}, [src, kind]);
 
 	useEffect(() => {
 		if (!open) return;
@@ -96,33 +132,7 @@ export function FilePreviewDialog({ open, onClose, load, label, onPrev, onNext, 
 					{openHref && <Button asChild size="icon" variant="ghost" className="h-8 w-8" aria-label="Open in a new tab" title="Open in a new tab"><a href={openHref} target="_blank" rel="noopener noreferrer"><ExternalLink className="h-4 w-4" /></a></Button>}
 				</div>
 				<div className="relative flex min-h-0 flex-1 items-center justify-center bg-serene-neutral-100/70">
-					{error ? (
-						<p className="max-w-sm px-6 text-center text-sm text-serene-neutral-700" role="alert">{error}</p>
-					) : !src ? (
-						<span className="flex items-center gap-2 text-sm text-serene-neutral-600" role="status"><Loader2 className="h-4 w-4 animate-spin" /> Opening</span>
-					) : kind === "image" ? (
-						// eslint-disable-next-line @next/next/no-img-element
-						<img src={src.url!} alt={src.name} className="max-h-full max-w-full object-contain" />
-					) : kind === "render" ? (
-						<FileRender kind={renderKindOf(src.name, src.mime)!} url={src.url!} name={src.name} />
-					) : kind === "pdf" ? (
-						<iframe src={src.url!} title={src.name} className="h-full w-full border-0 bg-white" />
-					) : kind === "embed" ? (
-						<iframe src={src.embed!} title={src.name} className="h-full w-full border-0 bg-white" allow="autoplay" />
-					) : kind === "video" ? (
-						<video src={src.url!} controls className="max-h-full max-w-full" />
-					) : kind === "audio" ? (
-						<audio src={src.url!} controls className="w-[min(480px,90%)]" />
-					) : kind === "text" ? (
-						<pre className="h-full w-full overflow-auto whitespace-pre-wrap break-words bg-white p-5 text-sm text-serene-neutral-900">{text ?? "Loading…"}</pre>
-					) : (
-						<div className="flex max-w-sm flex-col items-center gap-3 px-6 text-center">
-							<FileText className="h-10 w-10 text-serene-neutral-400" aria-hidden />
-							<p className="text-sm font-medium text-serene-neutral-900">This kind of file cannot be shown here</p>
-							<p className="text-xs text-serene-neutral-600">Download it to open it in the app that made it.</p>
-							{src.downloadUrl && <Button asChild size="sm"><a href={src.downloadUrl}><Download className="mr-1.5 h-4 w-4" /> Download</a></Button>}
-						</div>
-					)}
+					<PreviewBody src={src} error={error} />
 				</div>
 			</DialogContent>
 		</Dialog>

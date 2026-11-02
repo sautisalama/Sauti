@@ -27,7 +27,7 @@ try {
 	check(`the top bar is slim (${Math.round(bar.h)}px)`, bar.h < 70);
 	check("stage is a compact menu, not a row of steps", (await page.getByRole("combobox", { name: "Stage" }).count()) === 1);
 
-	await page.getByRole("tab", { name: "Pages and copies" }).click();
+	await page.getByRole("tab", { name: "Application" }).click();
 	await page.getByRole("button", { name: "Add a document" }).waitFor({ timeout: 60000 });
 
 	// Add a file that already exists in Files.

@@ -35,7 +35,7 @@ for (const dark of [false, true]) {
 		const moved = await poll(async () => (await db.from("mjengo_opportunities").select("status").eq("id", opp.id).single()).data?.status !== "new", { timeout: 30000, interval: 1000 });
 		check(`choosing a stage saves it (${stages.join(", ")})`, !!moved);
 
-		await page.getByRole("tab", { name: "Pages and copies" }).click();
+		await page.getByRole("tab", { name: "Application" }).click();
 		check("related pages list the source, the site and where to apply", (await page.getByText("The organisation's own site").count()) === 1 && (await page.getByText("Where to apply").count()) === 1);
 		check("documents checklist sits beside the pages", (await page.getByText(/Documents|Add a document|needed/i).count()) > 0);
 		await page.getByRole("tab", { name: "To-dos and reminders" }).click();
@@ -43,7 +43,7 @@ for (const dark of [false, true]) {
 			check("to-dos tab shows to-dos", (await page.getByLabel("Add a to-do").count()) > 0);
 		await page.getByRole("tab", { name: "Sharing" }).click();
 		check("delete is in Sharing", (await page.getByRole("button", { name: /^Delete$/ }).count()) > 0);
-		await page.getByRole("tab", { name: "Pages and copies" }).click();
+		await page.getByRole("tab", { name: "Application" }).click();
 	}
 	await page.waitForTimeout(1500);
 	await page.screenshot({ path: path.join(OUT, `opp_layout_${dark ? "dark" : "light"}.png`), fullPage: false });

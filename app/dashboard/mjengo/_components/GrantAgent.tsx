@@ -24,8 +24,8 @@ export function GrantAgent({ kind, id }: { kind: "grant" | "opportunity"; id: st
 		return (
 			<button type="button" onClick={() => setOpen(true)} aria-expanded={false} className="flex w-full items-center gap-2 rounded-xl border border-serene-neutral-100 p-3 text-left hover:bg-serene-neutral-50">
 				<Sparkles className="h-4 w-4 text-sauti-teal" />
-				<span className="mr-auto text-sm font-semibold text-serene-neutral-900">Application agent</span>
-				<span className="hidden text-xs text-serene-neutral-500 sm:inline">Reads the funder&apos;s call and drafts the application</span>
+				<span className="mr-auto text-sm font-semibold text-serene-neutral-900">Application form</span>
+				<span className="hidden text-xs text-serene-neutral-500 sm:inline">Reads the funder&apos;s call and writes each section it asks for</span>
 				<ChevronDown className="h-4 w-4 text-serene-neutral-400" />
 			</button>
 		);
