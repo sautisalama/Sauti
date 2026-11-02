@@ -24,6 +24,14 @@ try {
 	await page.getByRole("link", { name: "Opportunities" }).first().waitFor({ timeout: 90000 });
 	await page.getByRole("link", { name: "Contacts", exact: true }).first().waitFor({ state: "detached", timeout: 20000 }).catch(() => {});
 	check("it stays hidden after a reload", (await page.getByRole("link", { name: "Contacts", exact: true }).count()) === 0);
+	const phone = await newPage(browser, { viewport: { width: 390, height: 800 } });
+	await signIn(phone, "admin");
+	await phone.goto(`${BASE}/dashboard/mjengo`, { waitUntil: "domcontentloaded", timeout: 120000 });
+	const strip = phone.getByRole("navigation", { name: "Mjengo sections" });
+	await strip.getByRole("link", { name: "Opportunities" }).waitFor({ timeout: 90000 });
+	await strip.getByRole("link", { name: "Contacts" }).waitFor({ state: "detached", timeout: 20000 }).catch(() => {});
+	check("the phone strip leaves out what was hidden", (await strip.getByRole("link", { name: "Contacts" }).count()) === 0 && (await strip.getByRole("link", { name: "Mail" }).count()) === 1);
+	await phone.close();
 	await page.getByRole("button", { name: /^Hidden \(1\)/ }).click();
 	await page.getByRole("button", { name: "Show Contacts in the menu again" }).click();
 	await page.getByRole("link", { name: "Contacts", exact: true }).first().waitFor({ timeout: 10000 });

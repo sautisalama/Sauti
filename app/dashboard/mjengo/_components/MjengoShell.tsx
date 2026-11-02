@@ -37,11 +37,29 @@ const TABS = [
 	{ href: `${BASE}/logs`, label: "Logs", icon: ScrollText, superOnly: true },
 ];
 
+/** The side menu names each section by id; the strip names them by address. Sections not listed here cannot be hidden. */
+const NAV_ID: Record<string, string> = {
+	[BASE]: "mj-overview", [`${BASE}/assistant`]: "mj-assistant", [`${BASE}/mail`]: "mj-mail", [`${BASE}/chat`]: "mj-chat", [`${BASE}/contacts`]: "mj-contacts",
+	"/meet": "mj-meet", [`${BASE}/calendar`]: "mj-calendar", [`${BASE}/vault`]: "mj-files", [`${BASE}/grants`]: "mj-grants", [`${BASE}/opportunities`]: "mj-opps",
+	[`${BASE}/projects`]: "mj-projects", [`${BASE}/fellowships`]: "mj-fellowships", [`${BASE}/forms`]: "mj-forms", [`${BASE}/todos`]: "mj-todos",
+	[`${BASE}/design`]: "mj-design", [`${BASE}/people`]: "mj-people", [`${BASE}/logs`]: "mj-logs",
+};
+
 export function MjengoShell({ isSuper, children }: { isSuper: boolean; children: React.ReactNode }) {
 	const pathname = usePathname() ?? "";
 	// Grants, projects and fellowships show once there is one (an opportunity that was won).
 	const [has, setHas] = useState({ grants: true, projects: true, fellowships: true });
-	useEffect(() => fromCache(R.nav, (n) => setHas(n.has)), []);
+	// What this person took off the menu on any device. The browser copy shows at once; the account copy wins when it is newer.
+	const [hiddenNav, setHiddenNav] = useState<string[]>([]);
+	useEffect(() => {
+		let at = 0;
+		const local = () => { try { const raw = localStorage.getItem("ss_mj_nav_v1"); if (raw) { const p = JSON.parse(raw) as { hidden?: string[]; at?: number }; at = p.at ?? 0; setHiddenNav(Array.isArray(p.hidden) ? p.hidden : []); } } catch { /* nothing kept */ } };
+		local();
+		const onStorage = (e: StorageEvent) => { if (e.key === "ss_mj_nav_v1") local(); };
+		window.addEventListener("storage", onStorage);
+		const off = fromCache(R.nav, (n) => { setHas(n.has); if (n.pref && n.pref.at > at) { at = n.pref.at; setHiddenNav(n.pref.hidden ?? []); } });
+		return () => { window.removeEventListener("storage", onStorage); off?.(); };
+	}, []);
 	// On a phone the strip scrolls freely and the current section rests in the middle.
 	useEffect(() => {
 		const el = document.querySelector<HTMLElement>('nav[aria-label="Mjengo sections"] [aria-current="page"]');
@@ -79,7 +97,7 @@ export function MjengoShell({ isSuper, children }: { isSuper: boolean; children:
 						<ArrowLeft className="h-4 w-4" /> Back
 					</button>
 				)}
-				{TABS.filter((t) => (!t.superOnly || isSuper) && !((t.href.endsWith("/grants") && !has.grants) || (t.href.endsWith("/projects") && !has.projects) || (t.href.endsWith("/fellowships") && !has.fellowships))).map((t) => {
+				{TABS.filter((t) => (!t.superOnly || isSuper) && !hiddenNav.includes(NAV_ID[t.href] ?? "") && !((t.href.endsWith("/grants") && !has.grants) || (t.href.endsWith("/projects") && !has.projects) || (t.href.endsWith("/fellowships") && !has.fellowships))).map((t) => {
 					const active = t.exact ? pathname === t.href : pathname.startsWith(t.href);
 					return (
 						<Link
