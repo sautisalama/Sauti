@@ -13,7 +13,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { User, LogOut, Shield, Building2, ChevronLeft, Briefcase } from "lucide-react";
+import { User, LogOut, Shield, Building2, ChevronLeft, Briefcase, Home } from "lucide-react";
 import { signOut } from "@/app/(auth)/actions/auth";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -159,6 +159,12 @@ export function MobileTopBar() {
                         {(user?.profile?.user_type === "professional" || user?.profile?.user_type === "ngo") && (user?.id || dash?.data?.userId) && (
                             <OutOfOfficeMenuItem userId={(user?.id || dash?.data?.userId)!} />
                         )}
+                        <DropdownMenuItem asChild>
+                            <Link href="/?site" className="cursor-pointer rounded-xl focus:bg-serene-neutral-50 focus:text-sauti-teal p-3">
+                            <Home className="mr-3 h-4 w-4" />
+                            <span>Homepage</span>
+                            </Link>
+                        </DropdownMenuItem>
                         <ThemeMenuItem />
 
                         <WorkspaceMenu canSwitch={!!roleContext?.can_switch_to_admin} primaryRole={roleContext?.primary_role} />

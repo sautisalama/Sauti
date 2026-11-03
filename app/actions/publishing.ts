@@ -11,6 +11,7 @@ import { sendNotification } from "@/lib/notifications";
 import { createAdminClient } from "@/utils/supabase/admin-client";
 import { importDocument, type ImportedDocument } from "@/lib/content/import";
 import { makeSummary, normalizeLinks, readingStats, sanitizeContent, htmlToText, slugify } from "@/lib/content/sanitize";
+import { describePdf } from "@/lib/content/pdf-preview";
 import { emailPublicationCopy } from "@/lib/content/publication-email";
 import {
 	PUBLICATION_KINDS,
@@ -411,4 +412,13 @@ export async function extractPdfText(sourceUrl: string): Promise<ActionResult<{ 
 	} catch (e) {
 		return { ok: false, error: e instanceof Error ? e.message : "No text could be extracted from this PDF." };
 	}
+}
+
+/** A suggested description for a PDF post: its first real paragraph after the cover and contents. */
+export async function suggestPdfSummary(sourceUrl: string): Promise<ActionResult<{ summary: string }>> {
+	const auth = await requirePublisher();
+	if (!auth.ok) return auth;
+	if (!storagePathOf(sourceUrl)) return { ok: false, error: "Invalid file location." };
+	const summary = await describePdf(sourceUrl);
+	return summary ? { ok: true, summary } : { ok: false, error: "No readable text was found to suggest a description from." };
 }

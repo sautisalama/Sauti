@@ -107,3 +107,21 @@ export async function getPreviewBySlug(slug: string, token: string): Promise<Pub
 	const { data } = await createAdminClient().from("publications").select("*").eq("slug", slug).eq("preview_token", token).maybeSingle();
 	return (data as unknown as PublicationRow) ?? null;
 }
+
+/** Other published posts to keep readers going: newest first, never the one being read. */
+export async function getRelated(slug: string, n = 3): Promise<FeedItem[]> {
+	try {
+		const { data } = await createPublicClient()
+			.from("publications")
+			.select(CARD_COLS)
+			.eq("status", "published")
+			.neq("slug", slug)
+			.not("published_at", "is", null)
+			.lte("published_at", new Date().toISOString())
+			.order("published_at", { ascending: false })
+			.limit(n);
+		return ((data as unknown as Card[]) ?? []).map(fromRow);
+	} catch {
+		return [];
+	}
+}

@@ -5,7 +5,7 @@ import { ArrowLeft, EyeOff } from "lucide-react";
 import { Nav } from "@/components/Nav";
 import { Footer } from "@/components/Footer";
 import { ArticleView, KIND_LABEL } from "@/components/publishing/ArticleView";
-import { getPreviewBySlug, getPublishedBySlug } from "@/lib/content/feed";
+import { getPreviewBySlug, getPublishedBySlug, getRelated } from "@/lib/content/feed";
 import { cache } from "react";
 import { ensurePdfSummary } from "@/lib/content/pdf-preview";
 import { createAdminClient } from "@/utils/supabase/admin-client";
@@ -85,6 +85,7 @@ export default async function PublicationPage({ params, searchParams }: Props) {
 			);
 	}
 
+	const related = isPreview ? [] : await getRelated(pub.slug, 3);
 	const url = `${ORGANIZATION.url}/publications/${pub.slug}`;
 	const schema = {
 		"@context": "https://schema.org",
@@ -126,8 +127,8 @@ export default async function PublicationPage({ params, searchParams }: Props) {
 					<EyeOff className="h-4 w-4" aria-hidden /> Preview — this {pub.status.replace("_", " ")} is not public yet.
 				</div>
 			)}
-			<main id="main-content" className="flex-1 px-4 py-10 md:py-16">
-				<div className={`mx-auto mb-8 ${pub.display_mode === "pdf" && pub.source_file_url ? "max-w-4xl" : "max-w-3xl"}`}>
+			<main id="main-content" className="flex-1 px-4 py-6 md:py-16">
+				<div className={`mx-auto mb-5 md:mb-8 ${pub.display_mode === "pdf" && pub.source_file_url ? "max-w-4xl" : "max-w-3xl"}`}>
 					<Link href="/publications" className="inline-flex items-center gap-2 text-sm font-bold text-[#1a365d] hover:text-sauti-orange">
 						<ArrowLeft className="h-4 w-4" aria-hidden /> All publications
 					</Link>
@@ -147,6 +148,30 @@ export default async function PublicationPage({ params, searchParams }: Props) {
 					links={pub.external_links}
 					tags={pub.tags}
 				/>
+				{related.length > 0 && (
+					<aside aria-labelledby="keep-reading" className="mx-auto mt-14 max-w-4xl border-t border-gray-100 pt-8 md:mt-20">
+						<h2 id="keep-reading" className="mb-5 text-xl font-black text-[#1a365d]">Keep reading</h2>
+						<ul className="grid gap-4 sm:grid-cols-3">
+							{related.map((r) => (
+								<li key={r.slug}>
+									<Link href={r.href} className="group flex h-full flex-col overflow-hidden rounded-xl border border-gray-100 bg-white shadow-sm transition hover:shadow-lg">
+										<div className="aspect-video overflow-hidden bg-gradient-to-br from-[#1a365d] to-sauti-teal">
+											{r.image && (
+												// eslint-disable-next-line @next/next/no-img-element
+												<img src={r.image} alt="" loading="lazy" className="h-full w-full object-cover transition duration-500 group-hover:scale-105" />
+											)}
+										</div>
+										<div className="flex flex-1 flex-col p-4">
+											<span className="mb-1 text-[10px] font-black uppercase tracking-widest text-sauti-teal">{r.category}</span>
+											<span className="font-bold leading-snug text-[#1a365d] group-hover:text-sauti-orange">{r.title}</span>
+											<span className="mt-auto pt-3 text-xs text-gray-400">{r.dateLabel}</span>
+										</div>
+									</Link>
+								</li>
+							))}
+						</ul>
+					</aside>
+				)}
 			</main>
 			<div className="bg-[#00473e]">
 				<Footer />

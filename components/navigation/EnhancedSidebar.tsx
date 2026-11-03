@@ -880,6 +880,12 @@ export function EnhancedSidebar({
 									{(role === "professional" || role === "ngo") && dash?.data?.userId && (
 										<OutOfOfficeMenuItem userId={dash.data.userId} />
 									)}
+									<DropdownMenuItem asChild>
+										<Link href="/?site" className="cursor-pointer rounded-xl focus:bg-serene-neutral-50 focus:text-serene-blue-600 m-1">
+											<Home className="mr-2 h-4 w-4 text-serene-neutral-500" />
+											<span>Homepage</span>
+										</Link>
+									</DropdownMenuItem>
 									<ThemeMenuItem />
 									{(role === "professional" || role === "ngo") && (
 										<DropdownMenuItem asChild>

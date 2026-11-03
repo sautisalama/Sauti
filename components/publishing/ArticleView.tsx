@@ -30,7 +30,7 @@ export function ArticleView({ title, summary, category, kindLabel, coverUrl, cov
 	const date = publishedAt ? new Date(publishedAt) : null;
 	return (
 		<article className={pdfUrl ? "mx-auto max-w-4xl" : "mx-auto max-w-3xl"}>
-			<header className={pdfUrl ? "mx-auto mb-8 max-w-3xl" : "mb-8"}>
+			<header className={pdfUrl ? "mx-auto mb-6 max-w-3xl md:mb-8" : "mb-6 md:mb-8"}>
 				<div className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] font-black uppercase tracking-widest">
 					{kindLabel && <span className="text-sauti-teal">{kindLabel}</span>}
 					{category && (
@@ -54,13 +54,13 @@ export function ArticleView({ title, summary, category, kindLabel, coverUrl, cov
 						</>
 					) : null}
 				</div>
-				<h1 className="text-3xl font-black leading-tight text-[#1a365d] md:text-5xl">{title || "Untitled"}</h1>
+				<h1 className="text-[1.75rem] font-black leading-tight text-[#1a365d] sm:text-3xl md:text-5xl">{title || "Untitled"}</h1>
 				{summary && <p className="mt-4 text-lg font-medium leading-relaxed text-gray-600 md:text-xl">{summary}</p>}
 			</header>
 
 			{coverUrl && !pdfUrl && (
 				// eslint-disable-next-line @next/next/no-img-element
-				<img src={coverUrl} alt={coverAlt ?? ""} className="mb-10 aspect-video w-full rounded-2xl object-cover shadow-xl" />
+				<img src={coverUrl} alt={coverAlt ?? ""} className="mb-6 aspect-video md:mb-10 w-full rounded-2xl object-cover shadow-xl" />
 			)}
 
 			{pdfUrl ? (
@@ -72,7 +72,7 @@ export function ArticleView({ title, summary, category, kindLabel, coverUrl, cov
 			)}
 
 			{links.length > 0 && (
-				<aside className="mt-12 rounded-2xl border border-gray-200 bg-[#f8f9fb] p-6" aria-labelledby="other-sources">
+				<aside className="mt-10 rounded-2xl border border-gray-200 bg-[#f8f9fb] p-5 md:mt-12 md:p-6" aria-labelledby="other-sources">
 					<h2 id="other-sources" className="mb-3 text-lg font-black text-[#1a365d]">Other sources</h2>
 					<ul className="space-y-2">
 						{links.map((l) => (

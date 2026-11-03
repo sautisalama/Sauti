@@ -3,8 +3,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import {
-	AlertTriangle, Archive, CheckCircle2, Clock, Eye, ExternalLink, FileEdit, FileUp, Loader2, Mail, Pencil,
+	AlertTriangle, Archive, MoreHorizontal, Monitor, Smartphone, CheckCircle2, Clock, Eye, ExternalLink, FileEdit, FileUp, Loader2, Mail, Pencil,
 	Plus, Save, Send, Trash2, Undo2, X, FileText, RotateCcw,
 } from "lucide-react";
 import { RichEditor } from "@/components/editor/RichEditor";
@@ -13,7 +14,7 @@ import { cn } from "@/lib/utils";
 import { uploadToPublications } from "@/lib/content/upload-client";
 import { readingStats } from "@/lib/content/reading";
 import {
-	attachPdfFromStorage, deletePublication, extractPdfText, importFromStorage, resendPublicationEmail, returnPublication, savePublication, setPublicationStatus,
+	attachPdfFromStorage, deletePublication, extractPdfText, suggestPdfSummary, importFromStorage, resendPublicationEmail, returnPublication, savePublication, setPublicationStatus,
 } from "@/app/actions/publishing";
 import { PUBLICATION_KINDS, type PublicationDisplayMode, type PublicationKind, type PublicationRow, type PublicationStatus } from "@/types/publishing";
 
@@ -93,6 +94,11 @@ export function PublicationEditor({ initial, isAdmin = true, basePath = ADMIN_BA
 	const [d, setD] = useState<Draft>(() => fromRow(initial));
 	const [saved, setSaved] = useState<Draft>(() => fromRow(initial));
 	const [view, setView] = useState<"edit" | "preview">("edit");
+	const [device, setDevice] = useState<"phone" | "desktop">("desktop");
+	const [upPct, setUpPct] = useState<number | null>(null);
+	const [saveState, setSaveState] = useState<"idle" | "saving" | "saved">("idle");
+	const [savedAt, setSavedAt] = useState<number | null>(null);
+	const [, tick] = useState(0);
 	const [busy, setBusy] = useState<string | null>(null);
 	const [error, setError] = useState<string | null>(null);
 	const [notice, setNotice] = useState<string | null>(null);
@@ -138,12 +144,15 @@ export function PublicationEditor({ initial, isAdmin = true, basePath = ADMIN_BA
 		if (autosaving.current || !c.dirty || c.busy || c.status !== "draft" || c.d.title.trim().length < 3) return;
 		if (c.d.display_mode === "pdf" && !c.d.source_file_url) return;
 		autosaving.current = true;
+		setSaveState("saving");
 		try {
 			const res = await savePublication({ ...payloadOf(c.d, c.id) });
 			if (!res.ok) return;
 			setId(res.id);
 			setSlug(res.slug);
 			setSaved(c.d);
+			setSaveState("saved");
+			setSavedAt(Date.now());
 			// Keep the URL on the saved draft without remounting the editor mid-typing.
 			if (!c.id) window.history.replaceState(null, "", `${basePath}/${res.id}`);
 		} finally {
@@ -164,6 +173,20 @@ export function PublicationEditor({ initial, isAdmin = true, basePath = ADMIN_BA
 		};
 	}, [autosave]);
 
+	// "Saved just now" -> "Saved 2 min ago" without a re-render storm.
+	useEffect(() => {
+		if (!savedAt) return;
+		const t = setInterval(() => tick((n) => n + 1), 30000);
+		return () => clearInterval(t);
+	}, [savedAt]);
+	const savedLabel = (() => {
+		if (saveState === "saving" || busy === "save") return "Saving…";
+		if (dirty) return "Unsaved changes";
+		if (!savedAt) return id ? "All changes saved" : "";
+		const m = Math.floor((Date.now() - savedAt) / 60000);
+		return m < 1 ? "Saved just now" : `Saved ${m} min ago`;
+	})();
+
 	const flash = (m: string) => {
 		setNotice(m);
 		setTimeout(() => setNotice(null), 3500);
@@ -180,6 +203,8 @@ export function PublicationEditor({ initial, isAdmin = true, basePath = ADMIN_BA
 		setId(res.id);
 		setSlug(res.slug);
 		setSaved(d);
+		setSaveState("saved");
+		setSavedAt(Date.now());
 		if (!quiet) flash("Saved.");
 		if (!id) router.replace(`${basePath}/${res.id}`);
 		return res;
@@ -216,7 +241,9 @@ export function PublicationEditor({ initial, isAdmin = true, basePath = ADMIN_BA
 		if (d.body && !window.confirm("Replace the current content with the imported document?")) return;
 		setBusy("import");
 		try {
-			const up = await uploadToPublications(file, "imports");
+			setUpPct(0);
+			const up = await uploadToPublications(file, "imports", setUpPct);
+			setUpPct(null);
 			if (isPdf) {
 				// A PDF is shown as the PDF itself. No text is extracted.
 				const res = await attachPdfFromStorage(up.path);
@@ -379,7 +406,16 @@ export function PublicationEditor({ initial, isAdmin = true, basePath = ADMIN_BA
 						</button>
 					))}
 				</div>
-				<span className="text-xs text-gray-500">{stats.words} words · {stats.minutes} min read</span>
+				{view === "preview" && (
+					<div className="flex w-fit gap-1 rounded-xl border border-gray-200 bg-white p-1" role="group" aria-label="Preview width">
+						{(["phone", "desktop"] as const).map((v) => (
+							<button key={v} type="button" onClick={() => setDevice(v)} aria-pressed={device === v} className={cn("flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-bold capitalize transition-colors", device === v ? "bg-[#1a365d] text-white" : "text-gray-600 hover:bg-gray-100")}>
+								{v === "phone" ? <Smartphone className="h-4 w-4" /> : <Monitor className="h-4 w-4" />} {v}
+							</button>
+						))}
+					</div>
+				)}
+				<span className="text-xs text-gray-500" aria-live="polite">{savedLabel && <><span className={dirty ? "font-semibold text-amber-700" : "font-semibold text-emerald-700"}>{savedLabel}</span> · </>}{stats.words} words · {stats.minutes} min read</span>
 			</div>
 
 			{view === "edit" ? (
@@ -396,6 +432,12 @@ export function PublicationEditor({ initial, isAdmin = true, basePath = ADMIN_BA
 								{busy === "import" ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileUp className="h-4 w-4" />} {busy === "import" ? "Reading…" : "Upload document"}
 							</button>
 						</div>
+						{upPct !== null && (
+							<div className="mt-3" role="progressbar" aria-valuenow={upPct} aria-valuemin={0} aria-valuemax={100} aria-label="Uploading">
+								<div className="mb-1 flex justify-between text-xs font-semibold text-[#1a365d]"><span>Uploading…</span><span>{upPct}%</span></div>
+								<div className="h-1.5 overflow-hidden rounded-full bg-[#008080]/15"><div className="h-full rounded-full bg-[#008080] transition-all" style={{ width: `${upPct}%` }} /></div>
+							</div>
+						)}
 						{d.source_file_url && (
 							<p className="mt-2 text-xs text-gray-600">
 								{d.display_mode === "pdf" ? "PDF" : "Imported from"} <a className="font-semibold text-[#008080] underline" href={d.source_file_url} target="_blank" rel="noopener noreferrer">{d.source_file_name}</a>
@@ -423,8 +465,27 @@ export function PublicationEditor({ initial, isAdmin = true, basePath = ADMIN_BA
 							</select>
 						</Field>
 					</div>
-					<Field label="Summary" hint="Shown on cards and in search results. Leave empty to use the opening text.">
+					<Field label="Summary" hint={d.display_mode === "pdf" ? "Shown on cards, in search results and in link previews. Leave empty to use the first paragraph after the cover and contents." : "Shown on cards, in search results and in link previews. Leave empty to use the opening text."}>
 						<textarea value={d.summary} onChange={(e) => set("summary", e.target.value)} rows={2} maxLength={300} className="input" />
+						<div className="mt-1 flex items-center justify-between text-xs">
+							<span className={d.summary.length > 160 ? "font-semibold text-amber-700" : "text-gray-500"}>{d.summary.length}/160 ideal for link previews</span>
+							{d.display_mode === "pdf" && d.source_file_url && (
+								<button
+									type="button"
+									disabled={busy === "suggest"}
+									onClick={async () => {
+										setBusy("suggest");
+										const res = await suggestPdfSummary(d.source_file_url!);
+										setBusy(null);
+										if (!res.ok) return setError(res.error);
+										set("summary", res.summary);
+									}}
+									className="font-bold text-[#008080] underline disabled:opacity-60"
+								>
+									{busy === "suggest" ? "Reading the PDF…" : "Suggest from the PDF"}
+								</button>
+							)}
+						</div>
 					</Field>
 					<div className="grid gap-4 md:grid-cols-2">
 						<Field label="Category" hint="e.g. Legal Guide, Research Brief">
@@ -476,7 +537,8 @@ export function PublicationEditor({ initial, isAdmin = true, basePath = ADMIN_BA
 					)}
 				</div>
 			) : (
-				<div className="rounded-2xl border border-gray-200 bg-white p-5 md:p-10">
+				<div className="space-y-6">
+				<div className={cn("mx-auto rounded-2xl border border-gray-200 bg-white", device === "phone" ? "max-w-[390px] overflow-hidden p-4 shadow-xl ring-8 ring-gray-900/5" : "p-5 md:p-10")}>
 					<ArticleView
 						title={d.title}
 						summary={d.summary}
@@ -491,6 +553,13 @@ export function PublicationEditor({ initial, isAdmin = true, basePath = ADMIN_BA
 						links={d.links.filter((l) => l.url.trim()).map((l) => ({ label: l.label || l.url, url: /^https?:\/\//i.test(l.url) ? l.url : `https://${l.url}` }))}
 						tags={d.tags.split(",").map((t) => t.trim()).filter(Boolean)}
 					/>
+				</div>
+				<ShareCard
+					title={d.title}
+					description={d.summary || (d.display_mode === "pdf" ? "" : htmlSnippet(d.body))}
+					image={d.cover_image_url || (d.display_mode === "pdf" && slug && token && d.source_file_url ? `/api/publications/${slug}/social?preview=${token}` : null)}
+					needsSave={d.display_mode === "pdf" && !d.cover_image_url && !(slug && token)}
+				/>
 				</div>
 			)}
 
@@ -510,58 +579,64 @@ export function PublicationEditor({ initial, isAdmin = true, basePath = ADMIN_BA
 			<div className="sticky bottom-0 -mx-4 flex flex-wrap items-center gap-2 border-t border-gray-200 bg-white/95 px-4 py-3 backdrop-blur md:-mx-6 md:px-6">
 				{!lockedForAuthor && (
 					<button type="button" onClick={() => save()} disabled={!!busy || !d.title.trim()} className="btn-secondary">
-						{busy === "save" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Save {status === "published" ? "changes" : "draft"}
+						{busy === "save" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} {dirty ? "Save" : "Saved"}
 					</button>
 				)}
-				{previewUrl && (
-					<a href={previewUrl} target="_blank" rel="noopener noreferrer" className="btn-secondary" title="Shareable link for draft review — works without signing in">
-						<ExternalLink className="h-4 w-4" /> Open preview link
-					</a>
-				)}
+				<button type="button" onClick={() => setView((v) => (v === "preview" ? "edit" : "preview"))} className="btn-secondary" aria-pressed={view === "preview"}>
+					{view === "preview" ? <Pencil className="h-4 w-4" /> : <Eye className="h-4 w-4" />} {view === "preview" ? "Back to editing" : "Preview"}
+				</button>
 				<span className="flex-1" />
-				{isAdmin && id && (
-					<button type="button" onClick={resend} disabled={!!busy} className="btn-secondary" title="Email a PDF and Word copy to publications@sautisalama.org">
-						{busy === "email" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />} Email copy
+
+				{(previewUrl || (isAdmin && id) || (isAdmin && status === "draft") || (isAdmin && status === "in_review" && id) || (isAdmin && status === "published") || (!isAdmin && status === "in_review") || (id && (isAdmin || status === "draft"))) && (
+					<DropdownMenu>
+						<DropdownMenuTrigger asChild>
+							<button type="button" className="btn-secondary" aria-label="More actions" disabled={!!busy}>
+								<MoreHorizontal className="h-4 w-4" /> More
+							</button>
+						</DropdownMenuTrigger>
+						<DropdownMenuContent align="end" className="w-56">
+							{previewUrl && (
+								<DropdownMenuItem asChild>
+									<a href={previewUrl} target="_blank" rel="noopener noreferrer"><ExternalLink className="mr-2 h-4 w-4" /> Open shareable preview link</a>
+								</DropdownMenuItem>
+							)}
+							{isAdmin && id && (
+								<DropdownMenuItem onSelect={resend}><Mail className="mr-2 h-4 w-4" /> Email a copy</DropdownMenuItem>
+							)}
+							{isAdmin && status === "draft" && (
+								<DropdownMenuItem disabled={!publishable} onSelect={() => changeStatus("in_review")}><Clock className="mr-2 h-4 w-4" /> Send to review</DropdownMenuItem>
+							)}
+							{isAdmin && status === "in_review" && id && (
+								<DropdownMenuItem onSelect={() => setReturning((v) => !v)}><RotateCcw className="mr-2 h-4 w-4" /> Return to author</DropdownMenuItem>
+							)}
+							{isAdmin && status === "published" && (
+								<>
+									<DropdownMenuItem onSelect={() => changeStatus("draft")}><Undo2 className="mr-2 h-4 w-4" /> Unpublish</DropdownMenuItem>
+									<DropdownMenuItem onSelect={() => changeStatus("archived")}><Archive className="mr-2 h-4 w-4" /> Archive</DropdownMenuItem>
+								</>
+							)}
+							{!isAdmin && status === "in_review" && (
+								<DropdownMenuItem onSelect={() => changeStatus("draft")}><Undo2 className="mr-2 h-4 w-4" /> Withdraw</DropdownMenuItem>
+							)}
+							{id && (isAdmin || status === "draft") && (
+								<>
+									<DropdownMenuSeparator />
+									<DropdownMenuItem onSelect={remove} className="text-red-600 focus:text-red-700"><Trash2 className="mr-2 h-4 w-4" /> Delete permanently</DropdownMenuItem>
+								</>
+							)}
+						</DropdownMenuContent>
+					</DropdownMenu>
+				)}
+
+				{/* One main action, whatever the state. */}
+				{isAdmin && status !== "published" && (
+					<button type="button" onClick={() => changeStatus("published")} disabled={!!busy || !publishable} className="inline-flex items-center gap-2 rounded-lg bg-[#1a365d] px-5 py-2 text-sm font-bold text-white hover:bg-[#008080] disabled:opacity-50">
+						{busy === "published" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />} {status === "in_review" ? "Approve & publish" : "Publish"}
 					</button>
 				)}
-				{isAdmin ? (
-					<>
-						{status === "draft" && (
-							<button type="button" onClick={() => changeStatus("in_review")} disabled={!!busy || !publishable} className="btn-secondary">
-								<Clock className="h-4 w-4" /> Send to review
-							</button>
-						)}
-						{status === "in_review" && id && (
-							<button type="button" onClick={() => setReturning((v) => !v)} disabled={!!busy} className="btn-secondary">
-								<RotateCcw className="h-4 w-4" /> Return to author
-							</button>
-						)}
-						{status === "published" ? (
-							<>
-								<button type="button" onClick={() => changeStatus("draft")} disabled={!!busy} className="btn-secondary"><Undo2 className="h-4 w-4" /> Unpublish</button>
-								<button type="button" onClick={() => changeStatus("archived")} disabled={!!busy} className="btn-secondary"><Archive className="h-4 w-4" /> Archive</button>
-							</>
-						) : (
-							<button type="button" onClick={() => changeStatus("published")} disabled={!!busy || !publishable} className="inline-flex items-center gap-2 rounded-lg bg-[#1a365d] px-5 py-2 text-sm font-bold text-white hover:bg-[#008080] disabled:opacity-50">
-								{busy === "published" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />} {status === "in_review" ? "Approve & publish" : "Publish"}
-							</button>
-						)}
-					</>
-				) : (
-					<>
-						{status === "in_review" && (
-							<button type="button" onClick={() => changeStatus("draft")} disabled={!!busy} className="btn-secondary"><Undo2 className="h-4 w-4" /> Withdraw</button>
-						)}
-						{status === "draft" && (
-							<button type="button" onClick={() => changeStatus("in_review")} disabled={!!busy || !publishable} className="inline-flex items-center gap-2 rounded-lg bg-[#1a365d] px-5 py-2 text-sm font-bold text-white hover:bg-[#008080] disabled:opacity-50">
-								{busy === "in_review" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />} Submit for approval
-							</button>
-						)}
-					</>
-				)}
-				{id && (isAdmin || status === "draft") && (
-					<button type="button" onClick={remove} disabled={!!busy} className="rounded-lg p-2 text-red-600 hover:bg-red-50" aria-label="Delete permanently" title="Delete permanently">
-						<Trash2 className="h-4 w-4" />
+				{!isAdmin && status === "draft" && (
+					<button type="button" onClick={() => changeStatus("in_review")} disabled={!!busy || !publishable} className="inline-flex items-center gap-2 rounded-lg bg-[#1a365d] px-5 py-2 text-sm font-bold text-white hover:bg-[#008080] disabled:opacity-50">
+						{busy === "in_review" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />} Submit for approval
 					</button>
 				)}
 				<Link href={basePath} className="text-sm font-semibold text-gray-500 hover:text-gray-800">Close</Link>
@@ -575,6 +650,32 @@ export function PublicationEditor({ initial, isAdmin = true, basePath = ADMIN_BA
 				.btn-secondary:disabled{opacity:.5}
 			`}</style>
 		</div>
+	);
+}
+
+const htmlSnippet = (html: string) => html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 160);
+
+/** How the link looks when shared on WhatsApp, X or LinkedIn: image, title, description, site. */
+function ShareCard({ title, description, image, needsSave }: { title: string; description: string; image: string | null; needsSave: boolean }) {
+	return (
+		<section aria-labelledby="share-card" className="mx-auto max-w-xl">
+			<h3 id="share-card" className="mb-2 text-sm font-bold text-[#1a365d]">How a shared link looks</h3>
+			<div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+				<div className="flex aspect-[1.91/1] items-center justify-center bg-gradient-to-br from-[#1a365d] to-[#008080]">
+					{image ? (
+						// eslint-disable-next-line @next/next/no-img-element
+						<img src={image} alt="" className="h-full w-full object-cover" />
+					) : (
+						<span className="px-6 text-center text-xs font-semibold text-white/80">{needsSave ? "Save the draft to see the preview image made from the first page." : "No preview image yet. Add a cover image."}</span>
+					)}
+				</div>
+				<div className="space-y-0.5 border-t border-gray-100 bg-gray-50 px-4 py-3">
+					<p className="text-[11px] uppercase tracking-wide text-gray-500">sautisalama.org</p>
+					<p className="line-clamp-2 text-sm font-bold text-gray-900">{title || "Untitled"}</p>
+					<p className="line-clamp-2 text-xs text-gray-600">{description || "Add a summary so this line isn't empty."}</p>
+				</div>
+			</div>
+		</section>
 	);
 }
 

@@ -161,7 +161,8 @@ export async function updateSession(request: NextRequest) {
 			isAuthorized &&
 			(request.nextUrl.pathname.startsWith("/signin") ||
 				request.nextUrl.pathname.startsWith("/signup") ||
-				request.nextUrl.pathname === "/")
+				// `/?site` lets a signed-in person view the public homepage without signing out.
+				(request.nextUrl.pathname === "/" && !request.nextUrl.searchParams.has("site")))
 		) {
 			const url = request.nextUrl.clone();
 			// Everyone lands on the dashboard, unless this person last left an admin or Mjengo suite.
