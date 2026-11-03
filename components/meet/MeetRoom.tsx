@@ -5,12 +5,13 @@ import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { format } from "date-fns";
 import { MeetRecorder } from "@/lib/client/meet-recorder";
+import { BackgroundProcessor, backgroundSupported, PRESET_BACKGROUNDS, presetImage, type BackgroundMode } from "@/lib/client/meet-background";
 import { sendRecording } from "@/lib/client/remote-recording";
 import { beginRemoteRecording, finishRemoteRecording } from "@/app/actions/meet-recording";
 import { putToSignedUrl } from "@/lib/client/upload";
 import { prepareUpload, registerUpload } from "@/app/dashboard/mjengo/vault/api";
 import { attachRecording } from "@/app/actions/mjengo-meet";
-import { Sparkles, Accessibility, Captions, Circle, ExternalLink, MoreVertical, Maximize2, ShieldCheck, UserPlus, Check, Copy, Hand, Info, Loader2, Mail, BarChart3, MessageCircle, MessageSquareText, Settings2, Mic, MicOff, Minimize2, MonitorUp, Pin, PinOff, PictureInPicture2, PhoneOff, Smile, SmartphoneNfc, UserMinus, Users, Video, VideoOff, Volume2, X } from "lucide-react";
+import { Sparkles, Accessibility, Captions, Circle, ExternalLink, MoreVertical, Maximize2, ShieldCheck, UserPlus, Check, Copy, Hand, Info, Loader2, Mail, BarChart3, MessageCircle, MessageSquareText, Settings2, Mic, MicOff, Minimize2, MonitorUp, Pin, PinOff, PictureInPicture2, PhoneOff, ImagePlus, WifiOff, Smile, SmartphoneNfc, UserMinus, Users, Video, VideoOff, Volume2, X } from "lucide-react";
 import { makeCohost, verifyHostToken, lockMeeting, enterMeeting, checkMeetingEntry, listKnocks, decideKnock, decideAllKnocks, saveMeetingChat, type Knock } from "@/app/actions/meet-room";
 import { ChatPanel, PollPanel, ReactionLayer, ReactionPicker, type ChatMsg, type FloatingReaction, type Poll } from "./meet-parts";
 import { askSalamaInCall } from "@/app/actions/mjengo-salama";
@@ -58,6 +59,24 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 	const [a11yOpen, setA11yOpen] = useState(false);
 	const [moreOpen, setMoreOpen] = useState(false);
 	const [left, setLeft] = useState(false);
+	// Connection: told to the person the moment the call drops, and again when it is back.
+	const [conn, setConn] = useState<"ok" | "lost" | "back">("ok");
+	const lostRef = useRef(false);
+	const leavingRef = useRef(false);
+	const markLost = useCallback(() => { if (leavingRef.current) return; lostRef.current = true; setConn("lost"); }, []);
+	const markOk = useCallback(() => {
+		if (!lostRef.current) return;
+		lostRef.current = false;
+		setConn("back");
+		setTimeout(() => setConn((c) => (c === "back" ? "ok" : c)), 4000);
+	}, []);
+	// Background blur or a picture behind the person, made on this device before anyone sees the camera.
+	const [bg, setBg] = useState<BackgroundMode>({ kind: "none" });
+	const bgRef = useRef<BackgroundMode>({ kind: "none" });
+	const bgProc = useRef<{ proc: BackgroundProcessor; raw: MediaStreamTrack; out: MediaStreamTrack; stream: MediaStream } | null>(null);
+	const [bgBusy, setBgBusy] = useState(false);
+	const [bgNote, setBgNote] = useState("");
+	const [customBgs, setCustomBgs] = useState<string[]>([]);
 	const [recording, setRecording] = useState(false);
 	const [recBy, setRecBy] = useState<string | null>(null);
 	const [recSecs, setRecSecs] = useState(0);
@@ -183,7 +202,71 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 
 	/* ------------------------------------------------------------ lobby preview */
 
-	const stopPreview = () => { preview.current?.getTracks().forEach((t) => t.stop()); preview.current = null; };
+	const swapSenders = async (track: MediaStreamTrack) => {
+		for (const pc of pcs.current.values()) {
+			const sender = pc.getSenders().find((x) => x.track?.kind === "video");
+			if (sender && !sharing) await sender.replaceTrack(track).catch(() => undefined);
+		}
+	};
+	const refreshVideos = (stream: MediaStream) => {
+		if (stream === local.current && localVideo.current) localVideo.current.srcObject = stream;
+		else if (previewVideo.current) previewVideo.current.srcObject = stream;
+	};
+	/** Stop the effect. With restore, the plain camera goes back in; without, the camera is let go too. */
+	const clearBackground = async (restore: boolean) => {
+		const cur = bgProc.current;
+		if (!cur) return;
+		bgProc.current = null;
+		cur.proc.stop();
+		try { cur.stream.removeTrack(cur.out); } catch { /* already gone */ }
+		if (!restore) { cur.raw.stop(); return; }
+		cur.raw.enabled = cur.stream === local.current ? camOnRef.current : cur.raw.enabled;
+		cur.stream.addTrack(cur.raw);
+		if (cur.stream === local.current) await swapSenders(cur.raw);
+		refreshVideos(cur.stream);
+	};
+	const applyBackground = async (mode: BackgroundMode) => {
+		bgRef.current = mode;
+		setBg(mode);
+		setBgNote("");
+		const target = local.current && local.current.getVideoTracks().length ? local.current : preview.current;
+		if (!target) return;
+		if (mode.kind === "none") return clearBackground(true);
+		if (!backgroundSupported()) { setBgNote("This browser cannot change backgrounds."); return; }
+		setBgBusy(true);
+		try {
+			const cur = bgProc.current;
+			if (cur && cur.stream === target) { await cur.proc.setMode(mode); return; }
+			await clearBackground(true);
+			const raw = target.getVideoTracks()[0];
+			if (!raw) { setBgNote("Turn your camera on to change the background."); return; }
+			const proc = new BackgroundProcessor(raw, mode);
+			const out = await proc.start();
+			target.removeTrack(raw);
+			target.addTrack(out);
+			bgProc.current = { proc, raw, out, stream: target };
+			if (target === local.current) await swapSenders(out);
+			refreshVideos(target);
+		} catch {
+			bgRef.current = { kind: "none" };
+			setBg({ kind: "none" });
+			setBgNote("Could not load the background effect. Check your connection and try again.");
+		} finally {
+			setBgBusy(false);
+		}
+	};
+	const uploadBackground = (file: File | undefined) => {
+		if (!file) return;
+		if (!file.type.startsWith("image/") || file.size > 8_000_000) { setBgNote("Choose a picture under 8 MB."); return; }
+		const src = URL.createObjectURL(file);
+		setCustomBgs((c) => [...c.slice(-3), src]);
+		void applyBackground({ kind: "image", src });
+	};
+	const stopPreview = () => {
+		if (bgProc.current && bgProc.current.stream === preview.current) void clearBackground(false);
+		preview.current?.getTracks().forEach((t) => t.stop());
+		preview.current = null;
+	};
 	useEffect(() => {
 		if (joined || left) return;
 		let cancelled = false;
@@ -201,6 +284,7 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 				setPermission("granted");
 				if (previewVideo.current && previewVideo.current.srcObject !== stream) previewVideo.current.srcObject = stream;
 				stream.getVideoTracks().forEach((t) => (t.enabled = camOnRef.current));
+				if (bgRef.current.kind !== "none") void applyBackground(bgRef.current);
 				stream.getAudioTracks().forEach((t) => (t.enabled = micOnRef.current));
 
 				const all = await navigator.mediaDevices.enumerateDevices();
@@ -254,6 +338,9 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 		pc.ontrack = (e) => setRemote(peer.id, { stream: e.streams[0] });
 		pc.onicecandidate = (e) => { if (e.candidate) send("signal", { from: myId.current, to: peer.id, kind: "ice" as SignalKind, data: e.candidate.toJSON() }); };
 		pc.onconnectionstatechange = () => {
+			const states = [...pcs.current.values()].map((x) => x.connectionState);
+			if (states.length && states.every((x) => x === "disconnected" || x === "failed")) markLost();
+			else if (states.includes("connected")) markOk();
 			if (pc.connectionState === "failed" || pc.connectionState === "closed") {
 				pcs.current.delete(peer.id);
 				setRemotes((cur) => cur.filter((r) => r.id !== peer.id));
@@ -264,7 +351,7 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 			await pc.setLocalDescription(offer);
 			send("signal", { from: myId.current, to: peer.id, kind: "offer" as SignalKind, data: offer, name: shownName, companion, uid: userId });
 		}
-	}, [shownName, companion, userId, send, setRemote]);
+	}, [shownName, companion, userId, send, setRemote, markLost, markOk]);
 
 	const onSignal = useCallback(async (m: { from: string; to: string; kind: SignalKind; data: unknown; name?: string; companion?: boolean; uid?: string | null }) => {
 		if (m.to !== myId.current) return;
@@ -303,6 +390,7 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 	};
 
 	const begin = async (roomKeyValue: string, host: boolean, present = false, hostToken?: string) => {
+		leavingRef.current = false;
 		setIsHost(host);
 		if (host) hostIds.current.add(myId.current);
 		stopPreview();
@@ -314,6 +402,7 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 			local.current = stream;
 			stream.getAudioTracks().forEach((t) => (t.enabled = micOn));
 			stream.getVideoTracks().forEach((t) => (t.enabled = camOn));
+			if (bgRef.current.kind !== "none") void applyBackground(bgRef.current);
 		} catch {
 			local.current = new MediaStream();
 			setMicOn(false);
@@ -324,6 +413,13 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 		channel.current = ch;
 		ch.on("broadcast", { event: "signal" }, ({ payload }) => onSignal(payload))
 			.on("broadcast", { event: "caption" }, ({ payload }) => addLine(payload as TranscriptLine))
+			.on("broadcast", { event: "bye" }, ({ payload }) => {
+				const id = String(payload.id);
+				hostIds.current.delete(id);
+				pcs.current.get(id)?.close();
+				pcs.current.delete(id);
+				setRemotes((cur) => cur.filter((r) => r.id !== id));
+			})
 			.on("broadcast", { event: "rec" }, ({ payload }) => setRecBy(payload.on ? String(payload.by ?? "Someone") : null))
 			.on("broadcast", { event: "state" }, ({ payload }) => setRemote(payload.id, { muted: !!payload.muted, sharing: !!payload.sharing, hand: !!payload.hand, notes: !!payload.notes, cam: payload.cam !== false, handAt: payload.hand ? Date.now() : undefined }))
 			.on("broadcast", { event: "pin" }, ({ payload }) => setChat((cur) => cur.map((x) => (x.id === payload.id ? { ...x, pinned: !!payload.pinned } : x))))
@@ -355,7 +451,7 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 				const mine = payload.to === myId.current || payload.to === "all";
 				if (!mine) return;
 				if (payload.action === "mute") { micOnRef.current = false; setMicOn(false); local.current?.getAudioTracks().forEach((t) => (t.enabled = false)); pushState({ muted: true }); }
-				if (payload.action === "remove" || payload.action === "end") void leaveRef.current();
+				if ((payload.action === "remove" || payload.action === "end") && !(typeof payload.at === "number" && Date.now() - payload.at > 15_000)) void leaveRef.current();
 					if (payload.action === "cohost" && typeof payload.token === "string" && payload.to === myId.current) { setCohostToken(payload.token); send("cohost", { id: myId.current, ht: payload.token }); }
 			})
 			.on("presence", { event: "join" }, ({ key, newPresences }) => {
@@ -374,7 +470,7 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 				pcs.current.delete(key);
 				setRemotes((cur) => cur.filter((r) => r.id !== key));
 			})
-			.subscribe(async (status) => { if (status === "SUBSCRIBED") { await ch.track({ name: shownName, companion, uid: userId, host, ht: hostToken }); pushState({ muted: !micOnRef.current, cam: camOnRef.current && !!local.current?.getVideoTracks().length }); } });
+			.subscribe(async (status) => { if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") markLost(); if (status === "SUBSCRIBED") { markOk(); await ch.track({ name: shownName, companion, uid: userId, host, ht: hostToken }); pushState({ muted: !micOnRef.current, cam: camOnRef.current && !!local.current?.getVideoTracks().length }); } });
 		setJoined(true);
 		setReadyOpen(true);
 		if (present) setTimeout(() => { void toggleShareRef.current(); }, 600);
@@ -623,6 +719,8 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 
 	/** Change microphone or camera while in the call: the new track replaces the old one on every connection. */
 	const switchDevice = async (kind: "audio" | "video", deviceId: string) => {
+		const keepBg = kind === "video" && bgProc.current ? bgRef.current : null;
+		if (keepBg) await clearBackground(true);
 		try {
 			const fresh = await navigator.mediaDevices.getUserMedia(kind === "audio"
 				? { audio: { deviceId: { exact: deviceId }, noiseSuppression: noise, echoCancellation: echo, autoGainControl: true } }
@@ -640,6 +738,7 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 			if (kind === "audio") setMicId(deviceId); else setCamId(deviceId);
 			if (localVideo.current) localVideo.current.srcObject = local.current;
 		} catch { /* the old device stays in use */ }
+		if (keepBg) await applyBackground(keepBg);
 	};
 	const applyAudioProcessing = async (next: { noiseSuppression?: boolean; echoCancellation?: boolean }) => {
 		const t = local.current?.getAudioTracks()[0];
@@ -662,7 +761,7 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 		return () => { on = false; clearInterval(t); };
 			}, [joined, code, cohostToken]);
 	const addCohost = (peerId: string) => { void unwrap(makeCohost(code, peerId)).then((token) => { send("ctl", { from: myId.current, to: peerId, action: "cohost", token }); setRemote(peerId, { host: true }); hostIds.current.add(peerId); }).catch(() => undefined); };
-	const hostCtl = (to: string, action: "mute" | "remove" | "end") => send("ctl", { from: myId.current, to, action });
+	const hostCtl = (to: string, action: "mute" | "remove" | "end") => send("ctl", { from: myId.current, to, action, at: Date.now() });
 	const decide = (k: Knock, admit: boolean) => {
 		setKnocks((cur) => cur.filter((x) => x.guestKey !== k.guestKey));
 		void unwrap(decideKnock(code, k.guestKey, admit, cohostToken)).catch(() => undefined);
@@ -719,6 +818,16 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 	// Taking notes (the transcript is the notes) is announced to everyone, and told again to anyone who joins later.
 	useEffect(() => { if (joined) pushState({ notes: captionsOn }); }, [joined, captionsOn, pushState]);
 	const noteTakers = [...(captionsOn ? ["You"] : []), ...remotes.filter((r) => r.notes).map((r) => r.name)];
+
+	useEffect(() => {
+		if (!joined) return;
+		const off = () => markLost();
+		const on = () => markOk();
+		window.addEventListener("offline", off);
+		window.addEventListener("online", on);
+		if (!navigator.onLine) markLost();
+		return () => { window.removeEventListener("offline", off); window.removeEventListener("online", on); };
+	}, [joined, markLost, markOk]);
 
 	const home = canSave ? "/meet" : "/";
 	useEffect(() => {
@@ -791,11 +900,28 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 
 	const leave = useCallback(async () => {
 		// Everything that holds the camera, the microphone or the screen is let go first.
-		await persist(true);
-		if (recorder.current) await stopRecording();
-		stopPreview();
+		leavingRef.current = true;
+		lostRef.current = false;
+		setConn("ok");
+		// 1. What others can see goes first, and needs no network: the screen, the camera, and a goodbye so the
+		//    tile and any presentation disappear for everyone straight away.
+		try {
+			send("state", { id: myId.current, muted: true, cam: false, sharing: false, hand: false, notes: false });
+			send("bye", { id: myId.current });
+		} catch { /* the network is gone: the others notice when the connection drops */ }
 		screenStream.current?.getTracks().forEach((t) => t.stop());
 		screenStream.current = null;
+		setSharing(false);
+		await clearBackground(false);
+		local.current?.getVideoTracks().forEach((t) => t.stop());
+		await new Promise((r) => setTimeout(r, 120));
+		// 2. Saving the transcript and recording needs the network, so it never holds the rest up.
+		const keep = (async () => {
+			await persist(true);
+			if (recorder.current) await stopRecording();
+		})().catch(() => undefined);
+		await Promise.race([keep, new Promise((r) => setTimeout(r, 2500))]);
+		stopPreview();
 		pcs.current.forEach((pc) => pc.close());
 		pcs.current.clear();
 		local.current?.getTracks().forEach((t) => t.stop());
@@ -812,7 +938,7 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 		}
 		// Straight back to Meet: no second screen to dismiss, and no camera left on.
 		window.location.assign(home);
-	}, [persist, inSuite, router, home, stopRecording]);
+	}, [persist, inSuite, router, home, stopRecording, send]);
 
 	leaveRef.current = leave;
 	useEffect(() => () => {
@@ -912,6 +1038,7 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 					{micOn && permission === "granted" && (
 						<div className="mt-3 flex items-center gap-2 text-xs text-[#5f6368]"><Mic className="h-3.5 w-3.5" /><div className="h-1.5 flex-1 overflow-hidden rounded-full bg-[#e8eaed]"><div className="h-full rounded-full bg-[#068297] transition-[width] duration-100" style={{ width: `${Math.round(level * 100)}%` }} /></div></div>
 					)}
+					{permission === "granted" && mode === "video" && <div className="mt-3"><BackgroundPicker light bg={bg} busy={bgBusy} note={bgNote} customs={customBgs} onPick={(m) => void applyBackground(m)} onUpload={uploadBackground} /></div>}
 					{permission === "granted" && (
 						<div className="mt-3 flex flex-wrap gap-2">
 							{mics.length > 0 && <label className={chip}><Mic className="h-4 w-4 shrink-0" /><select aria-label="Microphone" value={micId} onChange={(e) => setMicId(e.target.value)} className="min-w-0 bg-transparent outline-none"><option value="">Default microphone</option>{mics.map((d) => <option key={d.id} value={d.id}>{d.label}</option>)}</select></label>}
@@ -979,6 +1106,7 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 
 	return (
 		<div className={cn("fixed inset-0 z-[100] flex h-dvh flex-col bg-[#0E1318] text-white", a11y.reduceMotion && "[&_*]:!transition-none [&_*]:!animate-none")}>
+			{remotes.filter((r) => r.stream).map((r) => <RemoteAudio key={r.id} stream={r.stream!} sinkId={speakerId} on={speakerOn} />)}
 			<ReactionLayer items={floating} />
 			{reactOpen && <div className="md:hidden"><div className="fixed inset-0 z-30" onClick={() => setReactOpen(false)} /><div className="fixed inset-x-0 bottom-20 z-40 flex justify-center"><div className="relative"><ReactionPicker onPick={react} onClose={() => setReactOpen(false)} /></div></div></div>}
 			{knocks.length > 0 && (
@@ -999,6 +1127,13 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 				<div role="status" className="absolute left-1/2 top-3 z-30 flex -translate-x-1/2 items-center gap-2 rounded-full bg-black/70 px-3.5 py-1.5 text-xs font-medium text-white backdrop-blur">
 					<span className={cn("h-2 w-2 rounded-full", saving ? "bg-amber-400" : "animate-pulse bg-[#ea4335]")} />
 					{saving ? `Saving the recording${savePct !== null ? ` ${savePct}%` : ""}` : recording ? `Recording ${String(Math.floor(recSecs / 60)).padStart(2, "0")}:${String(recSecs % 60).padStart(2, "0")}` : `${recBy} is recording this meeting`}
+				</div>
+			)}
+			{conn !== "ok" && (
+				<div role="alert" className={cn("absolute left-1/2 top-14 z-50 flex max-w-[92vw] -translate-x-1/2 items-center gap-3 rounded-2xl px-4 py-2.5 text-sm font-medium shadow-xl", conn === "lost" ? "bg-[#d93025] text-white" : "bg-[#137333] text-white")}>
+					{conn === "lost" ? <WifiOff className="h-4 w-4 shrink-0" /> : <Check className="h-4 w-4 shrink-0" />}
+					<span>{conn === "lost" ? "You are disconnected from the call. Trying to reconnect…" : "You are back in the call."}</span>
+					{conn === "lost" && <button onClick={() => void leave()} className="shrink-0 rounded-full bg-white/20 px-3 py-1 text-xs font-bold hover:bg-white/30">Leave</button>}
 				</div>
 			)}
 			{noteTakers.length > 0 && (
@@ -1044,9 +1179,7 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 							<div className="relative min-h-0 flex-1 overflow-hidden rounded-xl bg-black">
 								{presenter.id === "me" ? (
 									<>
-										<ScreenPreview stream={screenStream.current} />
-										<span className="absolute left-3 top-3 rounded-md bg-black/60 px-2.5 py-1 text-sm">You are presenting to everyone</span>
-										<button onClick={stopShare} className="absolute bottom-4 left-1/2 -translate-x-1/2 rounded-full bg-[#ea4335] px-5 py-2 text-sm font-medium hover:bg-[#d93025]">Stop presenting</button>
+										<PresentingPanel surface={screenStream.current?.getVideoTracks()[0]?.getSettings().displaySurface} onStop={stopShare} onFloat={() => void floatWindow()} />
 									</>
 								) : (
 									<>
@@ -1095,6 +1228,7 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 										<select value={micId} onChange={(e) => void switchDevice("audio", e.target.value)} className="h-10 w-full rounded-lg border border-[#dadce0] bg-white px-2"><option value="">Default microphone</option>{mics.map((d) => <option key={d.id} value={d.id}>{d.label}</option>)}</select></label>
 									<label className="block"><span className="mb-1 block text-xs text-[#5f6368]">Camera</span>
 										<select value={camId} onChange={(e) => void switchDevice("video", e.target.value)} className="h-10 w-full rounded-lg border border-[#dadce0] bg-white px-2"><option value="">Default camera</option>{cams.map((d) => <option key={d.id} value={d.id}>{d.label}</option>)}</select></label>
+									{mode === "video" && <BackgroundPicker light bg={bg} busy={bgBusy} note={bgNote} customs={customBgs} onPick={(m) => void applyBackground(m)} onUpload={uploadBackground} />}
 									<label className="block"><span className="mb-1 block text-xs text-[#5f6368]">Speaker</span>
 										<select value={speakerId} onChange={(e) => setSpeakerId(e.target.value)} className="h-10 w-full rounded-lg border border-[#dadce0] bg-white px-2"><option value="">Default speaker</option>{speakers.map((d) => <option key={d.id} value={d.id}>{d.label}</option>)}</select></label>
 									<label className="flex items-center justify-between gap-3"><span>Reduce background noise</span><input type="checkbox" checked={noise} onChange={(e) => { setNoise(e.target.checked); void applyAudioProcessing({ noiseSuppression: e.target.checked }); }} className="h-4 w-4 accent-[#068297]" /></label>
@@ -1317,8 +1451,52 @@ function StreamVideo({ stream, className, muted }: { stream: MediaStream | null;
 	useEffect(() => { if (ref.current && ref.current.srcObject !== stream) ref.current.srcObject = stream; if (ref.current && muted) ref.current.muted = true; }, [stream, muted]);
 	return <video ref={ref} data-rec-video="1" data-rec-stage="1" autoPlay playsInline muted={muted} className={className} />;
 }
-function ScreenPreview({ stream }: { stream: MediaStream | null }) {
-	return <StreamVideo stream={stream} muted className="h-full w-full object-contain" />;
+/**
+ * Shown to the person presenting instead of their own screen: showing the screen they are sharing back to them
+ * makes the call appear inside itself again and again. This says what is shared and how to carry on working.
+ */
+function PresentingPanel({ surface, onStop, onFloat }: { surface?: string; onStop: () => void; onFloat: () => void }) {
+	const what = surface === "browser" ? "a browser tab" : surface === "window" ? "a window" : surface === "monitor" ? "your whole screen" : "your screen";
+	return (
+		<div className="flex h-full flex-col items-center justify-center gap-4 bg-gradient-to-br from-[#12303a] to-[#0E1318] px-6 text-center">
+			<span className="flex h-16 w-16 items-center justify-center rounded-full bg-[#068297]/25 ring-1 ring-[#7fd3e0]/40"><MonitorUp className="h-8 w-8 text-[#7fd3e0]" /></span>
+			<div>
+				<p className="text-lg font-medium">You are presenting {what}</p>
+				<p className="mx-auto mt-1 max-w-sm text-sm text-white/70">Everyone can see it. It is not shown back to you, so the call does not appear inside itself. Go to what you are sharing and carry on.</p>
+			</div>
+			<div className="flex flex-wrap justify-center gap-2">
+				<button onClick={onFloat} className="flex items-center gap-2 rounded-full border border-white/30 px-5 py-2 text-sm font-medium hover:bg-white/10"><PictureInPicture2 className="h-4 w-4" /> Keep the call in a floating window</button>
+				<button onClick={onStop} className="rounded-full bg-[#ea4335] px-5 py-2 text-sm font-medium hover:bg-[#d93025]">Stop presenting</button>
+			</div>
+		</div>
+	);
+}
+
+/** Pick what is behind you: nothing, a blur, a ready-made picture or one of your own. */
+function BackgroundPicker({ bg, busy, note, customs, onPick, onUpload, light }: { bg: BackgroundMode; busy: boolean; note: string; customs: string[]; onPick: (m: BackgroundMode) => void; onUpload: (f: File | undefined) => void; light?: boolean }) {
+	const on = (m: BackgroundMode) => (m.kind === bg.kind && (m.kind !== "blur" || (bg.kind === "blur" && bg.strength === m.strength)) && (m.kind !== "image" || (bg.kind === "image" && bg.src === m.src)));
+	const tile = (active: boolean) => cn("relative flex h-14 w-20 shrink-0 items-center justify-center overflow-hidden rounded-lg border text-[11px] font-medium transition", active ? "border-[#068297] ring-2 ring-[#068297]" : light ? "border-[#dadce0] hover:border-[#068297]" : "border-white/20 hover:border-white/60", busy && "opacity-60");
+	return (
+		<div>
+			<span className={cn("mb-1 flex items-center gap-1.5 text-xs", light ? "text-[#5f6368]" : "text-white/70")}><Sparkles className="h-3.5 w-3.5" /> Background {busy && <Loader2 className="h-3 w-3 animate-spin" />}</span>
+			<div className="flex gap-2 overflow-x-auto pb-1">
+				<button type="button" disabled={busy} onClick={() => onPick({ kind: "none" })} className={cn(tile(on({ kind: "none" })), light ? "bg-white text-[#3c4043]" : "bg-white/10")}>None</button>
+				<button type="button" disabled={busy} onClick={() => onPick({ kind: "blur", strength: "light" })} className={cn(tile(on({ kind: "blur", strength: "light" })), light ? "bg-[#e8eaed] text-[#3c4043]" : "bg-white/20")}>Blur</button>
+				<button type="button" disabled={busy} onClick={() => onPick({ kind: "blur", strength: "strong" })} className={cn(tile(on({ kind: "blur", strength: "strong" })), light ? "bg-[#dadce0] text-[#3c4043]" : "bg-white/30")}>More blur</button>
+				{PRESET_BACKGROUNDS.map((p) => (
+					<button key={p.id} type="button" disabled={busy} aria-label={`${p.label} background`} onClick={() => onPick({ kind: "image", src: presetImage(p.id) })} className={tile(bg.kind === "image" && bg.src.startsWith("data:") && bg.src === presetImage(p.id))} style={{ background: `linear-gradient(135deg, ${p.colours[0]}, ${p.colours[1]})` }}><span className="rounded bg-black/40 px-1 text-white">{p.label}</span></button>
+				))}
+				{customs.map((c) => (
+					<button key={c} type="button" disabled={busy} aria-label="Your picture" onClick={() => onPick({ kind: "image", src: c })} className={tile(bg.kind === "image" && bg.src === c)} style={{ backgroundImage: `url(${c})`, backgroundSize: "cover", backgroundPosition: "center" }} />
+				))}
+				<label className={cn(tile(false), "cursor-pointer flex-col gap-0.5", light ? "bg-white text-[#068297]" : "bg-white/10")}>
+					<ImagePlus className="h-4 w-4" /> Upload
+					<input type="file" accept="image/*" className="sr-only" onChange={(e) => { onUpload(e.target.files?.[0]); e.target.value = ""; }} />
+				</label>
+			</div>
+			<p className={cn("mt-1 text-[11px]", light ? "text-[#5f6368]" : "text-white/50")}>{note || "The effect is made on your device, before anyone sees your camera."}</p>
+		</div>
+	);
 }
 
 function initials(n: string) { return n.trim().split(/\s+/).map((p) => p[0]).slice(0, 2).join("").toUpperCase() || "?"; }
@@ -1347,6 +1525,27 @@ function useSpeaking(stream: MediaStream | null, muted: boolean) {
 	return on;
 }
 
+/**
+ * One voice per person, played from the main page whichever window draws the picture. Tiles are always silent, so
+ * moving the call into the floating window (a new document that may not be allowed to play sound) cannot cut
+ * what you hear, and no one is heard twice.
+ */
+function RemoteAudio({ stream, sinkId, on }: { stream: MediaStream; sinkId: string; on: boolean }) {
+	const ref = useRef<HTMLAudioElement>(null);
+	useEffect(() => {
+		const el = ref.current;
+		if (!el) return;
+		if (el.srcObject !== stream) el.srcObject = stream;
+		el.muted = !on;
+		void el.play().catch(() => undefined);
+	}, [stream, on]);
+	useEffect(() => {
+		const el = ref.current as (HTMLAudioElement & { setSinkId?: (id: string) => Promise<void> }) | null;
+		if (el?.setSinkId && sinkId) el.setSinkId(sinkId).catch(() => undefined);
+	}, [sinkId]);
+	return <audio ref={ref} autoPlay />;
+}
+
 function RemoteTile({ r, sinkId, audioOn, reaction, pinned, onPin }: { r: Remote; sinkId: string; audioOn: boolean; reaction?: string; pinned: boolean; onPin: () => void }) {
 	const ref = useRef<HTMLVideoElement>(null);
 	// The other person's own word on their camera wins: a switched-off camera still sends black frames.
@@ -1359,7 +1558,7 @@ function RemoteTile({ r, sinkId, audioOn, reaction, pinned, onPin }: { r: Remote
 	}, [sinkId]);
 	return (
 		<div className={cn("group relative flex h-full min-h-[120px] items-center justify-center overflow-hidden rounded-2xl bg-[#2a2a2a] ring-2 transition", speaking ? "ring-[#7fd3e0]" : "ring-transparent")}>
-			<video ref={ref} data-remote="1" data-rec-video="1" autoPlay playsInline muted={!audioOn} className={cn("h-full w-full object-cover", !hasVideo && "invisible absolute")} />
+			<video ref={ref} data-remote="1" data-rec-video="1" autoPlay playsInline muted className={cn("h-full w-full object-cover", !hasVideo && "invisible absolute")} />
 			{!hasVideo && <span className="flex h-16 w-16 items-center justify-center rounded-full bg-[#4b5563] text-xl font-semibold">{initials(r.name)}</span>}
 			{r.cam === false && <span className="absolute left-2 top-2 flex items-center gap-1 rounded-md bg-black/60 px-2 py-1 text-xs"><VideoOff className="h-3 w-3" /> Camera off</span>}
 			{!r.stream && <Loader2 className="absolute right-3 top-3 h-4 w-4 animate-spin text-white/60" />}
