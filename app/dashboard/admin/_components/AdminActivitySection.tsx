@@ -64,7 +64,7 @@ export function AdminActivitySection() {
             // Fetch professionals
             const { data: professionals } = await supabase
                 .from("profiles")
-                .select("id, first_name, last_name, created_at, updated_at, verification_updated_at, avatar_url, user_type, verification_status, accreditation_files_metadata, reviewed_by")
+                .select("id, first_name, last_name, created_at, updated_at, verification_updated_at, admin_verified_at, avatar_url, user_type, verification_status, accreditation_files_metadata, reviewed_by")
                 .in("user_type", ["professional", "ngo"])
                 .order("updated_at", { ascending: false })
                 .limit(20);
@@ -72,7 +72,7 @@ export function AdminActivitySection() {
             // Fetch services
             const { data: services } = await supabase
                 .from("support_services")
-                .select("id, name, created_at, verification_updated_at, service_types, verification_status, accreditation_files_metadata, reviewed_by")
+                .select("id, name, created_at, verification_updated_at, verified_at, service_types, verification_status, accreditation_files_metadata, reviewed_by")
                 .order("verification_updated_at", { ascending: false })
                 .limit(20);
 
@@ -97,7 +97,8 @@ export function AdminActivitySection() {
                         type: "professional" as const,
                         name: `${p.first_name || 'Unknown'} ${p.last_name || ''}`.trim(),
                         submittedAt: (p.verification_updated_at as string) || (p.created_at as string) || new Date().toISOString(),
-                        updatedAt: (p.updated_at as string) || (p.created_at as string),
+                        // When it was decided, never when the profile was last touched (that moves with every edit or sign-in).
+                        updatedAt: decidedAt(reviewedByAny, p.admin_verified_at as string | null, p.verification_updated_at as string | null) || (p.created_at as string),
                         avatarUrl: p.avatar_url,
                         status: p.verification_status || 'pending',
                         details: p.user_type === 'ngo' ? 'NGO Representative' : 'Professional',
@@ -115,7 +116,7 @@ export function AdminActivitySection() {
                         type: "service" as const,
                         name: s.name || 'Untitled Service',
                         submittedAt: (s.verification_updated_at as string) || (s.created_at as string) || new Date().toISOString(),
-                        updatedAt: (s.verification_updated_at as string) || (s.created_at as string),
+                        updatedAt: decidedAt(reviewedByAny, s.verified_at as string | null, s.verification_updated_at as string | null) || (s.created_at as string),
                         avatarUrl: null,
                         status: s.verification_status || 'pending',
                         details: Array.isArray(s.service_types) ? (s.service_types[0] as string) : (s.service_types as string),
@@ -365,6 +366,12 @@ function ActivityCard({ item, isNew }: { item: ActivityItem, isNew: boolean }) {
             </Card>
         </Link>
     );
+}
+
+/** The moment a decision was made: the reviewer's own record first, then the verified-at stamps. */
+function decidedAt(reviewedBy: unknown, verifiedAt?: string | null, updatedAt?: string | null): string | null {
+    const r = reviewedBy && typeof reviewedBy === "object" ? (reviewedBy as { reviewed_at?: string }).reviewed_at : null;
+    return r || verifiedAt || updatedAt || null;
 }
 
 /** Days, not just hours: "Today, 14:05", "Yesterday", "3 days ago · 12 Oct 2026". */
