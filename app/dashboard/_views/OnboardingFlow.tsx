@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import Image from "next/image";
+import { RoleIcon } from "@/components/RoleIcon";
 import { useUser } from "@/hooks/useUser";
 import { createClient } from "@/utils/supabase/client";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
@@ -421,13 +421,7 @@ export default function OnboardingFlow() {
 					>
 						<div className="flex flex-row sm:flex-col items-center sm:justify-center gap-4 relative z-10 w-full">
 							<div className="w-14 sm:w-16 shrink-0 aspect-square relative flex justify-center items-center bg-serene-blue-50 rounded-xl shadow-sm border border-serene-blue-100 transition-all duration-500 group-hover:bg-serene-blue-100/50">
-								<Image
-									src="/icons/survivor-light.png"
-									alt="Survivor"
-									className="object-contain p-2"
-									height={60}
-									width={60}
-								/>
+								<RoleIcon role="survivor" size={60} />
 							</div>
 							<div className="flex-1 text-left sm:text-center">
 								<h3 className="text-base sm:text-lg font-bold text-serene-neutral-900 group-hover:text-serene-blue-600 transition-colors">
@@ -455,13 +449,7 @@ export default function OnboardingFlow() {
 					>
 						<div className="flex flex-row sm:flex-col items-center sm:justify-center gap-4 relative z-10 w-full">
 							<div className="w-14 sm:w-16 shrink-0 aspect-square relative flex justify-center items-center bg-serene-blue-50 rounded-xl shadow-sm border border-serene-blue-100 transition-all duration-500 group-hover:bg-serene-blue-100/50">
-								<Image
-									src="/icons/professional-light.png"
-									alt="Service Provider"
-									className="object-contain p-2"
-									height={60}
-									width={60}
-								/>
+								<RoleIcon role="professional" size={60} />
 							</div>
 							<div className="flex-1 text-left sm:text-center">
 								<h3 className="text-base sm:text-lg font-bold text-serene-neutral-900 group-hover:text-serene-blue-600 transition-colors">
@@ -489,13 +477,7 @@ export default function OnboardingFlow() {
 					>
 						<div className="flex flex-row sm:flex-col items-center sm:justify-center gap-4 relative z-10 w-full">
 							<div className="w-14 sm:w-16 shrink-0 aspect-square relative flex justify-center items-center bg-serene-blue-50 rounded-xl shadow-sm border border-serene-blue-100 transition-all duration-500 group-hover:bg-serene-blue-100/50">
-								<Image
-									src="/icons/ngo-light.png"
-									alt="Organisation"
-									className="object-contain p-2"
-									height={60}
-									width={60}
-								/>
+								<RoleIcon role="ngo" size={60} />
 							</div>
 							<div className="flex-1 text-left sm:text-center">
 								<h3 className="text-base sm:text-lg font-bold text-serene-neutral-900 group-hover:text-serene-blue-600 transition-colors">

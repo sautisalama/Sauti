@@ -49,7 +49,11 @@ export default async function SignIn({ searchParams }: { searchParams: Promise<{
                             <form action={signIn} className="space-y-5">
                                 {error && (
                                     <p role="alert" className="rounded-xl bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
-                                        That email and password did not match an account. Check them and try again.
+                                        {error === "network"
+                                            ? "We couldn't reach the server just now. Check your connection and try again."
+                                            : error === "google"
+                                              ? "Google sign-in didn't start. Please try again."
+                                              : "That email and password did not match an account. Check them and try again."}
                                     </p>
                                 )}
                                 {next && <input type="hidden" name="next" value={next} />}

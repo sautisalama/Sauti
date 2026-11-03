@@ -100,7 +100,9 @@ export async function signIn(formData: FormData) {
 	if (error) {
 		console.error("Sign in error:", error);
 		const back = safeNext(formData.get("next"));
-		return redirect(`/signin?error=invalid${back ? `&next=${encodeURIComponent(back)}` : ""}`);
+		// A dropped connection to Supabase is not a wrong password: say so.
+		const kind = error.name === "AuthRetryableFetchError" || error.status === 0 ? "network" : "invalid";
+		return redirect(`/signin?error=${kind}${back ? `&next=${encodeURIComponent(back)}` : ""}`);
 	}
 
 	// Register device on sign in
@@ -154,7 +156,7 @@ export async function signInWithGoogle() {
 
 	if (error) {
 		console.error("Google sign in error:", error);
-		return redirect("/?message=google_signin_failed");
+		return redirect(`/signin?error=${error.name === "AuthRetryableFetchError" ? "network" : "google"}`);
 	}
 
 	if (data.url) {

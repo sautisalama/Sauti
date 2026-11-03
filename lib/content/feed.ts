@@ -32,10 +32,10 @@ const fmt = (iso: string) =>
 
 type Card = Pick<
 	PublicationRow,
-	"slug" | "title" | "summary" | "kind" | "category" | "cover_image_url" | "cover_image_alt" | "published_at" | "read_minutes" | "featured"
+	"slug" | "title" | "summary" | "kind" | "category" | "cover_image_url" | "cover_image_alt" | "display_mode" | "source_file_url" | "published_at" | "read_minutes" | "featured"
 >;
 
-const CARD_COLS = "slug, title, summary, kind, category, cover_image_url, cover_image_alt, published_at, read_minutes, featured";
+const CARD_COLS = "slug, title, summary, kind, category, cover_image_url, cover_image_alt, display_mode, source_file_url, published_at, read_minutes, featured";
 
 function fromRow(r: Card): FeedItem {
 	return {
@@ -46,7 +46,7 @@ function fromRow(r: Card): FeedItem {
 		date: r.published_at!,
 		dateLabel: fmt(r.published_at!),
 		href: `/publications/${r.slug}`,
-		image: r.cover_image_url,
+		image: r.cover_image_url || (r.display_mode === "pdf" && r.source_file_url ? `/api/publications/${r.slug}/cover` : null),
 		imageAlt: r.cover_image_alt || r.title,
 		readTime: r.read_minutes ? `${r.read_minutes} min read` : KIND_LABEL[r.kind],
 		source: "db",

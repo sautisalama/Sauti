@@ -6,6 +6,9 @@ import { Nav } from "@/components/Nav";
 import { Footer } from "@/components/Footer";
 import { ArticleView, KIND_LABEL } from "@/components/publishing/ArticleView";
 import { getPreviewBySlug, getPublishedBySlug } from "@/lib/content/feed";
+import { cache } from "react";
+import { ensurePdfSummary } from "@/lib/content/pdf-preview";
+import { createAdminClient } from "@/utils/supabase/admin-client";
 import { sanitizeContent } from "@/lib/content/sanitize";
 import { createPublicClient } from "@/utils/supabase/public-client";
 import { ORGANIZATION } from "@/lib/organization";
@@ -13,7 +16,17 @@ import { breadcrumbSchema, jsonLd } from "@/lib/seo";
 
 type Props = { params: Promise<{ slug: string }>; searchParams: Promise<{ preview?: string }> };
 
-async function load(slug: string, preview?: string) {
+const load = cache(async (slug: string, preview?: string) => {
+	const found = await loadRaw(slug, preview);
+	if (!found.pub) return found;
+	// PDF posts get a real description (after the cover and contents), kept once found.
+	const pub = await ensurePdfSummary(found.pub, async (id, summary) => {
+		await createAdminClient().from("publications").update({ summary }).eq("id", id);
+	});
+	return { ...found, pub };
+});
+
+async function loadRaw(slug: string, preview?: string) {
 	if (preview) {
 		const draft = await getPreviewBySlug(slug, preview);
 		if (draft) return { pub: draft, isPreview: draft.status !== "published" };
@@ -22,12 +35,17 @@ async function load(slug: string, preview?: string) {
 	return { pub, isPreview: false };
 }
 
+/** The cover, or for a PDF post without one, its first page. */
+const previewImage = (pub: { slug: string; cover_image_url: string | null; display_mode: string; source_file_url: string | null }) =>
+	pub.cover_image_url || (pub.display_mode === "pdf" && pub.source_file_url ? `${ORGANIZATION.url}/api/publications/${pub.slug}/social` : undefined);
+
 export async function generateMetadata({ params, searchParams }: Props): Promise<Metadata> {
 	const { slug } = await params;
 	const { preview } = await searchParams;
 	const { pub, isPreview } = await load(slug, preview);
 	if (!pub) return { title: "Not found", robots: { index: false } };
 	const url = `${ORGANIZATION.url}/publications/${pub.slug}`;
+	const image = previewImage(pub);
 	return {
 		title: pub.title,
 		description: pub.summary ?? undefined,
@@ -37,9 +55,16 @@ export async function generateMetadata({ params, searchParams }: Props): Promise
 			title: pub.title,
 			description: pub.summary ?? undefined,
 			url,
+			siteName: ORGANIZATION.name,
 			type: "article",
 			publishedTime: pub.published_at ?? undefined,
-			images: pub.cover_image_url ? [pub.cover_image_url] : undefined,
+			images: image ? [{ url: image, ...(pub.cover_image_url ? {} : { width: 1200, height: 630, type: "image/jpeg" }), alt: pub.cover_image_alt || pub.title }] : undefined,
+		},
+		twitter: {
+			card: image ? "summary_large_image" : "summary",
+			title: pub.title,
+			description: pub.summary ?? undefined,
+			images: image ? [image] : undefined,
 		},
 	};
 }
@@ -66,7 +91,7 @@ export default async function PublicationPage({ params, searchParams }: Props) {
 		"@type": "Article",
 		headline: pub.title,
 		description: pub.summary ?? undefined,
-		image: pub.cover_image_url ?? undefined,
+		image: previewImage(pub),
 		datePublished: pub.published_at ?? undefined,
 		dateModified: pub.updated_at,
 		mainEntityOfPage: url,
@@ -102,7 +127,7 @@ export default async function PublicationPage({ params, searchParams }: Props) {
 				</div>
 			)}
 			<main id="main-content" className="flex-1 px-4 py-10 md:py-16">
-				<div className="mx-auto mb-8 max-w-3xl">
+				<div className={`mx-auto mb-8 ${pub.display_mode === "pdf" && pub.source_file_url ? "max-w-4xl" : "max-w-3xl"}`}>
 					<Link href="/publications" className="inline-flex items-center gap-2 text-sm font-bold text-[#1a365d] hover:text-sauti-orange">
 						<ArrowLeft className="h-4 w-4" aria-hidden /> All publications
 					</Link>

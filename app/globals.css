@@ -880,3 +880,8 @@ html.dark [class*="border-serene-neutral-200/"]:not(:focus):not(:focus-within),
 html.dark [class*="border-gray-200/"]:not(:focus):not(:focus-within),
 html.dark [class*="border-gray-100/"]:not(:focus):not(:focus-within) { border-color: #1f2b30; }
 html.dark hr { border-color: #1f2b30; }
+
+/* Role artwork: the dark variant replaces the light one inside the dark layer. */
+.role-icon-dark { display: none; }
+html.dark .role-icon-dark { display: block; }
+html.dark .role-icon-light { display: none; }

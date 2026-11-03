@@ -1,4 +1,5 @@
-import { Download, ExternalLink } from "lucide-react";
+import { ExternalLink } from "lucide-react";
+import { PdfReader } from "./PdfReader";
 import type { ExternalLink as Source } from "@/types/publishing";
 
 export interface ArticleViewProps {
@@ -28,8 +29,8 @@ export const KIND_LABEL: Record<string, string> = {
 export function ArticleView({ title, summary, category, kindLabel, coverUrl, coverAlt, publishedAt, readMinutes, bodyHtml, pdfUrl, links = [], tags = [] }: ArticleViewProps) {
 	const date = publishedAt ? new Date(publishedAt) : null;
 	return (
-		<article className="mx-auto max-w-3xl">
-			<header className="mb-8">
+		<article className={pdfUrl ? "mx-auto max-w-4xl" : "mx-auto max-w-3xl"}>
+			<header className={pdfUrl ? "mx-auto mb-8 max-w-3xl" : "mb-8"}>
 				<div className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] font-black uppercase tracking-widest">
 					{kindLabel && <span className="text-sauti-teal">{kindLabel}</span>}
 					{category && (
@@ -63,16 +64,7 @@ export function ArticleView({ title, summary, category, kindLabel, coverUrl, cov
 			)}
 
 			{pdfUrl ? (
-				<section aria-label="Document" className="space-y-3">
-					<a href={pdfUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 rounded-lg bg-[#008080] px-4 py-2 text-sm font-bold text-white hover:bg-[#006666]">
-						<Download className="h-4 w-4" aria-hidden /> Open or download the PDF
-					</a>
-					<object data={`${pdfUrl}#view=FitH`} type="application/pdf" className="h-[80vh] w-full rounded-xl border border-gray-200" aria-label={title}>
-						<p className="p-6 text-gray-600">
-							Your browser can’t show PDFs here. <a className="font-semibold text-sauti-teal underline" href={pdfUrl} target="_blank" rel="noopener noreferrer">Open the PDF</a> to read it.
-						</p>
-					</object>
-				</section>
+				<PdfReader url={pdfUrl} title={title} />
 			) : bodyHtml ? (
 				<div className="rich-content" dangerouslySetInnerHTML={{ __html: bodyHtml }} />
 			) : (

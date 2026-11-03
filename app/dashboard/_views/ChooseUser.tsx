@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import Image from "next/image";
+import { RoleIcon } from "@/components/RoleIcon";
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/utils/supabase/client";
 import { useRouter } from "next/navigation";
@@ -75,13 +75,7 @@ export default function ChooseUser() {
 					>
 						<div className="flex flex-row sm:flex-col items-center justify-between sm:justify-center gap-4 sm:gap-6 relative z-10 w-full">
 							<div className="w-16 sm:w-24 aspect-square relative flex justify-center items-center bg-white rounded-2xl shadow-sm border border-neutral-100 group-hover:scale-110 transition-transform duration-500">
-								<Image
-									src="/icons/survivor-light.png"
-									alt="Survivor"
-									className="object-contain p-2"
-									height={80}
-									width={80}
-								/>
+								<RoleIcon role="survivor" size={80} />
 							</div>
 							<div className="flex-1 sm:w-full">
 								<h3 className="text-lg font-black text-sauti-dark left sm:text-center group-hover:text-sauti-teal transition-colors">
@@ -105,13 +99,7 @@ export default function ChooseUser() {
 					>
 						<div className="flex flex-row sm:flex-col items-center justify-between sm:justify-center gap-4 sm:gap-6 relative z-10 w-full">
 							<div className="w-16 sm:w-24 aspect-square relative flex justify-center items-center bg-white rounded-2xl shadow-sm border border-neutral-100 group-hover:scale-110 transition-transform duration-500">
-								<Image
-									src="/icons/professional-light.png"
-									alt="Service Provider"
-									height={100}
-									width={100}
-									className="object-contain p-2"
-								/>
+								<RoleIcon role="professional" size={100} />
 							</div>
 							<div className="flex-1 sm:w-full">
 								<h3 className="text-lg font-black text-sauti-dark left sm:text-center group-hover:text-sauti-teal transition-colors">
@@ -135,13 +123,7 @@ export default function ChooseUser() {
 					>
 						<div className="flex flex-row sm:flex-col items-center justify-between sm:justify-center gap-4 sm:gap-6 relative z-10 w-full">
 							<div className="w-16 sm:w-24 aspect-square relative flex justify-center items-center bg-white rounded-2xl shadow-sm border border-neutral-100 group-hover:scale-110 transition-transform duration-500">
-								<Image
-									src="/icons/ngo-light.png"
-									alt="NGO"
-									height={120}
-									width={120}
-									className="object-contain p-2"
-								/>
+								<RoleIcon role="ngo" size={120} />
 							</div>
 							<div className="flex-1 sm:w-full">
 								<h3 className="text-lg font-black text-sauti-dark left sm:text-center group-hover:text-sauti-teal transition-colors">

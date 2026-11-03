@@ -377,28 +377,38 @@ export async function importAsDraft(path: string, kind: PublicationKind): Promis
 }
 
 /**
- * Keep an uploaded PDF as the post itself. Text is still extracted (best effort) so the
- * post is searchable and has a summary, but a scanned or unreadable PDF is fine: it is
- * shown as the PDF either way.
+ * Keep an uploaded PDF as the post itself. No text is extracted: readers see the PDF
+ * natively. Use `extractPdfText` only if the author later chooses "Show the text instead".
  */
-export async function attachPdfFromStorage(path: string): Promise<ActionResult<{ doc: ImportedDocument | null; sourceUrl: string; fileName: string; warning?: string }>> {
+export async function attachPdfFromStorage(path: string): Promise<ActionResult<{ sourceUrl: string; fileName: string }>> {
 	const auth = await requirePublisher();
 	if (!auth.ok) return auth;
 	if (!/^imports\/[\w-]+\/[^/]+$/.test(path)) return { ok: false, error: "Invalid file location." };
 	const admin = createAdminClient();
-	const { data: blob, error } = await admin.storage.from(BUCKET).download(path);
-	if (error || !blob) return { ok: false, error: "Could not read the uploaded file. Please try again." };
-	const buf = Buffer.from(await blob.arrayBuffer());
-	if (buf.subarray(0, 5).toString("latin1") !== "%PDF-") {
+	const { data: head, error } = await admin.storage.from(BUCKET).download(path);
+	if (error || !head) return { ok: false, error: "Could not read the uploaded file. Please try again." };
+	const magic = Buffer.from(await head.slice(0, 5).arrayBuffer()).toString("latin1");
+	if (magic !== "%PDF-") {
 		await admin.storage.from(BUCKET).remove([path]);
 		return { ok: false, error: "That file is not a PDF." };
 	}
 	const fileName = decodeURIComponent(path.split("/").pop() ?? "document.pdf");
 	const sourceUrl = admin.storage.from(BUCKET).getPublicUrl(path).data.publicUrl;
+	return { ok: true, sourceUrl, fileName };
+}
+
+/** On demand only: pull the text out of an already-attached PDF so it can be edited as an article. */
+export async function extractPdfText(sourceUrl: string): Promise<ActionResult<{ doc: ImportedDocument }>> {
+	const auth = await requirePublisher();
+	if (!auth.ok) return auth;
+	const path = storagePathOf(sourceUrl);
+	if (!path) return { ok: false, error: "Invalid file location." };
+	const { data: blob, error } = await createAdminClient().storage.from(BUCKET).download(path);
+	if (error || !blob) return { ok: false, error: "Could not read the PDF." };
 	try {
-		const doc = await importDocument(buf, fileName, { uploadImage: async () => null });
-		return { ok: true, doc, sourceUrl, fileName };
+		const doc = await importDocument(Buffer.from(await blob.arrayBuffer()), path.split("/").pop() ?? "document.pdf", { uploadImage: async () => null });
+		return { ok: true, doc };
 	} catch (e) {
-		return { ok: true, doc: null, sourceUrl, fileName, warning: e instanceof Error ? e.message : "No text could be extracted." };
+		return { ok: false, error: e instanceof Error ? e.message : "No text could be extracted from this PDF." };
 	}
 }

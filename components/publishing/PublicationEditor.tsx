@@ -13,7 +13,7 @@ import { cn } from "@/lib/utils";
 import { uploadToPublications } from "@/lib/content/upload-client";
 import { readingStats } from "@/lib/content/reading";
 import {
-	attachPdfFromStorage, deletePublication, importFromStorage, resendPublicationEmail, returnPublication, savePublication, setPublicationStatus,
+	attachPdfFromStorage, deletePublication, extractPdfText, importFromStorage, resendPublicationEmail, returnPublication, savePublication, setPublicationStatus,
 } from "@/app/actions/publishing";
 import { PUBLICATION_KINDS, type PublicationDisplayMode, type PublicationKind, type PublicationRow, type PublicationStatus } from "@/types/publishing";
 
@@ -60,6 +60,26 @@ const fromRow = (r?: PublicationRow): Draft => ({
 
 const ADMIN_BASE = "/dashboard/admin/publications";
 
+function payloadOf(d: Draft, id?: string) {
+	return {
+		id,
+		kind: d.kind,
+		title: d.title,
+		summary: d.summary,
+		body: d.body,
+		cover_image_url: d.cover_image_url,
+		cover_image_alt: d.cover_image_alt,
+		category: d.category,
+		tags: d.tags.split(",").map((t) => t.trim()).filter(Boolean),
+		featured: d.featured,
+		external_links: d.links,
+		source_file_url: d.source_file_url,
+		source_file_name: d.source_file_name,
+		source_file_type: d.source_file_type,
+		display_mode: d.display_mode,
+	};
+}
+
 /**
  * `isAdmin` admins publish directly. Everyone else (professionals, NGOs) can save drafts and
  * submit for an administrator to approve; the server enforces this, the UI just reflects it.
@@ -86,6 +106,18 @@ export function PublicationEditor({ initial, isAdmin = true, basePath = ADMIN_BA
 	const coverRef = useRef<HTMLInputElement>(null);
 
 	const dirty = useMemo(() => JSON.stringify(d) !== JSON.stringify(saved), [d, saved]);
+	const chooseMode = async (mode: PublicationDisplayMode) => {
+		if (mode === "content" && !d.body.trim() && d.source_file_url) {
+			setBusy("import");
+			const res = await extractPdfText(d.source_file_url);
+			setBusy(null);
+			if (!res.ok) return setError(res.error);
+			setD((p) => ({ ...p, body: res.doc.html, display_mode: "content" }));
+			setWarnings(res.doc.warnings);
+			return;
+		}
+		setD((p) => ({ ...p, display_mode: mode }));
+	};
 	const set = useCallback(<K extends keyof Draft>(k: K, v: Draft[K]) => setD((p) => ({ ...p, [k]: v })), []);
 	const stats = useMemo(() => readingStats(d.body), [d.body]);
 
@@ -97,28 +129,47 @@ export function PublicationEditor({ initial, isAdmin = true, basePath = ADMIN_BA
 		return () => window.removeEventListener("beforeunload", h);
 	}, [dirty]);
 
+	// Work in progress is kept as a draft automatically: shortly after you stop typing, and when you leave.
+	const latest = useRef({ d, dirty, id, status, busy });
+	latest.current = { d, dirty, id, status, busy };
+	const autosaving = useRef(false);
+	const autosave = useCallback(async () => {
+		const c = latest.current;
+		if (autosaving.current || !c.dirty || c.busy || c.status !== "draft" || c.d.title.trim().length < 3) return;
+		if (c.d.display_mode === "pdf" && !c.d.source_file_url) return;
+		autosaving.current = true;
+		try {
+			const res = await savePublication({ ...payloadOf(c.d, c.id) });
+			if (!res.ok) return;
+			setId(res.id);
+			setSlug(res.slug);
+			setSaved(c.d);
+			// Keep the URL on the saved draft without remounting the editor mid-typing.
+			if (!c.id) window.history.replaceState(null, "", `${basePath}/${res.id}`);
+		} finally {
+			autosaving.current = false;
+		}
+	}, [basePath]);
+	useEffect(() => {
+		if (!dirty) return;
+		const t = setTimeout(autosave, 2500);
+		return () => clearTimeout(t);
+	}, [d, dirty, autosave]);
+	useEffect(() => {
+		const flush = () => document.visibilityState === "hidden" && void autosave();
+		document.addEventListener("visibilitychange", flush);
+		return () => {
+			document.removeEventListener("visibilitychange", flush);
+			void autosave();
+		};
+	}, [autosave]);
+
 	const flash = (m: string) => {
 		setNotice(m);
 		setTimeout(() => setNotice(null), 3500);
 	};
 
-	const payload = () => ({
-		id,
-		kind: d.kind,
-		title: d.title,
-		summary: d.summary,
-		body: d.body,
-		cover_image_url: d.cover_image_url,
-		cover_image_alt: d.cover_image_alt,
-		category: d.category,
-		tags: d.tags.split(",").map((t) => t.trim()).filter(Boolean),
-		featured: d.featured,
-		external_links: d.links,
-		source_file_url: d.source_file_url,
-		source_file_name: d.source_file_name,
-		source_file_type: d.source_file_type,
-		display_mode: d.display_mode,
-	});
+	const payload = () => payloadOf(d, id);
 
 	const save = async (quiet = false) => {
 		setBusy("save");
@@ -167,19 +218,18 @@ export function PublicationEditor({ initial, isAdmin = true, basePath = ADMIN_BA
 		try {
 			const up = await uploadToPublications(file, "imports");
 			if (isPdf) {
-				// A PDF is shown as the PDF by default; the text is extracted for search and summary.
+				// A PDF is shown as the PDF itself. No text is extracted.
 				const res = await attachPdfFromStorage(up.path);
 				if (!res.ok) throw new Error(res.error);
 				setD((p) => ({
 					...p,
-					title: p.title.trim() ? p.title : res.doc?.title ?? file.name.replace(/\.pdf$/i, ""),
-					body: res.doc?.html ?? "",
+					title: p.title.trim() ? p.title : res.fileName.replace(/\.pdf$/i, "").replace(/[_-]+/g, " ").trim(),
+					body: "",
 					source_file_url: res.sourceUrl,
 					source_file_name: res.fileName,
 					source_file_type: "pdf",
 					display_mode: "pdf",
 				}));
-				setWarnings([...(res.doc?.warnings ?? []), ...(res.warning ? [`${res.warning} The PDF will still be shown as it is.`] : [])]);
 				flash(`Added “${file.name}”. Readers will see the PDF itself.`);
 			} else {
 				const res = await importFromStorage(up.path);
@@ -355,7 +405,7 @@ export function PublicationEditor({ initial, isAdmin = true, basePath = ADMIN_BA
 							<fieldset className="mt-3 flex flex-wrap gap-2" aria-label="How readers see this PDF">
 								{([["pdf", FileText, "Show the PDF itself"], ["content", Pencil, "Show the text instead"]] as const).map(([mode, Icon, label]) => (
 									<label key={mode} className={cn("inline-flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm font-bold", d.display_mode === mode ? "border-[#008080] bg-white text-[#008080]" : "border-gray-200 bg-white/60 text-gray-600")}>
-										<input type="radio" name="display_mode" className="sr-only" checked={d.display_mode === mode} onChange={() => set("display_mode", mode)} />
+										<input type="radio" name="display_mode" className="sr-only" checked={d.display_mode === mode} onChange={() => chooseMode(mode)} />
 										<Icon className="h-4 w-4" aria-hidden /> {label}
 									</label>
 								))}
@@ -404,7 +454,8 @@ export function PublicationEditor({ initial, isAdmin = true, basePath = ADMIN_BA
 						</div>
 					</Field>
 
-					<Field label={d.display_mode === "pdf" ? "Text version" : "Content"} required={d.display_mode !== "pdf"} hint={d.display_mode === "pdf" ? "Readers see the PDF. This text feeds search, the summary and the emailed copy; fix it if the extraction is off." : undefined}>
+					{d.display_mode !== "pdf" && (
+					<Field label="Content" required>
 						<RichEditor
 							value={d.body}
 							onChange={(html) => set("body", html)}
@@ -413,6 +464,7 @@ export function PublicationEditor({ initial, isAdmin = true, basePath = ADMIN_BA
 							minHeight={420}
 						/>
 					</Field>
+					)}
 
 					<SourcesEditor links={d.links} onChange={(l) => set("links", l)} />
 
