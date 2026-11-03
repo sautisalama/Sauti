@@ -1,6 +1,7 @@
 "use client";
 
 import { WorkspaceMenu } from "@/components/navigation/WorkspaceMenu";
+import { useWorkspace } from "@/hooks/useWorkspace";
 import { useWorkspaceSync } from "@/hooks/useWorkspace";
 import { ThemeMenuItem } from "@/components/theme/ThemeControls";
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
@@ -168,6 +169,9 @@ export function EnhancedSidebar({
 	const supabase = useMemo(() => createClient(), []);
 	const userType = dash?.data?.profile?.user_type || user?.profile?.user_type || null;
 	const role = isAdminMode ? "admin" : userType;
+	// The line under the name says where you are working now: Admin, Mjengo suite, or your own role.
+	const { current: workspace } = useWorkspace();
+	const workspaceLabel = workspace === "suite" ? "Mjengo suite" : workspace === "admin" ? "admin" : isAdminMode && workspace === null ? "admin" : userType;
 
 	const getRoleLabel = (userType: string) => {
 		switch (userType) {
@@ -848,7 +852,7 @@ export function EnhancedSidebar({
 									</p>
 									{role !== "survivor" && (
 										<p className="text-xs text-neutral-500 truncate capitalize">
-											{role || "Member"}
+											{workspaceLabel || "Member"}
 										</p>
 									)}
 								</div>

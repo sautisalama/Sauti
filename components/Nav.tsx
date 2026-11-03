@@ -88,7 +88,7 @@ export function Nav() {
 		<header data-site-nav className={`${pathname.startsWith("/learn") ? "relative" : "sticky top-0"} z-50 w-full border-b-2 border-gray-100 bg-white/98 backdrop-blur h-20 md:h-24 flex items-center shadow-sm`}>
 			<div className="container w-full max-w-[100vw] flex items-center justify-between px-6 xl:px-8 2xl:px-12 relative">
 				{/* Extreme Left: Logo */}
-				<Link href="/" className="flex items-center gap-2 shrink-0">
+				<Link href="/?site" className="flex items-center gap-2 shrink-0">
 					<Image src="/logo.webp" alt="logo" width={200} height={60} className="w-auto h-12 xl:h-14 2xl:h-16" />
 					<span className="sr-only">Sauti Salama</span>
 				</Link>
@@ -96,7 +96,7 @@ export function Nav() {
 				{/* Center: Menu Items */}
 				<nav className="hidden xl:flex items-center gap-4 2xl:gap-6 text-sm font-bold absolute left-1/2 -translate-x-1/2 whitespace-nowrap">
 					<Link
-						href="/"
+						href="/?site"
 						className={`px-3 py-1.5 rounded-full transition-colors ${
 							isActive("/") 
 								? "bg-sauti-teal text-white" 
@@ -331,7 +331,7 @@ export function Nav() {
 									{/* Mobile Nav Links */}
 									<nav className="grid gap-4">
 										<Link
-											href="/"
+											href="/?site"
 											className={`flex items-center gap-4 rounded-2xl px-5 py-4 text-lg font-black transition-all ${
 												isActive("/") ? "bg-sauti-blue text-white shadow-lg shadow-sauti-blue/20" : "hover:bg-gray-50 text-gray-700"
 											}`}

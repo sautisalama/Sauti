@@ -16,8 +16,14 @@ export const maxDuration = 60;
 export async function GET(request: Request, { params }: { params: Promise<{ provider: string }> }) {
 	const { provider } = await params;
 	const origin = originOf(request);
+	const rawReturn = request.headers.get("cookie")?.split(/;\s*/).find((c) => c.startsWith("ss_mail_oauth_return="))?.slice("ss_mail_oauth_return=".length);
+	let returnTo: string | null = null;
+	try { returnTo = rawReturn ? decodeURIComponent(rawReturn) : null; } catch { returnTo = null; }
+	if (returnTo && !/^\/dashboard\/mjengo(\/|\?|$)/.test(returnTo)) returnTo = null;
 	const back = (q: string) => {
-		const r = NextResponse.redirect(`${origin}/dashboard/mjengo/mail?${q}`);
+		// A sign-in started from the suite's welcome returns there; a failure still goes to the mail page to explain.
+		const r = NextResponse.redirect(returnTo && q.startsWith("mail_connected=") ? `${origin}${returnTo}` : `${origin}/dashboard/mjengo/mail?${q}`);
+		r.cookies.delete({ name: "ss_mail_oauth_return", path: "/api/mjengo/mail/oauth" });
 		r.cookies.delete({ name: "ss_mail_oauth", path: "/api/mjengo/mail/oauth" });
 		r.cookies.delete({ name: "ss_mail_oauth_all", path: "/api/mjengo/mail/oauth" });
 		return r;

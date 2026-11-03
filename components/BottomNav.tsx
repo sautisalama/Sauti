@@ -54,7 +54,7 @@ export function BottomNav({ forceShow = false }: { forceShow?: boolean }) {
               </>
             ) : (
               <>
-                <Item href="/" active={pathname === "/"} label="Home" icon={Home} />
+                <Item href="/?site" active={pathname === "/"} label="Home" icon={Home} />
                 <Item href="/weather" active={pathname?.startsWith("/weather")} label="Weather" icon={Cloud} />
                 <div className="flex items-center justify-center">
                   <Button onClick={() => setOpen(true)} className="h-12 w-12 rounded-full bg-[#f8941c] hover:bg-[#e38313] shadow-lg -mt-8">

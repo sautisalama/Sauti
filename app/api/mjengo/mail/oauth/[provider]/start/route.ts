@@ -28,6 +28,9 @@ export async function GET(request: Request, { params }: { params: Promise<{ prov
 	const all = p === "google" && sp.get("all") !== "0";
 	const res = NextResponse.redirect(authorizeUrl(p, origin, state, sp.get("email") || actor.email || undefined, all));
 	if (all) res.cookies.set("ss_mail_oauth_all", "1", { httpOnly: true, secure: origin.startsWith("https"), sameSite: "lax", path: "/api/mjengo/mail/oauth", maxAge: 600 });
+	// Where to come back to afterwards: only a page inside the suite.
+	const ret = sp.get("return");
+	if (ret && /^\/dashboard\/mjengo(\/|\?|$)/.test(ret)) res.cookies.set("ss_mail_oauth_return", ret, { httpOnly: true, secure: origin.startsWith("https"), sameSite: "lax", path: "/api/mjengo/mail/oauth", maxAge: 600 });
 	res.cookies.set("ss_mail_oauth", `${p}:${state}`, { httpOnly: true, secure: origin.startsWith("https"), sameSite: "lax", path: "/api/mjengo/mail/oauth", maxAge: 600 });
 	return res;
 }
