@@ -275,12 +275,19 @@ export function PdfReader({ url, title, coverUrl, coverAlt }: { url: string; tit
 		};
 	}, [full, mode]);
 
-	// Hide the site header while the reader fills the screen, so the document gets the room.
+	// Hide the site header while the pages fill the screen, so the document gets the room. This watches the
+	// page area itself (the whole reader can be taller than the screen, which would never look "mostly visible").
 	useEffect(() => {
-		const el = root.current;
+		const el = stage.current;
 		if (!el || full || mode !== "pages") return;
 		const html = document.documentElement;
-		const io = new IntersectionObserver(([e]) => (e.intersectionRatio >= 0.6 ? html.setAttribute("data-reading", "") : html.removeAttribute("data-reading")), { threshold: [0, 0.6, 1] });
+		const io = new IntersectionObserver(
+			([e]) => {
+				if (e.intersectionRatio >= 0.55) html.setAttribute("data-reading", "");
+				else if (e.intersectionRatio < 0.3) html.removeAttribute("data-reading");
+			},
+			{ threshold: Array.from({ length: 21 }, (_, i) => i / 20) }
+		);
 		io.observe(el);
 		return () => {
 			io.disconnect();
