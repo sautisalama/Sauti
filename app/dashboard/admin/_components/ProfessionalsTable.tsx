@@ -1,5 +1,7 @@
 "use client";
 
+import { MakeAdminItem } from "./MakeAdminItem";
+
 import { useState, useEffect } from "react";
 import { createClient } from "@/utils/supabase/client";
 import { useRouter } from "next/navigation";
@@ -425,7 +427,8 @@ export function ProfessionalsTable() {
 																	</DropdownMenuItem>
 																</>
 															)}
-														</DropdownMenuContent>
+														<MakeAdminItem userId={user.id} name={`${user.first_name} ${user.last_name}`.trim() || "this person"} isAdmin={(user as { is_admin?: boolean }).is_admin} onDone={() => void loadProfessionals()} />
+</DropdownMenuContent>
 													</DropdownMenu>
 												</div>
 											</TableCell>
@@ -516,7 +519,8 @@ export function ProfessionalsTable() {
 												>
 													{user.is_banned ? "Unban User" : "Ban User"}
 												</DropdownMenuItem>
-											</DropdownMenuContent>
+											<MakeAdminItem userId={user.id} name={`${user.first_name} ${user.last_name}`.trim() || "this person"} isAdmin={(user as { is_admin?: boolean }).is_admin} onDone={() => void loadProfessionals()} />
+</DropdownMenuContent>
 										</DropdownMenu>
 									</div>
 									<div className="flex items-center justify-between mt-3 pl-[3.25rem]">

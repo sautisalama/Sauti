@@ -1,5 +1,7 @@
 "use client";
 
+import { MakeAdminItem } from "./MakeAdminItem";
+
 import { useState, useEffect } from "react";
 import { createClient } from "@/utils/supabase/client";
 import { useRouter } from "next/navigation";
@@ -109,11 +111,10 @@ export function AdminUsersTable({ onRefresh }: AdminUsersTableProps) {
 				.from("profiles")
 				.select(
 					`
-          id, first_name, last_name, user_type, verification_status, is_banned,
+          id, first_name, last_name, user_type, verification_status, is_banned, is_admin,
           created_at, verification_updated_at, verification_notes, email
         `
 				)
-				.in("user_type", ["professional", "ngo", "survivor"])
 				.order("created_at", { ascending: false });
 
 			if (error) throw error;
@@ -430,7 +431,8 @@ export function AdminUsersTable({ onRefresh }: AdminUsersTableProps) {
                                                                     </>
                                                                 )}
                                                             </DropdownMenuItem>
-                                                        </DropdownMenuContent>
+                                                        <MakeAdminItem userId={user.id} name={`${user.first_name} ${user.last_name}`.trim() || "this person"} isAdmin={(user as { is_admin?: boolean }).is_admin} onDone={() => void loadUsers()} />
+</DropdownMenuContent>
                                                     </DropdownMenu>
 											    </div>
 										    </TableCell>
@@ -503,7 +505,8 @@ export function AdminUsersTable({ onRefresh }: AdminUsersTableProps) {
                                                 >
                                                     {user.is_banned ? "Unban User" : "Ban User"}
                                                 </DropdownMenuItem>
-                                            </DropdownMenuContent>
+                                            <MakeAdminItem userId={user.id} name={`${user.first_name} ${user.last_name}`.trim() || "this person"} isAdmin={(user as { is_admin?: boolean }).is_admin} onDone={() => void loadUsers()} />
+</DropdownMenuContent>
                                         </DropdownMenu>
                                     </div>
 

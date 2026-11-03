@@ -46,7 +46,7 @@ function fromRow(r: Card): FeedItem {
 		date: r.published_at!,
 		dateLabel: fmt(r.published_at!),
 		href: `/publications/${r.slug}`,
-		image: r.cover_image_url || (r.display_mode === "pdf" && r.source_file_url ? `/api/publications/${r.slug}/cover` : null),
+		image: r.cover_image_url || (r.display_mode === "pdf" && r.source_file_url ? `/api/publications/${r.slug}/social` : null),
 		imageAlt: r.cover_image_alt || r.title,
 		readTime: r.read_minutes ? `${r.read_minutes} min read` : KIND_LABEL[r.kind],
 		source: "db",

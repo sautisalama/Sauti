@@ -5,7 +5,7 @@ import { after } from 'next/server';
 import { sendNotification } from '@/lib/notifications';
 import { looseAdmin } from '@/lib/loose-db';
 import { logAudit } from '@/lib/access/audit';
-import { MAX_ADDED_PER_SUPER_ADMIN, requireSuperAdmin, type SuperAdminRow } from '@/lib/access/super-admin';
+import { MAX_ADDED_PER_SUPER_ADMIN, getActor, isSuperAdminEmail, requireSuperAdmin, type SuperAdminRow } from '@/lib/access/super-admin';
 
 export interface SuperAdminView extends SuperAdminRow {
   name: string | null;
@@ -60,7 +60,8 @@ export async function getAccessOverview(): Promise<AccessOverview> {
   const { data: adminProfiles } = await db
     .from('profiles')
     .select('id, email, first_name, last_name, user_type, is_admin, sauti_id')
-    .eq('is_admin', true)
+    // The team roster: every administrator, plus anyone with a Sauti Salama work account.
+    .or('is_admin.eq.true,email.ilike.%@sautisalama.org,email.ilike.%@sautisalama.com')
     .order('first_name');
 
   return {
@@ -71,12 +72,12 @@ export async function getAccessOverview(): Promise<AccessOverview> {
       hasAccount: byEmail.has(s.email.toLowerCase()),
       canRemove: !s.is_protected && (actor.row.is_protected || s.added_by?.toLowerCase() === actor.email),
     })),
-    admins: (adminProfiles ?? []).map((p: { id: string; email: string | null; first_name: string | null; last_name: string | null; user_type: string | null; sauti_id: string | null }) => ({
+    admins: (adminProfiles ?? []).map((p: { id: string; email: string | null; first_name: string | null; last_name: string | null; user_type: string | null; is_admin: boolean | null; sauti_id: string | null }) => ({
       id: p.id,
-      name: fullName(p) ?? p.email ?? 'Admin',
+      name: fullName(p) ?? p.email ?? 'Team member',
       email: p.email,
       userType: p.user_type,
-      isAdmin: true,
+      isAdmin: !!p.is_admin,
       isSuperAdmin: !!p.email && superEmails.has(p.email.toLowerCase()),
       sautiId: p.sauti_id,
     })),
@@ -262,4 +263,10 @@ export async function getPlatformEmailBody(id: string): Promise<string | null> {
   const { data } = await looseAdmin().from('email_log').select('html, subject').eq('id', id).maybeSingle();
   await logAudit({ actorId: actor.id, actorEmail: actor.email, action: 'email_log.viewed', targetType: 'email', targetId: id, targetLabel: data?.subject });
   return data?.html ?? null;
+}
+
+/** Whether the signed-in person is a super admin. Used to show the "Make admin" action; the action itself re-checks. */
+export async function getMyAccessLevel(): Promise<{ isSuperAdmin: boolean }> {
+  const actor = await getActor();
+  return { isSuperAdmin: !!actor && (await isSuperAdminEmail(actor.email)) };
 }

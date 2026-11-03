@@ -155,6 +155,20 @@ export async function updateSession(request: NextRequest) {
 			return redirectResponse;
 		}
 
+		// The public site's "Dashboard" button asks for `/dashboard?resume`: send them back to the dashboard they were last on.
+		if (isAuthorized && request.nextUrl.pathname === "/dashboard" && request.nextUrl.searchParams.has("resume")) {
+			const url = request.nextUrl.clone();
+			url.search = "";
+			const last = request.cookies.get(`ss_suite_${user.id}`)?.value;
+			url.pathname = profile?.is_admin && last === "mjengo" ? "/dashboard/mjengo" : profile?.is_admin && last === "admin" ? "/dashboard/admin" : "/dashboard";
+			const redirectResponse = NextResponse.redirect(url);
+			supabaseResponse.cookies.getAll().forEach((cookie) => {
+				const { name, value, ...options } = cookie;
+				redirectResponse.cookies.set(name, value, options);
+			});
+			return redirectResponse;
+		}
+
 		// 2. Redirect authorized users away from auth pages and the landing page
 		// (but NOT from /auth/setup-password — invite recipients need to set their password first)
 		if (

@@ -107,14 +107,14 @@ export function PeoplePanel() {
 				toast({ title: level ? "Access updated" : "Access taken away", description: note || undefined });
 			} catch (e) { fail(e); } finally { setAreaBusy(null); }
 		};
-		const openPerson = (p: { id: string; name: string; email: string | null; isSuperAdmin: boolean; isAdmin?: boolean; userType?: string | null }) => setOpen({ ...p, isAdmin: p.isAdmin ?? true });
+		const openPerson = (p: { id: string; name: string; email: string | null; isSuperAdmin: boolean; isAdmin?: boolean; userType?: string | null }) => { if (p.isAdmin === false) return; setOpen({ ...p, isAdmin: p.isAdmin ?? true }); };
 	const live = open ? (data.admins.find((a) => a.id === open.id) ?? open) : null;
 
 	return (
 		<div className="mx-auto max-w-5xl space-y-5">
 			<div>
 				<h2 className="text-xl font-bold tracking-tight text-sauti-dark">People and access</h2>
-				<p className="text-sm text-serene-neutral-500">Who is on the team, what each person may do in every part of the suite, and the roles that define it.</p>
+				<p className="text-sm text-serene-neutral-500">Everyone with a sautisalama.org or sautisalama.com account, what each administrator may do in every part of the suite, and the roles that define it. Only super admins can make someone an administrator.</p>
 			</div>
 
 			<div className="inline-flex rounded-xl border border-serene-neutral-200 bg-white p-1" role="tablist">
@@ -127,15 +127,15 @@ export function PeoplePanel() {
 				<section className="space-y-3">
 					<div className="relative">
 						<Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-serene-neutral-400" />
-						<Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search the team, or anyone by name, email or Sauti ID" className="h-11 bg-white pl-9" autoComplete="off" />
+						<Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search the team (everyone with a Sauti Salama account), or anyone by name, email or Sauti ID" className="h-11 bg-white pl-9" autoComplete="off" />
 					</div>
 					<ul className="divide-y divide-serene-neutral-100 overflow-hidden rounded-2xl border border-serene-neutral-200/70 bg-white">
 						{people.map((a) => {
 							const s = summary(a.id, a.isSuperAdmin);
 							const mine = roles.filter((r) => r.members.some((m) => m.id === a.id));
 							return (
-								<li key={a.id}>
-									<button onClick={() => openPerson(a)} className="flex w-full items-center gap-3 px-4 py-3 text-left transition hover:bg-serene-neutral-50/70">
+								<li key={a.id} className="flex items-center">
+									<button onClick={() => openPerson(a)} className="flex min-w-0 flex-1 items-center gap-3 px-4 py-3 text-left transition hover:bg-serene-neutral-50/70">
 										<span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-sauti-teal-light text-sm font-bold text-sauti-teal">{initials(a.name)}</span>
 										<span className="min-w-0 flex-1">
 											<span className="flex items-center gap-2"><span className="truncate text-sm font-semibold text-serene-neutral-900">{a.name}</span>{a.isSuperAdmin && <Crown className="h-3.5 w-3.5 shrink-0 text-amber-500" aria-label="Super admin" />}</span>
@@ -144,8 +144,13 @@ export function PeoplePanel() {
 										<span className="hidden flex-wrap justify-end gap-1 sm:flex">
 											{mine.map((r) => <span key={r.id} className="rounded-full bg-serene-neutral-100 px-2 py-0.5 text-[11px] font-medium text-serene-neutral-700">{r.name}</span>)}
 										</span>
-										<span className="w-36 shrink-0 text-right text-xs text-serene-neutral-500">{s.text}</span>
+										<span className="w-36 shrink-0 text-right text-xs text-serene-neutral-500">{a.isAdmin ? s.text : "Not an admin"}</span>
 									</button>
+									{!a.isAdmin && (
+										<Button size="sm" disabled={busy === a.id} className="mr-3 shrink-0 gap-1.5 bg-sauti-teal hover:bg-sauti-dark" onClick={() => window.confirm(`Make ${a.name} an administrator? They will be able to use the suite.`) && run(a.id, async () => { await setAdminStatus(a.id, true); await askEmail(a.id, "You were made an administrator, so you can now use the Mjengo suite."); }, "Made an admin")}>
+											{busy === a.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />} Make admin
+										</Button>
+									)}
 								</li>
 							);
 						})}

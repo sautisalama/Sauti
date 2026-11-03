@@ -387,6 +387,13 @@ export function EnhancedSidebar({
 					section: "main",
 				},
 				{
+					id: "all-users",
+					label: "All users",
+					icon: User,
+					href: "/dashboard/admin/users",
+					section: "main",
+				},
+				{
 					id: "blogs",
 					label: "Blogs & Events",
 					icon: BookOpen,

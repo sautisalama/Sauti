@@ -295,7 +295,7 @@ export function Nav() {
 					</Dialog>
 
 					{isAuthenticated ? (
-						<Link href="/dashboard" className="hidden xl:block">
+						<Link href="/dashboard?resume" className="hidden xl:block">
 							<Button variant="outline" className="rounded-full border-2 border-sauti-blue text-sauti-blue font-black px-4 xl:px-6 2xl:px-8 h-12 shadow-sm hover:bg-sauti-blue hover:text-white transition-all whitespace-nowrap">Dashboard</Button>
 						</Link>
 					) : (
@@ -568,7 +568,7 @@ export function Nav() {
 										</Button>
 
 										{isAuthenticated ? (
-											<Link href="/dashboard" className="w-full">
+											<Link href="/dashboard?resume" className="w-full">
 												<Button variant="outline" className="w-full h-16 rounded-2xl text-xl font-black border-2 border-sauti-blue text-sauti-blue active:scale-95 transition-all">
 													Dashboard
 												</Button>
