@@ -1,6 +1,7 @@
 "use client";
 
-import { MakeAdminItem } from "./MakeAdminItem";
+import { DeleteUserItem, MakeAdminItem } from "./MakeAdminItem";
+import { setUserBan, setUserType, type AccountType } from "@/app/actions/admin-users";
 
 import { useState, useEffect } from "react";
 import { createClient } from "@/utils/supabase/client";
@@ -67,6 +68,11 @@ import { cn } from "@/lib/utils";
 interface AdminUsersTableProps {
 	onRefresh: () => void;
 }
+
+const TYPE_LABEL: Record<AccountType, string> = { survivor: "a survivor", professional: "a service provider", ngo: "an organisation" };
+
+/** Survivors are never verified, so their status is "Not required" rather than a verification state. */
+const statusOf = (u: { user_type?: string | null; verification_status?: string | null }) => (u.user_type === "survivor" || !u.user_type ? "not_required" : u.verification_status || "pending");
 
 export function AdminUsersTable({ onRefresh }: AdminUsersTableProps) {
 	const router = useRouter();
@@ -148,9 +154,7 @@ export function AdminUsersTable({ onRefresh }: AdminUsersTableProps) {
 
 		// Status filter
 		if (statusFilter !== "all") {
-			filtered = filtered.filter(
-				(user) => user.verification_status === statusFilter
-			);
+			filtered = filtered.filter((user) => statusOf(user) === statusFilter);
 		}
 
 		// Ban filter
@@ -169,51 +173,29 @@ export function AdminUsersTable({ onRefresh }: AdminUsersTableProps) {
     const paginatedUsers = filteredUsers.slice(startIndex, startIndex + itemsPerPage);
 
 	const handleBanUser = async (userId: string, ban: boolean) => {
-		try {
-			setIsProcessing(true);
-			const {
-				data: { user: currentUser },
-			} = await supabase.auth.getUser();
-			if (!currentUser) throw new Error("Not authenticated");
-
-			const { error } = await supabase
-				.from("profiles")
-				.update({
-					is_banned: ban,
-					banned_at: ban ? new Date().toISOString() : null,
-					banned_by: ban ? currentUser.id : null,
-					ban_reason: ban ? "Banned by admin" : null,
-				})
-				.eq("id", userId);
-
-			if (error) throw error;
-
-			// Log admin action
-			await supabase.from("admin_actions").insert({
-				admin_id: currentUser.id,
-				action_type: ban ? "ban_user" : "unban_user",
-				target_type: "user",
-				target_id: userId,
-				details: { action: ban ? "banned" : "unbanned" },
-			});
-
-			toast({
-				title: "Success",
-				description: `User ${ban ? "banned" : "unbanned"} successfully`,
-			});
-
-			onRefresh();
-			loadUsers();
-		} catch (error) {
-			console.error("Error updating user ban status:", error);
-			toast({
-				title: "Error",
-				description: `Failed to ${ban ? "ban" : "unban"} user`,
-				variant: "destructive",
-			});
-		} finally {
-			setIsProcessing(false);
+		setIsProcessing(true);
+		const res = await setUserBan(userId, ban);
+		setIsProcessing(false);
+		if (!res.ok) {
+			toast({ title: "Could not update the account", description: res.error, variant: "destructive" });
+			return;
 		}
+		toast({ title: "Done", description: `User ${ban ? "banned" : "unbanned"} successfully` });
+		onRefresh();
+		void loadUsers();
+	};
+
+	const handleChangeType = async (userId: string, type: AccountType, name: string) => {
+		if (!window.confirm(`Change ${name}'s account to ${TYPE_LABEL[type]}?`)) return;
+		setIsProcessing(true);
+		const res = await setUserType(userId, type);
+		setIsProcessing(false);
+		if (!res.ok) {
+			toast({ title: "Could not change the account type", description: res.error, variant: "destructive" });
+			return;
+		}
+		toast({ title: "Account type changed", description: `${name} is now ${TYPE_LABEL[type]}.` });
+		void loadUsers();
 	};
 
 	const getStatusColor = (status: string) => {
@@ -230,9 +212,10 @@ export function AdminUsersTable({ onRefresh }: AdminUsersTableProps) {
 				return "bg-serene-neutral-100 text-serene-neutral-700 border-serene-neutral-200 rounded-full px-3 py-0.5";
 		}
 	};
-    
+
     const getVerificationBadge = (status: string) => {
         switch(status) {
+            case 'not_required': return <Badge variant="outline" className="text-serene-neutral-500 border-serene-neutral-200 rounded-full px-3 py-0.5">Not required</Badge>;
             case 'verified': return <Badge className="bg-green-50 text-green-700 border border-green-200 hover:bg-green-100 shadow-sm rounded-full px-3 py-0.5">Verified</Badge>;
             case 'pending': return <Badge className="bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 shadow-sm rounded-full px-3 py-0.5">Pending</Badge>;
             case 'under_review': return <Badge className="bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 shadow-sm rounded-full px-3 py-0.5">Reviewing</Badge>;
@@ -311,6 +294,7 @@ export function AdminUsersTable({ onRefresh }: AdminUsersTableProps) {
 						</SelectTrigger>
 						<SelectContent>
 							<SelectItem value="all">All Status</SelectItem>
+							<SelectItem value="not_required">Not required (survivors)</SelectItem>
 							<SelectItem value="pending">Pending</SelectItem>
 							<SelectItem value="under_review">Under Review</SelectItem>
 							<SelectItem value="verified">Verified</SelectItem>
@@ -374,8 +358,8 @@ export function AdminUsersTable({ onRefresh }: AdminUsersTableProps) {
 											    </Badge>
 										    </TableCell>
 										    <TableCell className="py-4">
-											    <Badge className={getStatusColor(user.verification_status)}>
-												    {user.verification_status.replace("_", " ")}
+											    <Badge className={statusOf(user) === "not_required" ? "bg-serene-neutral-50 text-serene-neutral-500 border border-serene-neutral-200 shadow-none" : getStatusColor(user.verification_status)}>
+												    {statusOf(user) === "not_required" ? "Not required" : user.verification_status.replace("_", " ")}
 											    </Badge>
 										    </TableCell>
 										    <TableCell className="py-4 text-sm text-serene-neutral-500">
@@ -431,7 +415,14 @@ export function AdminUsersTable({ onRefresh }: AdminUsersTableProps) {
                                                                     </>
                                                                 )}
                                                             </DropdownMenuItem>
-                                                        <MakeAdminItem userId={user.id} name={`${user.first_name} ${user.last_name}`.trim() || "this person"} isAdmin={(user as { is_admin?: boolean }).is_admin} onDone={() => void loadUsers()} />
+                                                        <DropdownMenuSeparator className="bg-serene-neutral-50" />
+{(["survivor", "professional", "ngo"] as const).filter((t) => t !== user.user_type).map((t) => (
+	<DropdownMenuItem key={t} onClick={(e) => { e.stopPropagation(); void handleChangeType(user.id, t, `${user.first_name} ${user.last_name}`.trim() || "this person"); }} className="cursor-pointer rounded-lg">
+		<User className="mr-2 h-3.5 w-3.5" /> Make {t === "professional" ? "service provider" : t === "ngo" ? "organisation" : "survivor"}
+	</DropdownMenuItem>
+))}
+<MakeAdminItem userId={user.id} name={`${user.first_name} ${user.last_name}`.trim() || "this person"} isAdmin={(user as { is_admin?: boolean }).is_admin} onDone={() => void loadUsers()} />
+<DeleteUserItem userId={user.id} name={`${user.first_name} ${user.last_name}`.trim() || "this person"} onDone={() => void loadUsers()} />
 </DropdownMenuContent>
                                                     </DropdownMenu>
 											    </div>
@@ -505,14 +496,21 @@ export function AdminUsersTable({ onRefresh }: AdminUsersTableProps) {
                                                 >
                                                     {user.is_banned ? "Unban User" : "Ban User"}
                                                 </DropdownMenuItem>
-                                            <MakeAdminItem userId={user.id} name={`${user.first_name} ${user.last_name}`.trim() || "this person"} isAdmin={(user as { is_admin?: boolean }).is_admin} onDone={() => void loadUsers()} />
+                                            <DropdownMenuSeparator className="bg-serene-neutral-50" />
+{(["survivor", "professional", "ngo"] as const).filter((t) => t !== user.user_type).map((t) => (
+	<DropdownMenuItem key={t} onClick={(e) => { e.stopPropagation(); void handleChangeType(user.id, t, `${user.first_name} ${user.last_name}`.trim() || "this person"); }} className="cursor-pointer rounded-lg">
+		<User className="mr-2 h-3.5 w-3.5" /> Make {t === "professional" ? "service provider" : t === "ngo" ? "organisation" : "survivor"}
+	</DropdownMenuItem>
+))}
+<MakeAdminItem userId={user.id} name={`${user.first_name} ${user.last_name}`.trim() || "this person"} isAdmin={(user as { is_admin?: boolean }).is_admin} onDone={() => void loadUsers()} />
+<DeleteUserItem userId={user.id} name={`${user.first_name} ${user.last_name}`.trim() || "this person"} onDone={() => void loadUsers()} />
 </DropdownMenuContent>
                                         </DropdownMenu>
                                     </div>
 
                                     <div className="flex items-center justify-between mt-3 pt-3 border-t border-serene-neutral-50 text-xs text-serene-neutral-500">
                                         <div className="flex items-center gap-2">
-                                            {getVerificationBadge(user.verification_status)}
+                                            {getVerificationBadge(statusOf(user))}
                                             {user.is_banned && <Badge variant="destructive" className="h-4 px-1 text-[9px]">Banned</Badge>}
                                         </div>
                                         <span>Joined {new Date(user.created_at).toLocaleDateString()}</span>

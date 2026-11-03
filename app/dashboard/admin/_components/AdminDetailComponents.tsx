@@ -251,7 +251,11 @@ export function DetailHeader({
                 <Button 
                     variant="ghost" 
                     size="icon" 
-                    onClick={() => router.push(backUrl)}
+                    onClick={() => {
+                        // Back means where you came from (the list you opened this from), not a fixed page.
+                        if (typeof window !== "undefined" && window.history.length > 1) router.back();
+                        else router.push(backUrl);
+                    }}
                     className="rounded-full h-10 w-10 bg-white shadow-sm border border-serene-neutral-200 hover:bg-serene-neutral-50 transition-colors mt-1"
                 >
                     <ArrowLeft className="h-5 w-5 text-serene-neutral-600" />

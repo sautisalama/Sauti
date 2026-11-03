@@ -1,6 +1,7 @@
 "use client";
 
-import { MakeAdminItem } from "./MakeAdminItem";
+import { DeleteUserItem, MakeAdminItem } from "./MakeAdminItem";
+import { setUserBan } from "@/app/actions/admin-users";
 
 import { useState, useEffect } from "react";
 import { createClient } from "@/utils/supabase/client";
@@ -158,31 +159,8 @@ export function ProfessionalsTable() {
 	const handleBanUser = async (userId: string, ban: boolean) => {
 		try {
 			setIsProcessing(true);
-			const {
-				data: { user: currentUser },
-			} = await supabase.auth.getUser();
-			if (!currentUser) throw new Error("Not authenticated");
-
-			const { error } = await supabase
-				.from("profiles")
-				.update({
-					is_banned: ban,
-					banned_at: ban ? new Date().toISOString() : null,
-					banned_by: ban ? currentUser.id : null,
-					ban_reason: ban ? "Banned by admin" : null,
-				})
-				.eq("id", userId);
-
-			if (error) throw error;
-
-            // Log action
-            await supabase.from("admin_actions").insert({
-				admin_id: currentUser.id,
-				action_type: ban ? "ban_user" : "unban_user",
-				target_type: "user",
-				target_id: userId,
-				details: { action: ban ? "banned" : "unbanned" },
-			});
+			const res = await setUserBan(userId, ban);
+			if (!res.ok) throw new Error(res.error);
 
 			toast({
 				title: "Success",
@@ -428,6 +406,7 @@ export function ProfessionalsTable() {
 																</>
 															)}
 														<MakeAdminItem userId={user.id} name={`${user.first_name} ${user.last_name}`.trim() || "this person"} isAdmin={(user as { is_admin?: boolean }).is_admin} onDone={() => void loadProfessionals()} />
+<DeleteUserItem userId={user.id} name={`${user.first_name} ${user.last_name}`.trim() || "this person"} onDone={() => void loadProfessionals()} />
 </DropdownMenuContent>
 													</DropdownMenu>
 												</div>
@@ -520,6 +499,7 @@ export function ProfessionalsTable() {
 													{user.is_banned ? "Unban User" : "Ban User"}
 												</DropdownMenuItem>
 											<MakeAdminItem userId={user.id} name={`${user.first_name} ${user.last_name}`.trim() || "this person"} isAdmin={(user as { is_admin?: boolean }).is_admin} onDone={() => void loadProfessionals()} />
+<DeleteUserItem userId={user.id} name={`${user.first_name} ${user.last_name}`.trim() || "this person"} onDone={() => void loadProfessionals()} />
 </DropdownMenuContent>
 										</DropdownMenu>
 									</div>

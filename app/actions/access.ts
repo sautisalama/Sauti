@@ -193,7 +193,7 @@ export async function setAdminStatus(userId: string, makeAdmin: boolean) {
       ? { title: 'You are now an administrator', message: 'An administrator has given you admin access on Sauti Salama. Your dashboard now includes the admin tools, such as reviewing profiles and approving publications.' }
       : { title: 'Your admin access has been removed', message: 'An administrator has removed your admin access on Sauti Salama. You keep your account and your regular dashboard.' }));
   }
-  await logAudit({ actorId: actor.id, actorEmail: actor.email, action: makeAdmin ? 'role.admin_granted' : 'role.admin_revoked', targetType: 'user', targetId: userId, targetLabel: p.email ?? fullName(p) ?? userId });
+  await logAudit({ actorId: actor.id, actorEmail: actor.email, action: makeAdmin ? 'role.admin_granted' : 'role.admin_revoked', targetType: 'user', targetId: userId, targetLabel: p.email ?? fullName(p) ?? userId, details: { person_email: p.email ?? null, person_name: fullName(p) ?? null, person_account_type: p.user_type ?? null } });
   revalidatePath('/dashboard/mjengo/people');
   return { success: true };
 }
@@ -208,7 +208,7 @@ export async function setAccountType(userId: string, userType: 'survivor' | 'pro
     const label = { survivor: 'a survivor', professional: 'a professional', ngo: 'an NGO' }[userType];
     after(() => tellOfRoleChange(userId, { title: 'Your account type has changed', message: `An administrator has changed your account to ${label}. Refresh your dashboard to see what is available to you.` }));
   }
-  await logAudit({ actorId: actor.id, actorEmail: actor.email, action: 'role.account_type_changed', targetType: 'user', targetId: userId, targetLabel: p.email ?? userId, details: { from: p.user_type, to: userType } });
+  await logAudit({ actorId: actor.id, actorEmail: actor.email, action: 'role.account_type_changed', targetType: 'user', targetId: userId, targetLabel: p.email ?? userId, details: { from: p.user_type, to: userType, person_email: p.email ?? null, person_name: fullName(p) ?? null } });
   revalidatePath('/dashboard/mjengo/people');
   return { success: true };
 }
