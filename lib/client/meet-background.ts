@@ -4,7 +4,12 @@
  * out. Nothing leaves the device for this: the model runs in the browser.
  */
 
-export type BackgroundMode = { kind: "none" } | { kind: "blur"; strength: "light" | "strong" } | { kind: "image"; src: string };
+/** blur: amount is 0 to 100. color: one colour, or a gradient when b is given. image: a picture, cover-fitted. */
+export type BackgroundMode =
+	| { kind: "none" }
+	| { kind: "blur"; amount: number }
+	| { kind: "color"; a: string; b?: string }
+	| { kind: "image"; src: string };
 
 const VERSION = "1.2.0";
 const WASM = `https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${VERSION}/wasm`;
@@ -137,9 +142,19 @@ export class BackgroundProcessor {
 
 		g.save();
 		if (mode.kind === "blur") {
-			g.filter = `blur(${mode.strength === "strong" ? 22 : 11}px)`;
+			const px = 2 + (Math.max(0, Math.min(100, mode.amount)) / 100) * 38;
+			g.filter = `blur(${px.toFixed(1)}px)`;
 			// Draw a little larger so the blurred edges do not show a thin line at the borders.
-			g.drawImage(this.video, -24, -24, w + 48, h + 48);
+			const pad = Math.ceil(px * 1.5);
+			g.drawImage(this.video, -pad, -pad, w + pad * 2, h + pad * 2);
+		} else if (mode.kind === "color") {
+			if (mode.b) {
+				const gr = g.createLinearGradient(0, 0, w, h);
+				gr.addColorStop(0, mode.a);
+				gr.addColorStop(1, mode.b);
+				g.fillStyle = gr;
+			} else g.fillStyle = mode.a;
+			g.fillRect(0, 0, w, h);
 		} else if (this.bg) {
 			cover(g, this.bg, w, h);
 		} else {
@@ -177,30 +192,69 @@ function cover(g: CanvasRenderingContext2D, i: HTMLImageElement, w: number, h: n
 	g.drawImage(i, (w - dw) / 2, (h - dh) / 2, dw, dh);
 }
 
-/** Ready-made backgrounds drawn in the browser on demand, so there is nothing to download. */
-export const PRESET_BACKGROUNDS: { id: string; label: string; colours: [string, string] }[] = [
-	{ id: "teal", label: "Teal", colours: ["#0b2f3a", "#068297"] },
-	{ id: "dusk", label: "Dusk", colours: ["#1a365d", "#e8762b"] },
-	{ id: "forest", label: "Forest", colours: ["#0b3d2e", "#7fd3a0"] },
-	{ id: "slate", label: "Slate", colours: ["#1B232B", "#5f6368"] },
+/** Ready-made colours and gradients, drawn straight onto the call, so there is nothing to download. */
+export const COLOR_PRESETS: { label: string; a: string; b?: string }[] = [
+	{ label: "Teal", a: "#0b2f3a", b: "#068297" },
+	{ label: "Dusk", a: "#1a365d", b: "#e8762b" },
+	{ label: "Forest", a: "#0b3d2e", b: "#7fd3a0" },
+	{ label: "Slate", a: "#1B232B", b: "#5f6368" },
+	{ label: "White", a: "#f4f6f7" },
+	{ label: "Green", a: "#1e8e3e" },
+	{ label: "Charcoal", a: "#202124" },
 ];
-const presetCache = new Map<string, string>();
-export const presetImage = (id: string) => {
-	let v = presetCache.get(id);
-	if (!v) { v = gradient((PRESET_BACKGROUNDS.find((p) => p.id === id) ?? PRESET_BACKGROUNDS[0]).colours); presetCache.set(id, v); }
-	return v;
-};
 
-function gradient([a, b]: [string, string]): string {
-	if (typeof document === "undefined") return "";
-	const c = document.createElement("canvas");
-	c.width = 1280;
-	c.height = 720;
-	const g = c.getContext("2d")!;
-	const gr = g.createLinearGradient(0, 0, 1280, 720);
-	gr.addColorStop(0, a);
-	gr.addColorStop(1, b);
-	g.fillStyle = gr;
-	g.fillRect(0, 0, 1280, 720);
-	return c.toDataURL("image/jpeg", 0.85);
+/* ------------------------------------------------------------ remembered choices */
+
+export interface BackgroundPrefs {
+	/** What was last chosen; a picture is stored as its place in `photos`, so it is only saved once. */
+	mode: BackgroundMode;
+	blur: number;
+	color: { a: string; b: string; gradient: boolean };
+	photos: string[];
 }
+
+const KEY = "ss_meet_bg_v2";
+const MAX_PHOTOS = 8;
+export const DEFAULT_PREFS: BackgroundPrefs = { mode: { kind: "none" }, blur: 55, color: { a: "#0b2f3a", b: "#068297", gradient: true }, photos: [] };
+
+export function loadBackgroundPrefs(): BackgroundPrefs {
+	try {
+		const raw = JSON.parse(localStorage.getItem(KEY) || "null") as { mode?: { kind?: string; amount?: number; a?: string; b?: string; photo?: number }; blur?: number; color?: BackgroundPrefs["color"]; photos?: string[] } | null;
+		if (!raw) return DEFAULT_PREFS;
+		const photos = Array.isArray(raw.photos) ? raw.photos.filter((p) => typeof p === "string").slice(0, MAX_PHOTOS) : [];
+		const blur = typeof raw.blur === "number" ? Math.max(0, Math.min(100, raw.blur)) : DEFAULT_PREFS.blur;
+		const color = raw.color && typeof raw.color.a === "string" ? { a: raw.color.a, b: raw.color.b || DEFAULT_PREFS.color.b, gradient: !!raw.color.gradient } : DEFAULT_PREFS.color;
+		const m = raw.mode;
+		let mode: BackgroundMode = { kind: "none" };
+		if (m?.kind === "blur") mode = { kind: "blur", amount: typeof m.amount === "number" ? m.amount : blur };
+		else if (m?.kind === "color" && typeof m.a === "string") mode = { kind: "color", a: m.a, b: m.b };
+		else if (m?.kind === "image" && typeof m.photo === "number" && photos[m.photo]) mode = { kind: "image", src: photos[m.photo] };
+		return { mode, blur, color, photos };
+	} catch { return DEFAULT_PREFS; }
+}
+
+export function saveBackgroundPrefs(p: BackgroundPrefs) {
+	const store = (photos: string[]) => {
+		const photo = p.mode.kind === "image" ? photos.indexOf(p.mode.src) : -1;
+		const mode = p.mode.kind === "image" ? (photo >= 0 ? { kind: "image", photo } : { kind: "none" }) : p.mode;
+		localStorage.setItem(KEY, JSON.stringify({ mode, blur: p.blur, color: p.color, photos }));
+	};
+	try { store(p.photos); return; } catch { /* storage full: keep the newest pictures only */ }
+	try { store(p.photos.slice(0, Math.max(1, Math.floor(p.photos.length / 2)))); } catch { /* not remembered */ }
+}
+
+/** A picture from the device, shrunk to the size the call uses and re-encoded, so it is quick to load and small to keep. */
+export async function optimiseBackgroundPhoto(file: File): Promise<string> {
+	const url = URL.createObjectURL(file);
+	try {
+		const img = await loadImage(url);
+		const r = Math.min(1, 1280 / img.naturalWidth, 720 / img.naturalHeight);
+		const c = document.createElement("canvas");
+		c.width = Math.max(1, Math.round(img.naturalWidth * r));
+		c.height = Math.max(1, Math.round(img.naturalHeight * r));
+		c.getContext("2d")!.drawImage(img, 0, 0, c.width, c.height);
+		return c.toDataURL("image/jpeg", 0.8);
+	} finally { URL.revokeObjectURL(url); }
+}
+
+export const addBackgroundPhoto = (photos: string[], photo: string) => [photo, ...photos.filter((p) => p !== photo)].slice(0, MAX_PHOTOS);

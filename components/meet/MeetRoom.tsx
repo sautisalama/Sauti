@@ -5,13 +5,14 @@ import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { format } from "date-fns";
 import { MeetRecorder } from "@/lib/client/meet-recorder";
-import { BackgroundProcessor, backgroundSupported, PRESET_BACKGROUNDS, presetImage, type BackgroundMode } from "@/lib/client/meet-background";
+import { BackgroundProcessor, backgroundSupported, loadBackgroundPrefs, type BackgroundMode } from "@/lib/client/meet-background";
+import { BackgroundPicker } from "./BackgroundPicker";
 import { sendRecording } from "@/lib/client/remote-recording";
 import { beginRemoteRecording, finishRemoteRecording } from "@/app/actions/meet-recording";
 import { putToSignedUrl } from "@/lib/client/upload";
 import { prepareUpload, registerUpload } from "@/app/dashboard/mjengo/vault/api";
 import { attachRecording } from "@/app/actions/mjengo-meet";
-import { Sparkles, Accessibility, Captions, Circle, ExternalLink, MoreVertical, Maximize2, ShieldCheck, UserPlus, Check, Copy, Hand, Info, Loader2, Mail, BarChart3, MessageCircle, MessageSquareText, Settings2, Mic, MicOff, Minimize2, MonitorUp, Pin, PinOff, PictureInPicture2, PhoneOff, ImagePlus, WifiOff, Smile, SmartphoneNfc, UserMinus, Users, Video, VideoOff, Volume2, X } from "lucide-react";
+import { Sparkles, Accessibility, Captions, Circle, ExternalLink, MoreVertical, Maximize2, ShieldCheck, UserPlus, Check, Copy, Hand, Info, Loader2, Mail, BarChart3, MessageCircle, MessageSquareText, Settings2, Mic, MicOff, Minimize2, MonitorUp, Pin, PinOff, PictureInPicture2, PhoneOff, WifiOff, Smile, SmartphoneNfc, UserMinus, Users, Video, VideoOff, Volume2, X } from "lucide-react";
 import { makeCohost, verifyHostToken, lockMeeting, enterMeeting, checkMeetingEntry, listKnocks, decideKnock, decideAllKnocks, saveMeetingChat, type Knock } from "@/app/actions/meet-room";
 import { ChatPanel, PollPanel, ReactionLayer, ReactionPicker, type ChatMsg, type FloatingReaction, type Poll } from "./meet-parts";
 import { askSalamaInCall } from "@/app/actions/mjengo-salama";
@@ -76,9 +77,11 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 	const bgProc = useRef<{ proc: BackgroundProcessor; raw: MediaStreamTrack; out: MediaStreamTrack; stream: MediaStream } | null>(null);
 	const [bgBusy, setBgBusy] = useState(false);
 	const [bgNote, setBgNote] = useState("");
-	const [customBgs, setCustomBgs] = useState<string[]>([]);
 	const [recording, setRecording] = useState(false);
 	const [recBy, setRecBy] = useState<string | null>(null);
+	const recNameRef = useRef<string | null>(null);
+	const [notice, setNotice] = useState<{ id: number; text: string } | null>(null);
+	const seen = useRef<{ rec: boolean; notes: Set<string> }>({ rec: false, notes: new Set() });
 	const [recSecs, setRecSecs] = useState(0);
 	const [saving, setSaving] = useState(false);
 	const [savePct, setSavePct] = useState<number | null>(null);
@@ -163,6 +166,7 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 	const pcs = useRef(new Map<string, RTCPeerConnection>());
 	const channel = useRef<ReturnType<ReturnType<typeof createClient>["channel"]> | null>(null);
 	const pendingIce = useRef(new Map<string, RTCIceCandidateInit[]>());
+	const offerQueue = useRef(new Map<string, Promise<void>>());
 	const savedUpTo = useRef(0);
 	const linesRef = useRef<TranscriptLine[]>([]);
 	linesRef.current = lines;
@@ -170,7 +174,7 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 	remotesRef.current = remotes;
 
 	const link = typeof window === "undefined" ? "" : `${window.location.origin}/meet/${code}`;
-	const shownName = companion ? `${name} (phone)` : name;
+	const shownName = companion ? `${name} (companion)` : name;
 
 	const addLine = useCallback((l: TranscriptLine) => setLines((cur) => (cur.some((x) => x.id === l.id) ? cur : [...cur, l])), []);
 	const send = useCallback((event: string, payload: Record<string, unknown>) => { channel.current?.send({ type: "broadcast", event, payload }).catch(() => undefined); }, []);
@@ -264,13 +268,11 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 			setBgBusy(false);
 		}
 	};
-	const uploadBackground = (file: File | undefined) => {
-		if (!file) return;
-		if (!file.type.startsWith("image/") || file.size > 8_000_000) { setBgNote("Choose a picture under 8 MB."); return; }
-		const src = URL.createObjectURL(file);
-		setCustomBgs((c) => [...c.slice(-3), src]);
-		void applyBackground({ kind: "image", src });
-	};
+	// What was picked last time comes back by itself.
+	useEffect(() => {
+		const saved = loadBackgroundPrefs().mode;
+		if (saved.kind !== "none") { bgRef.current = saved; setBg(saved); }
+	}, []);
 	const stopPreview = () => {
 		if (bgProc.current && bgProc.current.stream === preview.current) void clearBackground(false);
 		preview.current?.getTracks().forEach((t) => t.stop());
@@ -367,14 +369,25 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 		if (m.kind === "offer") {
 			await connect({ id: m.from, name: m.name ?? "Guest", companion: m.companion, uid: m.uid }, false);
 			const pc = pcs.current.get(m.from)!;
-			await pc.setRemoteDescription(m.data as RTCSessionDescriptionInit);
-			for (const c of pendingIce.current.get(m.from) ?? []) await pc.addIceCandidate(c).catch(() => undefined);
-			pendingIce.current.delete(m.from);
-			const answer = await pc.createAnswer();
-			await pc.setLocalDescription(answer);
-			send("signal", { from: myId.current, to: m.from, kind: "answer" as SignalKind, data: answer });
+			// Offers from the same person are answered one at a time: two at once leave the second answering a
+			// connection that is already settled, which the browser refuses.
+			const turn = (offerQueue.current.get(m.from) ?? Promise.resolve()).then(async () => {
+				if (pcs.current.get(m.from) !== pc || pc.signalingState === "closed") return;
+				await pc.setRemoteDescription(m.data as RTCSessionDescriptionInit);
+				for (const c of pendingIce.current.get(m.from) ?? []) await pc.addIceCandidate(c).catch(() => undefined);
+				pendingIce.current.delete(m.from);
+				if (pc.signalingState !== "have-remote-offer") return;
+				const answer = await pc.createAnswer();
+				if (pc.signalingState !== "have-remote-offer") return;
+				await pc.setLocalDescription(answer);
+				send("signal", { from: myId.current, to: m.from, kind: "answer" as SignalKind, data: answer });
+			}).catch(() => undefined);
+			offerQueue.current.set(m.from, turn);
+			await turn;
 		} else if (m.kind === "answer") {
-			await pcs.current.get(m.from)?.setRemoteDescription(m.data as RTCSessionDescriptionInit);
+			// A repeated answer arrives when the connection is already settled; it is ignored, not an error.
+			const pc = pcs.current.get(m.from);
+			if (pc && pc.signalingState === "have-local-offer") await pc.setRemoteDescription(m.data as RTCSessionDescriptionInit).catch(() => undefined);
 		} else if (m.kind === "ice") {
 			const pc = pcs.current.get(m.from);
 			if (pc?.remoteDescription) await pc.addIceCandidate(m.data as RTCIceCandidateInit).catch(() => undefined);
@@ -489,6 +502,8 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 				
 				// The newcomer is told how this device is now once it is listening.
 				setTimeout(() => pushState({}), 900);
+				// Someone who joins mid-recording is told straight away, not only people who were here at the start.
+				setTimeout(() => { if (recNameRef.current) send("rec", { on: true, by: recNameRef.current }); }, 1400);
 			})
 			.on("presence", { event: "leave" }, ({ key }) => {
 				hostIds.current.delete(key);
@@ -544,6 +559,8 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 	/* ------------------------------------------------------------ controls */
 
 	const toggleMic = () => {
+		// A companion never carries sound: the main device does, and a second open microphone would echo.
+		if (companion) { setNotice({ id: Date.now(), text: "Companion mode keeps your microphone and speaker off so there is no echo. Use your main device to speak and listen." }); return; }
 		const next = !micOn;
 		setMicOn(next);
 		local.current?.getAudioTracks().forEach((t) => (t.enabled = next));
@@ -706,6 +723,8 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 		const toSalama = addressedToSalama(text);
 		if (toSalama) askSalamaRef.current(toSalama);
 	};
+	/** Puts the joining link in the chat for everyone, so people who are already in can pass it on. */
+	const shareLinkInChat = () => { setPanel("chat"); sendChat(`Join this meeting: ${link}`); };
 	/** Salama answers in the call's chat, for everyone, and the answer is kept with the meeting like any message. */
 	const postSalama = (text: string, everyone = true) => {
 		const line: ChatMsg = { id: `salama-${myId.current}-${Date.now()}`, name: SALAMA.name, text: text.slice(0, 1000), at: new Date().toISOString(), mine: false };
@@ -857,6 +876,25 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 	// Taking notes (the transcript is the notes) is announced to everyone, and told again to anyone who joins later.
 	useEffect(() => { if (joined) pushState({ notes: captionsOn }); }, [joined, captionsOn, pushState]);
 	const noteTakers = [...(captionsOn ? ["You"] : []), ...remotes.filter((r) => r.notes).map((r) => r.name)];
+	// Said once, loudly, the moment recording or transcribing starts for anyone; the strip at the top keeps saying it after.
+	const noteKey = noteTakers.join("|");
+	useEffect(() => {
+		if (!joined) return;
+		const who = recording ? "You" : recBy;
+		const prev = seen.current;
+		const parts: string[] = [];
+		if (who && !prev.rec) parts.push(who === "You" ? "Recording has started. Everyone in the call has been told." : `${who} started recording this meeting.`);
+		prev.rec = !!who;
+		const now = new Set(noteKey ? noteKey.split("|") : []);
+		const added = [...now].filter((n) => !prev.notes.has(n));
+		prev.notes = now;
+		if (added.length) parts.push(added.includes("You") && added.length === 1 ? "Transcription is on. What you say is written down and shared with everyone here." : `${added.map((n) => (n === "You" ? "You" : n)).join(" and ")} turned on transcription. What is said is written down.`);
+		if (!parts.length) return;
+		const id = Date.now();
+		setNotice({ id, text: parts.join(" ") });
+		const t = setTimeout(() => setNotice((n) => (n && n.id === id ? null : n)), 9000);
+		return () => clearTimeout(t);
+	}, [joined, recording, recBy, noteKey]);
 
 	useEffect(() => {
 		if (!joined) return;
@@ -903,6 +941,7 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 		if (!r) return;
 		recorder.current = null;
 		setRecording(false);
+		recNameRef.current = null;
 		send("rec", { on: false, by: name });
 		setSaving(true);
 		try {
@@ -950,7 +989,8 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 		recorder.current = r;
 		setRecording(true);
 		setRecSecs(0);
-		send("rec", { on: true, by: name || "Someone" });
+		recNameRef.current = name || "Someone";
+		send("rec", { on: true, by: recNameRef.current });
 	};
 	useEffect(() => {
 		if (!recording) return;
@@ -1098,7 +1138,7 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 					{micOn && permission === "granted" && (
 						<div className="mt-3 flex items-center gap-2 text-xs text-[#5f6368]"><Mic className="h-3.5 w-3.5" /><div className="h-1.5 flex-1 overflow-hidden rounded-full bg-[#e8eaed]"><div className="h-full rounded-full bg-[#068297] transition-[width] duration-100" style={{ width: `${Math.round(level * 100)}%` }} /></div></div>
 					)}
-					{permission === "granted" && mode === "video" && <div className="mt-3"><BackgroundPicker light bg={bg} busy={bgBusy} note={bgNote} customs={customBgs} onPick={(m) => void applyBackground(m)} onUpload={uploadBackground} /></div>}
+					{permission === "granted" && mode === "video" && <div className="mt-3"><BackgroundPicker light bg={bg} busy={bgBusy} note={bgNote} onPick={(m) => void applyBackground(m)} /></div>}
 					{permission === "granted" && (
 						<div className="mt-3 flex flex-wrap gap-2">
 							{mics.length > 0 && <label className={chip}><Mic className="h-4 w-4 shrink-0" /><select aria-label="Microphone" value={micId} onChange={(e) => setMicId(e.target.value)} className="min-w-0 bg-transparent outline-none"><option value="">Default microphone</option>{mics.map((d) => <option key={d.id} value={d.id}>{d.label}</option>)}</select></label>}
@@ -1118,28 +1158,37 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 						<span className="mb-1 flex items-center justify-between text-xs font-medium text-[#5f6368]"><span>Your name</span><span className={cn("rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide", name.trim() ? "bg-[#e6f4ea] text-[#137333]" : "bg-[#fce8e6] text-[#d93025]")}>{name.trim() ? "Done" : "Required"}</span></span>
 						<input value={name} onChange={(e) => setName(e.target.value)} placeholder="How should people see you?" className="h-12 w-full rounded-lg border border-[#dadce0] px-3 text-base outline-none focus:border-[#068297] focus:ring-1 focus:ring-[#068297]" />
 					</label>
-					<ul aria-label="Before you join" className="w-full max-w-sm space-y-2 rounded-xl bg-[#f6f8f9] p-3 text-left text-xs text-[#3c4043]">
-						<li className="text-[11px] font-bold uppercase tracking-wide text-[#5f6368]">Before you join</li>
-						<li className="flex items-start gap-2">{name.trim() ? <Check className="mt-0.5 h-4 w-4 shrink-0 text-[#137333]" /> : <X className="mt-0.5 h-4 w-4 shrink-0 text-[#d93025]" />}<span><b>Your name</b> <span className="font-bold text-[#d93025]">(required)</span><span className="block text-[#5f6368]">Type it above. You cannot join without it.</span></span></li>
-						<li className="flex items-start gap-2">{permission === "granted" ? <Check className="mt-0.5 h-4 w-4 shrink-0 text-[#137333]" /> : permission === "denied" ? <X className="mt-0.5 h-4 w-4 shrink-0 text-[#d93025]" /> : <Loader2 className="mt-0.5 h-4 w-4 shrink-0 animate-spin text-[#5f6368]" />}<span><b>Microphone and camera access</b> <span className="font-bold text-[#5f6368]">(to speak and be seen)</span><span className="block text-[#5f6368]">{permission === "granted" ? "Allowed." : permission === "denied" ? "Blocked. Allow them in your browser's address bar to speak or show video. You can still join and listen." : "Choose Allow when your browser asks."}</span></span></li>
-						<li className="flex items-start gap-2"><Volume2 className="mt-0.5 h-4 w-4 shrink-0 text-[#5f6368]" /><span><b>Headphones</b> <span className="font-bold text-[#5f6368]">(recommended)</span><span className="block text-[#5f6368]">They stop echo and keep the call private.</span></span></li>
-						<li className="flex items-start gap-2"><MessageSquareText className="mt-0.5 h-4 w-4 shrink-0 text-[#5f6368]" /><span><b>Notes may be taken</b> <span className="font-bold text-[#5f6368]">(you will be told)</span><span className="block text-[#5f6368]">When anyone turns on captions, what is said is transcribed and shown to everyone. A banner tells you while it happens, and the team may keep the notes.</span></span></li>
-						<li className="flex items-start gap-2"><ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-[#5f6368]" /><span><b>The host may let you in</b> <span className="font-bold text-[#5f6368]">(if asked)</span><span className="block text-[#5f6368]">Some calls ask the host to admit you. Stay on this page until they do.</span></span></li>
-					</ul>
+					<div className="flex w-full max-w-sm flex-wrap gap-2 text-xs" aria-label="Ready check">
+						<span className={cn("inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 font-medium", name.trim() ? "bg-[#e6f4ea] text-[#137333]" : "bg-[#fce8e6] text-[#d93025]")}>{name.trim() ? <Check className="h-3.5 w-3.5" /> : <X className="h-3.5 w-3.5" />}{name.trim() ? "Name set" : "Add your name to join"}</span>
+						<span className={cn("inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 font-medium", permission === "granted" ? "bg-[#e6f4ea] text-[#137333]" : permission === "denied" ? "bg-[#fef7e0] text-[#8a6d00]" : "bg-[#f1f3f4] text-[#5f6368]")}>{permission === "granted" ? <Check className="h-3.5 w-3.5" /> : permission === "denied" ? <MicOff className="h-3.5 w-3.5" /> : <Loader2 className="h-3.5 w-3.5 animate-spin" />}{permission === "granted" ? "Microphone and camera on" : permission === "denied" ? "Blocked: you can still listen" : "Waiting for your permission"}</span>
+					</div>
+					{permission === "denied" && <p className="max-w-sm text-xs text-[#5f6368]">Allow the microphone and camera in your browser&apos;s address bar to speak or show video.</p>}
 					<div className="flex flex-wrap justify-center gap-3 lg:justify-start">
 						<button onClick={() => join(false)} disabled={!name.trim() || entry === "checking"} className="h-12 rounded-full bg-[#068297] px-7 text-sm font-medium text-white shadow-sm hover:bg-[#056d7e] disabled:opacity-40">{entry === "checking" ? "Joining…" : companion ? "Join as companion" : "Join now"}</button>
 						<button onClick={() => join(true)} disabled={!name.trim() || entry === "checking"} className="flex h-12 items-center gap-2 rounded-full border border-[#dadce0] px-6 text-sm font-medium text-[#068297] hover:bg-[#f1fafb] disabled:opacity-40"><MonitorUp className="h-4 w-4" /> Present</button>
 					</div>
 					{entryError && <p role="alert" className="max-w-sm text-sm text-[#d93025]">{entryError}</p>}
+					<div className="w-full max-w-sm rounded-xl border border-[#e8eaed] p-3 text-left">
+						<p className="flex items-center gap-1.5 text-sm font-medium"><SmartphoneNfc className="h-4 w-4 text-[#068297]" /> Companion mode</p>
+						<p className="mt-1 text-xs text-[#5f6368]">Join from a second device, like a laptop in a meeting room or your phone, while sound stays on the device you joined with. This device has the microphone and speaker off, so there is no echo.</p>
 						{userId ? (
-							<label className="flex max-w-sm cursor-pointer items-start gap-3 text-left">
-								<input type="checkbox" checked={companion} onChange={(e) => { setCompanion(e.target.checked); if (e.target.checked) { setSpeakerOn(false); setMicOn(false); } else setMicOn(true); }} className="mt-1 h-4 w-4 accent-[#068297]" />
-								<span className="text-sm"><span className="flex items-center gap-1.5 font-medium"><SmartphoneNfc className="h-4 w-4" /> Use this device as a companion</span><span className="block text-xs text-[#5f6368]">Your microphone and speaker stay on the device you joined with. Use this one to see what is presented, present your screen, show a camera, chat and react. It shows to others as you, not as a second person.</span></span>
-							</label>
+							<>
+								<button type="button" aria-pressed={companion} onClick={() => { const on = !companion; setCompanion(on); if (on) { setSpeakerOn(false); setMicOn(false); } else { setSpeakerOn(true); setMicOn(true); } }} className={cn("mt-2 flex h-9 items-center gap-2 rounded-full border px-4 text-sm font-medium", companion ? "border-[#068297] bg-[#e0f2f5] text-[#068297]" : "border-[#dadce0] text-[#068297] hover:bg-[#f1fafb]")}>{companion ? <><Check className="h-4 w-4" /> Companion mode is on</> : "Use Companion mode"}</button>
+								<p className="mt-2 text-[11px] text-[#5f6368]">You can present, show your camera, chat, react, raise your hand and see everyone. You appear as &ldquo;{name.trim() || "You"} (companion)&rdquo;, not as another person.</p>
+							</>
 						) : (
-							<p className="flex max-w-sm items-start gap-3 text-left text-xs text-[#5f6368]"><SmartphoneNfc className="mt-0.5 h-4 w-4 shrink-0" /> Sign in on this device and on your main device with the same account to use one of them as a companion.</p>
+							<p className="mt-2 text-[11px] text-[#5f6368]">Sign in on this device and on your main device with the same account to use Companion mode.</p>
 						)}
-					<p className="max-w-sm text-xs text-[#5f6368]">Captions and accessibility tools are off until you turn them on inside the call. Calls go directly between people in the call.</p>
+					</div>
+					<details className="w-full max-w-sm rounded-xl bg-[#f6f8f9] p-3 text-left text-xs text-[#3c4043]">
+						<summary className="cursor-pointer text-[11px] font-bold uppercase tracking-wide text-[#5f6368]">Good to know</summary>
+						<ul className="mt-2 space-y-2">
+							<li className="flex items-start gap-2"><Volume2 className="mt-0.5 h-4 w-4 shrink-0 text-[#5f6368]" /><span>Headphones stop echo and keep the call private.</span></li>
+							<li className="flex items-start gap-2"><MessageSquareText className="mt-0.5 h-4 w-4 shrink-0 text-[#5f6368]" /><span>If anyone records or transcribes, a bar at the top of the call tells everyone. The team may keep the notes.</span></li>
+							<li className="flex items-start gap-2"><ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-[#5f6368]" /><span>Some calls ask the host to let you in. Stay on this page until they do.</span></li>
+							<li className="flex items-start gap-2"><Captions className="mt-0.5 h-4 w-4 shrink-0 text-[#5f6368]" /><span>Captions and accessibility tools stay off until you turn them on inside the call.</span></li>
+						</ul>
+					</details>
 				</div>
 			</div></main>
 		);
@@ -1183,12 +1232,6 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 					{knocks.length > 1 && <button onClick={() => decideAll(true)} className="w-full rounded-full border border-[#dadce0] py-1.5 text-sm font-medium text-[#068297] hover:bg-[#f1fafb]">Admit all</button>}
 				</div>
 			)}
-			{(recording || recBy || saving) && (
-				<div role="status" className="absolute left-1/2 top-3 z-30 flex -translate-x-1/2 items-center gap-2 rounded-full bg-black/70 px-3.5 py-1.5 text-xs font-medium text-white backdrop-blur">
-					<span className={cn("h-2 w-2 rounded-full", saving ? "bg-amber-400" : "animate-pulse bg-[#ea4335]")} />
-					{saving ? `Saving the recording${savePct !== null ? ` ${savePct}%` : ""}` : recording ? `Recording ${String(Math.floor(recSecs / 60)).padStart(2, "0")}:${String(recSecs % 60).padStart(2, "0")}` : `${recBy} is recording this meeting`}
-				</div>
-			)}
 			{conn !== "ok" && (
 				<div role="alert" className={cn("absolute left-1/2 top-14 z-50 flex max-w-[92vw] -translate-x-1/2 items-center gap-3 rounded-2xl px-4 py-2.5 text-sm font-medium shadow-xl", conn === "lost" ? "bg-[#d93025] text-white" : "bg-[#137333] text-white")}>
 					{conn === "lost" ? <WifiOff className="h-4 w-4 shrink-0" /> : <Check className="h-4 w-4 shrink-0" />}
@@ -1196,10 +1239,27 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 					{conn === "lost" && <button onClick={() => void leave()} className="shrink-0 rounded-full bg-white/20 px-3 py-1 text-xs font-bold hover:bg-white/30">Leave</button>}
 				</div>
 			)}
-			{noteTakers.length > 0 && (
-				<div role="status" className={cn("absolute left-1/2 z-30 flex max-w-[92vw] -translate-x-1/2 items-center gap-2 rounded-full bg-black/70 px-3.5 py-1.5 text-xs font-medium text-white backdrop-blur", recording || recBy || saving ? "top-12" : "top-3")}>
-					<MessageSquareText className="h-3.5 w-3.5 shrink-0 text-[#7fd3e0]" />
-					<span className="truncate">{noteTakers.length === 1 && noteTakers[0] === "You" ? "Notes are being taken: what you say is transcribed and shared with everyone here" : `Notes are being taken${noteTakers.includes("You") ? "" : ` by ${noteTakers.slice(0, 2).join(" and ")}${noteTakers.length > 2 ? ` and ${noteTakers.length - 2} more` : ""}`}: what is said is transcribed`}</span>
+			{(recording || recBy || saving || noteTakers.length > 0) && (
+				<div role="status" aria-live="polite" className="flex shrink-0 flex-wrap items-center justify-center gap-2 px-3 pt-2 text-xs font-medium">
+					{(recording || recBy || saving) && (
+						<span title="This meeting is being recorded. Everyone in the call has been told." className="flex items-center gap-2 rounded-full bg-[#d93025] px-3 py-1 text-white shadow">
+							<span className={cn("h-2 w-2 rounded-full bg-white", !saving && "animate-pulse")} />
+							{saving ? `Saving the recording${savePct !== null ? ` ${savePct}%` : ""}` : recording ? `Recording ${String(Math.floor(recSecs / 60)).padStart(2, "0")}:${String(recSecs % 60).padStart(2, "0")}` : `${recBy} is recording`}
+						</span>
+					)}
+					{noteTakers.length > 0 && (
+						<span title="What is said is being written down and shared with everyone in the call." className="flex max-w-[92vw] items-center gap-2 rounded-full bg-[#068297] px-3 py-1 text-white shadow">
+							<MessageSquareText className="h-3.5 w-3.5 shrink-0" />
+							<span className="truncate">Transcribing · {noteTakers.slice(0, 2).join(", ")}{noteTakers.length > 2 ? ` +${noteTakers.length - 2}` : ""}</span>
+						</span>
+					)}
+				</div>
+			)}
+			{notice && (
+				<div role="alert" className="absolute left-1/2 top-12 z-40 flex w-[min(92vw,26rem)] -translate-x-1/2 items-start gap-3 rounded-2xl bg-white px-4 py-3 text-sm text-[#202124] shadow-2xl">
+					<ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-[#068297]" />
+					<p className="min-w-0 flex-1">{notice.text}</p>
+					<button onClick={() => setNotice(null)} aria-label="Dismiss" className="shrink-0 text-[#5f6368] hover:text-black"><X className="h-4 w-4" /></button>
 				</div>
 			)}
 			<div className="hidden shrink-0 items-center gap-3 px-5 pt-3 text-base md:flex">
@@ -1275,7 +1335,7 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 							{panel === "transcript" ? "Transcript" : panel === "info" ? "Meeting details" : panel === "chat" ? "Messages" : panel === "polls" ? "Polls" : panel === "settings" ? "Call settings" : panel === "docs" ? "Documents" : "People"}
 							<button onClick={() => setPanel("none")} aria-label="Close" className="flex h-8 w-8 items-center justify-center rounded-full hover:bg-black/5"><X className="h-4 w-4" /></button>
 						</div>
-													{panel === "chat" && <ChatPanel lines={chat} onSend={sendChat} onPin={pinChat} salama={{ busy: salamaBusy, ask: (q) => askSalamaRef.current(q), speak: hearSalama, onSpeak: setHearSalama }} />}
+													{panel === "chat" && <ChatPanel lines={chat} onSend={sendChat} onShareLink={shareLinkInChat} onPin={pinChat} salama={{ busy: salamaBusy, ask: (q) => askSalamaRef.current(q), speak: hearSalama, onSpeak: setHearSalama }} />}
 							{panel === "docs" && (
 								<DocsPanel code={code} docs={meetDocs.docs} loading={meetDocs.loading} error={userId ? meetDocs.error : "Sign in to work on documents together."} canAttach={canSave && !!userId} openId={openDoc?.id ?? null}
 									onChanged={(next) => { meetDocs.setDocs(next); setOpenDoc((cur) => (cur && next.some((d) => d.id === cur.id) ? cur : null)); send("docs", { by: myId.current }); }}
@@ -1288,12 +1348,12 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 										<select value={micId} onChange={(e) => void switchDevice("audio", e.target.value)} className="h-10 w-full rounded-lg border border-[#dadce0] bg-white px-2"><option value="">Default microphone</option>{mics.map((d) => <option key={d.id} value={d.id}>{d.label}</option>)}</select></label>
 									<label className="block"><span className="mb-1 block text-xs text-[#5f6368]">Camera</span>
 										<select value={camId} onChange={(e) => void switchDevice("video", e.target.value)} className="h-10 w-full rounded-lg border border-[#dadce0] bg-white px-2"><option value="">Default camera</option>{cams.map((d) => <option key={d.id} value={d.id}>{d.label}</option>)}</select></label>
-									{mode === "video" && <BackgroundPicker light bg={bg} busy={bgBusy} note={bgNote} customs={customBgs} onPick={(m) => void applyBackground(m)} onUpload={uploadBackground} />}
+									{mode === "video" && <BackgroundPicker light bg={bg} busy={bgBusy} note={bgNote} onPick={(m) => void applyBackground(m)} />}
 									<label className="block"><span className="mb-1 block text-xs text-[#5f6368]">Speaker</span>
 										<select value={speakerId} onChange={(e) => setSpeakerId(e.target.value)} className="h-10 w-full rounded-lg border border-[#dadce0] bg-white px-2"><option value="">Default speaker</option>{speakers.map((d) => <option key={d.id} value={d.id}>{d.label}</option>)}</select></label>
 									<label className="flex items-center justify-between gap-3"><span>Reduce background noise</span><input type="checkbox" checked={noise} onChange={(e) => { setNoise(e.target.checked); void applyAudioProcessing({ noiseSuppression: e.target.checked }); }} className="h-4 w-4 accent-[#068297]" /></label>
 									<label className="flex items-center justify-between gap-3"><span>Echo cancellation</span><input type="checkbox" checked={echo} onChange={(e) => { setEcho(e.target.checked); void applyAudioProcessing({ echoCancellation: e.target.checked }); }} className="h-4 w-4 accent-[#068297]" /></label>
-									<label className="flex items-center justify-between gap-3"><span>Play call sound</span><input type="checkbox" checked={speakerOn} onChange={(e) => setSpeakerOn(e.target.checked)} className="h-4 w-4 accent-[#068297]" /></label>
+									<label className="flex items-center justify-between gap-3"><span>Play call sound</span><input type="checkbox" checked={speakerOn && !companion} disabled={companion} onChange={(e) => setSpeakerOn(e.target.checked)} className="h-4 w-4 accent-[#068297]" /></label>
 								</div>
 							)}
 							{panel === "transcript" && (
@@ -1354,6 +1414,7 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 								)}
 								<p className="break-all rounded-lg bg-[#f1f3f4] p-3 text-xs">{link}</p>
 								<button onClick={() => { navigator.clipboard.writeText(link).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500); }); }} className="flex items-center gap-2 rounded-full border border-[#dadce0] px-4 py-2 text-[#068297] hover:bg-[#f1fafb]">{copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />} {copied ? "Copied" : "Copy joining link"}</button>
+								<button onClick={shareLinkInChat} className="flex items-center gap-2 rounded-full border border-[#dadce0] px-4 py-2 text-[#068297] hover:bg-[#f1fafb]"><MessageCircle className="h-4 w-4" /> Share the link in chat</button>
 								<a href={mailto} className="flex items-center gap-2 text-[#068297] hover:underline"><Mail className="h-4 w-4" /> Send by email</a>
 							</div>
 						)}
@@ -1534,33 +1595,6 @@ function PresentingPanel({ surface, onStop, onFloat }: { surface?: string; onSto
 				<button onClick={onFloat} className="flex items-center gap-2 rounded-full border border-white/30 px-5 py-2 text-sm font-medium hover:bg-white/10"><PictureInPicture2 className="h-4 w-4" /> Keep the call in a floating window</button>
 				<button onClick={onStop} className="rounded-full bg-[#ea4335] px-5 py-2 text-sm font-medium hover:bg-[#d93025]">Stop presenting</button>
 			</div>
-		</div>
-	);
-}
-
-/** Pick what is behind you: nothing, a blur, a ready-made picture or one of your own. */
-function BackgroundPicker({ bg, busy, note, customs, onPick, onUpload, light }: { bg: BackgroundMode; busy: boolean; note: string; customs: string[]; onPick: (m: BackgroundMode) => void; onUpload: (f: File | undefined) => void; light?: boolean }) {
-	const on = (m: BackgroundMode) => (m.kind === bg.kind && (m.kind !== "blur" || (bg.kind === "blur" && bg.strength === m.strength)) && (m.kind !== "image" || (bg.kind === "image" && bg.src === m.src)));
-	const tile = (active: boolean) => cn("relative flex h-14 w-20 shrink-0 items-center justify-center overflow-hidden rounded-lg border text-[11px] font-medium transition", active ? "border-[#068297] ring-2 ring-[#068297]" : light ? "border-[#dadce0] hover:border-[#068297]" : "border-white/20 hover:border-white/60", busy && "opacity-60");
-	return (
-		<div>
-			<span className={cn("mb-1 flex items-center gap-1.5 text-xs", light ? "text-[#5f6368]" : "text-white/70")}><Sparkles className="h-3.5 w-3.5" /> Background {busy && <Loader2 className="h-3 w-3 animate-spin" />}</span>
-			<div className="flex gap-2 overflow-x-auto pb-1">
-				<label className={cn(tile(false), "cursor-pointer flex-col gap-0.5", light ? "bg-white text-[#068297]" : "bg-white/10")}>
-					<ImagePlus className="h-4 w-4" /> Your photo
-					<input type="file" accept="image/*" className="sr-only" onChange={(e) => { onUpload(e.target.files?.[0]); e.target.value = ""; }} />
-				</label>
-				{customs.map((c) => (
-					<button key={c} type="button" disabled={busy} aria-label="Your picture" onClick={() => onPick({ kind: "image", src: c })} className={tile(bg.kind === "image" && bg.src === c)} style={{ backgroundImage: `url(${c})`, backgroundSize: "cover", backgroundPosition: "center" }} />
-				))}
-				<button type="button" disabled={busy} onClick={() => onPick({ kind: "none" })} className={cn(tile(on({ kind: "none" })), light ? "bg-white text-[#3c4043]" : "bg-white/10")}>None</button>
-				<button type="button" disabled={busy} onClick={() => onPick({ kind: "blur", strength: "light" })} className={cn(tile(on({ kind: "blur", strength: "light" })), light ? "bg-[#e8eaed] text-[#3c4043]" : "bg-white/20")}>Blur</button>
-				<button type="button" disabled={busy} onClick={() => onPick({ kind: "blur", strength: "strong" })} className={cn(tile(on({ kind: "blur", strength: "strong" })), light ? "bg-[#dadce0] text-[#3c4043]" : "bg-white/30")}>More blur</button>
-				{PRESET_BACKGROUNDS.map((p) => (
-					<button key={p.id} type="button" disabled={busy} aria-label={`${p.label} background`} onClick={() => onPick({ kind: "image", src: presetImage(p.id) })} className={tile(bg.kind === "image" && bg.src.startsWith("data:") && bg.src === presetImage(p.id))} style={{ background: `linear-gradient(135deg, ${p.colours[0]}, ${p.colours[1]})` }}><span className="rounded bg-black/40 px-1 text-white">{p.label}</span></button>
-				))}
-			</div>
-			<p className={cn("mt-1 text-[11px]", light ? "text-[#5f6368]" : "text-white/50")}>{note || "The effect is made on your device, before anyone sees your camera."}</p>
 		</div>
 	);
 }

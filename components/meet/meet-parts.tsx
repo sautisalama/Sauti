@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Loader2, Pin, PinOff, Send, Sparkles, X } from "lucide-react";
+import { Link2, Loader2, Pin, PinOff, Send, Sparkles, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 /* ---------------------------------------------------------------- reactions */
@@ -66,7 +66,7 @@ export interface ChatMsg { id: string; name: string; text: string; at: string; m
 /** Salama, the team's AI member, can be asked from the chat: quick asks, a thinking note, and an option to hear her answers. */
 export interface SalamaChat { busy: boolean; ask: (question: string) => void; speak: boolean; onSpeak: (on: boolean) => void }
 
-export function ChatPanel({ lines, onSend, onPin, salama }: { lines: ChatMsg[]; onSend: (text: string) => void; onPin?: (id: string, pinned: boolean) => void; salama?: SalamaChat }) {
+export function ChatPanel({ lines, onSend, onPin, onShareLink, salama }: { lines: ChatMsg[]; onSend: (text: string) => void; onShareLink?: () => void; onPin?: (id: string, pinned: boolean) => void; salama?: SalamaChat }) {
 	const [draft, setDraft] = useState("");
 	const end = useRef<HTMLDivElement>(null);
 	useEffect(() => { end.current?.scrollIntoView({ block: "end" }); }, [lines.length]);
@@ -83,6 +83,11 @@ export function ChatPanel({ lines, onSend, onPin, salama }: { lines: ChatMsg[]; 
 							{onPin && <button onClick={() => onPin(l.id, false)} aria-label="Unpin" title="Unpin" className="shrink-0 text-[#8a6d00] hover:text-black"><PinOff className="h-3.5 w-3.5" /></button>}
 						</div>
 					))}
+				</div>
+			)}
+			{onShareLink && (
+				<div className="shrink-0 border-b border-[#e8eaed] px-3 py-2">
+					<button type="button" onClick={onShareLink} className="flex w-full items-center justify-center gap-2 rounded-full border border-[#dadce0] py-1.5 text-xs font-medium text-[#068297] hover:bg-[#f1fafb]"><Link2 className="h-3.5 w-3.5" /> Share the meeting link here</button>
 				</div>
 			)}
 			<div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4 text-sm">
