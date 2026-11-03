@@ -71,6 +71,7 @@ export async function updateSession(request: NextRequest) {
 		"/volunteer",
 		"/learn",
 		"/publications",
+		"/share-preview",
 		"/report-abuse",
 		"/schedule",
 		"/sitemap.xml",
@@ -94,6 +95,13 @@ export async function updateSession(request: NextRequest) {
 	const isPublic = path === "/" || PUBLIC_PREFIXES.some((p) => path === p || path.startsWith(p.endsWith("/") ? p : `${p}/`) || (p === "/api" && path.startsWith("/api")));
 
 	if (!user && !isPublic) {
+		// A shared dashboard link opened by a link-preview crawler (or anyone signed out) gets a small page that
+		// carries the section's own preview and then sends people to sign in, instead of a bare redirect.
+		if (path.startsWith("/dashboard")) {
+			const preview = request.nextUrl.clone();
+			preview.pathname = `/share-preview${path}`;
+			return NextResponse.rewrite(preview);
+		}
 		const url = request.nextUrl.clone();
 		url.pathname = "/signin";
 		// Bring the visitor back to where they were going after they sign in.

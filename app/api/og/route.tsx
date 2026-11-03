@@ -5,7 +5,7 @@ import { getPreview, type PreviewKind } from "@/lib/seo/previews";
 
 export const dynamic = "force-dynamic";
 
-const KINDS: PreviewKind[] = ["form", "doc", "meet", "user", "group", "schedule"];
+const KINDS: PreviewKind[] = ["form", "doc", "meet", "user", "group", "schedule", "section", "course"];
 
 /**
  * The picture shown when a link is shared. It is drawn from the thing the link points to (a person's photo, a

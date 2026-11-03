@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { previewMetadata } from "@/lib/seo/previews";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import Image from "next/image";
@@ -16,9 +17,8 @@ type Props = { params: Promise<{ slug: string }> };
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
 	const { slug } = await params;
-	const supabase = await createClient();
-	const { data } = await supabase.from("courses").select("title, summary").eq("slug", slug).eq("status", "published").maybeSingle();
-	return data ? { title: data.title, description: data.summary ?? undefined, alternates: { canonical: `/learn/courses/${slug}` } } : { title: "Course not found" };
+	const m = await previewMetadata("course", slug, "Course not found", { index: true });
+	return { ...m, alternates: { canonical: `/learn/courses/${slug}` } };
 }
 
 export default async function CoursePage({ params }: Props) {

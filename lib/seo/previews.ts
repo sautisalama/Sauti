@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
 import { looseAdmin } from "@/lib/loose-db";
 import { getBookableProfessional } from "@/lib/scheduling/public-professional";
+import { SECTIONS } from "@/lib/seo/sections";
 
 /** What a shared link looks like in chats, mail and social feeds: its own title, description and picture. */
-export type PreviewKind = "form" | "doc" | "meet" | "user" | "group" | "schedule";
+export type PreviewKind = "form" | "doc" | "meet" | "user" | "group" | "schedule" | "section" | "course";
 
 export interface Preview {
 	label: string;
@@ -32,6 +33,16 @@ async function person(id: string | null | undefined) {
 	return data as { first_name: string | null; last_name: string | null; avatar_url: string | null } | null;
 }
 
+const TZ = "Africa/Nairobi";
+function whenText(start: string, end: string | null) {
+	const a = new Date(start);
+	if (Number.isNaN(a.getTime())) return "";
+	const day = new Intl.DateTimeFormat("en-GB", { weekday: "short", day: "numeric", month: "short", timeZone: TZ }).format(a);
+	const t = (d: Date) => new Intl.DateTimeFormat("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: TZ }).format(d);
+	const b = end ? new Date(end) : null;
+	return `${day}, ${t(a)}${b && !Number.isNaN(b.getTime()) ? `\u2013${t(b)}` : ""} EAT`;
+}
+
 export async function getPreview(kind: PreviewKind, id: string): Promise<Preview | null> {
 	const db = looseAdmin();
 	if (kind === "form") {
@@ -54,7 +65,11 @@ export async function getPreview(kind: PreviewKind, id: string): Promise<Preview
 		if (!data) return null;
 		const host = await person(data.created_by);
 		const by = fullName(host);
-		return { label: data.mode === "voice" ? "Voice call" : "Video call", title: clip(data.title, 90) || "Sauti Salama meeting", description: clip(data.description, 160) || (by ? `${by} invited you to join. No account needed.` : "You are invited to join. No account needed."), image: host?.avatar_url ?? null, round: true, accent: TEAL };
+		// A calendar invite: say when it is, in Nairobi time, so the card works as the invitation.
+		const { data: ev } = await db.from("mjengo_events").select("starts_at, ends_at").eq("meeting_code", id).order("starts_at", { ascending: false }).limit(1).maybeSingle();
+		const when = ev?.starts_at ? whenText(ev.starts_at as string, ev.ends_at as string | null) : "";
+		const base = clip(data.description, 160) || (by ? `${by} invited you to join. No account needed.` : "You are invited to join. No account needed.");
+		return { label: ev ? "Calendar invite" : data.mode === "voice" ? "Voice call" : "Video call", title: clip(data.title, 90) || "Sauti Salama meeting", description: when ? `${when}. ${base}` : base, image: host?.avatar_url ?? null, round: true, accent: TEAL };
 	}
 	if (kind === "user") {
 		const c = id.replace(/[^a-z0-9]/gi, "").toUpperCase();
@@ -72,6 +87,18 @@ export async function getPreview(kind: PreviewKind, id: string): Promise<Preview
 		const n = data.member_count ?? 0;
 		return { label: "Group invite", title: clip(data.name, 90), description: clip(data.description, 140) || `${n} ${n === 1 ? "member" : "members"}. Open the link to join the conversation.`, image: data.avatar_url ?? null, round: true, accent: TEAL };
 	}
+	if (kind === "section") {
+		const x = SECTIONS[id];
+		return x ? { label: x.label, title: x.title, description: x.description, image: null, round: false, accent: TEAL } : null;
+	}
+	if (kind === "course") {
+		if (!/^[a-z0-9-]{1,120}$/i.test(id)) return null;
+		const { data } = await db.from("courses").select("title, summary, cover_image_url, level, estimated_minutes").eq("slug", id).eq("status", "published").maybeSingle();
+		if (!data) return null;
+		const mins = data.estimated_minutes ? `${data.estimated_minutes} min` : "";
+		const extra = [data.level, mins].filter(Boolean).join(" · ");
+		return { label: "Free course", title: clip(data.title, 90), description: clip(data.summary, 170) || `A free self-paced course from Sauti Salama${extra ? ` (${extra})` : ""}.`, image: https(data.cover_image_url), round: false, accent: TEAL };
+	}
 	const pro = await getBookableProfessional(id);
 	if (!pro) return null;
 	const p = await person(pro.id);
@@ -80,14 +107,14 @@ export async function getPreview(kind: PreviewKind, id: string): Promise<Preview
 }
 
 /** Metadata for a page whose link gets shared: Open Graph and Twitter cards with the card picture from /api/og. */
-export async function previewMetadata(kind: PreviewKind, id: string, fallbackTitle: string): Promise<Metadata> {
+export async function previewMetadata(kind: PreviewKind, id: string, fallbackTitle: string, opts: { index?: boolean } = {}): Promise<Metadata> {
 	const p = await getPreview(kind, id).catch(() => null);
 	if (!p) return { title: fallbackTitle, robots: { index: false, follow: false } };
 	const image = `/api/og?k=${kind}&id=${encodeURIComponent(id)}`;
 	return {
-		title: `${p.title} | Sauti Salama`,
+		title: { absolute: `${p.title} | Sauti Salama` },
 		description: p.description,
-		robots: { index: false, follow: false },
+		robots: opts.index ? { index: true, follow: true } : { index: false, follow: false },
 		openGraph: { title: p.title, description: p.description, siteName: "Sauti Salama", type: "website", images: [{ url: image, width: 1200, height: 630, alt: p.title }] },
 		twitter: { card: "summary_large_image", title: p.title, description: p.description, images: [image] },
 	};
