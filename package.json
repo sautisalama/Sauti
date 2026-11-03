@@ -98,11 +98,11 @@
 		"lottie-react": "^2.4.0",
 		"lucide-react": "^0.548.0",
 		"mailparser": "^3.9.37",
-		"mailtrap": "^3.4.0",
+		"mailtrap": "^6.0.0",
 		"mammoth": "^1.13.0",
 		"mermaid": "^12.2.0",
 		"next": "^16.0.8",
-		"nodemailer": "^6.10.1",
+		"nodemailer": "^10.3.1",
 		"pdf-lib": "^1.17.1",
 		"pdfjs-dist": "^6.4.299",
 		"pptx-preview": "^1.0.7",
@@ -126,7 +126,18 @@
 	},
 	"overrides": {
 		"react": "^19.2.1",
-		"react-dom": "^19.2.1"
+		"react-dom": "^19.2.1",
+		"lodash-es": "^4.18.1",
+		"serialize-javascript": "^7.1.4",
+		"pptxgenjs": {
+			"image-size": "^2.0.4"
+		},
+		"@excalidraw/excalidraw": {
+			"nanoid": "3.3.20",
+			"@excalidraw/mermaid-to-excalidraw": {
+				"nanoid": "5.1.16"
+			}
+		}
 	},
 	"devDependencies": {
 		"@tailwindcss/postcss": "^4",
