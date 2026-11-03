@@ -8,11 +8,12 @@ import { CircledText } from "@/components/ui/CircledText";
 import { getFeed, type FeedItem } from "@/lib/content/feed";
 import { ORGANIZATION } from "@/lib/organization";
 import { breadcrumbSchema, jsonLd } from "@/lib/seo";
+import { withOg } from "@/lib/seo/meta";
 
 // Re-render at most every 5 minutes; publishing also revalidates this page immediately.
 export const revalidate = 300;
 
-export const metadata: Metadata = {
+export const metadata: Metadata = withOg({
 	title: "Publications — GBV Research, Legal Guides & Training from Kenya",
 	description:
 		"Free publications from Sauti Salama: research briefs, legal literacy guides and training modules on gender-based violence in Kenya. Written by survivors, open to everyone.",
@@ -32,7 +33,7 @@ export const metadata: Metadata = {
 		url: `${ORGANIZATION.url}/publications`,
 		type: "website",
 	},
-};
+}, "/publications", "publications");
 
 function collectionSchema(items: FeedItem[]) {
 	return {

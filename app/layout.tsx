@@ -37,8 +37,12 @@ export const metadata: Metadata = {
 		"Sauti Salama is a survivor-led Kenyan non-profit offering free, confidential gender-based violence (GBV) support in Nairobi and across Kenya: counselling, safe shelter referrals, legal aid and anonymous reporting. Get help today.",
 	manifest: "/manifest.json",
 	icons: {
-		icon: "/icons/icons-512.png",
-		apple: "/icons/icons-512.png",
+		icon: [
+			{ url: "/favicon.svg", type: "image/svg+xml" },
+			{ url: "/favicon-32x32.png", sizes: "32x32", type: "image/png" },
+			{ url: "/icons/icons-192.png", sizes: "192x192", type: "image/png" },
+		],
+		apple: "/icons/icons-180.png",
 	},
 	keywords: [
 		"GBV support Kenya",

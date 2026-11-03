@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import { looseAdmin } from "@/lib/loose-db";
 import { getBookableProfessional } from "@/lib/scheduling/public-professional";
-import { SECTIONS } from "@/lib/seo/sections";
+import { SECTIONS, sectionAccent, sectionHeadline } from "@/lib/seo/sections";
+import { socialMeta } from "@/lib/seo/meta";
 
 /** What a shared link looks like in chats, mail and social feeds: its own title, description and picture. */
 export type PreviewKind = "form" | "doc" | "meet" | "user" | "group" | "schedule" | "section" | "course";
@@ -89,7 +90,7 @@ export async function getPreview(kind: PreviewKind, id: string): Promise<Preview
 	}
 	if (kind === "section") {
 		const x = SECTIONS[id];
-		return x ? { label: x.label, title: x.title, description: x.description, image: null, round: false, accent: TEAL } : null;
+		return x ? { label: x.label, title: x.title, description: x.description, image: null, round: true, accent: sectionAccent(id) } : null;
 	}
 	if (kind === "course") {
 		if (!/^[a-z0-9-]{1,120}$/i.test(id)) return null;
@@ -106,16 +107,13 @@ export async function getPreview(kind: PreviewKind, id: string): Promise<Preview
 	return { label: "Book an appointment", title: fullName(pro) || "Book an appointment", description: title ? `${title}. Pick a time that suits you.` : "Pick a time that suits you.", image: p?.avatar_url ?? null, round: true, accent: TEAL };
 }
 
+const PATHS: Record<PreviewKind, string> = { form: "/f/", doc: "/d/", meet: "/meet/", user: "/connect/", group: "/join/", schedule: "/schedule/", course: "/learn/courses/", section: "/dashboard/" };
+
 /** Metadata for a page whose link gets shared: Open Graph and Twitter cards with the card picture from /api/og. */
 export async function previewMetadata(kind: PreviewKind, id: string, fallbackTitle: string, opts: { index?: boolean } = {}): Promise<Metadata> {
 	const p = await getPreview(kind, id).catch(() => null);
 	if (!p) return { title: fallbackTitle, robots: { index: false, follow: false } };
 	const image = `/api/og?k=${kind}&id=${encodeURIComponent(id)}`;
-	return {
-		title: { absolute: `${p.title} | Sauti Salama` },
-		description: p.description,
-		robots: opts.index ? { index: true, follow: true } : { index: false, follow: false },
-		openGraph: { title: p.title, description: p.description, siteName: "Sauti Salama", type: "website", images: [{ url: image, width: 1200, height: 630, alt: p.title }] },
-		twitter: { card: "summary_large_image", title: p.title, description: p.description, images: [image] },
-	};
+	const title = kind === "section" && SECTIONS[id] ? sectionHeadline(SECTIONS[id]) : `${p.title} · ${p.label}`;
+	return { title: { absolute: `${title} | Sauti Salama` }, ...socialMeta({ path: `${PATHS[kind]}${id}`, title, description: p.description, image, alt: p.title, index: opts.index }) };
 }

@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
 import { ORGANIZATION } from "@/lib/organization";
 import { breadcrumbSchema, jsonLd } from "@/lib/seo";
+import { withOg } from "@/lib/seo/meta";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = withOg({
 	title: "Help Center — How to Get GBV Support in Kenya",
 	description:
 		"Answers to the most common questions about gender-based violence support in Kenya: how to report an incident, what help is available, how to access shelter, counselling and legal aid, and how to support someone you love.",
@@ -22,7 +23,7 @@ export const metadata: Metadata = {
 		url: `${ORGANIZATION.url}/faq`,
 		type: "website",
 	},
-};
+}, "/faq", "faq");
 
 /**
  * FAQPage schema. Keep the answers here in sync with components/AccordionFAQs.tsx —

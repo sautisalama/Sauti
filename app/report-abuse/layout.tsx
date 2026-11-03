@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
 import { ORGANIZATION } from "@/lib/organization";
 import { breadcrumbSchema, jsonLd } from "@/lib/seo";
+import { withOg } from "@/lib/seo/meta";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = withOg({
 	title: "Report Abuse Confidentially \u2014 GBV Reporting in Kenya",
 	description:
 		"Report gender-based violence confidentially or anonymously in Kenya. Your report is encrypted and connects you to counselling, medical, shelter and legal support. Free and available across Kenya.",
@@ -15,7 +16,7 @@ export const metadata: Metadata = {
 		url: `${ORGANIZATION.url}/report-abuse`,
 		type: "website",
 	},
-};
+}, "/report-abuse", "report-abuse");
 
 export default function Layout({ children }: { children: React.ReactNode }) {
 	return (

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
-import { sectionFor } from "@/lib/seo/sections";
+import { sectionFor, sectionHeadline } from "@/lib/seo/sections";
+import { sectionImage, socialMeta } from "@/lib/seo/meta";
 import { SignInRedirect } from "./SignInRedirect";
 
 /**
@@ -10,16 +11,10 @@ import { SignInRedirect } from "./SignInRedirect";
 export async function generateMetadata({ params }: { params: Promise<{ path: string[] }> }): Promise<Metadata> {
 	const { path } = await params;
 	const { key, info, record } = sectionFor(path);
-	const title = record && info.one ? `${info.one} · ${info.title}` : info.title;
+	const headline = sectionHeadline(info);
+	const title = record && info.one ? `${info.one} · ${headline}` : headline;
 	const description = record && info.one ? `${info.one} shared with you on Sauti Salama. Sign in to open it. ${info.description}` : info.description;
-	const image = `/api/og?k=section&id=${encodeURIComponent(key)}`;
-	return {
-		title: { absolute: `${title} | Sauti Salama` },
-		description,
-		robots: { index: false, follow: false },
-		openGraph: { title, description, siteName: "Sauti Salama", type: "website", images: [{ url: image, width: 1200, height: 630, alt: title }] },
-		twitter: { card: "summary_large_image", title, description, images: [image] },
-	};
+	return { title: { absolute: title }, ...socialMeta({ path: `/${path.join("/")}`, title, description, image: sectionImage(key), alt: info.title }) };
 }
 
 export default async function SharePreviewPage({ params }: { params: Promise<{ path: string[] }> }) {

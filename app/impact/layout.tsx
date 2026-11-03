@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
 import { ORGANIZATION } from "@/lib/organization";
 import { breadcrumbSchema, jsonLd } from "@/lib/seo";
+import { withOg } from "@/lib/seo/meta";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = withOg({
 	title: "Our Impact \u2014 GBV Response Results Across Kenya",
 	description:
 		"How survivor-led GBV response works in practice in Kenya: survivors supported, community members trained, advocacy campaigns and the outcomes behind each of our programmes.",
@@ -15,7 +16,7 @@ export const metadata: Metadata = {
 		url: `${ORGANIZATION.url}/impact`,
 		type: "website",
 	},
-};
+}, "/impact", "impact");
 
 export default function Layout({ children }: { children: React.ReactNode }) {
 	return (

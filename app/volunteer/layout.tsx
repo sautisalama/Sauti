@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
 import { ORGANIZATION } from "@/lib/organization";
 import { breadcrumbSchema, jsonLd } from "@/lib/seo";
+import { withOg } from "@/lib/seo/meta";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = withOg({
 	title: "Volunteer & Get Involved \u2014 Join the GBV Movement in Kenya",
 	description:
 		"Volunteer with Sauti Salama in Kenya. Join as a counsellor, legal aid partner, community mobiliser or technologist and help survivors of gender-based violence access care and justice.",
@@ -15,7 +16,7 @@ export const metadata: Metadata = {
 		url: `${ORGANIZATION.url}/volunteer`,
 		type: "website",
 	},
-};
+}, "/volunteer", "volunteer");
 
 export default function Layout({ children }: { children: React.ReactNode }) {
 	return (

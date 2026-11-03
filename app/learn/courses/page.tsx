@@ -6,14 +6,15 @@ import { ArrowRight, GraduationCap } from "lucide-react";
 import { Nav } from "@/components/Nav";
 import { Footer } from "@/components/Footer";
 import { createPublicClient } from "@/utils/supabase/public-client";
+import { withOg } from "@/lib/seo/meta";
 
 export const revalidate = 300;
 
-export const metadata: Metadata = {
+export const metadata: Metadata = withOg({
 	title: "Courses — Free GBV Response Training",
 	description: "Free self-paced courses from Sauti Salama. Sign in, start learning, and track your progress.",
 	alternates: { canonical: "/learn/courses" },
-};
+}, "/learn/courses", "courses");
 
 export default async function CoursesPage() {
 	const db = createPublicClient();

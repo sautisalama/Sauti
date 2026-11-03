@@ -6,8 +6,9 @@ import { Footer } from "@/components/Footer";
 import { CircledText } from "@/components/ui/CircledText";
 import { ORGANIZATION, STREET_ADDRESS_LINE } from "@/lib/organization";
 import { breadcrumbSchema, jsonLd } from "@/lib/seo";
+import { withOg } from "@/lib/seo/meta";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = withOg({
 	title: "Contact Us — Sauti Salama, Lunga Lunga Road, Nairobi",
 	description:
 		"Contact Sauti Salama for gender-based violence support in Kenya. Visit us at Lunga Lunga Square, Lunga Lunga Road, Industrial Area, Nairobi, call +254 725 668148 or email info@sautisalama.org.",
@@ -26,7 +27,7 @@ export const metadata: Metadata = {
 		url: `${ORGANIZATION.url}/contact`,
 		type: "website",
 	},
-};
+}, "/contact", "contact");
 
 const contactPageSchema = {
 	"@context": "https://schema.org",

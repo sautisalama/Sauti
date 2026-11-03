@@ -37,6 +37,18 @@ export const SECTIONS: Record<string, SectionInfo> = {
 	projects: { label: M, title: "Projects", description: "What Sauti Salama is building, who is on it and where it stands.", one: "Project" },
 	todos: { label: M, title: "Tasks", description: "To-dos and who owns them across the team." },
 	vault: { label: M, title: "Vault", description: "Private, access-controlled storage for sensitive team files.", one: "Vault file" },
+	// Public pages with a fixed address
+	about: { label: "Sauti Salama", title: "Our story", description: "A survivor-led organisation in Nairobi building free, confidential support for people affected by gender-based violence." },
+	faq: { label: "Help Center", title: "Help Center", description: "Answers on how to get GBV support in Kenya, how reporting works and what happens to your information." },
+	contact: { label: "Sauti Salama", title: "Contact us", description: "Reach the Sauti Salama team in Nairobi for support, partnerships, volunteering and press." },
+	programs: { label: "Programs", title: "Our programs", description: "GBV care, prevention, legal access and feminist technology, delivered with survivors across Kenya." },
+	impact: { label: "Impact", title: "Our impact", description: "What Sauti Salama has achieved with survivors, partners and communities across Kenya." },
+	volunteer: { label: "Get involved", title: "Volunteer with us", description: "Join the movement to end gender-based violence: volunteer, partner or support the work in Kenya." },
+	"report-abuse": { label: "Report abuse", title: "Report abuse", description: "Report gender-based violence confidentially and get matched with support services in Kenya." },
+	learn: { label: "Learn", title: "Learning hub", description: "Free GBV courses, guides and training for survivors, professionals and communities in Kenya." },
+	publications: { label: "Publications", title: "Publications", description: "Research briefs, legal guides and training modules on gender-based violence, free for anyone to use." },
+	courses: { label: "Learn", title: "Free courses", description: "Free self-paced GBV response courses from Sauti Salama. Sign in, start learning and track your progress." },
+	meet: { label: "Meet", title: "Meet", description: "Video and voice calls with Sauti Salama. Guests can join with a link and no account." },
 	// The wider dashboard
 	blogs: { label: "Blogs", title: "Blogs", description: "Stories and guidance on gender-based violence response, written for the Sauti Salama community.", one: "Blog post" },
 	learning: { label: "Learning", title: "Learning", description: "Free self-paced courses and certificates from Sauti Salama.", one: "Course" },
@@ -59,4 +71,18 @@ export function sectionFor(path: string[]): { key: string; info: SectionInfo; re
 	const info = SECTIONS[key] ?? SECTIONS[mj ? "mjengo" : "dashboard"];
 	const depth = mj ? 2 : 1;
 	return { key: SECTIONS[key] ? key : mj ? "mjengo" : "dashboard", info, record: p.length > depth };
+}
+
+/** A longer, more descriptive headline for share cards and tab titles (about 50 to 60 characters). */
+export function sectionHeadline(info: SectionInfo): string {
+	const where = info.label === "Mjengo" ? "Mjengo team workspace" : info.label;
+	return `${info.title} | ${where} · Sauti Salama`;
+}
+
+const ACCENTS = ["#068297", "#e8762b", "#1a365d", "#7c3aed", "#0f766e", "#be185d", "#b45309", "#2563eb"];
+/** Each section keeps its own colour on its card, so a row of shared links is easy to tell apart. */
+export function sectionAccent(key: string): string {
+	let h = 0;
+	for (const c of key) h = (h * 31 + c.charCodeAt(0)) >>> 0;
+	return ACCENTS[h % ACCENTS.length];
 }
