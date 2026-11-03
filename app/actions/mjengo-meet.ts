@@ -99,6 +99,16 @@ async function makeNotes_(code: string): Promise<string> {
   return notes;
 }
 
+export interface LiveMeeting { code: string; title: string | null; mode: 'video' | 'voice'; created_at: string }
+
+/** Meetings this person started that have not ended, newest first (a day at most: older ones are over). */
+async function myLive_(): Promise<LiveMeeting[]> {
+  const a = await requireModule('meet');
+  const since = new Date(Date.now() - 12 * 3600_000).toISOString();
+  const { data } = await looseAdmin().from('mjengo_meetings').select('code, title, mode, created_at').eq('created_by', a.id).is('ended_at', null).gte('created_at', since).order('created_at', { ascending: false }).limit(10);
+  return (data ?? []) as LiveMeeting[];
+}
+
 export interface MeetHomeItem { key: string; title: string; code: string | null; start: string; end: string | null; kind: 'scheduled' | 'link' }
 
 /** What is on for one day: calendar meetings, and links made for later that day. */
@@ -160,6 +170,7 @@ export const attachRecording = guard(attachRecording_);
 export const getMeetingPlan = guard(getPlan_);
 export const saveMeetingPlan = guard(savePlan_);
 export const meetHome = guard(meetHome_);
+export const myLiveMeetings = guard(myLive_);
 export const meetingDetail = guard(meetingDetail_);
 export const makeMeetingNotes = guard(makeNotes_);
 export const createMeeting = guard(createMeeting_);

@@ -123,7 +123,7 @@ async function deleteContact_(id: string) {
 }
 
 /** Bulk add (CSV or mail): contacts whose email already exists are skipped, not overwritten. */
-async function importContacts_(rows: ContactInput[], source: 'csv' | 'google' | 'mail'): Promise<{ added: number; skipped: number }> {
+async function importContacts_(rows: ContactInput[], source: 'csv' | 'google' | 'mail'): Promise<{ added: number; skipped: number; retagged: number }> {
   const actor = await requireModule('contacts', 'write');
   const db = looseAdmin();
   const prepared: ReturnType<typeof normalise>[] = [];
@@ -143,17 +143,28 @@ async function importContacts_(rows: ContactInput[], source: 'csv' | 'google' | 
   }
   const emails = prepared.map((p) => p.email).filter(Boolean) as string[];
   const existing = new Set<string>();
+  const have = new Map<string, { id: string; tags: string[] }>();
   for (let i = 0; i < emails.length; i += 200) {
-    const { data } = await db.from('mjengo_contacts').select('email').in('email', emails.slice(i, i + 200));
-    (data ?? []).forEach((d: { email: string }) => existing.add(d.email.toLowerCase()));
+    const { data } = await db.from('mjengo_contacts').select('id, email, tags').in('email', emails.slice(i, i + 200));
+    (data ?? []).forEach((d: { id: string; email: string; tags: string[] | null }) => { existing.add(d.email.toLowerCase()); have.set(d.email.toLowerCase(), { id: d.id, tags: d.tags ?? [] }); });
   }
   const fresh = prepared.filter((p) => !p.email || !existing.has(p.email));
+  // People already in Contacts keep their details; they only gain the tags from this file.
+  let retagged = 0;
+  for (const p of prepared) {
+    const cur = p.email ? have.get(p.email) : undefined;
+    if (!cur || !p.tags.length) continue;
+    const merged = [...new Set([...cur.tags, ...p.tags])].slice(0, 12);
+    if (merged.length === cur.tags.length) continue;
+    await db.from('mjengo_contacts').update({ tags: merged }).eq('id', cur.id);
+    retagged++;
+  }
   skipped += prepared.length - fresh.length;
   for (let i = 0; i < fresh.length; i += 200) {
     await db.from('mjengo_contacts').insert(fresh.slice(i, i + 200).map((p) => ({ ...p, source, created_by: actor.id })));
   }
-  await logAudit({ actorId: actor.id, actorEmail: actor.email, action: 'contact.imported', targetType: 'contact', details: { source, added: fresh.length, skipped } });
-  return { added: fresh.length, skipped };
+  await logAudit({ actorId: actor.id, actorEmail: actor.email, action: 'contact.imported', targetType: 'contact', details: { source, added: fresh.length, skipped, retagged, tags: [...new Set(prepared.flatMap((p) => p.tags))].slice(0, 12) } });
+  return { added: fresh.length, skipped, retagged };
 }
 
 /** Add someone seen in a received email. Returns the existing contact if there is one. */
@@ -319,6 +330,17 @@ async function setVisibility_(contactId: string, visibility: 'team' | 'private')
   await logAudit({ actorId: actor.id, actorEmail: actor.email, action: 'contact.visibility', targetType: 'contact', targetId: contactId, targetLabel: row.name, details: { visibility } });
 }
 
+/** Every tag with the people who carry it and have an email address, for writing to a whole group at once. */
+async function tagGroups_(): Promise<{ tag: string; people: { name: string; email: string }[] }[]> {
+  const rows = await listContacts_('');
+  const groups = new Map<string, { name: string; email: string }[]>();
+  for (const r of rows) {
+    if (!r.email) continue;
+    for (const t of r.tags) groups.set(t, [...(groups.get(t) ?? []), { name: r.name, email: r.email }]);
+  }
+  return [...groups.entries()].map(([tag, people]) => ({ tag, people })).sort((a, b) => b.people.length - a.people.length);
+}
+export const contactTagGroups = guard(tagGroups_);
 export const listContacts = guard(listContacts_);
 export const contactAccess = guard(contactAccess_);
 export const setContactAccess = guard(setAccess_);

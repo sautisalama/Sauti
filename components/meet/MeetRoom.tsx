@@ -123,6 +123,10 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 	const [pinned, setPinned] = useState<string | null>(null);
 	const presentAfter = useRef(false);
 	const hostIds = useRef(new Set<string>());
+	/** The proof that this device is a host, sent with every instruction so it can be checked on the spot. */
+	const myHt = useRef<string | null>(null);
+	/** People the host removed: they are not reconnected to, even if their device keeps trying. */
+	const kicked = useRef(new Set<string>());
 	const chatRef = useRef<ChatMsg[]>([]);
 	const chatSaved = useRef(0);
 	const recent = useRef<{ emoji: string; at: number }[]>([]);
@@ -329,7 +333,7 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 	/* ------------------------------------------------------------ connections */
 
 	const connect = useCallback(async (peer: Peer, initiator: boolean) => {
-		if (pcs.current.has(peer.id)) return;
+		if (pcs.current.has(peer.id) || kicked.current.has(peer.id)) return;
 		const pc = new RTCPeerConnection({ iceServers: ICE });
 		pcs.current.set(peer.id, pc);
 		setRemote(peer.id, { name: peer.name, companion: peer.companion, uid: peer.uid });
@@ -391,6 +395,7 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 
 	const begin = async (roomKeyValue: string, host: boolean, present = false, hostToken?: string) => {
 		leavingRef.current = false;
+		myHt.current = hostToken ?? null;
 		setIsHost(host);
 		if (host) hostIds.current.add(myId.current);
 		stopPreview();
@@ -446,13 +451,29 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 				.on("broadcast", { event: "react" }, ({ payload }) => showReaction(String(payload.id), String(payload.emoji).slice(0, 8), String(payload.name ?? "Someone")))
 			.on("broadcast", { event: "docs" }, () => { void refreshDocsRef.current(); })
 			.on("broadcast", { event: "ctl" }, ({ payload }) => {
-				// Only the host's instructions are followed.
-				if (!hostIds.current.has(String(payload.from))) return;
-				const mine = payload.to === myId.current || payload.to === "all";
-				if (!mine) return;
-				if (payload.action === "mute") { micOnRef.current = false; setMicOn(false); local.current?.getAudioTracks().forEach((t) => (t.enabled = false)); pushState({ muted: true }); }
-				if ((payload.action === "remove" || payload.action === "end") && !(typeof payload.at === "number" && Date.now() - payload.at > 15_000)) void leaveRef.current();
-					if (payload.action === "cohost" && typeof payload.token === "string" && payload.to === myId.current) { setCohostToken(payload.token); send("cohost", { id: myId.current, ht: payload.token }); }
+				const from = String(payload.from);
+				const run = () => {
+					const stale = typeof payload.at === "number" && Date.now() - payload.at > 90_000;
+					const toMe = payload.to === myId.current || payload.to === "all";
+					// Everyone else in the call stops showing and hearing the person who was removed.
+					if (payload.action === "remove" && !toMe && typeof payload.to === "string" && !stale) {
+						kicked.current.add(payload.to); const gone = String(payload.to); setTimeout(() => kicked.current.delete(gone), 20_000);
+						hostIds.current.delete(payload.to);
+						pcs.current.get(payload.to)?.close();
+						pcs.current.delete(payload.to);
+						setRemotes((cur) => cur.filter((r) => r.id !== payload.to));
+						return;
+					}
+					if (!toMe) return;
+					if (payload.action === "mute") { micOnRef.current = false; setMicOn(false); local.current?.getAudioTracks().forEach((t) => (t.enabled = false)); pushState({ muted: true }); }
+					if ((payload.action === "remove" || payload.action === "end") && !stale) void leaveRef.current();
+					if (payload.action === "cohost" && typeof payload.token === "string" && payload.to === myId.current) { setCohostToken(payload.token); myHt.current = payload.token; send("cohost", { id: myId.current, ht: payload.token }); }
+				};
+				if (hostIds.current.has(from)) return run();
+				// Not yet known as a host (the check on their join may still be on its way): the proof they send is checked now.
+				const ht = typeof payload.ht === "string" ? payload.ht : "";
+				if (!ht || ht.split(".")[1] !== from) return;
+				void unwrap(verifyHostToken(code, ht)).then((ok) => { if (ok) { hostIds.current.add(from); setRemote(from, { host: true }); run(); } }).catch(() => undefined);
 			})
 			.on("presence", { event: "join" }, ({ key, newPresences }) => {
 				if (key === myId.current) return;
@@ -761,7 +782,20 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 		return () => { on = false; clearInterval(t); };
 			}, [joined, code, cohostToken]);
 	const addCohost = (peerId: string) => { void unwrap(makeCohost(code, peerId)).then((token) => { send("ctl", { from: myId.current, to: peerId, action: "cohost", token }); setRemote(peerId, { host: true }); hostIds.current.add(peerId); }).catch(() => undefined); };
-	const hostCtl = (to: string, action: "mute" | "remove" | "end") => send("ctl", { from: myId.current, to, action, at: Date.now() });
+	const hostCtl = (to: string, action: "mute" | "remove" | "end") => {
+		const say = () => send("ctl", { from: myId.current, to, action, at: Date.now(), ht: myHt.current });
+		say();
+		// A single message can be missed while someone's connection is busy, so removal and ending are repeated.
+		if (action !== "mute") { setTimeout(say, 400); setTimeout(say, 900); }
+		if (action === "remove" && to !== "all") {
+			kicked.current.add(to);
+			setTimeout(() => kicked.current.delete(to), 20_000);
+			hostIds.current.delete(to);
+			pcs.current.get(to)?.close();
+			pcs.current.delete(to);
+			setRemotes((cur) => cur.filter((r) => r.id !== to));
+		}
+	};
 	const decide = (k: Knock, admit: boolean) => {
 		setKnocks((cur) => cur.filter((x) => x.guestKey !== k.guestKey));
 		void unwrap(decideKnock(code, k.guestKey, admit, cohostToken)).catch(() => undefined);
@@ -1250,7 +1284,7 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 											<span className="mr-auto text-[#5f6368]">{isHost ? "You are the host" : "You are a co-host"}</span>
 											{isHost && <button onClick={() => { const next = !locked; setLocked(next); void unwrap(lockMeeting(code, next)).catch(() => setLocked(!next)); }} aria-pressed={locked} className={cn("rounded-full border px-3 py-1 font-medium", locked ? "border-[#068297] bg-[#e0f2f5] text-[#068297]" : "border-[#dadce0] text-[#5f6368] hover:bg-[#f1fafb]")}>{locked ? "Call is locked" : "Lock the call"}</button>}
 											{remotes.length > 0 && <button onClick={() => hostCtl("all", "mute")} className="rounded-full border border-[#dadce0] px-3 py-1 font-medium text-[#068297] hover:bg-[#f1fafb]">Mute everyone</button>}
-											{remotes.length > 0 && <button onClick={() => { hostCtl("all", "end"); setTimeout(() => void leaveRef.current(), 400); }} className="rounded-full bg-[#fce8e6] px-3 py-1 font-medium text-[#d93025] hover:bg-[#f9d6d2]">End for everyone</button>}
+											{remotes.length > 0 && <button onClick={() => { hostCtl("all", "end"); setTimeout(() => void leaveRef.current(), 1200); }} className="rounded-full bg-[#fce8e6] px-3 py-1 font-medium text-[#d93025] hover:bg-[#f9d6d2]">End for everyone</button>}
 										</div>
 									)}
 									{handOrder.length > 0 && (
@@ -1364,6 +1398,12 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 			{pipWin && createPortal(
 				<div className="flex h-screen w-screen flex-col bg-[#191919] text-white">
 					<div className={cn("grid min-h-0 flex-1 auto-rows-fr gap-1.5 overflow-auto p-1.5", visible.length > 0 ? "grid-cols-2" : "grid-cols-1")}>
+						{sharing && (
+							<div className="relative col-span-full min-h-[110px] overflow-hidden rounded-xl bg-black ring-2 ring-[#068297]">
+								<StreamVideo stream={screenStream.current} muted className="h-full w-full object-contain" />
+								<span className="absolute left-2 top-2 flex items-center gap-1.5 rounded-md bg-black/60 px-2 py-1 text-xs"><MonitorUp className="h-3 w-3" /> Your presentation, as others see it</span>
+							</div>
+						)}
 						<div className="min-h-[90px]">{selfTile}</div>
 						{remotes.map((r) => <div key={r.id} className="min-h-[90px]">{tile(r)}</div>)}
 					</div>
@@ -1384,7 +1424,7 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 						<p className="mt-1 text-sm text-[#5f6368]">You are the host. The others can carry on without you, or you can end the call for everyone.</p>
 						<div className="mt-4 flex flex-col gap-2">
 							<button onClick={() => { setEndAsk(false); void leave(); }} className="h-11 rounded-full border border-[#dadce0] text-sm font-medium hover:bg-[#f8f9fa]">Leave, the call goes on</button>
-							<button onClick={() => { setEndAsk(false); hostCtl("all", "end"); setTimeout(() => void leaveRef.current(), 400); }} className="h-11 rounded-full bg-[#ea4335] text-sm font-medium text-white hover:bg-[#d93025]">End for everyone</button>
+							<button onClick={() => { setEndAsk(false); hostCtl("all", "end"); setTimeout(() => void leaveRef.current(), 1200); }} className="h-11 rounded-full bg-[#ea4335] text-sm font-medium text-white hover:bg-[#d93025]">End for everyone</button>
 							<button onClick={() => setEndAsk(false)} className="h-10 rounded-full text-sm font-medium text-[#068297] hover:bg-[#f1fafb]">Stay in the call</button>
 						</div>
 					</div>

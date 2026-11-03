@@ -10,6 +10,7 @@ import { addressDeadline, getOverview, listEntities, type Deadline, type Overvie
 import { suiteStatus, type SuiteStatus } from "@/app/actions/mjengo-nav";
 import { GrantCharts, type GrantLite } from "./_components/GrantCharts";
 import { WorkspaceSearch } from "./_components/WorkspaceSearch";
+import { LiveMeetings } from "@/components/meet/LiveMeetings";
 import { DigestCard } from "./_components/DigestCard";
 import { canMarkDone, markDone } from "@/lib/client/mark-done";
 import { DeadlineChip, KIND_LABEL, STATUSES, money, type Kind } from "./_components/shared";
@@ -79,6 +80,8 @@ export default function MjengoOverview() {
 
 	return (
 		<div className="mx-auto max-w-6xl space-y-6">
+			<LiveMeetings />
+
 			<DigestCard />
 
 			<WorkspaceSearch />

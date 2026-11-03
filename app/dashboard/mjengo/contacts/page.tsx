@@ -57,8 +57,8 @@ function parseCsv(text: string): string[][] {
 }
 
 /** Works with Google Contacts and Outlook exports: picks the columns it recognises. */
-function contactsFromCsv(text: string) {
-	const [head, ...body] = parseCsv(text);
+function contactsFromRows(all: string[][]) {
+	const [head, ...body] = all;
 	if (!head) return [];
 	const h = head.map((x) => x.trim().toLowerCase());
 	const find = (...names: string[]) => h.findIndex((x) => names.some((n) => x === n || x.startsWith(n)));
@@ -69,10 +69,26 @@ function contactsFromCsv(text: string) {
 	const iPhone = find("phone 1 - value", "mobile phone", "primary phone", "phone");
 	const iOrg = find("organization name", "organization 1 - name", "company", "organisation");
 	const iTitle = find("organization title", "organization 1 - title", "job title", "title");
+	const iTags = find("tags", "tag", "groups", "group", "labels", "label", "categories", "category");
+	const iFirstOnly = iFirst >= 0 ? iFirst : find("firstname", "first");
 	return body.map((r) => {
 		const full = [r[iFirst], r[iLast]].filter(Boolean).join(" ").trim();
-		return { name: (iName >= 0 && r[iName]) || full || r[iEmail] || "", email: r[iEmail] || null, phone: r[iPhone] || null, organisation: r[iOrg] || null, title: r[iTitle] || null };
+		const first = [r[iFirstOnly]].filter(Boolean).join(" ").trim();
+		const tags = iTags >= 0 && r[iTags] ? String(r[iTags]).split(/[,;|]+/).map((t) => t.trim().toLowerCase()).filter(Boolean) : [];
+		return { name: (iName >= 0 && r[iName]) || full || first || r[iEmail] || "", email: r[iEmail] || null, phone: r[iPhone] || null, organisation: r[iOrg] || null, title: r[iTitle] || null, tags };
 	});
+}
+
+/** A spreadsheet (.xlsx, .xls or .csv) becomes rows of text; the first sheet is used. */
+async function rowsFromFile(file: File): Promise<string[][]> {
+	if (/\.(xlsx|xls|xlsm|ods)$/i.test(file.name)) {
+		const XLSX = await import("xlsx");
+		const wb = XLSX.read(await file.arrayBuffer(), { type: "array" });
+		const ws = wb.Sheets[wb.SheetNames[0]];
+		const grid = XLSX.utils.sheet_to_json<unknown[]>(ws, { header: 1, raw: false, defval: "" });
+		return grid.map((r) => r.map((c) => String(c ?? "").trim())).filter((r) => r.some(Boolean));
+	}
+	return parseCsv(await file.text());
 }
 
 export default function ContactsPage() {
@@ -83,6 +99,8 @@ export default function ContactsPage() {
 	const [busy, setBusy] = useState(false);
 	const [importing, setImporting] = useState(false);
 	const csv = useRef<HTMLInputElement>(null);
+	const [pending, setPending] = useState<{ name: string; people: ReturnType<typeof contactsFromRows> } | null>(null);
+	const [importTag, setImportTag] = useState("");
 	const [tag, setTag] = useState<string | null>(null);
 	const [sharing, setSharing] = useState<ContactRow | null>(null);
 
@@ -107,18 +125,33 @@ export default function ContactsPage() {
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, []);
 
+	/** Read the file first, then ask which tag to give everyone in it. */
 	const onCsv = async (file: File | undefined) => {
 		if (!file) return;
+		try {
+			const people = contactsFromRows(await rowsFromFile(file)).filter((p) => p.email);
+			if (!people.length) throw new Error("No email addresses were found. Put emails in a column headed Email.");
+			setImportTag(file.name.replace(/\.[a-z0-9]+$/i, "").toLowerCase().replace(/[^a-z0-9 -]+/g, " ").trim().slice(0, 30));
+			setPending({ name: file.name, people });
+		} catch (e) {
+			toast({ title: "Could not read that file", description: e instanceof Error ? e.message : undefined, variant: "destructive" });
+		} finally {
+			if (csv.current) csv.current.value = "";
+		}
+	};
+	const confirmImport = async () => {
+		if (!pending) return;
 		setBusy(true);
 		try {
-			const r = await api.import(contactsFromCsv(await file.text()), "csv");
-			toast({ title: `Imported ${r.added} contact${r.added === 1 ? "" : "s"}`, description: r.skipped ? `${r.skipped} skipped (duplicates or no email).` : undefined });
+			const t = importTag.trim().toLowerCase();
+			const r = await api.import(pending.people.map((p) => ({ ...p, tags: [...new Set([...(p.tags ?? []), ...(t ? [t] : [])])] })), "csv");
+			toast({ title: `Imported ${r.added} contact${r.added === 1 ? "" : "s"}`, description: [r.retagged ? `${r.retagged} existing ${r.retagged === 1 ? "contact" : "contacts"} tagged` : "", r.skipped ? `${r.skipped} already there or skipped` : ""].filter(Boolean).join(". ") || undefined });
+			setPending(null);
 			load(q);
 		} catch (e) {
 			toast({ title: "Could not import", description: e instanceof Error ? e.message : undefined, variant: "destructive" });
 		} finally {
 			setBusy(false);
-			if (csv.current) csv.current.value = "";
 		}
 	};
 
@@ -138,7 +171,7 @@ export default function ContactsPage() {
 						{busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />} Import
 					</Button>
 					<Button className="gap-2 bg-sauti-teal hover:bg-sauti-dark" onClick={() => setEdit({})}><Plus className="h-4 w-4" /> Add contact</Button>
-					<input ref={csv} type="file" accept=".csv,text/csv" className="hidden" onChange={(e) => onCsv(e.target.files?.[0])} />
+					<input ref={csv} type="file" accept=".csv,.xlsx,.xls,.ods,text/csv" className="hidden" onChange={(e) => onCsv(e.target.files?.[0])} />
 				</div>
 			</div>
 
@@ -146,6 +179,13 @@ export default function ContactsPage() {
 				<Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-serene-neutral-400" />
 				<Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search by name, email or organisation" className="bg-white pl-9" aria-label="Search contacts" />
 			</div>
+
+			{tag && shown.some((r) => r.email) && (
+				<div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-sauti-teal/30 bg-sauti-teal-light/40 px-4 py-2.5 text-sm">
+					<span><b>{tag}</b>: {shown.filter((r) => r.email).length} {shown.filter((r) => r.email).length === 1 ? "person" : "people"} with an email address</span>
+					<Link href={`/dashboard/mjengo/mail?tag=${encodeURIComponent(tag)}`} className="inline-flex items-center gap-1.5 rounded-full bg-sauti-teal px-4 py-1.5 text-xs font-semibold text-white hover:bg-sauti-dark"><Mail className="h-3.5 w-3.5" /> Email this tag</Link>
+				</div>
+			)}
 
 			{tagCounts.size > 0 && (
 				<div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="Filter by tag">
@@ -219,9 +259,27 @@ export default function ContactsPage() {
 						</a>
 						<button type="button" onClick={() => { setImporting(false); csv.current?.click(); }} className="flex w-full items-center gap-3 rounded-xl border border-serene-neutral-200 bg-white p-3 text-left transition hover:border-sauti-teal/40 hover:bg-sauti-teal-light/30">
 							<span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-sauti-teal-light text-sauti-teal"><Upload className="h-5 w-5" /></span>
-							<span className="min-w-0"><span className="block text-sm font-semibold text-sauti-dark">A CSV file</span><span className="block text-xs text-serene-neutral-500">From Google Contacts, Outlook or a spreadsheet.</span></span>
+							<span className="min-w-0"><span className="block text-sm font-semibold text-sauti-dark">An Excel or CSV file</span><span className="block text-xs text-serene-neutral-500">A sheet with an Email column (and optionally Name, Phone, Organisation, Tags).</span></span>
 						</button>
 					</div>
+				</DialogContent>
+			</Dialog>
+
+			<Dialog open={!!pending} onOpenChange={(o) => { if (!o) setPending(null); }}>
+				<DialogContent className="max-w-md">
+					<DialogHeader>
+						<DialogTitle>Import {pending?.people.length} {pending?.people.length === 1 ? "contact" : "contacts"}</DialogTitle>
+						<DialogDescription>From {pending?.name}. They are added to Contacts, and you can write to the whole group by its tag.</DialogDescription>
+					</DialogHeader>
+					<div className="space-y-1.5">
+						<Label htmlFor="import-tag">Tag everyone in this file as</Label>
+						<Input id="import-tag" value={importTag} onChange={(e) => setImportTag(e.target.value)} placeholder="for example: partners" maxLength={30} />
+						<p className="text-xs text-serene-neutral-500">People already in Contacts keep their details and get this tag. A Tags column in the file is used as well.</p>
+					</div>
+					<DialogFooter>
+						<Button variant="outline" onClick={() => setPending(null)}>Cancel</Button>
+						<Button className="bg-sauti-teal hover:bg-sauti-dark" disabled={busy} onClick={() => void confirmImport()}>{busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}Import</Button>
+					</DialogFooter>
 				</DialogContent>
 			</Dialog>
 

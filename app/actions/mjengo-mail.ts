@@ -606,6 +606,45 @@ export interface SendInput {
   vaultAttach?: string[];
   /** The sender has been told some recipients cannot open the linked files and sends anyway. */
   acknowledgeNoAccess?: boolean;
+  /** One message per person in To, greeted by their own first name instead of "Dear All". */
+  individually?: boolean;
+}
+
+const escHtml = (x: string) => x.replace(/[&<>"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[ch]!);
+const GENERIC = new Set(['info', 'admin', 'hello', 'contact', 'office', 'team', 'support', 'mail', 'noreply', 'no-reply', 'sales', 'enquiries', 'inquiries']);
+
+/** The first name to greet each address with: a profile first name, a contact's name, or the part before the @ when it looks like a name. */
+async function firstNamesFor(addrs: string[]): Promise<Map<string, string>> {
+  const db = looseAdmin();
+  const list = [...new Set(addrs.map((a) => a.toLowerCase()))];
+  const out = new Map<string, string>();
+  const cap = (n: string) => n.charAt(0).toUpperCase() + n.slice(1).toLowerCase();
+  const [{ data: cs }, { data: ps }] = await Promise.all([
+    db.from('mjengo_contacts').select('email, name').in('email', list),
+    db.from('profiles').select('email, first_name').in('email', list),
+  ]);
+  for (const c of (cs ?? []) as { email: string; name: string }[]) {
+    const words = c.name.trim().split(/\s+/);
+    if (words[0] && !/[@\d]/.test(words[0]) && words.length <= 4) out.set(c.email.toLowerCase(), cap(words[0]));
+  }
+  for (const p of (ps ?? []) as { email: string | null; first_name: string | null }[]) if (p.email && p.first_name?.trim()) out.set(p.email.toLowerCase(), p.first_name.trim());
+  for (const a of list) {
+    if (out.has(a)) continue;
+    const local = a.split('@')[0].split(/[._-]+/)[0];
+    if (/^[a-z]{2,}$/i.test(local) && !GENERIC.has(local.toLowerCase())) out.set(a, cap(local));
+  }
+  return out;
+}
+
+/** Swap "Dear All", "Hello everyone" and {{first_name}} for the person's own first name. With no greeting, one is added. */
+function personalise(html: string, first: string | undefined): string {
+  if (!first) return html;
+  const name = escHtml(first);
+  const out = html.replace(/\{\{\s*(first_?name|name)\s*\}\}|\[\s*(first name|name)\s*\]/gi, name);
+  const group = /\b(Dear|Hello|Hi|Hey|Greetings)(\s+)(all|everyone|everybody|team|colleagues|friends|partners|members|sir\/madam|sir or madam|madam\/sir|recipient|valued (?:partner|friend|colleague|member))\b/i;
+  if (group.test(out)) return out.replace(group, `$1$2${name}`);
+  const startsWithGreeting = /^\s*(?:<[^>]+>\s*)*(dear|hello|hi|hey|greetings|good (?:morning|afternoon|evening))\b/i.test(out);
+  return startsWithGreeting ? out : `<p>Dear ${name},</p>${out}`;
 }
 
 const emailOk = (e: string) => /^[^\s@,;]+@[^\s@,;]+\.[^\s@,;]+$/.test(e);
@@ -663,32 +702,42 @@ async function sendMail_(input: SendInput) {
   }
   if (attachments.reduce((n, a) => n + a.content.length, 0) > 18 * 1024 * 1024) throw new Error('Attachments are too large (18 MB total).');
 
-  const mail = {
-    from: acct.email,
-    to,
-    cc: cc.length ? cc : undefined,
-    bcc: bcc.length ? bcc : undefined,
-    subject: input.subject.trim() || '(no subject)',
-    html,
-    text: htmlToText(html),
-    inReplyTo: input.inReplyTo || undefined,
-    references: input.references?.length ? input.references : undefined,
-    attachments,
-  };
-  const raw = await new MailComposer(mail).compile().build();
-  try {
-    await (await transporter(acct)).sendMail({ envelope: { from: acct.email, to: [...to, ...cc, ...bcc] }, raw });
-  } catch (e) {
-    throw new Error('The message was not sent. ' + explain(e));
+  const batches: { to: string[]; cc: string[]; bcc: string[]; html: string }[] = input.individually && to.length > 1
+    ? await (async () => {
+        const names = await firstNamesFor(to);
+        // Copies and blind copies go with the first message only, so they are not repeated for every person.
+        return to.map((addr, i) => ({ to: [addr], cc: i === 0 ? cc : [], bcc: i === 0 ? bcc : [], html: personalise(html, names.get(addr.toLowerCase())) }));
+      })()
+    : [{ to, cc, bcc, html }];
+  const transport = await transporter(acct);
+  for (const [n, batch] of batches.entries()) {
+    const mail = {
+      from: acct.email,
+      to: batch.to,
+      cc: batch.cc.length ? batch.cc : undefined,
+      bcc: batch.bcc.length ? batch.bcc : undefined,
+      subject: input.subject.trim() || '(no subject)',
+      html: batch.html,
+      text: htmlToText(batch.html),
+      inReplyTo: input.inReplyTo || undefined,
+      references: input.references?.length ? input.references : undefined,
+      attachments,
+    };
+    const raw = await new MailComposer(mail).compile().build();
+    try {
+      await transport.sendMail({ envelope: { from: acct.email, to: [...batch.to, ...batch.cc, ...batch.bcc] }, raw });
+    } catch (e) {
+      throw new Error((batches.length > 1 ? `Sent to ${n} of ${batches.length} people, then it stopped. ` : 'The message was not sent. ') + explain(e));
+    }
+    // Gmail and Microsoft keep a copy in Sent by themselves; others need us to file it.
+    if (acct.protocol === 'imap' && !/gmail|googlemail|office365|outlook/i.test(acct.smtp_host)) {
+      await withImap(acct, async (c) => {
+        const sent = pathOf(classify(await c.list()), 'sent');
+        if (sent) await c.append(sent, raw, ['\\Seen']);
+      }).catch(() => undefined);
+    }
   }
-
-  // Gmail and Microsoft keep a copy in Sent by themselves; others need us to file it.
-  if (acct.protocol === 'imap' && !/gmail|googlemail|office365|outlook/i.test(acct.smtp_host)) {
-    await withImap(acct, async (c) => {
-      const sent = pathOf(classify(await c.list()), 'sent');
-      if (sent) await c.append(sent, raw, ['\\Seen']);
-    }).catch(() => undefined);
-  }
+  const mail = { subject: input.subject.trim() || '(no subject)', attachments };
   await logAudit({ actorId: actor.id, actorEmail: actor.email, action: 'mail.sent', targetType: 'mailbox', targetId: acct.id, targetLabel: acct.email, details: { to, subject: mail.subject.slice(0, 120), attachments: attachments.length, vault_links: linkIds, vault_attached: attachIds } });
   await touchContacts([...to, ...cc, ...bcc]);
   await autoAddTeamContacts(actor.id, acct.email, [...to, ...cc]);

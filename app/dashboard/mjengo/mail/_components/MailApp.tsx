@@ -26,6 +26,7 @@ import { ContactDialog, type ContactDraft } from "./ContactDialog";
 import { AiSummary, ThreadMessage } from "./Thread";
 import { MeetingChips } from "./MeetingChips";
 import { unwrap } from "@/lib/action-result";
+import { contactTagGroups } from "@/app/actions/mjengo-contacts";
 import { listLabels, saveLabel, deleteLabel, setMessageLabel, projectLabel, listGrantsLite, linkToWork, mailTriage, type LabelRow, type ProjectLite, type GrantLite } from "./api";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { AccountSwitcher } from "./AccountSwitcher";
@@ -169,6 +170,16 @@ export function MailApp() {
 		if (!to) return;
 		setCompose({ to: [to] });
 		window.history.replaceState(null, "", window.location.pathname);
+	}, []);
+	// Opened from a contact tag: /mail?tag=partners writes to everyone with that tag.
+	useEffect(() => {
+		const tag = new URLSearchParams(window.location.search).get("tag");
+		if (!tag) return;
+		window.history.replaceState(null, "", window.location.pathname);
+		void unwrap(contactTagGroups()).then((g) => {
+			const people = g.find((x) => x.tag === tag.toLowerCase())?.people ?? [];
+			if (people.length) setCompose({ to: people.map((p) => p.email) });
+		}).catch(() => undefined);
 	}, []);
 	// Opened from the Overview: /mail?account=..&uid=.. goes straight to that message.
 	const deepLink = useRef<{ account: string; uid: number; box: string } | null>(null);

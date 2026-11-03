@@ -8,6 +8,7 @@ import { unwrap } from "@/lib/action-result";
 import { cn } from "@/lib/utils";
 import { holidayOn } from "@/lib/mjengo/holidays-ke";
 import { listMeetings, meetHome, type MeetHomeItem, type MeetingRow } from "@/app/actions/mjengo-meet";
+import { LiveMeetings } from "./LiveMeetings";
 import { MeetChooser } from "@/app/dashboard/mjengo/_components/MeetChooser";
 
 const CODE = /[a-z0-9]{3}-[a-z0-9]{4}-[a-z0-9]{3}/i;
@@ -52,6 +53,8 @@ export function MeetHome({ isAdmin }: { isAdmin: boolean }) {
 					<button type="submit" disabled={!found} className="h-10 rounded-xl bg-sauti-teal px-5 text-sm font-semibold text-white transition hover:bg-sauti-dark disabled:opacity-40">Join</button>
 				</form>
 			</section>
+
+			{isAdmin && <LiveMeetings />}
 
 			{isAdmin && (
 				<div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
