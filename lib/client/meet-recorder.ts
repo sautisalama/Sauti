@@ -20,7 +20,9 @@ export class MeetRecorder {
 	private ctx: AudioContext | null = null;
 	private dest: MediaStreamAudioDestinationNode | null = null;
 	private connected = new Set<string>();
-	private raf = 0;
+	private tick: Worker | null = null;
+	private tickUrl = "";
+	private fallback: ReturnType<typeof setInterval> | null = null;
 	private syncTimer: ReturnType<typeof setInterval> | null = null;
 	private rec: MediaRecorder | null = null;
 	private chunks: Blob[] = [];
@@ -36,11 +38,16 @@ export class MeetRecorder {
 
 	start() {
 		const g = this.canvas.getContext("2d")!;
-		const draw = () => {
-			this.paint(g);
-			this.raf = requestAnimationFrame(draw);
-		};
-		this.raf = requestAnimationFrame(draw);
+		// Drawing is driven by a worker's clock, not by animation frames: frames stop when the page is hidden or the
+		// call sits in the floating window, and the recording would freeze on the last picture.
+		const draw = () => this.paint(g);
+		try {
+			this.tickUrl = URL.createObjectURL(new Blob(["setInterval(function(){postMessage(0)},42)"], { type: "text/javascript" }));
+			this.tick = new Worker(this.tickUrl);
+			this.tick.onmessage = draw;
+		} catch {
+			this.fallback = setInterval(draw, 42);
+		}
 
 		this.ctx = new AudioContext();
 		this.dest = this.ctx.createMediaStreamDestination();
@@ -66,7 +73,9 @@ export class MeetRecorder {
 	stop(): Promise<Blob> {
 		return new Promise((resolve) => {
 			const finish = () => {
-				cancelAnimationFrame(this.raf);
+				this.tick?.terminate();
+				if (this.tickUrl) URL.revokeObjectURL(this.tickUrl);
+				if (this.fallback) clearInterval(this.fallback);
 				if (this.syncTimer) clearInterval(this.syncTimer);
 				this.ctx?.close().catch(() => undefined);
 				resolve(new Blob(this.chunks, { type: this.mime }));

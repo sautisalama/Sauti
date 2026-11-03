@@ -382,7 +382,7 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 
 	beginRef.current = begin;
 	// Your own picture is never played back to you: the muted flag is set on the element itself, since React only sets it when the element is first made.
-	useEffect(() => { if (joined && localVideo.current && local.current) { localVideo.current.muted = true; localVideo.current.srcObject = local.current; } }, [joined, camOn, sharing]);
+	useEffect(() => { if (joined && localVideo.current && local.current) { localVideo.current.muted = true; localVideo.current.srcObject = local.current; } }, [joined, camOn, sharing, pipWin]);
 
 	/* ------------------------------------------------------------ captions */
 
@@ -471,6 +471,8 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 	 * place, so no one is heard twice) with the mic, camera and leave controls under them.
 	 */
 	const [pipWin, setPipWin] = useState<Window | null>(null);
+	const pipRef = useRef<Window | null>(null);
+	useEffect(() => { pipRef.current = pipWin; }, [pipWin]);
 	const openFloating = async (): Promise<boolean> => {
 		const dpip = (window as unknown as { documentPictureInPicture?: { requestWindow: (o: { width: number; height: number }) => Promise<Window> } }).documentPictureInPicture;
 		if (!dpip) return false;
@@ -768,7 +770,8 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 		const r = new MeetRecorder({
 			title: title || code,
 			streams: () => [...(local.current ? [local.current] : []), ...remotesRef.current.flatMap((x) => (x.stream ? [x.stream] : []))],
-			videos: () => Array.from(document.querySelectorAll<HTMLVideoElement>("video[data-rec-video]")),
+			// The call may be in the floating window: its videos live in that window's document, so both are read.
+			videos: () => [document, ...(pipRef.current ? [pipRef.current.document] : [])].flatMap((d) => Array.from(d.querySelectorAll<HTMLVideoElement>("video[data-rec-video]"))),
 		});
 		try { r.start(); } catch { return; }
 		recorder.current = r;
