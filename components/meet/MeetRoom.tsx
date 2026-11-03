@@ -26,7 +26,7 @@ import type { MeetingDoc } from "@/app/actions/meet-docs";
 
 type SignalKind = "offer" | "answer" | "ice";
 interface Peer { id: string; name: string; companion?: boolean; uid?: string | null }
-interface Remote extends Peer { stream: MediaStream | null; muted: boolean; sharing?: boolean; hand?: boolean; cam?: boolean; host?: boolean; handAt?: number }
+interface Remote extends Peer { stream: MediaStream | null; muted: boolean; sharing?: boolean; hand?: boolean; cam?: boolean; host?: boolean; handAt?: number; notes?: boolean }
 interface Device { id: string; label: string }
 
 const ICE: RTCIceServer[] = [
@@ -107,7 +107,7 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 	const chatRef = useRef<ChatMsg[]>([]);
 	const chatSaved = useRef(0);
 	const recent = useRef<{ emoji: string; at: number }[]>([]);
-	const stateRef = useRef({ muted: !startMic, cam: mode === "video" && startCam, sharing: false, hand: false });
+	const stateRef = useRef<{ muted: boolean; cam: boolean; sharing: boolean; hand: boolean; notes?: boolean }>({ muted: !startMic, cam: mode === "video" && startCam, sharing: false, hand: false, notes: false });
 	chatRef.current = chat;
 	const leaveRef = useRef<() => Promise<void>>(async () => undefined);
 	const toggleMicRef = useRef<() => void>(() => undefined);
@@ -325,7 +325,7 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 		ch.on("broadcast", { event: "signal" }, ({ payload }) => onSignal(payload))
 			.on("broadcast", { event: "caption" }, ({ payload }) => addLine(payload as TranscriptLine))
 			.on("broadcast", { event: "rec" }, ({ payload }) => setRecBy(payload.on ? String(payload.by ?? "Someone") : null))
-			.on("broadcast", { event: "state" }, ({ payload }) => setRemote(payload.id, { muted: !!payload.muted, sharing: !!payload.sharing, hand: !!payload.hand, cam: payload.cam !== false, handAt: payload.hand ? Date.now() : undefined }))
+			.on("broadcast", { event: "state" }, ({ payload }) => setRemote(payload.id, { muted: !!payload.muted, sharing: !!payload.sharing, hand: !!payload.hand, notes: !!payload.notes, cam: payload.cam !== false, handAt: payload.hand ? Date.now() : undefined }))
 			.on("broadcast", { event: "pin" }, ({ payload }) => setChat((cur) => cur.map((x) => (x.id === payload.id ? { ...x, pinned: !!payload.pinned } : x))))
 			.on("broadcast", { event: "chat" }, ({ payload }) => {
 				const l = payload as ChatMsg;
@@ -716,6 +716,10 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 		return () => clearInterval(t);
 	}, [joined, canSave, persist]);
 
+	// Taking notes (the transcript is the notes) is announced to everyone, and told again to anyone who joins later.
+	useEffect(() => { if (joined) pushState({ notes: captionsOn }); }, [joined, captionsOn, pushState]);
+	const noteTakers = [...(captionsOn ? ["You"] : []), ...remotes.filter((r) => r.notes).map((r) => r.name)];
+
 	const home = canSave ? "/meet" : "/";
 	useEffect(() => {
 		if (!left) return;
@@ -932,6 +936,7 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 						<li className="flex items-start gap-2">{name.trim() ? <Check className="mt-0.5 h-4 w-4 shrink-0 text-[#137333]" /> : <X className="mt-0.5 h-4 w-4 shrink-0 text-[#d93025]" />}<span><b>Your name</b> <span className="font-bold text-[#d93025]">(required)</span><span className="block text-[#5f6368]">Type it above. You cannot join without it.</span></span></li>
 						<li className="flex items-start gap-2">{permission === "granted" ? <Check className="mt-0.5 h-4 w-4 shrink-0 text-[#137333]" /> : permission === "denied" ? <X className="mt-0.5 h-4 w-4 shrink-0 text-[#d93025]" /> : <Loader2 className="mt-0.5 h-4 w-4 shrink-0 animate-spin text-[#5f6368]" />}<span><b>Microphone and camera access</b> <span className="font-bold text-[#5f6368]">(to speak and be seen)</span><span className="block text-[#5f6368]">{permission === "granted" ? "Allowed." : permission === "denied" ? "Blocked. Allow them in your browser's address bar to speak or show video. You can still join and listen." : "Choose Allow when your browser asks."}</span></span></li>
 						<li className="flex items-start gap-2"><Volume2 className="mt-0.5 h-4 w-4 shrink-0 text-[#5f6368]" /><span><b>Headphones</b> <span className="font-bold text-[#5f6368]">(recommended)</span><span className="block text-[#5f6368]">They stop echo and keep the call private.</span></span></li>
+						<li className="flex items-start gap-2"><MessageSquareText className="mt-0.5 h-4 w-4 shrink-0 text-[#5f6368]" /><span><b>Notes may be taken</b> <span className="font-bold text-[#5f6368]">(you will be told)</span><span className="block text-[#5f6368]">When anyone turns on captions, what is said is transcribed and shown to everyone. A banner tells you while it happens, and the team may keep the notes.</span></span></li>
 						<li className="flex items-start gap-2"><ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-[#5f6368]" /><span><b>The host may let you in</b> <span className="font-bold text-[#5f6368]">(if asked)</span><span className="block text-[#5f6368]">Some calls ask the host to admit you. Stay on this page until they do.</span></span></li>
 					</ul>
 					<div className="flex flex-wrap justify-center gap-3 lg:justify-start">
@@ -994,6 +999,12 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 				<div role="status" className="absolute left-1/2 top-3 z-30 flex -translate-x-1/2 items-center gap-2 rounded-full bg-black/70 px-3.5 py-1.5 text-xs font-medium text-white backdrop-blur">
 					<span className={cn("h-2 w-2 rounded-full", saving ? "bg-amber-400" : "animate-pulse bg-[#ea4335]")} />
 					{saving ? `Saving the recording${savePct !== null ? ` ${savePct}%` : ""}` : recording ? `Recording ${String(Math.floor(recSecs / 60)).padStart(2, "0")}:${String(recSecs % 60).padStart(2, "0")}` : `${recBy} is recording this meeting`}
+				</div>
+			)}
+			{noteTakers.length > 0 && (
+				<div role="status" className={cn("absolute left-1/2 z-30 flex max-w-[92vw] -translate-x-1/2 items-center gap-2 rounded-full bg-black/70 px-3.5 py-1.5 text-xs font-medium text-white backdrop-blur", recording || recBy || saving ? "top-12" : "top-3")}>
+					<MessageSquareText className="h-3.5 w-3.5 shrink-0 text-[#7fd3e0]" />
+					<span className="truncate">{noteTakers.length === 1 && noteTakers[0] === "You" ? "Notes are being taken: what you say is transcribed and shared with everyone here" : `Notes are being taken${noteTakers.includes("You") ? "" : ` by ${noteTakers.slice(0, 2).join(" and ")}${noteTakers.length > 2 ? ` and ${noteTakers.length - 2} more` : ""}`}: what is said is transcribed`}</span>
 				</div>
 			)}
 			<div className="hidden shrink-0 items-center gap-3 px-5 pt-3 text-base md:flex">
