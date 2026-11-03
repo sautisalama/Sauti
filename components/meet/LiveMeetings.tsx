@@ -2,15 +2,24 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { Check, Copy, Radio, Video } from "lucide-react";
+import { Check, Copy, Loader2, PhoneOff, Radio, Video } from "lucide-react";
 import { formatDistanceToNowStrict } from "date-fns";
 import { unwrap } from "@/lib/action-result";
 import { myLiveMeetings, type LiveMeeting } from "@/app/actions/mjengo-meet";
+import { endMeetingForAll } from "@/app/actions/meet-room";
 
 /** Meetings you started that are still going on, with a way back in. Shown in Meet and on the overview. */
 export function LiveMeetings() {
 	const [items, setItems] = useState<LiveMeeting[] | null>(null);
 	const [copied, setCopied] = useState<string | null>(null);
+	const [ending, setEnding] = useState<string | null>(null);
+	const [confirm, setConfirm] = useState<string | null>(null);
+	const end = async (code: string) => {
+		setEnding(code);
+		try { await unwrap(endMeetingForAll(code)); setItems((cur) => (cur ?? []).filter((m) => m.code !== code)); } catch { /* stays listed; try again */ }
+		setEnding(null);
+		setConfirm(null);
+	};
 	const load = useCallback(() => { void unwrap(myLiveMeetings()).then(setItems).catch(() => setItems((cur) => cur ?? [])); }, []);
 	useEffect(() => {
 		load();
@@ -35,6 +44,15 @@ export function LiveMeetings() {
 						>
 							{copied === m.code ? <Check className="h-3.5 w-3.5 text-[#137333]" /> : <Copy className="h-3.5 w-3.5" />} {copied === m.code ? "Copied" : "Copy link"}
 						</button>
+						{confirm === m.code ? (
+							<span className="flex items-center gap-1.5 text-xs">
+								<span className="text-serene-neutral-600">End for everyone?</span>
+								<button onClick={() => void end(m.code)} disabled={ending === m.code} className="flex items-center gap-1 rounded-full bg-[#ea4335] px-3 py-1.5 font-semibold text-white hover:bg-[#d93025] disabled:opacity-60">{ending === m.code && <Loader2 className="h-3 w-3 animate-spin" />} End</button>
+								<button onClick={() => setConfirm(null)} className="rounded-full px-2.5 py-1.5 font-medium text-serene-neutral-600 hover:bg-serene-neutral-100">Keep</button>
+							</span>
+						) : (
+							<button onClick={() => setConfirm(m.code)} className="flex items-center gap-1.5 rounded-full border border-[#ea4335]/40 px-3 py-1.5 text-xs font-medium text-[#d93025] hover:bg-[#ea4335]/10"><PhoneOff className="h-3.5 w-3.5" /> End for everyone</button>
+						)}
 						<Link href={`/meet/${m.code}`} className="rounded-full bg-sauti-teal px-4 py-1.5 text-xs font-semibold text-white hover:bg-sauti-dark">Rejoin</Link>
 					</li>
 				))}

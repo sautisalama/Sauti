@@ -7,7 +7,7 @@ import { CalendarClock, CalendarDays, ChevronLeft, ChevronRight, Clapperboard, H
 import { unwrap } from "@/lib/action-result";
 import { cn } from "@/lib/utils";
 import { holidayOn } from "@/lib/mjengo/holidays-ke";
-import { listMeetings, meetHome, type MeetHomeItem, type MeetingRow } from "@/app/actions/mjengo-meet";
+import { createMeeting, listMeetings, meetHome, type MeetHomeItem, type MeetingRow } from "@/app/actions/mjengo-meet";
 import { LiveMeetings } from "./LiveMeetings";
 import { MeetChooser } from "@/app/dashboard/mjengo/_components/MeetChooser";
 
@@ -40,6 +40,18 @@ export function MeetHome({ isAdmin }: { isAdmin: boolean }) {
 		return () => { on = false; };
 	}, [day, isAdmin]);
 
+	const [starting, setStarting] = useState(false);
+	/** Start now opens the call straight away: there is nothing to choose, so no window in between. */
+	const startNow = async () => {
+		if (starting) return;
+		setStarting(true);
+		try {
+			const { code: c } = await unwrap(createMeeting("video", null));
+			navigator.clipboard?.writeText(`${window.location.origin}/meet/${c}`).catch(() => undefined);
+			window.location.assign(`/meet/${c}`);
+		} catch { setStarting(false); }
+	};
+
 	const join = () => { if (found) window.location.assign(`/meet/${found}`); };
 
 	return (
@@ -58,7 +70,7 @@ export function MeetHome({ isAdmin }: { isAdmin: boolean }) {
 
 			{isAdmin && (
 				<div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-					<Tile tint="bg-sauti-teal-light" icon={Zap} title="Start now" hint="Open a call right away and share the link." onClick={() => setChooser({ initial: "now" })} />
+					<Tile tint="bg-sauti-teal-light" icon={Zap} title="Start now" hint="Open a call right away and share the link." onClick={() => void startNow()} busy={starting} />
 					<Tile tint="bg-sauti-yellow-light" icon={Link2} title="Meeting for later" hint="Get a link, add people, notes and resources." onClick={() => setChooser({ initial: "later" })} />
 					<Tile tint="bg-serene-blue-50" icon={CalendarClock} title="Schedule on calendar" hint="Pick a time and choose how you are reminded." onClick={() => setChooser({ initial: "calendar" })} />
 				</div>
@@ -148,12 +160,12 @@ export function MeetHome({ isAdmin }: { isAdmin: boolean }) {
 	);
 }
 
-function Tile({ icon: Icon, title, hint, tint, onClick }: { icon: typeof Video; title: string; hint: string; tint: string; onClick: () => void }) {
+function Tile({ icon: Icon, title, hint, tint, onClick, busy }: { icon: typeof Video; title: string; hint: string; tint: string; onClick: () => void; busy?: boolean }) {
 	return (
-		<button onClick={onClick} className={cn("rounded-2xl border border-black/5 p-4 text-left shadow-[0_1px_2px_rgba(16,24,40,0.04)] transition hover:-translate-y-0.5 hover:shadow-md", tint)}>
+		<button onClick={onClick} disabled={busy} className={cn("rounded-2xl border border-black/5 p-4 text-left disabled:opacity-60 shadow-[0_1px_2px_rgba(16,24,40,0.04)] transition hover:-translate-y-0.5 hover:shadow-md", tint)}>
 			<span className="mb-3 flex h-9 w-9 items-center justify-center rounded-xl bg-white/80 text-sauti-teal"><Icon className="h-4 w-4" /></span>
 			<span className="block text-sm font-bold text-serene-neutral-900">{title}</span>
-			<span className="block text-xs text-serene-neutral-600">{hint}</span>
+			<span className="block text-xs text-serene-neutral-600">{busy ? "Opening the call…" : hint}</span>
 		</button>
 	);
 }

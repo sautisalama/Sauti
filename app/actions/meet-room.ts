@@ -156,6 +156,26 @@ async function cohost_(code: string, peerId: string): Promise<string> {
   return `c.${peer}.${cohostMac(code, peer)}`;
 }
 
+/**
+ * The person who started a meeting ends it for everyone, from anywhere (the Meet home): the meeting is marked over
+ * and everyone in the call is told over the call's own channel, with the proof that it comes from the host.
+ */
+async function endAll_(code: string): Promise<void> {
+  if (!CODE.test(code)) throw new Error('That is not a valid call link.');
+  const a = await getActor();
+  if (!a) throw new Error('Sign in first.');
+  const db = looseAdmin();
+  const { data: m } = await db.from('mjengo_meetings').select('created_by, ended_at').eq('code', code).maybeSingle();
+  if (!m) throw new Error('That call does not exist.');
+  if (m.created_by !== a.id && !a.isAdmin) throw new Error('Only the person who started the call can end it for everyone.');
+  const { error } = await db.from('mjengo_meetings').update({ ended_at: new Date().toISOString() }).eq('code', code);
+  if (error) throw new Error('Could not end the call.');
+  const host = m.created_by as string;
+  const payload = { from: 'server', to: 'all', action: 'end', at: Date.now(), ht: `${host}.${hostMac(code, host)}` };
+  try { await db.channel(`meet:${code}:${roomKey(code)}`).httpSend('ctl', payload); } catch { /* the call is over on the server even if no one was listening */ }
+}
+
+export const endMeetingForAll = guard(endAll_);
 export const makeCohost = guard(cohost_);
 export const verifyHostToken = guard(verifyHost_);
 export const lockMeeting = guard(lock_);

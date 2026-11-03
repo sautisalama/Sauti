@@ -821,6 +821,10 @@ html.dark [role="menuitem"][data-highlighted][class*="focus:bg-blue"] { backgrou
 html.dark [role="menuitem"][data-state="open"] { background-color: #1e2b30; }
 html.dark [role="separator"] { background-color: #1f2b30; }
 
+/* Hover surfaces written as light hex colours (the call screens, pickers) step to the raised dark surface. */
+html.dark [class*="hover:bg-[#f" i]:hover, html.dark [class*="hover:bg-[#e" i]:hover, html.dark [class*="hover:bg-[#d" i]:hover, html.dark [class*="focus:bg-[#f" i]:focus, html.dark [class*="focus:bg-[#e" i]:focus { background-color: #1e2b30; }
+html.dark [class*="hover:border-[#" i]:hover { border-color: #3f9fb0; }
+
 /* The sand-timer and other Lottie loaders are drawn dark on light; flip them for dark surfaces. */
 html.dark .lottie-art { background: #e3ebed; border-radius: 32px; padding: 8px; }
 html.dark .bg-serene-neutral-50\/10 { background-color: transparent; }

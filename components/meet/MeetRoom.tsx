@@ -80,6 +80,9 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 	const [recording, setRecording] = useState(false);
 	const [recBy, setRecBy] = useState<string | null>(null);
 	const recNameRef = useRef<string | null>(null);
+	const endAllRef = useRef(false);
+	const joinAt = useRef(Date.now());
+	const becomeCompanionRef = useRef<() => void>(() => undefined);
 	const [notice, setNotice] = useState<{ id: number; text: string } | null>(null);
 	const seen = useRef<{ rec: boolean; notes: Set<string> }>({ rec: false, notes: new Set() });
 	const [recSecs, setRecSecs] = useState(0);
@@ -151,6 +154,7 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 	const [level, setLevel] = useState(0);
 	const [permission, setPermission] = useState<"asking" | "granted" | "denied">("asking");
 	const [companion, setCompanion] = useState(false);
+	const companionRef = useRef(false);
 	const [speakerOn, setSpeakerOn] = useState(true);
 
 	// Accessibility choices are remembered; captions themselves always start off.
@@ -174,6 +178,7 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 	remotesRef.current = remotes;
 
 	const link = typeof window === "undefined" ? "" : `${window.location.origin}/meet/${code}`;
+	companionRef.current = companion;
 	const shownName = companion ? `${name} (companion)` : name;
 
 	const addLine = useCallback((l: TranscriptLine) => setLines((cur) => (cur.some((x) => x.id === l.id) ? cur : [...cur, l])), []);
@@ -357,11 +362,16 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 				setRemotes((cur) => cur.filter((r) => r.id !== peer.id));
 			}
 		};
-		if (initiator) {
+		const offerNow = async () => {
+			if (pcs.current.get(peer.id) !== pc || pc.signalingState !== "stable") return;
 			const offer = await pc.createOffer();
+			if (pc.signalingState !== "stable") return;
 			await pc.setLocalDescription(offer);
 			send("signal", { from: myId.current, to: peer.id, kind: "offer" as SignalKind, data: offer, name: shownName, companion, uid: userId });
-		}
+		};
+		if (initiator) await offerNow().catch(() => undefined);
+		// The side that waits makes the offer itself if none has come, so a lost message never leaves a blank tile.
+		else setTimeout(() => { if (pcs.current.get(peer.id) === pc && !pc.remoteDescription) void offerNow().catch(() => undefined); }, 6000);
 	}, [shownName, companion, userId, send, setRemote, markLost, markOk]);
 
 	const onSignal = useCallback(async (m: { from: string; to: string; kind: SignalKind; data: unknown; name?: string; companion?: boolean; uid?: string | null }) => {
@@ -443,6 +453,7 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 				pcs.current.delete(id);
 				setRemotes((cur) => cur.filter((r) => r.id !== id));
 			})
+			.on("broadcast", { event: "companion" }, ({ payload }) => patchRemote(String(payload.id), { companion: true, name: String(payload.name ?? "Guest") }))
 			.on("broadcast", { event: "rec" }, ({ payload }) => setRecBy(payload.on ? String(payload.by ?? "Someone") : null))
 			.on("broadcast", { event: "state" }, ({ payload }) => patchRemote(payload.id, { muted: !!payload.muted, sharing: !!payload.sharing, hand: !!payload.hand, notes: !!payload.notes, cam: payload.cam !== false, handAt: payload.hand ? Date.now() : undefined }))
 			.on("broadcast", { event: "pin" }, ({ payload }) => setChat((cur) => cur.map((x) => (x.id === payload.id ? { ...x, pinned: !!payload.pinned } : x))))
@@ -490,7 +501,8 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 				if (hostIds.current.has(from)) return run();
 				// Not yet known as a host (the check on their join may still be on its way): the proof they send is checked now.
 				const ht = typeof payload.ht === "string" ? payload.ht : "";
-				if (!ht || ht.split(".")[1] !== from) return;
+				// "server" is the Meet home ending the call for everyone: the same proof from the host is checked.
+				if (!ht || (from !== "server" && ht.split(".")[1] !== from)) return;
 				void unwrap(verifyHostToken(code, ht)).then((ok) => { if (ok) { hostIds.current.add(from); patchRemote(from, { host: true }); run(); } }).catch(() => undefined);
 			})
 			.on("presence", { event: "join" }, ({ key, newPresences }) => {
@@ -498,7 +510,11 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 				const p = newPresences[0] as unknown as { name?: string; companion?: boolean; uid?: string | null; host?: boolean; ht?: string };
 				// Someone who says they are the host is believed only after the server confirms it.
 				if (p?.ht) void unwrap(verifyHostToken(code, p.ht)).then((ok) => { if (ok) { hostIds.current.add(key); patchRemote(key, { host: true }); } }).catch(() => undefined);
-				connect({ id: key, name: p?.name ?? "Guest", companion: p?.companion, uid: p?.uid }, true);
+				// Only one side makes the offer (the larger id), so two people meeting never offer to each other at once.
+				// The same account already in this call on another device: this one joins as its companion.
+				const q = p as { at?: number } | undefined;
+				if (userId && p?.uid === userId && !p?.companion && !companionRef.current && (q?.at ?? 0) < joinAt.current) becomeCompanionRef.current();
+				connect({ id: key, name: p?.name ?? "Guest", companion: p?.companion, uid: p?.uid }, myId.current > key);
 				
 				// The newcomer is told how this device is now once it is listening.
 				setTimeout(() => pushState({}), 900);
@@ -511,7 +527,7 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 				pcs.current.delete(key);
 				setRemotes((cur) => cur.filter((r) => r.id !== key));
 			})
-			.subscribe(async (status) => { if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") markLost(); if (status === "SUBSCRIBED") { markOk(); await ch.track({ name: shownName, companion, uid: userId, host, ht: hostToken }); pushState({ muted: !micOnRef.current, cam: camOnRef.current && !!local.current?.getVideoTracks().length }); } });
+			.subscribe(async (status) => { if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") markLost(); if (status === "SUBSCRIBED") { markOk(); await ch.track({ name: shownName, companion, uid: userId, host, ht: hostToken, at: joinAt.current }); pushState({ muted: !micOnRef.current, cam: camOnRef.current && !!local.current?.getVideoTracks().length }); } });
 		setJoined(true);
 		setReadyOpen(true);
 		if (present) setTimeout(() => { void toggleShareRef.current(); }, 600);
@@ -558,6 +574,20 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 
 	/* ------------------------------------------------------------ controls */
 
+	/** Signed in to this call on another device already: this device turns its sound off and shows as the companion. */
+	const becomeCompanion = () => {
+		companionRef.current = true;
+		setCompanion(true);
+		setSpeakerOn(false);
+		setMicOn(false);
+		local.current?.getAudioTracks().forEach((t) => (t.enabled = false));
+		pushState({ muted: true });
+		const cname = `${name} (companion)`;
+		void channel.current?.track({ name: cname, companion: true, uid: userId, host: false, at: joinAt.current });
+		send("companion", { id: myId.current, name: cname });
+		setNotice({ id: Date.now(), text: "You are already in this call on another device, so this one joined in Companion mode: no sound, everything else works." });
+	};
+	becomeCompanionRef.current = becomeCompanion;
 	const toggleMic = () => {
 		// A companion never carries sound: the main device does, and a second open microphone would echo.
 		if (companion) { setNotice({ id: Date.now(), text: "Companion mode keeps your microphone and speaker off so there is no echo. Use your main device to speak and listen." }); return; }
@@ -883,7 +913,7 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 		const who = recording ? "You" : recBy;
 		const prev = seen.current;
 		const parts: string[] = [];
-		if (who && !prev.rec) parts.push(who === "You" ? "Recording has started. Everyone in the call has been told." : `${who} started recording this meeting.`);
+		if (who && !prev.rec) parts.push("This call is being recorded.");
 		prev.rec = !!who;
 		const now = new Set(noteKey ? noteKey.split("|") : []);
 		const added = [...now].filter((n) => !prev.notes.has(n));
@@ -1017,7 +1047,8 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 		await new Promise((r) => setTimeout(r, 120));
 		// 2. Saving the transcript and recording needs the network, so it never holds the rest up.
 		const keep = (async () => {
-			await persist(true);
+			// The meeting is over only when the last person goes or the host ends it for everyone; a person leaving a call that goes on does not end it.
+			await persist(endAllRef.current || !remotesRef.current.some((r) => !r.companion));
 			if (recorder.current) await stopRecording();
 		})().catch(() => undefined);
 		await Promise.race([keep, new Promise((r) => setTimeout(r, 2500))]);
@@ -1138,7 +1169,7 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 					{micOn && permission === "granted" && (
 						<div className="mt-3 flex items-center gap-2 text-xs text-[#5f6368]"><Mic className="h-3.5 w-3.5" /><div className="h-1.5 flex-1 overflow-hidden rounded-full bg-[#e8eaed]"><div className="h-full rounded-full bg-[#068297] transition-[width] duration-100" style={{ width: `${Math.round(level * 100)}%` }} /></div></div>
 					)}
-					{permission === "granted" && mode === "video" && <div className="mt-3"><BackgroundPicker light bg={bg} busy={bgBusy} note={bgNote} onPick={(m) => void applyBackground(m)} /></div>}
+					{permission === "granted" && mode === "video" && <div className="mt-3"><BackgroundPicker light bg={bg} busy={bgBusy} note={bgNote} onPick={(m) => void applyBackground(m)} onRestore={(m) => void applyBackground(m)} /></div>}
 					{permission === "granted" && (
 						<div className="mt-3 flex flex-wrap gap-2">
 							{mics.length > 0 && <label className={chip}><Mic className="h-4 w-4 shrink-0" /><select aria-label="Microphone" value={micId} onChange={(e) => setMicId(e.target.value)} className="min-w-0 bg-transparent outline-none"><option value="">Default microphone</option>{mics.map((d) => <option key={d.id} value={d.id}>{d.label}</option>)}</select></label>}
@@ -1158,27 +1189,21 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 						<span className="mb-1 flex items-center justify-between text-xs font-medium text-[#5f6368]"><span>Your name</span><span className={cn("rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide", name.trim() ? "bg-[#e6f4ea] text-[#137333]" : "bg-[#fce8e6] text-[#d93025]")}>{name.trim() ? "Done" : "Required"}</span></span>
 						<input value={name} onChange={(e) => setName(e.target.value)} placeholder="How should people see you?" className="h-12 w-full rounded-lg border border-[#dadce0] px-3 text-base outline-none focus:border-[#068297] focus:ring-1 focus:ring-[#068297]" />
 					</label>
-					<div className="flex w-full max-w-sm flex-wrap gap-2 text-xs" aria-label="Ready check">
-						<span className={cn("inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 font-medium", name.trim() ? "bg-[#e6f4ea] text-[#137333]" : "bg-[#fce8e6] text-[#d93025]")}>{name.trim() ? <Check className="h-3.5 w-3.5" /> : <X className="h-3.5 w-3.5" />}{name.trim() ? "Name set" : "Add your name to join"}</span>
-						<span className={cn("inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 font-medium", permission === "granted" ? "bg-[#e6f4ea] text-[#137333]" : permission === "denied" ? "bg-[#fef7e0] text-[#8a6d00]" : "bg-[#f1f3f4] text-[#5f6368]")}>{permission === "granted" ? <Check className="h-3.5 w-3.5" /> : permission === "denied" ? <MicOff className="h-3.5 w-3.5" /> : <Loader2 className="h-3.5 w-3.5 animate-spin" />}{permission === "granted" ? "Microphone and camera on" : permission === "denied" ? "Blocked: you can still listen" : "Waiting for your permission"}</span>
-					</div>
-					{permission === "denied" && <p className="max-w-sm text-xs text-[#5f6368]">Allow the microphone and camera in your browser&apos;s address bar to speak or show video.</p>}
 					<div className="flex flex-wrap justify-center gap-3 lg:justify-start">
 						<button onClick={() => join(false)} disabled={!name.trim() || entry === "checking"} className="h-12 rounded-full bg-[#068297] px-7 text-sm font-medium text-white shadow-sm hover:bg-[#056d7e] disabled:opacity-40">{entry === "checking" ? "Joining…" : companion ? "Join as companion" : "Join now"}</button>
 						<button onClick={() => join(true)} disabled={!name.trim() || entry === "checking"} className="flex h-12 items-center gap-2 rounded-full border border-[#dadce0] px-6 text-sm font-medium text-[#068297] hover:bg-[#f1fafb] disabled:opacity-40"><MonitorUp className="h-4 w-4" /> Present</button>
 					</div>
 					{entryError && <p role="alert" className="max-w-sm text-sm text-[#d93025]">{entryError}</p>}
-					<div className="w-full max-w-sm rounded-xl border border-[#e8eaed] p-3 text-left">
-						<p className="flex items-center gap-1.5 text-sm font-medium"><SmartphoneNfc className="h-4 w-4 text-[#068297]" /> Companion mode</p>
-						<p className="mt-1 text-xs text-[#5f6368]">Join from a second device, like a laptop in a meeting room or your phone, while sound stays on the device you joined with. This device has the microphone and speaker off, so there is no echo.</p>
+					<div className="group relative w-full max-w-sm rounded-xl border border-[#e8eaed] p-3 text-left" tabIndex={0}>
+						<p className="flex items-center gap-1.5 text-sm font-medium"><SmartphoneNfc className="h-4 w-4 text-[#068297]" /> Companion mode <Info className="h-3.5 w-3.5 text-[#5f6368]" aria-hidden /></p>
 						{userId ? (
-							<>
-								<button type="button" aria-pressed={companion} onClick={() => { const on = !companion; setCompanion(on); if (on) { setSpeakerOn(false); setMicOn(false); } else { setSpeakerOn(true); setMicOn(true); } }} className={cn("mt-2 flex h-9 items-center gap-2 rounded-full border px-4 text-sm font-medium", companion ? "border-[#068297] bg-[#e0f2f5] text-[#068297]" : "border-[#dadce0] text-[#068297] hover:bg-[#f1fafb]")}>{companion ? <><Check className="h-4 w-4" /> Companion mode is on</> : "Use Companion mode"}</button>
-								<p className="mt-2 text-[11px] text-[#5f6368]">You can present, show your camera, chat, react, raise your hand and see everyone. You appear as &ldquo;{name.trim() || "You"} (companion)&rdquo;, not as another person.</p>
-							</>
+							<button type="button" aria-pressed={companion} onClick={() => { const on = !companion; setCompanion(on); if (on) { setSpeakerOn(false); setMicOn(false); } else { setSpeakerOn(true); setMicOn(true); } }} className={cn("mt-2 flex h-9 items-center gap-2 rounded-full border px-4 text-sm font-medium", companion ? "border-[#068297] bg-[#e0f2f5] text-[#068297]" : "border-[#dadce0] text-[#068297] hover:bg-[#f1fafb]")}>{companion ? <><Check className="h-4 w-4" /> Companion mode is on</> : "Use Companion mode"}</button>
 						) : (
-							<p className="mt-2 text-[11px] text-[#5f6368]">Sign in on this device and on your main device with the same account to use Companion mode.</p>
+							<p className="mt-1 text-[11px] text-[#5f6368]">Sign in to use Companion mode.</p>
 						)}
+						<span role="tooltip" className="pointer-events-none invisible absolute bottom-full left-0 z-20 mb-2 w-full rounded-lg bg-[#202124] p-3 text-xs font-normal leading-relaxed text-white opacity-0 shadow-xl transition group-focus-within:visible group-focus-within:opacity-100 group-hover:visible group-hover:opacity-100">
+							Join from a second device with sound off, so there is no echo. You can still present, chat and react.
+			</span>
 					</div>
 					<details className="w-full max-w-sm rounded-xl bg-[#f6f8f9] p-3 text-left text-xs text-[#3c4043]">
 						<summary className="cursor-pointer text-[11px] font-bold uppercase tracking-wide text-[#5f6368]">Good to know</summary>
@@ -1244,7 +1269,7 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 					{(recording || recBy || saving) && (
 						<span title="This meeting is being recorded. Everyone in the call has been told." className="flex items-center gap-2 rounded-full bg-[#d93025] px-3 py-1 text-white shadow">
 							<span className={cn("h-2 w-2 rounded-full bg-white", !saving && "animate-pulse")} />
-							{saving ? `Saving the recording${savePct !== null ? ` ${savePct}%` : ""}` : recording ? `Recording ${String(Math.floor(recSecs / 60)).padStart(2, "0")}:${String(recSecs % 60).padStart(2, "0")}` : `${recBy} is recording`}
+							{saving ? `Saving the recording${savePct !== null ? ` ${savePct}%` : ""}` : recording ? `This call is being recorded · ${String(Math.floor(recSecs / 60)).padStart(2, "0")}:${String(recSecs % 60).padStart(2, "0")}` : "This call is being recorded"}
 						</span>
 					)}
 					{noteTakers.length > 0 && (
@@ -1270,7 +1295,31 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 					{!companion && myCompanion && <span className="flex items-center gap-1.5 rounded-full bg-[#068297]/30 px-2.5 py-1 text-xs"><SmartphoneNfc className="h-3.5 w-3.5" /> Your companion device is connected</span>}
 				<button onClick={() => setPanel((p) => (p === "info" ? "none" : "info"))} aria-label="Meeting details" className="text-white/70 hover:text-white"><Info className="h-4 w-4" /></button>
 				<span className="flex-1" />
-				<button onClick={() => setPanel((p) => (p === "people" ? "none" : "people"))} aria-label="People" className="flex h-10 items-center gap-2 rounded-full bg-white/10 px-3 text-sm hover:bg-white/20"><Users className="h-4 w-4" />{remotes.length + 1}</button>
+				<button onClick={() => setPanel((p) => (p === "people" ? "none" : "people"))} aria-label="People" className="flex h-10 items-center gap-2 rounded-full bg-white/10 px-3 text-sm hover:bg-white/20"><Users className="h-4 w-4" />{remotes.filter((r) => !r.companion).length + 1}</button>
+				{(() => {
+					// Who else is here: the host and two others by name, everyone after that as overlapping faces.
+					const others = remotes.filter((r) => !r.companion);
+					const ordered = [...others.filter((r) => r.host), ...others.filter((r) => !r.host)];
+					const named = ordered.slice(0, 3);
+					const rest = ordered.slice(3);
+					if (!ordered.length) return null;
+					return (
+						<div className="flex items-center gap-1.5" aria-label="Who is in the call">
+							<div className="hidden items-center gap-1.5 sm:flex">
+								{named.map((r) => <span key={r.id} title={r.host ? `${r.name} (host)` : r.name} className="flex max-w-[9rem] items-center gap-1.5 rounded-full bg-white/10 py-1 pl-1 pr-2.5 text-xs"><span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#4b5563] text-[10px] font-semibold">{initials(r.name)}</span><span className="truncate">{r.name}{r.host ? " · Host" : ""}</span></span>)}
+							</div>
+							<div className="flex -space-x-2 sm:hidden">
+								{named.map((r) => <span key={r.id} title={r.name} className="flex h-7 w-7 items-center justify-center rounded-full bg-[#4b5563] text-[10px] font-semibold ring-2 ring-[#0E1318]">{initials(r.name)}</span>)}
+							</div>
+							{rest.length > 0 && (
+								<div className="flex -space-x-2" title={rest.map((r) => r.name).join(", ")}>
+									{rest.slice(0, 4).map((r) => <span key={r.id} className="flex h-7 w-7 items-center justify-center rounded-full bg-[#5f6368] text-[10px] font-semibold ring-2 ring-[#0E1318]">{initials(r.name)}</span>)}
+									{rest.length > 4 && <span className="flex h-7 min-w-7 items-center justify-center rounded-full bg-[#068297] px-1 text-[10px] font-semibold ring-2 ring-[#0E1318]">+{rest.length - 4}</span>}
+								</div>
+							)}
+						</div>
+					);
+				})()}
 			</div>
 			{endsAt && nowTick > new Date(endsAt).getTime() && (
 				<div className="pointer-events-none absolute inset-x-0 top-2 z-30 flex justify-center px-3" role="status">
@@ -1309,6 +1358,12 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 								)}
 							</div>
 							<div className="flex shrink-0 gap-2 overflow-x-auto lg:w-56 lg:flex-col lg:overflow-y-auto">
+								{presenter.id === "me" && screenStream.current && (
+									<div className="relative h-28 w-44 shrink-0 overflow-hidden rounded-xl bg-black ring-1 ring-[#7fd3e0]/50 lg:h-32 lg:w-full">
+										<StreamVideo stream={screenStream.current} className="h-full w-full object-contain" />
+										<span className="absolute bottom-2 left-2 rounded-md bg-black/60 px-2 py-0.5 text-xs">Your presentation</span>
+									</div>
+								)}
 								<div className="h-28 w-44 shrink-0 lg:h-32 lg:w-full">{selfTile}</div>
 								{visible.filter((r) => r.id !== presenter.id).map((r) => <div key={r.id} className="h-28 w-44 shrink-0 lg:h-32 lg:w-full">{tile(r)}</div>)}
 							</div>
@@ -1348,7 +1403,7 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 										<select value={micId} onChange={(e) => void switchDevice("audio", e.target.value)} className="h-10 w-full rounded-lg border border-[#dadce0] bg-white px-2"><option value="">Default microphone</option>{mics.map((d) => <option key={d.id} value={d.id}>{d.label}</option>)}</select></label>
 									<label className="block"><span className="mb-1 block text-xs text-[#5f6368]">Camera</span>
 										<select value={camId} onChange={(e) => void switchDevice("video", e.target.value)} className="h-10 w-full rounded-lg border border-[#dadce0] bg-white px-2"><option value="">Default camera</option>{cams.map((d) => <option key={d.id} value={d.id}>{d.label}</option>)}</select></label>
-									{mode === "video" && <BackgroundPicker light bg={bg} busy={bgBusy} note={bgNote} onPick={(m) => void applyBackground(m)} />}
+									{mode === "video" && <BackgroundPicker light bg={bg} busy={bgBusy} note={bgNote} onPick={(m) => void applyBackground(m)} onRestore={(m) => void applyBackground(m)} />}
 									<label className="block"><span className="mb-1 block text-xs text-[#5f6368]">Speaker</span>
 										<select value={speakerId} onChange={(e) => setSpeakerId(e.target.value)} className="h-10 w-full rounded-lg border border-[#dadce0] bg-white px-2"><option value="">Default speaker</option>{speakers.map((d) => <option key={d.id} value={d.id}>{d.label}</option>)}</select></label>
 									<label className="flex items-center justify-between gap-3"><span>Reduce background noise</span><input type="checkbox" checked={noise} onChange={(e) => { setNoise(e.target.checked); void applyAudioProcessing({ noiseSuppression: e.target.checked }); }} className="h-4 w-4 accent-[#068297]" /></label>
@@ -1370,7 +1425,7 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 											<span className="mr-auto text-[#5f6368]">{isHost ? "You are the host" : "You are a co-host"}</span>
 											{isHost && <button onClick={() => { const next = !locked; setLocked(next); void unwrap(lockMeeting(code, next)).catch(() => setLocked(!next)); }} aria-pressed={locked} className={cn("rounded-full border px-3 py-1 font-medium", locked ? "border-[#068297] bg-[#e0f2f5] text-[#068297]" : "border-[#dadce0] text-[#5f6368] hover:bg-[#f1fafb]")}>{locked ? "Call is locked" : "Lock the call"}</button>}
 											{remotes.length > 0 && <button onClick={() => hostCtl("all", "mute")} className="rounded-full border border-[#dadce0] px-3 py-1 font-medium text-[#068297] hover:bg-[#f1fafb]">Mute everyone</button>}
-											{remotes.length > 0 && <button onClick={() => { hostCtl("all", "end"); setTimeout(() => void leaveRef.current(), 1200); }} className="rounded-full bg-[#fce8e6] px-3 py-1 font-medium text-[#d93025] hover:bg-[#f9d6d2]">End for everyone</button>}
+											{remotes.length > 0 && <button onClick={() => { endAllRef.current = true; hostCtl("all", "end"); setTimeout(() => void leaveRef.current(), 1200); }} className="rounded-full bg-[#fce8e6] px-3 py-1 font-medium text-[#d93025] hover:bg-[#f9d6d2]">End for everyone</button>}
 										</div>
 									)}
 									{handOrder.length > 0 && (
@@ -1511,7 +1566,7 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 						<p className="mt-1 text-sm text-[#5f6368]">You are the host. The others can carry on without you, or you can end the call for everyone.</p>
 						<div className="mt-4 flex flex-col gap-2">
 							<button onClick={() => { setEndAsk(false); void leave(); }} className="h-11 rounded-full border border-[#dadce0] text-sm font-medium hover:bg-[#f8f9fa]">Leave, the call goes on</button>
-							<button onClick={() => { setEndAsk(false); hostCtl("all", "end"); setTimeout(() => void leaveRef.current(), 1200); }} className="h-11 rounded-full bg-[#ea4335] text-sm font-medium text-white hover:bg-[#d93025]">End for everyone</button>
+							<button onClick={() => { setEndAsk(false); endAllRef.current = true; hostCtl("all", "end"); setTimeout(() => void leaveRef.current(), 1200); }} className="h-11 rounded-full bg-[#ea4335] text-sm font-medium text-white hover:bg-[#d93025]">End for everyone</button>
 							<button onClick={() => setEndAsk(false)} className="h-10 rounded-full text-sm font-medium text-[#068297] hover:bg-[#f1fafb]">Stay in the call</button>
 						</div>
 					</div>

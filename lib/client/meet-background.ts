@@ -9,7 +9,8 @@ export type BackgroundMode =
 	| { kind: "none" }
 	| { kind: "blur"; amount: number }
 	| { kind: "color"; a: string; b?: string }
-	| { kind: "image"; src: string };
+	| { kind: "image"; src: string; fit?: PhotoFit };
+export type PhotoFit = "fill" | "fit" | "grid";
 
 const VERSION = "1.2.0";
 const WASM = `https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${VERSION}/wasm`;
@@ -35,6 +36,9 @@ function loadSegmenter(): Promise<Segmenter> {
 	}
 	return shared;
 }
+
+/** Starts loading the effect model without waiting for it, when it is likely to be wanted. */
+export const preloadBackground = () => { void loadSegmenter().catch(() => undefined); };
 
 export const backgroundSupported = () => typeof window !== "undefined" && typeof Worker !== "undefined" && typeof HTMLCanvasElement !== "undefined" && "captureStream" in HTMLCanvasElement.prototype;
 
@@ -62,7 +66,7 @@ export class BackgroundProcessor {
 	async setMode(mode: BackgroundMode) {
 		this.mode = mode;
 		this.bg = null;
-		if (mode.kind === "image") this.bg = await loadImage(mode.src).catch(() => null);
+		if (mode.kind === "image") this.bg = await cachedImage(mode.src).catch(() => null);
 	}
 
 	async start(): Promise<MediaStreamTrack> {
@@ -156,7 +160,10 @@ export class BackgroundProcessor {
 			} else g.fillStyle = mode.a;
 			g.fillRect(0, 0, w, h);
 		} else if (this.bg) {
-			cover(g, this.bg, w, h);
+			const fit = mode.kind === "image" ? mode.fit ?? "fill" : "fill";
+			if (fit === "grid") grid(g, this.bg, w, h);
+			else if (fit === "fit") contain(g, this.bg, w, h);
+			else cover(g, this.bg, w, h);
 		} else {
 			g.fillStyle = "#1B232B";
 			g.fillRect(0, 0, w, h);
@@ -175,6 +182,17 @@ export class BackgroundProcessor {
 	}
 }
 
+const decoded = new Map<string, HTMLImageElement>();
+/** A picture is decoded once and kept (the last few), so switching back to it is instant. */
+async function cachedImage(src: string): Promise<HTMLImageElement> {
+	const hit = decoded.get(src);
+	if (hit) return hit;
+	const img = await loadImage(src);
+	decoded.set(src, img);
+	if (decoded.size > 4) decoded.delete(decoded.keys().next().value as string);
+	return img;
+}
+
 function loadImage(src: string): Promise<HTMLImageElement> {
 	return new Promise((resolve, reject) => {
 		const i = new Image();
@@ -190,6 +208,42 @@ function cover(g: CanvasRenderingContext2D, i: HTMLImageElement, w: number, h: n
 	const dw = i.naturalWidth * r;
 	const dh = i.naturalHeight * r;
 	g.drawImage(i, (w - dw) / 2, (h - dh) / 2, dw, dh);
+}
+
+/** The picture shown whole, with a soft blown-up copy of it filling the sides. */
+function contain(g: CanvasRenderingContext2D, i: HTMLImageElement, w: number, h: number) {
+	g.save();
+	g.filter = "blur(24px) brightness(0.7)";
+	cover(g, i, w, h);
+	g.restore();
+	const r = Math.min(w / i.naturalWidth, h / i.naturalHeight);
+	const dw = i.naturalWidth * r;
+	const dh = i.naturalHeight * r;
+	g.drawImage(i, (w - dw) / 2, (h - dh) / 2, dw, dh);
+}
+
+/** The picture repeated as a grid of six, with a thin gap between. */
+function grid(g: CanvasRenderingContext2D, i: HTMLImageElement, w: number, h: number) {
+	g.fillStyle = "#1B232B";
+	g.fillRect(0, 0, w, h);
+	const cols = 3;
+	const rows = 2;
+	const gap = 6;
+	const cw = (w - gap * (cols + 1)) / cols;
+	const ch = (h - gap * (rows + 1)) / rows;
+	for (let y = 0; y < rows; y++) for (let x = 0; x < cols; x++) {
+		const cx = gap + x * (cw + gap);
+		const cy = gap + y * (ch + gap);
+		g.save();
+		g.beginPath();
+		g.rect(cx, cy, cw, ch);
+		g.clip();
+		const r = Math.max(cw / i.naturalWidth, ch / i.naturalHeight);
+		const dw = i.naturalWidth * r;
+		const dh = i.naturalHeight * r;
+		g.drawImage(i, cx + (cw - dw) / 2, cy + (ch - dh) / 2, dw, dh);
+		g.restore();
+	}
 }
 
 /** Ready-made colours and gradients, drawn straight onto the call, so there is nothing to download. */
@@ -211,15 +265,20 @@ export interface BackgroundPrefs {
 	blur: number;
 	color: { a: string; b: string; gradient: boolean };
 	photos: string[];
+	/** How the chosen picture is laid out behind the person. */
+	fit: PhotoFit;
 }
 
 const KEY = "ss_meet_bg_v2";
-const MAX_PHOTOS = 8;
-export const DEFAULT_PREFS: BackgroundPrefs = { mode: { kind: "none" }, blur: 55, color: { a: "#0b2f3a", b: "#068297", gradient: true }, photos: [] };
+const MAX_PHOTOS = 6;
+export const DEFAULT_PREFS: BackgroundPrefs = { mode: { kind: "none" }, blur: 55, color: { a: "#0b2f3a", b: "#068297", gradient: true }, photos: [], fit: "fill" };
 
 export function loadBackgroundPrefs(): BackgroundPrefs {
+	try { return parsePrefs(JSON.parse(localStorage.getItem(KEY) || "null")); } catch { return DEFAULT_PREFS; }
+}
+
+function parsePrefs(raw: { mode?: { kind?: string; amount?: number; a?: string; b?: string; photo?: number; fit?: string }; fit?: string; blur?: number; color?: BackgroundPrefs["color"]; photos?: string[] } | null): BackgroundPrefs {
 	try {
-		const raw = JSON.parse(localStorage.getItem(KEY) || "null") as { mode?: { kind?: string; amount?: number; a?: string; b?: string; photo?: number }; blur?: number; color?: BackgroundPrefs["color"]; photos?: string[] } | null;
 		if (!raw) return DEFAULT_PREFS;
 		const photos = Array.isArray(raw.photos) ? raw.photos.filter((p) => typeof p === "string").slice(0, MAX_PHOTOS) : [];
 		const blur = typeof raw.blur === "number" ? Math.max(0, Math.min(100, raw.blur)) : DEFAULT_PREFS.blur;
@@ -228,16 +287,29 @@ export function loadBackgroundPrefs(): BackgroundPrefs {
 		let mode: BackgroundMode = { kind: "none" };
 		if (m?.kind === "blur") mode = { kind: "blur", amount: typeof m.amount === "number" ? m.amount : blur };
 		else if (m?.kind === "color" && typeof m.a === "string") mode = { kind: "color", a: m.a, b: m.b };
-		else if (m?.kind === "image" && typeof m.photo === "number" && photos[m.photo]) mode = { kind: "image", src: photos[m.photo] };
-		return { mode, blur, color, photos };
+		else if (m?.kind === "image" && typeof m.photo === "number" && photos[m.photo]) mode = { kind: "image", src: photos[m.photo], fit: asFit(m.fit) };
+		return { mode, blur, color, photos, fit: asFit(raw.fit ?? (m?.kind === "image" ? m.fit : undefined)) };
 	} catch { return DEFAULT_PREFS; }
+}
+
+const asFit = (v: unknown): PhotoFit => (v === "fit" || v === "grid" ? v : "fill");
+
+/** Everything except the pictures themselves, in the form that is stored; a chosen picture is its place in the list. */
+export function toSettings(p: BackgroundPrefs, photos = p.photos) {
+	const photo = p.mode.kind === "image" ? photos.indexOf(p.mode.src) : -1;
+	const mode = p.mode.kind === "image" ? (photo >= 0 ? { kind: "image", photo, fit: p.mode.fit ?? p.fit } : { kind: "none" }) : p.mode;
+	return { mode, blur: p.blur, color: p.color, fit: p.fit };
+}
+
+/** Settings and pictures from the account, in the same form as the ones kept on the device. */
+export function fromStored(settings: Record<string, unknown>, photos: string[]): BackgroundPrefs {
+	const raw = { ...settings, photos } as Parameters<typeof parsePrefs>[0];
+	return parsePrefs(raw);
 }
 
 export function saveBackgroundPrefs(p: BackgroundPrefs) {
 	const store = (photos: string[]) => {
-		const photo = p.mode.kind === "image" ? photos.indexOf(p.mode.src) : -1;
-		const mode = p.mode.kind === "image" ? (photo >= 0 ? { kind: "image", photo } : { kind: "none" }) : p.mode;
-		localStorage.setItem(KEY, JSON.stringify({ mode, blur: p.blur, color: p.color, photos }));
+		localStorage.setItem(KEY, JSON.stringify({ ...toSettings(p, photos), photos }));
 	};
 	try { store(p.photos); return; } catch { /* storage full: keep the newest pictures only */ }
 	try { store(p.photos.slice(0, Math.max(1, Math.floor(p.photos.length / 2)))); } catch { /* not remembered */ }
@@ -248,12 +320,17 @@ export async function optimiseBackgroundPhoto(file: File): Promise<string> {
 	const url = URL.createObjectURL(file);
 	try {
 		const img = await loadImage(url);
-		const r = Math.min(1, 1280 / img.naturalWidth, 720 / img.naturalHeight);
+		const r = Math.min(1, 960 / img.naturalWidth, 540 / img.naturalHeight);
 		const c = document.createElement("canvas");
 		c.width = Math.max(1, Math.round(img.naturalWidth * r));
 		c.height = Math.max(1, Math.round(img.naturalHeight * r));
 		c.getContext("2d")!.drawImage(img, 0, 0, c.width, c.height);
-		return c.toDataURL("image/jpeg", 0.8);
+		// WebP where the browser makes it (a third smaller), JPEG otherwise; kept small enough to travel with the account.
+		let type = "image/webp";
+		let out = c.toDataURL(type, 0.78);
+		if (!out.startsWith("data:image/webp")) { type = "image/jpeg"; out = c.toDataURL(type, 0.78); }
+		for (let q = 0.65; out.length > 120_000 && q > 0.3; q -= 0.1) out = c.toDataURL(type, q);
+		return out;
 	} finally { URL.revokeObjectURL(url); }
 }
 
