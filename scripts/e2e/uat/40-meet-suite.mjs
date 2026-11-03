@@ -37,9 +37,21 @@ const flowing = async (page, others, label) => {
 	check(`${label}: sees ${others} other camera(s) and hears them`, m.vids.filter((w) => w > 0).length >= others && m.auds.filter(Boolean).length >= others, JSON.stringify(m));
 };
 const host = await newPage(browser);
+// Every camera and microphone a page opens is remembered, so it can be checked that leaving lets them all go.
+const trackAll = (p) => p.addInitScript(() => {
+	window.__streams = [];
+	const gum = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
+	navigator.mediaDevices.getUserMedia = async (c) => { const s = await gum(c); window.__streams.push(s); return s; };
+	const gdm = navigator.mediaDevices.getDisplayMedia?.bind(navigator.mediaDevices);
+	if (gdm) navigator.mediaDevices.getDisplayMedia = async (c) => { const s = await gdm(c); window.__streams.push(s); return s; };
+});
+const liveTracks = (p) => p.evaluate(() => (window.__streams || []).flatMap((s) => s.getTracks()).filter((t) => t.readyState === "live").length);
+await trackAll(host);
 const guest = await newPage(browser);
+await trackAll(guest);
 const phone = await newPage(browser);
 const third = await newPage(browser);
+await trackAll(third);
 const auto = await newPage(browser);
 try {
 	await signIn(host, "admin");
@@ -218,6 +230,8 @@ try {
 	await row.getByRole("button", { name: "End", exact: true }).click();
 	await guest.getByRole("button", { name: "Leave call" }).waitFor({ state: "detached", timeout: 30000 });
 	check("Ending from the Meet home ends the call for everyone in it", true);
+	await guest.waitForTimeout(1500);
+	check("Ending the call lets go of the camera and microphone", (await liveTracks(guest)) === 0 && (await liveTracks(third)) === 0, `guest ${await liveTracks(guest)}, third ${await liveTracks(third)}`);
 	check("The ended call leaves the list", (await admin2.getByLabel("Meetings you started").locator("li", { hasText: code }).count()) === 0);
 } catch (e) {
 	check("Meeting suite", false, String(e).slice(0, 300));

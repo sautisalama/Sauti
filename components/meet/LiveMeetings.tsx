@@ -7,6 +7,7 @@ import { formatDistanceToNowStrict } from "date-fns";
 import { unwrap } from "@/lib/action-result";
 import { myLiveMeetings, type LiveMeeting } from "@/app/actions/mjengo-meet";
 import { endMeetingForAll } from "@/app/actions/meet-room";
+import { callStore } from "@/lib/client/call-store";
 
 /** Meetings you started that are still going on, with a way back in. Shown in Meet and on the overview. */
 export function LiveMeetings() {
@@ -16,7 +17,10 @@ export function LiveMeetings() {
 	const [confirm, setConfirm] = useState<string | null>(null);
 	const end = async (code: string) => {
 		setEnding(code);
-		try { await unwrap(endMeetingForAll(code)); setItems((cur) => (cur ?? []).filter((m) => m.code !== code)); } catch { /* stays listed; try again */ }
+		try {
+			await unwrap(endMeetingForAll(code));
+			// If this window is in that call, it leaves too, so the camera and microphone are let go here as well.
+			if (callStore.get()?.code === code) callStore.requestLeave(); setItems((cur) => (cur ?? []).filter((m) => m.code !== code)); } catch { /* stays listed; try again */ }
 		setEnding(null);
 		setConfirm(null);
 	};

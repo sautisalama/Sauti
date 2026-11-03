@@ -18,7 +18,7 @@ import {
     Search
 } from "lucide-react";
 import Link from "next/link";
-import { formatDistanceToNow } from "date-fns";
+import { differenceInCalendarDays, format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { useUser } from "@/hooks/useUser";
 import { Tables } from "@/types/db-schema";
@@ -154,18 +154,28 @@ export function AdminActivitySection() {
             .slice(0, 3);
     }, [items]);
 
+    const [clearedAt, setClearedAt] = useState<number>(0);
+    useEffect(() => {
+        try { setClearedAt(Number(localStorage.getItem("ss_admin_history_cleared") || 0)); } catch {}
+    }, []);
+    const clearHistory = () => {
+        const now = Date.now();
+        setClearedAt(now);
+        try { localStorage.setItem("ss_admin_history_cleared", String(now)); } catch {}
+    };
     const historyItems = useMemo(() => {
         return items
             .filter(i => i.status !== 'pending' && i.status !== 'under_review') // Only completed items
             .sort((a, b) => new Date(b.updatedAt || b.submittedAt).getTime() - new Date(a.updatedAt || a.submittedAt).getTime())
+            .filter(i => new Date(i.updatedAt || i.submittedAt).getTime() > clearedAt)
             .slice(0, 2);
-    }, [items]);
+    }, [items, clearedAt]);
 
     if (isLoading) {
         return <AdminActivitySkeleton />;
     }
 
-    if (newItems.length === 0 && historyItems.length === 0) {
+    if (newItems.length === 0 && historyItems.length === 0 && clearedAt === 0) {
         return <EmptyActivityState />;
     }
 
@@ -197,8 +207,17 @@ export function AdminActivitySection() {
                  <div className="flex items-center justify-between">
                     <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
                         <History className="h-5 w-5 text-gray-500" />
-                        Recent History
+                        {historyItems.length > 0 ? "Recent History" : "Management console"}
                     </h3>
+                    {historyItems.length > 0 && (
+                        <button
+                            type="button"
+                            onClick={clearHistory}
+                            className="ml-auto mr-4 text-sm font-medium text-gray-500 hover:text-gray-800 transition-colors"
+                        >
+                            Clear
+                        </button>
+                    )}
                     <Link 
                         href="/dashboard/admin/review" 
                         className="text-sm font-medium text-serene-blue-600 hover:text-serene-blue-700 flex items-center gap-1 transition-colors"
@@ -213,9 +232,16 @@ export function AdminActivitySection() {
                             <ActivityCard key={`${item.type}-${item.id}`} item={item} isNew={false} />
                         ))
                     ) : (
-                        <div className="p-6 text-center bg-gray-50/50 rounded-2xl border border-dashed border-gray-200">
-                            <p className="text-gray-500 text-sm">No recent activity history.</p>
-                        </div>
+                        <Link
+                            href="/dashboard/admin"
+                            className="flex items-center justify-between rounded-2xl border border-gray-200 bg-white p-5 transition-colors hover:bg-gray-50"
+                        >
+                            <span>
+                                <span className="block text-sm font-semibold text-gray-900">Management console</span>
+                                <span className="block text-xs text-gray-500">Reviews, matching and platform settings</span>
+                            </span>
+                            <ArrowRight className="h-4 w-4 text-gray-400" />
+                        </Link>
                     )}
                 </div>
             </div>
@@ -308,7 +334,7 @@ function ActivityCard({ item, isNew }: { item: ActivityItem, isNew: boolean }) {
                             </div>
                             <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden sm:flex items-center gap-1">
                                 <Clock className="h-3 w-3" />
-                                {formatDistanceToNow(new Date(isNew ? item.submittedAt : (item.updatedAt || item.submittedAt)), { addSuffix: true })}
+                                {when(isNew ? item.submittedAt : (item.updatedAt || item.submittedAt))}
                             </span>
                         </div>
                         
@@ -331,7 +357,7 @@ function ActivityCard({ item, isNew }: { item: ActivityItem, isNew: boolean }) {
                             )}
                             <div className="flex items-center gap-1 text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-gray-400 sm:hidden">
                                 <Clock className="h-2.5 w-2.5" />
-                                {formatDistanceToNow(new Date(isNew ? item.submittedAt : (item.updatedAt || item.submittedAt)), { addSuffix: true })}
+                                {when(isNew ? item.submittedAt : (item.updatedAt || item.submittedAt))}
                             </div>
                         </div>
                     </div>
@@ -344,6 +370,15 @@ function ActivityCard({ item, isNew }: { item: ActivityItem, isNew: boolean }) {
             </Card>
         </Link>
     );
+}
+
+/** Days, not just hours: "Today, 14:05", "Yesterday", "3 days ago · 12 Oct 2026". */
+function when(value: string | Date): string {
+    const d = new Date(value);
+    const days = differenceInCalendarDays(new Date(), d);
+    if (days <= 0) return `Today, ${format(d, "HH:mm")}`;
+    if (days === 1) return `Yesterday, ${format(d, "HH:mm")}`;
+    return `${days} days ago · ${format(d, "d MMM yyyy")}`;
 }
 
 function EmptyActivityState() {

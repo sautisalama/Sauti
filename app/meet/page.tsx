@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { getActor } from "@/lib/access/super-admin";
+import { getActor, isSuperAdminEmail } from "@/lib/access/super-admin";
 import { MeetHome } from "@/components/meet/MeetHome";
 
 export const dynamic = "force-dynamic";
@@ -7,5 +7,6 @@ export const metadata: Metadata = { title: "Meet | Sauti Salama", robots: { inde
 
 export default async function MeetIndex() {
 	const actor = await getActor();
-	return <MeetHome isAdmin={!!actor?.isAdmin} />;
+	const isSuper = !!actor && (await isSuperAdminEmail(actor.email));
+	return <MeetHome isAdmin={!!actor?.isAdmin} isSuper={isSuper} />;
 }

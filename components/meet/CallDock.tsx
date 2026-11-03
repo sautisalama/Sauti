@@ -48,7 +48,9 @@ export function CallDock() {
 	return (
 		<div
 			className={cn(
-				"overflow-hidden bg-[#0E1318] shadow-2xl transition-[width,height,border-radius] duration-200",
+				"overflow-hidden shadow-2xl transition-[width,height,border-radius] duration-200",
+				// Light until you are in: the picture-and-sound check before joining follows the chosen theme.
+				call.live ? "bg-[#0E1318]" : "bg-white",
 				floating && call.pip
 					? "fixed bottom-20 right-4 z-[60] h-12 w-[min(80vw,260px)] rounded-full border border-black/10 lg:bottom-4"
 					: floating

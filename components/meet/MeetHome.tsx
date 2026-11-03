@@ -3,12 +3,13 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { addDays, endOfDay, format, isSameDay, startOfDay, startOfWeek } from "date-fns";
-import { CalendarClock, CalendarDays, ChevronLeft, ChevronRight, Clapperboard, History, Keyboard, Link2, NotebookText, Video, Zap } from "lucide-react";
+import { CalendarClock, CalendarDays, ChevronLeft, ChevronRight, Clapperboard, History, Keyboard, Link2, NotebookText, Trash2, Video, Zap } from "lucide-react";
 import { unwrap } from "@/lib/action-result";
 import { cn } from "@/lib/utils";
 import { holidayOn } from "@/lib/mjengo/holidays-ke";
 import { createMeeting, listMeetings, meetHome, type MeetHomeItem, type MeetingRow } from "@/app/actions/mjengo-meet";
 import { LiveMeetings } from "./LiveMeetings";
+import { deleteRecording } from "@/app/actions/meet-recording";
 import { MeetChooser } from "@/app/dashboard/mjengo/_components/MeetChooser";
 
 const CODE = /[a-z0-9]{3}-[a-z0-9]{4}-[a-z0-9]{3}/i;
@@ -17,7 +18,7 @@ const CODE = /[a-z0-9]{3}-[a-z0-9]{4}-[a-z0-9]{3}/i;
 const isOver = (m: MeetHomeItem) => (m.end ? new Date(m.end).getTime() < Date.now() : new Date(m.start) < startOfDay(new Date()));
 
 /** The Meet home: join with a code, start a meeting now, later or on the calendar, and see the day's meetings. */
-export function MeetHome({ isAdmin }: { isAdmin: boolean }) {
+export function MeetHome({ isAdmin, isSuper = false }: { isAdmin: boolean; isSuper?: boolean }) {
 	const [day, setDay] = useState(() => startOfDay(new Date()));
 	const [items, setItems] = useState<MeetHomeItem[] | null>(null);
 	const [code, setCode] = useState("");
@@ -40,6 +41,18 @@ export function MeetHome({ isAdmin }: { isAdmin: boolean }) {
 		return () => { on = false; };
 	}, [day, isAdmin]);
 
+	const [removing, setRemoving] = useState<string | null>(null);
+	const [confirmDel, setConfirmDel] = useState<string | null>(null);
+	/** A super administrator deletes a recording; the call and its notes stay. */
+	const removeRecording = async (code: string) => {
+		setRemoving(code);
+		try {
+			await unwrap(deleteRecording(code));
+			setPast((cur) => (cur ?? []).map((m) => (m.code === code ? { ...m, remoteRecording: false, recordingFileId: null } : m)));
+		} catch { /* stays listed */ }
+		setRemoving(null);
+		setConfirmDel(null);
+	};
 	const [starting, setStarting] = useState(false);
 	/** Start now opens the call straight away: there is nothing to choose, so no window in between. */
 	const startNow = async () => {
@@ -146,6 +159,9 @@ export function MeetHome({ isAdmin }: { isAdmin: boolean }) {
 										{m.ended_at && !m.recordingFileId && Date.now() - new Date(m.ended_at).getTime() < 15 * 60_000 && <a href={`/meet/${m.code}`} className="flex items-center gap-1 rounded-full bg-[#068297] px-2.5 py-1 text-xs font-semibold text-white hover:bg-[#056d7e]" title="You left a few minutes ago">Rejoin <span className="opacity-80">({Math.max(1, Math.round((Date.now() - new Date(m.ended_at).getTime()) / 60000))} min ago)</span></a>}
 										{m.remoteRecording && <Link href={`/meet/${m.code}/recording`} className="flex items-center gap-1 rounded-full bg-rose-50 px-2.5 py-1 text-xs font-medium text-rose-700 hover:bg-rose-100"><Clapperboard className="h-3 w-3" /> Recording</Link>}
 										{m.recordingFileId && <Link href={`/dashboard/mjengo/vault?open=${m.recordingFileId}`} className="flex items-center gap-1 rounded-full bg-rose-50 px-2.5 py-1 text-xs font-medium text-rose-700 hover:bg-rose-100"><Clapperboard className="h-3 w-3" /> Recording</Link>}
+										{isSuper && (m.remoteRecording || m.recordingFileId) && (confirmDel === m.code ? (
+											<span className="flex items-center gap-1 text-xs"><button onClick={() => void removeRecording(m.code)} disabled={removing === m.code} className="rounded-full bg-[#ea4335] px-2.5 py-1 font-semibold text-white hover:bg-[#d93025] disabled:opacity-60">{removing === m.code ? "Deleting…" : "Delete recording"}</button><button onClick={() => setConfirmDel(null)} className="rounded-full px-2 py-1 font-medium text-serene-neutral-600 hover:bg-serene-neutral-100">Keep</button></span>
+										) : <button onClick={() => setConfirmDel(m.code)} aria-label="Delete the recording" title="Delete the recording" className="flex h-7 w-7 items-center justify-center rounded-full text-serene-neutral-500 hover:bg-rose-50 hover:text-rose-700"><Trash2 className="h-3.5 w-3.5" /></button>)}
 										{(m.hasNotes || m.lines > 0) && <Link href={`/meet/${m.code}/notes`} className="flex items-center gap-1 rounded-full bg-sauti-teal-light px-2.5 py-1 text-xs font-medium text-sauti-dark hover:bg-sauti-teal-light/70"><NotebookText className="h-3 w-3" /> {m.hasNotes ? "Notes" : "Transcript"}</Link>}
 									</span>
 								</li>

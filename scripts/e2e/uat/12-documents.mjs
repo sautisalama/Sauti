@@ -31,14 +31,16 @@ try {
 
 	// The top bar of a document.
 	await page.goto(`${BASE}/dashboard/mjengo/documents/editor?file=${docId}`, { waitUntil: "domcontentloaded" });
-	await page.getByRole("button", { name: /^File/ }).first().waitFor({ timeout: 60000 });
+	// The editor draws its own ribbon; File is its first tab.
+	const fileTab = page.getByText("File", { exact: true }).first();
+	await fileTab.waitFor({ timeout: 90000 });
 	check("Document top bar has the File menu", true);
 	check("Document top bar has Share", (await page.getByRole("button", { name: /Share/ }).count()) > 0);
 	check("Document top bar has Copy link", (await page.getByRole("button", { name: "Copy link" }).count()) > 0);
 
 	// Labels and meeting through the File menu.
-	await page.getByRole("button", { name: /^File/ }).first().click();
-	await page.getByRole("menuitem", { name: /Labels and meeting/ }).click();
+	await fileTab.click();
+	await page.getByText("Labels and meeting").first().click();
 	await page.getByPlaceholder(/Add a label/).fill("Grant report");
 	await page.keyboard.press("Enter");
 	await page.getByRole("dialog").getByRole("button", { name: "Save", exact: true }).click();

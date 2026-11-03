@@ -1352,7 +1352,7 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 									</>
 								) : (
 									<>
-										<StreamVideo stream={(presenter as Remote).stream} className="h-full w-full object-contain" />
+										<StreamVideo stream={(presenter as Remote).stream} muted className="h-full w-full object-contain" />
 										<span className="absolute left-3 top-3 rounded-md bg-black/60 px-2.5 py-1 text-sm">{presenter.name} is presenting</span>
 									</>
 								)}
@@ -1539,16 +1539,24 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 
 			{pipWin && createPortal(
 				<div className="flex h-screen w-screen flex-col bg-[#191919] text-white">
-					<div className={cn("grid min-h-0 flex-1 auto-rows-fr gap-1.5 overflow-auto p-1.5", visible.length > 0 ? "grid-cols-2" : "grid-cols-1")}>
-						{sharing && (
-							<div className="relative col-span-full min-h-[110px] overflow-hidden rounded-xl bg-black ring-2 ring-[#068297]">
-								<StreamVideo stream={screenStream.current} muted className="h-full w-full object-contain" />
-								<span className="absolute left-2 top-2 flex items-center gap-1.5 rounded-md bg-black/60 px-2 py-1 text-xs"><MonitorUp className="h-3 w-3" /> Your presentation, as others see it</span>
+					{presenter ? (
+						// Whatever is being presented has the window; the people shrink to a strip under it.
+						<div className="flex min-h-0 flex-1 flex-col gap-1.5 p-1.5">
+							<div className="relative min-h-0 flex-1 overflow-hidden rounded-xl bg-black ring-2 ring-[#068297]">
+								<StreamVideo stream={presenter.id === "me" ? screenStream.current : (presenter as Remote).stream} muted className="h-full w-full object-contain" />
+								<span className="absolute left-2 top-2 flex items-center gap-1.5 rounded-md bg-black/60 px-2 py-1 text-xs"><MonitorUp className="h-3 w-3" /> {presenter.id === "me" ? "Your presentation, as others see it" : `${presenter.name} is presenting`}</span>
 							</div>
-						)}
-						<div className="min-h-[90px]">{selfTile}</div>
-						{remotes.map((r) => <div key={r.id} className="min-h-[90px]">{tile(r)}</div>)}
-					</div>
+							<div className="flex h-[72px] shrink-0 gap-1.5 overflow-x-auto">
+								<div className="h-full w-28 shrink-0">{selfTile}</div>
+								{visible.filter((r) => r.id !== presenter.id).map((r) => <div key={r.id} className="h-full w-28 shrink-0">{tile(r)}</div>)}
+							</div>
+						</div>
+					) : (
+						<div className={cn("grid min-h-0 flex-1 auto-rows-fr gap-1.5 overflow-auto p-1.5", visible.length > 0 ? "grid-cols-2" : "grid-cols-1")}>
+							<div className="min-h-[90px]">{selfTile}</div>
+							{remotes.map((r) => <div key={r.id} className="min-h-[90px]">{tile(r)}</div>)}
+						</div>
+					)}
 					<div className="flex shrink-0 items-center justify-center gap-2 bg-[#191919] pb-2 pt-1">
 						<Ctl onClick={toggleMic} label={micOn ? "Turn off the microphone" : "Turn on the microphone"} icon={micOn ? <Mic className="h-5 w-5" /> : <MicOff className="h-5 w-5" />} danger={!micOn} />
 						<Ctl onClick={toggleCam} label={camOn ? "Turn off the camera" : "Turn on the camera"} icon={camOn ? <Video className="h-5 w-5" /> : <VideoOff className="h-5 w-5" />} danger={!camOn} />

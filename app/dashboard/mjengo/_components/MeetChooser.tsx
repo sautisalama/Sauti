@@ -130,7 +130,9 @@ export function MeetChooser({ open, onClose, initial }: { open: boolean; onClose
 		setResources((r) => (r.some((x) => x.url === url.trim()) ? r : [...r, { label: label.trim() || url.trim(), url: url.trim() }]));
 		setNewLabel(""); setNewUrl(""); setSaved(false);
 	};
+	/** Saving a booked call also puts it on the calendar, for the host and everyone invited, unless it already is. */
 	const savePlan = async () => {
+		if (!onCalendar) { await addToCalendar(); return; }
 		setBusy(true);
 		try {
 			await unwrap(saveMeetingPlan(code, { title: title.trim() || null, description, invitees: guests.split(/[,;\s]+/).filter(Boolean), resources }));

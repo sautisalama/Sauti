@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useSyncExternalStore } from "react";
 import { usePathname, useRouter } from "next/navigation";
 
 /**
@@ -21,6 +21,13 @@ export function workspaceOf(pathname: string | null | undefined): WorkspaceId | 
 	if (pathname === "/dashboard") return "personal";
 	return null; // shared pages (profile, chat, ...) belong to whichever workspace you came from
 }
+
+// The workspace a person has just picked, held until the page arrives, so the menu answers at once for every
+// workspace (admin already did through its stored flag; the suite and personal now do too).
+let pending: WorkspaceId | null = null;
+const listeners = new Set<() => void>();
+const setPending = (ws: WorkspaceId | null) => { pending = ws; listeners.forEach((l) => l()); };
+const subscribe = (l: () => void) => { listeners.add(l); return () => { listeners.delete(l); }; };
 
 const lastKey = (userId: string) => `ss_workspace:${userId}`;
 const LANDED = "ss_landed";
@@ -70,7 +77,11 @@ export function useWorkspaceSync(userId: string | null | undefined, canSwitch: b
 export function useWorkspace() {
 	const pathname = usePathname();
 	const router = useRouter();
-	let current = workspaceOf(pathname);
+	const picked = useSyncExternalStore(subscribe, () => pending, () => null);
+	const real = workspaceOf(pathname);
+	useEffect(() => { if (picked && real === picked) setPending(null); }, [picked, real]);
+	useEffect(() => { if (!picked) return; const t = setTimeout(() => setPending(null), 5000); return () => clearTimeout(t); }, [picked]);
+	let current = picked ?? real;
 	if (!current) {
 		try {
 			current = localStorage.getItem("adminMode") === "true" ? "admin" : "personal";
@@ -82,6 +93,7 @@ export function useWorkspace() {
 		(ws: WorkspaceId) => {
 			if (ws === "admin") setAdminFlag(true);
 			if (ws === "personal") setAdminFlag(false);
+			setPending(ws);
 			router.push(WORKSPACE_HOME[ws]);
 		},
 		[router]

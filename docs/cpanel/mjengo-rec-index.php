@@ -46,4 +46,11 @@ if ($action === 'get') {
   readfile($path);
   exit;
 }
+if ($action === 'delete') {
+  // Only a super administrator's signed request reaches here; a file that is already gone counts as removed.
+  if (is_file($path)) unlink($path);
+  header('Content-Type: application/json');
+  echo json_encode(['ok' => true]);
+  exit;
+}
 fail(400, 'unknown action');
