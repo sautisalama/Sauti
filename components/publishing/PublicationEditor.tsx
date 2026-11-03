@@ -146,7 +146,7 @@ export function PublicationEditor({ initial, isAdmin = true, basePath = ADMIN_BA
 		autosaving.current = true;
 		setSaveState("saving");
 		try {
-			const res = await savePublication({ ...payloadOf(c.d, c.id) });
+			const res = await savePublication({ ...payloadOf(c.d, c.id), autosave: true });
 			if (!res.ok) return;
 			setId(res.id);
 			setSlug(res.slug);

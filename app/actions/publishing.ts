@@ -25,6 +25,8 @@ import {
 export type ActionResult<T = {}> = ({ ok: true } & T) | { ok: false; error: string };
 
 export interface PublicationInput {
+	/** A background save of a draft: nothing public changes, so no page is refreshed and no history entry is added. */
+	autosave?: boolean;
 	id?: string;
 	kind: PublicationKind;
 	title: string;
@@ -126,8 +128,10 @@ export async function savePublication(input: PublicationInput): Promise<ActionRe
 			.maybeSingle();
 		if (error) return { ok: false, error: error.message };
 		if (!data) return { ok: false, error: "That item no longer exists." };
-		await logEvent(data.id, user.id, "edited");
-		revalidateAll(data.slug);
+		if (!input.autosave) {
+			await logEvent(data.id, user.id, "edited");
+			revalidateAll(data.slug);
+		}
 		return { ok: true, id: data.id, slug: data.slug, status: data.status as PublicationStatus };
 	}
 
@@ -141,7 +145,7 @@ export async function savePublication(input: PublicationInput): Promise<ActionRe
 		if (error?.code === "23505") continue; // slug raced with another insert
 		if (error) return { ok: false, error: error.message };
 		await logEvent(data.id, user.id, "created");
-		revalidateAll();
+		if (!input.autosave) revalidateAll();
 		return { ok: true, id: data.id, slug: data.slug, status: data.status as PublicationStatus };
 	}
 	return { ok: false, error: "Could not create a unique link for this title. Try a slightly different title." };

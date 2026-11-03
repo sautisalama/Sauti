@@ -49,6 +49,11 @@ export function RichEditor({
 }: RichEditorProps) {
 	const [panel, setPanel] = useState<Panel>(null);
 	const lastEmitted = useRef(value);
+	// The parent re-renders on every save and keystroke; the editor must not be reconfigured each time.
+	const onChangeRef = useRef(onChange);
+	const onUploadRef = useRef(onUploadImage);
+	onChangeRef.current = onChange;
+	onUploadRef.current = onUploadImage;
 
 	const editor = useEditor({
 		immediatelyRender: false,
@@ -96,9 +101,9 @@ export function RichEditor({
 			handlePaste(view, event) {
 				// Paste an image straight from the clipboard.
 				const file = Array.from(event.clipboardData?.files ?? []).find((f) => f.type.startsWith("image/"));
-				if (file && onUploadImage) {
+				if (file && onUploadRef.current) {
 					event.preventDefault();
-					onUploadImage(file)
+					onUploadRef.current(file)
 						.then((url) => view.dispatch(view.state.tr.replaceSelectionWith(view.state.schema.nodes.image.create({ src: url, alt: "" }))))
 						.catch(() => undefined);
 					return true;
@@ -109,7 +114,7 @@ export function RichEditor({
 		onUpdate: ({ editor }) => {
 			const html = editor.isEmpty ? "" : editor.getHTML();
 			lastEmitted.current = html;
-			onChange(html);
+			onChangeRef.current(html);
 		},
 	});
 
