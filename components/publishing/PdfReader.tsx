@@ -217,6 +217,19 @@ export function PdfReader({ url, title, coverUrl, coverAlt }: { url: string; tit
 		};
 	}, [full, mode]);
 
+	// Hide the site header while the reader fills the screen, so the document gets the room.
+	useEffect(() => {
+		const el = root.current;
+		if (!el || full || mode !== "pages") return;
+		const html = document.documentElement;
+		const io = new IntersectionObserver(([e]) => (e.intersectionRatio >= 0.6 ? html.setAttribute("data-reading", "") : html.removeAttribute("data-reading")), { threshold: [0, 0.6, 1] });
+		io.observe(el);
+		return () => {
+			io.disconnect();
+			html.removeAttribute("data-reading");
+		};
+	}, [full, mode, doc]);
+
 	const onKey = (e: React.KeyboardEvent) => {
 		if (e.key === "Escape" && full) return exit();
 		if (mode !== "pages") return;
@@ -257,7 +270,7 @@ export function PdfReader({ url, title, coverUrl, coverAlt }: { url: string; tit
 			onKeyDown={onKey}
 			aria-label={title ? `${title} (document)` : "Document"}
 			className={full ? "fixed inset-0 z-[100] flex flex-col bg-[#0f1d33] outline-none" : "-mx-4 outline-none sm:mx-0"}
-			style={full ? undefined : { scrollSnapAlign: "center", scrollMarginTop: "5rem" }}
+			style={full ? undefined : { scrollSnapAlign: "center", scrollMarginTop: "1rem" }}
 		>
 			<style>{`
 				.pdf-text-layer{position:absolute;inset:0;overflow:hidden;line-height:1;text-size-adjust:none;forced-color-adjust:none;transform-origin:0 0}

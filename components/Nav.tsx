@@ -85,7 +85,7 @@ export function Nav() {
 	const isActive = (path: string) => pathname === path;
 
 	return (
-		<header className={`${pathname.startsWith("/learn") ? "relative" : "sticky top-0"} z-50 w-full border-b-2 border-gray-100 bg-white/98 backdrop-blur h-20 md:h-24 flex items-center shadow-sm`}>
+		<header data-site-nav className={`${pathname.startsWith("/learn") ? "relative" : "sticky top-0"} z-50 w-full border-b-2 border-gray-100 bg-white/98 backdrop-blur h-20 md:h-24 flex items-center shadow-sm`}>
 			<div className="container w-full max-w-[100vw] flex items-center justify-between px-6 xl:px-8 2xl:px-12 relative">
 				{/* Extreme Left: Logo */}
 				<Link href="/" className="flex items-center gap-2 shrink-0">

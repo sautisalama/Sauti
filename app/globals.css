@@ -885,3 +885,8 @@ html.dark hr { border-color: #1f2b30; }
 .role-icon-dark { display: none; }
 html.dark .role-icon-dark { display: block; }
 html.dark .role-icon-light { display: none; }
+
+/* While a document is being read (the PDF reader has snapped into view), the site header steps out of the way. */
+[data-site-nav] { transition: transform .25s ease; }
+html[data-reading] [data-site-nav] { transform: translateY(-100%); }
+@media (prefers-reduced-motion: reduce) { [data-site-nav] { transition: none; } }
