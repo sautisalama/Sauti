@@ -202,12 +202,13 @@ export function AdminActivitySection() {
                 </div>
             )}
 
-            {/* History Section */}
+            {/* History Section: gone once cleared, the Management Console below takes its place */}
+            {(historyItems.length > 0 || clearedAt === 0) && (
             <div className="space-y-4">
                  <div className="flex items-center justify-between">
                     <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
                         <History className="h-5 w-5 text-gray-500" />
-                        {historyItems.length > 0 ? "Recent History" : "Management console"}
+                        Recent History
                     </h3>
                     {historyItems.length > 0 && (
                         <button
@@ -232,19 +233,13 @@ export function AdminActivitySection() {
                             <ActivityCard key={`${item.type}-${item.id}`} item={item} isNew={false} />
                         ))
                     ) : (
-                        <Link
-                            href="/dashboard/admin"
-                            className="flex items-center justify-between rounded-2xl border border-gray-200 bg-white p-5 transition-colors hover:bg-gray-50"
-                        >
-                            <span>
-                                <span className="block text-sm font-semibold text-gray-900">Management console</span>
-                                <span className="block text-xs text-gray-500">Reviews, matching and platform settings</span>
-                            </span>
-                            <ArrowRight className="h-4 w-4 text-gray-400" />
-                        </Link>
+                        <div className="p-6 text-center bg-gray-50/50 rounded-2xl border border-dashed border-gray-200">
+                            <p className="text-gray-500 text-sm">No recent activity history.</p>
+                        </div>
                     )}
                 </div>
             </div>
+            )}
         </div>
     );
 }
