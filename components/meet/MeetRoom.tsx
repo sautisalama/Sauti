@@ -381,6 +381,9 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 	};
 
 	beginRef.current = begin;
+	const [pipWin, setPipWin] = useState<Window | null>(null);
+	const pipRef = useRef<Window | null>(null);
+	useEffect(() => { pipRef.current = pipWin; }, [pipWin]);
 	// Your own picture is never played back to you: the muted flag is set on the element itself, since React only sets it when the element is first made.
 	useEffect(() => { if (joined && localVideo.current && local.current) { localVideo.current.muted = true; localVideo.current.srcObject = local.current; } }, [joined, camOn, sharing, pipWin]);
 
@@ -470,9 +473,6 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 	 * screen, and stays on top while people work elsewhere. The tiles move into it (they are only ever drawn in one
 	 * place, so no one is heard twice) with the mic, camera and leave controls under them.
 	 */
-	const [pipWin, setPipWin] = useState<Window | null>(null);
-	const pipRef = useRef<Window | null>(null);
-	useEffect(() => { pipRef.current = pipWin; }, [pipWin]);
 	const openFloating = async (): Promise<boolean> => {
 		const dpip = (window as unknown as { documentPictureInPicture?: { requestWindow: (o: { width: number; height: number }) => Promise<Window> } }).documentPictureInPicture;
 		if (!dpip) return false;
