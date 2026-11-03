@@ -174,6 +174,11 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 
 	const addLine = useCallback((l: TranscriptLine) => setLines((cur) => (cur.some((x) => x.id === l.id) ? cur : [...cur, l])), []);
 	const send = useCallback((event: string, payload: Record<string, unknown>) => { channel.current?.send({ type: "broadcast", event, payload }).catch(() => undefined); }, []);
+	/** Change someone who is already in the call. Unlike setRemote it never adds anyone, so a late message from a person
+	 *  who has left cannot bring back an empty "Guest" tile that cannot be removed. */
+	const patchRemote = useCallback((id: string, patch: Partial<Remote>) => {
+		setRemotes((cur) => (cur.some((r) => r.id === id) ? cur.map((r) => (r.id === id ? { ...r, ...patch } : r)) : cur));
+	}, []);
 	const setRemote = useCallback((id: string, patch: Partial<Remote>) => {
 		setRemotes((cur) => {
 			if (cur.some((r) => r.id === id)) return cur.map((r) => (r.id === id ? { ...r, ...patch } : r));
@@ -339,7 +344,7 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 		setRemote(peer.id, { name: peer.name, companion: peer.companion, uid: peer.uid });
 		local.current?.getTracks().forEach((t) => pc.addTrack(t, local.current!));
 		if (!local.current?.getVideoTracks().length) pc.addTransceiver("video", { direction: "recvonly" });
-		pc.ontrack = (e) => setRemote(peer.id, { stream: e.streams[0] });
+		pc.ontrack = (e) => patchRemote(peer.id, { stream: e.streams[0] });
 		pc.onicecandidate = (e) => { if (e.candidate) send("signal", { from: myId.current, to: peer.id, kind: "ice" as SignalKind, data: e.candidate.toJSON() }); };
 		pc.onconnectionstatechange = () => {
 			const states = [...pcs.current.values()].map((x) => x.connectionState);
@@ -426,7 +431,7 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 				setRemotes((cur) => cur.filter((r) => r.id !== id));
 			})
 			.on("broadcast", { event: "rec" }, ({ payload }) => setRecBy(payload.on ? String(payload.by ?? "Someone") : null))
-			.on("broadcast", { event: "state" }, ({ payload }) => setRemote(payload.id, { muted: !!payload.muted, sharing: !!payload.sharing, hand: !!payload.hand, notes: !!payload.notes, cam: payload.cam !== false, handAt: payload.hand ? Date.now() : undefined }))
+			.on("broadcast", { event: "state" }, ({ payload }) => patchRemote(payload.id, { muted: !!payload.muted, sharing: !!payload.sharing, hand: !!payload.hand, notes: !!payload.notes, cam: payload.cam !== false, handAt: payload.hand ? Date.now() : undefined }))
 			.on("broadcast", { event: "pin" }, ({ payload }) => setChat((cur) => cur.map((x) => (x.id === payload.id ? { ...x, pinned: !!payload.pinned } : x))))
 			.on("broadcast", { event: "chat" }, ({ payload }) => {
 				const l = payload as ChatMsg;
@@ -446,7 +451,7 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 			.on("broadcast", { event: "cohost" }, ({ payload }) => {
 					const c = payload as { id: string; ht: string };
 					if (String(c.ht).split(".")[1] !== String(c.id)) return;
-					void unwrap(verifyHostToken(code, c.ht)).then((ok) => { if (ok) { hostIds.current.add(String(c.id)); setRemote(String(c.id), { host: true }); } }).catch(() => undefined);
+					void unwrap(verifyHostToken(code, c.ht)).then((ok) => { if (ok) { hostIds.current.add(String(c.id)); patchRemote(String(c.id), { host: true }); } }).catch(() => undefined);
 				})
 				.on("broadcast", { event: "react" }, ({ payload }) => showReaction(String(payload.id), String(payload.emoji).slice(0, 8), String(payload.name ?? "Someone")))
 			.on("broadcast", { event: "docs" }, () => { void refreshDocsRef.current(); })
@@ -473,13 +478,13 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 				// Not yet known as a host (the check on their join may still be on its way): the proof they send is checked now.
 				const ht = typeof payload.ht === "string" ? payload.ht : "";
 				if (!ht || ht.split(".")[1] !== from) return;
-				void unwrap(verifyHostToken(code, ht)).then((ok) => { if (ok) { hostIds.current.add(from); setRemote(from, { host: true }); run(); } }).catch(() => undefined);
+				void unwrap(verifyHostToken(code, ht)).then((ok) => { if (ok) { hostIds.current.add(from); patchRemote(from, { host: true }); run(); } }).catch(() => undefined);
 			})
 			.on("presence", { event: "join" }, ({ key, newPresences }) => {
 				if (key === myId.current) return;
 				const p = newPresences[0] as unknown as { name?: string; companion?: boolean; uid?: string | null; host?: boolean; ht?: string };
 				// Someone who says they are the host is believed only after the server confirms it.
-				if (p?.ht) void unwrap(verifyHostToken(code, p.ht)).then((ok) => { if (ok) { hostIds.current.add(key); setRemote(key, { host: true }); } }).catch(() => undefined);
+				if (p?.ht) void unwrap(verifyHostToken(code, p.ht)).then((ok) => { if (ok) { hostIds.current.add(key); patchRemote(key, { host: true }); } }).catch(() => undefined);
 				connect({ id: key, name: p?.name ?? "Guest", companion: p?.companion, uid: p?.uid }, true);
 				
 				// The newcomer is told how this device is now once it is listening.
@@ -781,7 +786,7 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 		const t = setInterval(poll, 3500);
 		return () => { on = false; clearInterval(t); };
 			}, [joined, code, cohostToken]);
-	const addCohost = (peerId: string) => { void unwrap(makeCohost(code, peerId)).then((token) => { send("ctl", { from: myId.current, to: peerId, action: "cohost", token }); setRemote(peerId, { host: true }); hostIds.current.add(peerId); }).catch(() => undefined); };
+	const addCohost = (peerId: string) => { void unwrap(makeCohost(code, peerId)).then((token) => { send("ctl", { from: myId.current, to: peerId, action: "cohost", token }); patchRemote(peerId, { host: true }); hostIds.current.add(peerId); }).catch(() => undefined); };
 	const hostCtl = (to: string, action: "mute" | "remove" | "end") => {
 		const say = () => send("ctl", { from: myId.current, to, action, at: Date.now(), ht: myHt.current });
 		say();
@@ -862,6 +867,27 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 		if (!navigator.onLine) markLost();
 		return () => { window.removeEventListener("offline", off); window.removeEventListener("online", on); };
 	}, [joined, markLost, markOk]);
+
+	// Anyone shown in the call who is no longer in the room is taken off the screen, so nobody lingers as a stuck tile.
+	useEffect(() => {
+		if (!joined) return;
+		// Someone is only taken off after they are missing from the room on two checks in a row, so a person who is
+		// still connecting is never dropped by mistake.
+		let missed = new Set<string>();
+		const t = setInterval(() => {
+			const ch = channel.current;
+			if (!ch) return;
+			const here = Object.keys(ch.presenceState());
+			if (!here.includes(myId.current)) return;
+			const now = new Set(remotesRef.current.filter((r) => !here.includes(r.id)).map((r) => r.id));
+			const drop = [...now].filter((id) => missed.has(id));
+			missed = now;
+			if (!drop.length) return;
+			for (const id of drop) { pcs.current.get(id)?.close(); pcs.current.delete(id); hostIds.current.delete(id); }
+			setRemotes((cur) => cur.filter((r) => !drop.includes(r.id)));
+		}, 6000);
+		return () => clearInterval(t);
+	}, [joined]);
 
 	const home = canSave ? "/meet" : "/";
 	useEffect(() => {
@@ -1520,19 +1546,19 @@ function BackgroundPicker({ bg, busy, note, customs, onPick, onUpload, light }: 
 		<div>
 			<span className={cn("mb-1 flex items-center gap-1.5 text-xs", light ? "text-[#5f6368]" : "text-white/70")}><Sparkles className="h-3.5 w-3.5" /> Background {busy && <Loader2 className="h-3 w-3 animate-spin" />}</span>
 			<div className="flex gap-2 overflow-x-auto pb-1">
+				<label className={cn(tile(false), "cursor-pointer flex-col gap-0.5", light ? "bg-white text-[#068297]" : "bg-white/10")}>
+					<ImagePlus className="h-4 w-4" /> Your photo
+					<input type="file" accept="image/*" className="sr-only" onChange={(e) => { onUpload(e.target.files?.[0]); e.target.value = ""; }} />
+				</label>
+				{customs.map((c) => (
+					<button key={c} type="button" disabled={busy} aria-label="Your picture" onClick={() => onPick({ kind: "image", src: c })} className={tile(bg.kind === "image" && bg.src === c)} style={{ backgroundImage: `url(${c})`, backgroundSize: "cover", backgroundPosition: "center" }} />
+				))}
 				<button type="button" disabled={busy} onClick={() => onPick({ kind: "none" })} className={cn(tile(on({ kind: "none" })), light ? "bg-white text-[#3c4043]" : "bg-white/10")}>None</button>
 				<button type="button" disabled={busy} onClick={() => onPick({ kind: "blur", strength: "light" })} className={cn(tile(on({ kind: "blur", strength: "light" })), light ? "bg-[#e8eaed] text-[#3c4043]" : "bg-white/20")}>Blur</button>
 				<button type="button" disabled={busy} onClick={() => onPick({ kind: "blur", strength: "strong" })} className={cn(tile(on({ kind: "blur", strength: "strong" })), light ? "bg-[#dadce0] text-[#3c4043]" : "bg-white/30")}>More blur</button>
 				{PRESET_BACKGROUNDS.map((p) => (
 					<button key={p.id} type="button" disabled={busy} aria-label={`${p.label} background`} onClick={() => onPick({ kind: "image", src: presetImage(p.id) })} className={tile(bg.kind === "image" && bg.src.startsWith("data:") && bg.src === presetImage(p.id))} style={{ background: `linear-gradient(135deg, ${p.colours[0]}, ${p.colours[1]})` }}><span className="rounded bg-black/40 px-1 text-white">{p.label}</span></button>
 				))}
-				{customs.map((c) => (
-					<button key={c} type="button" disabled={busy} aria-label="Your picture" onClick={() => onPick({ kind: "image", src: c })} className={tile(bg.kind === "image" && bg.src === c)} style={{ backgroundImage: `url(${c})`, backgroundSize: "cover", backgroundPosition: "center" }} />
-				))}
-				<label className={cn(tile(false), "cursor-pointer flex-col gap-0.5", light ? "bg-white text-[#068297]" : "bg-white/10")}>
-					<ImagePlus className="h-4 w-4" /> Upload
-					<input type="file" accept="image/*" className="sr-only" onChange={(e) => { onUpload(e.target.files?.[0]); e.target.value = ""; }} />
-				</label>
 			</div>
 			<p className={cn("mt-1 text-[11px]", light ? "text-[#5f6368]" : "text-white/50")}>{note || "The effect is made on your device, before anyone sees your camera."}</p>
 		</div>
@@ -1589,9 +1615,37 @@ function RemoteAudio({ stream, sinkId, on }: { stream: MediaStream; sinkId: stri
 function RemoteTile({ r, sinkId, audioOn, reaction, pinned, onPin }: { r: Remote; sinkId: string; audioOn: boolean; reaction?: string; pinned: boolean; onPin: () => void }) {
 	const ref = useRef<HTMLVideoElement>(null);
 	// The other person's own word on their camera wins: a switched-off camera still sends black frames.
+	// A received track starts out "muted" until its first picture arrives; the tile redraws the moment that happens
+	// (and when tracks are added, stopped or switched), instead of waiting for some other update to come along.
+	const [, redraw] = useState(0);
+	useEffect(() => {
+		const stream = r.stream;
+		const el = ref.current;
+		if (!stream) return;
+		const bump = () => redraw((n) => n + 1);
+		const watch = (t: MediaStreamTrack) => { t.addEventListener("unmute", bump); t.addEventListener("mute", bump); t.addEventListener("ended", bump); };
+		const unwatch = (t: MediaStreamTrack) => { t.removeEventListener("unmute", bump); t.removeEventListener("mute", bump); t.removeEventListener("ended", bump); };
+		const added = (e: MediaStreamTrackEvent) => { watch(e.track); bump(); };
+		stream.getVideoTracks().forEach(watch);
+		stream.addEventListener("addtrack", added);
+		stream.addEventListener("removetrack", bump);
+		el?.addEventListener("playing", bump);
+		el?.addEventListener("loadeddata", bump);
+		bump();
+		return () => {
+			stream.getVideoTracks().forEach(unwatch);
+			stream.removeEventListener("addtrack", added);
+			stream.removeEventListener("removetrack", bump);
+			el?.removeEventListener("playing", bump);
+			el?.removeEventListener("loadeddata", bump);
+		};
+	}, [r.stream]);
 	const hasVideo = r.cam !== false && !!r.stream?.getVideoTracks().some((t) => t.readyState === "live" && !t.muted);
 	const speaking = useSpeaking(r.stream, r.muted);
-	useEffect(() => { if (ref.current && r.stream) ref.current.srcObject = r.stream; }, [r.stream]);
+	useEffect(() => {
+		const el = ref.current;
+		if (el && r.stream) { el.srcObject = r.stream; void el.play().catch(() => undefined); }
+	}, [r.stream]);
 	useEffect(() => {
 		const el = ref.current as (HTMLVideoElement & { setSinkId?: (id: string) => Promise<void> }) | null;
 		if (el?.setSinkId && sinkId) el.setSinkId(sinkId).catch(() => undefined);
