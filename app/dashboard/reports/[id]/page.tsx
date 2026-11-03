@@ -660,10 +660,8 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
 		const { error } = await supabase.from("reports").update({ notes: content }).eq("report_id", reportId);
 		if (error) {
 			toast({ title: "Unable to save notes", description: error.message, variant: "destructive" });
-		} else {
-			toast({ title: "Notes saved", description: "Your private notes have been saved securely." });
-			fetchReport();
 		}
+		// A background save: the editor already shows the text, so no toast and no reload of the page.
 	};
 
 	const currentMatch = allMatches[matchIndex];

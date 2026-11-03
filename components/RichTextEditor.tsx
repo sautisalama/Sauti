@@ -53,8 +53,10 @@ export function RichTextEditor({
 		return () => { isMountedRef.current = false; };
 	}, []);
 
+	const lastHtmlRef = useRef(content);
 	const doSave = useCallback(async (html: string) => {
 		if (!onSave) return;
+		lastHtmlRef.current = html;
 		setSaveStatus('saving');
 		try {
 			await onSave(html);
@@ -116,8 +118,10 @@ export function RichTextEditor({
 
 	// Sync external content changes
 	useEffect(() => {
-		if (editor && content !== editor.getHTML() && saveStatus !== 'unsaved') {
-			editor.commands.setContent(content);
+		// Only content that came from outside is loaded; what the person typed (and we saved) is already here.
+		if (editor && content !== lastHtmlRef.current && content !== editor.getHTML() && saveStatus !== 'unsaved') {
+			lastHtmlRef.current = content;
+			editor.commands.setContent(content, { emitUpdate: false });
 		}
 	}, [content, editor]);
 
