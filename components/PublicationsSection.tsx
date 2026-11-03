@@ -7,14 +7,15 @@ import type { FeedItem } from "@/lib/content/feed";
 /**
  * Homepage Publications.
  *
- * One card per publication (image and words together, the whole card is the link). The newest
- * leads as a large card; the next two sit beside it as compact cards, so the section stays short
- * and every item shows its image, type, date, reading time and a clear summary.
+ * Five publications, one card each (image and words together, the whole card is the link). The
+ * newest leads as a large card with two compact cards beside it; the next two sit below as a pair.
+ * Every card shows its image, type, date and a clear summary.
  */
 export function PublicationsSection({ items }: { items: FeedItem[] }) {
 	const [first, ...rest] = items;
 	if (!first) return null;
 	const side = rest.slice(0, 2);
+	const more = rest.slice(2, 4);
 
 	return (
 		<section id="publications" className="bg-[#f8f9fb] py-12 md:py-24" aria-labelledby="publications-heading">
@@ -38,6 +39,14 @@ export function PublicationsSection({ items }: { items: FeedItem[] }) {
 						</div>
 					)}
 				</div>
+
+				{more.length > 0 && (
+					<div className={`mt-6 grid gap-6 lg:mt-8 lg:gap-8 ${more.length > 1 ? "md:grid-cols-2" : "mx-auto max-w-3xl"}`}>
+						{more.map((item) => (
+							<MediumCard key={item.slug} item={item} />
+						))}
+					</div>
+				)}
 
 				<div className="mt-10 flex justify-center md:mt-16">
 					<Link
@@ -118,6 +127,24 @@ function CompactCard({ item }: { item: FeedItem }) {
 				<Meta item={item} />
 				<TitleLink item={item} className="mb-2 text-lg font-bold leading-snug text-[#1a365d] transition-colors group-hover:text-sauti-orange md:text-xl" />
 				<p className="mb-4 line-clamp-3 flex-1 text-sm leading-relaxed text-gray-500">{item.summary}</p>
+				<span className="inline-flex items-center gap-2 text-sm font-bold text-[#1a365d] transition-all group-hover:gap-3 group-hover:text-sauti-orange">
+					Read <ArrowRight className="h-4 w-4" aria-hidden />
+				</span>
+			</div>
+		</article>
+	);
+}
+
+function MediumCard({ item }: { item: FeedItem }) {
+	return (
+		<article className="group relative flex flex-col overflow-hidden rounded-2xl bg-white shadow-lg transition-shadow duration-500 hover:shadow-2xl">
+			<div className="relative aspect-video overflow-hidden bg-gradient-to-br from-[#1a365d] to-sauti-teal">
+				<Thumb item={item} sizes="(min-width: 768px) 50vw, 100vw" />
+			</div>
+			<div className="flex flex-1 flex-col p-6 md:p-8">
+				<Meta item={item} />
+				<TitleLink item={item} className="mb-3 text-xl font-bold leading-snug text-[#1a365d] transition-colors group-hover:text-sauti-orange md:text-2xl" />
+				<p className="mb-5 line-clamp-3 flex-1 text-base leading-relaxed text-gray-500">{item.summary}</p>
 				<span className="inline-flex items-center gap-2 text-sm font-bold text-[#1a365d] transition-all group-hover:gap-3 group-hover:text-sauti-orange">
 					Read <ArrowRight className="h-4 w-4" aria-hidden />
 				</span>

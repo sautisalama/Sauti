@@ -19,6 +19,6 @@ export const metadata: Metadata = {
 };
 
 export default async function Home() {
-	const publications = await getFeed({ limit: 3 });
+	const publications = await getFeed({ limit: 5 });
 	return <LandingPage publications={publications} />;
 }
