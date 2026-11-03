@@ -58,13 +58,13 @@ export function ArticleView({ title, summary, category, kindLabel, coverUrl, cov
 				{summary && <p className="mt-4 text-lg font-medium leading-relaxed text-gray-600 md:text-xl">{summary}</p>}
 			</header>
 
-			{coverUrl && (
+			{coverUrl && !pdfUrl && (
 				// eslint-disable-next-line @next/next/no-img-element
 				<img src={coverUrl} alt={coverAlt ?? ""} className="mb-10 aspect-video w-full rounded-2xl object-cover shadow-xl" />
 			)}
 
 			{pdfUrl ? (
-				<PdfReader url={pdfUrl} title={title} />
+				<PdfReader url={pdfUrl} title={title} coverUrl={coverUrl} coverAlt={coverAlt} />
 			) : bodyHtml ? (
 				<div className="rich-content" dangerouslySetInnerHTML={{ __html: bodyHtml }} />
 			) : (

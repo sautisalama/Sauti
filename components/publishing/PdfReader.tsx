@@ -81,7 +81,7 @@ function PdfPage({ doc, index, width, maxHeight, eager, onVisible }: { doc: PdfD
  * The PDF shown as the post itself. Click it to read full page, like an e-book: scroll the pages,
  * or flip them one at a time (swipe, arrow keys, edge buttons). An Exit button always leaves.
  */
-export function PdfReader({ url, title }: { url: string; title: string }) {
+export function PdfReader({ url, title, coverUrl, coverAlt }: { url: string; title: string; coverUrl?: string | null; coverAlt?: string | null }) {
 	const root = useRef<HTMLElement>(null);
 	const measure = useRef<HTMLDivElement>(null);
 	const [doc, setDoc] = useState<PdfDoc | null>(null);
@@ -89,7 +89,7 @@ export function PdfReader({ url, title }: { url: string; title: string }) {
 	const [vh, setVh] = useState(800);
 	const [failed, setFailed] = useState(false);
 	const [full, setFull] = useState(false);
-	const [mode, setMode] = useState<Mode>("scroll");
+	const [mode, setMode] = useState<Mode>("pages");
 	const [current, setCurrent] = useState(0);
 	const touch = useRef<{ x: number; y: number; t: number } | null>(null);
 	const total = doc?.numPages ?? 0;
@@ -175,6 +175,48 @@ export function PdfReader({ url, title }: { url: string; title: string }) {
 		};
 	}, [full]);
 
+	// Pages mode: the wheel turns pages. One flip per gesture (trackpad inertia is ignored), and at the
+	// first or last page the wheel is handed back to the article so the reader never traps the scroll.
+	const stage = useRef<HTMLDivElement>(null);
+	const wheelState = useRef({ last: 0, locked: false });
+	const live = useRef({ current: 0, total: 0, go: (_: number) => {} });
+	live.current = { current, total, go };
+	useEffect(() => {
+		const el = stage.current;
+		if (!el || mode !== "pages") return;
+		const onWheel = (e: WheelEvent) => {
+			if (e.ctrlKey || Math.abs(e.deltaY) < Math.abs(e.deltaX)) return;
+			const { current: c, total: t, go: flip } = live.current;
+			const dir = e.deltaY > 0 ? 1 : -1;
+			if ((dir > 0 && c >= t - 1) || (dir < 0 && c <= 0)) return;
+			e.preventDefault();
+			const now = performance.now();
+			const w = wheelState.current;
+			if (w.locked && now - w.last < 140) {
+				w.last = now;
+				return;
+			}
+			w.locked = false;
+			if (Math.abs(e.deltaY) < 8) return;
+			w.locked = true;
+			w.last = now;
+			flip(c + dir);
+		};
+		el.addEventListener("wheel", onWheel, { passive: false });
+		return () => el.removeEventListener("wheel", onWheel);
+	}, [mode, doc]);
+
+	// Scrolling the article settles on the reader once it comes near, instead of passing through it.
+	useEffect(() => {
+		if (full || mode !== "pages") return;
+		const html = document.documentElement;
+		const prev = html.style.scrollSnapType;
+		html.style.scrollSnapType = "y proximity";
+		return () => {
+			html.style.scrollSnapType = prev;
+		};
+	}, [full, mode]);
+
 	const onKey = (e: React.KeyboardEvent) => {
 		if (e.key === "Escape" && full) return exit();
 		if (mode !== "pages") return;
@@ -204,7 +246,8 @@ export function PdfReader({ url, title }: { url: string; title: string }) {
 		if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.6 && Date.now() - s.t < 900) go(current + (dx < 0 ? 1 : -1));
 	};
 
-	const fitHeight = mode === "pages" ? (full ? vh - 120 : Math.round(vh * 0.8)) : undefined;
+	// Pages are 20% larger than a plain fit so the text is comfortable to read, not just to see.
+	const fitHeight = mode === "pages" ? (full ? Math.min(Math.round((vh - 120) * 1.2), vh - 64) : Math.round(vh * 0.96)) : undefined;
 	const btn = full ? "text-white/90 hover:bg-white/10" : "text-[#1a365d] hover:bg-[#1a365d]/5";
 
 	return (
@@ -214,6 +257,7 @@ export function PdfReader({ url, title }: { url: string; title: string }) {
 			onKeyDown={onKey}
 			aria-label={title ? `${title} (document)` : "Document"}
 			className={full ? "fixed inset-0 z-[100] flex flex-col bg-[#0f1d33] outline-none" : "-mx-4 outline-none sm:mx-0"}
+			style={full ? undefined : { scrollSnapAlign: "center", scrollMarginTop: "5rem" }}
 		>
 			<style>{`
 				.pdf-text-layer{position:absolute;inset:0;overflow:hidden;line-height:1;text-size-adjust:none;forced-color-adjust:none;transform-origin:0 0}
@@ -224,9 +268,19 @@ export function PdfReader({ url, title }: { url: string; title: string }) {
 				@media (prefers-reduced-motion:reduce){.pdf-flip{animation:none}}
 			`}</style>
 
+			{coverUrl && !full && (
+				<button type="button" onClick={enter} className="group relative mb-8 block w-full overflow-hidden text-left sm:rounded-2xl" aria-label="Read the document full page">
+					{/* eslint-disable-next-line @next/next/no-img-element */}
+					<img src={coverUrl} alt={coverAlt ?? ""} className="aspect-video w-full object-cover shadow-xl transition-transform duration-500 group-hover:scale-[1.02]" />
+					<span className="absolute inset-x-0 bottom-0 flex items-center justify-center gap-2 bg-gradient-to-t from-[#0f1d33]/80 to-transparent px-4 pb-4 pt-12 text-sm font-bold text-white">
+						<Maximize2 className="h-4 w-4" aria-hidden /> Read the document
+					</span>
+				</button>
+			)}
+
 			<div className={`flex items-center justify-between gap-2 px-4 py-2 ${full ? "text-white sm:px-6" : "mb-3 text-[#1a365d] sm:px-0"}`}>
 				<div className="flex items-center gap-1" role="group" aria-label="Reading mode">
-					{(["scroll", "pages"] as const).map((m) => (
+					{(["pages", "scroll"] as const).map((m) => (
 						<button key={m} type="button" onClick={() => setReadingMode(m)} aria-pressed={mode === m} className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold ${mode === m ? (full ? "bg-white/15" : "bg-[#008080] text-white") : btn}`}>
 							{m === "scroll" ? <GalleryVertical className="h-4 w-4" aria-hidden /> : <BookOpen className="h-4 w-4" aria-hidden />}
 							{m === "scroll" ? "Scroll" : "Pages"}
@@ -252,13 +306,14 @@ export function PdfReader({ url, title }: { url: string; title: string }) {
 
 			<div
 				className={full ? `relative min-h-0 flex-1 px-2 pb-4 sm:px-6 ${mode === "scroll" ? "overflow-y-auto overscroll-contain" : "flex items-center justify-center overflow-hidden"}` : "relative cursor-zoom-in"}
+				ref={stage}
 				onClick={openFromClick}
 				onTouchStart={onTouchStart}
 				onTouchEnd={onTouchEnd}
 				style={{ touchAction: mode === "pages" ? "pan-y pinch-zoom" : undefined }}
 				title={full ? undefined : "Click to read full page"}
 			>
-				<div ref={measure} className={`mx-auto w-full ${full ? "max-w-5xl" : ""}`}>
+				<div ref={measure} className={`mx-auto w-full ${full ? (mode === "pages" ? "max-w-[76.8rem]" : "max-w-5xl") : ""}`} style={!full && mode === "pages" ? { width: "120%", maxWidth: "calc(100vw - 2rem)", position: "relative", left: "50%", transform: "translateX(-50%)" } : undefined}>
 					{failed ? (
 						<p className="rounded-xl border border-gray-200 bg-[#f8f9fb] p-6 text-gray-600">
 							The document couldn’t be shown here. <a className="font-semibold text-sauti-teal underline" href={url} target="_blank" rel="noopener noreferrer">Open the PDF</a> to read it.
