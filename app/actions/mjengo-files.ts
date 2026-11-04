@@ -13,7 +13,7 @@ import {
 
 const BUCKET = 'mjengo-docs';
 
-export interface RecentFile { id: string; name: string; location: string; opened: string; size: number; driveLink: string | null; level: Level; ownerId: string; mime: string | null }
+export interface RecentFile { id: string; name: string; location: string; opened: string; size: number; driveLink: string | null; level: Level; ownerId: string; mime: string | null; people: string[] }
 export interface FilesHub {
   recent: RecentFile[];
   drive: { connected: boolean; email: string | null; folders: DriveFolder[]; error: string | null; available: boolean };
@@ -37,6 +37,7 @@ async function filesHub_(): Promise<FilesHub> {
       level: (levelFor(ix, a.id, 'file', f.id, oversight) ?? 'view') as Level,
       ownerId: f.owner_id,
       mime: f.mime,
+      people: [...new Set([f.owner_id, ...ix.perms.filter((p) => p.resource_type === 'file' && p.resource_id === f.id).map((p) => p.user_id)])],
     }));
 
   const available = !!process.env.GOOGLE_CLIENT_ID && !!process.env.GOOGLE_CLIENT_SECRET;

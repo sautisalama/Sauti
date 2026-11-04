@@ -26,6 +26,9 @@ export interface ContactRow {
   /** Your own part in it. */
   mine: 'owner' | 'edit' | 'view' | 'team';
   sharedWith: number;
+  /** Everyone who has it: the whole team, or its owner and the people it was shared with. */
+  everyone: boolean;
+  people: string[];
 }
 
 export interface ContactInput {
@@ -69,13 +72,13 @@ async function visible(actor: { id: string; email: string }) {
   return { access, oversight };
 }
 
-function shape(row: Record<string, unknown>, actor: { id: string }, access: Map<string, 'view' | 'edit'>, shared: Map<string, number>, oversight: boolean): ContactRow | null {
+function shape(row: Record<string, unknown>, actor: { id: string }, access: Map<string, 'view' | 'edit'>, shared: Map<string, string[]>, oversight: boolean): ContactRow | null {
   const id = row.id as string;
   const owner = row.created_by === actor.id;
   const vis = (row.visibility as 'team' | 'private') ?? 'team';
   const lvl = access.get(id);
   if (vis === 'private' && !owner && !lvl && !oversight) return null;
-  return { ...(row as unknown as ContactRow), visibility: vis, mine: owner ? 'owner' : lvl ?? (vis === 'team' ? 'team' : oversight ? 'edit' : 'view'), sharedWith: shared.get(id) ?? 0 };
+  return { ...(row as unknown as ContactRow), visibility: vis, mine: owner ? 'owner' : lvl ?? (vis === 'team' ? 'team' : oversight ? 'edit' : 'view'), sharedWith: (shared.get(id) ?? []).length, everyone: vis === 'team', people: [...new Set([row.created_by as string | null, ...(shared.get(id) ?? [])].filter(Boolean) as string[])] };
 }
 
 async function listContacts_(q = ''): Promise<ContactRow[]> {
@@ -86,9 +89,9 @@ async function listContacts_(q = ''): Promise<ContactRow[]> {
   if (term) query = query.or(`name.ilike.%${term}%,email.ilike.%${term}%,organisation.ilike.%${term}%,tags.cs.{${term.toLowerCase()}}`);
   const [{ data, error }, v] = await Promise.all([query, visible(actor)]);
   if (error) throw new Error('Could not load contacts.');
-  const { data: counts } = await db.from('mjengo_contact_access').select('contact_id');
-  const shared = new Map<string, number>();
-  for (const c of (counts ?? []) as { contact_id: string }[]) shared.set(c.contact_id, (shared.get(c.contact_id) ?? 0) + 1);
+  const { data: counts } = await db.from('mjengo_contact_access').select('contact_id, user_id');
+  const shared = new Map<string, string[]>();
+  for (const c of (counts ?? []) as { contact_id: string; user_id: string }[]) shared.set(c.contact_id, [...(shared.get(c.contact_id) ?? []), c.user_id]);
   return ((data ?? []) as Record<string, unknown>[]).map((r) => shape(r, actor, v.access, shared, v.oversight)).filter((r): r is ContactRow => !!r);
 }
 
@@ -113,7 +116,7 @@ async function saveContact_(id: string | null, v: ContactInput): Promise<Contact
     throw new Error('Could not save the contact.');
   }
   await logAudit({ actorId: actor.id, actorEmail: actor.email, action: id ? 'contact.updated' : 'contact.created', targetType: 'contact', targetId: data.id, targetLabel: data.name });
-  return { ...(data as unknown as ContactRow), mine: 'owner', sharedWith: 0 };
+  return { ...(data as unknown as ContactRow), mine: 'owner', sharedWith: 0, everyone: ((data as { visibility?: string }).visibility ?? 'team') === 'team', people: [actor.id] };
 }
 
 async function deleteContact_(id: string) {

@@ -1,4 +1,5 @@
 "use client";
+import { AvatarStack, useTeam } from "../_components/People";
 
 import { R, fromCache, fresh, held } from "@/lib/client/resources";
 import { SHARE_EMAIL_UI } from "@/lib/client/flags";
@@ -103,6 +104,7 @@ export default function ContactsPage() {
 	const [importTag, setImportTag] = useState("");
 	const [tag, setTag] = useState<string | null>(null);
 	const [sharing, setSharing] = useState<ContactRow | null>(null);
+	const team = useTeam();
 
 	const load = useCallback(async (term: string) => {
 		try { const r = R.contacts(term); const h = held(r); if (h) setRows(h); setRows(await fresh(r)); } catch (e) { setRows([]); toast({ title: "Could not load contacts", description: e instanceof Error ? e.message : undefined, variant: "destructive" }); }
@@ -220,6 +222,7 @@ export default function ContactsPage() {
 									</p>
 									{c.tags.length > 0 && <p className="mt-1 flex flex-wrap gap-1">{c.tags.map((t) => <button key={t} onClick={() => setTag(t)} className="rounded-full bg-sauti-teal-light/60 px-2 py-0.5 text-[10px] font-medium text-sauti-dark hover:bg-sauti-teal-light">{t}</button>)}</p>}
 								</div>
+								<span className="hidden sm:flex"><AvatarStack ids={c.everyone ? team.map((t) => t.id) : c.people} team={team} max={3} /></span>
 								<button type="button" onClick={() => setSharing(c)} title={c.visibility === "private" ? `Only the people it is shared with${c.sharedWith ? ` (${c.sharedWith})` : ""}` : "Everyone on the team"} className={cn("hidden items-center gap-1 rounded-full px-2 py-0.5 text-[11px] sm:flex", c.visibility === "private" ? "bg-amber-50 text-amber-800" : "bg-serene-neutral-100 text-serene-neutral-600")}>
 									{c.visibility === "private" ? <Lock className="h-3 w-3" /> : <Globe className="h-3 w-3" />}{c.visibility === "private" ? `Shared with ${c.sharedWith}` : "Team"}
 								</button>

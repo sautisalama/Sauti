@@ -206,6 +206,10 @@ export async function listEntities(kind: Kind): Promise<EntityRow[]> {
     isSuperAdminEmail(actor.email),
     db.from('mjengo_entity_access').select('entity_type, entity_id, level').eq('user_id', actor.id).eq('entity_type', kind),
   ]);
+  // Everyone who has been given access, for the overlapping photos on each card.
+  const { data: everyAccess } = await db.from('mjengo_entity_access').select('entity_id, user_id').eq('entity_type', kind);
+  const grantedTo = new Map<string, string[]>();
+  for (const g of (everyAccess ?? []) as { entity_id: string; user_id: string }[]) grantedTo.set(g.entity_id, [...(grantedTo.get(g.entity_id) ?? []), g.user_id]);
   const access = new Map(((acc ?? []) as { entity_type: string; entity_id: string; level: 'view' | 'edit' }[]).map((r) => [`${r.entity_type}:${r.entity_id}`, r.level]));
   const all = (data ?? []) as { id: string; created_by: string | null; visibility?: string; hidden_fields?: string[] }[];
   const shaped: Record<string, unknown>[] = [];
@@ -214,6 +218,9 @@ export async function listEntities(kind: Kind): Promise<EntityRow[]> {
     if (!mine) continue;
     const hidden = mine === 'owner' || oversight ? [] : (r.hidden_fields ?? []);
     const out: Record<string, unknown> = { ...r, _mine: mine };
+    // Open to the team: everyone has it. Restricted: its owner and the people it was shared with.
+    out._everyone = r.visibility !== 'restricted';
+    out._people = [...new Set([r.created_by, (r as { owner_id?: string | null }).owner_id, (r as { lead_id?: string | null }).lead_id, ...(grantedTo.get(r.id) ?? [])].filter(Boolean) as string[])];
     for (const k of hidden) out[k] = null;
     out._hidden = hidden;
     shaped.push(out);

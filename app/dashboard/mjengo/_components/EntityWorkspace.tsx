@@ -28,7 +28,7 @@ import { DocumentsPanel } from "./DocumentsPanel";
 import { ApplicationStudio } from "./ApplicationStudio";
 import { OpportunityVerifyCard } from "./OpportunityVerify";
 import { GrantCharts, type GrantLite } from "./GrantCharts";
-import { Avatars, DeadlineChip, STATUSES, StatusPill, money, type Kind } from "./shared";
+import { Avatars, accessIds, DeadlineChip, STATUSES, StatusPill, money, type Kind } from "./shared";
 import { EntityAccessPanel, FellowshipAssignments } from "./EntityExtras";
 import { EntityTimeline } from "./EntityTimeline";
 import { EntityTasks } from "./EntityTasks";
@@ -753,7 +753,7 @@ export function EntityWorkspace({ kind, pageId }: { kind: Kind; pageId?: string 
 									<StatusPill kind={kind} value={r.status} />
 									{cfg.amountKey && <span className="w-24 text-right text-sm tabular-nums text-serene-neutral-700">{money(r[cfg.amountKey], r.currency)}</span>}
 									<DeadlineChip date={r[dueKey(kind)]} done={["awarded", "declined", "closed", "won", "lost", "passed", "completed", "cancelled"].includes(r.status)} />
-									<Avatars ids={[...new Set([r[ownerKey(kind)], r.created_by].filter(Boolean))] as string[]} admins={admins} />
+									<Avatars ids={accessIds(r, admins)} admins={admins} />
 									{r.docs.missing > 0 && <span className="inline-flex items-center gap-1 text-xs font-medium text-amber-700"><FileWarning className="h-3.5 w-3.5" />{r.docs.missing}</span>}
 								</button>
 							</li>
@@ -820,7 +820,7 @@ function Card({ fullHref, kind, r, admins, onOpen, onDragStart, onDragEnd, dragg
 				{r.docs.missing > 0 && <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800"><FileWarning className="h-3 w-3" />{r.docs.missing} doc{r.docs.missing === 1 ? "" : "s"} needed</span>}
 				{r.openTodos > 0 && <span className="inline-flex items-center gap-1 rounded-full bg-sauti-teal-light px-2 py-0.5 text-xs font-medium text-sauti-dark"><CheckSquare className="h-3 w-3" />{r.openTodos}</span>}
 			</div>
-			<div className="mt-2"><Avatars ids={[...new Set([r[ownerKey(kind)], r.created_by].filter(Boolean))] as string[]} admins={admins} /></div>
+			<div className="mt-2"><Avatars ids={accessIds(r, admins)} admins={admins} /></div>
 		</div>
 	);
 }

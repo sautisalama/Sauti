@@ -50,7 +50,7 @@ export default function VaultPage() {
 	const [removing, setRemoving] = useState<VaultItem | null>(null);
 	const [trashOpen, setTrashOpen] = useState(false);
 	/** A recent file as the same kind of item the lists use, so it gets the same actions menu. */
-	const recentItem = (r: { id: string; name: string; size: number; driveLink: string | null; level: VaultItem["level"]; ownerId: string; mime: string | null; opened: string }): VaultItem => ({ type: "file", id: r.id, name: r.name, level: r.level, ownerId: r.ownerId, ownerName: "", shared: false, general: "restricted", size: r.size, mime: r.mime, driveLink: r.driveLink, updatedAt: r.opened, people: [r.ownerId] });
+	const recentItem = (r: { id: string; name: string; size: number; driveLink: string | null; level: VaultItem["level"]; ownerId: string; mime: string | null; opened: string; people: string[] }): VaultItem => ({ type: "file", id: r.id, name: r.name, level: r.level, ownerId: r.ownerId, ownerName: "", shared: r.people.length > 1, general: "restricted", size: r.size, mime: r.mime, driveLink: r.driveLink, updatedAt: r.opened, people: r.people });
 	const [uploads, setUploads] = useState<{ name: string; pct: number; error?: string }[]>([]);
 	const fileInput = useRef<HTMLInputElement>(null);
 	const pdfInput = useRef<HTMLInputElement>(null);
@@ -301,7 +301,7 @@ export default function VaultPage() {
 											<span className="hidden truncate text-sm text-serene-neutral-500 sm:block">{r.location}</span>
 											<span className="text-right text-sm text-serene-neutral-500">{formatDistanceToNow(new Date(r.opened), { addSuffix: true })}</span>
 										</button>
-										<span className="shrink-0 pr-2">{rowMenu(recentItem(r))}</span>
+										<span className="hidden shrink-0 sm:block">{r.people.length > 1 && <AvatarStack ids={r.people} team={team} max={3} />}</span><span className="shrink-0 pr-2">{rowMenu(recentItem(r))}</span>
 									</li>
 								))}
 							</ul>

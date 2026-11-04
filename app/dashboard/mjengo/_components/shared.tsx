@@ -100,6 +100,12 @@ export function DeadlineChip({ date, done = false, className }: { date: string |
 	);
 }
 
+/** Who has access to a card: the whole team when it is open to everyone, otherwise the owner and those it was shared with. */
+export function accessIds(r: Record<string, unknown>, admins: { id: string }[]): string[] {
+	if (r._everyone) return admins.map((a) => a.id);
+	return Array.isArray(r._people) ? (r._people as string[]) : [];
+}
+
 export function Avatars({ ids, admins, max = 3 }: { ids: string[]; admins: { id: string; name: string; avatar: string | null }[]; max?: number }) {
 	const people = ids.map((id) => admins.find((a) => a.id === id)).filter(Boolean) as { id: string; name: string; avatar: string | null }[];
 	if (!people.length) return <span className="text-xs text-serene-neutral-400">Unassigned</span>;
