@@ -1,0 +1,31 @@
+# CodeRabbit reviews pull requests for mistakes and unclear code. Security scanning is left to Semgrep and
+# Dependabot (one list on GitHub's Security tab), so its own scanners are off to avoid saying the same thing twice.
+language: en-GB
+early_access: false
+reviews:
+  profile: chill
+  high_level_summary: true
+  poem: false
+  review_status: false
+  collapse_walkthrough: true
+  auto_review:
+    enabled: true
+    drafts: false
+    base_branches: ["main"]
+  path_filters:
+    - "!**/package-lock.json"
+    - "!supabase/migrations/**"
+    - "!.trail/**"
+    - "!docs/**"
+  path_instructions:
+    - path: "app/actions/**"
+      instructions: "Server actions run with the service role. Check that each one confirms who is asking and what they may do before it reads or changes anything."
+    - path: "supabase/**"
+      instructions: "Changes to the database must be additive so older code keeps working while a release rolls out."
+  tools:
+    semgrep:
+      enabled: false
+    gitleaks:
+      enabled: false
+chat:
+  auto_reply: true

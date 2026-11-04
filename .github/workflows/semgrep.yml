@@ -1,0 +1,30 @@
+name: semgrep
+# Static security scan. Results go to GitHub's Security tab (Code scanning), the same place as Dependabot's
+# vulnerability alerts, so there is one list to look at.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: "0 4 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    container:
+      image: semgrep/semgrep:latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Scan
+        run: semgrep scan --config p/default --config p/typescript --config p/nextjs --config p/secrets --sarif --output semgrep.sarif --metrics off --quiet
+      - name: Send results to the Security tab
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: semgrep.sarif
+          category: semgrep
