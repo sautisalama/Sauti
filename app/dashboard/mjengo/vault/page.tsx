@@ -309,12 +309,17 @@ export default function VaultPage() {
 					) : (
 						<div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
 							{hub.recent.map((r) => (
-								<div key={r.id} className="relative"><span className="absolute right-1 top-1 z-10">{rowMenu(recentItem(r))}</span>
-								<button onClick={() => open({ type: "file", id: r.id, name: r.name } as VaultItem)} className="flex flex-col items-center gap-2 rounded-2xl border border-serene-neutral-200/70 bg-white p-4 text-center transition hover:border-sauti-teal/40 hover:shadow-sm">
-									<TypeIcon name={r.name} big />
-									<span className="line-clamp-2 w-full break-words text-sm font-medium text-serene-neutral-900">{r.name}</span>
-									<span className="text-xs text-serene-neutral-500">{formatDistanceToNow(new Date(r.opened), { addSuffix: true })}</span>
-								</button></div>
+								<div key={r.id} className="group relative">
+									<button onClick={() => open({ type: "file", id: r.id, name: r.name } as VaultItem)} className="flex h-full min-h-[11rem] w-full flex-col items-center rounded-2xl border border-serene-neutral-200/70 bg-white p-4 text-center transition hover:border-sauti-teal/40 hover:shadow-sm">
+										<span className="flex h-16 items-center justify-center"><TypeIcon name={r.name} big /></span>
+										<span className="mt-2 line-clamp-2 min-h-[2.5rem] w-full break-words text-sm font-medium text-serene-neutral-900">{r.name}</span>
+										<span className="mt-auto flex w-full items-center justify-center gap-2 pt-2 text-xs text-serene-neutral-500">
+											<span className="truncate">{formatDistanceToNow(new Date(r.opened), { addSuffix: true })}</span>
+											{r.people.length > 1 && <AvatarStack ids={r.people} team={team} max={3} />}
+										</span>
+									</button>
+									<span className="absolute right-1.5 top-1.5 z-10">{rowMenu(recentItem(r))}</span>
+								</div>
 							))}
 						</div>
 					)}
