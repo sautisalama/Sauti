@@ -623,11 +623,13 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 		setHandUp(next);
 		pushState({ hand: next });
 	};
-	const toggleShare = async () => {
-		toggleShareRef.current = toggleShare;
+	const toggleShare = async (from?: Window) => {
+		toggleShareRef.current = () => toggleShare();
 		if (sharing) return stopShare();
 		try {
-			const screen = await navigator.mediaDevices.getDisplayMedia({ video: true });
+			// A click in the floating window counts for that window, so it is the one that asks for the screen.
+			const nav = from && !from.closed ? from.navigator : navigator;
+			const screen = await nav.mediaDevices.getDisplayMedia({ video: true });
 			const track = screen.getVideoTracks()[0];
 			await replaceVideo(track);
 			screenStream.current = screen;
@@ -666,6 +668,20 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 		}
 	};
 	useEffect(() => () => { try { pipWin?.close(); } catch { /* already closed */ } }, [pipWin]);
+	// Pictures moved to another window, or a page that went to the background, can be paused by the browser.
+	// Every few seconds anything that has a stream but is not playing is started again, so no one's video freezes.
+	useEffect(() => {
+		if (!joined) return;
+		const wake = () => {
+			for (const d of [document, ...(pipRef.current && !pipRef.current.closed ? [pipRef.current.document] : [])]) {
+				d.querySelectorAll<HTMLVideoElement>("video").forEach((v) => { if (v.srcObject && v.paused && !v.ended) void v.play().catch(() => undefined); });
+			}
+		};
+		const t = setInterval(wake, 2000);
+		document.addEventListener("visibilitychange", wake);
+		wake();
+		return () => { clearInterval(t); document.removeEventListener("visibilitychange", wake); };
+	}, [joined, pipWin]);
 	// The corner window shrinks to a small bar while the call is in its own window.
 	useEffect(() => { if (inSuite) callStore.setPip(!!pipWin); }, [inSuite, pipWin]);
 
@@ -1491,7 +1507,7 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 					<Ctl onClick={toggleCam} label={camOn ? "Turn off camera" : "Turn on camera"} icon={camOn ? <Video className="h-5 w-5" /> : <VideoOff className="h-5 w-5" />} danger={!camOn} />
 					<Ctl onClick={() => setCaptionsOn((v) => !v)} label={captionsOn ? "Turn off captions" : "Turn on captions"} icon={<Captions className="h-5 w-5" />} active={captionsOn} className="hidden md:flex" />
 					<Ctl onClick={toggleHand} label={handUp ? "Lower hand" : "Raise hand"} icon={<Hand className="h-5 w-5" />} active={handUp} className="hidden md:flex" />
-					<Ctl onClick={toggleShare} label={sharing ? "Stop presenting" : "Present now"} icon={<MonitorUp className="h-5 w-5" />} active={sharing} className="hidden md:flex" />
+					<Ctl onClick={() => void toggleShare()} label={sharing ? "Stop presenting" : "Present now"} icon={<MonitorUp className="h-5 w-5" />} active={sharing} className="hidden md:flex" />
 					<div className="relative hidden md:block">
 						<Ctl onClick={() => setA11yOpen((v) => !v)} label="Accessibility" icon={<Accessibility className="h-5 w-5" />} active={a11yOpen || a11y.contrast || a11y.size !== "md" || a11y.reduceMotion} />
 						{a11yOpen && (
@@ -1560,6 +1576,7 @@ export function MeetRoom({ code, mode, title, defaultName, canSave, embedded, de
 					<div className="flex shrink-0 items-center justify-center gap-2 bg-[#191919] pb-2 pt-1">
 						<Ctl onClick={toggleMic} label={micOn ? "Turn off the microphone" : "Turn on the microphone"} icon={micOn ? <Mic className="h-5 w-5" /> : <MicOff className="h-5 w-5" />} danger={!micOn} />
 						<Ctl onClick={toggleCam} label={camOn ? "Turn off the camera" : "Turn on the camera"} icon={camOn ? <Video className="h-5 w-5" /> : <VideoOff className="h-5 w-5" />} danger={!camOn} />
+						<Ctl onClick={() => void toggleShare(pipWin)} label={sharing ? "Stop presenting" : "Share your screen"} icon={<MonitorUp className="h-5 w-5" />} active={sharing} />
 						<Ctl onClick={() => pipWin.close()} label="Bring the call back to the page" icon={<Maximize2 className="h-5 w-5" />} />
 						<button onClick={() => { pipWin.close(); leave(); }} aria-label="Leave call" title="Leave call" className="flex h-12 w-16 items-center justify-center rounded-full bg-[#ea4335] hover:bg-[#d93025]"><PhoneOff className="h-5 w-5" /></button>
 					</div>

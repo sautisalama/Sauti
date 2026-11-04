@@ -41,7 +41,7 @@ async function stamps(): Promise<Map<string, { type: SourceType; id: string; tit
   const out = new Map<string, { type: SourceType; id: string; title: string; stamp: string }>();
   const put = (type: SourceType, id: string, title: string, stamp: string) => out.set(`${type}:${id}`, { type, id, title, stamp: sha(`${type}|${id}|${title}|${stamp}`) });
   const [files, meets, todos, events, ...ents] = await Promise.all([
-    db.from('vault_files').select('id, name, size, updated_at'),
+    db.from('vault_files').select('id, name, size, updated_at').is('deleted_at', null),
     db.from('mjengo_meetings').select('code, title, notes, ended_at, notes_shared_at, created_at').order('created_at', { ascending: false }).limit(400),
     db.from('mjengo_todos').select('id, title, updated_at'),
     db.from('mjengo_events').select('id, title, description, starts_at'),

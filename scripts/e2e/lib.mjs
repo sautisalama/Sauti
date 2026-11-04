@@ -27,6 +27,8 @@ export async function launch() {
 
 export async function newPage(browser, opts = {}) {
 	const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 }, permissions: ["microphone", "geolocation"], geolocation: { latitude: -1.2921, longitude: 36.8219 }, ...opts });
+	// The suite's first-visit set-up prompt is snoozed so it does not cover other screens (its own test clears this).
+	await ctx.addInitScript(() => { try { if (!localStorage.getItem("ss_suite_welcome_until")) localStorage.setItem("ss_suite_welcome_until", String(Date.now() + 7 * 864e5)); } catch {} });
 	const page = await ctx.newPage();
 	page.setDefaultTimeout(45000);
 	page.errors = [];

@@ -4,6 +4,8 @@ import { BASE, check, launch, newPage, signIn, summary } from "../lib.mjs";
 
 const browser = await launch();
 const page = await newPage(browser, {});
+// The shared helper snoozes the prompt; this test is about the prompt, so clear it once at the start.
+await page.addInitScript(() => { try { if (!sessionStorage.getItem("e2e_cleared")) { sessionStorage.setItem("e2e_cleared", "1"); localStorage.removeItem("ss_suite_welcome_until"); } } catch {} });
 try {
 	await signIn(page, "admin");
 	await page.goto(`${BASE}/dashboard/mjengo`, { waitUntil: "domcontentloaded" });

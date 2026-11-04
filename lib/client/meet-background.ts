@@ -10,7 +10,7 @@ export type BackgroundMode =
 	| { kind: "blur"; amount: number }
 	| { kind: "color"; a: string; b?: string }
 	| { kind: "image"; src: string; fit?: PhotoFit };
-export type PhotoFit = "fill" | "fit" | "grid";
+export type PhotoFit = "fill" | "grid";
 
 const VERSION = "1.2.0";
 const WASM = `https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${VERSION}/wasm`;
@@ -162,7 +162,6 @@ export class BackgroundProcessor {
 		} else if (this.bg) {
 			const fit = mode.kind === "image" ? mode.fit ?? "fill" : "fill";
 			if (fit === "grid") grid(g, this.bg, w, h);
-			else if (fit === "fit") contain(g, this.bg, w, h);
 			else cover(g, this.bg, w, h);
 		} else {
 			g.fillStyle = "#1B232B";
@@ -210,24 +209,12 @@ function cover(g: CanvasRenderingContext2D, i: HTMLImageElement, w: number, h: n
 	g.drawImage(i, (w - dw) / 2, (h - dh) / 2, dw, dh);
 }
 
-/** The picture shown whole, with a soft blown-up copy of it filling the sides. */
-function contain(g: CanvasRenderingContext2D, i: HTMLImageElement, w: number, h: number) {
-	g.save();
-	g.filter = "blur(24px) brightness(0.7)";
-	cover(g, i, w, h);
-	g.restore();
-	const r = Math.min(w / i.naturalWidth, h / i.naturalHeight);
-	const dw = i.naturalWidth * r;
-	const dh = i.naturalHeight * r;
-	g.drawImage(i, (w - dw) / 2, (h - dh) / 2, dw, dh);
-}
-
-/** The picture repeated as a grid of six, with a thin gap between. */
+/** The picture repeated three across and three down, edge to edge. */
 function grid(g: CanvasRenderingContext2D, i: HTMLImageElement, w: number, h: number) {
 	g.fillStyle = "#1B232B";
 	g.fillRect(0, 0, w, h);
 	const cols = 3;
-	const rows = 2;
+	const rows = 3;
 	const gap = 6;
 	const cw = (w - gap * (cols + 1)) / cols;
 	const ch = (h - gap * (rows + 1)) / rows;
@@ -292,7 +279,8 @@ function parsePrefs(raw: { mode?: { kind?: string; amount?: number; a?: string; 
 	} catch { return DEFAULT_PREFS; }
 }
 
-const asFit = (v: unknown): PhotoFit => (v === "fit" || v === "grid" ? v : "fill");
+// "fit" was an option once; those choices now show as a fill.
+const asFit = (v: unknown): PhotoFit => (v === "grid" ? "grid" : "fill");
 
 /** Everything except the pictures themselves, in the form that is stored; a chosen picture is its place in the list. */
 export function toSettings(p: BackgroundPrefs, photos = p.photos) {

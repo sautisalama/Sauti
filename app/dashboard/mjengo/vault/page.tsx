@@ -4,6 +4,7 @@ import { R, fromCache, fresh, held } from "@/lib/client/resources";
 import { tagBrandGuidelines } from "@/app/actions/mjengo-brand";
 import { MjengoLoader } from "../_components/MjengoLoader";
 import { ShareDialog } from "../_components/ShareDialog";
+import { TrashDialog } from "./TrashDialog";
 import { DriveResult, saveToDrive } from "../_components/drive";
 import { AvatarStack, DriveBadge, useTeam } from "../_components/People";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -47,6 +48,9 @@ export default function VaultPage() {
 	const [rename, setRename] = useState<VaultItem | null>(null);
 	const [share, setShare] = useState<VaultItem | null>(null);
 	const [removing, setRemoving] = useState<VaultItem | null>(null);
+	const [trashOpen, setTrashOpen] = useState(false);
+	/** A recent file as the same kind of item the lists use, so it gets the same actions menu. */
+	const recentItem = (r: { id: string; name: string; size: number; driveLink: string | null; level: VaultItem["level"]; ownerId: string; mime: string | null; opened: string }): VaultItem => ({ type: "file", id: r.id, name: r.name, level: r.level, ownerId: r.ownerId, ownerName: "", shared: false, general: "restricted", size: r.size, mime: r.mime, driveLink: r.driveLink, updatedAt: r.opened, people: [r.ownerId] });
 	const [uploads, setUploads] = useState<{ name: string; pct: number; error?: string }[]>([]);
 	const fileInput = useRef<HTMLInputElement>(null);
 	const pdfInput = useRef<HTMLInputElement>(null);
@@ -235,6 +239,9 @@ export default function VaultPage() {
 						</button>
 					))}
 				</div>
+				<button onClick={() => setTrashOpen(true)} title="Deleted files stay for 21 days" className="flex touch-manipulation items-center gap-1.5 rounded-lg border border-serene-neutral-200 bg-white px-3 py-1.5 text-xs font-semibold text-serene-neutral-600 hover:bg-serene-neutral-50">
+					<Trash2 className="h-3.5 w-3.5" /> Trash
+				</button>
 				{tab === "mine" && (
 					<button onClick={() => setSharedOnly((v) => !v)} aria-pressed={sharedOnly} title="Only what you have shared with others. Open one and press Manage beside a person to change or remove their access." className={cn("flex touch-manipulation items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold", sharedOnly ? "border-sauti-teal bg-sauti-teal-light text-sauti-teal" : "border-serene-neutral-200 bg-white text-serene-neutral-600 hover:bg-serene-neutral-50")}>
 						<Users className="h-3.5 w-3.5" /> Shared by me
@@ -288,12 +295,13 @@ export default function VaultPage() {
 							<div className="hidden grid-cols-[1fr_200px_160px] gap-3 border-b border-serene-neutral-100 px-4 py-2 text-xs font-semibold text-serene-neutral-500 sm:grid"><span>File name</span><span>Location</span><span className="text-right">Last opened</span></div>
 							<ul className="divide-y divide-serene-neutral-50">
 								{hub.recent.map((r) => (
-									<li key={r.id}>
-										<button onClick={() => open({ type: "file", id: r.id, name: r.name } as VaultItem)} className="grid w-full grid-cols-[1fr_auto] items-center gap-3 px-4 py-3 text-left hover:bg-serene-neutral-50/70 sm:grid-cols-[1fr_200px_160px]">
+									<li key={r.id} className="flex items-center">
+										<button onClick={() => open({ type: "file", id: r.id, name: r.name } as VaultItem)} className="grid min-w-0 flex-1 grid-cols-[1fr_auto] items-center gap-3 px-4 py-3 text-left hover:bg-serene-neutral-50/70 sm:grid-cols-[1fr_200px_160px]">
 											<span className="flex min-w-0 items-center gap-3"><TypeIcon name={r.name} /><span className="truncate text-sm font-medium text-serene-neutral-900">{r.name}</span>{r.driveLink && <DriveBadge href={r.driveLink} />}</span>
 											<span className="hidden truncate text-sm text-serene-neutral-500 sm:block">{r.location}</span>
 											<span className="text-right text-sm text-serene-neutral-500">{formatDistanceToNow(new Date(r.opened), { addSuffix: true })}</span>
 										</button>
+										<span className="shrink-0 pr-2">{rowMenu(recentItem(r))}</span>
 									</li>
 								))}
 							</ul>
@@ -301,11 +309,12 @@ export default function VaultPage() {
 					) : (
 						<div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
 							{hub.recent.map((r) => (
-								<button key={r.id} onClick={() => open({ type: "file", id: r.id, name: r.name } as VaultItem)} className="flex flex-col items-center gap-2 rounded-2xl border border-serene-neutral-200/70 bg-white p-4 text-center transition hover:border-sauti-teal/40 hover:shadow-sm">
+								<div key={r.id} className="relative"><span className="absolute right-1 top-1 z-10">{rowMenu(recentItem(r))}</span>
+								<button onClick={() => open({ type: "file", id: r.id, name: r.name } as VaultItem)} className="flex flex-col items-center gap-2 rounded-2xl border border-serene-neutral-200/70 bg-white p-4 text-center transition hover:border-sauti-teal/40 hover:shadow-sm">
 									<TypeIcon name={r.name} big />
 									<span className="line-clamp-2 w-full break-words text-sm font-medium text-serene-neutral-900">{r.name}</span>
 									<span className="text-xs text-serene-neutral-500">{formatDistanceToNow(new Date(r.opened), { addSuffix: true })}</span>
-								</button>
+								</button></div>
 							))}
 						</div>
 					)}
@@ -516,19 +525,21 @@ export default function VaultPage() {
 			<Dialog open={!!removing} onOpenChange={(o) => !o && setRemoving(null)}>
 				<DialogContent>
 					<DialogHeader>
-						<DialogTitle>Delete “{removing?.name}”?</DialogTitle>
-						<DialogDescription>{removing?.type === "folder" ? "Everything inside it is deleted too, for everyone it was shared with." : "It is deleted for everyone it was shared with."} This cannot be undone.</DialogDescription>
+						<DialogTitle>Move “{removing?.name}” to the trash?</DialogTitle>
+						<DialogDescription>{removing?.type === "folder" ? "Everything inside it goes too, for everyone it was shared with." : "It goes for everyone it was shared with."} You can restore it from the Trash for 21 days; after that it is deleted for good.</DialogDescription>
 					</DialogHeader>
 					<DialogFooter>
 						<Button variant="outline" onClick={() => setRemoving(null)}>Cancel</Button>
 						<Button className="bg-red-600 hover:bg-red-700" disabled={busy} onClick={async () => {
 							if (!removing) return;
 							setBusy(true);
-							try { await deleteItem(removing.type, removing.id); setRemoving(null); load(); } catch (e) { fail("Could not delete", e); } finally { setBusy(false); }
-						}}>Delete</Button>
+							try { await deleteItem(removing.type, removing.id); setRemoving(null); load(); void loadHub(); } catch (e) { fail("Could not delete", e); } finally { setBusy(false); }
+						}}>Move to trash</Button>
 					</DialogFooter>
 				</DialogContent>
 			</Dialog>
+
+			<TrashDialog open={trashOpen} onClose={() => setTrashOpen(false)} onChanged={() => { load(); void loadHub(); }} />
 
 			<ShareDialog item={share} onClose={() => { setShare(null); load(); }} />
 		</div>

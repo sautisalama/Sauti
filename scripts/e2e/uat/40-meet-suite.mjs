@@ -87,6 +87,7 @@ try {
 	const stored = await host.evaluate(() => JSON.parse(localStorage.getItem("ss_meet_bg_v2") || "null"));
 	await host.getByRole("button", { name: "Grid", exact: true }).click();
 	check("A photo can be laid out as a grid", (await host.getByRole("button", { name: "Grid", exact: true }).getAttribute("aria-pressed")) === "true");
+	check("Only Fill and Grid are offered", (await host.getByRole("button", { name: "Fit", exact: true }).count()) === 0 && (await host.getByRole("button", { name: "Fill", exact: true }).count()) === 1);
 	check("Photo is saved shrunk and small", !!stored && stored.photos.length === 1 && stored.photos[0].startsWith("data:image/") && stored.photos[0].length < 120_000);
 	check("The choices are remembered (mode, blur, colour)", stored?.mode?.kind === "image" && stored.blur === 80 && stored.color.gradient === true);
 
@@ -171,6 +172,7 @@ try {
 	await phone.goto(`${BASE}/meet/${code}`, { waitUntil: "domcontentloaded" });
 	await phone.getByPlaceholder("How should people see you?").fill("Host Tester");
 	// A brand new device on the same account: the photo saved earlier comes from the account.
+	await phone.getByRole("button", { name: "Photo settings" }).waitFor({ timeout: 20000 }).catch(async () => { await phone.screenshot({ path: process.env.SHOTS + "/phone-no-gear.png" }); });
 	await phone.getByRole("button", { name: "Photo settings" }).click();
 	await phone.getByRole("button", { name: "Photo 1", exact: true }).waitFor({ timeout: 20000 });
 	check("Saved photos follow the account to another device", true);
@@ -207,6 +209,7 @@ try {
 
 	// /meet: Start now opens the call directly.
 	// Leave first: the suite keeps a call you are in running across pages.
+	await host.screenshot({ path: process.env.SHOTS + "/host-before-leave.png" }).catch(() => undefined);
 	await host.getByRole("button", { name: "Leave call" }).click();
 	await host.getByRole("button", { name: "Leave, the call goes on" }).click();
 	await host.waitForFunction(() => !/^\/meet\/[a-z0-9-]{12}/.test(location.pathname), null, { timeout: 40000 });

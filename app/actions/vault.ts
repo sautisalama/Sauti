@@ -13,6 +13,7 @@ import {
 
 import { driveToken, updateFileContent } from '@/lib/google-drive';
 import { sendAccessEmail } from '@/lib/mjengo/invite-email';
+import { TRASH_DAYS as DAYS, eraseTrashed, purgeExpired } from '@/lib/vault/trash';
 
 const BUCKET = 'mjengo-docs';
 const MAX_BYTES = 50 * 1024 * 1024;
@@ -164,28 +165,127 @@ async function renameItem_(type: ResType, id: string, name: string) {
   await logAudit({ actorId: c.actor.id, actorEmail: c.actor.email, action: 'vault.renamed', targetType: `vault_${type}`, targetId: id, targetLabel: n });
 }
 
+
+export interface TrashItem {
+  type: ResType;
+  id: string;
+  name: string;
+  size?: number;
+  deletedAt: string;
+  /** Days left before it is removed for good. */
+  daysLeft: number;
+  /** Where it was, for orientation. */
+  location: string;
+  /** Number of things inside (folders). */
+  contains?: number;
+}
+
+/** Everything under a folder, trashed or not (the index used here includes the trash). */
+function inside(ix: Awaited<ReturnType<typeof loadIndex>>, folderId: string) {
+  return descendants(ix, folderId);
+}
+
+/** Deleting moves it to the trash, where it can be restored for 21 days. */
 async function deleteItem_(type: ResType, id: string) {
   const c = await ctx('owner');
   need(c, type, id, 'edit', 'delete it');
   const db = looseAdmin();
-  let paths: string[] = [];
+  const now = new Date().toISOString();
   let label = '';
   if (type === 'file') {
-    const f = c.ix.files.get(id);
-    paths = f ? [f.storage_path] : [];
-    label = f?.name ?? '';
+    label = c.ix.files.get(id)?.name ?? '';
+    await db.from('vault_files').update({ deleted_at: now, deleted_by: c.actor.id, deleted_root: true }).eq('id', id);
   } else {
     const d = descendants(c.ix, id);
     // Deleting a folder deletes what is inside, so you must be able to edit every part of it.
     for (const sub of d.folders) if (!atLeast(lvl(c, 'folder', sub), 'edit')) throw new Error('This folder contains items you cannot delete.');
     for (const f of d.files) if (!atLeast(lvl(c, 'file', f.id), 'edit')) throw new Error('This folder contains files you cannot delete.');
-    paths = d.files.map((f) => f.storage_path);
     label = c.ix.folders.get(id)?.name ?? '';
+    await db.from('vault_folders').update({ deleted_at: now, deleted_by: c.actor.id }).in('id', d.folders);
+    await db.from('vault_folders').update({ deleted_root: true }).eq('id', id);
+    if (d.files.length) await db.from('vault_files').update({ deleted_at: now, deleted_by: c.actor.id }).in('id', d.files.map((f) => f.id));
   }
-  if (paths.length) await db.storage.from(BUCKET).remove(paths);
-  await db.from(type === 'folder' ? 'vault_folders' : 'vault_files').delete().eq('id', id);
-  await db.from('vault_permissions').delete().eq('resource_type', type).eq('resource_id', id);
+  await logAudit({ actorId: c.actor.id, actorEmail: c.actor.email, action: 'vault.trashed', targetType: `vault_${type}`, targetId: id, targetLabel: label });
+}
+
+async function trashCtx() {
+  const actor = await requireModule('files', 'owner');
+  const [ix, oversight] = await Promise.all([loadIndex({ withTrashed: true }), oversightFor(actor.email)]);
+  return { actor, ix, oversight, names: new Map<string, string>() };
+}
+
+/** What you deleted (or could have deleted) in the last 21 days. Anything older is removed first. */
+async function listTrash_(): Promise<TrashItem[]> {
+  await purgeExpired();
+  const c = await trashCtx();
+  const out: TrashItem[] = [];
+  const left = (at: string) => Math.max(0, Math.ceil((new Date(at).getTime() + DAYS * 86_400_000 - Date.now()) / 86_400_000));
+  for (const f of c.ix.folders.values()) {
+    if (!f.deleted_at || !f.deleted_root) continue;
+    if (!atLeast(levelFor(c.ix, c.actor.id, 'folder', f.id, c.oversight), 'edit')) continue;
+    const d = inside(c.ix, f.id);
+    out.push({ type: 'folder', id: f.id, name: f.name, deletedAt: f.deleted_at, daysLeft: left(f.deleted_at), location: f.parent_id ? c.ix.folders.get(f.parent_id)?.name ?? 'Mine' : 'Mine', contains: d.files.length + d.folders.length - 1 });
+  }
+  for (const f of c.ix.files.values()) {
+    if (!f.deleted_at || !f.deleted_root) continue;
+    if (!atLeast(levelFor(c.ix, c.actor.id, 'file', f.id, c.oversight), 'edit')) continue;
+    out.push({ type: 'file', id: f.id, name: f.name, size: f.size, deletedAt: f.deleted_at, daysLeft: left(f.deleted_at), location: f.folder_id ? c.ix.folders.get(f.folder_id)?.name ?? 'Mine' : 'Mine' });
+  }
+  return out.sort((a, b) => b.deletedAt.localeCompare(a.deletedAt));
+}
+
+/** Bring something back where it was (to the top level if the folder it was in is gone or still in the trash). */
+async function restoreItem_(type: ResType, id: string) {
+  const c = await trashCtx();
+  need(c, type, id, 'edit', 'restore it');
+  const db = looseAdmin();
+  if (type === 'file') {
+    const f = c.ix.files.get(id);
+    if (!f?.deleted_at) throw new Error('That file is not in the trash.');
+    const parent = f.folder_id ? c.ix.folders.get(f.folder_id) : null;
+    await db.from('vault_files').update({ deleted_at: null, deleted_by: null, deleted_root: false, ...(parent && !parent.deleted_at ? {} : { folder_id: null }) }).eq('id', id);
+    await logAudit({ actorId: c.actor.id, actorEmail: c.actor.email, action: 'vault.restored', targetType: 'vault_file', targetId: id, targetLabel: f.name });
+    return;
+  }
+  const folder = c.ix.folders.get(id);
+  if (!folder?.deleted_at) throw new Error('That folder is not in the trash.');
+  const d = inside(c.ix, id);
+  const same = folder.deleted_at;
+  const folderIds = d.folders.filter((x) => c.ix.folders.get(x)?.deleted_at === same);
+  const fileIds = d.files.filter((x) => x.deleted_at === same).map((x) => x.id);
+  const parent = folder.parent_id ? c.ix.folders.get(folder.parent_id) : null;
+  await db.from('vault_folders').update({ deleted_at: null, deleted_by: null, deleted_root: false }).in('id', folderIds);
+  if (!parent || parent.deleted_at) await db.from('vault_folders').update({ parent_id: null }).eq('id', id);
+  if (fileIds.length) await db.from('vault_files').update({ deleted_at: null, deleted_by: null, deleted_root: false }).in('id', fileIds);
+  await logAudit({ actorId: c.actor.id, actorEmail: c.actor.email, action: 'vault.restored', targetType: 'vault_folder', targetId: id, targetLabel: folder.name });
+}
+
+/** Delete from the trash for good. */
+async function deleteForever_(type: ResType, id: string) {
+  const c = await trashCtx();
+  need(c, type, id, 'edit', 'delete it for good');
+  const node = type === 'file' ? c.ix.files.get(id) : c.ix.folders.get(id);
+  if (!node?.deleted_at) throw new Error('Only something in the trash can be deleted for good.');
+  const label = await eraseTrashed(c, type, id);
   await logAudit({ actorId: c.actor.id, actorEmail: c.actor.email, action: 'vault.deleted', targetType: `vault_${type}`, targetId: id, targetLabel: label });
+}
+
+/** Empty the trash: everything in it that you may delete. */
+async function emptyTrash_(): Promise<number> {
+  const c = await trashCtx();
+  let n = 0;
+  for (const f of c.ix.folders.values()) {
+    if (!f.deleted_at || !f.deleted_root || !atLeast(levelFor(c.ix, c.actor.id, 'folder', f.id, c.oversight), 'edit')) continue;
+    await eraseTrashed(c, 'folder', f.id);
+    n++;
+  }
+  for (const f of c.ix.files.values()) {
+    if (!f.deleted_at || !f.deleted_root || !atLeast(levelFor(c.ix, c.actor.id, 'file', f.id, c.oversight), 'edit')) continue;
+    await eraseTrashed(c, 'file', f.id);
+    n++;
+  }
+  await logAudit({ actorId: c.actor.id, actorEmail: c.actor.email, action: 'vault.trash_emptied', targetType: 'vault', targetLabel: `${n} items` });
+  return n;
 }
 
 async function getFileUrl_(id: string): Promise<{ url: string; name: string; level: Level; folderId: string | null; mime: string | null }> {
@@ -494,6 +594,10 @@ export const prepareUpload = guard(prepareUpload_);
 export const registerUpload = guard(registerUpload_);
 export const renameItem = guard(renameItem_);
 export const deleteItem = guard(deleteItem_);
+export const listTrash = guard(listTrash_);
+export const restoreItem = guard(restoreItem_);
+export const deleteForever = guard(deleteForever_);
+export const emptyTrash = guard(emptyTrash_);
 export const getFileUrl = guard(getFileUrl_);
 export const prepareReplace = guard(prepareReplace_);
 export const finishReplace = guard(finishReplace_);

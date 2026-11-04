@@ -56,7 +56,7 @@ export async function getPreview(kind: PreviewKind, id: string): Promise<Preview
 	}
 	if (kind === "doc") {
 		if (!UUID.test(id)) return null;
-		const { data } = await db.from("vault_files").select("name, owner_id, link_access").eq("id", id).maybeSingle();
+		const { data } = await db.from("vault_files").select("name, owner_id, link_access").eq("id", id).is("deleted_at", null).maybeSingle();
 		if (!data || (data.link_access !== "view" && data.link_access !== "edit")) return null;
 		const by = fullName(await person(data.owner_id));
 		return { label: data.link_access === "edit" ? "Shared document · can edit" : "Shared document", title: clip(String(data.name).replace(/\.[a-z0-9]{2,5}$/i, ""), 90), description: by ? `Shared with you by ${by} on Sauti Salama.` : "Shared with you on Sauti Salama.", image: null, round: false, accent: TEAL };

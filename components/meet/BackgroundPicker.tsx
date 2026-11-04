@@ -14,7 +14,7 @@ const css = (c: { a: string; b?: string }) => (c.b ? `linear-gradient(135deg, ${
 /**
  * What is behind you: a photo (first), one blur with its own amount, or a colour that can be single or a gradient.
  * The gear on each choice opens its settings. Choosing Photo with none saved asks for one; with some saved it uses
- * the latest, and the gear lets you change it or lay it out as a fill, a fit or a grid. Every choice and picture is
+ * the latest, and the gear lets you change it or lay it out as a fill or a 3 by 3 grid. Every choice and picture is
  * kept on this device and on the account, so it follows the person to any device.
  */
 export function BackgroundPicker({ bg, busy, note, onPick, light, onRestore }: { bg: BackgroundMode; busy: boolean; note: string; onPick: (m: BackgroundMode) => void; light?: boolean; onRestore?: (m: BackgroundMode) => void }) {
@@ -123,7 +123,7 @@ export function BackgroundPicker({ bg, busy, note, onPick, light, onRestore }: {
 			<span className={cn("mb-1 flex items-center gap-1.5 text-xs", light ? "text-[#5f6368]" : "text-white/70")}><Sparkles className="h-3.5 w-3.5" /> Background {(busy || adding) && <Loader2 className="h-3 w-3 animate-spin" />}</span>
 			<div className="flex gap-2 overflow-x-auto pb-1">
 				<div className="relative shrink-0">
-					<button type="button" disabled={busy} onClick={() => { if (!prefs.photos.length) { fileInput.current?.click(); return; } if (!isPhoto) pickPhoto(prefs.photos[0]); }} className={cn(tile(isPhoto), base)}><ImagePlus className="h-4 w-4" />Photo</button>
+					<button type="button" disabled={busy} onClick={() => { setOpen("photo"); if (!prefs.photos.length) { fileInput.current?.click(); return; } if (!isPhoto) pickPhoto(prefs.photos[0]); }} className={cn(tile(isPhoto), base)}><ImagePlus className="h-4 w-4" />Photo</button>
 					{gear("photo", "Photo")}
 				</div>
 				<div className="relative shrink-0">
@@ -184,7 +184,7 @@ export function BackgroundPicker({ bg, busy, note, onPick, light, onRestore }: {
 						<div className="mt-3">
 							<span className={label}>Show the picture as</span>
 							<div className="mt-1 inline-flex rounded-full border border-[#dadce0] p-0.5 text-xs" role="group" aria-label="Picture layout">
-								{([["fill", "Fill"], ["fit", "Fit"], ["grid", "Grid"]] as [PhotoFit, string][]).map(([f, t]) => (
+								{([["fill", "Fill"], ["grid", "Grid"]] as [PhotoFit, string][]).map(([f, t]) => (
 									<button key={f} type="button" onClick={() => setFit(f)} aria-pressed={prefs.fit === f} className={cn("rounded-full px-3 py-1 font-medium", prefs.fit === f ? "bg-[#068297] text-white" : light ? "text-[#3c4043] hover:bg-[#f1f3f4]" : "text-white/80 hover:bg-white/10")}>{t}</button>
 								))}
 							</div>
